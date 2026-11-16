@@ -171,16 +171,6 @@ def validate_file(
     git_root: str | None = None,
     spec_root: str | None = None,
 ) -> list[SpecError]:
-    # Clear the step-16 chain-up cache so long-lived processes that call
-    # validate_file repeatedly do not accumulate cached entries.  The cache's
-    # only role is deduplicating the 16c→16b→16a→base chain inside ONE
-    # artifact; entries from prior artifacts are never queried again because
-    # the cache key includes spec_path.  validate_dir already clears it once
-    # per run; this clear protects single-file callers (CLI ``validate``, IDE
-    # integrations, daemon-mode hosts).
-    from .validators.step_16 import _step16_cache
-    _step16_cache.clear()
-
     try:
         get_shared_registry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
@@ -284,14 +274,6 @@ def validate_file(
 def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None, git_root: str | None = None, spec_root: str | None = None) -> list[SpecError]:
     # Reset config to pick up any env var changes since last call
     reset_config()
-    # Clear the step-16 content-hash cache so long-lived processes do not
-    # accumulate entries across successive validate_dir invocations.  The cache
-    # is a correctness-neutral optimisation for chain-up (16c→16b→16a→base);
-    # keeping it across runs would leak memory without benefit because each
-    # validate_dir walks a fresh set of artifacts.
-    from .validators.step_16 import _step16_cache
-    _step16_cache.clear()
-
     # Early exit: no JSON spec artifacts anywhere under spec_dir means nothing
     # to validate.  Use ``iter_spec_artifacts`` so the guard matches the main
     # walk's exclusion rules (``samples/``, ``extras/``, ``migration_backups/``)
@@ -589,8 +571,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     #   via path regex. _refine_impl_context_substep(step, data) then promotes the step
     #   based on content:  non-empty review.verdict → "16c",  non-empty
     #   execution.execution_results → "16b",  else stays at "16a". Chain-up inside the
-    #   validators (16c→16b→16a→base) preserves downstream checks; _step16_cache
-    #   deduplicates the base pass so chain-up is O(1) in base work.
+    #   validators (16c→16b→16a→base) preserves downstream checks.
     "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
     "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
     "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),

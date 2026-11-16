@@ -17,7 +17,7 @@ from ._legacy_shim import (
     LEGACY_PLAN_EVIDENCE_FIELDS,
     LEGACY_ROADMAP_FR_REF_FIELDS,
     LEGACY_TRACE_FIELDS,
-    has_legacy_fields,
+    reader_on,
     is_parked_any_shape,
     out_of_scope_fr_ids,
 )
@@ -205,24 +205,24 @@ def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecErr
 def _api_reader_on(data: dict[str, Any]) -> bool:
     """W564 / E535 read the `trace` of the apis."""
     apis = data["apis"]
-    return not apis.get("apis") or has_legacy_fields([apis], LEGACY_TRACE_FIELDS)
+    return reader_on([apis], LEGACY_TRACE_FIELDS, entries=apis.get("apis"))
 
 
 def _fixture_reader_on(data: dict[str, Any]) -> bool:
     """W565 / E536 read the `targets` and `out_of_scope` of the fixtures."""
     fixtures = data["fixtures"]
-    return not fixtures.get("fixtures") or has_legacy_fields([fixtures], LEGACY_FIXTURE_COVERAGE_FIELDS)
+    return reader_on([fixtures], LEGACY_FIXTURE_COVERAGE_FIELDS, entries=fixtures.get("fixtures"))
 
 
 def _milestone_reader_on(data: dict[str, Any]) -> bool:
     """W561 / W566 read the `fr_refs` of the roadmap."""
     roadmap = data["roadmap"]
-    return not roadmap.get("milestones") or has_legacy_fields([roadmap], LEGACY_ROADMAP_FR_REF_FIELDS)
+    return reader_on([roadmap], LEGACY_ROADMAP_FR_REF_FIELDS, entries=roadmap.get("milestones"))
 
 
 def _capability_reader_on(data: dict[str, Any]) -> bool:
     """W568 reads the `trace` of the frs."""
-    return has_legacy_fields([data["frs"]], LEGACY_TRACE_FIELDS)
+    return reader_on([data["frs"]], LEGACY_TRACE_FIELDS, when_empty=False)
 
 
 def uncomputed_dimensions(spec_dir: str, repo_root: str | None = None) -> list[str]:
@@ -242,7 +242,7 @@ def uncomputed_dimensions(spec_dir: str, repo_root: str | None = None) -> list[s
         ("fr_milestone_coverage", "frs", "roadmap", _milestone_reader_on),
         ("capability_fr_coverage", "capabilities", "frs", _capability_reader_on),
     )
-    return [name for name, first, second, reader_on in checks if first in data and second in data and not reader_on(data)]
+    return [name for name, first, second, is_on in checks if first in data and second in data and not is_on(data)]
 
 
 def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[SpecError]:
@@ -323,10 +323,10 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     if "charter" in data and "capabilities" in data:
         charter_goals = data["charter"]
         goal_half_on = (
-            has_legacy_fields([charter_goals], LEGACY_CHARTER_GOAL_FIELDS)
-            and has_legacy_fields([data["capabilities"]], LEGACY_CAPABILITY_GOAL_FIELDS)
+            reader_on([charter_goals], LEGACY_CHARTER_GOAL_FIELDS, when_empty=False)
+            and reader_on([data["capabilities"]], LEGACY_CAPABILITY_GOAL_FIELDS, when_empty=False)
         )
-        metric_half_on = has_legacy_fields([data["capabilities"]], LEGACY_CAPABILITY_METRIC_FIELDS)
+        metric_half_on = reader_on([data["capabilities"]], LEGACY_CAPABILITY_METRIC_FIELDS, when_empty=False)
         goal_ids: set[str] = set()
         for goal in dict_items(as_dict(charter_goals).get("goals")) if goal_half_on else []:
             if isinstance(goal.get("goal_id"), str) and goal["goal_id"]:
@@ -411,7 +411,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     checklist_task_refs: set[str] = set()
     # Legacy-guarded (M6c deletes): W562 / W563 read the checklist `spec_ref` of the milestone plans.
     checklist = _plan_checklist(data.get("impl_planner"))
-    checklist_reader_on = not checklist or has_legacy_fields(checklist, LEGACY_PLAN_CHECKLIST_FIELDS)
+    checklist_reader_on = reader_on(checklist, LEGACY_PLAN_CHECKLIST_FIELDS)
     if "impl_planner" in data and checklist_reader_on:
         for item in checklist:
             spec_ref = item.get("spec_ref")
@@ -524,7 +524,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Legacy-guarded (M6c deletes): reads the `deliverables` of the step-09 milestones.
     if (
         "impl_plan" in data and "roadmap" in data
-        and has_legacy_fields([data["impl_plan"]], LEGACY_DELIVERABLE_FIELDS)
+        and reader_on([data["impl_plan"]], LEGACY_DELIVERABLE_FIELDS, when_empty=False)
     ):
         # Collect all artifact IDs referenced in Step 14 tasks (fr_refs) and deliverables
         step14_task_fr_ids: set[str] = set()
@@ -559,7 +559,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Legacy-guarded (M6c deletes): reads the `critical_evidence` and checklist `spec_ref` of the plans.
     if (
         "code_execution" in data and "roadmap" in data
-        and has_legacy_fields(milestone_plans, LEGACY_PLAN_EVIDENCE_FIELDS)
+        and reader_on(milestone_plans, LEGACY_PLAN_EVIDENCE_FIELDS, when_empty=False)
     ):
         # Executed task coverage is sourced from `satisfied_task_ids`, resolved
         # per-plan in `_load_milestone_plans_from_anchor` from each plan's

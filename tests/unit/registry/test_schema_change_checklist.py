@@ -119,7 +119,7 @@ def test_rows_are_well_formed_and_ids_unique() -> None:
         ({"rows": "x"}, "'rows' array"),
         ({"rows": [3]}, "not an object"),
         ({"rows": [_row(change="rename")]}, "change"),
-        ({"rows": [_row(owner="M4")]}, "owner"),
+        ({"rows": [_row(owner=4)]}, "owner"),
         ({"rows": [_row(replaced_by=3)]}, "replaced_by"),
         ({"rows": [_row(design="DS L1")]}, "design"),
         ({"rows": [_row(tickets=[1])]}, "tickets"),
@@ -267,3 +267,8 @@ def test_generate_checklist_raises_naming_the_problem(tmp_path: Path) -> None:
 
 def test_generated_markdown_equals_committed_file() -> None:
     assert (_ROOT / CHECKLIST_FILE).read_text(encoding="utf-8") == generate_checklist(_ROOT)
+
+
+def test_a_row_owned_by_a_later_milestone_loads() -> None:
+    rows, problems = parse_rows({"rows": [_row(owner="M4")]})
+    assert problems == [] and [r.owner for r in rows] == ["M4"]

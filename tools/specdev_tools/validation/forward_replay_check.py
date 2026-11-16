@@ -293,6 +293,7 @@ def _check_semantic_coverage(
     spec_dir = spec_root if spec_root else git_root / "spec"
 
     for step in changed_steps:
+        removed = removed_paths(step, repo_root)  # read once per step, not once per changed file
         for new_path in spec_dir.glob(f"{step}_*.json"):
             try:
                 rel_path = new_path.relative_to(git_root).as_posix()
@@ -327,7 +328,7 @@ def _check_semantic_coverage(
             # Legacy (M6c deletes): a field removed from the schema that a legacy reader still reads is
             # not an id the new file dropped, so its subtree leaves the base document before the diff.
             try:
-                old_doc = _prune_removed_paths(json.loads(result.stdout), removed_paths(step, repo_root))
+                old_doc = _prune_removed_paths(json.loads(result.stdout), removed)
             except json.JSONDecodeError:
                 old_doc = None
             old_ids = _extract_ids(old_doc)

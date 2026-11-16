@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 import fnmatch
-import hashlib
+from collections import defaultdict
 import json
 import os
 import re
@@ -43,12 +43,6 @@ _ARTIFACT_ID_RE = re.compile(r'\b(?:fr|api|nfr|inv)-[a-z0-9-]+\b')
 _BUILTIN_DOC_BASENAMES: frozenset[str] = frozenset({
     "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "AUTHORS.md", "LICENSE.md",
 })
-
-# Cache for step_16 validation results by content hash.  When step_16a, 16b,
-# and 16c each call validate_step_16(), the first call computes the result and
-# subsequent calls for the same artifact return cached results.  This prevents
-# the triple execution overhead without changing the public API (AUDIT-029).
-_step16_cache: dict[str, list[SpecError]] = {}
 
 def _find_seed_manifest(spec_path: Optional[str], spec_root: Optional[str] = None) -> Optional[str]:
     """Locate the host's spec/common/seed_manifest.json without upward-walk ancestor escape.
@@ -163,12 +157,8 @@ def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: 
     Non-behavioral spec_ref types ('doc', 'code', 'task') are excluded — these are work items,
     not testable behaviors, and do not require behavior+validation pairing.
     """
-    from collections import defaultdict
-
     groups: dict[str, set] = defaultdict(set)
     for item in checklist:
-        if not isinstance(item, dict):
-            continue
         spec_ref = item.get("spec_ref")
         if not isinstance(spec_ref, dict):
             continue
@@ -479,7 +469,7 @@ def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]
         task_id = task.get("task_id")
         if not isinstance(task_id, str) or _is_set_aside(task):
             continue
-        criteria = {c.get("criterion_id") for c in dict_items(task.get("acceptance_criteria"))}
+        criteria = {c["criterion_id"] for c in dict_items(task.get("acceptance_criteria")) if isinstance(c.get("criterion_id"), str)}
         if not criteria & realised:
             errors.append(
                 make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' of milestone '{milestone_id}' has no plan item that realises one of its acceptance criteria")
@@ -526,7 +516,7 @@ def _check_fr_coverage_against_step_04(data: dict[str, Any], spec_path: str, err
         fr_data = json.loads(fr_list_path.read_text())
     except (OSError, json.JSONDecodeError):
         return  # Step 04 unreadable -- skip E306
-    known_fr_ids = {fr.get("fr_id") for fr in dict_items(as_dict(fr_data).get("functional_requirements")) if fr.get("fr_id")}
+    known_fr_ids = {fr["fr_id"] for fr in dict_items(as_dict(fr_data).get("functional_requirements")) if isinstance(fr.get("fr_id"), str) and fr["fr_id"]}
     for entry in dict_items(fr_coverage):
         fr_id = entry.get("fr_id")
         if isinstance(fr_id, str) and fr_id not in known_fr_ids:
@@ -565,12 +555,6 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
         List of SpecError objects. Empty list if valid. Never raises on a wrong-typed value: a value of the wrong
         type reads as absent (the schema reports it).
     """
-    # Cache lookup: hash data + spec_path + spec_root to detect identical invocations
-    cache_input = json.dumps(data, sort_keys=True) + "\0" + (spec_path or "") + "\0" + (spec_root or "")
-    cache_key = hashlib.md5(cache_input.encode()).hexdigest()
-    if cache_key in _step16_cache:
-        return list(_step16_cache[cache_key])  # Return a copy
-
     errors: list[SpecError] = []
     plan = as_dict(data.get("plan"))
     checklist = _checklist_of(plan)
@@ -588,5 +572,4 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
     if spec_path:
         _check_fr_coverage_against_step_04(data, spec_path, errors)
 
-    _step16_cache[cache_key] = list(errors)  # Cache a copy
     return errors

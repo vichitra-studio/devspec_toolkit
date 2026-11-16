@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ...core.errors import make_error, SpecError
+from ...core.scope_helpers import dict_items
 from ...validation.linter_utils import check_no_duplicates
 
 
@@ -13,13 +14,14 @@ def validate_step_05(instance: dict[str, Any], toolkit_root: str, spec_root: str
     owns them); they are kept for the uniform ``DEEP_VALIDATORS`` call shape.
     """
     errors: list[SpecError] = []
-    check_no_duplicates(instance.get("apis", []), "api_id", "api_id", errors)
+    apis = dict_items(instance.get("apis"))
+    check_no_duplicates(apis, "api_id", "api_id", errors)
     seen_method_route: set[tuple[str, str]] = set()
-    for i, api in enumerate(instance.get("apis", [])):
+    for i, api in enumerate(apis):
         api_id = api.get("api_id")
         method = api.get("method")
         route = api.get("path") or api.get("route")  # schema uses 'path'; fallback for backward compat
-        if method and route:
+        if isinstance(method, str) and isinstance(route, str) and method and route:
             key = (method, route)
             if key in seen_method_route:
                 errors.append(make_error("E520", f"Duplicate API method/route '{method} {route}' at index {i}"))

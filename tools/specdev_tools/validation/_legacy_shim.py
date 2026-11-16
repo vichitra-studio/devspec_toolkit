@@ -5,8 +5,10 @@ reader itself reads (one constant per reader or group of readers; never "any loa
 There is no old-to-new translation: new-shape data skips the reader and yields no finding.
 A guard counts a field anywhere in the whole array it reads: one array that holds entries of both shapes
 (some carrying the 1.1.1 field, some not) turns the 1.1.1 reader on for every entry of that array.
-Deleting this module means deleting every use of ``has_legacy_fields`` and the ``LEGACY_*`` names;
-the callers of ``is_parked_any_shape`` go back to ``core.scope_helpers.is_parked``.
+Deleting this module means deleting every use of ``reader_on``, ``has_legacy_fields`` and the ``LEGACY_*``
+names; the callers of ``is_parked_any_shape`` go back to ``core.scope_helpers.is_parked``. Two functions here are
+not guards and go with the retirement of their callers: ``removed_paths`` (``forward_replay_check.py``) and
+``out_of_scope_fr_ids`` (``cli.py``, ``matrix.py``, ``traceability_closure.py``).
 """
 from __future__ import annotations
 
@@ -24,11 +26,11 @@ LEGACY_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
 
 # Charter -> capabilities chain, read by E560 in `traceability_closure.py`. Each half needs both sides, so a pair
 # with one side migrated reports nothing for it: the goal half runs only when the charter carries `goal_id` AND the
-# capabilities carry `trace`; the metric half runs when the capabilities carry `success_metric_refs` (the charter
-# `metric_id` exists in both shapes, so it cannot gate).
+# capabilities carry `trace`; the metric half runs when the capabilities carry `trace` or `success_metric_refs`
+# (a 1.1.1 capability has either; the charter `metric_id` exists in both shapes, so it cannot gate).
 LEGACY_CHARTER_GOAL_FIELDS: frozenset[str] = frozenset({"goal_id"})
 LEGACY_CAPABILITY_GOAL_FIELDS: frozenset[str] = frozenset({"trace"})
-LEGACY_CAPABILITY_METRIC_FIELDS: frozenset[str] = frozenset({"success_metric_refs"})
+LEGACY_CAPABILITY_METRIC_FIELDS: frozenset[str] = frozenset({"trace", "success_metric_refs"})
 
 # Step-02 capability-coverage reader in `cross_artifact_checks.py` (component `trace` / `trace_refs`).
 LEGACY_COMPONENT_TRACE_FIELDS: frozenset[str] = frozenset({"trace", "trace_refs"})
@@ -108,6 +110,31 @@ def has_legacy_fields(artifacts: Iterable[Any], names: Collection[str]) -> bool:
     or list is ignored. Never raises on malformed data.
     """
     return any(_carries(artifact, names) for artifact in artifacts)
+
+
+_SAME: Any = object()
+
+
+def reader_on(
+    artifacts: Iterable[Any],
+    names: Collection[str],
+    *,
+    entries: Any = _SAME,
+    when_empty: bool = True,
+) -> bool:
+    """Return True when a 1.1.1 reader of *names* runs on *artifacts*.
+
+    The one rule of every guard: when *entries* (default *artifacts*; ``None`` is an absent array) is empty or absent the reader runs as
+    before (*when_empty*; pass False for a reader that has nothing to read then); otherwise it runs only when
+    *artifacts* still carry a key of *names*, so an array whose entries carry none of them is a graph-shape file
+    and is skipped. *entries* is the array whose emptiness decides, when the fields are searched in a larger
+    artifact (a step-05 file for its ``apis``). Never raises on malformed data.
+    """
+    artifacts = list(artifacts)
+    watched = artifacts if entries is _SAME else entries
+    if not watched:
+        return when_empty
+    return has_legacy_fields(artifacts, names)
 
 
 _SCHEMA_CHANGES_FILE = Path(__file__).resolve().parents[2] / "schema_changes.json"

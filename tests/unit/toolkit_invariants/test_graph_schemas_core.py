@@ -166,9 +166,10 @@ def test_ambiguities_declared_on_every_step_schema_and_trinity_location(schema_f
     assert node["$ref"] == _AMBIGUITY_LIST_REF
 
 
-def test_ambiguity_locations_are_the_twenty_of_the_plan() -> None:
-    assert len(_LOCATIONS) == 20
-    assert not any(name.startswith(("13a", "16")) for name, _ in _LOCATIONS[:-3])
+def test_ambiguity_locations_are_every_step_schema_and_the_trinity_locations() -> None:
+    assert len(_LOCATIONS) == len(_step_schema_files()) + len(_TRINITY_LOCATIONS)
+    assert len({name for name, _ in _LOCATIONS[:-len(_TRINITY_LOCATIONS)]}) == len(_step_schema_files())
+    assert not any(name.startswith(("13a", "16")) for name, _ in _LOCATIONS[:-len(_TRINITY_LOCATIONS)])
 
 
 @pytest.mark.parametrize("schema_file", ["16_anchor.schema.json", "16_impl_context.schema.json"])

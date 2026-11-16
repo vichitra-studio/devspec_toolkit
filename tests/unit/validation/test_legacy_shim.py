@@ -31,6 +31,7 @@ from specdev_tools.validation._legacy_shim import (
     has_legacy_fields,
     is_parked_any_shape,
     out_of_scope_fr_ids,
+    reader_on,
     removed_paths,
 )
 from specdev_tools.validation.seed_lint import lint_seeds
@@ -204,9 +205,29 @@ _CAPABILITIES_1_2_0 = {"capabilities": [{"capability_id": "cap-a", "scope": "in"
     (_CHARTER_1_1_1, _CAPABILITIES_1_2_0, False),
     (_CHARTER_1_2_0, _CAPABILITIES_1_1_1_TRACE_ONLY, False),
 ], ids=["both-1.1.1", "both-1.2.0", "charter-only-1.1.1", "capabilities-only-1.1.1"])
-def test_e560_chain_runs_only_when_both_sides_carry_the_1_1_1_fields(tmp_path, charter, capabilities, reports):
+def test_e560_goal_half_runs_only_when_both_sides_carry_the_1_1_1_fields(tmp_path, charter, capabilities, reports):
     spec_dir = _write_spec(tmp_path, {"00_charter.json": charter, "01_capabilities.json": capabilities})
-    assert ("E560" in _closure_codes(spec_dir)) is reports
+    goal_findings = [e for e in render_errors(check_traceability_closure(spec_dir)) if "charter_goal_without_capability" in e]
+    assert bool(goal_findings) is reports
+
+
+def test_e560_metric_half_reports_for_1_1_1_capabilities_with_trace_and_no_metric_refs(tmp_path):
+    """A 1.1.1 capability carries `trace`; `success_metric_refs` is optional, so the charter metrics still need a capability."""
+    charter = {"goals": [{"goal_id": "goal-a"}], "success_metrics": [{"metric_id": "metric-a"}, {"metric_id": "metric-b"}]}
+    spec_dir = _write_spec(tmp_path, {"00_charter.json": charter, "01_capabilities.json": _CAPABILITIES_1_1_1_TRACE_ONLY})
+    rendered = render_errors(check_traceability_closure(spec_dir))
+    assert [e for e in rendered if "charter_success_metric_without_capability" in e and ("metric-a" in e or "metric-b" in e)]
+    assert len([e for e in rendered if "charter_success_metric_without_capability" in e]) == 2
+
+
+def test_reader_on_is_the_one_rule_of_the_guards():
+    assert reader_on([], {"trace"}) is True
+    assert reader_on([], {"trace"}, when_empty=False) is False
+    assert reader_on([{"id": 1}], {"trace"}) is False
+    assert reader_on([{"trace": []}], {"trace"}) is True
+    assert reader_on([{"apis": [{"x": 1}], "trace": 1}], {"trace"}, entries=[]) is True
+    assert reader_on([{"apis": [{"x": 1}]}], {"trace"}, entries=[{"x": 1}]) is False
+    assert reader_on([{"out_of_scope": []}], {"trace"}, entries=None) is True  # an absent array runs the reader
 
 
 @pytest.mark.parametrize(("node", "expected"), [
@@ -626,7 +647,7 @@ def test_completeness_check_follows_guards(tmp_path):
     assert all(payload["coverage"][name] == vacuous for name in skipped)
     assert payload["coverage"]["milestone_decomp_completeness"]["total_count"] == 1
     _, text = _run_cli(["completeness-check", _graph_spec(tmp_path / "text"), "--repo-root", str(TOOLKIT_ROOT)])
-    assert text.count("[SKIP]") == 4
+    assert text.count("[SKIP]") == len(skipped)
     assert "[SKIP] FR → API coverage: not computed on this spec shape" in text
     assert "[OK] Milestone decomp completeness: 100.0%" in text
 
@@ -864,13 +885,13 @@ def _tool_sources() -> dict[str, str]:
 
 
 def _guard_calls(source: str) -> set[str]:
-    """The names of the functions (innermost def) that call ``has_legacy_fields``."""
+    """The names of the functions (innermost def) that call ``has_legacy_fields`` or ``reader_on``."""
     found: set[str] = set()
 
     def visit(node: ast.AST, enclosing: str | None) -> None:
         for child in ast.iter_child_nodes(node):
             name = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else enclosing
-            if isinstance(child, ast.Call) and getattr(child.func, "id", getattr(child.func, "attr", "")) == "has_legacy_fields":
+            if isinstance(child, ast.Call) and getattr(child.func, "id", getattr(child.func, "attr", "")) in ("has_legacy_fields", "reader_on"):
                 found.add(enclosing or "<module>")
             visit(child, name)
 

@@ -703,45 +703,11 @@ def test_ref_sibling_cycle_guard_and_unresolved_unchanged():
 
 
 def test_schema_ref_sibling_census():
-    """Pin the set of ``$ref`` nodes carrying siblings across schema/**/*.json.
+    """A ``$ref`` node in schema/**/*.json carries no sibling beyond annotations and array bounds.
 
-    A new sibling anywhere forces a deliberate update of this census.
-    262 = the 226 of the 1.1.1 shape (224 plus two description-only siblings in
-    ``schema/core/graph.schema.json``) with the net change of the M2 steps 00-05
-    schemas: the old-shape ``$ref`` arrays that carried ``items`` / ``minItems``
-    siblings are gone, and the graph-shape properties are annotated ``$ref``
-    nodes (``$ref`` plus ``description``). Per file, old -> new: 00 charter 12 -> 26,
-    01 capabilities 10 -> 11, 02 system sketch 14 -> 15, 02a delivery baseline
-    6 -> 15, 03 glossary 2 -> 3, 04 FR list 6 -> 11, 05 interfaces 11 -> 16.
-    256 after M3 WI-M3-02 and WI-M3-22: 02 system sketch 15 -> 14 (``tech_stack``
-    removed), core collections 26 -> 23 (the ingested-ref definitions removed, the
-    ambiguity item added), core step_base 8 -> 6 (the two ingested fields removed).
-    269 after M3 WI-M3-03: 20 ``ambiguities`` locations (17 steps, 3 trinity) are annotated ``$ref`` nodes (+20); the
-    removed ``crossCycleAmbiguityItem`` took four with it and the old trinity item ``$ref``s three (-7).
-    271 after M3 WI-M3-04..06 (steps 06, 07, 08): the removed ``trace``, ``targets`` and ``scope.components`` /
-    ``scope.apis`` ``$ref`` nodes (-5, all ``description``-only) and the added ``lifecycle`` (3), ``scope_reason`` (2)
-    and ``scope`` (2, a ``default`` beside the ``$ref``; steps 06 and 07 only, a fixture is a verifier) nodes (+7).
-    269 after M3 WI-M3-07..09 (steps 09, 10, 11), per file old -> new: 09 impl plan 10 -> 6 (``tech_stack``, ``trace``,
-    ``dependencies``, ``status`` and ``deliverables`` ``$ref`` nodes removed, ``lifecycle`` added), 10 governance 6 -> 6
-    (``reviewers``, ``trace``, ``links`` and ``required_metadata`` removed; the rule's ``rule_id``, ``lifecycle``,
-    ``scope`` and ``scope_reason`` added), 11 red team 9 -> 12 (``trace`` and ``target_ids`` removed; ``lifecycle``,
-    ``scope`` and ``scope_reason`` added on the threat and the edge case), and the unreferenced core definition
-    ``dependencyList`` removed (-1, its ``oneOf`` arm ``$ref`` carried a ``description``).
-    256 after M3 WI-M3-10..12 (steps 12, 14), per file old -> new: 12 CI gates 6 -> 4 (``trace``, ``requires`` and the
-    step ``id`` removed; the annotated ``lifecycle`` and ``replaces`` added, ``realises``, ``verifies`` and
-    ``depends_on`` carry no ``$ref`` sibling), 14 roadmap 15 -> 11 (``tech_stack``, ``trace``, ``dependencies``,
-    ``status`` and ``source_milestones`` removed, ``lifecycle`` added on the milestone, the task and the criterion),
-    core collections 19 -> 12 (``techStack*`` and ``dependency*`` definitions removed with their last ``$ref``).
-    253 after M3 WI-M3-13, 14 (steps 15, 16 anchor), per file old -> new: 15 scaffold 8 -> 6 (``trace``, ``links`` and
-    the row's ``method`` ``$ref`` nodes removed, the row's ``interface_ref`` becomes ``row_id``, ``lifecycle`` added),
-    16 anchor 4 -> 4 (``milestone_id`` becomes ``anchor_id``), core collections 12 -> 11 (the ``link`` definition
-    removed with its last ``$ref``).
-    Anchor row ``status`` gains ``default: pending`` (a description-only node becomes a default-and-description one).
-    246 after M3 WI-M3-15 (step 16 plan, execution, review), per file old -> new: 16 impl context 27 -> 22 (the item's
-    ``spec_ref``, ``nfr_refs`` and ``fixture_ref``, ``requirements_summary[].spec_refs``, ``plan.security.new_fixtures``,
-    ``spec_mutations[].ref`` and ``fixture_status.test_results[].fixture_ref`` removed; the root ``milestone`` and the
-    item's ``lifecycle`` added), core collections 11 -> 9 (the ``traceRef`` and ``traceId`` definitions removed with
-    their last ``$ref``; ``traceId`` was the one ``$anchor``-and-description node).
+    Allowed siblings: ``description``, ``default``, ``items``, ``minItems``, ``maxItems``. Any
+    other keyword beside a ``$ref`` (``type``, ``enum``, ``properties``, ...) is ignored or
+    contradicted by some validators, so a schema must not rely on it.
     """
     from collections import Counter
 
@@ -760,10 +726,6 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 246
-    assert dict(counts) == {
-        ("description",): 234,
-        ("description", "items"): 4,
-        ("description", "maxItems", "minItems"): 1,
-        ("default", "description"): 7,
-    }
+    allowed = {"description", "default", "items", "minItems", "maxItems"}
+    offenders = {siblings: n for siblings, n in counts.items() if not set(siblings) <= allowed}
+    assert offenders == {}

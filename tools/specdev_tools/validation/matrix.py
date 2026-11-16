@@ -15,7 +15,7 @@ from ._legacy_shim import (
     LEGACY_THREAT_MITIGATION_FIELDS,
     LEGACY_THREAT_TARGET_FIELDS,
     LEGACY_TRACE_FIELDS,
-    has_legacy_fields,
+    reader_on,
     is_parked_any_shape,
     out_of_scope_fr_ids,
 )
@@ -366,9 +366,8 @@ def build_trace_matrix(
     # nothing. FR-to-API coverage counts as computed when there is no API at all (coverage is 0
     # by definition, as on main) or when some API carries `trace`; it is not computed when APIs
     # exist and none carries `trace`.
-    legacy_api_trace = has_legacy_fields(apis.values(), LEGACY_TRACE_FIELDS)
-    fr_to_api_computed = legacy_api_trace or not apis
-    if legacy_api_trace:
+    fr_to_api_computed = reader_on(apis.values(), LEGACY_TRACE_FIELDS)
+    if fr_to_api_computed:
         for api in apis.values():
             for t in dict_items(api.get("trace")):
                 if t.get("type") == _MATRIX_LINK_FR_TYPE and isinstance(t.get("id"), str):
@@ -376,9 +375,9 @@ def build_trace_matrix(
 
     # One rule for every link reader: entities of its kind exist and none carries its legacy field, so
     # the reader is skipped and the values it fills are omitted and named in `not_computed`.
-    fixture_links_computed = has_legacy_fields(fixtures, LEGACY_FIXTURE_TARGET_FIELDS) or not fixtures
-    nfr_links_computed = has_legacy_fields(nfrs, LEGACY_NFR_TRACE_FIELDS) or not nfrs
-    threat_links_computed = has_legacy_fields(threats, LEGACY_THREAT_TARGET_FIELDS) or not threats
+    fixture_links_computed = reader_on(fixtures, LEGACY_FIXTURE_TARGET_FIELDS)
+    nfr_links_computed = reader_on(nfrs, LEGACY_NFR_TRACE_FIELDS)
+    threat_links_computed = reader_on(threats, LEGACY_THREAT_TARGET_FIELDS)
     if fixture_links_computed:
         for fx in fixtures:
             for t in dict_items(fx.get("targets")):
@@ -491,7 +490,7 @@ def build_trace_matrix(
         schema = as_str(data.get("$schema"))
         if "14-roadmap" in schema or "14_roadmap" in schema:
             roadmaps_loaded += 1
-            if not has_legacy_fields([data], LEGACY_ROADMAP_FR_REF_FIELDS):
+            if not reader_on([data], LEGACY_ROADMAP_FR_REF_FIELDS, when_empty=False):
                 continue
             roadmaps_read += 1
             for milestone in dict_items(data.get("milestones")):
@@ -525,7 +524,7 @@ def build_trace_matrix(
     # level of the matrix output so consumers can detect drift without
     # re-parsing individual threat objects.
     inv_to_threats: dict[str, set[str]] = collections.defaultdict(set)
-    mitigation_links_computed = has_legacy_fields(threats, LEGACY_THREAT_MITIGATION_FIELDS) or not threats
+    mitigation_links_computed = reader_on(threats, LEGACY_THREAT_MITIGATION_FIELDS)
     if mitigation_links_computed:
         for th in threats:
             for mitigation in dict_items(th.get("mitigations")):

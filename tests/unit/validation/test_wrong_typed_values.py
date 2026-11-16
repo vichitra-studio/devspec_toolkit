@@ -1,30 +1,49 @@
-"""No deep validator of steps 06-16 and no guarded reader raises on a wrong-typed value.
+"""No deep validator of steps 01-16, no milestone-state reader and no guarded reader raises on a wrong-typed value.
 
-The class is proved, not a list of sites: every valid document of the worked example (``tests/fixtures/graph_example``)
+The class is proved, not a list of sites.  Every valid document of the worked example (``tests/fixtures/graph_example``)
 and of the 1.1.1 corpus (``tests/fixtures/spec_corpus``) has the value at every JSON path replaced in turn by each of
 ``_WRONG_VALUES``; the step's deep validator (called directly, not through the E521 wrapper of ``validate.py``) must
-return a list.  A validator may report its own finding on a wrong type; raising is the failure.  The same holds for
-``check_traceability_closure`` and ``build_trace_matrix`` over a copy of the folder with one file mutated.
+return a list.  The same is done for the files a validator READS besides its own (found by recording the opens of a
+run on the unmutated folder): each is mutated on disk while the validator checks its unmutated document.  A validator
+may report its own finding on a wrong type; raising is the failure.  ``check_traceability_closure``,
+``uncomputed_dimensions`` and ``build_trace_matrix`` run over a copy of the folder with one file mutated, and
+``compute_milestone_state`` over the mutated plan.
 """
 from __future__ import annotations
 
+import builtins
 import copy
 import json
 import shutil
 from pathlib import Path
 from typing import Any, Iterator
+from unittest import mock
 
 import pytest
 
+from specdev_tools.context.milestone_state import compute_milestone_state
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
-from specdev_tools.validation.validate import DEEP_VALIDATORS
+from specdev_tools.validation.validate import DEEP_VALIDATORS, _build_validation_context
 
 _ROOT = Path(__file__).parents[3]
 _EXAMPLE = _ROOT / "tests" / "fixtures" / "graph_example" / "spec"
 _CORPUS = _ROOT / "tests" / "fixtures" / "spec_corpus"
-_WRONG_VALUES: tuple[Any, ...] = ("x", None, [], {}, 5, [None], ["x"], [[1]])
+_WRONG_VALUES: tuple[Any, ...] = (
+    "x", None, [], {}, 5, [None], ["x"], [[1]], "", True, 1.5, {"id": []}, [{"id": []}],
+)
+# The 1.1.1 readers of closure and matrix are all off on the example (it is graph-shaped), so its paths are mutated
+# with four kinds of wrong value (string, null, array, object): this keeps the run short.  The corpus, where the
+# readers run, gets every value.
+_EXAMPLE_FOLDER_VALUES: tuple[Any, ...] = ("x", None, [], {"id": []})
+_PLAN = "impl_context/ms_account_recovery_plan.json"
 _STEP_OF_FILE = {
+    "01_capabilities.json": "01",
+    "02_system_sketch.json": "02",
+    "02a_delivery_baseline.json": "02a",
+    "03_glossary.json": "03",
+    "04_fr_list.json": "04",
+    "05_interface_contracts.json": "05",
     "06_invariants.json": "06",
     "07_nfrs.json": "07",
     "08_fixtures.json": "08",
@@ -36,9 +55,12 @@ _STEP_OF_FILE = {
     "14_roadmap.json": "14",
     "15_scaffold.json": "15",
     "16_impl_context.json": "16",
-    "impl_context/ms_account_recovery_plan.json": "16a",
+    _PLAN: "16a",
 }
-_PLAN = "impl_context/ms_account_recovery_plan.json"
+_CORPUS_STEPS = {
+    "04_fr_list.json": "04", "05_interface_contracts.json": "05", "07_nfrs.json": "07", "08_fixtures.json": "08",
+    "11_redteam.json": "11", "14_roadmap.json": "14",
+}
 
 
 def _paths(value: Any, prefix: tuple = ()) -> Iterator[tuple]:
@@ -52,12 +74,12 @@ def _paths(value: Any, prefix: tuple = ()) -> Iterator[tuple]:
             yield from _paths(item, prefix + (index,))
 
 
-def _mutations(document: dict[str, Any]) -> Iterator[tuple[tuple, Any, dict[str, Any]]]:
+def _mutations(document: dict[str, Any], values: tuple[Any, ...] = _WRONG_VALUES) -> Iterator[tuple[tuple, Any, dict[str, Any]]]:
     """Yield ``(path, wrong_value, mutated_copy)`` for every path of *document* and every wrong value."""
     for path in _paths(document):
         if not path:
             continue
-        for wrong in _WRONG_VALUES:
+        for wrong in values:
             mutated = copy.deepcopy(document)
             parent = mutated
             for key in path[:-1]:
@@ -106,73 +128,144 @@ def _legacy_plan() -> dict[str, Any]:
     return plan
 
 
-def _call(step: str, document: dict[str, Any], artifact_path: str) -> list:
-    context = {"spec_root": str(_EXAMPLE), "artifact_path": artifact_path}
+def _call(step: str, document: dict[str, Any], artifact_path: str, spec_root: Path = _EXAMPLE) -> list:
+    if step == "03":  # the only validator that reads the loaded nfrs and monitoring data of the context
+        context = _build_validation_context(str(_ROOT), artifact_path, spec_root=str(spec_root))
+    else:
+        context = {"artifact_path": artifact_path, "spec_root": str(spec_root)}
     return DEEP_VALIDATORS[step](document, str(_ROOT), context)
 
 
-def _raised(step: str, document: dict[str, Any], artifact_path: str, label: str) -> list[str]:
+def _raise_of(label: str, call: Any) -> list[str]:
+    try:
+        result = call()
+    except Exception as exc:  # noqa: BLE001 - the point of the test is to catch any raise
+        return [f"{label}: {type(exc).__name__}: {exc}"]
+    return [] if isinstance(result, (list, dict)) else [f"{label}: returned {type(result).__name__}"]
+
+
+def _raised(step: str, document: dict[str, Any], artifact_path: str, label: str, spec_root: Path = _EXAMPLE) -> list[str]:
     """Run every mutation of *document* through the deep validator of *step*; return the ones that raise."""
     failures: list[str] = []
-    for path, wrong, mutated in _mutations(document):
-        try:
-            result = _call(step, mutated, artifact_path)
-        except Exception as exc:  # noqa: BLE001 - the point of the test is to catch any raise
-            failures.append(f"{label} {step} {list(path)} = {wrong!r}: {type(exc).__name__}: {exc}")
-        else:
-            if not isinstance(result, list):
-                failures.append(f"{label} {step} {list(path)} = {wrong!r}: returned {type(result).__name__}")
+    for path, wrong, mutated in _first_entries(document, _WRONG_VALUES):
+        failures += _raise_of(
+            f"{label} {step} {list(path)} = {wrong!r}", lambda: _call(step, mutated, artifact_path, spec_root)
+        )
     return failures
 
 
-def test_deep_validators_of_the_example_do_not_raise() -> None:
+# Documents checked by the validators of steps 01-16: (label, folder, file name, step, loader of the document).
+def _cases() -> list[tuple[str, Path, str, str, Any]]:
+    cases = [(f"example/{name}", _EXAMPLE, name, step, lambda name=name: _load(_EXAMPLE, name))
+             for name, step in _STEP_OF_FILE.items()]
+    cases += [(f"corpus/{name}", _CORPUS, name, step, lambda name=name: _load(_CORPUS, name))
+              for name, step in _CORPUS_STEPS.items()]
+    cases += [("plan+execution+review", _EXAMPLE, _PLAN, step, _full_plan) for step in ("16a", "16b", "16c")]
+    cases += [("1.1.1 plan", _EXAMPLE, _PLAN, step, _legacy_plan) for step in ("16", "16a", "16b", "16c")]
+    return cases
+
+
+def test_deep_validators_do_not_raise_on_a_wrong_value_in_their_document() -> None:
     failures: list[str] = []
-    for name, step in _STEP_OF_FILE.items():
-        failures += _raised(step, _load(_EXAMPLE, name), str(_EXAMPLE / name), name)
+    for label, base, name, step, loader in _cases():
+        failures += _raised(step, loader(), str(base / name), label, base)
     assert failures == []
 
 
-def test_deep_validators_of_16b_and_16c_do_not_raise() -> None:
-    document = _full_plan()
-    path = str(_EXAMPLE / _PLAN)
-    failures = _raised("16b", document, path, "plan+execution") + _raised("16c", document, path, "plan+review")
-    assert failures == []
+def _files_read(step: str, document: dict[str, Any], base: Path, name: str) -> set[str]:
+    """The JSON files under *base*, other than *name*, that the validator of *step* opens on the unmutated *document*."""
+    opened: set[str] = set()
+    real_open = builtins.open
+
+    def recording_open(file: Any, *args: Any, **kwargs: Any) -> Any:
+        path = Path(str(file))
+        if path.suffix == ".json" and base in path.parents:
+            opened.add(str(path.relative_to(base)))
+        return real_open(file, *args, **kwargs)
+
+    def recording_read_text(self: Path, *args: Any, **kwargs: Any) -> str:
+        if self.suffix == ".json" and base in self.parents:
+            opened.add(str(self.relative_to(base)))
+        return real_read_text(self, *args, **kwargs)
+
+    real_read_text = Path.read_text
+    with mock.patch("builtins.open", recording_open), mock.patch("io.open", recording_open), \
+            mock.patch.object(Path, "read_text", recording_read_text):
+        _call(step, document, str(base / name), base)
+    opened.discard(name)
+    return opened
 
 
-def test_deep_validators_of_a_1_1_1_shaped_plan_do_not_raise() -> None:
-    document = _legacy_plan()
-    path = str(_EXAMPLE / _PLAN)
-    failures = _raised("16", document, path, "legacy plan")
-    for step in ("16a", "16b", "16c"):
-        failures += _raised(step, document, path, "legacy plan")
-    assert failures == []
-
-
-def test_deep_validators_of_the_1_1_1_corpus_do_not_raise() -> None:
+def test_deep_validators_do_not_raise_on_a_wrong_value_in_a_file_they_read(tmp_path: Path) -> None:
+    """Mutate, on disk, each file a validator reads besides its own; the validator checks its unmutated document."""
     failures: list[str] = []
-    for name, step in (("07_nfrs.json", "07"), ("08_fixtures.json", "08"), ("11_redteam.json", "11"), ("14_roadmap.json", "14")):
-        failures += _raised(step, _load(_CORPUS, name), str(_CORPUS / name), f"corpus/{name}")
+    folders = {_EXAMPLE: tmp_path / "example", _CORPUS: tmp_path / "corpus"}
+    for source, copy_dir in folders.items():
+        shutil.copytree(source, copy_dir)
+    # The anchor reads the plan files: one folder whose plan is 1.1.1-shaped, so the plan's object `spec_ref` is read.
+    legacy = tmp_path / "legacy"
+    shutil.copytree(_EXAMPLE, legacy)
+    (legacy / _PLAN).write_text(json.dumps(_legacy_plan()), encoding="utf-8")
+    cases = [(label, folders[base], name, step, loader) for label, base, name, step, loader in _cases()]
+    cases.append(("anchor+1.1.1 plan", legacy, "16_impl_context.json", "16", lambda: _load(legacy, "16_impl_context.json")))
+    readers: dict[tuple[Path, str], list[tuple[str, Path, str, str, dict[str, Any]]]] = {}
+    for label, folder, name, step, loader in cases:
+        document = loader()
+        for sibling in _files_read(step, document, folder, name):
+            readers.setdefault((folder, sibling), []).append((label, folder, name, step, document))
+    siblings_mutated = 0
+    for (folder, sibling), users in sorted(readers.items(), key=lambda item: (str(item[0][0]), item[0][1])):
+        target = folder / sibling
+        original = target.read_text(encoding="utf-8")
+        for path, wrong, mutated in _first_entries(json.loads(original), _WRONG_VALUES):
+            target.write_text(json.dumps(mutated), encoding="utf-8")
+            siblings_mutated += 1
+            for label, _folder, name, step, document in users:
+                failures += _raise_of(
+                    f"{label} {step} reads {sibling} {list(path)} = {wrong!r}",
+                    lambda: _call(step, document, str(folder / name), folder),
+                )
+        target.write_text(original, encoding="utf-8")
+    assert siblings_mutated > 0
+    assert failures == []
+
+
+def test_milestone_state_does_not_raise_on_a_wrong_value_in_the_plan(tmp_path: Path) -> None:
+    failures: list[str] = []
+    for label, plan in (("plan", _load(_EXAMPLE, _PLAN)), ("1.1.1 plan", _legacy_plan())):
+        for path, wrong, mutated in _mutations(plan):
+            failures += _raise_of(
+                f"{label} {list(path)} = {wrong!r}", lambda: compute_milestone_state(mutated, str(tmp_path), "account_recovery")
+            )
     assert failures == []
 
 
 def _readers_raise(spec_dir: Path, label: str) -> list[str]:
-    try:
-        check_traceability_closure(str(spec_dir), str(_ROOT))
-        uncomputed_dimensions(str(spec_dir), str(_ROOT))
-        build_trace_matrix(str(_ROOT), str(spec_dir))
-    except Exception as exc:  # noqa: BLE001
-        return [f"{label}: {type(exc).__name__}: {exc}"]
-    return []
+    return (
+        _raise_of(label, lambda: check_traceability_closure(str(spec_dir), str(_ROOT)))
+        + _raise_of(label, lambda: uncomputed_dimensions(str(spec_dir), str(_ROOT)))
+        + _raise_of(label, lambda: build_trace_matrix(str(_ROOT), str(spec_dir)))
+    )
 
 
-def _mutate_folder(source: Path, tmp_path: Path, names: tuple[str, ...]) -> list[str]:
+def _first_entries(document: dict[str, Any], values: tuple[Any, ...]) -> Iterator[tuple[tuple, Any, dict[str, Any]]]:
+    """The mutations of *document* on the first entry of every array (the other entries of an
+    array have the same shape and are read alike)."""
+    for path, wrong, mutated in _mutations(document, values):
+        if all(key == 0 for key in path if isinstance(key, int)):
+            yield path, wrong, mutated
+
+
+def _mutate_folder(
+    source: Path, tmp_path: Path, names: tuple[str, ...], values: tuple[Any, ...]
+) -> list[str]:
     """For each file of *names*, rewrite it once per mutation in a copy of *source* and run the folder readers."""
     folder = tmp_path / source.parent.name / "spec"
     shutil.copytree(source, folder)
     failures: list[str] = []
     for name in names:
         original = (folder / name).read_text(encoding="utf-8")
-        for path, wrong, mutated in _mutations(json.loads(original)):
+        for path, wrong, mutated in _first_entries(json.loads(original), values):
             (folder / name).write_text(json.dumps(mutated), encoding="utf-8")
             failures += _readers_raise(folder, f"{name} {list(path)} = {wrong!r}")
         (folder / name).write_text(original, encoding="utf-8")
@@ -180,13 +273,13 @@ def _mutate_folder(source: Path, tmp_path: Path, names: tuple[str, ...]) -> list
 
 
 def test_closure_and_matrix_do_not_raise_on_the_example(tmp_path: Path) -> None:
-    names = tuple(sorted(_STEP_OF_FILE)) + ("01_capabilities.json", "04_fr_list.json", "05_interface_contracts.json", "00_charter.json")
-    assert _mutate_folder(_EXAMPLE, tmp_path, names) == []
+    names = tuple(_STEP_OF_FILE) + ("00_charter.json",)
+    assert _mutate_folder(_EXAMPLE, tmp_path, names, _EXAMPLE_FOLDER_VALUES) == []
 
 
 def test_closure_and_matrix_do_not_raise_on_the_1_1_1_corpus(tmp_path: Path) -> None:
     names = tuple(sorted(path.name for path in _CORPUS.glob("*.json")))
-    assert _mutate_folder(_CORPUS, tmp_path, names) == []
+    assert _mutate_folder(_CORPUS, tmp_path, names, _WRONG_VALUES) == []
 
 
 @pytest.mark.parametrize("field", ["trace", "targets", "target_ids"])

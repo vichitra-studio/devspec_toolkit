@@ -384,9 +384,10 @@ changes:
       fr_refs or capability_refs, or E520 / E530 for dependency entries; the cycle
       check (E141), duplicate ids and date checks stay. Step 15: a duplicate
       row_id is reported as E520; the E520 check for a duplicate interface_ref and
-      the E530 check for method are gone. The deep validators of steps 06 to 16 do
-      not raise on a value of the wrong type; the schema reports it (a validator
-      may also report its own finding). The
+      the E530 check for method are gone. The deep validators of steps 01 to 16 do
+      not raise on a value of the wrong type, in the file they validate or in a
+      file they read; the schema reports it for the file that holds it (a
+      validator may also report its own finding). The
       step 16 anchor no longer emits W607 or W612; a plan file with no milestone
       key is skipped with W608, a plan whose milestone no anchor row is about is
       skipped with W611, and W610 pairs a plan with its row through milestone.

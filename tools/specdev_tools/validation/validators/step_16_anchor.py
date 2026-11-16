@@ -345,7 +345,7 @@ def _mapping_drift_errors(contexts: dict[str, dict[str, Any]]) -> list[SpecError
             item_id = item.get("id")
             spec_ref = item.get("spec_ref")  # M8 rewrites: re-keyed onto differing `realises` sets
             spec_ref_id = spec_ref.get("id") if isinstance(spec_ref, dict) else None
-            if not item_id or not spec_ref_id:
+            if not isinstance(item_id, str) or not item_id or not isinstance(spec_ref_id, str) or not spec_ref_id:
                 continue
             if item_id not in registry:
                 registry[item_id] = (spec_ref_id, ms_file)

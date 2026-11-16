@@ -879,7 +879,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W610 ANCHOR_PREFIX_VIOLATION
 
-**Trigger**: A checklist item `id` in a milestone plan does not start with the `checklist_id_prefix` declared for that milestone in the anchor's `milestone_index`.
+**Trigger**: A checklist item `id` in a milestone plan does not start with the `checklist_id_prefix` declared for that milestone in the anchor's `milestone_index` (the row whose `about` equals the plan's file-level `milestone`; a plan that no row is about is skipped, see W611).
 
 **Resolution**: Rename the checklist item `id` to start with the declared prefix (`{prefix}_`), or correct the `checklist_id_prefix` in `milestone_index` if the item's ID is actually correct.
 
@@ -897,7 +897,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W617 UPSTREAM_BACKLOG_STATUS_FILTERED
 
-**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view. A 1.2.0 open item has status `open`, so this filter never hides it.
+**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view. A 1.2.0 open item has status `open`: the default filter shows it, and `--status resolved` hides it and counts it in this warning.
 
 **Resolution**: Informational only — re-run with `--status all` (or `--status resolved`) to see the hidden records. The JSON payload also carries this count as `summary.hidden_by_status_count`, which is always present (0 when nothing is hidden) for programmatic consumers.
 

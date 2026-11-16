@@ -119,13 +119,11 @@ def _check_trace_matrix_staleness(artifact_path: str | None) -> list[SpecError]:
     return errors
 
 
-def _check_task_dependency_cycles(tasks: list, milestone_id: Any) -> list[SpecError]:
+def _check_task_dependency_cycles(tasks: list[dict[str, Any]], milestone_id: Any) -> list[SpecError]:
     """DFS cycle detection on task depends_on graph within a milestone."""
-    task_ids = {task["task_id"] for task in tasks if isinstance(task, dict) and isinstance(task.get("task_id"), str)}
+    task_ids = {task["task_id"] for task in tasks if isinstance(task.get("task_id"), str)}
     adj: dict[str, list[str]] = {}
     for task in tasks:
-        if not isinstance(task, dict):
-            continue
         tid = task.get("task_id")
         if not isinstance(tid, str):
             continue

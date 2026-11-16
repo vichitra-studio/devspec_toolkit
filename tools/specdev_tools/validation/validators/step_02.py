@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_json
-from ...core.scope_helpers import is_parked
+from ...core.scope_helpers import dict_items, is_parked
 
 def check_component_ids(components: list[dict]) -> list[SpecError]:
     errors: list[SpecError] = []
     seen = set()
     for comp in components:
         comp_id = comp.get("component_id")
-        if not comp_id:
+        if not isinstance(comp_id, str) or not comp_id:
             continue
         if comp_id in seen:
             errors.append(make_error("E520", f"Duplicate component_id: {comp_id}"))
@@ -24,7 +24,7 @@ def check_rate_limits(connections: list[dict]) -> list[SpecError]:
             continue
         rps = rate_limit.get("rps")
         burst = rate_limit.get("burst")
-        if burst is not None and rps is not None and burst < rps:
+        if isinstance(burst, (int, float)) and isinstance(rps, (int, float)) and burst < rps:
             errors.append(
                 make_error("E520", f"Connection[{idx}] rate_limit burst {burst} is less than rps {rps}")
             )
@@ -101,8 +101,8 @@ def validate_step_02(
     """
     errors: list[SpecError] = []
 
-    components = instance.get("components", [])
-    connections = instance.get("connections", [])
+    components = dict_items(instance.get("components"))
+    connections = dict_items(instance.get("connections"))
     third_parties = instance.get("third_parties")
     third_party_ids = {
         tp["third_party_id"]

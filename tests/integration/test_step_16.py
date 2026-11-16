@@ -24,11 +24,6 @@ class TestStep16(unittest.TestCase):
         # Anchor fixtures live in tests/fixtures/step_16/ root (validated as anchor).
         self.fixtures_dir = str(toolkit_root / "tests" / "fixtures" / "step_16" / "impl_context")
         self.step16_dir = str(toolkit_root / "tests" / "fixtures" / "step_16")
-        # Clear the chain-up cache so a previous test that called
-        # validate_step_16{a,b,c} directly (bypassing validate_file's clear)
-        # cannot pollute the current test through the module-global hash table.
-        from specdev_tools.validation.validators.step_16 import _step16_cache
-        _step16_cache.clear()
 
     def test_valid_minimal(self):
         path = os.path.join(self.fixtures_dir, "valid_minimal.json")
@@ -1032,11 +1027,8 @@ class TestStep16(unittest.TestCase):
         """Chain-up (16c → 16b → 16a → base) must not cause base checks to
         fire multiple times on the same artifact.
 
-        _step16_cache (MD5 on data+path) deduplicates the base pass.  Without
-        it, calling validate_step_16c would re-run validate_step_16's checks
-        three times — once per layer — and any base-level error (here E307)
-        would appear triplicated in the returned list.  This test pins the
-        cache behavior by asserting the error appears exactly once.
+        Only 16a calls the base validator, so a base-level error (here E307)
+        appears exactly once in the list returned by 16c.
         """
         from specdev_tools.validation.validators.step_16c import validate_step_16c
 

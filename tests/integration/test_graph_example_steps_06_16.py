@@ -297,10 +297,10 @@ def test_completeness_check_json_skips_the_dimensions_it_cannot_compute() -> Non
     assert all(payload["coverage"][name] == _VACUOUS_DIMENSION for name in _SKIPPED_DIMENSIONS)
 
 
-def test_completeness_check_text_prints_four_skip_lines() -> None:
+def test_completeness_check_text_prints_one_skip_line_per_skipped_dimension() -> None:
     code, out = _run_cli("completeness-check", str(_SPEC), "--repo-root", str(_ROOT))
     assert code == 0
-    assert out.count("[SKIP]") == 4
+    assert out.count("[SKIP]") == len(_SKIPPED_DIMENSIONS)
     assert "[SKIP] FR → API coverage: not computed on this spec shape" in out
 
 

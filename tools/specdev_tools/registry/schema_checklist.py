@@ -27,7 +27,6 @@ ROWS_FILE = Path("tools") / "schema_changes.json"
 CHECKLIST_FILE = Path("docs") / "developers" / "schema-change-checklist.md"
 
 CHANGE_KINDS = ("add", "remove", "change")
-OWNERS = ("M2", "M3")
 
 Inventory = Mapping[str, Mapping[str, PathInfo]]
 
@@ -67,8 +66,8 @@ def _row_problems(raw: Any) -> list[str]:
                 if not isinstance(raw.get(key), str) or not raw[key]]
     if raw.get("change") not in CHANGE_KINDS:
         problems.append(f"change: must be one of {', '.join(CHANGE_KINDS)}")
-    if raw.get("owner") not in OWNERS:
-        problems.append(f"owner: must be one of {', '.join(OWNERS)}")
+    if not isinstance(raw.get("owner"), str):
+        problems.append("owner: must be a string")
     if raw.get("replaced_by") is not None and not isinstance(raw.get("replaced_by"), str):
         problems.append("replaced_by: must be a string or null")
     problems += [f"{key}: must be a list of strings" for key in _STRING_LISTS if not _is_str_list(raw.get(key))]

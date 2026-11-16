@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_upstream_ids, kebab_id_re
+from ...core.scope_helpers import dict_items
 from ...validation.linter_utils import check_no_duplicates
 
 FR_ID_PATTERN = kebab_id_re("fr")
@@ -16,20 +17,21 @@ def validate_step_04(instance: dict[str, Any], toolkit_root: str, spec_root: str
     """
     errors: list[SpecError] = []
 
-    check_no_duplicates(instance.get("functional_requirements", []), "fr_id", "fr_id", errors)
+    requirements = dict_items(instance.get("functional_requirements"))
+    check_no_duplicates(requirements, "fr_id", "fr_id", errors)
 
-    for i, req in enumerate(instance.get("functional_requirements", [])):
+    for i, req in enumerate(requirements):
         fr_id = req.get("fr_id")
 
         # Check FR ID format convention
-        if fr_id:
+        if isinstance(fr_id, str) and fr_id:
             if not FR_ID_PATTERN.match(fr_id):
                 errors.append(make_error("E530", f"FR at index {i} has fr_id '{fr_id}' that does not follow 'fr-<kebab>' convention"))
 
     # Cross-step capability_ref validation
     capability_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id", spec_root=spec_root)
     if capability_ids is not None:
-        for i, req in enumerate(instance.get("functional_requirements", [])):
+        for i, req in enumerate(requirements):
             _validate_capability_ref(req, i, capability_ids, errors)
 
     return errors

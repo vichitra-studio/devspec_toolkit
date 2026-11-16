@@ -69,6 +69,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
+from ..core.scope_helpers import as_dict, as_list, dict_items
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -192,6 +194,8 @@ def derive_group_state(
         if not isinstance(amb, dict):
             continue
         amb_id = amb.get("id", "")
+        if not isinstance(amb_id, str):
+            continue
         status = amb.get("status", "")
         # Missing 'resolved' key → treat as unresolved (conservative default)
         resolved = bool(amb.get("resolved", False))
@@ -457,15 +461,12 @@ def compute_milestone_state(
     # milestone_id in the output is not gate-critical for downstream consumers.
     milestone_id: str = batch_id
 
-    checklist: list[dict] = (
-        plan.get("plan", {})
-        .get("spec_alignment", {})
-        .get("checklist", [])
-    )
-    ambiguities: list[dict] = (
-        plan.get("execution", {})
-        .get("emergent_ambiguities", [])
-    )
+    # A wrong-typed level reads as absent; a group without a string `id` is not a group.
+    checklist: list[dict] = [
+        item for item in dict_items(as_dict(as_dict(plan.get("plan")).get("spec_alignment")).get("checklist"))
+        if isinstance(item.get("id"), str)
+    ]
+    ambiguities: list[dict] = as_list(as_dict(plan.get("execution")).get("emergent_ambiguities"))
 
     group_states: list[dict] = [
         derive_group_state(item, findings_dir, ambiguities)
