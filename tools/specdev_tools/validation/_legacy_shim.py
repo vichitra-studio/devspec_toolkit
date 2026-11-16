@@ -77,10 +77,6 @@ LEGACY_PLAN_CHECKLIST_FIELDS: frozenset[str] = frozenset({"spec_ref"})
 # `traceability_closure.py` is built from.
 LEGACY_PLAN_EVIDENCE_FIELDS: frozenset[str] = frozenset({"critical_evidence", "spec_ref"})
 
-# `trace`, `targets`, `fr_refs`, `source_milestones`: the edges `context/scope_resolver.py` builds its
-# trace graph from.
-LEGACY_SCOPE_LINK_FIELDS: frozenset[str] = frozenset({"trace", "targets", "fr_refs", "source_milestones"})
-
 # `trace` arrays: the structural review in `context/reviewer.py` (coverage and reverse trace) counts them.
 LEGACY_REVIEWER_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
 

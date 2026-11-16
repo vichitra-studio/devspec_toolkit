@@ -18,7 +18,7 @@ from specdev_tools.validation.validators.step_14 import validate_step_14
 
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
 from specdev_tools.context.reviewer import _compute_verdict, _run_structural_pass
-from specdev_tools.context.scope_resolver import _build_trace_graph, resolve_scope
+from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.core.errors import render_errors
 from specdev_tools.core.scope_helpers import is_parked
 from specdev_tools.validation._legacy_shim import (
@@ -136,11 +136,6 @@ def _silent_step_04_integrity(spec):
     assert check_step_04_integrity(arts, set(), capability_ids) == []
 
 
-def _silent_scope_resolver(spec):
-    _, adjacency = _build_trace_graph(spec.spec_dir)
-    assert not any(adjacency[fr["fr_id"]] for fr in spec.files["04_fr_list.json"]["functional_requirements"])
-
-
 def _silent_reviewer(spec):
     review = _run_structural_pass(
         spec.files["05_interface_contracts.json"], "", [("", spec.files["04_fr_list.json"])]
@@ -154,7 +149,6 @@ SILENT_READERS = {
     "matrix_fr_to_api": _silent_matrix_fr_to_api,
     "step_02_integrity": _silent_step_02_integrity,
     "step_04_integrity": _silent_step_04_integrity,
-    "scope_resolver": _silent_scope_resolver,
     "reviewer": _silent_reviewer,
 }
 
@@ -189,8 +183,6 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     assert any(
         "unknown capability" in line for line in render_errors(check_step_04_integrity(arts, set(), {"cap-a"}))
     ), "check_step_04_integrity reader"
-    _, adjacency = _build_trace_graph(spec_dir)
-    assert "cap-missing" in adjacency["fr-a"], "scope_resolver _build_trace_graph reader"
     review = _run_structural_pass(LEGACY_SHAPE["05_interface_contracts.json"], "", [("", {"fr_id": "fr-a"})])
     assert review.upstream_coverage["covered"] == ["fr-a"], "reviewer _run_structural_pass reader"
 
@@ -791,11 +783,9 @@ def test_prune_removed_paths(doc, paths, expected):
 
 def test_scope_resolver_no_crash_on_new_shape(tmp_path):
     spec_dir = _graph_spec(tmp_path)
-    id_to_file, adjacency = _build_trace_graph(spec_dir)
-    assert "fr-password-reset" in id_to_file
-    assert not any(adjacency.values())
     scope = resolve_scope("fr-password-reset", spec_dir, str(TOOLKIT_ROOT))
     assert not scope.get("errors")
+    assert scope["resolved_ids"]["fr"] == ["fr-password-reset"]
 
 
 @pytest.mark.parametrize("value", ["fr-a", 7, {"id": "fr-a"}, [7, None, ["fr-a"]]])
@@ -803,16 +793,8 @@ def test_scope_resolver_no_crash_on_new_shape(tmp_path):
 def test_scope_resolver_does_not_raise_on_wrong_typed_links(tmp_path, field, value):
     spec_dir = _write_spec(tmp_path, {"04_fr_list.json": {"functional_requirements": [
         {"fr_id": "fr-x", field: value}]}})
-    _, adjacency = _build_trace_graph(spec_dir)
-    assert not adjacency.get("fr-x")
-
-
-def test_scope_resolver_builds_every_legacy_edge(tmp_path):
-    spec_dir = _write_spec(tmp_path, {"14_roadmap.json": {"milestones": [{
-        "milestone_id": "m1", "fr_refs": ["fr-a"], "source_milestones": ["m0"],
-        "trace": [{"type": "fr", "id": "fr-b"}], "targets": [{"type": "api", "id": "api-c"}]}]}})
-    _, adjacency = _build_trace_graph(spec_dir)
-    assert adjacency["m1"] == {"fr-a", "m0", "fr-b", "api-c"}
+    scope = resolve_scope("fr-x", spec_dir, str(TOOLKIT_ROOT))
+    assert scope["resolved_ids"].get("fr") == ["fr-x"]
 
 
 def test_reviewer_skips_reverse_trace_without_trace():
@@ -883,7 +865,6 @@ SHIM_FILE = "validation/_legacy_shim.py"
 # following this list; a new guard site must be added here.
 GUARD_SITES = {
     ("context/reviewer.py", "_run_structural_pass"): "context/reviewer.py",
-    ("context/scope_resolver.py", "_collect_entity_ids_and_traces"): "context/scope_resolver.py",
     ("validation/cross_artifact_checks.py", "check_step_02_integrity"): "step-02 capability coverage (M2)",
     ("validation/matrix.py", "build_trace_matrix"): "validation/matrix.py",
     ("validation/traceability_closure.py", "_api_reader_on"): "validation/traceability_closure.py",
@@ -898,7 +879,6 @@ GUARD_SITES = {
 SHIM_CONSUMERS = {
     "cli.py": "completeness-check",
     "context/reviewer.py": "context/reviewer.py",
-    "context/scope_resolver.py": "context/scope_resolver.py",
     "validation/cross_artifact_checks.py": "step-02 capability coverage (M2)",
     "validation/forward_replay_check.py": "removed_paths",
     "validation/matrix.py": "validation/matrix.py",

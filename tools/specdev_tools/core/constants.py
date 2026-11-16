@@ -77,8 +77,6 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
 # ---------------------------------------------------------------------------
 # resolve_extras_path — shared logic for locating output files in the
 # spec/extras/ directory (host-repo).
-# Used by context/extractor.py, context/scope_resolver.py, and
-# validation/validators/step_14.py.
 # ---------------------------------------------------------------------------
 def resolve_extras_path(spec_dir: str, filename: str) -> str:
     """Return the canonical path ``<spec_dir>/extras/<filename>``.

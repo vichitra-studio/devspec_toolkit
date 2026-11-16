@@ -12,7 +12,9 @@ import pytest
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.lifecycle import LifecycleRefusedError, plan_lifecycle_change, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, NOT_APPLICABLE, Graph
+from specdev_tools.graph.queries import candidates
 from specdev_tools.graph.resolve import resolve_graph
+from specdev_tools.graph.trace import trace_node
 
 from ._synth import EXAMPLE_SPEC, ROOT, load_doc, make_toolkit, write_json
 
@@ -23,6 +25,8 @@ _PROBE = "fr-probe"
 # Each consumer of the graph, as the ids of the nodes it reads or reports on; later work items add their rows.
 CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     "resolver": lambda graph: {error.node_id for error in resolve_graph(graph) if error.node_id},
+    "trace": lambda graph: {node.id for node in trace_node(graph, "ac-probe-1", ("up",)).reached},
+    "candidates": lambda graph: {item.id for item in candidates(graph, "derives_from", kind="api").candidates},
 }
 
 

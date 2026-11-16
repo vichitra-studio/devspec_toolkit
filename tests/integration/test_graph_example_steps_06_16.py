@@ -30,7 +30,7 @@ import pytest
 from specdev_tools import cli
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
 from specdev_tools.context.reviewer import _run_structural_pass
-from specdev_tools.context.scope_resolver import _build_trace_graph, resolve_scope
+from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.validation.forward_replay_check import check_forward_replay
@@ -347,17 +347,17 @@ def test_upstream_backlog_is_empty() -> None:
     assert stderr_lines == []
 
 
-def test_scope_resolver_finds_the_fr_and_draws_no_trace_edge(tmp_path: Path) -> None:
-    # `resolve_scope` refreshes `<spec>/extras/trace_matrix.json`, so it runs on a copy: the fixture folder stays clean.
+def test_scope_resolver_finds_the_fr_and_its_lineage_but_not_its_sibling(tmp_path: Path) -> None:
+    # `resolve_scope` writes nothing: neither the fixture folder nor the copy gains an `extras` folder.
     spec = tmp_path / "spec"
     shutil.copytree(_SPEC, spec)
-    id_to_file, adjacency = _build_trace_graph(str(spec))
-    assert "fr-password-reset" in id_to_file
-    assert not any(adjacency.values())
     scope = resolve_scope("fr-password-reset", str(spec), str(_ROOT))
     assert not (_SPEC / "extras").exists()
+    assert not (spec / "extras").exists()
     assert not scope.get("errors")
-    assert scope["resolved_ids"] == {"frs": ["fr-password-reset"]}
+    assert scope["resolved_ids"]["fr"] == ["fr-password-reset"]
+    assert "cap-account-recovery" in scope["resolved_ids"]["capability"]
+    assert "fr-password-reset-request" not in scope["source_files"]
 
 
 def test_structural_reviewer_finds_nothing_to_report() -> None:

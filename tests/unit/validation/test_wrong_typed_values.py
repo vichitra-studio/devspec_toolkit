@@ -27,7 +27,7 @@ from unittest import mock
 import pytest
 
 from specdev_tools.context.milestone_state import compute_milestone_state
-from specdev_tools.context.scope_resolver import _build_trace_graph
+from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import run_graph_check
@@ -400,12 +400,11 @@ def _payload() -> dict[str, Any]:
 
 
 def _outputs(folder: Path) -> dict[str, Any]:
-    _, adjacency = _build_trace_graph(str(folder))
     return {
         "closure": [error.render() for error in check_traceability_closure(str(folder), str(_ROOT))],
         "uncomputed": uncomputed_dimensions(str(folder), str(_ROOT)),
         "matrix": build_trace_matrix(str(_ROOT), str(folder)),
-        "graph": {key: sorted(value) for key, value in adjacency.items()},
+        "scope": resolve_scope("FR-CORPUS-001", str(folder), str(_ROOT)),
     }
 
 

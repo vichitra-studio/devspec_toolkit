@@ -27,14 +27,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TOOLS_DIR = REPO_ROOT / "tools"
 SPEC_CORPUS = REPO_ROOT / "tests" / "fixtures" / "spec_corpus"
+GRAPH_EXAMPLE_SPEC = REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+SCOPE_ENTRY = "fr-password-reset"
 
 
 @pytest.fixture
-def spec_corpus_copy(tmp_path):
-    """Return a temporary copy of SPEC_CORPUS so writes (e.g. trace_matrix.json)
-    land in tmp_path rather than the tracked fixture directory."""
-    dest = tmp_path / "spec_corpus"
-    shutil.copytree(str(SPEC_CORPUS), str(dest))
+def graph_example_copy(tmp_path):
+    """Return a temporary copy of the worked example spec (a 1.2.0 graph with declared links)."""
+    dest = tmp_path / "spec"
+    shutil.copytree(str(GRAPH_EXAMPLE_SPEC), str(dest))
     return dest
 
 
@@ -489,59 +490,61 @@ class TestContextFreshness:
 # ---------------------------------------------------------------------------
 
 class TestContextScope:
-    """Smoke tests for `specdev context scope`."""
+    """Smoke tests for `specdev context scope` (an alias over the spec graph's trace)."""
 
-    def test_entry_id_present_in_source_files(self, spec_corpus_copy):
+    def test_entry_id_present_in_source_files(self, graph_example_copy):
         """The queried entry ID must appear in source_files with its origin file."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
-        assert "FR-CORPUS-001" in data["source_files"], (
-            f"FR-CORPUS-001 not found in source_files: {data.get('source_files')}"
+        assert SCOPE_ENTRY in data["source_files"], (
+            f"{SCOPE_ENTRY} not found in source_files: {data.get('source_files')}"
         )
-        assert data["source_files"]["FR-CORPUS-001"]["file"].endswith("04_fr_list.json"), (
-            f"Unexpected source file: {data['source_files']['FR-CORPUS-001']['file']}"
+        assert data["source_files"][SCOPE_ENTRY]["file"].endswith("04_fr_list.json"), (
+            f"Unexpected source file: {data['source_files'][SCOPE_ENTRY]['file']}"
         )
 
-    def test_connected_entities_are_reachable(self, spec_corpus_copy):
-        """BFS must discover cross-file linked entities (milestone, API, NFR, etc.)."""
+    def test_connected_entities_are_reachable(self, graph_example_copy):
+        """The scope must reach linked entities of other files, grouped by kind, and none of the entry's siblings."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
-        # All IDs across all buckets (spec_corpus uses uppercase so they land in "other")
-        all_ids: set[str] = set()
         resolved = data.get("resolved_ids", {})
+        all_ids: set[str] = set()
         for bucket_ids in resolved.values():
             all_ids.update(bucket_ids)
 
-        expected_connected = {"MS-CORPUS-001", "API-CORPUS-001", "NFR-CORPUS-001"}
+        expected_connected = {"milestone-account-recovery", "api-password-reset-confirm", "nfr-latency-reset-email"}
         missing = expected_connected - all_ids
         assert not missing, (
             f"Expected cross-file entities {expected_connected} to be reachable. "
             f"Missing: {missing}. All found: {all_ids}"
         )
+        assert resolved["fr"] == [SCOPE_ENTRY], "the buckets are named by kind and the FR bucket holds the entry alone"
+        assert "fr-password-reset-request" not in all_ids, "a sibling FR is not part of the scope"
+        assert "deprecated" in proc.stderr, "context scope prints a deprecation note on stderr"
 
-    def test_entry_field_echoed(self, spec_corpus_copy):
+    def test_entry_field_echoed(self, graph_example_copy):
         """The 'entry' field must echo the --entry argument."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
-        assert data["entry"] == "FR-CORPUS-001"
+        assert data["entry"] == SCOPE_ENTRY
 
-    def test_found_entry_has_no_scope_warning(self, spec_corpus_copy):
+    def test_found_entry_has_no_scope_warning(self, graph_example_copy):
         """An entry that exists in spec files must not produce a scope_warning."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
