@@ -1,4 +1,4 @@
-"""No deep validator of steps 01-16, no milestone-state reader and no guarded reader raises on a wrong-typed value.
+"""No deep validator of steps 01-16, no milestone-state reader, no guarded reader and no graph builder raises on a wrong-typed value.
 
 The class is proved, not a list of sites.  Every valid document of the worked example (``tests/fixtures/graph_example``)
 and of the 1.1.1 corpus (``tests/fixtures/spec_corpus``) has the value at every JSON path replaced in turn by each of
@@ -28,6 +28,8 @@ import pytest
 
 from specdev_tools.context.milestone_state import compute_milestone_state
 from specdev_tools.context.scope_resolver import _build_trace_graph
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.model import Graph
 from specdev_tools.validation import _legacy_shim
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
@@ -443,3 +445,40 @@ def _walk(value: Any) -> Iterator[dict[str, Any]]:
     elif isinstance(value, list):
         for item in value:
             yield from _walk(item)
+
+
+# --- the graph builder ------------------------------------------------------------------------------------------
+
+_GRAPH_FILES = (*_STEP_OF_FILE, "00_charter.json", "common/seed_manifest.json")
+
+
+def test_build_graph_does_not_raise_on_a_wrong_value() -> None:
+    """Every mutation of every file of the example and the corpus gives a graph (or load errors), never a traceback.
+
+    The mutated document replaces its file through ``overrides`` and ``files`` limits the build to that file.
+    """
+    failures: list[str] = []
+    cases = [(_EXAMPLE, name) for name in _GRAPH_FILES] + [(_CORPUS, name) for name in _CORPUS_STEPS]
+    for base, name in cases:
+        for path, wrong, mutated in _first_entries(_load(base, name), _WRONG_VALUES):
+            failures += _raise_of(
+                f"{base.name} {name} {list(path)} = {wrong!r}",
+                lambda: _built(base, {name: mutated}, name),
+            )
+        for document in _WHOLE_DOCUMENTS:
+            failures += _raise_of(f"{base.name} {name} = {document!r}", lambda: _built(base, {name: document}, name))
+    assert failures == []
+
+
+def _built(base: Path, overrides: dict[str, Any], name: str) -> dict[str, Any]:
+    graph = build_graph(str(base), str(_ROOT), files=[name], overrides=overrides)
+    return {"graph": isinstance(graph, Graph)}
+
+
+def test_build_graph_reads_a_file_that_is_not_utf8_json_as_a_load_error(tmp_path: Path) -> None:
+    folder = tmp_path / "spec"
+    shutil.copytree(_EXAMPLE, folder)
+    for raw in (b"{", _NOT_UTF8, b"[]"):
+        (folder / "04_fr_list.json").write_bytes(raw)
+        graph = build_graph(str(folder), str(_ROOT))
+        assert [error.file for error in graph.load_errors] == ["04_fr_list.json"]

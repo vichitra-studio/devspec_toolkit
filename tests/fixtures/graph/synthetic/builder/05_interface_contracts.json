@@ -1,0 +1,7 @@
+{
+  "interface": {
+    "apis": [
+      {"api_id": "api-login", "statement": "POST /sessions", "derives_from": ["fr-login"]}
+    ]
+  }
+}

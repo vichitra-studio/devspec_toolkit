@@ -1,0 +1,6 @@
+{
+  "environments": {
+    "prod": {"description": "Production", "derives_from": ["cap-login"]},
+    "dev": {"lifecycle": "not_applicable"}
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "capabilities": [
+    {"capability_id": "cap-login", "title": "Sign in", "derives_from": ["seed-accounts"]}
+  ]
+}
