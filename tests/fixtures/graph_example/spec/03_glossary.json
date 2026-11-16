@@ -13,11 +13,27 @@
         "kind": "term",
         "version": "1.0.0"
       }
+    },
+    {
+      "term_id": "term-reset-email-delivery-time-p95",
+      "term": "reset email delivery time p95",
+      "definition": "The 95th percentile of the time from a reset request to the reset email arriving in the member's inbox.",
+      "units": "ms",
+      "term_ref": {
+        "id": "cn:project:term:reset-email-delivery-time-p95",
+        "kind": "term",
+        "version": "1.0.0"
+      }
     }
   ],
   "canonical_refs_used": [
     {
       "id": "cn:project:term:reset-token",
+      "kind": "term",
+      "version": "^1.0.0"
+    },
+    {
+      "id": "cn:project:term:reset-email-delivery-time-p95",
       "kind": "term",
       "version": "^1.0.0"
     }

@@ -78,6 +78,21 @@
       "lifecycle": {
         "introduced_at": "2026-11-15T00:00:00Z"
       }
+    },
+    {
+      "id": "cn:project:term:reset-email-delivery-time-p95",
+      "kind": "term",
+      "preferred_label": "reset email delivery time p95",
+      "definition": "The 95th percentile of the time from a reset request to the reset email arriving in the member's inbox.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
     }
   ],
   "aliases": []

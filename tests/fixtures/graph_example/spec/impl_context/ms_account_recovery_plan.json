@@ -1,0 +1,56 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "plan-ms-account-recovery",
+  "owner": "api",
+  "created_at": "2026-11-15T00:00:00Z",
+  "milestone": "ms-account-recovery",
+  "canonical_refs_used": [],
+  "plan": {
+    "summary": {
+      "functional_summary": "Confirm endpoint rejects expired and reused reset tokens.",
+      "scope_in": [
+        "password-reset-confirm"
+      ],
+      "scope_out": [
+        "sms-reset"
+      ],
+      "target_file_patterns": [
+        "src/routes/password-resets/confirm.ts"
+      ]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "PWRESET_CONFIRM_EXPIRED_01",
+          "realises": [
+            "tc-confirm-expired-token"
+          ],
+          "description": "The confirm handler returns 410 token-expired for a token older than 30 minutes.",
+          "type": "behavior",
+          "layer": "api",
+          "implementation": {
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/routes/password-resets/confirm.ts",
+                "description": "Reject expired tokens before the password update."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": [
+        "npm run test:contract"
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "The confirm endpoint is a new public interface.",
+      "docs_touched": [
+        "docs/api/password-resets.md"
+      ]
+    }
+  }
+}

@@ -536,17 +536,17 @@ Terms: `E142`, `W574`, `W581`, `W582`, `E581`, `E582`, `W602`, `W605`, `W607`, `
 
 Terms: `graph_example`, `W570`
 
-- [ ] `tests/integration/test_graph_example_steps_00_05.py`: `W570`, `graph_example`
-- [ ] `tests/integration/test_step_16.py`: `W570`
-- [ ] `tests/unit/core/test_ensure_spec_errors.py`: `W570`
-- [ ] `tests/unit/core/test_error_code_coverage.py`: `W570`
-- [ ] `tests/unit/core/test_error_code_registry.py`: `W570`
-- [ ] `tests/unit/generation/test_schema_contracts.py`: `W570`
-- [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `W570`
-- [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `W570`
-- [ ] `tests/unit/validation/test_legacy_shim.py`: `graph_example`
-- [ ] `tests/unit/validation/validators/test_step_02_deep.py`: `graph_example`
-- [ ] `tests/unit/validation/validators/test_step_16a_deep.py`: `W570`
+- [x] `tests/integration/test_graph_example_steps_00_05.py`: `W570`, `graph_example`
+- [x] `tests/integration/test_step_16.py`: `W570`
+- [x] `tests/unit/core/test_ensure_spec_errors.py`: `W570`
+- [x] `tests/unit/core/test_error_code_coverage.py`: `W570`
+- [x] `tests/unit/core/test_error_code_registry.py`: `W570`
+- [x] `tests/unit/generation/test_schema_contracts.py`: `W570`
+- [x] `tests/unit/validation/linters/test_hallucination_lint.py`: `W570`
+- [x] `tests/unit/validation/linters/test_traceability_closure.py`: `W570`
+- [x] `tests/unit/validation/test_legacy_shim.py`: `graph_example`
+- [x] `tests/unit/validation/validators/test_step_02_deep.py`: `graph_example`
+- [x] `tests/unit/validation/validators/test_step_16a_deep.py`: `W570`
 
 ## WI-M3-22: M2 leftovers
 

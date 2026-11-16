@@ -1,0 +1,68 @@
+{
+  "$schema": "vc:08-fixtures",
+  "id": "fixtures-password-reset",
+  "owner": "api",
+  "created_at": "2026-11-15T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fix-password-reset-expired-token",
+      "mode": "contract",
+      "description": "The confirm endpoint rejects a token issued 31 minutes earlier and leaves the password unchanged.",
+      "verifies": [
+        "ac-password-reset-3",
+        "api-password-reset-confirm"
+      ],
+      "input": {
+        "method": "POST",
+        "path": "/v1/password-resets/tok-fixture-expired",
+        "body": {
+          "new_password": "N3w-Passw0rd!"
+        }
+      },
+      "expected": {
+        "status": 410,
+        "body": {
+          "error": "token-expired"
+        }
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fixture_id": "fix-password-reset-reused-token",
+      "mode": "contract",
+      "description": "The confirm endpoint rejects a token that already changed a password, even within 30 minutes.",
+      "verifies": [
+        "inv-reset-token-single-use"
+      ],
+      "input": {
+        "method": "POST",
+        "path": "/v1/password-resets/tok-fixture-used",
+        "body": {
+          "new_password": "N3w-Passw0rd!"
+        }
+      },
+      "expected": {
+        "status": 410,
+        "body": {
+          "error": "token-expired"
+        }
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag",
+      "version": "^1.0.0"
+    }
+  ]
+}

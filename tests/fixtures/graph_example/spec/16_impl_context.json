@@ -1,0 +1,36 @@
+{
+  "$schema": "vc:16-anchor",
+  "id": "anchor-password-reset",
+  "owner": "api",
+  "created_at": "2026-11-15T00:00:00Z",
+  "artifact_role": "anchor",
+  "canonical_refs_used": [],
+  "plan": {
+    "summary": {
+      "functional_summary": "Password reset by emailed single-use link.",
+      "scope_in": [
+        "password-reset-confirm"
+      ],
+      "scope_out": [
+        "sms-reset"
+      ]
+    },
+    "ambiguities": [],
+    "drift": {
+      "checks": [
+        "Verified the ms-account-recovery plan names a milestone of 14_roadmap (2026-11-15)"
+      ]
+    },
+    "milestone_index": [
+      {
+        "anchor_id": "anchor-ms-account-recovery",
+        "about": [
+          "ms-account-recovery"
+        ],
+        "status": "in_progress",
+        "checklist_id_prefix": "PWRESET",
+        "summary": "Confirm endpoint in progress."
+      }
+    ]
+  }
+}

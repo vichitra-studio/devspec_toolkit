@@ -14,21 +14,21 @@ import sys
 from collections import Counter
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from typing import Any, Iterator, NamedTuple
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
+import _graph_example as shared
 from specdev_tools import cli
 from specdev_tools.core.changelog_parser import get_toolkit_version
-from specdev_tools.core.entry_key_registry import iter_nodes, join_nested_path
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import DEEP_VALIDATORS
 
-_ROOT = Path(__file__).parents[2]
-_EXAMPLE = _ROOT / "tests" / "fixtures" / "graph_example"
-_SPEC = _EXAMPLE / "spec"
+_ROOT = shared.ROOT
+_EXAMPLE = shared.EXAMPLE
+_SPEC = shared.SPEC
 _FILES = (
     "00_charter.json",
     "01_capabilities.json",
@@ -45,7 +45,7 @@ _DEEP_STEPS = {
     "04_fr_list.json": "04",
     "05_interface_contracts.json": "05",
 }
-_SEED_ID = "seed-accounts"
+_SEED_ID = shared.SEED_ID
 
 _EXPECTED_KINDS: dict[str, str] = {
     "scope-password-reset": "scope-item",
@@ -71,6 +71,7 @@ _EXPECTED_KINDS: dict[str, str] = {
     "secret-reset-token-signing-key": "secret",
     "secret-mailrelay-api-key": "secret",
     "term-reset-token": "term",
+    "term-reset-email-delivery-time-p95": "term",  # step 07's NFR metric must be a glossary term (E590)
     "fr-password-reset": "fr",
     "fr-password-reset-request": "fr",
     "ac-password-reset-1": "criterion",
@@ -82,11 +83,12 @@ _EXPECTED_KINDS: dict[str, str] = {
     "err-password-reset-confirm-token-expired": "api-error",
 }
 
-# Warnings the example produces by construction: no other code may appear.
+# Warnings about the 00-05 files that the example produces by construction.  The warnings about the files of
+# steps 06-16 are pinned in test_graph_example_steps_06_16.py; spec-check runs on the whole folder here too, and
+# this test keeps only the findings that name a 00-05 file or the seed.
 _PINNED_WARNINGS = Counter(
     {
         "W555": 1,  # the seed has no out-of-scope section (only a prose line), so the lint counts 0 of the 3 it expects
-        "W570": 3,  # steps 07, 14 and 16 are absent: the example stops at step 05 until M3
         "W594": 2,  # 01 and 03 restate the design's wording with little token overlap upstream
     }
 )
@@ -96,44 +98,18 @@ _PINNED_WARNINGS = Counter(
 _PINNED_WARNING_SUBJECTS = Counter(
     {
         ("W555", "STEP00_SEED_OUT_OF_SCOPE_THIN"): 1,
-        ("W570", "07_nfrs.json"): 1,
-        ("W570", "14_roadmap.json"): 1,
-        ("W570", "16_impl_context.json"): 1,
         ("W594", "01_capabilities.json"): 1,
         ("W594", "03_glossary.json"): 1,
     }
 )
 
 
-class _Node(NamedTuple):
-    node_id: str
-    kind: str
-    item: dict[str, Any]
-    links: list[dict[str, Any]]
-
-
 def _load(name: str) -> dict[str, Any]:
-    return json.loads((_SPEC / name).read_text(encoding="utf-8"))
+    return shared.load(name)
 
 
-def _entries(entries: list[dict[str, Any]], parent_path: str | None = None) -> Iterator[tuple[str, dict[str, Any]]]:
-    """Yield ``(full_array_path, registry_entry)`` for every entry, nested ones included."""
-    for entry in entries:
-        full = entry["array_path"] if parent_path is None else join_nested_path(parent_path, entry["array_path"])
-        yield full, entry
-        yield from _entries(entry.get("nested", []), full)
-
-
-def _example_nodes() -> list[_Node]:
-    registry = json.loads((_ROOT / "tools" / "entry_key_registry.json").read_text(encoding="utf-8"))["registry"]
-    nodes: list[_Node] = []
-    for name in _FILES:
-        doc = _load(name)
-        for full, entry in _entries(registry[name]["arrays"]):
-            for item, _path, key in iter_nodes(doc, full):
-                node_id = key if key is not None else item[entry["id_field"]]
-                nodes.append(_Node(node_id, entry["kind"], item, entry.get("links", [])))
-    return nodes
+def _example_nodes() -> list[shared.Node]:
+    return shared.nodes_of(_FILES)
 
 
 def _validated(doc: dict[str, Any]) -> list[tuple[tuple, str]]:
@@ -209,18 +185,24 @@ def test_third_party_without_pin_fails_schema() -> None:
     assert any("pin" in message for _path, message in errors)
 
 
+def _is_about_00_05(rendered: str) -> bool:
+    """True for a finding that names a 00-05 file or is the seed lint's."""
+    return "STEP00_SEED_OUT_OF_SCOPE_THIN" in rendered or any(name in rendered for name in _FILES)
+
+
 def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
     spec_dir = str(stamped_example / "spec")
     errors, context = run_spec_check_json(
         str(_ROOT), spec_dir, spec_root=spec_dir, project_canon_dir=str(stamped_example / "spec" / "canon")
     )
     assert [e.render() for e in errors if not e.code.startswith("W")] == []
-    assert Counter(e.code for e in errors) == _PINNED_WARNINGS
+    about_00_05 = [e for e in errors if _is_about_00_05(e.render())]
+    assert Counter(e.code for e in about_00_05) == _PINNED_WARNINGS
     subjects = Counter(
         (e.code, next((n for c, n in _PINNED_WARNING_SUBJECTS if c == e.code and n in e.render()), "?"))
-        for e in errors
+        for e in about_00_05
     )
-    assert subjects == _PINNED_WARNING_SUBJECTS, [e.render() for e in errors]
+    assert subjects == _PINNED_WARNING_SUBJECTS, [e.render() for e in about_00_05]
     assert context["checks"]["seed-lint"]["status"] != "SKIP"
 
 
