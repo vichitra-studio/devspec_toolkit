@@ -197,8 +197,9 @@ slices:
     - "tools/specdev_tools/guides/**/*.yaml"
     - "tools/specdev_tools/context/**/*.py"
     # Manually-maintained toolkit config files that live under tools/ but are NOT
-    # generator outputs (registry-generate writes only entry_key_registry.json,
-    # extraction_paths.json and cli_commands.json). Routed here for semantic drift review rather than the
+    # generator outputs (registry-generate writes entry_key_registry.json,
+    # extraction_paths.json, step_order.json, cli_commands.json and
+    # docs/developers/schema-change-checklist.md). Routed here for semantic drift review rather than the
     # deterministic generated_artifacts slice:
     #   - command_prefixes.json — command-prefix allowlist (E530 / hallucination_lint)
     #   - step_docs.json — step→reference-doc map (consumed by `specdev ai-help`)
@@ -247,7 +248,11 @@ slices:
 - name: generated_artifacts
   description: >
     Files declared as generator-owned. Must stay byte-exact with the
-    output of their generator. Hand-edits forbidden.
+    output of their generator. Hand-edits forbidden. Two further outputs of
+    registry-generate are routed elsewhere for review of their content:
+    tools/step_order.json (pipeline_topology) and
+    docs/developers/schema-change-checklist.md (docs). The T0-10 check diffs
+    all five against a fresh generator run.
   globs:
     - "tools/entry_key_registry.json"
     - "tools/extraction_paths.json"

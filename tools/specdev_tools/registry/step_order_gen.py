@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import heapq
 import itertools
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -372,6 +373,47 @@ def declared_edge_pairs(hand: dict[str, Any]) -> list[Pair]:
         for edge in declared
         if isinstance(edge, list) and len(edge) == 2 and all(isinstance(x, str) for x in edge)
     ]
+
+
+class StepOrderError(ValueError):
+    """Raised when the hand-kept keys of ``tools/step_order.json`` cannot be used."""
+
+
+_HAND_KEPT_TYPES: tuple[tuple[str, type, str], ...] = (
+    ("version", str, "a string"),
+    ("policy", dict, "an object"),
+    ("coverage_thresholds", dict, "an object"),
+)
+
+
+def _hand_kept_problems(hand: Any) -> list[str]:
+    """Problems of the hand-kept keys of a parsed ``step_order.json`` (empty when usable); never raises."""
+    if not isinstance(hand, dict):
+        return ["the file must be a JSON object"]
+    problems = [f"{key}: must be {what}" for key, kind, what in _HAND_KEPT_TYPES if not isinstance(hand.get(key), kind)]
+    steps = hand.get("steps")
+    if not isinstance(steps, list) or not steps or not all(isinstance(s, str) and s for s in steps):
+        problems.append("steps: must be a non-empty list of step ids")
+    elif len(set(steps)) != len(steps):
+        problems.append("steps: a step id is listed twice")
+    return problems
+
+
+def load_hand_kept(path: str | os.PathLike[str]) -> dict[str, Any]:
+    """Read ``tools/step_order.json`` at *path* for its hand-kept keys.
+
+    Raises ``StepOrderError`` naming every problem when the file cannot be read, is not JSON, or its
+    ``version``, ``steps``, ``policy`` or ``coverage_thresholds`` has the wrong type.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            hand = json.load(fh)
+    except (OSError, ValueError) as exc:
+        raise StepOrderError(f"tools/step_order.json: {exc}") from exc
+    problems = _hand_kept_problems(hand)
+    if problems:
+        raise StepOrderError("tools/step_order.json: " + "; ".join(problems))
+    return hand
 
 
 def build_step_order_document(derived: dict[str, Any], hand: dict[str, Any]) -> dict[str, Any]:

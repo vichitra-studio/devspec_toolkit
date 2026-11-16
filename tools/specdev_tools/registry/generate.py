@@ -64,9 +64,11 @@ from specdev_tools.registry.annotations import (
 )
 from specdev_tools.registry.schema_checklist import generate_checklist
 from specdev_tools.registry.step_order_gen import (
+    StepOrderError,
     build_step_order_document,
     declared_edge_pairs,
     derive_from_decls,
+    load_hand_kept,
 )
 
 
@@ -642,9 +644,7 @@ def generate_registry_from_decls(
     scan = scan_annotations(repo_root, decls)
 
     # Load step order
-    step_order_path = os.path.join(tools_dir, "step_order.json")
-    step_order_data = _load_json(step_order_path)
-    steps: list[str] = step_order_data["steps"]
+    steps: list[str] = load_hand_kept(os.path.join(tools_dir, "step_order.json"))["steps"]
 
     # Build $ref resolvers
     items_resolver, array_resolver = _build_ref_resolver(repo_root)
@@ -787,6 +787,8 @@ def run(
     Raises:
         AnnotationError: if the annotation lint fails or no annotated step gives a step order.
         ChecklistError: if ``tools/schema_changes.json`` is not well formed.
+        StepOrderError: if the hand-kept keys of ``tools/step_order.json`` cannot be used, or its ``steps``
+            leave out an annotated step.
     """
     repo_root = os.path.abspath(repo_root)
     decls = collect_annotations(repo_root)
@@ -798,7 +800,7 @@ def run(
 
     # Derive everything first (the checklist too), so a failure writes no output file.
     if step_order_out:
-        hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
+        hand = load_hand_kept(os.path.join(repo_root, "tools", "step_order.json"))
         derived = derive_from_decls(decls)
         if not derived["steps"]:
             raise AnnotationError(
@@ -807,6 +809,11 @@ def run(
         declared = declared_edge_pairs(hand)
         if declared:
             derived = derive_from_decls(decls, declared)
+        unlisted = [s for s in derived["steps"] if s not in hand["steps"]]
+        if unlisted:  # writing would drop these steps from the registry and from step_order.json
+            raise StepOrderError(
+                f"tools/step_order.json: steps: annotated step(s) {', '.join(unlisted)} are not listed"
+            )
         outputs.append((os.path.abspath(step_order_out), build_step_order_document(derived, hand)))
     if cli_commands_out:
         # Lazy: generate_cli_commands builds the full CLI parser (specdev_tools.cli), which loads
@@ -815,9 +822,9 @@ def run(
 
         outputs.append((os.path.abspath(cli_commands_out), generate_cli_commands()))
 
-    checklist = generate_checklist(Path(repo_root)) if checklist_out else None
+    checklist = (os.path.abspath(checklist_out), generate_checklist(Path(repo_root))) if checklist_out else None
 
     for path, doc in outputs:
         _write_doc(path, doc)
-    if checklist is not None:
-        _write_text(os.path.abspath(checklist_out), checklist)
+    if checklist:
+        _write_text(*checklist)

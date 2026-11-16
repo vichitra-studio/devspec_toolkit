@@ -177,3 +177,30 @@ def test_t10_specdev_unavailable_emits_p2_finding():
     assert f.get("catalog_tag") == "D9", (
         f"Expected catalog_tag='D9', got {f.get('catalog_tag')!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# T0-10: every generator output is compared
+# ---------------------------------------------------------------------------
+
+
+def test_t10_redirects_every_output_flag_of_registry_generate():
+    """GENERATED_OUTPUTS names every ``--*out`` flag of ``registry-generate``, so a new output cannot go undiffed."""
+    from specdev_tools.cli import build_parser
+
+    subparsers = next(a for a in build_parser()._actions if getattr(a, "choices", None) and "registry-generate" in a.choices)
+    out_flags = {
+        flag
+        for action in subparsers.choices["registry-generate"]._actions
+        for flag in action.option_strings
+        if flag == "--out" or flag.endswith("-out")
+    }
+    assert {flag for flag, _rel in _tier0.GENERATED_OUTPUTS} == out_flags
+    for _flag, rel in _tier0.GENERATED_OUTPUTS:
+        assert (_tier0.REPO_ROOT / rel).is_file(), rel
+
+
+def test_t10_clean_tree_has_no_generator_drift():
+    """On the committed tree the five generated files equal a fresh generator run."""
+    assert _tier0.check_t10_generated_artifacts_clean() == []
+

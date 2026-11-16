@@ -18,6 +18,7 @@ from specdev_tools.registry.annotations import (
 from specdev_tools.registry.generate import run as registry_run
 from specdev_tools.registry.step_order_gen import (
     Disagreement,
+    StepOrderError,
     build_step_order_document,
     derive_from_decls,
     derive_step_order,
@@ -305,6 +306,56 @@ def test_step_order_out_failure_writes_nothing(tmp_path):
     with pytest.raises(ValueError, match="no annotated step"):
         registry_run(str(root), str(r), str(e), step_order_out=str(o))
     assert not r.exists() and not e.exists() and not o.exists()
+
+
+def _edit_hand(root: Path, edit) -> None:
+    path = root / "tools" / "step_order.json"
+    hand = json.loads(path.read_text())
+    path.write_text(json.dumps(edit(hand)))
+
+
+def _without(key: str):
+    return lambda hand: {k: v for k, v in hand.items() if k != key}
+
+
+@pytest.mark.parametrize(
+    "edit, fragment",
+    [(_without(key), key) for key in ("version", "steps", "policy", "coverage_thresholds")]
+    + [
+        (lambda hand: {**hand, "steps": None}, "steps"),
+        (lambda hand: {**hand, "steps": 5}, "steps"),
+        (lambda hand: {**hand, "steps": "01"}, "steps"),
+        (lambda hand: {**hand, "steps": [1, 2]}, "steps"),
+        (lambda hand: {**hand, "steps": []}, "steps"),
+        (lambda hand: {**hand, "steps": hand["steps"] + hand["steps"][:1]}, "listed twice"),
+        (lambda hand: {**hand, "version": 5}, "version"),
+        (lambda hand: {**hand, "policy": None}, "policy"),
+        (lambda hand: [hand], "JSON object"),
+        (lambda hand: None, "JSON object"),
+        (lambda hand: {**hand, "steps": ["01"]}, "04"),  # an annotated step left out of the hand list
+    ],
+)
+def test_hand_kept_keys_that_cannot_be_used_fail_and_write_nothing(edit, fragment, tmp_path):
+    root = _toolkit(tmp_path, [
+        _N("01", "capability"),
+        _N("04", "fr", [("derives_from", ["capability"], None)]),
+    ])
+    _edit_hand(root, edit)
+    r, e, o = tmp_path / "r.json", tmp_path / "e.json", tmp_path / "o.json"
+    clear_shared_caches()
+    with pytest.raises(StepOrderError, match=fragment):
+        registry_run(str(root), str(r), str(e), step_order_out=str(o))
+    assert not r.exists() and not e.exists() and not o.exists()
+
+
+def test_a_step_order_file_that_is_not_json_fails_and_writes_nothing(tmp_path):
+    root = _toolkit(tmp_path, [_N("01", "capability")])
+    (root / "tools" / "step_order.json").write_text("{")
+    r, e = tmp_path / "r.json", tmp_path / "e.json"
+    clear_shared_caches()
+    with pytest.raises(StepOrderError, match="step_order.json"):
+        registry_run(str(root), str(r), str(e))
+    assert not r.exists() and not e.exists()
 
 
 def test_cli_step_order_failure_is_a_clean_error(tmp_path):

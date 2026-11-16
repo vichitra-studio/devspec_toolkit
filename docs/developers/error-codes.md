@@ -789,7 +789,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP
 
-**Trigger (E550)**: Fired by `forward_replay_check.py` in three shapes: (1) `SPECDEV_REPLAY_DIFF_ERROR_MODE` is set to an invalid value (must be `error` or `ignore`); (2) the diff against the base ref could not be computed at all; (3) a changed step's downstream consumers (per `tools/step_order.json`) were not also replayed.
+**Trigger (E550)**: Fired by `forward_replay_check.py` in three shapes: (1) `SPECDEV_REPLAY_DIFF_ERROR_MODE` is set to an invalid value (must be `error` or `ignore`); (2) the diff against the base ref could not be computed at all; (3) a step that comes after a changed step in the `steps` order of `tools/step_order.json`, and has a spec file, was not changed too (the first such step is named; `downstream_consumers` is not read).
 
 **Trigger (W550)**: Fired when semantic coverage checking could not read the base-ref version of an artifact (e.g. the file didn't exist at the base ref), so the coverage-regression check for that artifact is skipped rather than failing closed.
 

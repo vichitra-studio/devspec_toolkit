@@ -702,7 +702,8 @@ def _forward_replay_repo(root: Path, *, shim: bool) -> None:
     (root / "tools").mkdir(parents=True)
     (root / "spec").mkdir()
     (root / "tools" / "step_order.json").write_text(json.dumps({"steps": ["00", "01"]}), encoding="utf-8")
-    row = {"id": "SC-01-90", "step": "01", "path": "capabilities[].trace", "change": "remove", "shim": shim}
+    row = {"id": "SC-01-90", "step": "01", "path": "capabilities[].trace", "change": "remove", "shim": shim,
+           "replaced_by": None, "owner": "M2", "design": [], "tickets": []}
     (root / "tools" / "schema_changes.json").write_text(json.dumps({"rows": [row]}), encoding="utf-8")
     (root / "spec" / "00_charter.json").write_text("{}", encoding="utf-8")
     (root / "spec" / "01_capabilities.json").write_text(
@@ -732,13 +733,18 @@ def test_forward_replay_prunes_removed_paths_before_dropped_id_diff(tmp_path):
 
 
 def test_removed_paths_lists_shim_removals_of_one_step(tmp_path):
+    def row(seq: int, step: str, path: str, change: str, shim: bool) -> dict:
+        return {"id": f"SC-{step}-{seq:02d}", "step": step, "path": path, "change": change, "shim": shim,
+                "replaced_by": None, "owner": "M3", "design": [], "tickets": []}
+
     rows = [
-        {"id": "a", "step": "05", "path": "out_of_scope", "change": "remove", "shim": True},
-        {"id": "b", "step": "05", "path": "apis[].trace", "change": "remove", "shim": False},
-        {"id": "c", "step": "05", "path": "apis[].scope", "change": "change", "shim": True},
-        {"id": "d", "step": "16_anchor", "path": "plan.x", "change": "remove", "shim": True},
-        {"id": "e", "step": "16_impl_context", "path": "plan.y", "change": "remove", "shim": True},
-        {"id": "f", "step": "13a", "path": "z", "change": "remove", "shim": True},
+        row(1, "05", "out_of_scope", "remove", True),
+        row(2, "05", "apis[].trace", "remove", False),
+        row(3, "05", "apis[].scope", "change", True),
+        row(1, "16_anchor", "plan.x", "remove", True),
+        row(1, "16_impl_context", "plan.y", "remove", True),
+        row(1, "13a", "z", "remove", True),
+        {"id": "SC-05-09", "step": "05", "path": "not_well_formed", "change": "remove", "shim": True},
     ]
     (tmp_path / "tools").mkdir()
     (tmp_path / "tools" / "schema_changes.json").write_text(json.dumps({"rows": rows}), encoding="utf-8")
@@ -746,6 +752,13 @@ def test_removed_paths_lists_shim_removals_of_one_step(tmp_path):
     assert removed_paths("16", tmp_path) == ["plan.x", "plan.y"]
     assert removed_paths("13", tmp_path) == []
     assert removed_paths("01", tmp_path / "absent") == []
+
+
+@pytest.mark.parametrize("content", ['{"rows": null}', '{"rows": 5}', "[]", "null", "{", "\xff\xfe"])
+def test_removed_paths_of_a_rows_file_that_cannot_be_used_is_empty(content, tmp_path):
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools" / "schema_changes.json").write_bytes(content.encode("latin-1"))
+    assert removed_paths("05", tmp_path) == []
 
 
 def test_shipped_removed_paths_hold_the_legacy_read_fields():

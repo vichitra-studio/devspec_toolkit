@@ -10,7 +10,7 @@ canon/
   aliases.json           # Alias mappings for alternate term spellings
   aliases.schema.json    # JSON Schema for aliases.json
   kind.schema.json       # JSON Schema for individual kinds/ files
-  kinds/                 # 25 per-kind JSON files (one per vocabulary kind)
+  kinds/                 # 24 per-kind JSON files (one per vocabulary kind)
 ```
 
 `manifest.json` is the authoritative flat registry. The `kinds/` files are the editable source; `manifest.json` is regenerated from them.

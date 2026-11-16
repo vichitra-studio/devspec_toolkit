@@ -60,7 +60,7 @@ Explicitly allowed: `Read` on `$TOOLKIT_ROOT/prompts/prompt_NN_*.md` and `$TOOLK
 |---|---|---|
 | `step_order.json` | `$TOOLKIT_ROOT/tools/step_order.json` | "Which steps are downstream of step N? Which upstream files feed step N?" |
 | `trace_matrix.json` | `$GIT_ROOT/spec/extras/trace_matrix.json` | "If I change entity E, which other entities are linked? Fixed link categories: `apis`, `fixtures`, `nfrs`, `threats`. (`trace_type.json` is a separate vocabulary registry for `trace[]` arrays inside entities — not the matrix keys.)" |
-| `entry_key_registry.json` | `$TOOLKIT_ROOT/tools/entry_key_registry.json` | "Which file/array/id_field holds entities of kind K? Registry is keyed by filename: `{<file>: {step, arrays: [{array_path, id_field, kind}]}}`. Each array entry may also carry an optional `nested: [{array_path, id_field, kind}]` array (present in `fr`, `threat`, `milestone`) for sub-array entries. To find the file for a kind, scan entries." |
+| `entry_key_registry.json` | `$TOOLKIT_ROOT/tools/entry_key_registry.json` | "Which file/array/id_field holds entities of kind K? Registry is keyed by filename: `{<file>: {step, arrays: [{array_path, id_field, kind}]}}`. Each array entry may also carry an optional `nested: [{array_path, id_field, kind}]` array for sub-array entries (the registry file says which kinds carry one). To find the file for a kind, scan entries." |
 
 **Composition rule**: when walking from a kind to its owning file, from an entity to its dependents, or from a step to its downstream files — compose these three indices. Never hardcode the mappings they encode.
 

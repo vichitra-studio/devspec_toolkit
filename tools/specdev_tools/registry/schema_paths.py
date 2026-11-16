@@ -46,7 +46,7 @@ def _type_of(node: dict[str, Any]) -> str | None:
     """The node's ``type`` as one string; a type list becomes its sorted members joined by ``|``."""
     declared = node.get("type")
     if isinstance(declared, list):
-        return "|".join(sorted(declared))
+        return "|".join(sorted(str(member) for member in declared))
     return declared if isinstance(declared, str) else None
 
 
@@ -171,8 +171,8 @@ def flatten_schema_dir(schema_dir: Path) -> dict[str, dict[str, PathInfo]]:
     loaded: dict[Path, dict[str, Any]] = {}
     for file in sorted(schema_dir.rglob(f"*{_SCHEMA_SUFFIX}")):
         try:
-            loaded[file] = json.loads(file.read_text())
-        except json.JSONDecodeError as exc:
+            loaded[file] = json.loads(file.read_text(encoding="utf-8"))
+        except ValueError as exc:  # not UTF-8 or not JSON
             raise SchemaPathError(f"{file}: invalid JSON: {exc}") from exc
     docs = index_by_id(loaded.values())
     listed = [f for f in loaded if f.parent in (schema_dir, schema_dir / "core")]

@@ -2206,6 +2206,7 @@ def main():
         from .registry.annotations import AnnotationError
         from .registry.generate import run as registry_generate_run
         from .registry.schema_checklist import ChecklistError
+        from .registry.step_order_gen import StepOrderError
         try:
             registry_generate_run(
                 repo_root=repo_root,
@@ -2215,7 +2216,7 @@ def main():
                 cli_commands_out=cli_commands_out,
                 checklist_out=checklist_out,
             )
-        except (AnnotationError, ChecklistError) as exc:  # the issue list is in the message
+        except (AnnotationError, ChecklistError, StepOrderError) as exc:  # the issue list is in the message
             print(f"registry-generate: failed: {exc}", file=sys.stderr)
             sys.exit(1)
 

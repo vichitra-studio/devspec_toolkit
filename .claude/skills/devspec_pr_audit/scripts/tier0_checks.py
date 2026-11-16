@@ -458,11 +458,21 @@ def check_t09_changelog_entry_present(
     )]
 
 
+# Every file `specdev registry-generate` writes: (redirect flag, committed path).
+GENERATED_OUTPUTS: tuple[tuple[str, str], ...] = (
+    ("--out", "tools/entry_key_registry.json"),
+    ("--extraction-paths-out", "tools/extraction_paths.json"),
+    ("--step-order-out", "tools/step_order.json"),
+    ("--cli-commands-out", "tools/cli_commands.json"),
+    ("--checklist-out", "docs/developers/schema-change-checklist.md"),
+)
+
+
 def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
     """T0-10: Re-run registry-generate to temp files; diff against committed files.
 
-    The generator supports: --repo-root, --out (entry_key_registry),
-    --extraction-paths-out. We generate to temp paths then diff.
+    Every output of the generator (GENERATED_OUTPUTS) is redirected to a temp
+    path and compared with the committed file.
 
     Falls back to a P2 informational finding if specdev is unavailable.
     """
@@ -496,18 +506,14 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
         ))
         return findings
 
-    # The generator supports --out and --extraction-paths-out for redirect output.
+    # Every output of the generator has a redirect flag (GENERATED_OUTPUTS).
     # Generate to temp files, then diff against committed files.
-    # The two generator-owned artifacts are entry_key_registry.json and extraction_paths.json.
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_ekr = Path(tmpdir) / "entry_key_registry.json"
-        tmp_ep = Path(tmpdir) / "extraction_paths.json"
-        tmp_cc = Path(tmpdir) / "cli_commands.json"
-
-        gen_cmd = (
-            f"{env_setup}specdev registry-generate --repo-root . "
-            f"--out {tmp_ekr} --extraction-paths-out {tmp_ep} --cli-commands-out {tmp_cc}"
+        tmp_paths = [Path(tmpdir) / Path(rel).name for _flag, rel in GENERATED_OUTPUTS]
+        redirects = " ".join(
+            f"{flag} {tmp}" for (flag, _rel), tmp in zip(GENERATED_OUTPUTS, tmp_paths)
         )
+        gen_cmd = f"{env_setup}specdev registry-generate --repo-root . {redirects}"
         gen_result = subprocess.run(
             ["bash", "-c", gen_cmd],
             capture_output=True, text=True, cwd=REPO_ROOT,
@@ -530,8 +536,7 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
             ))
             return findings
 
-        tmp_paths = [tmp_ekr, tmp_ep, tmp_cc]
-        disk_rels = ["tools/entry_key_registry.json", "tools/extraction_paths.json", "tools/cli_commands.json"]
+        disk_rels = [rel for _flag, rel in GENERATED_OUTPUTS]
         for tmp_file, rel in zip(tmp_paths, disk_rels):
             disk_file = REPO_ROOT / rel
             if not tmp_file.exists():

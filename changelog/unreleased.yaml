@@ -189,7 +189,9 @@ changes:
       schema's own top-level required, properties and additionalProperties, while
       the step schemas keep most or all of their properties under allOf, so they
       miss the changes below, top-level ones included (align diff reports a 1.1.1
-      file of step 07, 08, 11 or 14 as OK).
+      file of step 07, 08, 11 or 14 as OK). specdev update decides with the same
+      comparison, so it re-stamps spec/specdev_version on such a spec as if
+      nothing had changed.
     migration:
       action: ai_assisted
 
@@ -447,8 +449,10 @@ changes:
       docs/developers/schema-change-checklist.md (rendered from
       tools/schema_changes.json) when --out is absent; --step-order-out now
       defaults to the first file, and the new --checklist-out sets the second. A
-      failed annotation lint, a missing annotated step or a malformed rows file
-      ends the command with registry-generate: failed:. The generator-owned files
+      failed annotation lint, a missing annotated step, a malformed rows file or
+      a tools/step_order.json whose hand-kept keys cannot be used ends the
+      command with registry-generate: failed: and writes no file. The
+      generator-owned files
       are now entry_key_registry.json, extraction_paths.json, step_order.json,
       cli_commands.json and the checklist. In entry_key_registry.json, the kind
       inv becomes invariant, milestone becomes design-milestone (step 09) and

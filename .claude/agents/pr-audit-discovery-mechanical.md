@@ -72,11 +72,14 @@ docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json
    a. **D9 — generator drift (T0-10 complement):** For each changed file in
       `generated_artifacts`, run:
       ```bash
-      TMPFILE=$(mktemp)
-      CLITMP=$(mktemp)
-      specdev registry-generate --repo-root . --out "$TMPFILE" --cli-commands-out "$CLITMP"
-      diff "$TMPFILE" tools/entry_key_registry.json
-      diff "$CLITMP" tools/cli_commands.json
+      T=$(mktemp -d)
+      specdev registry-generate --repo-root . --out "$T/ekr.json" --extraction-paths-out "$T/ep.json" \
+        --step-order-out "$T/so.json" --cli-commands-out "$T/cc.json" --checklist-out "$T/cl.md"
+      diff "$T/ekr.json" tools/entry_key_registry.json
+      diff "$T/ep.json" tools/extraction_paths.json
+      diff "$T/so.json" tools/step_order.json
+      diff "$T/cc.json" tools/cli_commands.json
+      diff "$T/cl.md" docs/developers/schema-change-checklist.md
       ```
       Any delta in the diff output → P0 finding
       `catalog_tag: "D9"`. Evidence: diff excerpt (first 20 lines).
@@ -199,7 +202,7 @@ Example P0/P1 finding fragment:
 - **Read**: raw source files for changed paths in scope; digest files for expansion neighbors
 - **Glob**: enumerate files under assigned slice paths
 - **Grep**: pattern checks (hardcoded paths, flag names, documented surface)
-- **Bash**: run `specdev registry-generate --out "$TMPFILE" --cli-commands-out "$CLITMP"` + `diff "$TMPFILE" tools/entry_key_registry.json` + `diff "$CLITMP" tools/cli_commands.json`; JSON parse validation;
+- **Bash**: run `specdev registry-generate` with its five redirect flags (`--out`, `--extraction-paths-out`, `--step-order-out`, `--cli-commands-out`, `--checklist-out`) and `diff` each output against its committed file; JSON parse validation;
   `git show <base>:<file>` to retrieve the pre-PR version of a file for diff comparison
 - **Write**: ONLY to `docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json`
 - Do NOT call Edit; do NOT call any nested Agent tool

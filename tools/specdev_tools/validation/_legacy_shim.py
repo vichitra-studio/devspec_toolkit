@@ -15,7 +15,7 @@ reader reads; ``records_of(artifact)`` gives the file and the object members of 
 exceptions name their records at the call site: the plan's ``execution`` object (``critical_evidence``), the plan
 checklist items (``spec_ref``) and the anchor rows of ``plan.milestone_index`` (``fr_refs``).
 One array holding records of both shapes turns the 1.1.1 reader on for the whole array. The reader of an empty or
-absent array runs as before (``reader_on(..., when_empty=True)``); the FR-to-API, FR-to-fixture and FR-to-milestone
+absent array runs, as it did in 1.1.1 (``reader_on(..., when_empty=True)``); the FR-to-API, FR-to-fixture and FR-to-milestone
 decisions below are written once and used by ``matrix.py`` and ``traceability_closure.py`` alike.
 Deleting this module means deleting every use of ``reader_on``, ``has_legacy_fields``, ``records_of``,
 ``fr_api_reader_on``, ``fr_fixture_reader_on``, ``fr_milestone_reader_on`` and the ``LEGACY_*`` names, and with them
@@ -26,13 +26,13 @@ Deleting this module means deleting every use of ``reader_on``, ``has_legacy_fie
 """
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Collection, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
 from ..core.scope_helpers import is_parked, scope_in
+from ..registry.schema_checklist import load_rows, selects
 
 # 1.1.1 `trace` links, read by three live readers: W564/E535 (05 apis) and W568 (04 frs) in
 # `traceability_closure.py`, and FR-to-API coverage (05 apis) in `matrix.py`.
@@ -130,7 +130,7 @@ def has_legacy_fields(records: Iterable[Any], names: Collection[str]) -> bool:
 def reader_on(records: Iterable[Any], names: Collection[str], *, when_empty: bool = True) -> bool:
     """Return True when a 1.1.1 reader of *names* runs on *records*.
 
-    With no record the reader runs as before (*when_empty*; False for a reader that then has nothing to read);
+    With no record the reader runs, as it did in 1.1.1 (*when_empty*; False for a reader that then has nothing to read);
     otherwise it runs only when a record carries a key of *names*, so records that carry none are a graph-shape
     file and are skipped. Never raises on malformed data.
     """
@@ -160,29 +160,20 @@ _SCHEMA_CHANGES_FILE = Path(__file__).resolve().parents[2] / "schema_changes.jso
 
 
 def removed_paths(step: str, repo_root: str | os.PathLike[str] | None = None) -> list[str]:
-    """Return the paths of fields removed from *step* that a legacy reader still reads.
+    """Return the removed paths of *step* that forward replay prunes from the old file before comparing ids.
 
     These are the ``path`` values of the ``tools/schema_changes.json`` rows with ``change: remove``
     and ``shim: true`` whose ``step`` is *step* or a schema of it (``16`` selects ``16_anchor`` and
     ``16_impl_context``). Paths use the rows' notation (``a[].b``, ``m{}``). *repo_root* is the
     toolkit root (default: the toolkit this module belongs to). Returns ``[]`` when the rows file is
-    absent or unreadable.
+    absent or unreadable; a row that is not well formed is left out.
     """
     path = _SCHEMA_CHANGES_FILE if repo_root is None else Path(repo_root) / "tools" / "schema_changes.json"
     try:
-        rows = json.loads(path.read_text(encoding="utf-8")).get("rows", [])
-    except (OSError, ValueError, AttributeError):
+        rows, _problems = load_rows(Path(path))
+    except (OSError, ValueError):
         return []
-    return [
-        row["path"]
-        for row in rows
-        if isinstance(row, dict)
-        and row.get("shim") is True
-        and row.get("change") == "remove"
-        and isinstance(row.get("path"), str)
-        and isinstance(row.get("step"), str)
-        and (row["step"] == step or row["step"].startswith(f"{step}_"))
-    ]
+    return [row.path for row in rows if row.shim and row.change == "remove" and selects(step, row.step)]
 
 
 def out_of_scope_fr_ids(artifact: Mapping[str, Any]) -> set[str]:

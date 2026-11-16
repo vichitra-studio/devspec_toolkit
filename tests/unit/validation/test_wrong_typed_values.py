@@ -205,7 +205,7 @@ def _files_read(step: str, document: dict[str, Any], base: Path, name: str) -> s
 
 # Readers of a sibling file that raise on one that is not JSON or not UTF-8, by documented contract: ``load_upstream_ids``
 # (step 04 reading 01; ``tests/unit/core/test_loaders.py`` pins the ``JSONDecodeError``) and the step 03 context loaders of
-# ``validate.py`` (07 and 16).  1.1.1 code the milestone did not touch; ``_run_deep_validation`` turns the raise into E521.
+# ``validate.py`` (07 and 16).  1.1.1 code the milestone did not touch; ``validate.py`` reports the raise as E520 (step 03) or E521 (step 04).
 _LOADERS_THAT_RAISE = {("03", "07_nfrs.json"), ("03", "16_impl_context.json"), ("04", "01_capabilities.json")}
 
 

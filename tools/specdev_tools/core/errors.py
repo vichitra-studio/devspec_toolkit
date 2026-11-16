@@ -160,7 +160,8 @@ ERROR_CODES = {
     # Legacy schema surfaced when a post-split host repo still declares the
     # pre-split schema on its anchor artifact.  Soft-warn only — schema
     # validation against vc:16-impl-context still passes, but host repos
-    # need the signal to migrate per the 0.6.0 breaking-change entry.
+    # need the signal to migrate per the 0.6.0 breaking-change entry.  Also
+    # reported for a plan file in impl_context/ that has no `milestone` key.
     "W608": "ANCHOR_LEGACY_SCHEMA",
     # Misfiled anchor: an artifact_role="anchor" file landed inside
     # spec/impl_context/ instead of at spec/ root.  Routing

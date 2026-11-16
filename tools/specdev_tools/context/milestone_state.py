@@ -69,17 +69,12 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from ..core.scope_helpers import as_dict, as_list, dict_items
+from ..core.scope_helpers import as_dict, as_list, as_str, dict_items
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _stored_status(value: Any) -> str:
-    """A stored status string, or ``""`` when the value is absent or not a string."""
-    return value if isinstance(value, str) else ""
-
 
 def _load_json(path: str) -> Any:
     """Load JSON from *path*, returning the parsed value."""
@@ -239,9 +234,8 @@ def derive_group_state(
     # --- State derivation (precedence: deferred/wont_do > verified > blocked > code_converged > pending) --
     # M8 rewrites these two reads. A 1.2.0 plan item stores neither status, so both read as absent and the group
     # stays `pending` (or `code_converged` / `blocked` from its findings) until M8 derives the state from records.
-    checklist_status = _stored_status(group.get("checklist_status"))
-    impl = group.get("implementation")
-    impl_status = _stored_status(impl.get("status") if isinstance(impl, dict) else None)
+    checklist_status = as_str(group.get("checklist_status"))
+    impl_status = as_str(as_dict(group.get("implementation")).get("status"))
 
     if checklist_status == "deferred":
         state = "deferred"

@@ -249,7 +249,7 @@ def render_checklist(rows: Iterable[ChangeRow]) -> str:
         "",
         f"{len(rows)} changes since the 1.1.1 baseline across {len(groups)} schema groups. "
         "Each row says what happened to one path (or a glob of paths) of a schema; "
-        "`replaced_by` names where the content went, `shim` marks a removed field or value a legacy reader still reads.",
+        "`replaced_by` names where the content went, `shim` marks a removed field that forward replay leaves out when it compares the ids of the old and the new file.",
     ]
     for step, group in groups.items():
         lines += [

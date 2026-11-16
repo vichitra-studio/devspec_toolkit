@@ -125,11 +125,11 @@ Only NOW do we schedule the work.
 **User Action:**
 > **PROMPT:**
 > The specs (00-13) are updated.
-> Add a new item to `spec/14_roadmap.json`.
-> ID: `step-[feature-name]`.
-> Title: One User Story.
-> Tasks: Atomic sub-tasks.
-> Status: `planned`.
+> Add a new milestone to `spec/14_roadmap.json`.
+> `milestone_id`: `ms-[feature-name]`, with a `name` and a `target_date`.
+> `user_story`: One User Story.
+> `tasks`: Atomic sub-tasks, each with `acceptance_criteria` that `refines` the new requirement's criteria.
+> (A milestone stores no status; the Trinity Anchor row about it does.)
 
 ---
 
