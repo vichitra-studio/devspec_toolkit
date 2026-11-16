@@ -513,7 +513,9 @@ changes:
     description: >
       Interim states until later 1.2.0 changes: the rule text of the step prompts
       still names removed fields (the last example of each Output Contract section
-      validates, which is the one prompt-sync E310 checks in every prompt; earlier
+      of the prompts for steps 06 to 16c has the new shape and passes its JSON
+      Schema; for six of them, 06, 07, 08, 16a, 16b and 16c, specdev validate
+      reports E210 on the canonical refs, as it did in 1.1.1; earlier
       example blocks of prompt_16b_impl_coder.md still show removed fields);
       specdev align prompts output and the
       migration templates in prompts/migration/ for steps 06 to 16 still describe
@@ -527,6 +529,15 @@ changes:
       as rebuilding the trace links of a spec;
       schema/13a_completeness_assessment still describes fr_refs, and the step 13
       title still mentions the trace matrix; tests/fixtures/spec_corpus stays
-      1.1.1-shaped.
+      1.1.1-shaped. Some procedures in those prompts, skills and agents do not
+      work on a 1.2.0-shaped spec until then: the milestone-close steps of
+      prompt_16c_impl_reviewer.md and of the specdev-trinity skill (the anchor
+      row refuses status done without close, and a step 09 or step 14 milestone
+      has no status); the emergent-ambiguity insert in
+      .claude/agents/specdev-trinity-impl.md (it writes severity and no about);
+      the matrix checks of prompt_14_roadmap.md and prompt_16b_impl_coder.md
+      (the values they read are among those specdev matrix leaves out); and
+      prompt_13a_completeness_assessment.md, which copies the four coverage
+      numbers that completeness-check does not compute on that shape.
     migration:
       action: none

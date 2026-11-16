@@ -115,5 +115,5 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 
 ## Outputs
 - Validated JSON artifacts under `spec/00*` through `spec/12*`.
-- Updated trace matrix (FR ↔ API coverage is not computed for steps 00-05 in the new shape until graph coverage lands; the matrix omits `fr_with_api` and the `apis` of each row and names them in its top-level `not_computed` list; once steps 06 to 16 have the new shape too, the list also names `fr_with_fixture`, `fixtures`, `fr_with_nfr`, `nfrs`, `fr_with_threat`, `threats`, `milestone_coverage` and `invariant_threat_coverage`).
+- Updated trace matrix (FR ↔ API coverage is not computed for steps 00-05 in the new shape until graph coverage lands; the matrix omits `fr_with_api` and the `apis` of each row and names them in its top-level `not_computed` list; on a spec whose later steps have the new shape as well, the list also names `fr_with_fixture`, `fixtures`, `fr_with_nfr`, `nfrs`, `fr_with_threat`, `threats`, `milestone_coverage` and `invariant_threat_coverage`).
 - Governance rules embedded in CI to keep the spec authoritative.
