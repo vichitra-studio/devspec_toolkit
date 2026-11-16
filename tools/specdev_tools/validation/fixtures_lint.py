@@ -9,7 +9,11 @@ _FIXTURES_SCHEMA_SUFFIX = "/08_fixtures.schema.json"
 
 
 def _load_fixtures(spec_dir: str) -> list[Any]:
-    """Return every fixture entry of every step 08 artifact under *spec_dir*; unreadable files are skipped."""
+    """Return every fixture entry of every step 08 artifact under *spec_dir*; unreadable files are skipped.
+
+    As in 1.1.1, a step 08 artifact is recognised by a ``$schema`` ending in ``/08_fixtures.schema.json``;
+    a file that carries the registry id ``vc:08-fixtures`` is not read (DEVSPEC-237).
+    """
     fixtures: list[Any] = []
     for p in iter_spec_artifacts(spec_dir):
         try:

@@ -18,6 +18,7 @@ keys carried by hand in the file itself (``version``, ``steps``, ``policy``, ``c
 Errors are ``AnnotationError`` with the ``ANNOT-`` prefix: ANNOT-20 (the derived step graph
 has a cycle), ANNOT-21 (an ``x-link`` kind lives in the holder's own step and is not in
 ``same_step_kinds``).  Lint issues of the annotations themselves are raised first.
+``StepOrderError`` is raised by ``load_steps`` and ``load_hand_kept`` when the hand-kept keys cannot be used.
 """
 from __future__ import annotations
 
@@ -400,10 +401,12 @@ def _declared_edges_problems(hand: dict[str, Any]) -> list[str]:
         return []
     steps, edges = hand.get("steps"), hand["declared_edges"]
     listed = set(steps) if isinstance(steps, list) and all(isinstance(s, str) for s in steps) else set()
-    well_formed = isinstance(edges, list) and all(
-        isinstance(e, list) and len(e) == 2 and all(isinstance(x, str) and x in listed for x in e) for e in edges
-    )
-    return [] if well_formed else ["declared_edges: must be a list of [producer, consumer] pairs of steps listed in steps"]
+    if not isinstance(edges, list) or not all(
+        isinstance(e, list) and len(e) == 2 and all(isinstance(x, str) for x in e) for e in edges
+    ):
+        return ["declared_edges: must be a list of [producer, consumer] pairs of step ids"]
+    unlisted = sorted({x for e in edges for x in e} - listed)
+    return [f"declared_edges: names step(s) {', '.join(unlisted)} that steps does not list"] if unlisted else []
 
 
 def _exemptions_problems(hand: dict[str, Any]) -> list[str]:

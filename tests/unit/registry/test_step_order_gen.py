@@ -332,7 +332,8 @@ def _without(key: str):
         (lambda hand: {**hand, "policy": None}, "policy"),
         (lambda hand: [hand], "JSON object"),
         (lambda hand: None, "JSON object"),
-        (lambda hand: {**hand, "steps": ["01"]}, "declared_edges"),  # an edge names a step that is not listed
+        (lambda hand: {**hand, "declared_edges": [["01", "04"]], "steps": ["01"]},
+         "declared_edges: names step.s. 04 that steps does not list"),
         (lambda hand: {**_without("declared_edges")(hand), "steps": ["01"]}, "annotated step.*04"),
         (lambda hand: {**hand, "declared_edges": "abc"}, "declared_edges"),
         (lambda hand: {**hand, "declared_edges": None}, "declared_edges"),

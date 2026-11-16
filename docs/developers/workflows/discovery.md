@@ -111,7 +111,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Task Deferral**: A task is set aside with `disposition`, which needs both `value` (`deferred` or `wont_do`) and `reason`. Task and milestone `status` are gone.
 - **Removed Fields**: `fr_refs`, `capability_refs`, `source_milestones`, `deliverables`, `tech_stack` and `dependencies` are not part of the schema.
 - **Date Sequencing**: Milestones must be ordered chronologically. If `m2` lists `target_date` earlier than `m1`, validation fails.
-- **Migration Plan**: `migration_plan` cannot be empty (the schema requires at least one character; no other check reads it). If no migration is needed, state it explicitly ("No migration required because ...").
+- **Migration Plan**: `migration_plan` cannot be empty (the schema requires at least one character; the vague-language lint, W593, also scans it). If no migration is needed, state it explicitly ("No migration required because ...").
 
 ## Outputs
 - Validated JSON artifacts under `spec/00*` through `spec/12*`.

@@ -202,9 +202,8 @@ def test_t10_redirects_every_output_flag_of_registry_generate():
 
 def test_t10_clean_tree_has_no_generator_drift():
     """On the committed tree the five generated files equal a fresh generator run."""
-    import shutil
-
-    if shutil.which("specdev") is None and not (_tier0.REPO_ROOT / "devspec_env" / "bin" / "activate").exists():
-        pytest.skip("specdev is not on PATH and the repository has no devspec_env")
-    assert _tier0.check_t10_generated_artifacts_clean() == []
+    findings = _tier0.check_t10_generated_artifacts_clean()
+    if any(f["message"].startswith("T0-10 skipped") for f in findings):
+        pytest.skip("the check found no specdev to run")
+    assert findings == []
 

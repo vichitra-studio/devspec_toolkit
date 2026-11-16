@@ -139,10 +139,11 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
     explicitly covers a "removed value" not propagated to dependents. So every
     removal is tagged D7, EXCEPT a load-bearing deterministic toolkit artifact
     (the GENERATED_ARTIFACT_NAMES set), whose absence is treated as a D9
-    generator-integrity defect. For the true generator outputs
-    (entry_key_registry.json, extraction_paths.json, step_order.json,
-    cli_commands.json) that is literal — the
-    generator would re-emit them, so a committed deletion is provably wrong. For
+    generator-integrity defect. For the fully derived generator outputs
+    (entry_key_registry.json, extraction_paths.json, cli_commands.json) that is
+    literal — the generator would re-emit them, so a committed deletion is
+    provably wrong. step_order.json is generated too, but from itself (its
+    hand-kept keys), so the generator cannot run without it. For it and for
     the manually-maintained members of the set the D9/P0 tag is a deliberate
     high-severity choice (their loss silently breaks routing, ai-help, or
     schema/step resolution), not a claim that a generator owns them. The catalog

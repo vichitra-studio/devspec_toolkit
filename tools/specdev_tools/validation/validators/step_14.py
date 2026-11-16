@@ -15,7 +15,8 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
     """Deep checks of a step 14 artifact: unique milestone and task ids, valid and ordered dates, acyclic task ``depends_on``.
 
     Reads only values of the expected type; a malformed ``milestones``, milestone, ``tasks`` or task is skipped and
-    left to the schema's own error. Never raises on wrong-typed input. Also warns W604 when the trace matrix is stale.
+    left to the schema's own error. Never raises on wrong-typed input. Also warns W604 when the trace matrix is stale, on a roadmap
+    that still carries the 1.1.1 ``fr_refs`` or ``source_milestones``.
     """
     errors: list[SpecError] = []
     milestone_dates: list[tuple[str, str]] = []

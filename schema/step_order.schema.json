@@ -44,7 +44,7 @@
         },
         "allow_self_dependency": {
           "type": "boolean",
-          "description": "A step is never listed as its own upstream input; a link to a kind in same_step_kinds is not a step edge."
+          "description": "When false, 'dependency-order-lint' reports a prompt that names its own step's spec file as an input. The generated step_metadata never lists a step as its own input: a link to a kind in same_step_kinds is not a step edge."
         },
         "allow_forward_dependency": {
           "type": "boolean",
@@ -61,7 +61,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "description": "A JSON path pattern exempt from replay (e.g., '$.milestones[*].status')."
+              "description": "A field path exempt from replay, in dotted notation with '[]' for array items (e.g., 'milestones[].status')."
             },
             "description": "Array of JSON path patterns exempt from triggering forward replay for this step."
           }
@@ -104,7 +104,7 @@
     },
     "downstream_consumers": {
       "type": "object",
-      "description": "Maps each step ID to the list of steps that actively consume its output. Used by 'specdev prompt-context' to surface relevant upstream artifacts. NOT used by forward-replay checks.",
+      "description": "Maps each step ID to the list of steps that actively consume its output. Read by 'specdev prompt-context', the context loaders, 'dag-lint', 'dependency-order-lint' and the W595 staleness check of forward replay. The E550 order check of forward replay does not read it: it uses the positional order in 'steps'.",
       "additionalProperties": {
         "type": "array",
         "items": {

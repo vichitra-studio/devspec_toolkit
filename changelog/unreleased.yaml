@@ -379,8 +379,11 @@ changes:
       E520 for a missing trace or targets, E530 for a trace-target pattern, or
       E590 / W590 for a link target; fixtures-lint no longer reports E520 (missing
       targets) or E590 (targets unknown API / FR / Invariant / NFR), a 1.1.1
-      fixture file with targets included; its input / expected checks stay. Step
-      09 no longer checks that a deliverable names a capability (E590 / W590).
+      fixture file with targets included; its input / expected checks are
+      unchanged, and so is the file match they sit behind: as in 1.1.1 the
+      command reads only a step 08 file whose $schema ends in
+      /08_fixtures.schema.json, so a file that carries vc:08-fixtures is not
+      checked. Step 09 no longer checks that a deliverable names a capability (E590 / W590).
       Step 10 no longer reports E530 for pr_rules or for a trace type or link
       target. Step 11 no longer reports E520, E530 or E590 for the ids a threat
       names: W583 is satisfied by a threat threatens and W615 by a threat

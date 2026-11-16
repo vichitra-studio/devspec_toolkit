@@ -8,7 +8,8 @@ that spans all milestones.  The anchor's unique job is cross-milestone drift det
       removed ``fr_refs`` and does nothing on the 1.2.0 row shape.
 
   E309 (ANCHOR_CHECKLIST_DRIFT): fires when the same checklist ID maps to different
-      spec_ref.id values across any two milestone context files.
+      spec_ref.id values across any two milestone context files (1.1.1 plans only), or
+      when two ``milestone_index`` rows share one ``checklist_id_prefix``.
 
 The anchor validator does NOT call validate_step_16() — the anchor has its own
 contract (vc:16-anchor schema), and the checks here are cross-artifact comparisons
@@ -330,7 +331,7 @@ def _checklist(ms_data: dict[str, Any]) -> list[Any]:
 def _mapping_drift_errors(contexts: dict[str, dict[str, Any]]) -> list[SpecError]:
     """E309 [mapping]: one checklist id must not map to different ``spec_ref.id`` values across plan files.
 
-    Reads the old object-shaped ``spec_ref``: a no-op on a 1.2.0 plan, whose ``spec_ref`` is a bare task id.
+    Reads the old object-shaped ``spec_ref``: a no-op on a 1.2.0 plan, whose items carry no ``spec_ref``.
     """
     errors: list[SpecError] = []
     registry: dict[str, tuple[str, str]] = {}  # checklist id -> (spec_ref id, plan file)
