@@ -242,7 +242,7 @@ Validates the completeness and consistency of the dependency DAG defined in `too
 
 #### `extraction-intent-check`
 
-Validates that each prompt's `### Extraction Intent` section is consistent with `tools/step_order.json`: an entry may name only a step that the `steps` list holds (E598 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise). It also reports an empty section (E591: the `### Extraction Intent` header is present and no entry parses) and vague intent text (W597). A prompt without that header is skipped with no message. An entry that names a step which does not precede the current one is reported by `dag-lint` (W596), not by this command.
+Validates that each prompt's `### Extraction Intent` section is consistent with `tools/step_order.json`: an entry may name only a step that the `steps` list holds (E598 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise). It also reports an empty section (E591: the `### Extraction Intent` header is present and neither a step entry nor the `**Seeds**` bullet parses) and vague intent text (W597). A prompt without that header is skipped with no message. An entry that names a step which does not precede the current one is reported by `dag-lint` (W596), not by this command.
 
 **What it checks:**
 - Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).
@@ -374,11 +374,12 @@ specdev align rollback spec --repo-root ./devspec_toolkit --backup-dir <backup-n
 
 
 ### Step-Specific Verification
-The toolkit's own step tests run with `pytest`; two of the files are also scripts that check one file given as the argument (step 12: DAG and cycles; step 15: `validate`):
+The toolkit's own step tests run with `pytest`. Most of the step test files are also scripts that check one file given as the argument (step 12: DAG and cycles; steps 03 to 10, 13 and 15: `validate`). Run them from the toolkit root, because the `validate` scripts read the argument relative to it:
 ```bash
-pytest devspec_toolkit/tests/integration/test_step_02.py -v
-python devspec_toolkit/tests/integration/test_step_12.py devspec_toolkit/tests/fixtures/step_12/valid_dag.json
-python devspec_toolkit/tests/integration/test_step_15.py devspec_toolkit/tests/fixtures/step_15/valid_full.json
+cd devspec_toolkit
+pytest tests/integration/test_step_02.py -v
+python tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
+python tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
