@@ -3438,7 +3438,7 @@ class TestStep16(unittest.TestCase):
     def test_invalid_fixture_step_08_no_phantom_unevaluated_companion(self):
         """Step 08 shares the same schema restructure as 09/13/15/16 — its invalid fixture must
         surface its real error without triggering a phantom 'Unevaluated properties' companion."""
-        rel = "tests/fixtures/step_08/invalid/invalid_out_of_scope_missing_rationale.json"
+        rel = "tests/fixtures/step_08/invalid/invalid_missing_verifies.json"
         errors = validate_file(self.repo_root, rel)
         unevaluated = [e for e in errors if "Unevaluated properties" in e.message]
         self.assertEqual(

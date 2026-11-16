@@ -448,6 +448,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:07-nfrs": "schema/07_nfrs.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
                 "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
@@ -462,6 +463,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "schema" / "canon.schema.json").write_text(
@@ -666,6 +671,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:07-nfrs": "schema/07_nfrs.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
                 "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
@@ -680,6 +686,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "schema" / "canon.schema.json").write_text(

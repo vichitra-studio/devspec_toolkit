@@ -18,8 +18,24 @@
           "description": "Array of system invariant rules that must always hold true. An invariant is a machine-verifiable always-true constraint the system must never violate — as opposed to a design principle, which is subjective or situational guidance. Decision rule: if you can write an automated test that fails when the constraint is violated, it is an invariant. Examples: 'order total must always equal the sum of line item amounts'; 'session token must expire within 24 hours of creation'. Anti-pattern: including architectural preferences ('use RESTful APIs') or subjective guidelines ('responses should be fast') — these are design principles, not invariants.",
           "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "invariant",
+            "role": "obligation-system",
+            "contract": [
+              "description",
+              "language",
+              "expression",
+              "severity",
+              "enforcement_point",
+              "policy_ref",
+              "risk_category_ref",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "inv_id"
+          },
           "items": {
-            "description": "A single invariant rule with its formal expression, scope, severity, and traceability. Each invariant covers one specific, testable property. Worked example 1 — payment invariant triple: inv_id='inv-payment-positive-amount', description='The system ensures payment amounts are always positive', expression='payment.amount > 0' (language='cel'), scope={components: ['payment-service']}, trace=[{type: 'capability', id: 'cap-payment-processing', note: 'Derives from this capability'}]. Worked example 2 — user-email invariant triple: inv_id='inv-user-unique-email', description='The system ensures no two active accounts share an email address', expression='size(users.filter(u, u.email == input.email && u.status == \"active\")) <= 1' (language='cel'), scope={components: ['user-service'], apis: ['api-user-register']}, trace=[{type: 'capability', id: 'cap-user-management', note: 'Derives from this capability'}]. Decision rule: if you cannot write a specific inv_id/description/expression triple, the candidate is not an invariant — it may be a design principle or NFR instead.",
+            "description": "A single invariant rule with its formal expression, severity, and the nodes it constrains. Each invariant covers one specific, testable property. Worked example 1 — payment invariant triple: inv_id='inv-payment-positive-amount', description='The system ensures payment amounts are always positive', expression='payment.amount > 0' (language='cel'), constrains=['api-payment-create', 'payment-service']. Worked example 2 — user-email invariant triple: inv_id='inv-user-unique-email', description='The system ensures no two active accounts share an email address', expression='size(users.filter(u, u.email == input.email && u.status == \"active\")) <= 1' (language='cel'), constrains=['fr-user-register', 'api-user-register', 'user-service']. Decision rule: if you cannot write a specific inv_id/description/expression triple, the candidate is not an invariant — it may be a design principle or NFR instead.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -44,21 +60,6 @@
                 "description": "Machine-readable or formal expression of the invariant in the language specified by the 'language' field. Decision rule — language selection: use 'cel' for field comparisons and arithmetic (order.total > 0, user.email != null, timestamps, size checks); use 'jsonlogic' for complex branching over nested objects (conditional rules requiring multiple levels of nesting); use 'text' only when the constraint is inherently non-computable (depends on human judgment or external state unavailable at runtime). Examples — CEL: 'order.total > 0 && order.line_items.size() > 0'; jsonlogic: '{\"and\": [{\"!\": [{\"missing\": \"user.email\"}]}, {\"!\": [{\"missing\": \"user.id\"}]}]}'. Non-computable example requiring language='text': 'User-facing error messages must not expose internal system state or stack traces' — this rule requires a human reviewer to inspect actual error messages; no runtime expression can evaluate it automatically, so language='text' and expression describes the rule in prose. Anti-pattern: using 'text' when a computable CEL expression is possible — text expressions cannot be automatically validated and should be the last resort.",
                 "type": "string"
               },
-              "scope": {
-                "description": "Specifies which components or APIs this invariant applies to. At least one of 'components' or 'apis' must be populated. Decision rules: use 'apis' when the invariant applies at the HTTP boundary (e.g., rate limiting, authentication headers, request size limits); use 'components' when it applies inside the service layer (e.g., database transaction atomicity, cache invalidation rules); use both when enforcement spans layers. Valid scope example: {\"components\": [\"payment-service\"], \"apis\": [\"api-payment-create\"]} — specifies both the service layer and the HTTP boundary where the invariant is enforced. Empty scope {} is rejected — at least components or apis must be provided; the validator will raise an error on a scope object with both fields absent. Anti-pattern: omitting scope entirely (invariant with no scope cannot be assigned to an enforcement point, sprint task, or red-team scenario). The scope field constrains WHERE this invariant is enforced — it is not just metadata, it drives which services and endpoints are tested during validation. Populating components enforces the invariant in service-layer tests; populating apis enforces it at the HTTP boundary. Populate both when the invariant must hold at every layer. Anti-pattern: omitting scope (invariant has no enforcement surface and will not be validated by linters).",
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "components": {
-                    "description": "Component IDs this invariant applies to. Each value must correspond to a component_id in spec/02_system_sketch.json or a task target in spec/09_impl_plan.json. Include business-logic components that own the enforcement code; exclude pure infrastructure components that have no business logic. Worked example distinguishing infra vs business: for a payment amount invariant, use ['payment-service', 'audit-service'] — payment-service enforces the rule, audit-service logs violations. Do not include ['load-balancer', 'cdn', 'nginx'] for this invariant — infrastructure components route traffic but do not enforce business invariants. Anti-pattern: ['nginx'] — infrastructure components such as reverse proxies, CDNs, or load balancers do not contain business-logic enforcement code; an invariant scoped only to infra components cannot be tested against business rules.",
-                    "$ref": "vc:core:collections#kebabIdArray"
-                  },
-                  "apis": {
-                    "description": "API IDs this invariant applies to. Each value must correspond to an api_id in spec/05_interface_contracts.json. Examples: ['api-user-auth', 'api-token-refresh'] (for a session invariant), ['api-payment-charge'] (for a payment atomicity invariant). Use when the invariant must be enforced at the HTTP boundary — authentication, rate limiting, input validation, response shape guarantees. Anti-pattern: listing component IDs here — components go in scope.components.",
-                    "$ref": "vc:core:collections#kebabIdArray"
-                  }
-                }
-              },
               "severity": {
                 "description": "Violation severity level. Decision rule — use 'error' for invariants protecting data integrity, security, or financial accuracy: violations must be rejected with a 4xx/5xx response and the operation must not proceed; use 'warn' for soft business rules where the operation is permitted but the violation is logged for review (e.g., an order with an unusually high discount percentage). Examples — error: inv-payment-positive-amount (a negative or zero payment amount must be rejected outright); warn: inv-order-discount-threshold (discount >50% is logged for fraud review but the order is not blocked). Anti-pattern: using 'warn' for security invariants — security violations must never be silently allowed; always use 'error' for auth, injection-prevention, and access-control constraints.",
                 "type": "string",
@@ -76,13 +77,28 @@
                 "type": "string",
                 "enum": ["database", "service", "api-gateway", "client", "queue", "cache"]
               },
-              "trace": {
-                "description": "Traceability links back to the capabilities or functional requirements this invariant enforces. Every invariant must trace to at least one upstream capability or FR — set type to the canonical kind of the target ('capability' for cap-* targets, 'fr' for fr-* targets) and put the 'derives_from' relationship in note. Invariants without trace links are floating rules that cannot be validated against charter scope. Example: [{\"type\": \"capability\", \"id\": \"cap-payment-processing\", \"note\": \"Derives from this capability; enforces that payment amounts are always positive\"}]. Consult the items description below for approved trace types and full format rules.",
+              "constrains": {
+                "description": "Ids of the nodes this invariant constrains: functional requirements, APIs, components or connections. Optional; an invariant states a rule over something, and this field says over what. Omit it only for a system-wide invariant. Example: [\"fr-user-login\", \"api-session-create\", \"identity-service\"]. Anti-pattern: listing capabilities or NFRs here (an invariant constrains a requirement, an interface or a part of the system, not a goal).",
                 "type": "array",
-                "minItems": 1,
                 "items": {
-                  "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this invariant to the capability or requirement it enforces. At step 06, use type 'capability' pointing to a cap-* ID from spec/01_capabilities.json, or type 'fr' pointing to an fr-* ID from spec/04_fr_list.json (the type is the canonical kind of the target; put the 'derives_from' relationship in note). Example: {\"type\": \"capability\", \"id\": \"cap-payment-processing\", \"note\": \"Derives from this capability; invariant enforces that payment amounts are always positive\"}. Anti-patterns: omitting the note (makes the enforcement rationale opaque), using verb-types such as 'derives_from' (type must be the target's canonical kind, not a relationship verb), referencing IDs that do not exist in spec/01_capabilities.json or spec/04_fr_list.json. Decision guidance: if the invariant is purely a data-integrity rule with no matching FR, trace to the most relevant capability; if it enforces a specific functional requirement, prefer the fr-* ID."
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": ["fr", "api", "component", "connection"],
+                  "required": false
+                }
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this invariant relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": ["assumption"],
+                  "required": false
                 }
               },
               "policy_ref": {
@@ -98,6 +114,39 @@
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "risk_category" } } }
                 ]
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this invariant: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "scope": {
+                "description": "Delivery scope for this invariant: 'in' for the current release (the default when the field is omitted), 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope",
+                "default": "in"
+              },
+              "scope_reason": {
+                "description": "Why this invariant is 'later' or 'out' of scope. Required when scope is 'later' or 'out'.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this invariant, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this invariant replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -105,9 +154,12 @@
               "description",
               "language",
               "expression",
-              "scope",
-              "trace",
               "policy_ref"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
             ]
           }
         }

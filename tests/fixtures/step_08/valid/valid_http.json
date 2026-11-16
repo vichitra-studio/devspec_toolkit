@@ -7,11 +7,8 @@
     {
       "fixture_id": "fixture-http-success",
       "description": "Successful HTTP request to user endpoint",
-      "targets": [
-        {
-          "type": "api",
-          "id": "api-user-get"
-        }
+      "verifies": [
+        "api-user-get"
       ],
       "mode": "contract",
       "input": {

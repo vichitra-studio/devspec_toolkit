@@ -26,17 +26,13 @@ class StepValidatorsTests(unittest.TestCase):
         errs = step_05.validate_step_05({"apis": [{"api_id": "a", "method": "GET", "path": "/"}, {"api_id": "a", "method": "GET", "path": "/"}]}, ".")
         self.assertTrue(errs)
 
-    def test_step_06_missing_trace(self):
-        errs = step_06.validate_step_06({"rules": [{"inv_id": "inv-1"}]}, ".")
-        self.assertTrue(any("missing trace" in e for e in _render(errs)))
+    def test_step_06_does_not_read_trace_or_scope_object(self):
+        rule = {"inv_id": "inv-1", "trace": "not-a-list", "scope": {"components": 7, "apis": "x"}}
+        self.assertEqual(step_06.validate_step_06({"rules": [rule]}, "."), [])
 
     def test_step_07_invalid_stage(self):
         errs = step_07.validate_step_07({"nfrs": [{"nfr_id": "n1", "stage": "qa"}]}, ".")
         self.assertTrue(any("invalid stage" in e for e in _render(errs)))
-
-    def test_step_08_missing_targets(self):
-        errs = step_08.validate_step_08({"fixtures": [{"fixture_id": "f1", "targets": []}]}, ".")
-        self.assertTrue(errs)
 
     def test_step_09_unordered_dates(self):
         errs = step_09.validate_step_09({"milestones": [{"milestone_id": "m1", "target_date": "2026-12-01"}, {"milestone_id": "m2", "target_date": "2026-01-01"}]}, ".")
@@ -125,12 +121,16 @@ class StepValidatorsTests(unittest.TestCase):
 
     # T10a: step_06 tests
     def test_step_06_bad_inv_id_format(self):
-        errs = step_06.validate_step_06({"rules": [{"inv_id": "BAD", "trace": ["fr-a"]}]}, ".")
+        errs = step_06.validate_step_06({"rules": [{"inv_id": "BAD", "constrains": ["fr-a"]}]}, ".")
         self.assertTrue(any("convention" in e for e in _render(errs)))
 
-    def test_step_06_bad_trace_target(self):
-        errs = step_06.validate_step_06({"rules": [{"inv_id": "inv-a", "trace": ["not-a-valid-id"]}]}, ".")
-        self.assertTrue(any("pattern" in e for e in _render(errs)))
+    def test_step_06_duplicate_inv_id(self):
+        errs = step_06.validate_step_06({"rules": [{"inv_id": "inv-a"}, {"inv_id": "inv-a"}]}, ".")
+        self.assertTrue(any("Duplicate" in e for e in _render(errs)))
+
+    def test_step_06_wrong_typed_rules_do_not_raise(self):
+        for rules in (7, {"inv_id": "inv-a"}, ["inv-a", 3, None]):
+            self.assertEqual(step_06.validate_step_06({"rules": rules}, "."), [])
 
     # T11a: step_07 tests
     def test_step_07_bad_nfr_id_format(self):
@@ -143,12 +143,16 @@ class StepValidatorsTests(unittest.TestCase):
 
     # T12a: step_08 tests
     def test_step_08_bad_fixture_id(self):
-        errs = step_08.validate_step_08({"fixtures": [{"fixture_id": "BAD", "targets": ["fr-a"]}]}, ".")
+        errs = step_08.validate_step_08({"fixtures": [{"fixture_id": "BAD", "verifies": ["ac-a"]}]}, ".")
         self.assertTrue(any("convention" in e for e in _render(errs)))
 
-    def test_step_08_bad_target_format(self):
-        errs = step_08.validate_step_08({"fixtures": [{"fixture_id": "fix-a", "targets": ["not-valid"]}]}, ".")
-        self.assertTrue(any("pattern" in e for e in _render(errs)))
+    def test_step_08_does_not_read_targets_or_out_of_scope(self):
+        instance = {"fixtures": [{"fixture_id": "fix-a", "targets": ["not-valid"]}], "out_of_scope": [{"fr_id": "fr-gone"}]}
+        self.assertEqual(step_08.validate_step_08(instance, "."), [])
+
+    def test_step_08_wrong_typed_fixtures_do_not_raise(self):
+        for fixtures in (7, {"fixture_id": "fix-a"}, ["fix-a", 3, None]):
+            self.assertEqual(step_08.validate_step_08({"fixtures": fixtures}, "."), [])
 
     # T13a: step_12 tests
     def test_step_12_circular_dependency(self):

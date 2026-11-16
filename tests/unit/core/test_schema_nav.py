@@ -718,6 +718,9 @@ def test_schema_ref_sibling_census():
     ambiguity item added), core step_base 8 -> 6 (the two ingested fields removed).
     269 after M3 WI-M3-03: 20 ``ambiguities`` locations (17 steps, 3 trinity) are annotated ``$ref`` nodes (+20); the
     removed ``crossCycleAmbiguityItem`` took four with it and the old trinity item ``$ref``s three (-7).
+    271 after M3 WI-M3-04..06 (steps 06, 07, 08): the removed ``trace``, ``targets`` and ``scope.components`` /
+    ``scope.apis`` ``$ref`` nodes (-5, all ``description``-only) and the added ``lifecycle`` (3), ``scope_reason`` (2)
+    and ``scope`` (2, a ``default`` beside the ``$ref``; steps 06 and 07 only, a fixture is a verifier) nodes (+7).
     """
     from collections import Counter
 
@@ -736,11 +739,11 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 269
+    assert sum(counts.values()) == 271
     assert dict(counts) == {
         ("description",): 262,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
-        ("default", "description"): 1,
+        ("default", "description"): 3,
         ("$anchor", "description"): 1,
     }

@@ -159,7 +159,7 @@ See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 
       "expected": {
         "status": 200
       },
-      "targets": [{ "type": "api", "id": "api-auth-login", "note": "Validates: this fixture exercises the auth login API contract" }],
+      "verifies": ["ac-auth-login-1", "api-auth-login"],
       "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag" }
     }
   ],

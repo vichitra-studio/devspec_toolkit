@@ -1117,13 +1117,73 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".rules",
+          "contract": [
+            "description",
+            "language",
+            "expression",
+            "severity",
+            "enforcement_point",
+            "policy_ref",
+            "risk_category_ref",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "inv_id",
-          "kind": "inv"
+          "kind": "invariant",
+          "links": [
+            {
+              "built": false,
+              "field": "constrains",
+              "kinds": [
+                "fr",
+                "api",
+                "component",
+                "connection"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "06"
@@ -1132,13 +1192,97 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".nfrs",
+          "contract": [
+            "name",
+            "category",
+            "metric",
+            "target",
+            "baseline",
+            "unit",
+            "measurement_method",
+            "measurement_frequency",
+            "stage",
+            "metric_ref",
+            "unit_ref",
+            "stage_ref",
+            "environment_ref",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "nfr_id",
-          "kind": "nfr"
+          "kind": "nfr",
+          "links": [
+            {
+              "built": false,
+              "field": "constrains",
+              "kinds": [
+                "fr",
+                "api",
+                "component",
+                "connection"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "relies_on",
+              "kinds": [
+                "third-party"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "metric"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "07"
@@ -1147,13 +1291,68 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".fixtures",
+          "contract": [
+            "description",
+            "mode",
+            "input",
+            "expected",
+            "tag_ref",
+            "manual_reason"
+          ],
           "id_field": "fixture_id",
-          "kind": "fixture"
+          "kind": "fixture",
+          "links": [
+            {
+              "built": false,
+              "field": "verifies",
+              "kinds": [
+                "criterion",
+                "api",
+                "invariant",
+                "nfr"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "removes",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "verifier",
+          "source": "x-node"
         }
       ],
       "step": "08"

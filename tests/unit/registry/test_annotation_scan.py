@@ -154,9 +154,10 @@ def test_real_registry_lists_seed_external_kind():
 
 
 def test_scan_of_real_toolkit_finds_seed_and_no_step_kinds():
+    """Step 13 never gets a step kind (WI-M3-18), so only its shared ambiguity list is annotated."""
     scan = scan_annotations(str(_ROOT))
     assert [e["kind"] for e in scan.external_kinds] == ["seed"]
-    host = scan.host("schema/06_invariants.schema.json")
+    host = scan.host("schema/13_extension_manifest.schema.json")
     assert host is not None and not host.annotation_only
     assert {occ.entry["kind"] for occ in host.occurrences} == {"ambiguity-item"}
 

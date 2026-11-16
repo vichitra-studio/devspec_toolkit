@@ -26,18 +26,18 @@ Terms: `trace`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `trace`
 - [ ] `tests/fixtures/spec_corpus/`: `trace`
-- [ ] `tests/fixtures/step_06/`: `trace`
+- [x] `tests/fixtures/step_06/`: `trace`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
-- [ ] `tests/integration/test_step_16.py`: `trace`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_06/ fixtures
+- [x] `tests/integration/test_step_16.py`: `trace`
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_06/ fixtures
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer.py`: `trace`
 - [ ] `tests/unit/core/test_entry_key_registry.py`: `trace`
 - [ ] `tests/unit/core/test_resolve_pointers.py`: `trace`
-- [ ] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
+- [x] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
-- [ ] `tests/unit/registry/test_generate.py`: `trace`
+- [x] `tests/unit/registry/test_generate.py`: `trace`
 - [ ] `tests/unit/test_cli.py`: `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `trace`
@@ -49,12 +49,12 @@ Terms: `trace`
 - [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `trace`
 - [ ] `tests/unit/validation/test_legacy_shim.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `trace`
 
 ## WI-M3-05: step 07 NFRs
 
@@ -62,18 +62,18 @@ Terms: `trace`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `trace`
 - [ ] `tests/fixtures/spec_corpus/`: `trace`
-- [ ] `tests/fixtures/step_07/`: `trace`
+- [x] `tests/fixtures/step_07/`: `trace`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
 - [ ] `tests/integration/test_step_16.py`: `trace`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_07/ fixtures
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_07/ fixtures
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer.py`: `trace`
 - [ ] `tests/unit/core/test_entry_key_registry.py`: `trace`
 - [ ] `tests/unit/core/test_resolve_pointers.py`: `trace`
-- [ ] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
+- [x] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
-- [ ] `tests/unit/registry/test_generate.py`: `trace`
+- [x] `tests/unit/registry/test_generate.py`: `trace`
 - [ ] `tests/unit/test_cli.py`: `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `trace`
@@ -85,32 +85,32 @@ Terms: `trace`
 - [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `trace`
 - [ ] `tests/unit/validation/test_legacy_shim.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `trace`
 
 ## WI-M3-06: step 08 fixtures
 
 Terms: `targets`, `out_of_scope`
 
-- [ ] `tests/fixtures/entry_key_registry_golden.json`: `out_of_scope`
+- [x] `tests/fixtures/entry_key_registry_golden.json`: `out_of_scope`
 - [ ] `tests/fixtures/entry_key_registry_pre_m1.json`: `out_of_scope`
 - [ ] `tests/fixtures/spec_corpus/`: `targets`
-- [ ] `tests/fixtures/step_08/`: `out_of_scope`, `targets`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_08/ fixtures
+- [x] `tests/fixtures/step_08/`: `out_of_scope`, `targets`
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_08/ fixtures
 - [ ] `tests/unit/generation/test_schema_differ.py`: `out_of_scope`
-- [ ] `tests/unit/registry/test_generate.py`: `out_of_scope`
+- [x] `tests/unit/registry/test_generate.py`: `out_of_scope`
 - [ ] `tests/unit/test_cli.py`: `out_of_scope`
-- [ ] `tests/unit/validation/linters/test_fixtures_lint.py`: `targets`
+- [x] `tests/unit/validation/linters/test_fixtures_lint.py`: `targets`
 - [ ] `tests/unit/validation/linters/test_matrix_rules.py`: `out_of_scope`, `targets`
 - [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `out_of_scope`, `targets`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `out_of_scope`, `targets`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `targets`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `out_of_scope`, `targets`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `targets`
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `targets`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `targets`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `targets`
 
 ## WI-M3-07: step 09 impl plan
 

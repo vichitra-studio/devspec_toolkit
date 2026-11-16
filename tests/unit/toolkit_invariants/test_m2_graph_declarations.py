@@ -410,7 +410,8 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
 ]
 
 
-def _declared_link_kinds() -> list[tuple[str, str, Any]]:
+def declared_link_kinds(files: list[str]) -> list[tuple[str, str, Any]]:
+    """``(schema file, JSON pointer, sorted kinds or "*")`` of every ``x-link`` found in the schema *files*."""
     found: list[tuple[str, str, Any]] = []
 
     def walk(node: Any, pointer: str, fname: str) -> None:
@@ -424,9 +425,13 @@ def _declared_link_kinds() -> list[tuple[str, str, Any]]:
             for index, value in enumerate(node):
                 walk(value, f"{pointer}/{index}", fname)
 
-    for fname in _FILES:
+    for fname in files:
         walk(json.loads((_SCHEMA_DIR / fname).read_text(encoding="utf-8")), "", fname)
     return found
+
+
+def _declared_link_kinds() -> list[tuple[str, str, Any]]:
+    return declared_link_kinds(_FILES)
 
 
 def test_every_x_link_declares_the_pinned_kinds() -> None:

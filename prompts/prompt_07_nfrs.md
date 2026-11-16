@@ -131,7 +131,8 @@ Before emitting, verify:
       "measurement_method": "P95 latency via APM dashboard, 5-min rolling window",
       "stage": "prod",
       "owner": "api",
-      "trace": [{ "type": "charter-goal", "id": "goal-auth-latency", "note": "Derives from: metric-auth-p95-latency charter success metric directly motivating this NFR" }]
+      "constrains": ["api-auth-login"],
+      "derives_from": ["metric-auth-p95-latency"]
     }
   ],
   "canonical_refs_used": []

@@ -7,11 +7,8 @@
     {
       "fixture_id": "fixture-generic-success",
       "description": "Generic unit test for data processing",
-      "targets": [
-        {
-          "type": "fr",
-          "id": "fr-data-processing"
-        }
+      "verifies": [
+        "ac-data-processing-1"
       ],
       "mode": "unit",
       "input": {

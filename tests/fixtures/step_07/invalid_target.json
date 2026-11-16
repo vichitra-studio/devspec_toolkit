@@ -25,11 +25,8 @@
       "measurement_method": "PromQL: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m])) by (le))",
       "stage": "prod",
       "owner": "api",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-login"
-        }
+      "constrains": [
+        "fr-user-login"
       ]
     }
   ],

@@ -25,12 +25,12 @@ class StepScriptBridgeTests(unittest.TestCase):
             # from canonical-integrity. Schema validation passes. Architectural limitation of fixture-only testing.
             ("test_step_04.py", [str(toolkit_root / "tests" / "fixtures" / "step_04" / "valid_comprehensive.json")], repo_root, {0, 1}),
             ("test_step_05.py", [str(toolkit_root / "tests" / "fixtures" / "step_05" / "valid_rest_api.json")], repo_root, {0}),
-            # Step 06 fixture references api IDs from 05_interface_contracts.json → E590 in fixture-only context.
+            # Step 06 fixture constrains api IDs of 05_interface_contracts.json; not resolved in fixture-only context.
             ("test_step_06.py", [str(toolkit_root / "tests" / "fixtures" / "step_06" / "valid_full.json")], repo_root, {0, 1}),
             ("test_step_07.py", [str(toolkit_root / "tests" / "fixtures" / "step_07" / "valid_full.json")], repo_root, {0}),
             ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_generic.json")], repo_root, {0}),
-            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_out_of_scope.json")], repo_root, {0}),
-            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "invalid" / "invalid_out_of_scope_missing_rationale.json")], repo_root, {1}),
+            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_http.json")], repo_root, {0}),
+            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "invalid" / "invalid_missing_verifies.json")], repo_root, {1}),
             ("test_step_09.py", [str(toolkit_root / "tests" / "fixtures" / "step_09" / "valid_complete.json")], repo_root, {0}),
             ("test_step_10.py", [str(toolkit_root / "tests" / "fixtures" / "step_10" / "valid_full.json")], repo_root, {0}),
             ("test_step_11.py", [], repo_root, {0}),

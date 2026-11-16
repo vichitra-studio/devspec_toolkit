@@ -134,15 +134,8 @@ Before emitting, verify:
       "description": "The system ensures every request to an authenticated endpoint carries a valid session token.",
       "language": "cel",
       "expression": "request.authenticated == true && request.token != null",
-      "scope": { "components": ["auth-service"], "apis": ["api-auth-login"] },
       "enforcement_point": "api-gateway",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-auth-login",
-          "note": "Derives from: 'The system shall authenticate a registered user and return a signed session token.'"
-        }
-      ],
+      "constrains": ["fr-auth-login", "api-auth-login", "auth-service"],
       "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy" }
     }
   ],

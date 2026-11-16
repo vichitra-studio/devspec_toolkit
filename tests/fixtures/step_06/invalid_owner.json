@@ -9,23 +9,16 @@
       "description": "All user authentication requests must include a valid JWT token",
       "language": "jsonlogic",
       "expression": "{ \"and\": [ { \"in\": [ \"auth-token\", { \"var\": \"headers\" } ] }, { \"not\": { \"empty\": { \"var\": \"auth-token\" } } } ] }",
-      "scope": {
-        "components": [
-          "auth-service"
-        ],
-        "apis": [
-          "api-login",
-          "api-secure-endpoint"
-        ]
-      },
+      "constrains": [
+        "fr-user-authentication",
+        "api-login",
+        "auth-service"
+      ],
       "severity": "error",
-      "policy_ref": {"id": "cn:core:policy:spec-first", "kind": "policy"},
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-authentication"
-        }
-      ]
+      "policy_ref": {
+        "id": "cn:core:policy:spec-first",
+        "kind": "policy"
+      }
     }
   ],
   "canonical_refs_used": []
