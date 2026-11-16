@@ -7,7 +7,17 @@ from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
 from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, ALWAYS_EXCLUDED
-from ._legacy_shim import LEGACY_TRACE_FIELDS, has_legacy_fields, is_parked_any_shape
+from ._legacy_shim import (
+    LEGACY_FIXTURE_TARGET_FIELDS,
+    LEGACY_NFR_TRACE_FIELDS,
+    LEGACY_ROADMAP_FR_REF_FIELDS,
+    LEGACY_THREAT_MITIGATION_FIELDS,
+    LEGACY_THREAT_TARGET_FIELDS,
+    LEGACY_TRACE_FIELDS,
+    has_legacy_fields,
+    is_parked_any_shape,
+    out_of_scope_fr_ids,
+)
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -52,6 +62,18 @@ if _invalid_matrix_link_types:
 def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _link_entries(entity: dict, field: str) -> list[dict]:
+    """The object entries of the list ``entity[field]``; empty when the field is absent or not a list."""
+    value = entity.get(field)
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _fr_refs(node: dict) -> list[str]:
+    """The string entries of ``node["fr_refs"]``; empty when the field is absent or not a list."""
+    value = node.get("fr_refs")
+    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
 def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[tuple[str, str]]]:
@@ -357,28 +379,37 @@ def build_trace_matrix(
     # exist and none carries `trace`.
     legacy_api_trace = has_legacy_fields(apis.values(), LEGACY_TRACE_FIELDS)
     fr_to_api_computed = legacy_api_trace or not apis
-    for api in apis.values():
-        for t in api.get("trace", []):
-            if t.get("type") == _MATRIX_LINK_FR_TYPE:
-                fr_to_api[t["id"]].add(api["api_id"])
+    if legacy_api_trace:
+        for api in apis.values():
+            for t in _link_entries(api, "trace"):
+                if t.get("type") == _MATRIX_LINK_FR_TYPE and "id" in t:
+                    fr_to_api[t["id"]].add(api["api_id"])
 
-    for fx in fixtures:
-        for t in fx.get("targets", []):
-            if t.get("type") == _MATRIX_LINK_API_TYPE:
-                api_to_fixture[t["id"]].add(fx["fixture_id"])
+    # One rule for every link reader: entities of its kind exist and none carries its legacy field, so
+    # the reader is skipped and the values it fills are omitted and named in `not_computed`.
+    fixture_links_computed = has_legacy_fields(fixtures, LEGACY_FIXTURE_TARGET_FIELDS) or not fixtures
+    nfr_links_computed = has_legacy_fields(nfrs, LEGACY_NFR_TRACE_FIELDS) or not nfrs
+    threat_links_computed = has_legacy_fields(threats, LEGACY_THREAT_TARGET_FIELDS) or not threats
+    if fixture_links_computed:
+        for fx in fixtures:
+            for t in _link_entries(fx, "targets"):
+                if t.get("type") == _MATRIX_LINK_API_TYPE and "id" in t:
+                    api_to_fixture[t["id"]].add(fx["fixture_id"])
 
-    for n in nfrs:
-        for t in n.get("trace", []):
-            if t.get("type") == _MATRIX_LINK_API_TYPE:
-                api_to_nfr[t["id"]].add(n["nfr_id"])
-            elif t.get("type") == _MATRIX_LINK_FR_TYPE:
-                fr_to_nfr[t["id"]].add(n["nfr_id"])
+    if nfr_links_computed:
+        for n in nfrs:
+            for t in _link_entries(n, "trace"):
+                if t.get("type") == _MATRIX_LINK_API_TYPE and "id" in t:
+                    api_to_nfr[t["id"]].add(n["nfr_id"])
+                elif t.get("type") == _MATRIX_LINK_FR_TYPE and "id" in t:
+                    fr_to_nfr[t["id"]].add(n["nfr_id"])
 
     # Link Threats to APIs
-    for th in threats:
-        for t in th.get("target_ids", []):
-            if t.get("type") == _MATRIX_LINK_API_TYPE:
-                api_to_threat[t["id"]].add(th["threat_id"])
+    if threat_links_computed:
+        for th in threats:
+            for t in _link_entries(th, "target_ids"):
+                if t.get("type") == _MATRIX_LINK_API_TYPE and "id" in t:
+                    api_to_threat[t["id"]].add(th["threat_id"])
 
     # Exclude FRs that will never be built from the coverage denominator:
     # parked FRs (scope later/out, or the 1.1.1 priority:"wont-have"; explicitly parked, no API/fixture/threat
@@ -395,13 +426,9 @@ def build_trace_matrix(
         # convention traceability_closure.py uses), not by pinning to the
         # canonical $schema string -- more robust across schema versions/aliases.
         if "apis" in data:
-            for entry in data.get("out_of_scope", []):
-                if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale"):
-                    step05_oos_fr_ids.add(entry["fr_id"])
+            step05_oos_fr_ids |= out_of_scope_fr_ids(data)
         if "fixtures" in data:
-            for entry in data.get("out_of_scope", []):
-                if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale"):
-                    step08_oos_fr_ids.add(entry["fr_id"])
+            step08_oos_fr_ids |= out_of_scope_fr_ids(data)
     excluded_fr_ids = wont_have_fr_ids | step05_oos_fr_ids
     # Step 08 fixtures.out_of_scope[] is a deliberately separate exemption
     # from Step 05's (an FR with no API can still need a fixture and vice
@@ -430,6 +457,14 @@ def build_trace_matrix(
             "nfrs": sorted(direct_nfrs | indirect_nfrs),
             "threats": sorted(associated_threats)
         }
+        if not fr_to_api_computed:
+            del row["apis"]
+        if not fixture_links_computed:
+            del row["fixtures"]
+        if not nfr_links_computed:
+            del row["nfrs"]
+        if not threat_links_computed:
+            del row["threats"]
         matrix.append(row)
 
     # Coverage summaries. wont-have/Step-05-out-of-scope FRs are excluded from
@@ -443,30 +478,43 @@ def build_trace_matrix(
     coverage = {
         "fr_total": len(frs) - len(excluded_fr_ids),
         "fr_total_fixture": len(frs) - len(excluded_fr_ids_fixture),
-        "fr_with_api": sum(1 for r in covered_matrix if r["apis"]),
-        "fr_with_fixture": sum(1 for r in covered_matrix_fixture if r["fixtures"]),
-        "fr_with_nfr": sum(1 for r in covered_matrix if r["nfrs"]),
-        "fr_with_threat": sum(1 for r in covered_matrix if r["threats"]),
+        "fr_with_api": sum(1 for r in covered_matrix if r.get("apis")),
+        "fr_with_fixture": sum(1 for r in covered_matrix_fixture if r.get("fixtures")),
+        "fr_with_nfr": sum(1 for r in covered_matrix if r.get("nfrs")),
+        "fr_with_threat": sum(1 for r in covered_matrix if r.get("threats")),
         "scaffolds_found": len([a for a in artifacts.values() if "15_scaffold" in a.get("$schema", "")]),
     }
+    if not fr_to_api_computed:
+        del coverage["fr_with_api"]
+    if not fixture_links_computed:
+        del coverage["fr_with_fixture"]
+    if not nfr_links_computed:
+        del coverage["fr_with_nfr"]
+    if not threat_links_computed:
+        del coverage["fr_with_threat"]
     
     # Build milestone_coverage: map FR IDs -> sorted list of milestone IDs that reference them
     # Load from any Step 14 roadmap artifact found in the spec directory.
     milestone_coverage: dict[str, list[str]] = {}
     fr_to_milestones: dict[str, set[str]] = collections.defaultdict(set)
+    roadmaps_loaded = roadmaps_read = 0
     for data in artifacts.values():
         schema = data.get("$schema", "")
         if "14-roadmap" in schema or "14_roadmap" in schema:
-            for milestone in data.get("milestones", []):
+            roadmaps_loaded += 1
+            if not has_legacy_fields([data], LEGACY_ROADMAP_FR_REF_FIELDS):
+                continue
+            roadmaps_read += 1
+            for milestone in _link_entries(data, "milestones"):
                 ms_id = milestone.get("milestone_id")
                 if not ms_id:
                     continue
                 # Collect fr_refs at milestone level
-                for fr_ref in milestone.get("fr_refs", []):
+                for fr_ref in _fr_refs(milestone):
                     fr_to_milestones[fr_ref].add(ms_id)
                 # Collect fr_refs at task level
-                for task in milestone.get("tasks", []):
-                    for fr_ref in task.get("fr_refs", []):
+                for task in _link_entries(milestone, "tasks"):
+                    for fr_ref in _fr_refs(task):
                         fr_to_milestones[fr_ref].add(ms_id)
     if fr_to_milestones:
         milestone_coverage = {fr: sorted(ms_ids) for fr, ms_ids in sorted(fr_to_milestones.items())}
@@ -488,19 +536,35 @@ def build_trace_matrix(
     # level of the matrix output so consumers can detect drift without
     # re-parsing individual threat objects.
     inv_to_threats: dict[str, set[str]] = collections.defaultdict(set)
-    for th in threats:
-        for mitigation in th.get("mitigations", []):
-            if not isinstance(mitigation, dict):
-                continue
-            if _normalize_type(mitigation.get("type", "")) == "invariant":
-                inv_id = mitigation.get("id", "")
-                if inv_id:
-                    inv_to_threats[inv_id].add(th["threat_id"])
+    mitigation_links_computed = has_legacy_fields(threats, LEGACY_THREAT_MITIGATION_FIELDS) or not threats
+    if mitigation_links_computed:
+        for th in threats:
+            for mitigation in _link_entries(th, "mitigations"):
+                if _normalize_type(mitigation.get("type", "")) == "invariant":
+                    inv_id = mitigation.get("id", "")
+                    if inv_id:
+                        inv_to_threats[inv_id].add(th["threat_id"])
     if inv_to_threats:
         result["invariant_threat_coverage"] = {
             inv_id: sorted(threat_ids)
             for inv_id, threat_ids in sorted(inv_to_threats.items())
         }
+
+    not_computed: list[str] = []
+    if not fr_to_api_computed:
+        not_computed += ["fr_with_api", "apis"]
+    if not fixture_links_computed:
+        not_computed += ["fr_with_fixture", "fixtures"]
+    if not nfr_links_computed:
+        not_computed += ["fr_with_nfr", "nfrs"]
+    if not threat_links_computed:
+        not_computed += ["fr_with_threat", "threats"]
+    if roadmaps_loaded and not roadmaps_read:
+        not_computed.append("milestone_coverage")
+    if not mitigation_links_computed:
+        not_computed.append("invariant_threat_coverage")
+    if not_computed:
+        result["not_computed"] = not_computed
 
     integrity_errors = validate_trace_integrity(repo_root, spec_dir)
     if integrity_errors:

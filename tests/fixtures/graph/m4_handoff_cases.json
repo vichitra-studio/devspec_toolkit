@@ -1,0 +1,461 @@
+{
+ "description": "Every E590 existence test the M3 step bundles deleted (b8f3fd0..e087deb), recorded for the M4 resolver: each case becomes a resolver fixture. old_test is the deleted test, old_input what it fed the removed check, new_link_field the 1.2.0 field that now carries the link, expected what the resolver reports for it.",
+ "cases": [
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "06 rule inv-auth-required with trace [fr fr-login, api api-auth]; 04 lists fr-login, 05 lists api-auth",
+   "new_link_field": "rules[].constrains",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "06 rule with trace [fr fr-login, api api-auth]; no 04 and no 05 file in the spec folder",
+   "new_link_field": "rules[].constrains",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_broken_ref_emits_e590",
+   "old_input": "06 rule with trace [fr fr-unknown, api api-missing]; 04 lists fr-login only, 05 lists api-auth only",
+   "new_link_field": "rules[].constrains",
+   "expected": "one dangling-link finding per id: fr-unknown, api-missing (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_inv_self_ref_valid",
+   "old_input": "06 rule inv-session-valid with trace [inv inv-auth-required]; the target is a rule of the same file",
+   "new_link_field": "none: constrains takes fr, api, component and connection, so a rule-to-rule link has no field in 06; M4 decides",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_inv_self_ref_broken_emits_e590",
+   "old_input": "06 rule with trace [inv inv-nonexistent]; no rule of that id in the file",
+   "new_link_field": "none: constrains takes fr, api, component and connection, so a rule-to-rule link has no field in 06; M4 decides",
+   "expected": "one dangling-link finding per id: inv-nonexistent (was E590) if M4 keeps a rule-to-rule link, else no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_scope_apis_valid",
+   "old_input": "06 rule with scope.apis [api-auth, api-users]; 05 lists both",
+   "new_link_field": "rules[].constrains",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep06CrossStep::test_scope_apis_broken_emits_e590",
+   "old_input": "06 rule with scope.apis [api-nonexistent]; 05 lists api-auth only",
+   "new_link_field": "rules[].constrains",
+   "expected": "one dangling-link finding per id: api-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep08CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "08 fixture fix-login-happy with targets [fr fr-login, api api-auth, inv inv-session, nfr nfr-latency]; 04, 05, 06, 07 list all four",
+   "new_link_field": "fixtures[].verifies",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep08CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "08 fixture with targets [fr, api, inv, nfr]; no 04, 05, 06 and no 07 file",
+   "new_link_field": "fixtures[].verifies",
+   "expected": "warning that each absent upstream file is missing (was W590) for all four files"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep08CrossStep::test_broken_ref_emits_e590",
+   "old_input": "08 fixture fix-broken with targets [fr fr-nonexistent, api api-ghost]; 04 to 07 present without them",
+   "new_link_field": "fixtures[].verifies",
+   "expected": "one dangling-link finding per id: fr-nonexistent, api-ghost (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep08CrossStep::test_out_of_scope_broken_fr_id_emits_e590",
+   "old_input": "08 top-level out_of_scope [fr-login with rationale, fr-nonexistent with rationale]; 04 lists fr-login",
+   "new_link_field": "none: out_of_scope is removed from 08; an FR with no fixture states scope: out with scope_reason on the FR (04)",
+   "expected": "no finding from 08 (the field is gone); the coverage rule on the FR is M4's"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep09CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "09 milestone ms-alpha with deliverables [capability cap-authentication] and capability_refs [cap-dashboard]; 01 lists both",
+   "new_link_field": "milestones[].schedules",
+   "expected": "no finding (capability is not a kind of schedules; M4 decides whether that is a kind error)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep09CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "09 milestone with deliverables [capability cap-authentication]; no 01_capabilities.json",
+   "new_link_field": "milestones[].schedules",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep09CrossStep::test_broken_ref_emits_e590",
+   "old_input": "09 milestone with deliverables [capability cap-nonexistent]; 01 lists cap-authentication only",
+   "new_link_field": "milestones[].schedules",
+   "expected": "one dangling-link finding per id: cap-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep09CrossStep::test_capability_refs_field_not_validated",
+   "old_input": "09 milestone ms-beta with capability_refs [cap-unknown] and no deliverables; 01 lists cap-authentication",
+   "new_link_field": "none: capability_refs was never a schema field of 09",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep12CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "12 top-level trace [fr fr-login]; 04 lists fr-login, 07 lists nfr-latency",
+   "new_link_field": "jobs[].verifies (nfr only); an fr target has no field in 12",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep12CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "12 top-level trace [fr fr-login]; no 04 and no 07 file",
+   "new_link_field": "jobs[].verifies (nfr only)",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep12CrossStep::test_broken_ref_emits_e590",
+   "old_input": "12 top-level trace [fr fr-phantom, nfr nfr-ghost]; 04 lists fr-login, 07 lists nfr-latency",
+   "new_link_field": "jobs[].verifies (nfr only); an fr target has no field in 12",
+   "expected": "one dangling-link finding per id: nfr-ghost (was E590) (fr-phantom has no link field in 12)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep12CrossStep::test_broken_ref_in_job_deep_scan_emits_e590",
+   "old_input": "12 job with a free-text field coverage_target 'fr-does-not-exist'; 04 and 07 present",
+   "new_link_field": "none: the deep scan of fr-* and nfr-* strings is gone; only typed link fields are resolved",
+   "expected": "no finding (the string is not a link)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep15CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "15 interface_map rows with interface_ref api-auth and api-users; 05 lists both",
+   "new_link_field": "interface_map[].realises",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep15CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "15 interface_map row with interface_ref api-auth; no 05_interface_contracts.json",
+   "new_link_field": "interface_map[].realises",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestStep15CrossStep::test_broken_ref_emits_e590",
+   "old_input": "15 interface_map row with interface_ref api-nonexistent; 05 lists api-auth only",
+   "new_link_field": "interface_map[].realises",
+   "expected": "one dangling-link finding per id: api-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_cross_step_validation.py::TestCrossStepNoSpecDir::test_step_15_no_spec_dir",
+   "old_input": "15 interface_map row with interface_ref api-x; the folder holds no spec files at all",
+   "new_link_field": "interface_map[].realises",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "06 rule inv-auth-required with trace [fr fr-login, api api-auth]; 04 lists fr-login, 05 lists api-auth",
+   "new_link_field": "rules[].constrains",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "06 rule with trace [fr fr-login, api api-auth]; no 04 and no 05 file in the spec folder",
+   "new_link_field": "rules[].constrains",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_broken_ref_emits_e590",
+   "old_input": "06 rule with trace [fr fr-unknown, api api-missing]; 04 lists fr-login only, 05 lists api-auth only",
+   "new_link_field": "rules[].constrains",
+   "expected": "one dangling-link finding per id: fr-unknown, api-missing (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_inv_self_ref_valid",
+   "old_input": "06 rule inv-session-valid with trace [inv inv-auth-required]; the target is a rule of the same file",
+   "new_link_field": "none: constrains takes fr, api, component and connection, so a rule-to-rule link has no field in 06; M4 decides",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_inv_self_ref_broken_emits_e590",
+   "old_input": "06 rule with trace [inv inv-nonexistent]; no rule of that id in the file",
+   "new_link_field": "none: constrains takes fr, api, component and connection, so a rule-to-rule link has no field in 06; M4 decides",
+   "expected": "one dangling-link finding per id: inv-nonexistent (was E590) if M4 keeps a rule-to-rule link, else no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_scope_apis_valid",
+   "old_input": "06 rule with scope.apis [api-auth, api-users]; 05 lists both",
+   "new_link_field": "rules[].constrains",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep06CrossStep::test_scope_apis_broken_emits_e590",
+   "old_input": "06 rule with scope.apis [api-nonexistent]; 05 lists api-auth only",
+   "new_link_field": "rules[].constrains",
+   "expected": "one dangling-link finding per id: api-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep08CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "08 fixture fix-login-happy with targets [fr fr-login, api api-auth, inv inv-session, nfr nfr-latency]; 04, 05, 06, 07 list all four",
+   "new_link_field": "fixtures[].verifies",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep08CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "08 fixture with targets [fr, api, inv, nfr]; no 04, 05, 06 and no 07 file",
+   "new_link_field": "fixtures[].verifies",
+   "expected": "warning that each absent upstream file is missing (was W590) for all four files"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep08CrossStep::test_broken_ref_emits_e590",
+   "old_input": "08 fixture fix-broken with targets [fr fr-nonexistent, api api-ghost]; 04 to 07 present without them",
+   "new_link_field": "fixtures[].verifies",
+   "expected": "one dangling-link finding per id: fr-nonexistent, api-ghost (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep09CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "09 milestone ms-alpha with deliverables [capability cap-authentication] and capability_refs [cap-dashboard]; 01 lists both",
+   "new_link_field": "milestones[].schedules",
+   "expected": "no finding (capability is not a kind of schedules; M4 decides whether that is a kind error)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep09CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "09 milestone with deliverables [capability cap-authentication]; no 01_capabilities.json",
+   "new_link_field": "milestones[].schedules",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep09CrossStep::test_broken_ref_emits_e590",
+   "old_input": "09 milestone with deliverables [capability cap-nonexistent]; 01 lists cap-authentication only",
+   "new_link_field": "milestones[].schedules",
+   "expected": "one dangling-link finding per id: cap-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep09CrossStep::test_capability_refs_field_not_validated",
+   "old_input": "09 milestone ms-beta with capability_refs [cap-unknown] and no deliverables; 01 lists cap-authentication",
+   "new_link_field": "none: capability_refs was never a schema field of 09",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep12CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "12 top-level trace [fr fr-login]; 04 lists fr-login, 07 lists nfr-latency",
+   "new_link_field": "jobs[].verifies (nfr only); an fr target has no field in 12",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep12CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "12 top-level trace [fr fr-login]; no 04 and no 07 file",
+   "new_link_field": "jobs[].verifies (nfr only)",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep12CrossStep::test_broken_ref_emits_e590",
+   "old_input": "12 top-level trace [fr fr-phantom, nfr nfr-ghost]; 04 lists fr-login, 07 lists nfr-latency",
+   "new_link_field": "jobs[].verifies (nfr only); an fr target has no field in 12",
+   "expected": "one dangling-link finding per id: nfr-ghost (was E590) (fr-phantom has no link field in 12)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep12CrossStep::test_broken_ref_in_job_deep_scan_emits_e590",
+   "old_input": "12 job with a free-text field coverage_target 'fr-does-not-exist'; 04 and 07 present",
+   "new_link_field": "none: the deep scan of fr-* and nfr-* strings is gone; only typed link fields are resolved",
+   "expected": "no finding (the string is not a link)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep15CrossStep::test_valid_upstream_refs_pass",
+   "old_input": "15 interface_map rows with interface_ref api-auth and api-users; 05 lists both",
+   "new_link_field": "interface_map[].realises",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep15CrossStep::test_missing_upstream_emits_w590",
+   "old_input": "15 interface_map row with interface_ref api-auth; no 05_interface_contracts.json",
+   "new_link_field": "interface_map[].realises",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestStep15CrossStep::test_broken_ref_emits_e590",
+   "old_input": "15 interface_map row with interface_ref api-nonexistent; 05 lists api-auth only",
+   "new_link_field": "interface_map[].realises",
+   "expected": "one dangling-link finding per id: api-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_r9_cross_step.py::TestCrossStepNoSpecDir::test_step_15_no_spec_dir",
+   "old_input": "15 interface_map row with interface_ref api-x; the folder holds no spec files at all",
+   "new_link_field": "interface_map[].realises",
+   "expected": "warning that each absent upstream file is missing (was W590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_unknown_inv_id_emits_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [inv inv-unknown]; 06 lists inv-known only",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: inv-unknown (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_valid_inv_id_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [inv inv-known]; 06 lists inv-known",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_absent_step06_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [inv inv-anything]; no 06 file",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_unknown_fr_id_emits_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [fr fr-ghost]; 04 lists fr-known only",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: fr-ghost (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_valid_fr_id_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [fr fr-known]; 04 lists fr-known",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_unknown_capability_id_emits_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [capability cap-phantom]; 01 lists cap-auth only",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: cap-phantom (was E590) (capability is not a kind of mitigated_by; M4 decides whether that is a kind error)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_absent_step01_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [capability cap-anything]; no 01 file",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_valid_capability_id_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [capability cap-x]; 01 lists cap-x",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding (capability is not a kind of mitigated_by; M4 decides whether that is a kind error)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_valid_nfr_id_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [nfr nfr-x]; 07 lists nfr-x",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_unknown_nfr_id_emits_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [nfr nfr-ghost]; 07 lists nfr-x only",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: nfr-ghost (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_valid_fixture_id_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [fixture fix-x]; 08 lists fix-x",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_unknown_fixture_id_emits_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [fixture fix-ghost]; 08 lists fix-x only",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: fix-ghost (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_valid_api_mitigation_no_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [api api-x]; 05 lists api-x",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_unknown_api_mitigation_emits_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [api api-ghost]; 05 lists api-x only",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: api-ghost (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_empty_upstream_mitigation_still_fires_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [inv inv-ghost]; 06 exists with an empty rules array",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: inv-ghost (was E590); an empty upstream is not an absent one"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_empty_upstream_fr_mitigation_still_fires_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [fr fr-ghost]; 04 exists with an empty functional_requirements array",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: fr-ghost (was E590); an empty upstream is not an absent one"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_empty_upstream_nfr_mitigation_still_fires_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [nfr nfr-ghost]; 07 exists with an empty nfrs array",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: nfr-ghost (was E590); an empty upstream is not an absent one"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_empty_upstream_fixture_mitigation_still_fires_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [fixture fix-ghost]; 08 exists with an empty fixtures array",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: fix-ghost (was E590); an empty upstream is not an absent one"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_empty_upstream_capability_mitigation_still_fires_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [capability cap-ghost]; 01 exists with an empty capabilities array",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: cap-ghost (was E590); an empty upstream is not an absent one (capability is not a kind of mitigated_by; M4 decides whether that is a kind error)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestMitigationCrossRef::test_doc_mitigation_never_e590",
+   "old_input": "11 threat threat-01 (target_ids [api api-x]) with mitigations [doc any id]; 04 and 06 present without it",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "no finding (a doc mitigation was never resolved; M4 decides whether doc stays a mitigation kind)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestComponentCrossRef::test_unknown_component",
+   "old_input": "11 threat with target_ids [component comp-nonexistent]; 02 lists comp-auth only",
+   "new_link_field": "threats[].threatens",
+   "expected": "one dangling-link finding per id: comp-nonexistent (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestComponentCrossRef::test_known_component",
+   "old_input": "11 threat with target_ids [component comp-auth]; 02 lists comp-auth",
+   "new_link_field": "threats[].threatens",
+   "expected": "no finding"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestEmptyUpstreamFlagsStrayRefs::test_empty_apis_flags_unknown_api_target",
+   "old_input": "11 threat with target_ids [api api-ghost]; 05 exists with an empty apis array",
+   "new_link_field": "threats[].threatens",
+   "expected": "one dangling-link finding per id: api-ghost (was E590); an empty upstream is not an absent one"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_11_deep.py::TestEmptyUpstreamFlagsStrayRefs::test_empty_components_flags_unknown_component_target",
+   "old_input": "11 threat with target_ids [component comp-ghost]; 02 exists with an empty components array",
+   "new_link_field": "threats[].threatens",
+   "expected": "one dangling-link finding per id: comp-ghost (was E590); an empty upstream is not an absent one"
+  },
+  {
+   "old_test": "tests/integration/test_step_11.py::TestStep11Fixtures::test_unresolvable_mitigation_detected",
+   "old_input": "11 threat threat-test (target_ids [api api-ask]) with mitigations [fr fr-does-not-exist]; a mock id index (the test's own helper, not the validator)",
+   "new_link_field": "threats[].mitigated_by",
+   "expected": "one dangling-link finding per id: fr-does-not-exist (was E590)"
+  },
+  {
+   "old_test": "tests/integration/test_step_14.py::Step14IntegrationTests::test_unknown_source_milestone_fails_referential_integrity",
+   "old_input": "14 valid_roadmap with milestone[0].source_milestones ['missing-from-step09']; 09 lacks that id",
+   "new_link_field": "none: source_milestones is removed from 14; the 09-14 edge is a declared edge of step_order.json",
+   "expected": "no finding from 14 (the field is gone)"
+  },
+  {
+   "old_test": "tests/integration/test_step_14.py::Step14IntegrationTests::test_invalid_bad_fr_ref",
+   "old_input": "14 invalid_bad_fr_ref (milestone fr_refs naming an FR absent from 04); 04 lists fr-user-login and fr-user-registration",
+   "new_link_field": "milestones[].tasks[].acceptance_criteria[].refines (kinds include fr and criterion)",
+   "expected": "one dangling-link finding naming the unknown FR (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_07_deep.py::TestCrossStepFrTraceability::test_unknown_fr_ref",
+   "old_input": "07 nfr nfr-01 with fr_refs [fr-login, fr-nonexistent]; 04 lists fr-login and fr-logout",
+   "new_link_field": "nfrs[].constrains",
+   "expected": "one dangling-link finding naming fr-nonexistent only (the old check printed 'unknown fr_ref')"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_16a_deep.py::TestStep16aMissingSpecRefId::test_active_item_missing_spec_ref_id_fires_e590",
+   "old_input": "16a checklist item chk-1 (type behavior, layer api, active) with no spec_ref.id",
+   "new_link_field": "plan.spec_alignment.checklist[].realises",
+   "expected": "M8 decides the rule: the old E590 flagged an active item with no link at all (was E590)"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_16a_deep.py::TestStep16aMissingSpecRefId::test_deferred_item_missing_spec_ref_id_does_not_fire_e590",
+   "old_input": "16a checklist item chk-1 with checklist_status deferred and a deferred_reason, no spec_ref.id",
+   "new_link_field": "plan.spec_alignment.checklist[].realises",
+   "expected": "no finding for a deferred item"
+  },
+  {
+   "old_test": "tests/unit/validation/validators/test_step_16a_deep.py::TestStep16aMissingSpecRefId::test_wont_do_item_missing_spec_ref_id_does_not_fire_e590",
+   "old_input": "16a checklist item chk-1 with checklist_status wont_do and a wont_do_reason, no spec_ref.id",
+   "new_link_field": "plan.spec_alignment.checklist[].realises",
+   "expected": "no finding for a wont_do item"
+  }
+ ]
+}

@@ -2022,7 +2022,8 @@ class CliTests(unittest.TestCase):
                 {"capability_id": "cap-legacy", "scope": "out"},
                 {"capability_id": "cap-roadmap-v2", "scope": "later"},
             ]}
-            frs = {"functional_requirements": [{"fr_id": "fr-login", "derives_from": ["cap-auth"]}]}
+            frs = {"functional_requirements": [
+                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
             (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
             (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
 

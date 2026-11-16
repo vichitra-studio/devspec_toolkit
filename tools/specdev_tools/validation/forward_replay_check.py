@@ -10,11 +10,13 @@ from pathlib import Path
 
 from ..core.config import get_config
 from ..core.errors import SpecError, make_error
+from ._legacy_shim import removed_paths
 from .linter_utils import CONTENT_STOPWORDS, tokenize_free_text
 from .traceability_closure import check_traceability_closure
 
 SPEC_FILE_RE = re.compile(r"spec/(\d{2}[a-z]?)_[a-z0-9_]+\.json$")
 ID_MATCH_RE = re.compile(r"[a-z]+-[a-z0-9-]+")
+_PATH_SEGMENT_RE = re.compile(r"^([^\[\]{}]+)((?:\[\]|\{\})*)$")
 
 
 def check_forward_replay(
@@ -206,13 +208,56 @@ def _step_exists(spec_dir: Path, step: str) -> bool:
     return any(spec_dir.glob(f"{step}_*.json"))
 
 
+def _fan_out(nodes: list[object], marker: str) -> list[object]:
+    """The items of every list in *nodes* (marker ``[]``) or the values of every dict in them (``{}``)."""
+    if marker == "[]":
+        return [item for node in nodes if isinstance(node, list) for item in node]
+    return [value for node in nodes if isinstance(node, dict) for value in node.values()]
+
+
+def _prune_node(node: object, segments: list[tuple[str, str]]) -> None:
+    """Delete the subtree that *segments* (``(key, fan-out markers)``) name below *node*, in place."""
+    if not segments or not isinstance(node, dict):
+        return
+    (key, fanout), rest = segments[0], segments[1:]
+    if key not in node:
+        return
+    if not rest:
+        if not fanout:
+            del node[key]
+        return
+    children = [node[key]]
+    for i in range(0, len(fanout), 2):
+        children = _fan_out(children, fanout[i:i + 2])
+    for child in children:
+        _prune_node(child, rest)
+
+
+def _prune_removed_paths(doc: object, paths: list[str]) -> object:
+    """Return a copy of *doc* without the subtrees at *paths* (``a[].b``, ``m{}``; a glob or core path is ignored).
+
+    A path whose last segment fans out (``a[]``) is not a subtree and is ignored. Never raises on a
+    document or path of an unexpected shape.
+    """
+    pruned = copy.deepcopy(doc)
+    for path in paths:
+        segments = [_PATH_SEGMENT_RE.match(part) for part in path.split(".")]
+        if all(segments) and not path.startswith("$"):
+            _prune_node(pruned, [(m.group(1), m.group(2)) for m in segments if m])
+    return pruned
+
+
 def _extract_ids_from_spec(path: str) -> set[str]:
-    ids = set()
     try:
         with open(path, "r", encoding="utf-8") as f:
             obj = json.load(f)
     except (OSError, json.JSONDecodeError):
-        return ids
+        return set()
+    return _extract_ids(obj)
+
+
+def _extract_ids(obj: object) -> set[str]:
+    ids: set[str] = set()
 
     def _crawl(data):
         if isinstance(data, dict):
@@ -279,14 +324,14 @@ def _check_semantic_coverage(
                     })
                 continue
                 
-            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".json")
+            # Legacy (M6c deletes): a field removed from the schema that a legacy reader still reads is
+            # not an id the new file dropped, so its subtree leaves the base document before the diff.
             try:
-                with os.fdopen(tmp_fd, "w", encoding="utf-8") as tmp:
-                    tmp.write(result.stdout)
-                old_ids = _extract_ids_from_spec(tmp_path)
-            finally:
-                os.remove(tmp_path)
-                
+                old_doc = _prune_removed_paths(json.loads(result.stdout), removed_paths(step, repo_root))
+            except json.JSONDecodeError:
+                old_doc = None
+            old_ids = _extract_ids(old_doc)
+
             new_ids = _extract_ids_from_spec(str(new_path))
                 
             dropped = sorted(old_ids - new_ids)

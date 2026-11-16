@@ -8,9 +8,15 @@ from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 from ._legacy_shim import (
     LEGACY_CHARTER_CHAIN_FIELDS,
+    LEGACY_DELIVERABLE_FIELDS,
+    LEGACY_FIXTURE_COVERAGE_FIELDS,
+    LEGACY_PLAN_CHECKLIST_FIELDS,
+    LEGACY_PLAN_EVIDENCE_FIELDS,
+    LEGACY_ROADMAP_FR_REF_FIELDS,
     LEGACY_TRACE_FIELDS,
     has_legacy_fields,
     is_parked_any_shape,
+    out_of_scope_fr_ids,
 )
 
 # ---------------------------------------------------------------------------
@@ -165,14 +171,20 @@ def _load_milestone_plans_from_anchor(
     return plans, errors
 
 
-def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[SpecError]:
-    errors: list[SpecError] = []
+def _dict_items(value: Any) -> list[dict[str, Any]]:
+    """The object entries of *value*; empty when *value* is not a list."""
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
-    # Resolve spec_dir relative to repo_root if it's a relative path
-    if repo_root and not os.path.isabs(spec_dir):
-        spec_dir = os.path.join(repo_root, spec_dir)
 
+def _str_items(value: Any) -> list[str]:
+    """The string entries of *value*; empty when *value* is not a list."""
+    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+
+def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecError]]:
+    """Load the spec files of ``SPEC_FILES`` that exist and parse; W570 for a required one that does not."""
     data: dict[str, Any] = {}
+    errors: list[SpecError] = []
     for key, filename in SPEC_FILES.items():
         path = os.path.join(spec_dir, filename)
         if not os.path.isfile(path):
@@ -188,6 +200,62 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 continue
             errors.append(make_error("W570", f"GRACEFUL_SKIP unreadable_spec_file {filename}"))
             continue
+    return data, errors
+
+
+# Legacy guards (M6c deletes them): each reader of a 1.1.1 link runs only when its own artifact still
+# carries the field it reads. An artifact with no entries at all is read as before (every FR is then
+# uncovered by definition, as on main); one with entries that carry no such field is a graph-shape
+# file and is skipped. The four below are also the dimensions `completeness-check` reports.
+def _api_reader_on(data: dict[str, Any]) -> bool:
+    """W564 / E535 read the `trace` of the apis."""
+    apis = data["apis"]
+    return not apis.get("apis") or has_legacy_fields([apis], LEGACY_TRACE_FIELDS)
+
+
+def _fixture_reader_on(data: dict[str, Any]) -> bool:
+    """W565 / E536 read the `targets` and `out_of_scope` of the fixtures."""
+    fixtures = data["fixtures"]
+    return not fixtures.get("fixtures") or has_legacy_fields([fixtures], LEGACY_FIXTURE_COVERAGE_FIELDS)
+
+
+def _milestone_reader_on(data: dict[str, Any]) -> bool:
+    """W561 / W566 read the `fr_refs` of the roadmap."""
+    roadmap = data["roadmap"]
+    return not roadmap.get("milestones") or has_legacy_fields([roadmap], LEGACY_ROADMAP_FR_REF_FIELDS)
+
+
+def _capability_reader_on(data: dict[str, Any]) -> bool:
+    """W568 reads the `trace` of the frs."""
+    return has_legacy_fields([data["frs"]], LEGACY_TRACE_FIELDS)
+
+
+def uncomputed_dimensions(spec_dir: str, repo_root: str | None = None) -> list[str]:
+    """Return the ``completeness-check`` dimensions whose closure reader is skipped on this spec.
+
+    A dimension is listed when the artifacts it needs are present but they no longer carry the 1.1.1
+    field its reader reads (a spec of the graph shape), so the reader reports nothing and the number
+    is not computed. Names: ``fr_api_coverage``, ``fr_fixture_coverage``, ``fr_milestone_coverage``,
+    ``capability_fr_coverage``. Never raises on malformed data; an absent or unreadable file lists nothing.
+    """
+    if repo_root and not os.path.isabs(spec_dir):
+        spec_dir = os.path.join(repo_root, spec_dir)
+    data, _ = _load_closure_artifacts(spec_dir)
+    checks = (
+        ("fr_api_coverage", "frs", "apis", _api_reader_on),
+        ("fr_fixture_coverage", "frs", "fixtures", _fixture_reader_on),
+        ("fr_milestone_coverage", "frs", "roadmap", _milestone_reader_on),
+        ("capability_fr_coverage", "capabilities", "frs", _capability_reader_on),
+    )
+    return [name for name, first, second, reader_on in checks if first in data and second in data and not reader_on(data)]
+
+
+def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[SpecError]:
+    # Resolve spec_dir relative to repo_root if it's a relative path
+    if repo_root and not os.path.isabs(spec_dir):
+        spec_dir = os.path.join(repo_root, spec_dir)
+
+    data, errors = _load_closure_artifacts(spec_dir)
 
     # Load the Trinity Anchor (`vc:16-anchor`) and each milestone plan it
     # declares via `plan.milestone_index[].context_path`. Merged checklist and
@@ -305,11 +373,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     fr_traced_caps: set[str] = set()
     fr_ids: set[str] = set()
     if "frs" in data:
-        for fr in data["frs"].get("functional_requirements", []):
+        for fr in _dict_items(data["frs"].get("functional_requirements")):
             # Capability traces are always collected — a `wont-have` FR still
             # anchors its capability so W568 UNCOVERED_CAPABILITY does not fire.
-            for cap_ref in fr.get("trace", []):
-                if isinstance(cap_ref, dict) and normalize_trace_type(cap_ref.get("type") or "") == _CAPABILITY_TRACE_TYPE and "id" in cap_ref:
+            for cap_ref in _dict_items(fr.get("trace")):
+                if normalize_trace_type(cap_ref.get("type") or "") == _CAPABILITY_TRACE_TYPE and "id" in cap_ref:
                     fr_traced_caps.add(cap_ref["id"])
             # Exclude `wont-have` FRs from downstream coverage checks — they
             # are explicitly out-of-scope (parked for a later phase) and have
@@ -325,13 +393,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # with a non-empty rationale is acknowledged as having no HTTP API surface;
     # the same exemption extends to milestone coverage because infra/ops FRs with
     # no API surface may also legitimately lack milestone placement (DEVSPEC-2).
-    step05_oos_fr_ids: set[str] = set()
-    if "apis" in data:
-        step05_oos_fr_ids = {
-            entry["fr_id"]
-            for entry in data["apis"].get("out_of_scope", [])
-            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
-        }
+    step05_oos_fr_ids: set[str] = out_of_scope_fr_ids(data["apis"]) if "apis" in data else set()
 
     # Compute FR IDs exempted by Step 08 out_of_scope[] from W565 (fixture coverage).
     # Deliberately separate from step05_oos_fr_ids (DEVSPEC-122): "no API surface"
@@ -339,13 +401,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # FR with no API can still need a fixture (e.g. a background job), and an FR
     # with an API can legitimately have no fixture yet. Reusing step05_oos_fr_ids
     # here would silently suppress legitimate W565 warnings.
-    step08_oos_fr_ids: set[str] = set()
-    if "fixtures" in data:
-        step08_oos_fr_ids = {
-            entry["fr_id"]
-            for entry in data["fixtures"].get("out_of_scope", [])
-            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
-        }
+    step08_oos_fr_ids: set[str] = out_of_scope_fr_ids(data["fixtures"]) if "fixtures" in data else set()
 
     milestone_fr_refs: set[str] = set()
     milestone_ids: set[str] = set()
@@ -353,25 +409,22 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     milestone_fr_set: dict[str, set[str]] = {}
     milestone_task_fr_refs: dict[str, set[str]] = {}
     if "roadmap" in data:
-        for ms in data["roadmap"].get("milestones", []):
+        for ms in _dict_items(data["roadmap"].get("milestones")):
             ms_id = ms.get("milestone_id")
+            tasks = _dict_items(ms.get("tasks"))
             if ms_id:
                 milestone_ids.add(ms_id)
-                milestone_task_ids[ms_id] = [t.get("task_id") for t in ms.get("tasks", []) if t.get("task_id")]
-                milestone_fr_set[ms_id] = set(ms.get("fr_refs", []))
-                milestone_task_fr_refs[ms_id] = set(
-                    fr for t in ms.get("tasks", [])
-                    for fr in t.get("fr_refs", [])
-                    if isinstance(fr, str)
-                )
-            for fr_ref in ms.get("fr_refs", []):
-                milestone_fr_refs.add(fr_ref)
+                milestone_task_ids[ms_id] = [t["task_id"] for t in tasks if t.get("task_id")]
+                milestone_fr_set[ms_id] = set(_str_items(ms.get("fr_refs")))
+                milestone_task_fr_refs[ms_id] = {fr for t in tasks for fr in _str_items(t.get("fr_refs"))}
+            milestone_fr_refs.update(_str_items(ms.get("fr_refs")))
 
     checklist_milestone_refs: set[str] = set()
     checklist_task_refs: set[str] = set()
-    if "impl_planner" in data:
-        impl_data = data["impl_planner"]
-        checklist = impl_data.get("plan", {}).get("spec_alignment", {}).get("checklist", [])
+    # Legacy-guarded (M6c deletes): W562 / W563 read the checklist `spec_ref` of the milestone plans.
+    checklist = data.get("impl_planner", {}).get("plan", {}).get("spec_alignment", {}).get("checklist", [])
+    checklist_reader_on = not checklist or has_legacy_fields(checklist, LEGACY_PLAN_CHECKLIST_FIELDS)
+    if "impl_planner" in data and checklist_reader_on:
         for item in checklist:
             spec_ref = item.get("spec_ref", {})
             if isinstance(spec_ref, dict) and "id" in spec_ref:
@@ -381,11 +434,13 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             if any(t_id in checklist_task_refs for t_id in tasks):
                 checklist_milestone_refs.add(ms_id)
 
-    if "frs" in data and "roadmap" in data:
+    # Legacy-guarded (M6c deletes): W561 and W566 read the `fr_refs` of the roadmap.
+    milestone_reader_on = "frs" in data and "roadmap" in data and _milestone_reader_on(data)
+    if milestone_reader_on:
         for fr_id in sorted(fr_ids - milestone_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W561", f"UNCOVERED_FR {fr_id}"))
 
-    if "roadmap" in data and "impl_planner" in data:
+    if "roadmap" in data and "impl_planner" in data and checklist_reader_on:
         for ms_id in sorted(milestone_ids - checklist_milestone_refs):
             errors.append(make_error("W562", f"ORPHAN_MILESTONE {ms_id}"))
 
@@ -402,11 +457,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # W564 / E535: FR→API coverage and out_of_scope[] contradiction check.
     # step05_oos_fr_ids (computed above) carries the Step 05 out_of_scope[] exemption.
     # Legacy-guarded (M6c deletes): reads the `trace` of the apis.
-    if "frs" in data and "apis" in data and has_legacy_fields([data["apis"]], LEGACY_TRACE_FIELDS):
+    if "frs" in data and "apis" in data and _api_reader_on(data):
         api_fr_refs: set[str] = set()
-        for api in data["apis"].get("apis", []):
-            for trace_ref in api.get("trace", []):
-                if isinstance(trace_ref, dict) and normalize_trace_type(trace_ref.get("type") or "") == _FR_TRACE_TYPE and "id" in trace_ref:
+        for api in _dict_items(data["apis"].get("apis")):
+            for trace_ref in _dict_items(api.get("trace")):
+                if normalize_trace_type(trace_ref.get("type") or "") == _FR_TRACE_TYPE and "id" in trace_ref:
                     api_fr_refs.add(trace_ref["id"])
         # E535: FR declared in out_of_scope[] ("no API surface") but also referenced by
         # an API's trace[] — the two claims contradict. out_of_scope[] suppresses W564,
@@ -418,12 +473,13 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     # W565 / E536: FR→fixture coverage and out_of_scope[] contradiction check.
     # step08_oos_fr_ids (computed above) carries the Step 08 out_of_scope[] exemption.
-    if "frs" in data and "fixtures" in data:
+    # Legacy-guarded (M6c deletes): reads the `targets` and `out_of_scope` of the fixtures.
+    if "frs" in data and "fixtures" in data and _fixture_reader_on(data):
         fixture_fr_refs: set[str] = set()
-        for fixture in data["fixtures"].get("fixtures", []):
-            for target in fixture.get("targets", []):
+        for fixture in _dict_items(data["fixtures"].get("fixtures")):
+            for target in _dict_items(fixture.get("targets")):
                 # "type" field confirmed by 08_fixtures.schema.json targets[].type (via vc:core:collections#traceRef)
-                if isinstance(target, dict) and normalize_trace_type(target.get("type") or "") == _FR_TRACE_TYPE and "id" in target:
+                if normalize_trace_type(target.get("type") or "") == _FR_TRACE_TYPE and "id" in target:
                     fixture_fr_refs.add(target["id"])
         # E536: FR declared in out_of_scope[] ("no fixture needed") but also referenced by
         # a fixture's targets[] — the two claims contradict. out_of_scope[] suppresses W565,
@@ -442,7 +498,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # W566 is the designated pairwise completeness code used for filtering and error promotion.
     # W561 is NOT in PROMOTABLE_PAIRS (see errors.py) to prevent double-promotion: without this
     # exclusion, SPECDEV_WARNINGS_AS_ERRORS=1 would emit both E561 and E566 for a single FR gap.
-    if "frs" in data and "roadmap" in data:
+    if milestone_reader_on:
         for fr_id in sorted(fr_ids - milestone_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W566", f"UNCOVERED_FR_MILESTONE {fr_id}"))
 
@@ -468,7 +524,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Mirrors the E560 capability_without_fr check but as a promotable warning.
     # scope:"out" capabilities are exempt (permanently excluded, no FR expected).
     # Legacy-guarded (M6c deletes): reads the `trace` of the frs.
-    if "capabilities" in data and "frs" in data and has_legacy_fields([data["frs"]], LEGACY_TRACE_FIELDS):
+    if "capabilities" in data and "frs" in data and _capability_reader_on(data):
         for cap_id in sorted(capability_ids - fr_traced_caps - capability_parked_ids):
             errors.append(make_error("W568", f"UNCOVERED_CAPABILITY {cap_id}"))
 
@@ -477,24 +533,24 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # deliverable ID is referenced by at least one Step 14 task via the task's fr_refs, or
     # is referenced in any Step 14 milestone's deliverables list.
     # Guard: only fires when both impl_plan and roadmap are present.
-    if "impl_plan" in data and "roadmap" in data:
+    # Legacy-guarded (M6c deletes): reads the `deliverables` of the step-09 milestones.
+    if (
+        "impl_plan" in data and "roadmap" in data
+        and has_legacy_fields([data["impl_plan"]], LEGACY_DELIVERABLE_FIELDS)
+    ):
         # Collect all artifact IDs referenced in Step 14 tasks (fr_refs) and deliverables
         step14_task_fr_ids: set[str] = set()
         step14_deliverable_ids: set[str] = set()
-        for ms in data["roadmap"].get("milestones", []):
-            for task in ms.get("tasks", []):
-                for fr_id in task.get("fr_refs", []):
-                    if isinstance(fr_id, str):
-                        step14_task_fr_ids.add(fr_id)
-            for deliverable in ms.get("deliverables", []):
-                if isinstance(deliverable, dict) and "id" in deliverable:
+        for ms in _dict_items(data["roadmap"].get("milestones")):
+            for task in _dict_items(ms.get("tasks")):
+                step14_task_fr_ids.update(_str_items(task.get("fr_refs")))
+            for deliverable in _dict_items(ms.get("deliverables")):
+                if "id" in deliverable:
                     step14_deliverable_ids.add(deliverable["id"])
         step14_covered_ids = step14_task_fr_ids | step14_deliverable_ids
-        for ms09 in data["impl_plan"].get("milestones", []):
+        for ms09 in _dict_items(data["impl_plan"].get("milestones")):
             ms09_id = ms09.get("milestone_id") or ms09.get("id", "<unknown>")
-            for deliverable in ms09.get("deliverables", []):
-                if not isinstance(deliverable, dict):
-                    continue
+            for deliverable in _dict_items(ms09.get("deliverables")):
                 deliverable_id = deliverable.get("id")
                 if not isinstance(deliverable_id, str) or not deliverable_id:
                     continue
@@ -512,7 +568,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # `code_execution` key is synthesized from spec/impl_context/<milestone>_plan.json
     # files; post-Trinity-Anchor split there is no longer a separate 16b_code.json
     # artifact — the same milestone-plan file accumulates plan/execution/review).
-    if "code_execution" in data and "roadmap" in data:
+    # Legacy-guarded (M6c deletes): reads the `critical_evidence` and checklist `spec_ref` of the plans.
+    if (
+        "code_execution" in data and "roadmap" in data
+        and has_legacy_fields(milestone_plans, LEGACY_PLAN_EVIDENCE_FIELDS)
+    ):
         # Executed task coverage is sourced from `satisfied_task_ids`, resolved
         # per-plan in `_load_milestone_plans_from_anchor` from each plan's
         # `critical_evidence.satisfied_checklist_ids` → `checklist[*].spec_ref.id`.
@@ -540,10 +600,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 item.get("checklist_status", "active")
             )
         # Check each non-done, non-deferred, non-wont_do task
-        for ms in data["roadmap"].get("milestones", []):
-            for task in ms.get("tasks", []):
-                if not isinstance(task, dict):
-                    continue
+        for ms in _dict_items(data["roadmap"].get("milestones")):
+            for task in _dict_items(ms.get("tasks")):
                 task_id = task.get("task_id")
                 task_status = task.get("status", "pending")
                 if not isinstance(task_id, str) or not task_id:

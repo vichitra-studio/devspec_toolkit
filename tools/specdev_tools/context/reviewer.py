@@ -18,6 +18,7 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
+from ..validation._legacy_shim import LEGACY_REVIEWER_TRACE_FIELDS, has_legacy_fields
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
 from ._utils import merge_allof as _u_merge_allof
@@ -164,7 +165,7 @@ def _collect_trace_ids(obj: Any) -> list[str]:
                 for item in v:
                     if isinstance(item, str):
                         results.append(item)
-                    elif isinstance(item, dict) and "id" in item:
+                    elif isinstance(item, dict) and isinstance(item.get("id"), str):
                         results.append(item["id"])
             else:
                 results.extend(_collect_trace_ids(v))
@@ -268,14 +269,29 @@ def _load_upstream_specs(step_id: str, spec_dir: str, repo_root: str) -> list[tu
 # Pass 1 — Structural review
 # ---------------------------------------------------------------------------
 
+def _empty_structural_review() -> StructuralReview:
+    """A structural review that reports nothing: no covered or dropped upstream id, no unjustified id."""
+    return StructuralReview(
+        upstream_coverage={"covered": [], "dropped": []},
+        reverse_trace={"unjustified": [], "scope_creep": []},
+    )
+
+
 def _run_structural_pass(
     artifact: dict,
     artifact_path: str,
     upstream_specs: list[tuple[str, dict]],
     step_id: str = "",
 ) -> StructuralReview:
-    """Execute Pass 1: automated structural analysis with zero LLM token cost."""
+    """Execute Pass 1: automated structural analysis with zero LLM token cost.
+
+    Coverage and reverse trace are counted from the artifact's ``trace`` arrays (and ``scope.apis`` /
+    ``scope.components``); an artifact without any ``trace`` array is of the graph shape, so both sub-passes
+    are skipped and report nothing (M4 / M6a replace them; M6c deletes the guard).
+    """
     _ = artifact_path  # currently unused
+    if not has_legacy_fields([artifact], LEGACY_REVIEWER_TRACE_FIELDS):
+        return _empty_structural_review()
 
     # --- Collect upstream entity IDs ---
     all_upstream_ids: set[str] = set()
@@ -780,12 +796,8 @@ def review_artifact(
     _ = entry_id  # currently informational; future: scope-filter structural pass
     artifact = _load_json_safe(artifact_path)
     if artifact is None:
-        empty_structural = StructuralReview(
-            upstream_coverage={"covered": [], "dropped": []},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
         return ReviewResult(
-            structural=empty_structural,
+            structural=_empty_structural_review(),
             semantic_pairs=[],
             verdict="PASS",
             token_cost={"structural": 0, "semantic_total": 0},

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .core.config import get_config, reset_config
 from .core.errors import SpecError
-from .validation._legacy_shim import is_parked_any_shape
+from .validation._legacy_shim import is_parked_any_shape, out_of_scope_fr_ids
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
 # Also match warnings prefixed with file paths (e.g., "spec/05_x.json: W590 ...")
@@ -1009,7 +1009,7 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "completeness-check":
-        from .validation.traceability_closure import check_traceability_closure
+        from .validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
         spec_dir = os.path.abspath(args.spec_dir)
         repo_root = os.path.abspath(args.repo_root)
         all_errs = check_traceability_closure(spec_dir, repo_root)
@@ -1098,15 +1098,9 @@ def main():
             if is_parked_any_shape(fr) and fr.get("fr_id")
         }
         apis_data = _load_spec_json("05_interface_contracts.json")
-        step05_oos_fr_ids = {
-            entry["fr_id"] for entry in apis_data.get("out_of_scope", [])
-            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
-        }
+        step05_oos_fr_ids = out_of_scope_fr_ids(apis_data)
         fixtures_data = _load_spec_json("08_fixtures.json")
-        step08_oos_fr_ids = {
-            entry["fr_id"] for entry in fixtures_data.get("out_of_scope", [])
-            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
-        }
+        step08_oos_fr_ids = out_of_scope_fr_ids(fixtures_data)
         total_frs_api_milestone = len(all_fr_ids - wont_have_fr_ids - step05_oos_fr_ids)
         total_frs_fixture = len(all_fr_ids - wont_have_fr_ids - step08_oos_fr_ids)
 
@@ -1134,7 +1128,13 @@ def main():
         uncovered_w567 = _extract_ids_for_code("W567")
         uncovered_w568 = _extract_ids_for_code("W568")
 
-        def _dim(total: int, uncovered: list) -> dict:
+        # A dimension whose closure reader is skipped on this spec shape is written in the 13a schema's
+        # vacuous form and named under `not_computed` (M6c retires 13a and these readers).
+        not_computed = uncomputed_dimensions(spec_dir, repo_root)
+
+        def _dim(name: str, total: int, uncovered: list) -> dict:
+            if name in not_computed:
+                total, uncovered = 0, []
             covered = max(0, total - len(uncovered))
             return {
                 "covered_count": covered,
@@ -1144,11 +1144,11 @@ def main():
             }
 
         coverage = {
-            "fr_api_coverage":               _dim(total_frs_api_milestone, uncovered_w564),
-            "fr_fixture_coverage":           _dim(total_frs_fixture,       uncovered_w565),
-            "fr_milestone_coverage":         _dim(total_frs_api_milestone, uncovered_w566),
-            "milestone_decomp_completeness": _dim(total_milestones,        uncovered_w567),
-            "capability_fr_coverage":        _dim(total_caps,              uncovered_w568),
+            "fr_api_coverage":               _dim("fr_api_coverage", total_frs_api_milestone, uncovered_w564),
+            "fr_fixture_coverage":           _dim("fr_fixture_coverage", total_frs_fixture, uncovered_w565),
+            "fr_milestone_coverage":         _dim("fr_milestone_coverage", total_frs_api_milestone, uncovered_w566),
+            "milestone_decomp_completeness": _dim("milestone_decomp_completeness", total_milestones, uncovered_w567),
+            "capability_fr_coverage":        _dim("capability_fr_coverage", total_caps, uncovered_w568),
         }
 
         if getattr(args, "json_output", False):
@@ -1159,6 +1159,7 @@ def main():
                 "command": "completeness-check",
                 "spec_dir": spec_dir,
                 "coverage": coverage,
+                "not_computed": not_computed,
             }
             print(format_errors_json(spec_errors, context=ctx))
             has_ecodes = any(not e.code.startswith("W") for e in spec_errors)
@@ -1171,13 +1172,17 @@ def main():
             print("=== Pairwise Completeness Check ===")
             print()
             labels = [
-                ("W564", "FR → API coverage",              coverage["fr_api_coverage"]),
-                ("W565", "FR → Fixture coverage",          coverage["fr_fixture_coverage"]),
-                ("W566", "FR → Milestone coverage",        coverage["fr_milestone_coverage"]),
-                ("W567", "Milestone decomp completeness",  coverage["milestone_decomp_completeness"]),
-                ("W568", "Capability → FR coverage",       coverage["capability_fr_coverage"]),
+                ("fr_api_coverage",               "FR → API coverage"),
+                ("fr_fixture_coverage",           "FR → Fixture coverage"),
+                ("fr_milestone_coverage",         "FR → Milestone coverage"),
+                ("milestone_decomp_completeness", "Milestone decomp completeness"),
+                ("capability_fr_coverage",        "Capability → FR coverage"),
             ]
-            for _, label, dim in labels:
+            for name, label in labels:
+                dim = coverage[name]
+                if name in not_computed:
+                    print(f"  [SKIP] {label}: not computed on this spec shape")
+                    continue
                 ratio = dim["ratio"]
                 uncovered = dim["uncovered_ids"]
                 pct = f"{ratio * 100:.1f}%"

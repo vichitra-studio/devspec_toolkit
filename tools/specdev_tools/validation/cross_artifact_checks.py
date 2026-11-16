@@ -321,6 +321,8 @@ def check_step_04_integrity(
         basename = os.path.basename(path)
         for fr in data.get("functional_requirements", []):
             for trace in fr.get("trace", []) or []:
+                if not isinstance(trace, dict):
+                    continue
                 trace_type = normalize_trace_type(trace.get("type") or "")
                 trace_id = trace.get("id")
 

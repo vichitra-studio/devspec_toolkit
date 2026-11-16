@@ -8,6 +8,7 @@ from pathlib import Path
 from ..core.errors import SpecError, make_error
 from ..core.registry import derive_allowed_upstream
 from ._extraction_intent_parser import parse_extraction_intent
+from ._legacy_shim import EXTRACTION_INTENT_DEFERRED
 
 
 # Pattern to match step number from prompt filenames: prompt_05_interface_contracts.md -> "05"
@@ -112,7 +113,7 @@ def check_extraction_intent(
         # E597: each required_spec_input should have an intent entry
         step_deps = allowed_deps.get(step_id, [])
         for dep in step_deps:
-            if dep not in intent_entries:
+            if dep not in intent_entries and (step_id, dep) not in EXTRACTION_INTENT_DEFERRED:
                 errors.append(make_error(
                     "E597",
                     f"EXTRACTION_INTENT_UPSTREAM_GAP prompt_{step_id} "

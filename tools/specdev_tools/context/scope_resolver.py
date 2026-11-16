@@ -15,6 +15,7 @@ import os
 from typing import Any
 
 from ..core.constants import resolve_extras_path
+from ..validation._legacy_shim import LEGACY_SCOPE_LINK_FIELDS, has_legacy_fields
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,21 @@ def _iter_spec_files(spec_dir: str):
 # Trace graph construction
 # ---------------------------------------------------------------------------
 
+def _linked_ids(obj: dict) -> list[str]:
+    """The ids *obj* links to through ``trace`` / ``targets`` entries (objects with an ``id``), ``fr_refs``
+    (roadmap milestones and tasks to FRs) and ``source_milestones`` (roadmap tasks); a wrong-typed field adds none."""
+    linked: list[str] = []
+    for field in ("trace", "targets"):
+        entries = obj.get(field)
+        if isinstance(entries, list):
+            linked.extend(e["id"] for e in entries if isinstance(e, dict) and isinstance(e.get("id"), str) and e["id"])
+    for field in ("fr_refs", "source_milestones"):
+        refs = obj.get(field)
+        if isinstance(refs, list):
+            linked.extend(ref for ref in refs if isinstance(ref, str) and ref)
+    return linked
+
+
 def _collect_entity_ids_and_traces(
     data: dict,
     file_path: str,
@@ -98,6 +114,8 @@ def _collect_entity_ids_and_traces(
     a directed edge is added in *adjacency* (bidirectional: both directions
     are added so BFS reaches everything).
     """
+
+    edges_on = has_legacy_fields([data], LEGACY_SCOPE_LINK_FIELDS)
 
     def _scan(obj: Any, parent_array_key: str | None, array_index: int | None) -> None:
         if isinstance(obj, dict):
@@ -120,33 +138,11 @@ def _collect_entity_ids_and_traces(
                         "path": jq_path,
                     }
 
-                # Collect trace edges from this entity
-                for trace_entry in obj.get("trace", []):
-                    if isinstance(trace_entry, dict):
-                        linked = trace_entry.get("id")
-                        if isinstance(linked, str) and linked:
-                            adjacency[entity_id].add(linked)
-                            adjacency[linked].add(entity_id)
-
-                # Collect targets edges (fixtures -> apis, threats -> apis)
-                for target_entry in obj.get("targets", []):
-                    if isinstance(target_entry, dict):
-                        linked = target_entry.get("id")
-                        if isinstance(linked, str) and linked:
-                            adjacency[entity_id].add(linked)
-                            adjacency[linked].add(entity_id)
-
-                # Collect fr_refs (roadmap milestones/tasks -> FRs)
-                for fr_ref in obj.get("fr_refs", []):
-                    if isinstance(fr_ref, str) and fr_ref:
-                        adjacency[entity_id].add(fr_ref)
-                        adjacency[fr_ref].add(entity_id)
-
-                # Collect source_milestones (roadmap tasks)
-                for ms_ref in obj.get("source_milestones", []):
-                    if isinstance(ms_ref, str) and ms_ref:
-                        adjacency[entity_id].add(ms_ref)
-                        adjacency[ms_ref].add(entity_id)
+                # Legacy (M4 replaces the graph with `trace` / `node`): edges of the 1.1.1 link fields.
+                if edges_on:
+                    for linked in _linked_ids(obj):
+                        adjacency[entity_id].add(linked)
+                        adjacency[linked].add(entity_id)
 
             # Recurse into values
             for k, v in obj.items():
