@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -436,7 +437,7 @@ def _apply_we_promotion(failures: list[SpecError]) -> list[SpecError]:
     for err in failures:
         if err.code in codes_to_promote:
             new_code = PROMOTABLE_PAIRS[err.code]
-            promoted.append(SpecError(code=new_code, message=err.message, path=err.path))
+            promoted.append(replace(err, code=new_code))
         else:
             promoted.append(err)
 

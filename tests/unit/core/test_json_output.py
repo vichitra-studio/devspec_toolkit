@@ -148,6 +148,21 @@ class TestErrorToDict:
         d = error_to_dict(err)
         assert "value" not in d
 
+    def test_render_text_unchanged(self) -> None:
+        owned = SpecError(code="E700", message="no node", path="a.json", owner="step:04", node_id="fr-x")
+        assert owned.render() == "E700 a.json no node"
+        assert SpecError(code="E700", message="no node", owner="step:04").render() == "E700 no node"
+
+    def test_error_to_dict_adds_keys_only_when_set(self) -> None:
+        assert "owner" not in error_to_dict(SpecError(code="E700", message="m"))
+        assert "node_id" not in error_to_dict(SpecError(code="E700", message="m"))
+        d = error_to_dict(SpecError(code="E700", message="m", owner="step:04", node_id="fr-x"))
+        assert d["owner"] == "step:04"
+        assert d["node_id"] == "fr-x"
+        only_owner = error_to_dict(SpecError(code="E520", message="m", owner="step:04"))
+        assert only_owner["owner"] == "step:04"
+        assert "node_id" not in only_owner
+
     def test_empty_string_subcode_is_included(self) -> None:
         err = SpecError(code="E530", message="test", subcode="")
         d = error_to_dict(err)

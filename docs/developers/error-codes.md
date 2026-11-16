@@ -937,6 +937,96 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (warning only).
 
+## Spec Graph (70x / 72x)
+
+Errors E700-E704 and W720 are findings about the spec: each is given an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and a `node_id` when it is raised. The table of owners is `tools/error_ownership.json`.
+
+### E700 LINK_TARGET_NOT_FOUND
+
+**Trigger**: A link field names an id that is not a node.
+
+**Resolution**: Owner `step:<holder step>`. Fix the id, or define the node it names.
+
+**Promotable**: No (error only).
+
+### E701 LINK_TARGET_WRONG_KIND
+
+**Trigger**: A link field names a node whose kind is not one of the kinds the field allows.
+
+**Resolution**: Owner `step:<holder step>`. Point the field at a node of an allowed kind.
+
+**Promotable**: No (error only).
+
+### E702 LINK_POINTS_DOWNSTREAM
+
+**Trigger**: A link field names a node of a later step (or of the same step, where that is not a declared same-step link).
+
+**Resolution**: Owner `step:<holder step>`. Link only to a node of an earlier step.
+
+**Promotable**: No (error only).
+
+### E703 LINK_CYCLE_SAME_STEP
+
+**Trigger**: Links among nodes of one step form a cycle.
+
+**Resolution**: Owner `step:<step>`. Break the cycle.
+
+**Promotable**: No (error only).
+
+### E704 DUPLICATE_NODE_ID
+
+**Trigger**: An id is defined by more than one node.
+
+**Resolution**: Owner `step:<step of the later definition>`. Rename one definition.
+
+**Promotable**: No (error only).
+
+### E705 LIFECYCLE_CHANGE_REFUSED
+
+**Trigger**: A `node status` change was refused (unknown or ambiguous id, bad value, or a node of role `record` or `seed`).
+
+**Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
+
+**Promotable**: No (error only).
+
+### E706 GRAPH_COMMAND_TARGET_UNKNOWN
+
+**Trigger**: A read command was given an id, field, kind or role the graph does not know.
+
+**Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
+
+**Promotable**: No (error only).
+
+### E707 RECIPE_START_KIND_INVALID
+
+**Trigger**: The start node of a recipe is not of the kind the role starts from.
+
+**Resolution**: Command usage error: no owner, no node id. Start from a node of the right kind.
+
+**Promotable**: No (error only).
+
+### E708 DIFF_REF_UNRESOLVED
+
+**Trigger**: A ref given to `diff` does not resolve.
+
+**Resolution**: Command usage error: no owner, no node id. Give a ref that exists.
+
+**Promotable**: No (error only).
+
+### E709 DIFF_REF_PREDATES_GRAPH_MODEL
+
+**Trigger**: The tree of a ref given to `diff` predates the 1.2.0 node model.
+
+**Resolution**: Command usage error: no owner, no node id. Give a ref from after the node model.
+
+**Promotable**: No (error only).
+
+### W720 LINK_TO_DEPRECATED_NODE
+
+**Trigger**: A link field names a node whose lifecycle is `deprecated`.
+
+**Resolution**: Owner `step:<holder step>`. Not promotable (no E counterpart). Registered in 1.2.0; the check that emits it is not built yet.
+
 ## Exception Classes
 
 ### SubmoduleDetectionError

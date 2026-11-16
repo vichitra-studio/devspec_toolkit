@@ -28,7 +28,13 @@ EXPECTED_PROMOTABLE_PAIRS = {
 
 # Registered codes with no string literal outside errors.py that are not the E side
 # of a PROMOTABLE_PAIRS row: kept for compatibility or reserved, not emitted.
-REGISTERED_WITHOUT_EMITTER = {"E422", "E561", "E604", "E620", "W150", "W591"}
+# W720 is emitted from M5 (the lock hook); M5 removes it from this set.  E700-E709 are registered in WI-M4-02 before
+# the graph code that writes them exists: each M4 work item that first writes one of them as a literal removes it here.
+REGISTERED_WITHOUT_EMITTER = {
+    "E422", "E561", "E604", "E620", "W150", "W591",
+    "E700", "E701", "E702", "E703", "E704", "E705", "E706", "E707", "E708", "E709",
+    "W720",
+}
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic
 # names.  These are legitimate divergences documented in errors.py (non-

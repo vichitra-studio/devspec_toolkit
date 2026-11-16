@@ -15,6 +15,8 @@ class SpecError:
     file: Optional[str] = None
     jq_path: Optional[str] = None
     value: Optional[str] = None
+    owner: Optional[str] = None
+    node_id: Optional[str] = None
 
     def render(self) -> str:
         if self.path:
@@ -213,6 +215,19 @@ ERROR_CODES = {
     # promoted, like W613): the filtering itself is correct behavior, this
     # just discloses that it happened.
     "W617": "UPSTREAM_BACKLOG_STATUS_FILTERED",
+    # Spec graph (7xx). E700-E704 are findings about the spec and carry an owner
+    # and a node id; E705-E709 are command usage errors and carry neither.
+    "E700": "LINK_TARGET_NOT_FOUND",
+    "E701": "LINK_TARGET_WRONG_KIND",
+    "E702": "LINK_POINTS_DOWNSTREAM",
+    "E703": "LINK_CYCLE_SAME_STEP",
+    "E704": "DUPLICATE_NODE_ID",
+    "E705": "LIFECYCLE_CHANGE_REFUSED",
+    "E706": "GRAPH_COMMAND_TARGET_UNKNOWN",
+    "E707": "RECIPE_START_KIND_INVALID",
+    "E708": "DIFF_REF_UNRESOLVED",
+    "E709": "DIFF_REF_PREDATES_GRAPH_MODEL",
+    "W720": "LINK_TO_DEPRECATED_NODE",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
@@ -224,6 +239,7 @@ ERROR_CODES = {
 # its name with the registered-but-unemitted E604 and stays advisory (see the
 # inline W604 note below). W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
 # E-counterpart at all -- it is an informational nudge, not a hard failure.
+# W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the
@@ -295,12 +311,15 @@ def make_error(
     file: Optional[str] = None,
     jq_path: Optional[str] = None,
     value: Optional[str] = None,
+    owner: Optional[str] = None,
+    node_id: Optional[str] = None,
 ) -> SpecError:
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
     return SpecError(
         code=code, message=message, path=path,
         subcode=subcode, file=file, jq_path=jq_path, value=value,
+        owner=owner, node_id=node_id,
     )
 
 

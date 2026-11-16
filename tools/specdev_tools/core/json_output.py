@@ -118,6 +118,10 @@ def error_to_dict(err: SpecError) -> dict[str, Any]:
         entry["jq_path"] = err.jq_path
     if err.value is not None:
         entry["value"] = err.value
+    if err.owner is not None:
+        entry["owner"] = err.owner
+    if err.node_id is not None:
+        entry["node_id"] = err.node_id
     remediation = _make_remediation(err)
     if remediation is not None:
         entry["remediation"] = remediation

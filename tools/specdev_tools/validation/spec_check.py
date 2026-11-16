@@ -16,7 +16,8 @@ from typing import Any
 from ..core.config import reset_config
 from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
-from ..core.loaders import iter_spec_artifacts
+from ..core.loaders import iter_spec_artifacts, read_json_object
+from ..graph.ownership import stamp_file_owner, step_for_file
 
 
 def _classify(errors: list[SpecError]) -> dict[str, Any]:
@@ -142,15 +143,16 @@ def _run_checks(
     schema_errs: list[SpecError] = []
     if os.path.isdir(spec_dir):
         for file_path in iter_spec_artifacts(spec_dir):
+            file_errs = validate_file(
+                repo_root,
+                file_path,
+                include_quality_lint=False,
+                include_canonical_integrity=False,
+                git_root=git_root,
+                spec_root=spec_root,
+            )
             schema_errs.extend(
-                validate_file(
-                    repo_root,
-                    file_path,
-                    include_quality_lint=False,
-                    include_canonical_integrity=False,
-                    git_root=git_root,
-                    spec_root=spec_root,
-                )
+                stamp_file_owner(file_errs, step_for_file(file_path, read_json_object(file_path)))
             )
     checks["schema-validation"] = _check_result(schema_errs)
 

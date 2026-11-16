@@ -65,6 +65,9 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W615", "E615",
             # DEVSPEC-123: upstream-backlog discloses records hidden by --status filtering
             "W617",
+            # Spec graph (7xx)
+            "E700", "E701", "E702", "E703", "E704", "E705", "E706", "E707", "E708", "E709",
+            "W720",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(
