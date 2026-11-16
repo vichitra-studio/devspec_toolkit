@@ -15,7 +15,7 @@
           "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
         },
         "rules": {
-          "description": "Array of governance rules. A rule is one requirement on how the project is changed or released, with the upstream reason it exists and, optionally, who enforces it: a command named in cli_command, or a person (enforcer 'review'). A rule with neither is enforced by a CI job of step 12 that realises it. At least one rule.",
+          "description": "Array of governance rules. A rule is one requirement on how the project is changed or released, with the upstream reason it exists and, optionally, who enforces it: a command named in cli_command, or a person (enforcer 'review'). A rule with neither is meant to be enforced by a CI job of step 12 that names it in its `realises`. At least one rule.",
           "type": "array",
           "minItems": 1,
           "x-node": {
@@ -45,7 +45,7 @@
                 "minLength": 1
               },
               "enforcer": {
-                "description": "Who enforces this rule when it is not a command or a job. The only value is 'review': a person decides, and the decision is attested at release. Omit it for a rule a CI job enforces (that job names the rule in its own `realises`) and for a rule that names a command in cli_command. A rule never carries both enforcer and cli_command.",
+                "description": "Who enforces this rule when it is not a command or a job. The only value is 'review': a person decides. Omit it for a rule a CI job enforces (that job names the rule in its own `realises`) and for a rule that names a command in cli_command. A rule never carries both enforcer and cli_command.",
                 "type": "string",
                 "enum": [
                   "review"
@@ -151,16 +151,16 @@
         },
         "commit_message_rules": {
           "type": "object",
-          "description": "Rules governing commit message format and content. Validated by governance-check on every PR. Defines the regex pattern and artifact ID requirements that keep commits traceable to spec changes.",
+          "description": "Rules for the format of commit messages. `specdev governance-check --message` reads them and checks the one message it is given; it checks commit messages only.",
           "additionalProperties": false,
           "properties": {
             "require_spec_ids": {
               "type": "boolean",
-              "description": "When set to true, governance-check enforces that every commit message must embed at least one bracketed spec artifact ID (e.g., [fr-user-login]). When false, IDs are optional. Valid spec ID prefixes that may appear in commit messages: fr-* (functional requirements), api-* (API contracts), cap-* (capabilities), nfr-* (non-functional requirements), inv-* (invariants), fix-* (fixtures), ms-* (milestones), ext-* (extensions). The governance-check command validates that commit messages reference IDs that exist in the spec. Anti-pattern: referencing a spec ID prefix not in this list (e.g., req-*, feat-*) — use the canonical prefixes so cross-step traceability works."
+              "description": "When true and `pattern` is set, governance-check fails a message that does not match `pattern`. When false, or when `pattern` is absent, it accepts any message. It does not check that an id named in the message exists. Spec ids that may appear in a message, written in brackets (e.g., [fr-user-login]), begin with one of these prefixes: fr-* (functional requirements), api-* (API contracts), cap-* (capabilities), nfr-* (non-functional requirements), inv-* (invariants), fix-* (fixtures), ms-* (milestones), ext-* (extensions). Anti-pattern: a prefix not in this list (e.g., req-*, feat-*) — use the canonical prefixes so a reader can find the node."
             },
             "pattern": {
               "type": "string",
-              "description": "Commit message pattern that governance-check validates. Should include step reference in brackets: 'feat(spec): add login flow [fr-user-login]' — enforced at runtime by governance-check. The bracketed IDs should match valid artifact IDs in the spec. Conventional Commits format is recommended: '<type>(<scope>): <summary> [<artifact-id>]'."
+              "description": "Regular expression that governance-check matches against the start of a commit message when require_spec_ids is true. A pattern that expects a bracketed artifact id keeps commits tied to spec changes, as in 'feat(spec): add login flow [fr-user-login]'. Conventional Commits format is recommended: '<type>(<scope>): <summary> [<artifact-id>]'."
             },
             "id_pattern_ref": {
               "description": "Canonical reference to the ID pattern used in commit messages. Kind is structurally pinned to 'id_pattern'. Example: {\"id\": \"cn:core:id_pattern:conventional-commit\", \"kind\": \"id_pattern\"}. Omit if the pattern is fully defined by the 'pattern' field.",

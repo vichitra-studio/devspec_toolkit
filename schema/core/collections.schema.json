@@ -126,7 +126,7 @@
       "properties": {
         "field_path": {
           "type": "string",
-          "description": "JSON path to the field in the source document where the conflicting input value appeared. Uses dot-notation for objects and bracket-notation for arrays. Dot-notation for named properties: 'capabilities[0].capability_ref.id'. Bracket-notation for pattern properties or dynamic keys: 'environments[\"production\"].database_url'. Full example showing both: 'functional_requirements[2].trace[0].id'. Anti-pattern: using bracket-notation for simple named properties — prefer dot-notation (use 'terms[2].term_ref.id' not 'terms[2][\"term_ref\"][\"id\"]'). Populated by canonical-autofix tooling — do not author manually."
+          "description": "JSON path to the field in the source document where the conflicting input value appeared. Uses dot-notation for objects and bracket-notation for arrays. Dot-notation for named properties: 'capabilities[0].capability_ref.id'. Bracket-notation for pattern properties or dynamic keys: 'environments[\"production\"].database_url'. Full example showing both: 'functional_requirements[2].entity_ref.id'. Anti-pattern: using bracket-notation for simple named properties — prefer dot-notation (use 'terms[2].term_ref.id' not 'terms[2][\"term_ref\"][\"id\"]'). Populated by canonical-autofix tooling — do not author manually."
         },
         "input_value": {
           "type": "string",

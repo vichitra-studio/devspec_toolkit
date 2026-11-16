@@ -15,7 +15,7 @@
       "properties": {
         "language": {
           "type": "string",
-          "description": "Primary programming language for this scaffold. Use lowercase with no version suffix. Decision rule: choose the single language that owns the runtime entry point for this scaffold unit — if the project is polyglot, create one scaffold per language boundary. Examples: 'python' for FastAPI or Django services, 'typescript' for Next.js or Express applications, 'go' for high-throughput microservices, 'java' for Spring Boot services, 'rust' for systems or WASM targets. Anti-pattern: 'Python 3.11' (include the version in tech_stack, not here — language is a stable identifier); 'Python/TypeScript' (one language per scaffold — split polyglot projects into separate scaffold entries)."
+          "description": "Primary programming language for this scaffold. Use lowercase with no version suffix. Decision rule: choose the single language that owns the runtime entry point for this scaffold unit — if the project is polyglot, create one scaffold per language boundary. Examples: 'python' for FastAPI or Django services, 'typescript' for Next.js or Express applications, 'go' for high-throughput microservices, 'java' for Spring Boot services, 'rust' for systems or WASM targets. Anti-pattern: 'Python 3.11' (the version is a pin on a third party in Step 02, not part of this value — language is a stable identifier); 'Python/TypeScript' (one language per scaffold — split polyglot projects into separate scaffold entries)."
         },
         "framework": {
           "type": "string",

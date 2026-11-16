@@ -60,7 +60,7 @@
                 }
               },
               "mitigated_by": {
-                "description": "Ids of the nodes that mitigate this threat: requirements, criteria, APIs, API errors, invariants, NFRs, rules, gates, secrets, environments, constraints or fixtures. Optional: a threat with no mitigation is a threat that is not built yet, which is a gate result, not a schema error. Example: [\"inv-reset-token-single-use\", \"fix-password-reset-expired-token\"]. Anti-pattern: naming a capability here.",
+                "description": "Ids of the nodes that mitigate this threat: requirements, criteria, APIs, API errors, invariants, NFRs, rules, gates, secrets, environments, constraints or fixtures. Optional: the schema accepts a threat with no mitigation. Example: [\"inv-reset-token-single-use\", \"fix-password-reset-expired-token\"]. Anti-pattern: naming a capability here.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

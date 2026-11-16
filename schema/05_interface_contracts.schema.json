@@ -68,7 +68,7 @@
                 "type": "string"
               },
               "method": {
-                "description": "When provided, must be one of: GET, POST, PUT, PATCH, DELETE (enforced by enum). Optional — omit for non-HTTP protocols such as gRPC, WebSocket, or event buses. OPTIONS and HEAD are only available in Step 15 scaffold (httpMethodFull). Decision rules: GET — read with no side effects, safe and idempotent, never for actions; POST — create a new resource or trigger a non-idempotent action (login, payment); PUT — full replacement of an existing resource, idempotent (caller provides complete object); PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource, idempotent. Anti-pattern: POST for idempotent updates (use PUT or PATCH); GET for operations with side effects (use POST or PUT).",
+                "description": "When provided, must be one of: GET, POST, PUT, PATCH, DELETE (enforced by enum). Optional — omit for non-HTTP protocols such as gRPC, WebSocket, or event buses. Decision rules: GET — read with no side effects, safe and idempotent, never for actions; POST — create a new resource or trigger a non-idempotent action (login, payment); PUT — full replacement of an existing resource, idempotent (caller provides complete object); PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource, idempotent. Anti-pattern: POST for idempotent updates (use PUT or PATCH); GET for operations with side effects (use POST or PUT).",
                 "$ref": "vc:core:atoms#httpMethod"
               },
               "input_schema_ref": {

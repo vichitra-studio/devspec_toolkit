@@ -81,7 +81,7 @@
                   "id": "criterion_id"
                 },
                 "items": {
-                  "description": "A single acceptance criterion with an ID and testable text. Fixture coverage is authored in Step 08 via fixture.targets[] referencing the parent FR — Step 04 does not declare fixture references.",
+                  "description": "A single acceptance criterion with an ID and testable text. A fixture in Step 08 proves a criterion through its `verifies` field; Step 04 does not declare fixture references.",
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -318,4 +319,52 @@ def test_description_coverage_no_regression(schema_path: Path) -> None:
     assert coverage_fraction >= _PER_FILE_FLOOR, (
         f"{schema_path.name}: description coverage {coverage_fraction:.1%} "
         f"({with_desc}/{total}) is below per-file floor {_PER_FILE_FLOOR:.0%}"
+    )
+
+
+# ===========================================================================
+# Link descriptions carry no per-link note (the removed {type, id, note} shape)
+# ===========================================================================
+
+_GRAPH_SHAPE_SCHEMAS = [
+    *sorted(SCHEMA_DIR.glob("0[6-9]_*.schema.json")),
+    *sorted(SCHEMA_DIR.glob("1[0-6]*.schema.json")),
+    SCHEMA_DIR / "core" / "collections.schema.json",
+]
+_WORD_NOTE = re.compile(r"\bnote\b", re.IGNORECASE)
+_WORD_TYPE = re.compile(r"\btype\b", re.IGNORECASE)
+
+
+def _collect_descriptions(node: Any, path: str = "$") -> list[tuple[str, str]]:
+    """Return ``(path, text)`` for every ``description`` string under *node*."""
+    found: list[tuple[str, str]] = []
+    if isinstance(node, dict):
+        for key, child in node.items():
+            if key == "description" and isinstance(child, str):
+                found.append((f"{path}.description", child))
+            else:
+                found.extend(_collect_descriptions(child, f"{path}.{key}"))
+    elif isinstance(node, list):
+        for index, child in enumerate(node):
+            found.extend(_collect_descriptions(child, f"{path}[{index}]"))
+    return found
+
+
+@pytest.mark.parametrize(
+    "schema_path",
+    _GRAPH_SHAPE_SCHEMAS,
+    ids=[str(p.relative_to(SCHEMA_DIR)) for p in _GRAPH_SHAPE_SCHEMAS],
+)
+def test_no_description_carries_the_removed_type_id_note_shape(schema_path: Path) -> None:
+    """No description in schemas 06-16, the anchor or the core collections
+    names both ``note`` and ``type``: that pair is the removed
+    ``{type, id, note}`` link shape."""
+    offenders = [
+        path
+        for path, text in _collect_descriptions(_load_json(schema_path))
+        if _WORD_NOTE.search(text) and _WORD_TYPE.search(text)
+    ]
+    assert not offenders, (
+        f"{schema_path.name} describes the removed {{type, id, note}} shape at:\n"
+        + "\n".join(f"  - {p}" for p in offenders)
     )

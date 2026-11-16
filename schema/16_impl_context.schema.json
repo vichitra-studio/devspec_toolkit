@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:16-impl-context",
   "title": "16_impl_context",
-  "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence binding.",
+  "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence recorded per execution result.",
   "$defs": {
     "specRef": {
       "type": "object",
@@ -48,7 +48,7 @@
         "blocked",
         "partial"
       ],
-      "description": "Execution outcome. Decision rule: 'partial' = started but not all sub-tasks complete; 'blocked' = cannot proceed due to an unresolved dependency or ambiguity (document the blocker in deferred_reason). Example: use 'blocked' when an upstream API contract is not finalised; use 'partial' when 3 of 5 test suites pass but 2 are still running. Anti-pattern: using 'partial' for a run that has not started at all (use 'passed'/'failed' after completion)."
+      "description": "Execution outcome. Decision rule: 'partial' = started but not all sub-tasks complete; 'blocked' = cannot proceed due to an unresolved dependency or ambiguity (describe the blocker in outcome_description). Example: use 'blocked' when an upstream API contract is not finalised; use 'partial' when 3 of 5 test suites pass but 2 are still running. Anti-pattern: using 'partial' for a run that has not started at all (use 'passed'/'failed' after completion)."
     },
     "evidenceObject": {
       "type": "object",
@@ -94,7 +94,7 @@
   "properties": {
     "extensions": {
       "type": "object",
-      "description": "Structured extensions for host-repo-specific additions that do not fit standard fields. Examples: {\"deployment_runbook\": \"https://runbooks.example.com/auth-deploy\"}, {\"slack_channel\": \"#auth-team\"}. Anti-pattern: duplicating data already captured in standard fields (e.g., restating plan.status here).",
+      "description": "Structured extensions for host-repo-specific additions that do not fit standard fields. Examples: {\"deployment_runbook\": \"https://runbooks.example.com/auth-deploy\"}, {\"slack_channel\": \"#auth-team\"}. Anti-pattern: duplicating data already captured in standard fields (e.g., restating plan.scope_validation here).",
       "additionalProperties": false,
       "properties": {
         "execution_context": {
@@ -104,7 +104,7 @@
           "properties": {
             "command_overrides": {
               "type": "object",
-              "description": "Map of command names to override values for execution. Example: {\"validate\": \"python -m pytest tests/unit/ --tb=short\", \"lint\": \"ruff check src/\"}. Anti-pattern: overriding commands without documenting why in a code comment or the plan's deferred_reason.",
+              "description": "Map of command names to override values for execution. Example: {\"validate\": \"python -m pytest tests/unit/ --tb=short\", \"lint\": \"ruff check src/\"}. Anti-pattern: overriding commands without documenting why in a code comment.",
               "additionalProperties": {
                 "type": "string",
                 "description": "Override value for a specific command name."
@@ -1262,7 +1262,7 @@
                   "minor",
                   "nit"
                 ],
-                "description": "Severity of the finding from blocking (must fix) to nit (optional). Uses a review-specific four-tier scale (blocking/major/minor/nit) — distinct from severityLevel (low/medium/high/critical) and ambiguity severity (blocking/non_blocking) used elsewhere in this schema."
+                "description": "Severity of the finding from blocking (must fix) to nit (optional). Uses a review-specific four-tier scale (blocking/major/minor/nit) — distinct from severityLevel (low/medium/high/critical) used elsewhere in this schema."
               },
               "spec_ref": {
                 "$ref": "#/$defs/specRef",
@@ -1379,7 +1379,7 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5,
-              "description": "Rating of how completely the spec requirements were implemented (integer 0–5). Rubric: 0 = no spec requirements addressed; 1 = fewer than 25% of FRs implemented or all implementations are stubs; 2 = 25–50% of FRs implemented with some evidence; 3 = 50–75% of FRs implemented with test coverage; 4 = more than 75% of FRs implemented with minor documented gaps; 5 = all FRs fully implemented with evidence binding to fixtures and acceptance criteria. Anti-pattern: assigning 5 when any FR lacks test coverage."
+              "description": "Rating of how completely the spec requirements were implemented (integer 0–5). Rubric: 0 = no spec requirements addressed; 1 = fewer than 25% of FRs implemented or all implementations are stubs; 2 = 25–50% of FRs implemented with some evidence; 3 = 50–75% of FRs implemented with test coverage; 4 = more than 75% of FRs implemented with minor documented gaps; 5 = all FRs fully implemented with evidence tied to fixtures and acceptance criteria. Anti-pattern: assigning 5 when any FR lacks test coverage."
             },
             "code_quality": {
               "type": "integer",
@@ -1403,7 +1403,7 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5,
-              "description": "Rating of how well canonical references and traceability metadata are used (integer 0–5). Rubric: 0 = no canonical_refs_used, no trace links; 1 = canonical_refs_used present but empty when refs exist, trace links missing; 2 = some canonical refs populated but inconsistent (missing kinds or labels); 3 = all *_ref fields populated with valid cn: IDs, canonical_refs_used aggregated; 4 = all refs populated, canonical_refs_used correctly deduplicated, canonical_proposals added for new terms; 5 = all refs populated, proposals complete, no fabricated cn: IDs, all trace links resolve. Anti-pattern: assigning 5 without running canonical-integrity lint."
+              "description": "Rating of how well canonical references are used (integer 0–5). Rubric: 0 = no canonical_refs_used; 1 = canonical_refs_used present but empty when refs exist; 2 = some canonical refs populated but inconsistent (missing kinds or labels); 3 = all *_ref fields populated with valid cn: IDs, canonical_refs_used aggregated; 4 = all refs populated, canonical_refs_used correctly deduplicated, canonical_proposals added for new terms; 5 = all refs populated, proposals complete, no fabricated cn: IDs. Anti-pattern: assigning 5 without running canonical-integrity lint."
             }
           },
           "required": [
@@ -1430,7 +1430,7 @@
         },
         "fixture_status": {
           "type": "object",
-          "description": "Status of fixture test results and CI for implemented interfaces.",
+          "description": "CI status and the implemented interfaces of the fixture tests.",
           "additionalProperties": false,
           "properties": {
             "implemented_interfaces": {
@@ -1521,7 +1521,7 @@
           "properties": {
             "fr_coverage": {
               "type": "array",
-              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. Should cover every FR referenced in the plan's spec_alignment. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence binding.",
+              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. Should cover every FR referenced in the plan's spec_alignment. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence.",
               "items": {
                 "type": "object",
                 "properties": {

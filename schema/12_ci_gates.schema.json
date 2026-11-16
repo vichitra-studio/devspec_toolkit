@@ -121,7 +121,7 @@
                 }
               },
               "realises": {
-                "description": "Ids of the nodes this job is the running proof of: the environment it runs in, the gate it runs, the secret it uses or the rule it enforces. Optional; a job that realises nothing and verifies nothing is an unused node (a gate finding, not a schema error). A scheduled live probe is an ordinary job whose environment_ref is the environment it probes and whose realises names the gate or rule it guards. Example: [\"ci\", \"contract-tests\", \"rule-contract-tests-on-every-pr\"]. Anti-pattern: naming an NFR here (use verifies).",
+                "description": "Ids of the nodes this job is the running proof of: the environment it runs in, the gate it runs, the secret it uses or the rule it enforces. Optional; the schema accepts a job that names nothing here. A scheduled live probe is an ordinary job whose environment_ref is the environment it probes and whose realises names the gate or rule it guards. Example: [\"ci\", \"contract-tests\", \"rule-contract-tests-on-every-pr\"]. Anti-pattern: naming an NFR here (use verifies).",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
