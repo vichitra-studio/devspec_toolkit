@@ -170,6 +170,39 @@ class TestGroupStateBlocked:
         assert len(health) == 1
         assert health[0]["well_formed"] is True
 
+    def test_new_shape_ambiguity_item_does_not_raise_or_block(self, tmp_path: Path) -> None:
+        """A 1.2.0 open item (about, no status/severity/impact) neither raises nor blocks; junk items are skipped."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        _write_findings(findings_dir, "findings_GRP_N_1.json", [])
+        group = _make_group("GRP_N")
+        ambs = [
+            {"id": "amb-new", "description": "GRP_N is unclear", "about": ["GRP_N"]},
+            "not-a-dict",
+        ]
+        result = derive_group_state(group, str(findings_dir), ambs)
+        assert result["state"] == "code_converged"
+        assert result["blocking_amb_ids"] == []
+
+    def test_legacy_blocked_item_still_blocks(self, tmp_path: Path) -> None:
+        """A legacy blocked item still blocks when only its description names the group; wrong-typed impact is tolerated."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        _write_findings(findings_dir, "findings_GRP_L_1.json", [])
+        group = _make_group("GRP_L")
+        ambs = [
+            {
+                "id": "amb-legacy",
+                "status": "blocked",
+                "severity": "high",
+                "description": "GRP_L cannot proceed",
+                "impact": "GRP_L",
+            }
+        ]
+        result = derive_group_state(group, str(findings_dir), ambs)
+        assert result["state"] == "blocked"
+        assert result["blocking_amb_ids"] == ["amb-legacy"]
+
     def test_resolved_amb_does_not_block(self, tmp_path: Path) -> None:
         """A resolved blocked amb does not trigger blocked state."""
         findings_dir = tmp_path / ".specdev" / "findings"

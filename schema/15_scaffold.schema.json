@@ -4,6 +4,10 @@
   "title": "15_scaffold",
   "type": "object",
   "properties": {
+    "ambiguities": {
+      "$ref": "vc:core:collections#ambiguityList",
+      "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+    },
     "project_skeleton": {
       "type": "object",
       "description": "Top-level project skeleton definition. Specifies the runtime language, framework, and module layout that all scaffold entries must be consistent with. This object anchors the technology choices for the entire scaffold artifact. Example 1 (Python/FastAPI): {\"language\": \"python\", \"framework\": \"fastapi\", \"modules\": [\"src/api/handlers\", \"src/services\", \"src/models\", \"src/core\", \"tests/unit\", \"tests/integration\"]}. Example 2 (Node/TypeScript + Express): {\"language\": \"typescript\", \"framework\": \"express\", \"modules\": [\"src/routes\", \"src/controllers\", \"src/services\", \"src/db\", \"tests/unit\", \"tests/e2e\"]}. Decision rule: `modules` should list directory paths (not file names) that represent the project's logical layer separation. Anti-pattern: listing file names instead of directory paths (e.g., 'auth_handler.py' instead of 'src/auth/') — file names belong in interface_map entries, not in the skeleton; omitting a 'tests/' entry means there is no declared test strategy for the scaffold.",

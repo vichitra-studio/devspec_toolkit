@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "trace": {
           "type": "array",
           "description": "Traceability links connecting this red team assessment to the capabilities and APIs it covers. Every threat must trace to at least one upstream capability or API it targets. type = the canonical kind of the target: use type='capability' for cap-* IDs, type='api' for api-* IDs. The relationship verb (derives_from) goes in note. Example: [{\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"derives_from: threat targets the credential validation flow\"}]. Threats without trace links cannot be validated against the attack surface defined in Steps 01–05. Multiple traces allowed when a threat crosses capability boundaries.",

@@ -158,18 +158,17 @@ class TestStep16AnchorSchema(_AnchorTestBase):
                 scope_in=["auth"],
                 ambiguities=[{
                     "id": "amb-noise-test",
-                    "description": "An ambiguity with an enum-violating severity value.",
-                    "severity": "INVALID_SEVERITY",
-                    "status": "tracking",
+                    "description": "An ambiguity with an empty about list.",
+                    "about": [],
                 }],
             )
             errors = validate_file(self.repo_root, str(anchor_path))
 
-        # Exactly one error should fire — the real one for the bad enum.
-        severity_errors = [e for e in errors if "severity" in e.message and "INVALID_SEVERITY" in e.message]
+        # Exactly one error should fire — the real one for the empty about list.
+        about_errors = [e for e in errors if "ambiguities/0/about" in e.message]
         self.assertEqual(
-            len(severity_errors), 1,
-            f"Expected exactly one severity-enum error. Got: {errors}"
+            len(about_errors), 1,
+            f"Expected exactly one empty-about error. Got: {errors}"
         )
         # No phantom 'artifact_role' or 'plan' unevaluatedProperties companion.
         phantom = [

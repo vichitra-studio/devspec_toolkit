@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "versioning": {
           "type": "string",
           "description": "Versioning scheme applied to spec artifacts. Decision rule: use 'semver' for public APIs or schemas with explicit breaking-change semantics (MAJOR.MINOR.PATCH); use 'date-based' for internal artifact versioning where freshness matters more than compatibility (YYYY-MM-DD); use 'sequential' for simple monotonic increment when breaking changes are managed out-of-band. Examples: public REST API → 'semver'; internal spec artifacts → 'date-based'. Anti-pattern: using 'sequential' for public APIs (consumers cannot determine breaking changes from the version number alone)."

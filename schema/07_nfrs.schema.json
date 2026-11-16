@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "nfrs": {
           "description": "Array of non-functional requirements specifying measurable quality attributes for the system. Coverage rule: include at least one NFR for each quality dimension that is explicitly committed to in the charter success_metrics or stakeholder needs. Priority coverage: latency (for any user-facing API), availability (for any service with an SLA), security (for any auth path or PII handling), and durability (for any persistent data). Complete worked example of a single well-formed NFR entry: {\"nfr_id\": \"nfr-auth-p95-latency\", \"name\": \"Auth API P95 Latency\", \"category\": \"latency\", \"metric\": \"P95 response time for POST /auth/login\", \"target\": \"< 200ms\", \"unit\": \"ms\", \"measurement_method\": \"P95 latency from DataDog APM — auth.request.duration metric, averaged over 5-minute windows\", \"stage\": \"production\", \"owner\": \"api\", \"trace\": [{\"type\": \"charter-goal\", \"id\": \"goal-auth-latency\", \"note\": \"derives_from: charter success metric directly motivating this NFR\"}]}. Further examples: a checkout API with a latency success metric needs an nfr-latency-checkout-p95 entry; a 24/7 SaaS service needs an nfr-availability-api-uptime entry; a system handling user credentials needs an nfr-security-auth-encryption entry. Anti-patterns: copying NFRs verbatim from a template without grounding them in charter goals (produces unverifiable entries); omitting availability NFRs for a system whose charter commits to 24/7 uptime (breaks traceability-check).",
           "type": "array",

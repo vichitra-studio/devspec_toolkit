@@ -219,7 +219,7 @@ def test_json_summary_carries_hidden_by_status_count(dual_origin_spec: Path):
 def test_misfiled_anchor_is_skipped_not_misread_as_plan_ambiguities(tmp_path: Path):
     """DEVSPEC-123 follow-up: a Trinity Anchor (artifact_role="anchor")
     misfiled inside impl_context/ (the W609 condition) also has a
-    `plan.ambiguities[]` array, but it uses the shared crossCycleAmbiguityItem
+    `plan.ambiguities[]` array, but its legacy shape uses the
     severity scale (low/medium/high/critical), not the milestone plan's 16a
     binary blocking/non_blocking scale. Before the artifact_role guard, this
     fixture's "high" severity would have failed origin="plan" validation
@@ -244,7 +244,7 @@ def test_misfiled_anchor_with_whitespace_padded_role_is_still_skipped(tmp_path: 
     whitespace in an otherwise schema-invalid file). upstream-backlog's guard
     must match that same tolerance -- otherwise a file validate.py correctly
     flags as a misfiled anchor would fall through here and be misread as a
-    milestone plan, spuriously emitting E520 for its crossCycleAmbiguityItem
+    milestone plan, spuriously emitting E520 for its legacy-shape
     severities."""
     spec_dir = tmp_path / "spec"
     impl = spec_dir / "impl_context"
@@ -257,3 +257,24 @@ def test_misfiled_anchor_with_whitespace_padded_role_is_still_skipped(tmp_path: 
     payload = json.loads(r.stdout)
     assert payload["summary"]["total_records"] == 0
     assert payload["records"] == []
+
+
+def test_new_shape_item_listed_and_legacy_fixture_unchanged(clean_spec: Path):
+    """1.2.0 open items (about, no severity/status/impact) are listed and raise no E520 or W613;
+    the legacy-shape fixtures in the same run still report exactly as before."""
+    baseline = _run_cli(clean_spec, "--json")
+    shutil.copy(FIXTURE_DIR / "plan_with_new_shape_items.json",
+                clean_spec / "impl_context" / "plan_with_new_shape_items.json")
+    r = _run_cli(clean_spec, "--json")
+    assert r.returncode == 0, r.stderr
+    assert "E520" not in r.stderr
+    payload = json.loads(r.stdout)
+    new_records = [rec for rec in payload["records"] if rec["milestone_id"] == "ms-new-shape"]
+    assert {(rec["ambiguity_id"], rec["origin"], rec["severity"], rec["status"], tuple(rec["about"]))
+            for rec in new_records} == {
+        ("amb-session-timeout", "plan", None, "open", ("fr-user-login",)),
+        ("amb-missing-criterion", "execution", None, "open", ("fr-user-login", "fr-user-logout")),
+    }
+    legacy = [rec for rec in payload["records"] if rec["milestone_id"] != "ms-new-shape"]
+    assert legacy == json.loads(baseline.stdout)["records"]
+    assert len([ln for ln in r.stderr.splitlines() if ln.startswith("W613")]) == 2

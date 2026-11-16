@@ -1401,13 +1401,13 @@ class TestStep16(unittest.TestCase):
         )
 
     def test_valid_with_emergent_ambiguities(self):
-        """Valid fixture with emergent_ambiguities covering 'low' and 'high' severities should pass."""
+        """Valid fixture with new-shape emergent_ambiguities (about, optional proposed_assumption) should pass."""
         path = os.path.join(self.fixtures_dir, "valid_with_emergent_ambiguities.json")
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid emergent_ambiguities fixture should pass. Errors: {errors}")
 
     def test_invalid_emergent_ambiguity_severity(self):
-        """emergent_ambiguities entry with invalid severity value should fail schema validation."""
+        """An emergent_ambiguities entry in the removed legacy shape (severity, no about) fails schema validation."""
         path = os.path.join(self.fixtures_dir, "invalid_emergent_ambiguity_severity.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(
@@ -3450,10 +3450,10 @@ class TestStep16(unittest.TestCase):
             f"Expected a real E520 on {rel}, got: {[(e.code, e.message[:80]) for e in errors]}",
         )
 
-    # --- crossCycleAmbiguityItem accepts optional resolved/decision ---
+    # --- ambiguityItem accepts optional decision/proposed_assumption ---
 
-    def test_emergent_ambiguity_with_resolved_and_decision(self):
-        """crossCycleAmbiguityItem accepts optional resolved + decision fields."""
+    def test_emergent_ambiguity_with_decision_and_assumption(self):
+        """ambiguityItem accepts optional decision + proposed_assumption fields."""
         data = {
             "$schema": "vc:16-impl-context",
             "id": "step-amb-test",
@@ -3470,9 +3470,9 @@ class TestStep16(unittest.TestCase):
                     {
                         "id": "amb-1",
                         "description": "Ambiguity surfaced during execution",
-                        "severity": "medium",
-                        "resolved": True,
+                        "about": ["fr-core"],
                         "decision": "accepted",
+                        "proposed_assumption": "Proceed on the accepted reading.",
                     }
                 ]
             },
@@ -3490,11 +3490,11 @@ class TestStep16(unittest.TestCase):
         e530 = [e for e in errors if e.code == "E530"]
         self.assertFalse(
             any("resolved" in e.message or "decision" in e.message for e in e520 + e530),
-            f"resolved/decision must validate. Got: {[e.message for e in errors]}"
+            f"decision/proposed_assumption must validate. Got: {[e.message for e in errors]}"
         )
 
-    def test_emergent_ambiguity_still_valid_without_resolved(self):
-        """crossCycleAmbiguityItem without resolved/decision still validates (fields optional)."""
+    def test_emergent_ambiguity_still_valid_without_decision(self):
+        """ambiguityItem without decision/proposed_assumption still validates (fields optional)."""
         data = {
             "$schema": "vc:16-impl-context",
             "id": "step-amb-min",
@@ -3508,7 +3508,7 @@ class TestStep16(unittest.TestCase):
             },
             "execution": {
                 "emergent_ambiguities": [
-                    {"id": "amb-2", "description": "Minimal ambiguity shape", "severity": "low"}
+                    {"id": "amb-2", "description": "Minimal ambiguity shape", "about": ["fr-core"]}
                 ]
             },
             "canonical_refs_used": [],

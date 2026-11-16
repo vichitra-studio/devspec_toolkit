@@ -157,26 +157,41 @@ def test_scan_of_real_toolkit_finds_seed_and_no_step_kinds():
     scan = scan_annotations(str(_ROOT))
     assert [e["kind"] for e in scan.external_kinds] == ["seed"]
     host = scan.host("schema/06_invariants.schema.json")
-    assert host is None
+    assert host is not None and not host.annotation_only
+    assert {occ.entry["kind"] for occ in host.occurrences} == {"ambiguity-item"}
 
 
 # ----------------------------------------- unannotated files unchanged (acc. 2)
 
+_AMBIGUITY_PATHS = frozenset({".ambiguities", ".plan.ambiguities", ".execution.emergent_ambiguities"})
+
+
+def _without_ambiguities(registry: dict) -> dict:
+    """Registry view without the ambiguity arrays every step gained in 1.2.0 (WI-M3-03); a file left empty is dropped."""
+    view = {
+        key: {**entry, "arrays": [a for a in entry["arrays"] if a["array_path"] not in _AMBIGUITY_PATHS]}
+        for key, entry in registry.items()
+    }
+    return {key: entry for key, entry in view.items() if entry["arrays"]}
+
+
 def test_unannotated_files_are_byte_identical_to_pre_m1():
     reg, _ = generate_registry(str(_ROOT))
     pre = json.loads(_PRE_M1.read_text())
+    view = _without_ambiguities(reg["registry"])
     annotated = {
-        k for k, v in reg["registry"].items()
+        k for k, v in view.items()
         if any(a.get("source") == "x-node" for a in v["arrays"])
     }
     for key, entry in pre["registry"].items():
         if key in annotated:
             continue
-        assert reg["registry"][key] == entry, key
-    assert set(reg["registry"]) - set(pre["registry"]) == annotated - set(pre["registry"])
+        assert view[key] == entry, key
+    assert set(view) - set(pre["registry"]) == annotated - set(pre["registry"])
     for key in ("_sentinels", "steps_with_deferred_registration"):
         assert reg[key] == pre[key], key
-    annotated_steps = {k.split("_")[0] for k in annotated}
+    ambiguity_only = set(reg["registry"]) - set(view)
+    annotated_steps = {k.split("_")[0] for k in annotated | ambiguity_only}
     for key in ("steps_without_entry_arrays",):
         assert [e for e in reg[key] if e["step"] not in annotated_steps] == [
             e for e in pre[key] if e["step"] not in annotated_steps

@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "trace": {
           "type": "array",
           "description": "Traceability links connecting CI gate jobs to the spec artifacts they enforce. Decision rule: every CI gate must trace to at least one NFR or invariant it enforces, using type='enforces'. Example: [{\"type\": \"enforces\", \"id\": \"nfr-api-auth-p95-latency\", \"note\": \"This gate rejects PRs that degrade latency beyond the NFR target\"}]. A second example: [{\"type\": \"enforces\", \"id\": \"inv-test-coverage-threshold\", \"note\": \"Coverage gate enforces the 80% line coverage invariant\"}]. Gates without trace links are floating checks that cannot be mapped to their specification rationale. Consult the items description for approved types and format. Anti-pattern: prose strings instead of traceRef objects — always use the {type, id, note} structure.",

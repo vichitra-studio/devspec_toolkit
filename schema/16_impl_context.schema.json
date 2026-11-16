@@ -681,104 +681,8 @@
           ]
         },
         "ambiguities": {
-          "type": "array",
-          "description": "Spec ambiguities discovered during planning that need resolution or tracking.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this ambiguity."
-              },
-              "description": {
-                "type": "string",
-                "description": "Description of the ambiguity and its potential impact."
-              },
-              "source": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "code",
-                  "plan",
-                  "mixed",
-                  "review"
-                ],
-                "description": "Where the ambiguity originated. Decision rules: 'spec' = the spec document itself contains conflicting requirements; 'code' = the spec is clear but implementation exposed an edge case (e.g., a race condition not covered); 'mixed' = spec is unclear AND implementation exposed it further; 'plan' = the planning step introduced a gap; 'review' = discovered during code review. Example: use 'code' when you discover a race condition not covered by the spec."
-              },
-              "severity": {
-                "type": "string",
-                "enum": [
-                  "blocking",
-                  "non_blocking"
-                ],
-                "description": "Whether this planning-phase ambiguity blocks progress or can be worked around. Decision rules: 'blocking' = implementation cannot proceed without resolution (e.g., conflicting invariants, missing auth requirements); 'non_blocking' = implementation can proceed with a documented assumption (e.g., UI copy, logging format). Anti-pattern: marking everything 'blocking' — only use for genuine blockers that halt implementation. Uses a binary scale — distinct from emergent_ambiguities[].severity which uses low/medium/high/critical."
-              },
-              "impact": {
-                "type": "array",
-                "description": "List of areas or artifacts affected by this ambiguity.",
-                "items": {
-                  "type": "string",
-                  "description": "An area or artifact affected by this ambiguity."
-                }
-              },
-              "proposed_assumption": {
-                "type": "string",
-                "description": "Proposed assumption to resolve the ambiguity if no authoritative answer is available."
-              },
-              "mitigation": {
-                "type": "string",
-                "minLength": 10,
-                "description": "Mitigation strategy for non-blocking ambiguities (minimum 10 characters)."
-              },
-              "status": {
-                "$ref": "vc:core:atoms#ambiguityStatus",
-                "description": "Current resolution status of this ambiguity. Uses the shared ambiguityStatus atom (resolved/tracking/deferred/blocked) — matches emergent_ambiguities and the anchor's ambiguities."
-              },
-              "decision": {
-                "type": "string",
-                "description": "The decision made to resolve this ambiguity, if resolved."
-              },
-              "resolved": {
-                "description": "Resolution indicator -- a string explanation or boolean flag.",
-                "oneOf": [
-                  {
-                    "type": "string",
-                    "description": "String explanation of how the ambiguity was resolved."
-                  },
-                  {
-                    "type": "boolean",
-                    "description": "Boolean flag indicating whether the ambiguity has been resolved."
-                  }
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "description",
-              "severity"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "severity": {
-                      "const": "non_blocking"
-                    }
-                  },
-                  "required": [
-                    "severity"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "mitigation"
-                  ]
-                }
-              }
-            ],
-            "description": "A spec ambiguity discovered during planning with severity, impact, and resolution tracking."
-          }
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities discovered during planning. An item is deleted once its answer is applied."
         },
         "solution": {
           "type": "object",
@@ -1689,12 +1593,8 @@
           }
         },
         "emergent_ambiguities": {
-          "type": "array",
-          "description": "Ambiguities discovered during execution that were not anticipated in planning. Reuses the shared `crossCycleAmbiguityItem` shape (same as the anchor's ambiguities) — distinct from planning-phase ambiguities which carry richer 16a-only fields (source/proposed_assumption/mitigation/decision/resolved) and a blocking/non_blocking binary severity.",
-          "items": {
-            "$ref": "vc:core:collections#crossCycleAmbiguityItem",
-            "description": "An ambiguity discovered during execution that was not anticipated in planning."
-          }
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities discovered during execution that planning did not anticipate. An item is deleted once its answer is applied."
         },
         "final_status": {
           "type": "object",

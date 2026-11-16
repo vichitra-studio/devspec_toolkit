@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "tech_stack": {
           "description": "Technology stack for the roadmap. Decision rule: include at minimum `languages` and `frameworks`; add `infrastructure` and `tools` as needed. Example 1 (Python backend): {\"languages\": [{\"name\": \"python\", \"version\": \"3.12\"}], \"frameworks\": [{\"name\": \"fastapi\", \"version\": \"0.111\"}], \"infrastructure\": [{\"name\": \"docker\", \"version\": \"25\"}, {\"name\": \"github-actions\", \"version\": \"latest\"}]}. Example 2 (TypeScript fullstack): {\"languages\": [{\"name\": \"typescript\", \"version\": \"5.x\"}], \"frameworks\": [{\"name\": \"nextjs\", \"version\": \"14\"}], \"infrastructure\": [{\"name\": \"vercel\", \"version\": \"latest\"}, {\"name\": \"github-actions\", \"version\": \"latest\"}]}. Anti-pattern: leaving `tech_stack` empty or omitting `languages` and `frameworks` — these are always required because they define the primary development environment.",
           "allOf": [

@@ -4,6 +4,10 @@
   "title": "13_extension_manifest",
   "type": "object",
   "properties": {
+    "ambiguities": {
+      "$ref": "vc:core:collections#ambiguityList",
+      "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+    },
     "extension_decision": {
       "type": "object",
       "additionalProperties": false,

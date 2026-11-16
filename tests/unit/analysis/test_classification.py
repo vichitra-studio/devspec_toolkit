@@ -1,9 +1,14 @@
 """Classifier unit tests — pure, no file I/O."""
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import pytest
 
-from specdev_tools.analysis.upstream_backlog import classify
+from specdev_tools.analysis.upstream_backlog import classify, run
+
+_FIXTURE_DIR = Path(__file__).parents[2] / "fixtures" / "analysis" / "upstream_backlog"
 
 
 @pytest.mark.parametrize("impact,expected", [
@@ -61,3 +66,13 @@ def test_non_string_entries_skipped():
 
 def test_all_non_string_falls_through():
     assert classify({"impact": [{}, 1, None]})[0] == "unclassified"
+
+
+def test_about_only_item_buckets_unclassified_without_w613(tmp_path):
+    impl = tmp_path / "impl_context"
+    impl.mkdir()
+    shutil.copy(_FIXTURE_DIR / "plan_with_new_shape_items.json", impl / "plan.json")
+    stdout, stderr_lines, exit_code = run(str(tmp_path))
+    assert exit_code == 0
+    assert "Unclassified — 2 open" in stdout
+    assert not any(line.startswith("W613") for line in stderr_lines)

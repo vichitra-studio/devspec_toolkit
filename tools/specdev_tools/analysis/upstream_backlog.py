@@ -1,7 +1,9 @@
 """Upstream-backlog rollup: aggregate ambiguities across milestone plans
 under ``spec/impl_context/*.json`` — both ``plan.ambiguities[]`` (16a,
 planning-phase) and ``execution.emergent_ambiguities[]`` (16b/16c,
-discovered during live execution/verification). Both arrays are
+discovered during live execution/verification). Two item shapes are read: the
+legacy shape (``severity``, ``status``, ``impact``) and the 1.2.0 open item
+(``about``, no ``severity``); see ``_is_open_item``. Both arrays are
 documented drift-recording targets (specdev-context SKILL.md "Upstream
 drift recording") and must be equally visible to backlog routing —
 DEVSPEC-123 found `plan.ambiguities[]` silently invisible to this tool.
@@ -104,8 +106,8 @@ def _iter_plans(spec_dir: str) -> Iterator[tuple[str, Optional[dict], Optional[s
     ``impl_context/`` instead of at the spec root (the ``W609
     ANCHOR_MISFILED`` condition validate.py already detects). The anchor's
     ``plan.ambiguities[]`` reuses the *path name* ``plan.ambiguities`` but not
-    the 16a shape -- it carries the shared ``crossCycleAmbiguityItem`` low/
-    medium/high/critical severity scale (cross-Trinity-cycle rollup), not the
+    the 16a shape -- in its legacy form it carries the low/medium/high/critical
+    severity scale (cross-Trinity-cycle rollup), not the
     milestone plan's binary blocking/non_blocking scale. Treating a misfiled
     anchor as a milestone plan would run its (valid) severities through the
     wrong vocabulary and spuriously fail every entry as E520 invalid_severity.
@@ -135,8 +137,16 @@ def _iter_plans(spec_dir: str) -> Iterator[tuple[str, Optional[dict], Optional[s
 # Record extraction + coercion
 # ---------------------------------------------------------------------------
 
+def _is_open_item(amb: dict) -> bool:
+    """True for the 1.2.0 open item: it names what it is ``about`` and carries no ``severity``."""
+    return "about" in amb and "severity" not in amb
+
+
 def _severity_rank(record: dict) -> int:
     """Return the shared 0-3 severity rank for a record.
+
+    An open item has no severity and every open item gates alike, so it ranks
+    as ``critical`` and no ``--severity`` threshold hides it.
 
     Dispatches on ``record["origin"]`` ("plan" uses the binary
     blocking/non_blocking scale via ``PLAN_SEVERITY_RANK``; anything else,
@@ -145,9 +155,60 @@ def _severity_rank(record: dict) -> int:
     keeps this backward-compatible with record dicts built before origin
     tagging existed (e.g. hand-built fixtures in unit tests).
     """
+    if record["severity"] is None:
+        return SEVERITY_ORDER["critical"]
     if record.get("origin") == "plan":
         return PLAN_SEVERITY_RANK[record["severity"]]
     return SEVERITY_ORDER[record["severity"]]
+
+
+def _open_item_record(amb: dict, amb_id: str, *, origin: str, milestone_id: str) -> dict:
+    """Unified record for a 1.2.0 open item: open status, no severity, bucketed ``unclassified`` by ``classify``."""
+    description = amb.get("description")
+    about = amb.get("about")
+    bucket, matched_rule, matched_entry = classify({})
+    return {
+        "milestone_id": milestone_id,
+        "ambiguity_id": amb_id,
+        "severity": None,
+        "status": "open",
+        "status_unset": False,
+        "description": description if isinstance(description, str) else "",
+        "impact": [],
+        "about": [a for a in about if isinstance(a, str)] if isinstance(about, list) else [],
+        "bucket": bucket,
+        "matched_rule": matched_rule,
+        "matched_impact_entry": matched_entry,
+        "origin": origin,
+        "open_item": True,
+    }
+
+
+def _legacy_record(
+    amb: dict, amb_id: str, severity: str, *, origin: str, milestone_id: str
+) -> dict:
+    """Unified record for a legacy-shape item: status collapse, description/impact coercion, classify()."""
+    status_raw = amb.get("status")
+    status_unset = status_raw in (None, "")
+    description = amb.get("description")
+    impact_raw = amb.get("impact")
+    if not isinstance(impact_raw, list):
+        impact_raw = []
+
+    bucket, matched_rule, matched_entry = classify({"impact": impact_raw})
+    return {
+        "milestone_id": milestone_id,
+        "ambiguity_id": amb_id,
+        "severity": severity,
+        "status": "tracking" if status_unset else status_raw,
+        "status_unset": status_unset,
+        "description": description if isinstance(description, str) else "",
+        "impact": impact_raw,
+        "bucket": bucket,
+        "matched_rule": matched_rule,
+        "matched_impact_entry": matched_entry,
+        "origin": origin,
+    }
 
 
 def _extract_one_array(
@@ -158,7 +219,8 @@ def _extract_one_array(
     Shared by both ``plan.ambiguities[]`` (origin="plan") and
     ``execution.emergent_ambiguities[]`` (origin="execution") — the two
     differ only in their valid severity vocabulary; status collapse,
-    description/impact coercion, and classify() are identical.
+    description/impact coercion, and classify() are identical. An open item
+    (``_is_open_item``) is not checked against either vocabulary.
     """
     records: list[dict] = []
     errors: list[str] = []
@@ -178,6 +240,11 @@ def _extract_one_array(
                 f"(origin={origin}, milestone={milestone_id or '?'})"
             )
             continue
+        if _is_open_item(amb):
+            records.append(
+                _open_item_record(amb, amb_id, origin=origin, milestone_id=milestone_id)
+            )
+            continue
         severity = amb.get("severity")
         if not isinstance(severity, str) or severity not in valid_severities:
             errors.append(
@@ -186,30 +253,9 @@ def _extract_one_array(
             )
             continue
 
-        status_raw = amb.get("status")
-        status_unset = status_raw in (None, "")
-        status = "tracking" if status_unset else status_raw
-        description = amb.get("description")
-        if not isinstance(description, str):
-            description = ""
-        impact_raw = amb.get("impact")
-        if not isinstance(impact_raw, list):
-            impact_raw = []
-
-        bucket, matched_rule, matched_entry = classify({"impact": impact_raw})
-        records.append({
-            "milestone_id": milestone_id,
-            "ambiguity_id": amb_id,
-            "severity": severity,
-            "status": status,
-            "status_unset": status_unset,
-            "description": description,
-            "impact": impact_raw,
-            "bucket": bucket,
-            "matched_rule": matched_rule,
-            "matched_impact_entry": matched_entry,
-            "origin": origin,
-        })
+        records.append(
+            _legacy_record(amb, amb_id, severity, origin=origin, milestone_id=milestone_id)
+        )
     return records, errors
 
 
@@ -319,8 +365,12 @@ def _status_display(r: dict) -> str:
     return r["status"]
 
 
-def _wrap_impact(impact: list, indent: int, width: int = 80) -> list[str]:
+def _wrap_impact(
+    impact: list, indent: int, width: int = 80, label: str = "impact"
+) -> list[str]:
     """Join string entries of *impact* with ' | ', soft-wrap to *width* chars.
+
+    *label* prefixes the first line (``impact`` for legacy records, ``about`` for open items).
 
     Continuation lines align with the first entry column and start with
     ``| `` to preserve the separator visually in the plain-text report.
@@ -330,8 +380,8 @@ def _wrap_impact(impact: list, indent: int, width: int = 80) -> list[str]:
     strings = [e for e in impact if isinstance(e, str)]
     if not strings:
         return []
-    prefix = " " * indent + "impact: "
-    cont_prefix = " " * (indent + len("impact: "))
+    prefix = " " * indent + f"{label}: "
+    cont_prefix = " " * (indent + len(f"{label}: "))
     lines: list[str] = []
     current = prefix + strings[0]
     for entry in strings[1:]:
@@ -379,7 +429,7 @@ def render_plain(
             header += f"  [{unclassified_w613_count} x W613 — see stderr]"
         lines = [header]
         for r in recs:
-            sev = r["severity"]
+            sev = r["severity"] or "open"
             pad = " " * max(1, 9 - len(sev))
             origin_tag = "16a" if r.get("origin") == "plan" else "16b+"
             lines.append(
@@ -392,6 +442,7 @@ def render_plain(
                 if first_line:
                     lines.append(f"           {first_line}")
             lines.extend(_wrap_impact(r["impact"], indent=11))
+            lines.extend(_wrap_impact(r.get("about", []), indent=11, label="about"))
         sections.append("\n".join(lines))
 
     body = "\n\n".join(sections)
@@ -404,6 +455,25 @@ def render_plain(
     if body:
         return f"{body}\n\n{totals}"
     return totals
+
+
+def _json_record(r: dict) -> dict:
+    """JSON form of one record; an open item also carries its ``about`` ids."""
+    out = {
+        "bucket": r["bucket"],
+        "origin": r.get("origin", "execution"),
+        "milestone_id": r["milestone_id"],
+        "ambiguity_id": r["ambiguity_id"],
+        "severity": r["severity"],
+        "status": r["status"],
+        "description": r["description"],
+        "impact": r["impact"],
+        "matched_rule": r["matched_rule"],
+        "matched_impact_entry": r["matched_impact_entry"],
+    }
+    if r.get("open_item"):
+        out["about"] = r["about"]
+    return out
 
 
 def render_json(
@@ -427,21 +497,7 @@ def render_json(
             "unclassified_count": unclassified_count,
             "hidden_by_status_count": hidden_by_status_count,
         },
-        "records": [
-            {
-                "bucket": r["bucket"],
-                "origin": r.get("origin", "execution"),
-                "milestone_id": r["milestone_id"],
-                "ambiguity_id": r["ambiguity_id"],
-                "severity": r["severity"],
-                "status": r["status"],
-                "description": r["description"],
-                "impact": r["impact"],
-                "matched_rule": r["matched_rule"],
-                "matched_impact_entry": r["matched_impact_entry"],
-            }
-            for r in records
-        ],
+        "records": [_json_record(r) for r in records],
         "warnings": warnings,
     }
     return json.dumps(payload, indent=2, sort_keys=False)
@@ -518,7 +574,7 @@ def run(
 
     w613_targets: list[str] = []
     for r in filtered:
-        if r["bucket"] == "unclassified":
+        if r["bucket"] == "unclassified" and not r.get("open_item"):
             target = f"{r['milestone_id']}:{r['ambiguity_id']}"
             w613_targets.append(target)
             stderr_lines.append(

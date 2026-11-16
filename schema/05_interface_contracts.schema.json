@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "apis": {
           "description": "Array of API interface contracts defining endpoints, protocols, and security requirements. Each entry should cover at least one distinct interface boundary; do not bundle unrelated resources into a single API entry.",
           "type": "array",

@@ -202,8 +202,9 @@ ERROR_CODES = {
     # ownership, prefix, and scope drift detection are silently skipped for IDs
     # that don't exist in the roadmap.
     "W612": "ANCHOR_PHANTOM_MILESTONE",
-    # Upstream backlog: ambiguity's impact[] matches none of the 4 classifier
-    # rules (see analysis/upstream_backlog.py). Informational only — never
+    # Upstream backlog: a legacy-shape ambiguity's impact[] matches none of the 4
+    # classifier rules (see analysis/upstream_backlog.py); a 1.2.0 open item has
+    # no impact[] and never fires it. Informational only — never
     # promoted (deliberately excluded from PROMOTABLE_PAIRS).
     "W613": "UPSTREAM_BACKLOG_UNCLASSIFIED",
     # Registry checks (R001–R003 / 620–622) and R004 / W614

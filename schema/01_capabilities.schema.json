@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "capabilities": {
           "description": "Array of system capabilities derived from the charter, each with scope and links to the charter nodes it derives from.",
           "type": "array",

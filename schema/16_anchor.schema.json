@@ -65,13 +65,8 @@
           }
         },
         "ambiguities": {
-          "type": "array",
-          "minItems": 0,
-          "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Reuses the shared crossCycleAmbiguityItem shape. An empty array on a fresh anchor is valid.",
-          "items": {
-            "$ref": "vc:core:collections#crossCycleAmbiguityItem",
-            "description": "A cross-milestone ambiguity or unresolved architectural decision."
-          }
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities across all Trinity cycles. An empty array on a fresh anchor is valid."
         },
         "drift": {
           "type": "object",

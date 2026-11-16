@@ -716,6 +716,8 @@ def test_schema_ref_sibling_census():
     256 after M3 WI-M3-02 and WI-M3-22: 02 system sketch 15 -> 14 (``tech_stack``
     removed), core collections 26 -> 23 (the ingested-ref definitions removed, the
     ambiguity item added), core step_base 8 -> 6 (the two ingested fields removed).
+    269 after M3 WI-M3-03: 20 ``ambiguities`` locations (17 steps, 3 trinity) are annotated ``$ref`` nodes (+20); the
+    removed ``crossCycleAmbiguityItem`` took four with it and the old trinity item ``$ref``s three (-7).
     """
     from collections import Counter
 
@@ -734,9 +736,9 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 256
+    assert sum(counts.values()) == 269
     assert dict(counts) == {
-        ("description",): 249,
+        ("description",): 262,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
         ("default", "description"): 1,

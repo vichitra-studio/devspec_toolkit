@@ -229,15 +229,12 @@ class TestNoArraysSteps:
             "Step '13a' in steps_without_entry_arrays has empty rationale."
         )
 
-    def test_16_in_steps_without_entry_arrays(self) -> None:
+    def test_16_registers_its_ambiguity_arrays(self) -> None:
         reg_doc, _ = _run_generator()
-        without_steps = {item["step"]: item for item in reg_doc["steps_without_entry_arrays"]}
-        assert "16" in without_steps, (
-            "Step '16' not found in steps_without_entry_arrays."
-        )
-        assert without_steps["16"]["rationale"], (
-            "Step '16' in steps_without_entry_arrays has empty rationale."
-        )
+        without_steps = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
+        assert "16" not in without_steps
+        paths = {a["array_path"] for a in reg_doc["registry"]["16_impl_context.json"]["arrays"]}
+        assert paths == {".plan.ambiguities", ".execution.emergent_ambiguities"}
 
 
 # ---------------------------------------------------------------------------

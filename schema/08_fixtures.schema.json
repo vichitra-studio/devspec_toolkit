@@ -4,6 +4,10 @@
   "title": "08_fixtures",
   "type": "object",
   "properties": {
+    "ambiguities": {
+      "$ref": "vc:core:collections#ambiguityList",
+      "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+    },
     "fixtures": {
       "description": "Array of test fixtures providing concrete input/expected pairs for validating spec artifacts. Each fixture must reference at least one spec artifact and provide verifiable input/output pairs. A fixture typically validates one acceptance criterion from an FR and one API contract simultaneously. Example: fix-auth-login-success validates ac-user-login-1 from fr-user-login AND the success response contract for api-auth-login. Anti-pattern: fixtures that target only an FR without also targeting the corresponding API contract when one exists.",
       "type": "array",

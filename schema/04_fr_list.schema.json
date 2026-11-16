@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "functional_requirements": {
           "description": "Array of functional requirements derived from capabilities, each with acceptance criteria and links to the capabilities it derives from (normally one; at least one). Each FR carries exactly one `capability_ref` and must include at least two testable acceptance criteria. Worked example of a complete FR entry: {\"fr_id\": \"fr-user-login\", \"statement\": \"The system must authenticate users via email and password and return a session token.\", \"priority\": \"must-have\", \"acceptance_criteria\": [{\"criterion_id\": \"ac-user-login-1\", \"scope\": \"in\", \"text\": \"Given valid credentials, the system returns a 200 response with a JWT token within 200ms.\"}, {\"criterion_id\": \"ac-user-login-2\", \"scope\": \"in\", \"text\": \"Given invalid credentials, the system returns 401 with error code INVALID_CREDENTIALS.\"}], \"scope\": \"in\", \"derives_from\": [\"cap-user-authentication\"], \"capability_ref\": {\"id\": \"cn:project:capability:user-authentication\", \"kind\": \"capability\", \"label\": \"User Authentication\"}, \"entity_ref\": {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"}}. Anti-pattern: an FR array with a single entry that conflates multiple behaviors (e.g., login + logout + password reset in one statement).",
           "type": "array",

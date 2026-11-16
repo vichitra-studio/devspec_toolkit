@@ -470,54 +470,6 @@
       },
       "description": "Array of structured dependency items (no simple string entries allowed)."
     },
-    "crossCycleAmbiguityItem": {
-      "$anchor": "crossCycleAmbiguityItem",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "description",
-        "severity"
-      ],
-      "description": "Shared shape for cross-cycle and emergent ambiguity entries: emergent ambiguities discovered during 16b execution and anchor-level ambiguities accumulated across Trinity cycles. Uses severityLevel (low|medium|high|critical) and ambiguityStatus enum. Optionally carries decision/resolved to record resolution outcomes. Planning-phase ambiguities (16a) use a separate local shape with additional required workflow fields (source/proposed_assumption/mitigation) and binary severity (blocking|non_blocking).",
-      "properties": {
-        "id": {
-          "$ref": "vc:core:atoms#kebabId",
-          "description": "Unique kebab-case identifier for this ambiguity."
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the ambiguity and what decision is needed."
-        },
-        "severity": {
-          "$ref": "vc:core:atoms#severityLevel",
-          "description": "Severity using the shared severityLevel scale: 'low' (clarification only), 'medium' (needs resolution before next cycle), 'high' (blocks milestone), 'critical' (may require spec revision)."
-        },
-        "impact": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "description": "An area, artifact, or milestone affected by this ambiguity."
-          },
-          "description": "Areas, artifacts, or milestones affected by this ambiguity."
-        },
-        "status": {
-          "$ref": "vc:core:atoms#ambiguityStatus",
-          "description": "Current resolution status. Uses the shared ambiguityStatus atom — matches planning-phase ambiguities, emergent_ambiguities, and anchor ambiguities."
-        },
-        "decision": {
-          "type": "string",
-          "description": "Optional resolution decision recorded on this ambiguity (written by 16a carry-over or 16c adjudication)."
-        },
-        "resolved": {
-          "oneOf": [
-            { "type": "string" },
-            { "type": "boolean" }
-          ],
-          "description": "Optional resolution outcome: boolean (resolved yes/no) or descriptive string."
-        }
-      }
-    },
     "ambiguityItem": {
       "$anchor": "ambiguityItem",
       "type": "object",

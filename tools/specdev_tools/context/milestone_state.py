@@ -181,7 +181,11 @@ def derive_group_state(
     blocking_amb_ids: list[str] = []
     blocking_amb_health: list[dict] = []
 
+    # M8 rewrites this group rule. A 1.2.0 open item has no `status`, so it never
+    # blocks here; an item that is not an object is skipped, not raised on.
     for amb in ambiguities:
+        if not isinstance(amb, dict):
+            continue
         amb_id = amb.get("id", "")
         status = amb.get("status", "")
         # Missing 'resolved' key → treat as unresolved (conservative default)
@@ -191,13 +195,14 @@ def derive_group_state(
             continue
 
         # Deterministic substring match: group_id referenced in impact or description
-        impact_refs: list[str] = []
-        for imp in amb.get("impact", []):
-            if isinstance(imp, str):
-                impact_refs.append(imp)
+        impact = amb.get("impact")
+        impact_refs = (
+            [imp for imp in impact if isinstance(imp, str)] if isinstance(impact, list) else []
+        )
+        description = amb.get("description")
         references_group = (
             any(group_id in imp for imp in impact_refs)
-            or group_id in amb.get("description", "")
+            or (isinstance(description, str) and group_id in description)
         )
         if not references_group:
             continue

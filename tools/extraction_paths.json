@@ -1,6 +1,7 @@
 {
   "00": {
     "00_charter.json": [
+      ".ambiguities",
       ".scope_items",
       ".assumptions",
       ".risks",
@@ -12,11 +13,13 @@
   },
   "01": {
     "01_capabilities.json": [
+      ".ambiguities",
       ".capabilities"
     ]
   },
   "02": {
     "02_system_sketch.json": [
+      ".ambiguities",
       ".components",
       ".connections",
       ".third_parties"
@@ -24,6 +27,7 @@
   },
   "02a": {
     "02a_delivery_baseline.json": [
+      ".ambiguities",
       ".environments{}",
       ".ci_gates",
       ".secrets"
@@ -31,59 +35,86 @@
   },
   "03": {
     "03_glossary.json": [
+      ".ambiguities",
       ".terms"
     ]
   },
   "04": {
     "04_fr_list.json": [
+      ".ambiguities",
       ".functional_requirements"
     ]
   },
   "05": {
     "05_interface_contracts.json": [
+      ".ambiguities",
       ".apis"
     ]
   },
   "06": {
     "06_invariants.json": [
+      ".ambiguities",
       ".rules"
     ]
   },
   "07": {
     "07_nfrs.json": [
+      ".ambiguities",
       ".nfrs"
     ]
   },
   "08": {
     "08_fixtures.json": [
+      ".ambiguities",
       ".fixtures"
     ]
   },
   "09": {
     "09_impl_plan.json": [
+      ".ambiguities",
       ".milestones"
+    ]
+  },
+  "10": {
+    "10_governance.json": [
+      ".ambiguities"
     ]
   },
   "11": {
     "11_redteam.json": [
+      ".ambiguities",
       ".threats",
       ".edge_cases"
     ]
   },
   "12": {
     "12_ci_gates.json": [
+      ".ambiguities",
       ".jobs"
     ]
   },
   "13": {
     "13_extension_manifest.json": [
+      ".ambiguities",
       ".extensions"
     ]
   },
   "14": {
     "14_roadmap.json": [
+      ".ambiguities",
       ".milestones",
       ".dependencies"
+    ]
+  },
+  "15": {
+    "15_scaffold.json": [
+      ".ambiguities"
+    ]
+  },
+  "16": {
+    "16_impl_context.json": [
+      ".plan.ambiguities",
+      ".execution.emergent_ambiguities"
     ]
   },
   "_meta": {

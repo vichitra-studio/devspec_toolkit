@@ -122,8 +122,7 @@ Before emitting, verify:
       {
         "id": "amb-token-ttl",
         "description": "JWT token TTL not confirmed by security team — 24h vs 8h options remain open.",
-        "severity": "medium",
-        "status": "tracking"
+        "about": ["fr-token-refresh"]
       }
     ],
     "drift": {

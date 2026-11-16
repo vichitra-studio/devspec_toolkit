@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -15,16 +16,21 @@ _ROOT = Path(__file__).parents[3]
 _SCHEMA_DIR = _ROOT / "schema"
 _CORE_DIR = _SCHEMA_DIR / "core"
 _COLLECTIONS = "vc:core:collections"
+_AMBIGUITY_LIST_REF = f"{_COLLECTIONS}#ambiguityList"
+_STEP_FILE_RE = re.compile(r"^(\d{2}a?)_")
+_TRINITY_LOCATIONS = (
+    ("16_anchor.schema.json", ("plan", "ambiguities")),
+    ("16_impl_context.schema.json", ("plan", "ambiguities")),
+    ("16_impl_context.schema.json", ("execution", "emergent_ambiguities")),
+)
 _REMOVED_AMBIGUITY_FIELDS = ("severity", "status", "impact", "resolved", "source", "mitigation")
 
 # Core definitions no schema `$ref`s that are still wanted: the annotation vocabulary and `metadata`.
-# `ambiguityList` is on this list until WI-M3-03 references it from the step schemas.
 _ORPHAN_ALLOW_LIST = frozenset({
     ("atoms", "metadata"),
     ("graph", "xNode"),
     ("graph", "xLink"),
     ("graph", "linkVerb"),
-    ("collections", "ambiguityList"),
 })
 
 
@@ -124,3 +130,56 @@ def test_testing_mode_accepts_manual() -> None:
 def test_step_base_has_no_ingested_fields() -> None:
     properties = _load(_CORE_DIR / "step_base.schema.json")["properties"]
     assert {"spec_refs_ingested", "seed_refs_ingested"}.isdisjoint(properties)
+
+
+def _step_schema_files() -> list[str]:
+    """Step schemas that carry a top-level `ambiguities`: 00 to 15 except 13a (a declared exception), not step 16."""
+    names = []
+    for path in _SCHEMA_DIR.glob("*.schema.json"):
+        match = _STEP_FILE_RE.match(path.name)
+        if match and match.group(1) not in ("13a", "16"):
+            names.append(path.name)
+    return sorted(names)
+
+
+def _root_properties(schema: dict[str, Any]) -> dict[str, Any]:
+    """Properties declared at the root of *schema* or in one of its top-level `allOf` branches."""
+    merged = dict(schema.get("properties", {}))
+    for branch in schema.get("allOf", []):
+        merged |= branch.get("properties", {})
+    return merged
+
+
+def _property_at(schema: dict[str, Any], path: tuple[str, ...]) -> dict[str, Any]:
+    node = {"properties": _root_properties(schema)}
+    for name in path:
+        node = node["properties"][name]
+    return node
+
+
+_LOCATIONS = [(name, ("ambiguities",)) for name in _step_schema_files()] + list(_TRINITY_LOCATIONS)
+
+
+@pytest.mark.parametrize(("schema_file", "path"), _LOCATIONS, ids=lambda value: str(value))
+def test_ambiguities_declared_on_every_step_schema_and_trinity_location(schema_file: str, path: tuple[str, ...]) -> None:
+    node = _property_at(_load(_SCHEMA_DIR / schema_file), path)
+    assert node["$ref"] == _AMBIGUITY_LIST_REF
+
+
+def test_ambiguity_locations_are_the_twenty_of_the_plan() -> None:
+    assert len(_LOCATIONS) == 20
+    assert not any(name.startswith(("13a", "16")) for name, _ in _LOCATIONS[:-3])
+
+
+@pytest.mark.parametrize("schema_file", ["16_anchor.schema.json", "16_impl_context.schema.json"])
+def test_ambiguities_not_in_step_base_nor_at_plan_or_anchor_root(schema_file: str) -> None:
+    step_base = _load(_CORE_DIR / "step_base.schema.json")
+    assert "ambiguities" not in step_base["properties"]
+    assert "ambiguities" not in _root_properties(_load(_SCHEMA_DIR / schema_file))
+
+
+def test_crosscycle_item_and_ambiguity_status_removed() -> None:
+    assert "crossCycleAmbiguityItem" not in _load(_CORE_DIR / "collections.schema.json")["$defs"]
+    assert "ambiguityStatus" not in _load(_CORE_DIR / "atoms.schema.json")["$defs"]
+    referenced = {ref for path in _SCHEMA_DIR.rglob("*.schema.json") for ref in _qualified_refs(_load(path))}
+    assert {f"{_COLLECTIONS}#crossCycleAmbiguityItem", "vc:core:atoms#ambiguityStatus"}.isdisjoint(referenced)

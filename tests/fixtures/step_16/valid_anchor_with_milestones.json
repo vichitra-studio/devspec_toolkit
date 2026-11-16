@@ -15,8 +15,8 @@
       {
         "id": "token-ttl-decision",
         "description": "JWT token TTL not confirmed by security team — 24h vs 8h.",
-        "severity": "medium",
-        "status": "tracking"
+        "about": ["fr-token-refresh"],
+        "proposed_assumption": "Work proceeds on 24h until security confirms."
       }
     ],
     "drift": {

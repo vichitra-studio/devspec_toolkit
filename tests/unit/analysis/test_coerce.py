@@ -203,3 +203,48 @@ def test_null_plan_ambiguities_yields_empty_no_error():
     records, errors = _coerce_records(plan, "p.json")
     assert records == []
     assert errors == []
+
+
+def test_new_shape_item_without_severity_or_status_is_not_e520():
+    plan = {
+        "id": "ms-x",
+        "plan": {"ambiguities": [
+            {"id": "amb-1", "description": "Unstated timeout.", "about": ["fr-login"]},
+        ]},
+        "execution": {"emergent_ambiguities": [
+            {"id": "amb-2", "description": "No criterion.", "about": ["fr-login", "fr-logout"],
+             "missing_kind": "criterion"},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert errors == []
+    assert [(r["ambiguity_id"], r["origin"], r["severity"], r["status"]) for r in records] == [
+        ("amb-1", "plan", None, "open"),
+        ("amb-2", "execution", None, "open"),
+    ]
+    assert records[1]["about"] == ["fr-login", "fr-logout"]
+
+
+def test_new_shape_item_with_wrong_typed_values_does_not_raise():
+    plan = {
+        "id": "ms-x",
+        "execution": {"emergent_ambiguities": [
+            {"id": "amb-1", "description": ["not", "a", "string"], "about": "fr-login"},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert errors == []
+    assert (records[0]["description"], records[0]["about"]) == ("", [])
+
+
+def test_legacy_shape_item_still_coerced():
+    plan = {
+        "id": "ms-x",
+        "execution": {"emergent_ambiguities": [
+            {"id": "amb-1", "severity": "high", "status": "blocked",
+             "description": "Legacy.", "impact": ["spec/09_impl_plan.json"]},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert errors == []
+    assert [(r["severity"], r["status"], r["bucket"]) for r in records] == [("high", "blocked", "step_09")]

@@ -102,22 +102,17 @@
       {
         "id": "ambiguity-session-expiry",
         "description": "Session expiry behaviour under concurrent logins is undefined in the spec. Should concurrent logins from different devices share a single session or be independent?",
-        "severity": "low",
-        "impact": [
-          "src/auth.py",
+        "about": [
           "fr-core-login"
-        ],
-        "status": "tracking"
+        ]
       },
       {
         "id": "ambiguity-token-rotation-policy",
         "description": "Token rotation policy on privilege escalation is not specified. The current implementation assumes no rotation, but the security model implies it may be required.",
-        "severity": "high",
-        "impact": [
-          "src/auth.py",
+        "about": [
           "nfr-security-authn"
         ],
-        "status": "tracking"
+        "proposed_assumption": "Work proceeds without rotation until the security model is confirmed."
       }
     ]
   },
