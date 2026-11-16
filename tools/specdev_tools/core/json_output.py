@@ -54,7 +54,7 @@ def _make_remediation(err: SpecError) -> dict[str, Any] | None:
     # Guard: only emit command-prefix remediation when the field IS a `command`
     # field. All command-prefix E530s from _scan_node set jq_path ending in
     # ".command" (e.g. ".jobs[0].steps[0].command"). Non-command INVENTED_ENUM_OR_ID
-    # errors (stage, unit, pr_rules) return None and get no remediation block.
+    # errors (stage, unit) return None and get no remediation block.
     if err.subcode == "INVENTED_ENUM_OR_ID" and err.jq_path and err.jq_path.endswith(".command"):
         prefix = err.value or "<prefix>"
         return {
@@ -95,35 +95,6 @@ def _make_remediation(err: SpecError) -> dict[str, Any] | None:
                 f"Command prefix '{prefix}' is not in the allowlist —"
                 " extend spec/canon/command_prefixes.json or register"
                 " in spec/canon/kinds/command.json"
-            ),
-        }
-
-    if err.subcode == "LINKED_TEST_FILE_NOT_FOUND":
-        path = err.value or "<test-path>"
-        file_arg = f'"{err.file}"' if err.file else "<spec-file>"
-        jq_arg = err.jq_path or ".linked_test_expectation"
-        return {
-            "guide_code": "E530-LINKED_TEST_FILE_NOT_FOUND",
-            "parameters": {
-                "fix_kind": "CREATE_OR_FIX_TEST_PATH",
-                "candidates": [
-                    {
-                        "kind": "correct_path",
-                        "command": (
-                            f"specdev json patch {file_arg}"
-                            f" '{jq_arg}' '\"<correct-path>\"'"
-                        ),
-                        "rationale": (
-                            "Update linked_test_expectation to point to an"
-                            " existing test file"
-                        ),
-                    },
-                ],
-                "references": [],
-            },
-            "owner_story": (
-                f"Test file '{path}' referenced in linked_test_expectation"
-                " does not exist on disk"
             ),
         }
 

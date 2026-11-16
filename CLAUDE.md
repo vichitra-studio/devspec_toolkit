@@ -97,9 +97,10 @@ specdev json delete spec/03_glossary.json '.terms[3]'
 # Diagnostic — print active SPECDEV_* config
 specdev env-check --repo-root ./devspec_toolkit
 
-# Regenerate toolkit-side entry-key registry + extraction_paths + cli_commands from schemas
-# Run after any schema or CLI-parser change; the three generator-owned files it writes
-# (entry_key_registry.json, extraction_paths.json, cli_commands.json) must stay byte-exact with
+# Regenerate toolkit-side entry-key registry + extraction_paths + step_order + cli_commands + schema-change checklist
+# Run after any schema, annotation or CLI-parser change; the five generator-owned files it writes
+# (entry_key_registry.json, extraction_paths.json, step_order.json, cli_commands.json under tools/,
+# and docs/developers/schema-change-checklist.md) must stay byte-exact with
 # this output (enforced by CI gate — do not hand-edit them). Note:
 # command_prefixes.json and step_docs.json are NOT generator outputs — they are
 # manually maintained despite also living under tools/.
@@ -142,7 +143,6 @@ Full E/W code catalog: `docs/developers/error-codes.md`. Generic step/schema pat
 
 - **E110 UNKNOWN_CANONICAL_ID**: Run `specdev guide E110` for full playbook.
 - **E530 INVENTED_ENUM_OR_ID**: Run `specdev guide E530-INVENTED_ENUM_OR_ID` for full playbook.
-- **E530 LINKED_TEST_FILE_NOT_FOUND**: Run `specdev guide E530-LINKED_TEST_FILE_NOT_FOUND` for full playbook.
 - **Forward-replay silently disabled**: pass `--git-root .` so git ops target the host. Make diff failures fatal: `SPECDEV_REPLAY_DIFF_ERROR_MODE=error`.
 - **`Schema not found`**: confirm `--repo-root` points to the toolkit; check `tools/schema_registry.json`.
 

@@ -46,7 +46,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - Components must include 3–6 responsibilities and an owner.
 - Multiple components require at least one connection; each connection must include `connection_id`, `protocol`, `trust_boundary`, `derives_from` (the source component) and `connects_to` (a component or third party).
 - `partner`/`public` connections require `auth` and `rate_limit`; `event` protocol requires `reliability`.
-- Connections no longer carry `schema_ref` or `interface_ref`; `tech_stack` is deprecated in favour of `third_parties`.
+- Connections no longer carry `schema_ref` or `interface_ref`; `tech_stack` is removed in favour of `third_parties`.
 
 ## Step 02a Troubleshooting
 - **Empty Environments**: an empty environment object (`"dev": {}`) fails schema validation: every environment needs `scope` and a non-empty `derives_from`, plus `scope_reason` when `scope` is `later` or `out`. Host keys (region, runner, replica count and so on) are optional and go under the environment's `config` object, never beside `scope`; `config`, when present, needs at least one key (`"dev": {"config": {}}` fails). All four environments (`dev`, `ci`, `staging`, `prod`) are required by default.
@@ -77,46 +77,43 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Missing Owner**: Owners must be one of the allowed types (e.g., `product`, `engineering`, `ops`) and cannot be invented.
 
 ## Step 08 Troubleshooting
-- **Orphan Fixtures**: Validation fails if `targets` is missing or empty. Every fixture must trace to at least one ID (`fr-*`, `api-*`, `nfr-*`, or `inv-*`).
-- **Unknown Target**: The linter will flag any target ID that does not exist in the ingested spec context. Ensure you are referencing real IDs from Steps 4, 5, 6, or 7.
+- **Orphan Fixtures**: Validation fails if a fixture carries neither `verifies` nor `removes`. `verifies` takes one or more ids of acceptance criteria, APIs, invariants or NFRs (not FRs).
+- **Link Targets**: This release checks that a `verifies` id has the right shape, not that it exists in Steps 4 to 7; a link resolver in a later 1.2.0 change does.
 - **Mode Strictness**: If `mode` is `contract`, you must provide an `expected` object with `status` (integer 100-599).
-- **Format Errors**: String IDs in `targets` are invalid; they must be objects `{ "type": "...", "id": "..." }`.
+- **Manual Mode**: `mode: manual` requires `manual_reason`, a string of at least 10 characters.
 
 ## Step 09 Troubleshooting
-- **Unstructured Tech Stack**: Validation fails if `tech_stack` is a simple list of strings. It must be an object with keys `languages`, `frameworks`, `infrastructure`, `tools`, each containing objects with `name` and `version`.
-- **Missing Traceability**: `milestones[].deliverables` is now required to link execution steps to FRs or APIs. Ensure you have valid `fr-*` or `api-*` IDs.
-- **Capabilities Mismatch**: If you list a technology in `tech_stack` that isn't in `spec/01_capabilities.json`, you must either add it to Step 1 or justify it as a "Spike" in the plan.
+- **Missing Schedules**: Every `milestones[]` entry requires `schedules`, with at least one id of a functional requirement, acceptance criterion, API, invariant, NFR, component, environment or risk. `deliverables`, `depends_on`, `status` and the top-level `tech_stack`, `dependencies` and `trace` are not part of the schema.
 - **Date Format**: `target_date` must use YYYY-MM-DD format.
 
 ## Step 10 Troubleshooting
-- **Traceability**: Validation now supports `trace` and `links`. If you reference an upstream requirement (like Charter), ensure the IDs exist.
-- **Spec Policy**: `spec_first_policy` must be a boolean. If set to `false`, justify it in the PR rules.
-- **Invalid PR Rules**: `pr_rules` must use the allowed enum values (e.g., `validate`, `test`, `audit`). Free-form strings are forbidden.
+- **Rules**: The artifact needs `rules` (at least one) and `commit_message_rules`. Each rule needs `rule_id`, `text` and `derives_from` (at least one id of a constraint, risk, scope item, gate, environment or stakeholder). `pr_rules`, `spec_first_policy`, `review_policy`, `reviewers`, `trace` and `links` are not part of the schema.
+- **Enforcer**: `enforcer` accepts only `review`, and a rule that carries `enforcer` must not carry `cli_command`.
 - **Regex Errors**: `commit_message_rules.pattern` must be a valid regular expression. Invalid patterns will fail the verification script.
 - **Schema Detection**: Ensure your file is named `spec/10_governance.json` or has an ID starting with `governance-` so tooling can detect it.
 
 ## Step 11 Troubleshooting
-- **Missing Targets**: Validation fails if `target_ids` is missing or empty. Every threat must trace to at least one `api-*` or `component-*`.
-- **Bad Mitigation Links**: `mitigations` keys must use strict `traceRef` objects. If you link to `inv-*` or `nfr-*`, the tooling verifies those IDs exist.
+- **Missing Targets**: Validation fails if a threat has no `threatens` (at least one id of an API, component, connection or third party). An edge case needs `threatens` (API, component or FR ids) and `mitigated_by` (at least one id).
+- **Mitigation Links**: `mitigated_by` on a threat is optional. W583 and W615 read `threatens` and `mitigated_by`. `target_ids` and `mitigations` are not part of the schema.
 - **Invalid Category**: `category` must be one of the strict enum values (`authn`, `authz`, `business_logic`, `transport`, `data_privacy`).
 - **Schema Sync**: `prompt_11_redteam.md` has an referenced step schema that must match `schema/11_redteam.schema.json`. Ensure they are kept in sync.
 
 ## Step 12 Troubleshooting
 - **Cycle Detected**: The validation tool (`validators/step_12.py`) enforces a DAG. If you have a cycle (A->B->A), you must break it by refactoring job dependencies.
-- **Missing Dependency**: All job IDs listed in `requires` must exist in the `jobs` list.
-- **Unstructured Steps**: Steps must be objects with `id`, `name`, `command`. String steps are forbidden to prevent hallucinations.
-- **Invalid Trace**: The `trace` field must be an **array of objects** (e.g., `[{ "type": "doc", "id": "10-governance" }]`) linking to upstream authority. Valid types are defined in `core/collections.schema.json`.
+- **Missing Dependency**: All job IDs listed in `depends_on` must exist in the `jobs` list (the job field was `requires` in 1.1.1).
+- **Unstructured Steps**: Steps must be objects with `name` and `command`. String steps are forbidden to prevent hallucinations; the step `id` field is gone.
+- **Links**: `realises` (environments, gates, secrets, rules) and `verifies` (NFRs) on a job are optional. The `trace` field is gone.
 - **Command Prefixes**: Commands should theoretically map to standard tools (`python`, `bash`, `npm`). While not strictly enforced as a blocking error yet, stick to known tools.
 
 
 ## Step 14 Troubleshooting
-- **Referential Integrity**: Validation fails if `source_milestones` contains IDs that do not exist in `09_impl_plan.json`. Ensure the upstream milestone IDs are correct.
-- **Tech Stack Mismatch**: Validation fails if `tech_stack` items in Roadmap do not match (name and version) the items defined in Step 09.
+- **Criterion Links**: Every `acceptance_criteria[]` entry needs `refines` (at least one id) or `removes` (at least one id). `verified_by` takes ids of fixtures, jobs or rules (it was `fixture_ref` in 1.1.1).
+- **Task Deferral**: A task is set aside with `disposition`, which needs both `value` (`deferred` or `wont_do`) and `reason`. Task and milestone `status` are gone.
+- **Removed Fields**: `fr_refs`, `capability_refs`, `source_milestones`, `deliverables`, `tech_stack` and `dependencies` are not part of the schema.
 - **Date Sequencing**: Milestones must be ordered chronologically. If `m2` lists `target_date` earlier than `m1`, validation fails.
 - **Migration Plan**: `migration_plan` cannot be empty. If no migration is needed, explicitly state "No migration required..." (must be > 3 words). "none" or "n/a" is also allowed but monitored.
-- **Dependency Rationale**: External dependencies must include a `note` explaining *why* they are blocking.
 
 ## Outputs
 - Validated JSON artifacts under `spec/00*` through `spec/12*`.
-- Updated trace matrix (FR ↔ API coverage is not computed for steps 00-05 in the new shape until graph coverage lands; the matrix reports `fr_with_api: 0` for them).
+- Updated trace matrix (FR ↔ API coverage is not computed for steps 00-05 in the new shape until graph coverage lands; the matrix omits `fr_with_api` and the `apis` of each row and names them in its top-level `not_computed` list).
 - Governance rules embedded in CI to keep the spec authoritative.

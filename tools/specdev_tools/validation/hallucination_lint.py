@@ -102,7 +102,6 @@ def lint_hallucinations(
                 resolve_fn=_file_resolve_fn,
             ))
         errors.extend(_check_existing_structures_paths(rel, data, path_root))
-        errors.extend(_check_linked_test_expectations(rel, data, path_root))
         if nfr_ids is not None:
             errors.extend(_check_nfr_refs(rel, data, nfr_ids))
         # Derivation reads step_order.json from the toolkit (repo_root/tools/),
@@ -588,10 +587,6 @@ def _check_path_values(
 
 def _check_existing_structures_paths(rel: str, data: Any, path_root: str) -> list[SpecError]:
     return _check_path_values(rel, data, path_root, "existing_structures", "EXISTING_STRUCTURE_PATH_NOT_FOUND")
-
-
-def _check_linked_test_expectations(rel: str, data: Any, path_root: str) -> list[SpecError]:
-    return _check_path_values(rel, data, path_root, "linked_test_expectation", "LINKED_TEST_FILE_NOT_FOUND")
 
 
 def _load_nfr_ids(spec_dir: str) -> set[str] | None:

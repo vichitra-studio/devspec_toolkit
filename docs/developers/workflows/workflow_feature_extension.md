@@ -81,9 +81,9 @@ Before starting, ensure your current specs are clean and valid.
 ## Phase 3: The Governance & Extension Planning (Steps 09–13)
 *Files: 09 -> 10 -> 11 -> 12 -> 13*
 
-1.  **Step 09: Implementation Plan**: Does this feature change the tech stack, milestones, or deliverables?
+1.  **Step 09: Implementation Plan**: Does this feature change the milestones or what they schedule?
     *   Target artifact: `spec/09_impl_plan.json`
-    *   Requires `tech_stack` as an object (not array) and `milestones` with a `deliverables` array.
+    *   Every `milestones[]` entry requires `schedules`, an array of at least one id of what the milestone schedules.
     *   *Reference*: `prompts/prompt_09_impl_plan.md`.
 2.  **Step 10: Governance**: Any new compliance needs?
     *   *Reference*: `prompts/prompt_10_governance.md`.

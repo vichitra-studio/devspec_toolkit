@@ -25,13 +25,13 @@
 
 ### E520 UNRESOLVED_INPUT / SCHEMA_NOT_FOUND
 
-**Trigger**: A validator could not resolve a required input and fails closed rather than crashing. Three message families share this code:
+**Trigger**: A validator could not resolve a required input and fails closed rather than crashing. Four message families share this code:
 - `UNRESOLVED_INPUT` — a required directory, file, or spec input was missing or unreadable (e.g. `missing_spec_dir`, `missing_canon_dir`, `invalid_json`), or a CLI input precondition was not met.
-- `schema_not_found` — the schema registry could not load the schema for a `$schema` URI. As of 1.1.0, `specdev validate` / `spec-check` fail closed on **all** registry I/O errors (previously only `FileNotFoundError` was caught; `PermissionError` and other `OSError`s now route here instead of escaping uncaught). The step-11 validator likewise emits a structured `E520` for malformed `threats[]` / `target_ids[]` entries that previously raised an unhandled `AttributeError`.
-- `checklist-proof` / `docs_impact` content validation — the step-16 checklist validator (`step_16.py`) emits `E520` when a proof-required checklist item (a non-deferred, non-`wont_do` item whose `type` is not in the docs/metadata/logging/config exemption set) has no `nfr_refs` while its FR has NFRs traced in `07_nfrs.json`, or has no `fixture_ref`; and separately when a milestone plan has code-change actions (non-doc `file_create`/`file_edit` targets) but `plan.docs_impact` is missing, its `status` is not `"required"`, `docs_touched` is empty, or a `docs_touched` entry does not match a `doc_paths` pattern from `seed_manifest.json`.
+- `schema_not_found` — the schema registry could not load the schema for a `$schema` URI. As of 1.1.0, `specdev validate` / `spec-check` fail closed on **all** registry I/O errors (previously only `FileNotFoundError` was caught; `PermissionError` and other `OSError`s now route here instead of escaping uncaught). The step-11 validator likewise emits a structured `E520` for a `threats[]` entry that is not an object.
+- `docs_impact` content validation — the step-16 validator (`step_16.py`) emits `E520` when a milestone plan has code-change actions (non-doc `file_create`/`file_edit` targets) but `plan.docs_impact` is missing, its `status` is not `"required"`, `docs_touched` is empty, or a `docs_touched` entry does not match a `doc_paths` pattern from `seed_manifest.json`.
 - `changelog_parser.py` structural validation — `validate_changelog()` in `tools/specdev_tools/core/changelog_parser.py` emits `E520` for unloadable/malformed YAML (missing file, parse error, empty or non-mapping content), plus four raw-dict structural checks run before the changelog is parsed into a dataclass: **Check 1** — `breaking` is present but not a `bool`; **Check 2** — a top-level key is not in the format's `required_fields`/`optional_fields`; **Check 3** — `version` is not valid semver or does not match the filename's version, except that a `version: "unreleased"` value in `unreleased.yaml` is exempted via an explicit unreleased-sentinel bypass; **Check 4** — a declared `source_of_truth`/`render_target` path is not a non-empty string, does not exist on disk, exists but points to a non-file path (e.g. a directory), or exists but is empty. It also emits `E520` for invalid `change.type` / `change.migration.action` values found after parsing.
 
-**Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable. For `checklist-proof` failures, add the missing `nfr_refs` / `fixture_ref` to the checklist item (or mark it `deferred`/`wont_do` if genuinely out of scope). For `docs_impact` failures, set `plan.docs_impact.status` to `"required"` and list the touched doc paths in `docs_touched`, matching a pattern in `seed_manifest.json`'s `doc_paths`. For `changelog_parser.py` failures, fix the offending YAML field per the check that fired (correct `breaking`'s type, remove/rename the unknown key, fix `version` to match the filename or use the `unreleased` sentinel only in `unreleased.yaml`, or fix the `source_of_truth`/`render_target` path).
+**Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable. For `docs_impact` failures, set `plan.docs_impact.status` to `"required"` and list the touched doc paths in `docs_touched`, matching a pattern in `seed_manifest.json`'s `doc_paths`. For `changelog_parser.py` failures, fix the offending YAML field per the check that fired (correct `breaking`'s type, remove/rename the unknown key, fix `version` to match the filename or use the `unreleased` sentinel only in `unreleased.yaml`, or fix the `source_of_truth`/`render_target` path).
 
 ### E530 INVENTED_ENUM_OR_ID
 
@@ -39,15 +39,7 @@
 
 **Resolution**: Run `specdev guide E530-INVENTED_ENUM_OR_ID` for the full playbook.  Quick summary: extend `spec/canon/command_prefixes.json` with the allowed verb, or register the verb as a canonical command entry and attach a sibling `command_ref`.
 
-**See also**: E530-LINKED_TEST_FILE_NOT_FOUND, E110.
-
-### E530 LINKED_TEST_FILE_NOT_FOUND
-
-**Trigger**: A `linked_test_expectation` field contains a path-shaped token (containing a slash or a recognised extension: `.py`, `.ts`, `.js`, `.go`, `.java`, `.rb`, `.sh`, `.json`) that does not exist on disk.  `bash -c "..."` / `sh -c '...'` wrappers are unwrapped before the check.  Compound commands (`&&`, `||`, `;`) are skipped.
-
-**Resolution**: Run `specdev guide E530-LINKED_TEST_FILE_NOT_FOUND` for the full playbook.  Quick summary: correct the path in the artifact with `specdev json patch`, or create the missing test file at the referenced path.
-
-**See also**: E530-INVENTED_ENUM_OR_ID.
+**See also**: E110.
 
 ### E125 ALIAS_SUNSET_EXPIRED
 
@@ -91,11 +83,11 @@
 
 1. **Structural suppression** (as of 1.1.0) — fields whose enclosing object is *structurally unbindable*: the object's schema sets `additionalProperties: false` and declares no `*_ref`/`*_refs` slot, so it physically cannot carry a binding reference.
 
-2. **Namespace-aware slot-kind suppression** (as of 1.1.0, round 4) — an object whose schema sets `additionalProperties: false` and declares only *purpose-specific* ref slots (e.g. `fr_refs`, `capability_refs`, `metric_ref`) that cannot accept a `term`/`acronym` canonical ID is also suppressed. The check extracts the kind labels from each `*_ref`/`*_refs` slot name (e.g. `fr_refs` → kind `fr`; `capability_refs` → kind `capability`) and suppresses E541 for a given term when the term's canonical kind (e.g. `term`) is absent from the slot-kind set. Example: `14_roadmap` milestones have `fr_refs`/`capability_refs` (slot kinds `{"fr", "capability"}`); a `term`-kind canonical ID has no namespace overlap → E541 is suppressed. Objects that DO have a matching slot (e.g. `03_glossary.json` `terms[]` items with `term_ref`) are NOT suppressed by this mechanism — they fall through to mechanism 3 (runtime binding check).
+2. **Namespace-aware slot-kind suppression** (as of 1.1.0, round 4) — an object whose schema sets `additionalProperties: false` and declares only *purpose-specific* ref slots (e.g. `fr_refs`, `capability_refs`, `metric_ref`) that cannot accept a `term`/`acronym` canonical ID is also suppressed. The check extracts the kind labels from each `*_ref`/`*_refs` slot name (e.g. `fr_refs` → kind `fr`; `capability_refs` → kind `capability`) and suppresses E541 for a given term when the term's canonical kind (e.g. `term`) is absent from the slot-kind set. Example: an object that declares only `fr_refs` and `capability_refs` has slot kinds `{"fr", "capability"}`; a `term`-kind canonical ID has no namespace overlap → E541 is suppressed. Objects that DO have a matching slot (e.g. `03_glossary.json` `terms[]` items with `term_ref`) are NOT suppressed by this mechanism — they fall through to mechanism 3 (runtime binding check).
 
 3. **Term-specific runtime suppression** (the `bound_refs` path) — when a sibling `*_ref`/`*_refs` key is present at the same object level, it suppresses E541 only for the specific term(s) it binds: suppression applies when one of the ref's *values* is one of the mentioned term's canonical IDs. An unrelated reference (binding a different ID) does **not** suppress, so a genuinely unbound term in the same object still fires. (Prior to this release the check was object-level — any ref present suppressed every free-text field — which over-suppressed legitimate unbound mentions.)
 
-4. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs. The complete set of exempted keys, sourced from `hallucination_lint.py` lines 774–838:
+4. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs. The complete set of exempted keys, sourced from `_E541_SKIP_KEYS` and `_E541_SKIP_KEYS_BY_FILE` in `hallucination_lint.py`:
 
    **Global skips (`_E541_SKIP_KEYS`):**
 
@@ -105,7 +97,7 @@
 
    *Category B — Step 16 implementation/narrative subtrees (belt-and-suspenders for `impl_context/` artifacts with variable filenames where `$schema` lookup is unreliable):*
    - **`actions`**, **`coding_examples`** — Step 16a/16b implementation subtrees
-   - **`emergent_ambiguities`**, **`ambiguities`**, **`docs_impact`** — Step 16 narrative subtrees
+   - **`emergent_ambiguities`**, **`docs_impact`** — Step 16 narrative subtrees; **`ambiguities`** — the open-ambiguity list, a top-level array in steps 00 to 15 and `plan.ambiguities` in the step 16 anchor and plans
    - **`review_requirements`** — Step 16 operational verification instructions (test commands, NFR measurement methods); these are not canonical term-binding sites. Note: structural suppression cannot reliably cover these because `test_commands[]` uses `oneOf` and `nfr_measurement_methods` uses `patternProperties`, both of which can cause `slot_kinds` to resolve as `None` under certain schema-navigation paths.
 
    *Category C — free-form runner output:*
@@ -115,7 +107,9 @@
    - **`edge_cases` in `11_redteam.json`** — unbindable narrative subtree; the red-team schema sets `additionalProperties: false` with no `*_ref` field on `edge_cases` items. Scoped to that file to avoid silently exempting a future `edge_cases` key in another artifact.
    - **`definition` in `03_glossary.json`** — glossary definitions are vocabulary prose; requiring `term_ref` bindings for every cross-term mention in the definition text is semantically incorrect. This skip applies only when the file's basename is `03_glossary.json`; a `definition` field in any other file is still checked normally. Note: the glossary `terms[]` object DOES have `term_ref`/`acronym_ref` slots (used to pin the entry's own canonical ID), so the namespace-aware structural rule does NOT suppress it — this explicit skip is required.
 
-   For artifacts with no resolvable `$schema` (where structural suppression and namespace-aware slot-kind suppression are inactive), two mechanisms remain active: the key-name skip (mechanism 4) and the term-specific runtime `bound_ref_ids` suppression (mechanism 3). Mechanism 3 — the `bound_ref_ids` collection at `hallucination_lint.py` lines 898–904 — is unconditional and has no guard on `schema_node`; the check `if cids & bound_ref_ids: continue` (line 959) fires regardless of whether `$schema` resolved. A sibling `*_ref` binding the mentioned term therefore suppresses E541 for that specific term even in a schema-free artifact.
+   For artifacts with no resolvable `$schema` (where structural suppression and namespace-aware slot-kind suppression are inactive), two mechanisms remain active: the key-name skip (mechanism 4) and the term-specific runtime `bound_ref_ids` suppression (mechanism 3). Mechanism 3 — the `bound_ref_ids` collection in `_check_free_text_terms` of `hallucination_lint.py` — is unconditional and has no guard on `schema_node`; the check `if cids & bound_ref_ids: continue` fires regardless of whether `$schema` resolved. A sibling `*_ref` binding the mentioned term therefore suppresses E541 for that specific term even in a schema-free artifact.
+
+**Note on the closure codes** (E535, E536, E560, W561, W562, W563, W564, W565, W566, W567, W568, W569, W575, W576): their Trigger and Resolution texts below describe the 1.1.1 shape. Each reads fields that 1.2.0 removed (`trace`, `targets`, `out_of_scope`, `fr_refs`, `spec_ref`, `deliverables`, `critical_evidence`, `pr_rules`) and runs only when the files it reads carry those fields, or hold no entries to read. A 1.2.0-shaped spec gets none of them until a later 1.2.0 change replaces them with graph coverage; the one live part is the empty-milestone half of W567 (a milestone with no tasks). A new-shape anchor has no `plan.milestone_index[].context_path`, so the closure checks load no milestone plans from it. Where a text below says to add a removed field to a 1.1.1 file, a 1.2.0 spec marks a node that needs no API or fixture with `scope: out` and `scope_reason`.
 
 ### E560 TRACEABILITY_GAP
 
@@ -209,16 +203,6 @@
 
 **Promotable**: W576 → E576.
 
-### E582 / W582 UNCOVERED_FR_REVIEW_COVERAGE
-
-**Trigger** (E582): Fired in step 16 under two conditions: (1) a checklist item's `milestone_ref` names a milestone that does not exist in the step 14 roadmap; or (2) a non-deferred checklist item's `milestone_ref` does not match the milestone that owns its `spec_ref.id` task in the step 14 roadmap.
-
-**Trigger** (W582): Fired in step 16c when a review artifact with `verdict: verified` has FRs declared in the corresponding step 14 roadmap milestone(s) that are not present in `semantic_review.fr_coverage`. If no milestone is scoped, the check runs against all milestones in the roadmap.
-
-**Resolution**: For E582 — correct the checklist item's `milestone_ref` to match an existing step 14 milestone that owns the referenced task. For W582 — add the missing FR IDs to `semantic_review.fr_coverage` in the step 16c artifact, or verify that the FR is intentionally excluded.
-
-**Promotable**: W582 → E582.
-
 ### W584 REMEDIATION_TASK_LINK_UNKNOWN
 
 **Trigger**: Fired in step 16a when a `review` section is present on the same Trinity-loop artifact (post-split model: 16a plan / 16b code / 16c review share one `spec/impl_context/{milestone_id}.json` file) and a `review.findings[].remediation_task.checklist_ids` entry does not resolve to any `id` in the artifact's `plan.spec_alignment.checklist[]`. Indicates the planner accepted a reviewer's remediation task without representing it as a plan checklist item.
@@ -277,27 +261,19 @@
 
 **Warning-only and non-promotable**: E555 already exists as `SEMANTIC_COVERAGE_REGRESSION` (a structurally different code with different semantics) and W555 is intentionally excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate W555 to an error.
 
-### E581 / W581 MILESTONE_REF_MISSING
-
-**Trigger**: A non-deferred checklist item in step 16 lacks a `milestone_ref` field binding it to a step 14 milestone.
-
-**Resolution**: Add a `milestone_ref` field to the checklist item with the `milestone_id` from step 14 that owns the referenced task.
-
-**Promotable**: W581 → E581.
-
 ### W583 API_UNCOVERED_BY_THREAT
 
-**Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and a public API ID is not named by the `target_ids` (entries with `type: api`) of any threat in the artifact. Each public API should be targeted by at least one threat. The check only runs when Step 05 is present (`api_ids` is not None).
+**Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and an API id of step 05 is not named in the `threatens` of any threat in the artifact (`threatens` accepts api, component, connection and third-party ids). Each API should be threatened by at least one threat. The check only runs when Step 05 is present.
 
-**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`, or the 1.1.1 `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted, and a 1.1.1 API linked only through `trace` is not exempt. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
+**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
 
-**Resolution**: Add a threat in Step 11 whose `target_ids` includes the uncovered API (`{"type": "api", "id": "<api-id>"}`), or confirm the API is intentionally outside threat scope.
+**Resolution**: Add a threat in Step 11 whose `threatens` includes the uncovered API id, or confirm the API is intentionally outside threat scope.
 
 **Warning-only and non-promotable**: W583 has no E-counterpart and is excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate it to an error.
 
 ### E604 / W604 TRACE_MATRIX_STALE
 
-**Trigger** (W604): Fired by the Step 14 validator when `extras/trace_matrix.json` is missing, or when its modification time is older than `14_roadmap.json` — an mtime-based freshness heuristic indicating the trace matrix may not reflect the current roadmap. Only W604 is emitted; E604 is registered as the nominal error form but is not currently produced by any code path.
+**Trigger** (W604): Fired by the Step 14 validator when `extras/trace_matrix.json` is missing, or when its modification time is older than `14_roadmap.json` — an mtime-based freshness heuristic indicating the trace matrix may not reflect the current roadmap. The check runs only when `14_roadmap.json` carries a 1.1.1 `fr_refs` or `source_milestones` field (the matrix is built from them), so it is skipped on a 1.2.0-shaped roadmap. Only W604 is emitted; E604 is registered as the nominal error form but is not currently produced by any code path.
 
 **Resolution**: Regenerate `extras/trace_matrix.json` so it post-dates `14_roadmap.json`, or confirm the staleness is benign (e.g. a checkout reordered file modification times).
 
@@ -373,6 +349,8 @@
 
 **Trigger (E590, step 02)**: "Missing capability coverage" (`validators/step_02.py` `check_capability_coverage`): a capability in the Step 01 artifact is not named in any component's `derives_from`. A parked capability (`scope` `later` or `out`) is exempt. The check is skipped when the Step 01 artifact is not found.
 
+**Trigger (E590, step 12)**: A job's `depends_on` names an id that is not a `job_id` of the same `12_ci_gates.json` (`validators/step_12.py`). The step validators of 06 to 11 and 14 to 16 do not check that the ids a node links to exist; a link resolver in a later 1.2.0 change does.
+
 **Trigger (W590)**: The upstream artifact file is missing entirely; cross-step validation is skipped for that upstream.
 
 **Resolution (E590)**: Fix the broken ID reference to match an ID that exists in the upstream artifact.
@@ -427,9 +405,9 @@
 
 ### E596 DAG_DEAD_END_PRODUCER
 
-**Trigger**: A non-terminal step has zero entries in `downstream_consumers` in step_order.json.
+**Trigger**: A non-terminal step has zero entries in `downstream_consumers` in step_order.json. Steps 03 and 16c are exempt: 16c ends the pipeline, and the glossary (03) is read by label, which no stored link carries, so the generated order lists no consumer for it.
 
-**Resolution**: Add the consuming steps to the step's `downstream_consumers` array in `tools/step_order.json`.
+**Resolution**: `downstream_consumers` is generated: run `specdev registry-generate --repo-root ./devspec_toolkit` and do not edit `tools/step_order.json` by hand. A consumer appears when a step's schema carries an `x-link` to this step's kinds; add that link to the consuming schema, or add a `[producer, consumer]` pair to `declared_edges` (a hand key of `tools/step_order.json`) for a context read no stored link carries.
 
 **Promotable**: No. E596 is error-only (emitted by dag-lint).
 
@@ -465,7 +443,7 @@
 
 **Trigger**: A step is listed in another step's `downstream_consumers`, but the consumer step does not appear after the producer in the `steps` ordering (i.e., the consumer precedes or equals the producer in the `steps` list).
 
-**Resolution**: Ensure `downstream_consumers` entries are consistent with the positional ordering of steps in `tools/step_order.json`. Every declared consumer must appear after its producer in the `steps` list.
+**Resolution**: Ensure `downstream_consumers` entries are consistent with the positional ordering of steps in `tools/step_order.json`. Every declared consumer must appear after its producer in the `steps` list. `downstream_consumers` is generated by `registry-generate`; the `steps` order and `declared_edges` are the hand-carried keys.
 
 **Promotable**: No (error only).
 
@@ -531,29 +509,23 @@
 
 ### W615 / E615 INVARIANT_UNEXERCISED_BY_THREAT
 
-**Trigger**: A step-06 invariant has a non-empty `risk_category_ref` field (marking it as security-relevant) but no step-11 threat has a mitigation of type `inv` referencing its `inv_id`. This indicates that a security-relevant invariant is not exercised by any threat in the red-team assessment, creating a gap between invariant definitions and threat coverage.
+**Trigger**: A step-06 invariant (`rules[]`) has a non-empty `risk_category_ref` field (marking it as security-relevant) but no step-11 threat names its `inv_id` in `mitigated_by`. This indicates that a security-relevant invariant is not exercised by any threat in the red-team assessment, creating a gap between invariant definitions and threat coverage.
 
 Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
 
-**Exemption**: An invariant is skipped if it has at least one FR trace (the 1.1.1 `trace` field, which step 06 still carries) and every FR it traces to is parked in step 04 (`scope` `later` or `out`, or the 1.1.1 `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant with zero FR traces (e.g. only a capability trace) is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
+**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
 
-**Resolution**: Either add a threat in `11_redteam.json` with a mitigation of type `inv` referencing the flagged `inv_id`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
+**Resolution**: Either add the flagged `inv_id` to the `mitigated_by` of a threat in `11_redteam.json`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 
 **Promotable**: W615 → E615 (via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`).
 
-### W616 PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED
-
-**Trigger**: A Step 16 checklist item has `checklist_status == "deferred"` or `"wont_do"` while its `implementation.status` still says `"verified"`. This combination is a stale contradiction: work was verified, then the item was marked paused or permanently cancelled, without ever clearing or annotating the implementation record. (This check does not itself validate evidence quality — that's E301/W600/W601's job — it only compares these two status fields.)
-
-**Resolution**: Reconcile which state is accurate. If the item is genuinely paused/cancelled, reset `implementation.status` to something other than `verified` (e.g. `deferred`) or note in `deferred_reason`/`wont_do_reason` why verified work is being shelved. If the work is actually done, set `checklist_status` back to `active`.
-
-**Promotable**: No. This is a human-reconcile nudge, not a correctness failure with a single unambiguous fix direction — there is no `E616` counterpart.
-
 ### Trinity Evidence & Proof Closure (30x / 599–603)
+
+**Note on the plan-item checks**: E301 shapes (1) to (3), W599, W600, W601 and E305 read `implementation.status` of a plan item, and E307 reads an object `spec_ref`. A 1.2.0 plan item stores neither field, so these checks report nothing on it until a later 1.2.0 change replaces them. The text below describes the 1.1.1 reading. E301's plan-level shape, E302, E303, E304 and E306 run on 1.2.0 plans.
 
 ### E301 MISSING_PROOF_CLOSURE
 
-**Trigger**: Fired by `step_16.py` in any of three shapes: (1) a checklist item's `implementation.status` is `"verified"` but it has no `actions`; (2) a `"verified"` item has actions but none of them carry an `evidence` field (`EVIDENCE_CONTENT_INVALID`/no-evidence variant); or (3) an action's `evidence.content` is present but lacks a recognized success-marker keyword (e.g. `PASS`, `OK`, `passed`, `success`, `0 failures`) and the evidence has no `stdout`/`stderr` field to fall back on. A fourth, plan-level shape (`MISSING_PROOF_CLOSURE`) fires when `plan.status == "active"` and a `review_requirements.test_commands` entry is not found among `execution.execution_results` with `status` in (`passed`, `blocked`) — an unacknowledged test command on an active plan.
+**Trigger**: Fired by `step_16.py` in any of three shapes, each only for a plan item that carries `implementation.status`: (1) a checklist item's `implementation.status` is `"verified"` but it has no `actions`; (2) a `"verified"` item has actions but none of them carry an `evidence` field (`EVIDENCE_CONTENT_INVALID`/no-evidence variant); or (3) an action's `evidence.content` is present but lacks a recognized success-marker keyword (e.g. `PASS`, `OK`, `passed`, `success`, `0 failures`) and the evidence has no `stdout`/`stderr` field to fall back on. A fourth, plan-level shape (`MISSING_PROOF_CLOSURE`) runs on every plan: it fires when the plan is active (`plan.status` is `active` or absent, as in every 1.2.0 plan), `execution.execution_results` is non-empty, and a `review_requirements.test_commands` entry is not found among `execution.execution_results` with `status` in (`passed`, `blocked`) — an unacknowledged test command on an active plan.
 
 **Resolution**: Add `actions` documenting the work for verified items, ensure at least one action carries an `evidence` field, and make evidence content include a success marker (or structured `stdout`/`stderr`) so proof can be machine-verified. For the plan-level shape, run the declared test command and record its result in `execution.execution_results`, or mark it `blocked` with a reason.
 
@@ -561,9 +533,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E302 UNPROVEN_VERIFIED_REVIEW
 
-**Trigger**: `review.verdict == "verified"` but the proof chain backing that verdict is incomplete, in any of four ways: (1) no `execution` section exists at all; (2) `execution.execution_results` is empty; (3) one or more `review_requirements.test_commands` entries have no matching `status == "passed"` entry in `execution_results`; or (4) `execution.critical_evidence.passed_test_commands` does not list every declared test command. Unlike E301's `acknowledged` set (which also accepts `blocked`), E302 requires an explicit `passed` status — a `blocked` acknowledgment satisfies E301 but not E302.
+**Trigger**: `review.verdict == "verified"` but the proof chain backing that verdict is incomplete, in any of three ways: (1) no `execution` section exists at all; (2) `execution.execution_results` is empty; or (3) one or more `review_requirements.test_commands` entries have no matching `status == "passed"` entry in `execution_results`. Unlike E301's `acknowledged` set (which also accepts `blocked`), E302 requires an explicit `passed` status — a `blocked` acknowledgment satisfies E301 but not E302.
 
-**Resolution**: Do not set `review.verdict` to `"verified"` until every `review_requirements.test_commands` entry has a corresponding `status: "passed"` entry in `execution.execution_results`, and until `execution.critical_evidence.passed_test_commands` lists each of them.
+**Resolution**: Do not set `review.verdict` to `"verified"` until every `review_requirements.test_commands` entry has a corresponding `status: "passed"` entry in `execution.execution_results`.
 
 **Promotable**: No (error only; no `W302` counterpart).
 
@@ -577,15 +549,15 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E304 ROADMAP_TASK_UNCOVERED
 
-**Trigger**: Fired on 16a milestone plans (not on the Trinity Anchor) when a `14_roadmap.json` task — scoped to the milestones referenced by the plan's checklist `milestone_ref`s, or to all non-`done`/non-`deferred` milestones when no scoping signal exists — has no checklist item whose `spec_ref.id` matches the task's `task_id`. A task itself marked `deferred`/`wont_do` in the roadmap is exempt (already an authored acknowledgment). Also covers two structural sub-conditions under the same code: `ROADMAP_PARSE_ERROR` (14_roadmap.json fails to load) and `ROADMAP_STRUCTURE_ERROR` (unexpected roadmap shape).
+**Trigger**: Fired on 16a milestone plans (not on the Trinity Anchor) in three shapes. `ROADMAP_MILESTONE_UNKNOWN`: the plan's file-level `milestone` is not a `milestone_id` of `14_roadmap.json`. `ROADMAP_TASK_UNCOVERED`: a task of that milestone has no plan item whose `realises` names one of the task's `acceptance_criteria[].criterion_id`; a task whose `disposition.value` is `deferred` or `wont_do` is exempt (already an authored acknowledgment). `ROADMAP_PARSE_ERROR` (14_roadmap.json fails to load) and `ROADMAP_STRUCTURE_ERROR` (14_roadmap.json is not an object). A plan with no `milestone` key checks nothing here (the schema reports the missing key); a missing `14_roadmap.json` is skipped.
 
-**Resolution**: Add a checklist item with `spec_ref.id` matching the uncovered roadmap `task_id`, or mark the roadmap task `deferred`/`wont_do` with a `status_reason` if it is genuinely paused or cancelled. For the structural variants, fix the malformed or misshapen `14_roadmap.json`.
+**Resolution**: Add a plan item whose `realises` names one of the uncovered task's criteria, or give the roadmap task a `disposition` (`deferred` or `wont_do`, with a `reason`) if it is genuinely paused or cancelled. Correct the plan's `milestone` for `ROADMAP_MILESTONE_UNKNOWN`. For the structural variants, fix the malformed or misshapen `14_roadmap.json`.
 
 **Promotable**: No (error only; no `W304` counterpart).
 
 ### E305 PLANNED_UNEXECUTED
 
-**Trigger**: `execution.final_status.ci_status == "green"` but a checklist item that is active (`checklist_status` not in the paused/cancelled set) is not present in `execution.critical_evidence.satisfied_checklist_ids`. A green final CI status implies every planned item should have been executed and recorded as satisfied.
+**Trigger**: Only for a plan whose items carry `implementation.status`. `execution.final_status.ci_status == "green"` but a checklist item that is active (`checklist_status` not in the paused/cancelled set) is not present in `execution.critical_evidence.satisfied_checklist_ids`. A green final CI status implies every planned item should have been executed and recorded as satisfied. Both fields are 1.1.1 fields; a 1.2.0 plan has neither, so E305 reports nothing on it.
 
 **Resolution**: Add the item's `id` to `execution.critical_evidence.satisfied_checklist_ids` once its work is genuinely done, or set `checklist_status` to `deferred`/`wont_do` if it was intentionally skipped for this milestone pass.
 
@@ -601,7 +573,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E307 BEHAVIOR_VALIDATION_PAIRING
 
-**Trigger**: For every behavioral `spec_ref` (types other than `doc`, `code`, `task` — i.e. `fr`, `api`, `inv`, `nfr`) referenced by at least one checklist item, the full set of checklist items sharing that `spec_ref.id` must include at least one item of `type: "behavior"` and one of `type: "validation"`. Deferred items still count toward pairing (a paused validation item still satisfies the pairing requirement); only its own proof-of-work fields are exempted elsewhere.
+**Trigger**: Only for plan items that carry an object `spec_ref` (a 1.1.1 field; a 1.2.0 plan item has none, so E307 reports nothing on it). For every behavioral `spec_ref` (types other than `doc`, `code`, `task` — i.e. `fr`, `api`, `inv`, `nfr`) referenced by at least one checklist item, the full set of checklist items sharing that `spec_ref.id` must include at least one item of `type: "behavior"` and one of `type: "validation"`. Deferred items still count toward pairing (a paused validation item still satisfies the pairing requirement); only its own proof-of-work fields are exempted elsewhere.
 
 **Resolution**: Add the missing `behavior` and/or `validation` checklist item(s) for the flagged `spec_ref.id`.
 
@@ -609,9 +581,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E308 ANCHOR_SCOPE_DRIFT
 
-**Trigger**: Fired by `step_16_anchor.py` (the Trinity Anchor's cross-milestone drift check) in two shapes: (1) `[ownership]` — the same FR/API `ref_id` appears in `fr_refs` of two non-done `milestone_index` entries, i.e. two active milestones both claim the same requirement; (2) `[scope]` — a milestone's `plan.summary.scope_in` item (case-insensitive) appears in the anchor's own `plan.summary.scope_out`, or a milestone's `scope_out` item appears in the anchor's `scope_in` — a bidirectional scope contradiction. The `[scope]` shape only runs when `spec_path` is provided and at least one milestone context file survives the W588/W589 filtering (see W611); the `[ownership]` shape runs purely in-memory off `milestone_index` regardless of `spec_path`.
+**Trigger**: Fired by `step_16_anchor.py` (the Trinity Anchor's cross-milestone drift check) in two shapes: (1) `[ownership]` — the same FR/API `ref_id` appears in `fr_refs` of two non-done `milestone_index` entries, i.e. two active milestones both claim the same requirement; a 1.2.0 anchor row has no `fr_refs`, so this shape finds nothing on it; (2) `[scope]` — a milestone plan's `plan.summary.scope_in` item (case-insensitive) appears in the anchor's own `plan.summary.scope_out`, or a plan's `scope_out` item appears in the anchor's `scope_in` — a bidirectional scope contradiction. The `[scope]` shape only runs when `spec_path` is provided and at least one plan file takes part in drift detection (see W611); the `[ownership]` shape runs purely in-memory off `milestone_index` regardless of `spec_path`.
 
-**Resolution**: For `[ownership]` conflicts, ensure at most one non-done milestone claims a given FR/API in its `fr_refs` (mark the stale milestone `done` or remove the duplicate ref). For `[scope]` conflicts, reconcile the milestone's `scope_in`/`scope_out` against the anchor's `plan.summary.scope_in`/`scope_out` so the same category is not declared in-scope by one and out-of-scope by the other.
+**Resolution**: For `[ownership]` conflicts (1.1.1 anchors only), ensure at most one non-done milestone claims a given FR/API in its `fr_refs` (mark the stale milestone `done` or remove the duplicate ref). For `[scope]` conflicts, reconcile the milestone's `scope_in`/`scope_out` against the anchor's `plan.summary.scope_in`/`scope_out` so the same category is not declared in-scope by one and out-of-scope by the other.
 
 **Promotable**: No (error only; no `W308` counterpart).
 
@@ -647,7 +619,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (warning only; no `E603` counterpart).
 
-### Step-16 Anchor Validation (W587 / W611 / W612)
+### Step-16 Anchor Validation (W587 / W588 / W611)
 
 ### W587 ANCHOR_DRIFT_CHECKS_STALE
 
@@ -659,7 +631,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 #### W588 ANCHOR_MILESTONE_UNREADABLE
 
-**Trigger**: A milestone-plan JSON file the Trinity Anchor either declares (via `plan.milestone_index[].context_path` in `16_impl_context.json`) or that is discovered by globbing `impl_context/*.json` exists on disk but cannot be parsed as JSON or cannot be read. Two independent emitters share this code: `traceability_closure.py` (registry-driven discovery, feeding the coverage checks above) and `step_16_anchor.py` (directory-glob discovery, feeding E308/E309 cross-milestone drift detection) — the same underlying condition surfaces through whichever path finds it first. A declared `context_path` that is simply missing from disk (rather than present-but-unreadable) is a separate condition owned by W607 ANCHOR_CONTEXT_PATH_MISSING, not W588.
+**Trigger**: A milestone-plan JSON file in `impl_context/*.json` exists on disk but cannot be read or parsed as JSON. Two independent emitters share this code: `traceability_closure.py` (which finds plans through the `plan.milestone_index[].context_path` of a 1.1.1 anchor, feeding the coverage checks above) and `step_16_anchor.py` (directory-glob discovery, feeding E308/E309 cross-milestone drift detection) — the same underlying condition surfaces through whichever path finds it first. A declared `context_path` that is missing from disk reports nothing.
 
 **Resolution**: Fix the malformed JSON in the named milestone-plan file, or restore its file-read permissions. Until fixed, the file is excluded from traceability coverage checks and from E308/E309 drift detection — see W611 below if this causes every milestone plan to be filtered out.
 
@@ -667,19 +639,11 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 #### W611 ANCHOR_DRIFT_SUPPRESSED
 
-**Trigger**: The Trinity Anchor's `impl_context/` directory contains one or more JSON files, but none of them declare `$schema='vc:16-impl-context'`, so every per-milestone plan was filtered out (typically because each tripped W588/W589). With zero surviving milestone contexts, the cross-milestone E308 (scope drift) and E309 (checklist drift) checks are completely suppressed — the anchor looks clean while contributing nothing to drift detection. Does not fire when `impl_context/` is genuinely empty (`files_seen == 0`), which is a valid state for a fresh anchor.
+**Trigger**: The Trinity Anchor's `impl_context/` directory contains one or more JSON files, and either none of them takes part in drift detection or some plan file names a milestone that no anchor row is about. A file takes part when it declares `$schema='vc:16-impl-context'` and its file-level `milestone` names a milestone that some anchor row is `about`. With zero participating plans, the cross-milestone E308 (scope drift) and E309 (checklist drift) checks are completely suppressed — the anchor looks clean while contributing nothing to drift detection. Does not fire when `impl_context/` is genuinely empty (no JSON files), which is a valid state for a fresh anchor.
 
-**Resolution**: Fix the W588/W589 warnings reported above the W611 line so the per-milestone plans are recognized (correct each plan's `$schema` to `vc:16-impl-context`). Once at least one plan survives filtering, E308/E309 drift detection is restored.
+**Resolution**: Fix the W588/W589/W608 warnings reported above the W611 line, or add the anchor row a plan file's `milestone` names, so the per-milestone plans take part. Once at least one plan takes part, E308/E309 drift detection is restored.
 
 **Promotable**: No. W611 flags a suppressed-coverage condition, not a concrete drift defect; it has no `E611` counterpart.
-
-#### W612 ANCHOR_PHANTOM_MILESTONE
-
-**Trigger**: A `milestone_index` entry in the Trinity Anchor names a `milestone_id` that does not match any `milestone_id` in `14_roadmap.json`. Phantom milestones bypass ownership, prefix, and scope-drift detection, so the mismatch is surfaced as a warning. Only checked when `14_roadmap.json` is present and readable.
-
-**Resolution**: Verify the `milestone_id` is not a typo. Either correct it to reference an existing roadmap milestone, or add the milestone to `14_roadmap.json` if it is legitimately new (replaying the step-14 roadmap step).
-
-**Promotable**: No. W612 has no `E612` counterpart — a phantom-milestone reference is advisory because the roadmap may legitimately lag a freshly-scaffolded anchor.
 
 ## Canonical Integrity Extensions (1xx / 4xx)
 
@@ -745,21 +709,13 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only).
 
-### E141 TASK_DEPENDENCY_CYCLE / Circular job-requires dependency
+### E141 TASK_DEPENDENCY_CYCLE / Circular job dependency
 
-**Trigger**: Two independent emitters share this code: (1) `step_12.py` — a CI job's `requires[]` graph in `12_ci_gates.json` contains a cycle; (2) `step_14.py` — a step 14 roadmap task's dependency graph (task-to-task, via `dfs`) contains a cycle involving a named milestone.
+**Trigger**: Two independent emitters share this code: (1) `step_12.py` — a CI job's `depends_on[]` graph in `12_ci_gates.json` contains a cycle; (2) `step_14.py` — a step 14 roadmap task's dependency graph (task-to-task, via `dfs`) contains a cycle involving a named milestone.
 
-**Resolution**: Break the cycle by removing or reordering the offending `requires`/task-dependency edge so the graph is acyclic.
+**Resolution**: Break the cycle by removing or reordering the offending `depends_on` (job) or task-dependency edge so the graph is acyclic.
 
 **Promotable**: No (error only).
-
-### E142 TECH_STACK_MISMATCH
-
-**Trigger**: Fired by `step_14.py` when a `tech_stack` entry used in `14_roadmap.json` is not present in the corresponding Step 09 (`09_impl_plan.json`) `tech_stack`.
-
-**Resolution**: Add the technology to Step 09's `tech_stack`, or remove it from the roadmap's `tech_stack` if it is not actually part of the approved stack.
-
-**See also**: W602 / W605 (the equivalent Step 02 ↔ Step 14 tech-stack consistency checks).
 
 ## Prompt / Schema / Dependency-Order Drift (31x / 54x)
 
@@ -829,26 +785,6 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only).
 
-### W574 TECH_STACK_COHERENCE_MISMATCH
-
-**Trigger**: Fired by `spec_quality_lint.py` when `09_impl_plan.json`'s `tech_stack` and `14_roadmap.json`'s `tech_stack` are both present but not identical.
-
-**Resolution**: Reconcile the two `tech_stack` objects so Step 09 and Step 14 declare the same technology choices.
-
-**Promotable**: No (warning only).
-
-## Step 02 ↔ Step 14 Tech Stack Consistency (60x)
-
-### W602 / W605 TECH_STACK_02_MISMATCH / TECH_STACK_02_MISSING
-
-**Trigger (W602)**: `step_14.py` (AUDIT-034) fires when a `tech_stack` entry used in `14_roadmap.json` is not found in Step 02's (`02_system_sketch.json`) `tech_stack`.
-
-**Trigger (W605)**: Fires when a technology declared in Step 02's `tech_stack` is absent from `14_roadmap.json`'s `tech_stack` — the roadmap dropped a technology the system sketch declared.
-
-**Resolution**: Add the missing technology to whichever artifact is missing it (Step 02 system sketch or Step 14 roadmap) so the two `tech_stack` sets agree.
-
-**Promotable**: No (warning only). This is a separate check from E142 (which compares Step 09 vs. Step 14 tech stacks).
-
 ## Forward Replay & ID Stability (55x / 59x)
 
 ### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP
@@ -897,7 +833,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E309 ANCHOR_CHECKLIST_DRIFT
 
-**Trigger**: Fired by `step_16_anchor.py` in two shapes: (1) `[prefix]` — two `milestone_index` entries declare the same `checklist_id_prefix`, so two milestones would allocate checklist IDs from the same namespace; (2) `[mapping]` — the same checklist item `id` appears in two different milestone plan files but maps to a different `spec_ref.id` in each, i.e. the same ID is bound to two different requirements.
+**Trigger**: Fired by `step_16_anchor.py` in two shapes: (1) `[prefix]` — two `milestone_index` entries declare the same `checklist_id_prefix`, so two milestones would allocate checklist IDs from the same namespace; (2) `[mapping]` — the same checklist item `id` appears in two different milestone plan files but maps to a different `spec_ref.id` in each, i.e. the same ID is bound to two different requirements. The `[mapping]` shape reads an object `spec_ref`, which a 1.2.0 plan item no longer has, so it finds nothing on a 1.2.0 plan.
 
 **Resolution**: For `[prefix]`, give each milestone a unique `checklist_id_prefix`. For `[mapping]`, rename the colliding checklist `id` in one of the milestone plans so each ID maps to exactly one `spec_ref.id`.
 
@@ -905,7 +841,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W585 ANCHOR_DRIFT_SKIP
 
-**Trigger**: Fired by `step_16_anchor.py` when `spec_path` is not provided to `validate_step_16_anchor`, so all filesystem-dependent drift checks (W607, the `[scope]` shape of E308, the `[mapping]` shape of E309, W610) are skipped — only the in-memory `milestone_index` checks still run.
+**Trigger**: Fired by `step_16_anchor.py` when `spec_path` is not provided to `validate_step_16_anchor`, so all filesystem-dependent drift checks (W588, W589, W608 for plan files, W611, the `[scope]` shape of E308, the `[mapping]` shape of E309, W610) are skipped — only the in-memory `milestone_index` checks still run.
 
 **Resolution**: Pass `spec_path` when invoking the anchor validator so the filesystem-dependent checks can run.
 
@@ -927,17 +863,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **See also**: W611 ANCHOR_DRIFT_SUPPRESSED (fires when W589/W588 filter out every milestone plan, suppressing drift detection entirely).
 
-### W607 ANCHOR_CONTEXT_PATH_MISSING
-
-**Trigger**: A `milestone_index[]` entry declares a `context_path` pointing to a milestone plan file, but no file exists at the resolved path — drift detection silently skips that milestone until the plan is authored.
-
-**Resolution**: Author the missing milestone plan file at the declared `context_path`, or correct the `context_path` to point to the existing plan file.
-
-**See also**: W588 ANCHOR_MILESTONE_UNREADABLE (the file exists but can't be parsed — a distinct condition from W607's file-absent case).
-
 ### W608 ANCHOR_LEGACY_SCHEMA
 
-**Trigger**: The artifact at the anchor path (`spec/16_impl_context.json`) declares `$schema='vc:16-impl-context'` — the pre-Trinity-split, per-milestone schema — instead of the anchor's own `vc:16-anchor` schema. Schema validation against `vc:16-impl-context` still passes, but the file is contributing nothing to cross-milestone drift detection.
+**Trigger**: Two cases. (1) The artifact at the anchor path (`spec/16_impl_context.json`) declares `$schema='vc:16-impl-context'` — the pre-Trinity-split, per-milestone schema — instead of the anchor's own `vc:16-anchor` schema. Schema validation against `vc:16-impl-context` still passes, but the file is contributing nothing to cross-milestone drift detection. (2) A plan file in `impl_context/` declares `vc:16-impl-context` but has no file-level `milestone` key (the pre-1.2.0 plan shape); the file is skipped by the drift checks until it names its milestone.
 
 **Resolution**: Migrate: move per-milestone checklist content to `spec/impl_context/<milestone>_plan.json`, rewrite the anchor file against `vc:16-anchor` (with `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`), and set `artifact_role='anchor'`. See `prompts/prompt_16_impl_context.md`.
 
@@ -961,7 +889,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W613 UPSTREAM_BACKLOG_UNCLASSIFIED
 
-**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an ambiguity record's `impact[]` matches none of the three classifier rules used to bucket ambiguities by upstream step, falling through to the `unclassified` bucket. Applies equally to `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) records.
+**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an ambiguity record's `impact[]` matches none of the three classifier rules used to bucket ambiguities by upstream step, falling through to the `unclassified` bucket. Applies equally to `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) records of the 1.1.1 shape. A 1.2.0 open item (it has `about` and no `severity`) has no `impact[]`: it is listed in the `unclassified` bucket and never fires W613.
 
 **Resolution**: Informational only — review the flagged ambiguity's `impact[]` text and, if appropriate, extend the classifier rules in `upstream_backlog.py` to recognize the pattern; no per-artifact fix is required.
 
@@ -969,7 +897,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W617 UPSTREAM_BACKLOG_STATUS_FILTERED
 
-**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view.
+**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view. A 1.2.0 open item has status `open`, so this filter never hides it.
 
 **Resolution**: Informational only — re-run with `--status all` (or `--status resolved`) to see the hidden records. The JSON payload also carries this count as `summary.hidden_by_status_count`, which is always present (0 when nothing is hidden) for programmatic consumers.
 

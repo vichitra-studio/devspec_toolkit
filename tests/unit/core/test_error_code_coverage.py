@@ -6,11 +6,11 @@ from specdev_tools.core.errors import ERROR_CODES
 
 
 class ErrorCodeCoverageTests(unittest.TestCase):
-    def test_expected_codes_present(self):
+    def test_expected_code_set_without_removed_codes(self):
         """All known error codes are present in ERROR_CODES (bidirectional)."""
         expected = {
             # Canonical integrity (1xx)
-            "E110", "E120", "E125", "E130", "E140", "E141", "E142", "E150",
+            "E110", "E120", "E125", "E130", "E140", "E141", "E150",
             "W110", "W120", "W130", "W140", "W150",
             # Cross-artifact drift (2xx)
             "E210", "E211",
@@ -27,27 +27,23 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E564", "E565", "E566", "E567", "E568", "E569",
             "E571", "E572", "E573",
             "E575", "E576",
-            "E580", "E581", "E582", "E585",
+            "E580", "E585",
             "W550", "W551", "W552", "W553", "W554", "W555", "W560", "W561", "W562", "W563",
             "W564", "W565", "W566", "W567", "W568", "W569",
-            "W570", "W571", "W572", "W573", "W574",
+            "W570", "W571", "W572", "W573",
             "W575", "W576",
-            "W580", "W581", "W582", "W583", "W584", "W585", "W586", "W587", "W588", "W589",
+            "W580", "W583", "W584", "W585", "W586", "W587", "W588", "W589",
             # R9: Cross-step validation (59x)
             "E590", "E591", "E592", "E593", "E594", "E595",
             "E596", "E597", "E598", "E599",
             "W590", "W591", "W592", "W593", "W594", "W595",
             "W596", "W597", "W598", "W599", "W600",
-            "W601", "W602", "W603",
+            "W601", "W603",
             "E604", "W604",
-            "W605",
             # Glossary parity (6xx)
             "E606", "E607", "W606",
             # Toolkit version gate (6xx)
             "E608",
-            # Anchor context_path integrity (follows the W585-W589 anchor
-            # group; W590-W606 are already allocated to unrelated semantics).
-            "W607",
             # Legacy anchor schema migration signal (post-split transition).
             "W608",
             # Misfiled anchor detection — anchor file landed inside
@@ -58,8 +54,6 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # All milestone files in impl_context/ were filtered by W588/W589,
             # suppressing E308/E309 drift detection entirely.
             "W611",
-            # Milestone ID in milestone_index not found in 14_roadmap.json.
-            "W612",
             # Upstream-backlog: ambiguity's impact[] matches no classifier rule.
             "W613",
             # Registry checks (R001-R003 / 620-622) and R004 / W614
@@ -69,8 +63,6 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W614",
             # DEVSPEC-89: invariant↔threat drift detection
             "W615", "E615",
-            # DEVSPEC-122 follow-up: deferred-item/verified-implementation contradiction
-            "W616",
             # DEVSPEC-123: upstream-backlog discloses records hidden by --status filtering
             "W617",
         }

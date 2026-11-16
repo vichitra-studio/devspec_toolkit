@@ -30,7 +30,6 @@ ERROR_CODES = {
     "E130": "CANONICAL_VERSION_MISMATCH",
     "E140": "AMBIGUOUS_ALIAS",
     "E141": "TASK_DEPENDENCY_CYCLE",
-    "E142": "TECH_STACK_MISMATCH",
     "E150": "SEED_MANIFEST_NOT_PROVIDED",
     "W110": "DEPRECATED_CANONICAL_USED",
     "W120": "ALIAS_DEPRECATED",
@@ -91,8 +90,6 @@ ERROR_CODES = {
     "E575": "IMPL_PLAN_DELIVERABLE_UNCOVERED",
     "E576": "TASK_EXECUTION_MISSING",
     "E580": "SUBSTEP_DRIFT",
-    "E581": "MILESTONE_REF_MISSING",
-    "E582": "UNCOVERED_FR_REVIEW_COVERAGE",
     "E585": "DAG_CIRCULAR_DEPENDENCY",
     "W550": "SEMANTIC_COVERAGE_SKIP",
     "W551": "UNDECLARED_SEED",
@@ -118,12 +115,9 @@ ERROR_CODES = {
     "W571": "ASSUMPTION_VAGUE_QUANTIFIER",
     "W572": "ASSUMPTION_COUNT_HIGH",
     "W573": "ASSUMPTION_UNBOUND_ID",
-    "W574": "TECH_STACK_COHERENCE_MISMATCH",
     "W575": "IMPL_PLAN_DELIVERABLE_UNCOVERED",
     "W576": "TASK_EXECUTION_MISSING",
     "W580": "SUBSTEP_DRIFT",
-    "W581": "MILESTONE_REF_MISSING",
-    "W582": "UNCOVERED_FR_REVIEW_COVERAGE",
     "W583": "API_UNCOVERED_BY_THREAT",
     "W584": "REMEDIATION_TASK_LINK_UNKNOWN",
     "W585": "ANCHOR_DRIFT_SKIP",
@@ -154,20 +148,15 @@ ERROR_CODES = {
     "W599": "EVIDENCE_TOO_SHORT",
     "W600": "VERIFIED_ACTION_NO_EVIDENCE",
     "W601": "EVIDENCE_NO_ARTIFACT_REF",
-    "W602": "TECH_STACK_02_MISMATCH",
     "W603": "FILES_OUTSIDE_TASK_SCOPE",
     "E604": "TRACE_MATRIX_STALE",
     "W604": "TRACE_MATRIX_STALE",
-    "W605": "TECH_STACK_02_MISSING",
     # Glossary parity (6xx)
     "E606": "GLOSSARY_PROPOSAL_DRIFT",
     "E607": "GLOSSARY_CANON_DRIFT",
     # Toolkit version gate (6xx)
     "E608": "TOOLKIT_VERSION_MISMATCH",
     "W606": "GLOSSARY_CANON_ORPHAN",
-    # Anchor context_path integrity (follows the W585-W589 anchor group;
-    # W590-W606 are already allocated to unrelated semantics).
-    "W607": "ANCHOR_CONTEXT_PATH_MISSING",
     # Legacy schema surfaced when a post-split host repo still declares the
     # pre-split schema on its anchor artifact.  Soft-warn only — schema
     # validation against vc:16-impl-context still passes, but host repos
@@ -178,7 +167,7 @@ ERROR_CODES = {
     # (validate.py:_refine_impl_context_substep) demotes the dispatch back
     # to "16" so the anchor validator runs, but every drift check then
     # resolves impl_context_dir to spec/impl_context/impl_context/ — which
-    # does not exist — so E308/E309/W607/W588/W589 silently no-op.  Without
+    # does not exist — so E308/E309/W588/W589 silently no-op.  Without
     # this warning the misfiling is invisible: the file passes the anchor
     # schema and emits zero drift errors despite contributing nothing to
     # cross-milestone drift detection.  W609 makes the misfiling
@@ -197,11 +186,6 @@ ERROR_CODES = {
     # Without this warning, the anchor appears clean while contributing nothing
     # to drift detection.
     "W611": "ANCHOR_DRIFT_SUPPRESSED",
-    # Milestone ID declared in milestone_index does not match any milestone in
-    # 14_roadmap.json.  Phantom milestones bypass all downstream checks —
-    # ownership, prefix, and scope drift detection are silently skipped for IDs
-    # that don't exist in the roadmap.
-    "W612": "ANCHOR_PHANTOM_MILESTONE",
     # Upstream backlog: a legacy-shape ambiguity's impact[] matches none of the 4
     # classifier rules (see analysis/upstream_backlog.py); a 1.2.0 open item has
     # no impact[] and never fires it. Informational only — never
@@ -221,14 +205,6 @@ ERROR_CODES = {
     # E615 is its promotable counterpart (SPECDEV_WARNINGS_AS_ERRORS or SPECDEV_PROMOTE_CODES=W615).
     "W615": "INVARIANT_UNEXERCISED_BY_THREAT",
     "E615": "INVARIANT_UNEXERCISED_BY_THREAT",
-    # DEVSPEC-122 follow-up: a checklist item marked checklist_status="deferred"
-    # or "wont_do" while its implementation.status still says "verified" (with
-    # full evidence) is a stale contradiction -- either the item isn't really
-    # paused/cancelled, or the implementation record needs its own reconciling
-    # note. Advisory only, no promotable E-counterpart (deliberately excluded
-    # from PROMOTABLE_PAIRS, like W570/W590/W597): this is a human-reconcile
-    # nudge, not a correctness failure with a single unambiguous fix direction.
-    "W616": "PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED",
     # DEVSPEC-123: upstream-backlog's --status filter (default "open") drops
     # resolved records from the per-bucket detail view without any indication
     # that anything was hidden -- the exact condition that made a real
@@ -246,9 +222,8 @@ ERROR_CODES = {
 # W596/W597/W606 have E-counterparts with different semantics; W570
 # (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
 # its name with the registered-but-unemitted E604 and stays advisory (see the
-# inline W604 note below). W616 (PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED) and
-# W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) have no E-counterpart at all -- both
-# are informational nudges, not hard failures.
+# inline W604 note below). W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
+# E-counterpart at all -- it is an informational nudge, not a hard failure.
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the
@@ -275,8 +250,6 @@ PROMOTABLE_PAIRS = {
     "W575": "E575",
     "W576": "E576",
     "W580": "E580",
-    "W581": "E581",
-    "W582": "E582",
     "W150": "E150",
     # W590 (CROSS_STEP_UPSTREAM_MISSING) is intentionally NOT in PROMOTABLE_PAIRS.
     # E590 (CROSS_STEP_ID_NOT_FOUND) is a structurally different condition — a

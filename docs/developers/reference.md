@@ -58,7 +58,7 @@ This reference collects recurring facts that developers need while authoring or 
 | Guide      | Human playbook describing a step (`spec/NN_name.guide.md`) |
 | Prompt     | AI instruction file (`prompts/prompt_NN_name.md`)         |
 | DoR        | Definition of Ready requirements for completing a step    |
-| traceRef   | `{type, id, note}` link object of steps 06–16 (`trace`, `targets`, `deliverables`); steps 00–05 link with `derives_from` id arrays |
+| Link field | An id array on a node whose schema carries an `x-link` annotation (for example `derives_from`, `constrains`, `verifies`, `schedules`, `threatens`, `mitigated_by`, `realises`, `refines`, `removes`); see [schema-annotations.md](schema-annotations.md) |
 
 ## Naming & Schema Conventions
 - **IDs**: kebab-case only (`fr-user-login`, `api-session-create`).
@@ -100,9 +100,9 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
-# Traceability closure — verifies the full charter-goal -> capability -> FR -> API/fixture
-# chain has no dangling links (capability/FR/API/fixture trace-type checks); add --json
-# for a machine-readable report; accepts --repo-root, --spec-root, and --git-root
+# Traceability closure — the 1.1.1-shape coverage checks (E535, E536, E560, W561 to W569,
+# W575, W576). They read 1.1.1 fields and report nothing on a 1.2.0-shaped spec for now;
+# add --json for a machine-readable report; accepts --repo-root, --spec-root, and --git-root
 ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Seed enforcement
@@ -217,27 +217,27 @@ that feed targeted `specdev json` calls, rather than reading `spec/*.json` direc
 | `specdev prompt-sync [spec_dir] [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Check prompt files are in sync with their canonical templates |
 | `specdev canonical-autofix spec_dir [--canon-dir CANON_DIR] [--write \| --dry-run] [--json]` | Auto-fix canonical-reference issues; defaults to reporting only — pass `--write` to persist |
 | `specdev glossary-drift-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Validate definition parity across glossary terms, canonical proposals, and the canon registry |
-| `specdev completeness-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Run pairwise completeness checks (W564–W568) and report coverage ratios |
+| `specdev completeness-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Run pairwise completeness checks (W564–W568) and report coverage ratios; a dimension whose reader finds no 1.1.1 field on a 1.2.0-shaped spec is reported as vacuous (`covered_count` 0, `total_count` 0, `ratio` 1.0), listed in `not_computed` of the `--json` output and printed as `[SKIP]` in text |
 | `specdev registry-check --spec-root SPEC_ROOT [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Validate `entry_key_registry.json`: coverage, phantom basenames, and drift against live spec files (R003) |
-| `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH] [--cli-commands-out PATH] [--step-order-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` + `cli_commands.json` from toolkit schemas and the CLI parser (byte-deterministic; run after any schema or parser change — see CLAUDE.md). `--cli-commands-out` defaults to `tools/cli_commands.json` only when `--out` is absent. `--step-order-out` also writes the step order derived from `x-node`/`x-link` annotations (not written by default); with no annotated step, or when the annotation lint finds issues, it fails, prints the reason and writes nothing. No command compares the derived order with `tools/step_order.json` yet (`step_order_gen.diff_against_hand` is library only). Annotation reference: [schema-annotations.md](schema-annotations.md) |
+| `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH] [--cli-commands-out PATH] [--step-order-out PATH] [--checklist-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` + `step_order.json` + `cli_commands.json` and `docs/developers/schema-change-checklist.md` from toolkit schemas, annotations and the CLI parser (byte-deterministic; run after any schema, annotation or parser change — see CLAUDE.md). `--step-order-out`, `--cli-commands-out` and `--checklist-out` each default to their file (`tools/step_order.json`, `tools/cli_commands.json`, `docs/developers/schema-change-checklist.md`) only when `--out` is absent. With no annotated step, when the annotation lint finds issues, or when `tools/schema_changes.json` is malformed, the command exits 1 and prints `registry-generate: failed:` with the reason. Annotation reference: [schema-annotations.md](schema-annotations.md) |
 | `specdev guide <CODE> [--json]` | Show the remediation playbook for an error/warning code, e.g. `specdev guide E110` or `specdev guide E530-INVENTED_ENUM_OR_ID` |
 | `specdev hardcoded-seed-check [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Detect literal seed-doc filenames hardcoded in prompts (W554 regression guard); with `--git-root` also scans `<git-root>/prompts/` for submodule deployments |
-| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate both `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) across `impl_context` plans by implicated upstream step (read-only) |
+| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate both `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) across `impl_context` plans by implicated upstream step (read-only). An open item (`about`, no `severity`) is listed with severity null and status `open` in the `unclassified` bucket |
 | `specdev canon-accept --from SPEC_FILE [--namespace NAMESPACE] [--owner OWNER] [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--dry-run] [--json]` | Promote `canonical_proposals` from a spec file into `canon/manifest.json`; with `--git-root`, writes project canon to `<git-root>/spec/canon/` instead (accepts `--git-root`, not `--spec-root` — see CLAUDE.md exception list) |
 
 ### DAG & Extraction Intent Commands
 
 #### `dag-lint`
 
-Validates the completeness and consistency of the dependency DAG defined in `tools/step_order.json`. This is a standalone command — it is **not** included in `validate-all`.
+Validates the completeness and consistency of the dependency DAG defined in `tools/step_order.json` (a generated file; see `registry-generate`). This is a standalone command — it is **not** included in `validate-all`.
 
 **What it checks:**
-- Every non-terminal step has at least one `downstream_consumers` entry (E596 DAG_DEAD_END_PRODUCER). Step 16c is exempt as the terminal step.
+- Every non-terminal step has at least one `downstream_consumers` entry (E596 DAG_DEAD_END_PRODUCER). Steps 03 and 16c are exempt: 16c is the terminal step, and the generated order lists no consumer for the glossary (03).
 - Every `downstream_consumers` entry is consistent with the computed step ordering (E599 DAG_CONSUMER_INCONSISTENCY). If step X lists Y as a consumer, Y must appear after X in the `steps` list.
 - No circular dependencies in the computed upstream graph (E585 DAG_CIRCULAR_DEPENDENCY).
 - Prompt extraction intent entries reference only computed upstream steps (W596 UNDECLARED_UPSTREAM_REF).
 
-**When to run:** After modifying `tools/step_order.json` or any prompt's `### Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
+**When to run:** After running `registry-generate` (which writes `tools/step_order.json`) or after changing any prompt's `### Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
 
 #### `extraction-intent-check`
 
@@ -408,22 +408,20 @@ Invoke commands from the root of your host repository so relative paths to `spec
 
 ## Troubleshooting Checklist
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm [tools/schema_registry.json](../../tools/schema_registry.json).
-- **Unknown Target in fixtures**: ensure the target ID (`fr-*`, `api-*`, `nfr-*`, `inv-*`) exists in the respective spec file.
+- **Fixture without a link**: every fixture needs `verifies` (ids of acceptance criteria, APIs, invariants or NFRs) or `removes`; `targets` is no longer part of the schema.
 - **Invariant evaluation null**: check referenced keys in fixtures or adjust the invariant expression.
-- **Governance rejection**: match the commit pattern defined in Step 10; ensure `pr_rules` use allowed enum values.
+- **Governance rejection**: match the commit pattern defined in Step 10; ensure each `rules[]` entry has `rule_id`, `text` and `derives_from`.
 - **Glossary failures**:
   - `minItems` error: Ensure `terms` array has at least one item.
   - `minLength` error: Definitions must be >20 chars.
   - `pattern` error: Check `domain` (kebab-case) and `units` (alphanumeric/slash) formats. no empty strings allowed.
 - **Implementation Plan failures**:
-  - `tech_stack` error: Ensure it is an object, not an array.
-  - `milestones` error: Ensure every milestone has a `deliverables` array linkage.
+  - `milestones` error: Ensure every milestone has a `schedules` array with at least one id.
 - **Red Team (Step 11) failures**:
-  - `target_ids` error: Threats must target an API or Component.
-  - `mitigations` error: Must be structured objects, not strings.
+  - `threatens` error: Every threat needs at least one id of an API, component, connection or third party.
+  - `mitigated_by` error: An edge case needs at least one id in `mitigated_by`; on a threat it is optional.
 - **Scaffold (Step 15) failures**:
-  - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
-  - `duplicate api_ref`: Each API Contract can only be mapped once.
+  - `duplicate row_id`: Each `interface_map[]` row needs its own `row_id`; an API may be realised by several rows.
 - **Canon/schema alignment failures** (`canon-schema-alignment`); see [error-codes.md](error-codes.md#canonschema-alignment-55x) for the authoritative E551-E554 definitions:
   - `E554 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
   - `E551 SCHEMA_ENUM_EXTRA`: Schema enum has values not present in the paired canon kind.
@@ -437,8 +435,8 @@ Invoke commands from the root of your host repository so relative paths to `spec
 `trace_types.py` now loads valid trace types from `canon/kinds/trace_type.json` via `CanonicalRegistry` at import time. If canon loading fails for any reason, it falls back to a hardcoded set of types and aliases. This keeps the canonical registry as the single source of truth while maintaining resilience.
 
 ### `step_order.json` schema changes
-- The `step_metadata` field has been **removed**.
-- A `downstream_consumers` field has been **added**. It maps each step ID to a list of step IDs that directly consume its output (e.g., `"04": ["05", "06", ...]`). This replaces the extraction-intent data previously stored in `step_metadata` and is used by the `prompt-context` command.
+- `tools/step_order.json` is generated by `specdev registry-generate`; do not edit it by hand. The hand-carried keys are `version`, `steps`, `policy`, `coverage_thresholds` and `declared_edges` (`[producer, consumer]` pairs for context reads no stored link carries).
+- `downstream_consumers` maps each step ID to the list of step IDs that consume its output (e.g., `"04": ["05", "06", ...]`), derived from the `x-link` declarations of the step schemas plus `declared_edges`. `prompt-context`, `context` and the W595 staleness check of forward replay read it.
 
 ### `prompt-context` output format
 The `prompt-context` command now outputs a 2-column table (`Step`, `Name`) instead of the previous 3-column format (`Step`, `Name`, `Extraction Intent`). Consumer lists are derived from the `downstream_consumers` field in `step_order.json`.

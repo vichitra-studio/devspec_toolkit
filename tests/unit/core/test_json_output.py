@@ -254,7 +254,7 @@ class TestMakeRemediation:
         )
         assert _make_remediation(err) is None
 
-    def test_e530_linked_test_file_not_found_shape(self) -> None:
+    def test_linked_test_file_not_found_subcode_no_longer_special_cased(self) -> None:
         err = SpecError(
             code="E530",
             message="LINKED_TEST_FILE_NOT_FOUND 09_impl_plan.json:linked_test_expectation path=tests/unit/missing.py",
@@ -263,26 +263,12 @@ class TestMakeRemediation:
             jq_path=".linked_test_expectation",
             value="tests/unit/missing.py",
         )
-        r = _make_remediation(err)
-        assert r is not None
-        assert r["guide_code"] == "E530-LINKED_TEST_FILE_NOT_FOUND"
-        assert r["parameters"]["fix_kind"] == "CREATE_OR_FIX_TEST_PATH"
-        candidates = r["parameters"]["candidates"]
-        assert len(candidates) >= 1
-        assert candidates[0]["kind"] == "correct_path"
-        cmd = candidates[0]["command"]
-        assert cmd.startswith("specdev json patch")
-        assert ".linked_test_expectation" in cmd
-        # err.file must appear in the command, not a literal <spec-file> placeholder
-        assert "09_impl_plan.json" in cmd
-        assert "<spec-file>" not in cmd
-        assert "tests/unit/missing.py" in r["owner_story"]
+        assert _make_remediation(err) is None
 
     def test_remediation_candidates_commands_start_with_specdev(self) -> None:
         errs = [
             SpecError(code="E110", message="test", subcode="UNKNOWN_CANONICAL_ID", value="cn:project:foo"),
             SpecError(code="E530", message="test", subcode="INVENTED_ENUM_OR_ID", jq_path=".jobs[0].steps[0].command", value="frobulate"),
-            SpecError(code="E530", message="test", subcode="LINKED_TEST_FILE_NOT_FOUND", file="spec/09.json", jq_path=".linked_test_expectation", value="tests/missing.py"),
         ]
         for err in errs:
             r = _make_remediation(err)

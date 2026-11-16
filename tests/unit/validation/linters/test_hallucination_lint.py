@@ -281,17 +281,6 @@ class HallucinationLintTests(unittest.TestCase):
             errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
             self.assertFalse(any("EXISTING_STRUCTURE_PATH_NOT_FOUND" in e for e in render_errors(errs)))
 
-    def test_linked_test_expectation_missing_file(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "spec" / "13_impl.json").write_text(
-                json.dumps({"linked_test_expectation": "tests/missing_test.py"}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertTrue(any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)))
-
     # ------------------------------------------------------------------
     # Submodule path resolution: git_root vs repo_root (Bug 1 & Bug 2)
     # ------------------------------------------------------------------
@@ -355,95 +344,6 @@ class HallucinationLintTests(unittest.TestCase):
                 "missing path in em-dash composite must still fire E530",
             )
 
-    def test_linked_test_expectation_playwright_command_no_error(self):
-        """Bug 2 regression: playwright command with --grep flag must extract the
-        test file path and not fire E530 when the file exists."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "tests").mkdir(parents=True)
-            (root / "tests" / "bootstrap.test.js").write_text("// test", encoding="utf-8")
-            cmd = "npx playwright test tests/bootstrap.test.js --grep 'publish post success'"
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "playwright command must extract test file path before existence check",
-            )
-
-    def test_linked_test_expectation_playwright_command_missing(self):
-        """Playwright command: if the extracted test file doesn't exist, E530 fires."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            cmd = "npx playwright test tests/missing.test.js --grep 'some test'"
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertTrue(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "missing test file in playwright command must fire E530",
-            )
-
-    def test_linked_test_expectation_bash_c_wrapped_no_error(self):
-        """Drift #2 (linked_test_expectation side): `bash -c "<cmd>"` wrap must
-        unwrap before path extraction, so the inner test path is checked and no
-        spurious E530 fires when the file exists."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "tests").mkdir(parents=True)
-            (root / "tests" / "wrapped.test.js").write_text("// test", encoding="utf-8")
-            cmd = 'bash -c "npx playwright test tests/wrapped.test.js"'
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "bash -c wrap must not break linked_test_expectation path extraction",
-            )
-
-    def test_linked_test_expectation_bash_c_wrapped_missing_fires(self):
-        """`bash -c "..."` wrap unwraps, then existence check still fires E530
-        when the inner path is missing — wrapping is not an escape from the check."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            cmd = 'bash -c "npx playwright test tests/does_not_exist.test.js"'
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertTrue(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "missing inner path under bash -c wrap must still fire E530",
-            )
-
-    def test_linked_test_expectation_compound_command_no_error(self):
-        """Compound shell commands (&&) must not fire E530 — there is no single
-        authoritative test-file path to validate in a compound command."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            cmd = "npx gulp zip && npx gscan theme/dist/vc-collective.zip"
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "compound && command must not fire E530 (no single test file to validate)",
-            )
-
     def test_existing_structures_emdash_composite_with_git_root(self):
         """Combined Bug 1A+1B: em-dash composite string AND git_root != repo_root.
         File exists at git_root; path must be extracted from composite before
@@ -469,29 +369,20 @@ class HallucinationLintTests(unittest.TestCase):
                 "em-dash composite at git_root must not fire E530 in submodule deployment",
             )
 
-    def test_linked_test_expectation_git_root_resolves_host_file(self):
-        """Bug 2A regression: test file at git_root must not fire E530 in
-        submodule deployment where repo_root is the toolkit subdirectory."""
+    def test_check_linked_test_expectations_removed(self):
+        """`linked_test_expectation` is no longer a checked path field: no check function, no E530."""
+        import specdev_tools.validation.hallucination_lint as hallucination_lint
+
+        self.assertFalse(hasattr(hallucination_lint, "_check_linked_test_expectations"))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            toolkit = root / "devspec_toolkit"
-            toolkit.mkdir()
-            spec = toolkit / "spec"
-            spec.mkdir()
-            (root / "tests").mkdir()
-            (root / "tests" / "bootstrap.test.js").write_text("// test", encoding="utf-8")
-            cmd = "npx playwright test tests/bootstrap.test.js --grep 'x'"
-            (spec / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"linked_test_expectation": "tests/missing_test.py"}),
                 encoding="utf-8",
             )
-            errs = lint_hallucinations(
-                str(spec), repo_root=str(toolkit), git_root=str(root)
-            )
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "test file at git_root must not trigger E530 in submodule deployment",
-            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual([e for e in errs if e.code == "E530"], [])
 
     def test_nfr_refs_unresolved(self):
         with tempfile.TemporaryDirectory() as td:
@@ -633,7 +524,7 @@ class ExtractPathFromStringTests(unittest.TestCase):
         self.assertEqual(result, "tests/bootstrap.test.js")
 
     def test_bash_c_double_quoted_wrapper_unwrapped(self):
-        """`bash -c "..."` wrap must not break path extraction. Drift #2 (linked_test_expectation side)."""
+        """`bash -c "..."` wrap must not break path extraction. Drift #2."""
         result = _extract_path_from_string(
             'bash -c "npx playwright test tests/bootstrap.test.js"'
         )
@@ -1124,25 +1015,6 @@ class StructuredFieldTests(unittest.TestCase):
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
             self.assertEqual(err.value, "theme/missing_dir/bootstrap.sh")
 
-    def test_linked_test_file_not_found_has_structured_fields(self):
-        """LINKED_TEST_FILE_NOT_FOUND E530 must carry all four structured fields."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            spec = root / "spec"
-            spec.mkdir()
-            (spec / "09_impl_plan.json").write_text(
-                json.dumps({"linked_test_expectation": "tests/unit/completely_missing.py"}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(spec), repo_root=str(root))
-            hits = [e for e in errs if e.code == "E530" and e.subcode == "LINKED_TEST_FILE_NOT_FOUND"]
-            self.assertTrue(hits, "Expected E530 LINKED_TEST_FILE_NOT_FOUND")
-            err = hits[0]
-            self.assertIsNotNone(err.file)
-            assert err.jq_path is not None
-            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
-            self.assertEqual(err.value, "tests/unit/completely_missing.py")
-
     def _lint(self, spec_data: dict, filename: str = "artifact.json") -> list:
         """Helper: write spec_data to a temp dir and run lint_hallucinations."""
         import tempfile
@@ -1265,25 +1137,25 @@ class CollectPathValuePairsTests(unittest.TestCase):
     """Unit tests for _collect_path_value_pairs — jq_path precision."""
 
     def test_top_level_string_field(self):
-        obj = {"linked_test_expectation": "tests/foo.py"}
-        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
-        assert pairs == [(".linked_test_expectation", "tests/foo.py")]
+        obj = {"existing_structures": "src/foo.py"}
+        pairs = _collect_path_value_pairs(obj, "existing_structures")
+        assert pairs == [(".existing_structures", "src/foo.py")]
 
     def test_nested_field_produces_precise_path(self):
-        obj = {"plan": {"steps": [{"linked_test_expectation": "tests/bar.py"}]}}
-        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
-        assert pairs == [(".plan.steps[0].linked_test_expectation", "tests/bar.py")]
+        obj = {"plan": {"steps": [{"existing_structures": "src/bar.py"}]}}
+        pairs = _collect_path_value_pairs(obj, "existing_structures")
+        assert pairs == [(".plan.steps[0].existing_structures", "src/bar.py")]
 
     def test_multiple_occurrences_all_paths_distinct(self):
         obj = {
             "tasks": [
-                {"linked_test_expectation": "tests/a.py"},
-                {"linked_test_expectation": "tests/b.py"},
+                {"existing_structures": "src/a.py"},
+                {"existing_structures": "src/b.py"},
             ]
         }
-        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
-        assert (".tasks[0].linked_test_expectation", "tests/a.py") in pairs
-        assert (".tasks[1].linked_test_expectation", "tests/b.py") in pairs
+        pairs = _collect_path_value_pairs(obj, "existing_structures")
+        assert (".tasks[0].existing_structures", "src/a.py") in pairs
+        assert (".tasks[1].existing_structures", "src/b.py") in pairs
         assert len(pairs) == 2
 
     def test_list_value_produces_indexed_paths(self):
@@ -1294,7 +1166,7 @@ class CollectPathValuePairsTests(unittest.TestCase):
             (".nfr_refs[1]", "nfr-sec-002"),
         ]
 
-    def test_linked_test_jq_path_appears_in_e530_error(self):
+    def test_existing_structures_jq_path_appears_in_e530_error(self):
         """E530 jq_path must reflect the actual nested location, not a static '.key'."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1304,16 +1176,16 @@ class CollectPathValuePairsTests(unittest.TestCase):
                 json.dumps({
                     "plan": {
                         "tasks": [
-                            {"linked_test_expectation": "tests/unit/missing.py"}
+                            {"existing_structures": "src/missing.py"}
                         ]
                     }
                 }),
                 encoding="utf-8",
             )
             errs = lint_hallucinations(str(spec), repo_root=str(root))
-            e530 = [e for e in errs if e.code == "E530" and e.subcode == "LINKED_TEST_FILE_NOT_FOUND"]
-            assert e530, "Expected an E530 LINKED_TEST_FILE_NOT_FOUND error"
-            assert e530[0].jq_path == ".plan.tasks[0].linked_test_expectation", (
+            e530 = [e for e in errs if e.code == "E530" and e.subcode == "EXISTING_STRUCTURE_PATH_NOT_FOUND"]
+            assert e530, "Expected an E530 EXISTING_STRUCTURE_PATH_NOT_FOUND error"
+            assert e530[0].jq_path == ".plan.tasks[0].existing_structures", (
                 f"Expected precise nested jq_path, got: {e530[0].jq_path!r}"
             )
 

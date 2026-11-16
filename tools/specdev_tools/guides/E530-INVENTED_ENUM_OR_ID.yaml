@@ -34,5 +34,4 @@ resolution: |
   discouraged.  Compound commands containing &&, ||, or ; are skipped by
   the path-validation check.
 see_also:
-  - E530-LINKED_TEST_FILE_NOT_FOUND
   - E110

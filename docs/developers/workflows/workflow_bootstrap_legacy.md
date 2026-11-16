@@ -277,7 +277,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 *Prompt: `prompts/prompt_09_impl_plan.md`*
 
-Use this step to capture milestones and deliverables. Requires `tech_stack` as an object (not array) and `milestones` with a `deliverables` array.
+Use this step to capture milestones. Every milestone requires `schedules`, an array of at least one id of what it schedules (functional requirements, acceptance criteria, APIs, invariants, NFRs, components, environments or risks).
 
 **Validation ritual:**
 ```bash
@@ -297,7 +297,7 @@ Use this step to capture milestones and deliverables. Requires `tech_stack` as a
 
 *Prompt: `prompts/prompt_11_redteam.md`*
 
-Add potential security threats for the project. `target_ids` must reference API or Component IDs; `mitigations` must be structured objects.
+Add potential security threats for the project. Every threat requires `threatens`, an array of at least one id of an API, component, connection or third party; `mitigated_by` lists the ids that mitigate it.
 
 **Validation ritual:**
 ```bash
@@ -429,7 +429,7 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 > Open `prompts/prompt_16_impl_context.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/14_roadmap.json` (active milestone, tasks, fr_refs)
+> - `spec/14_roadmap.json` (active milestone, tasks, acceptance criteria)
 > - `spec/04_fr_list.json`, `spec/05_interface_contracts.json`
 > - `spec/08_fixtures.json`, `spec/09_impl_plan.json`
 >
@@ -455,7 +455,7 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 >
 > **Context to supply**:
 > - `spec/16_impl_context.json` (Trinity Anchor scope)
-> - `spec/14_roadmap.json` (active milestone tasks and fr_refs)
+> - `spec/14_roadmap.json` (active milestone tasks and acceptance criteria)
 > - `spec/04_fr_list.json`, `spec/05_interface_contracts.json`
 >
 > The AI creates or updates `spec/impl_context/{step_id}.json` with the plan and checklist for the coding agent.

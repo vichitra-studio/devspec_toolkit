@@ -1,7 +1,34 @@
 """T02: Tests for R9 error codes and PROMOTABLE_PAIRS."""
+import re
 import unittest
+from pathlib import Path
 
 from specdev_tools.core.errors import ERROR_CODES, PROMOTABLE_PAIRS
+
+TOOLS_DIR = Path(__file__).resolve().parents[3] / "tools" / "specdev_tools"
+ERRORS_MODULE = TOOLS_DIR / "core" / "errors.py"
+CODE_LITERAL_RE = re.compile(r'["\']([EW]\d{3})["\']')
+
+# Codes whose only input was a removed field. No emitter is left for any of them.
+REMOVED_CODES = (
+    "E142", "W574", "W581", "W582", "E581", "E582",
+    "W602", "W605", "W607", "W612", "W616",
+)
+
+# The W->E pairs of PROMOTABLE_PAIRS. A later change that adds or removes a pair
+# edits this list in the same commit as its code change.
+EXPECTED_PROMOTABLE_PAIRS = {
+    "W550": "E550", "W560": "E560", "W562": "E562", "W563": "E563",
+    "W564": "E564", "W565": "E565", "W566": "E566", "W567": "E567",
+    "W568": "E568", "W569": "E569", "W571": "E571", "W572": "E572",
+    "W573": "E573", "W575": "E575", "W576": "E576", "W580": "E580",
+    "W150": "E150", "W591": "E591", "W592": "E592", "W593": "E593",
+    "W594": "E594", "W595": "E595", "W615": "E615",
+}
+
+# Registered codes with no string literal outside errors.py that are not the E side
+# of a PROMOTABLE_PAIRS row: kept for compatibility or reserved, not emitted.
+REGISTERED_WITHOUT_EMITTER = {"E422", "E561", "E604", "E620", "W150", "W591"}
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic
 # names.  These are legitimate divergences documented in errors.py (non-
@@ -29,7 +56,6 @@ CROSS_PREFIX_SEMANTIC_ALLOWLIST = {
     "598",  # E=EXTRACTION_INTENT_INVALID_REF / W=ID_STABILITY_REMOVAL
     "599",  # E=DAG_CONSUMER_INCONSISTENCY    / W=EVIDENCE_TOO_SHORT
     "606",  # E=GLOSSARY_PROPOSAL_DRIFT       / W=GLOSSARY_CANON_ORPHAN
-    "607",  # E=GLOSSARY_CANON_DRIFT          / W=ANCHOR_CONTEXT_PATH_MISSING
     "608",  # E=TOOLKIT_VERSION_MISMATCH      / W=ANCHOR_LEGACY_SCHEMA
 }
 
@@ -40,7 +66,7 @@ class TestR9ErrorCodes(unittest.TestCase):
     # All new R9 codes (26 new + 4 previously unregistered) + DEVSPEC-89 additions
     R9_NEW_CODES = {
         "E150", "E551", "E552", "E553", "E554", "E555",
-        "E571", "E572", "E573", "E580", "E581", "E585",
+        "E571", "E572", "E573", "E580", "E585",
         "E590", "E591", "E592", "E593", "E594", "E595",
         "E596", "E597", "E598", "E599",
         "E615",
@@ -55,12 +81,34 @@ class TestR9ErrorCodes(unittest.TestCase):
         for code in self.R9_NEW_CODES:
             self.assertIn(code, ERROR_CODES, f"{code} not registered in ERROR_CODES")
 
-    def test_promotable_pairs_count(self):
-        """PROMOTABLE_PAIRS has exactly 25 W→E mappings."""
+    def test_promotable_pairs_match_expected_list(self):
+        """PROMOTABLE_PAIRS equals the explicit W->E list above (23 pairs)."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
-        # This literal is an intentional regression guard — bump it in lockstep
-        # whenever a W→E pair is added to or removed from that dict.
-        self.assertEqual(len(PROMOTABLE_PAIRS), 25)
+        self.assertEqual(PROMOTABLE_PAIRS, EXPECTED_PROMOTABLE_PAIRS)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 23)
+
+    def test_removed_codes_not_registered(self):
+        """The codes whose input fields were removed are gone from ERROR_CODES and PROMOTABLE_PAIRS."""
+        pair_members = set(PROMOTABLE_PAIRS) | set(PROMOTABLE_PAIRS.values())
+        for code in REMOVED_CODES:
+            self.assertNotIn(code, ERROR_CODES, f"{code} must not be registered")
+            self.assertNotIn(code, pair_members, f"{code} must not be in PROMOTABLE_PAIRS")
+
+    def test_registered_codes_equal_emitted_codes(self):
+        """Registered codes are the codes written in source, plus the E side of each promotable pair, plus a named few."""
+        emitted: set[str] = set()
+        for py_file in TOOLS_DIR.rglob("*.py"):
+            if py_file != ERRORS_MODULE:
+                emitted.update(CODE_LITERAL_RE.findall(py_file.read_text(encoding="utf-8")))
+        registered = set(ERROR_CODES)
+        self.assertEqual(emitted & set(REMOVED_CODES), set(), "a removed code is still emitted")
+        self.assertEqual(emitted - registered, set(), "a code is emitted but not registered")
+        promoted = set(PROMOTABLE_PAIRS.values())
+        self.assertEqual(
+            registered - emitted - promoted,
+            REGISTERED_WITHOUT_EMITTER - promoted,
+            "registered code without an emitter that is not listed",
+        )
 
     def test_promotable_pairs_w_to_e(self):
         """Every key in PROMOTABLE_PAIRS is a W-code mapping to an E-code."""

@@ -1,7 +1,7 @@
 # Schema Annotations (`vc:core:graph`)
 
 `schema/core/graph.schema.json` (`$id` `vc:core:graph`) defines the annotation language step schemas use to declare
-graph nodes and links. It only defines shapes. The seed manifest (`schema/seed_manifest.schema.json`, the top-of-graph `seed` kind) and the step schemas 00, 01, 02, 02a, 03, 04 and 05 carry annotations today; the schemas of steps 06 to 16 are annotated later in this release. Every definition has an
+graph nodes and links. It only defines shapes. The seed manifest (`schema/seed_manifest.schema.json`, the top-of-graph `seed` kind) and the step schemas 00, 01, 02, 02a, 03, 04 and 05 carry annotations, as do the step schemas 06 to 12, 14 and 15, `schema/16_anchor.schema.json` and `schema/16_impl_context.schema.json`. The schemas of steps 13 and 13a carry none. Every definition has an
 `$anchor` equal to its name, so reference it as `vc:core:graph#<name>`.
 
 ## `x-node` (`xNode`)
@@ -67,7 +67,8 @@ Attach the reason rule in the item's `allOf`; it makes `scope_reason` required w
 | `tools/entry_key_registry.json` | `--out` | Annotated nodes add entries marked `source: "x-node"` with `role`, `contract`, `coarse` and `links`. When an annotated shared node has the same `array_path` as a legacy heuristic entry, the legacy entry is kept. Map-keyed nodes carry no `id_field`. Glob-keyed entries (step 16 plan files) use the glob as the key. |
 | `tools/extraction_paths.json` | `--extraction-paths-out` | Unchanged. |
 | `tools/cli_commands.json` | `--cli-commands-out` | The CLI command list built from the argparse tree. Defaults to `tools/cli_commands.json` only when `--out` is absent; the defaults of `--out` and `--extraction-paths-out` are unchanged. |
-| derived step order | `--step-order-out` | Written only when a path is given. `tools/step_order.json` stays the hand file and is never overwritten. No command compares the derived order with the hand file yet (`step_order_gen.diff_against_hand` is library only). With no annotated step, or when the annotation lint finds issues, the command fails, prints the reason and writes nothing. |
+| `tools/step_order.json` | `--step-order-out` | Generated: the order and edges derived from the annotations plus the hand-carried keys of the existing file (`version`, `steps`, `policy`, `coverage_thresholds`, `declared_edges`). Do not edit the derived keys (`downstream_consumers`, `step_metadata`) by hand. Defaults to `tools/step_order.json` only when `--out` is absent. With no annotated step, or when the annotation lint finds issues, the command fails with `registry-generate: failed:`. `step_order_gen.diff_against_hand` is library only. |
+| `docs/developers/schema-change-checklist.md` | `--checklist-out` | Rendered from `tools/schema_changes.json`. Defaults to that path only when `--out` is absent. A malformed rows file makes the command fail with `registry-generate: failed:`. |
 
 All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annotations produces the legacy registry entries unchanged; `_format_version` is `1.1.0`.
 

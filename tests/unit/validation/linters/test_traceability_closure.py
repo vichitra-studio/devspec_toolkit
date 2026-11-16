@@ -233,12 +233,9 @@ class TestTraceabilityClosure(unittest.TestCase):
             )
 
     def test_anchor_declares_missing_context_path_silently_skipped(self):
-        """Missing declared context_path is owned by W607 (step_16_anchor), not W588 here.
+        """Missing declared context_path is skipped silently, not reported as W588.
 
-        traceability_closure deliberately stays silent when a declared plan file is
-        absent — the anchor validator emits W607 ANCHOR_CONTEXT_PATH_MISSING for the
-        exact same condition. Double-reporting the same root cause from two
-        validators under different codes would clutter spec-check output.
+        traceability_closure stays silent when a declared plan file is absent.
 
         This test pins the quiet contract so a future regression that re-introduces
         a W588 "does not exist" emission here surfaces immediately.
@@ -261,7 +258,7 @@ class TestTraceabilityClosure(unittest.TestCase):
             self.assertFalse(
                 any("W588" in e and "does not exist" in e for e in rendered),
                 f"traceability_closure must not emit W588 for a missing declared "
-                f"context_path — that signal belongs to W607 on the anchor validator. "
+                f"context_path. "
                 f"Got: {rendered}",
             )
 
