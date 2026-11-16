@@ -516,17 +516,19 @@ changes:
       of the prompts for steps 06 to 16c has the new shape and passes its JSON
       Schema; for six of them, 06, 07, 08, 16a, 16b and 16c, specdev validate
       reports E210 on the canonical refs, as it did in 1.1.1; earlier
-      example blocks of prompt_16b_impl_coder.md still show removed fields);
+      example blocks of prompt_16b_impl_coder.md and prompt_16c_impl_reviewer.md
+      still show removed fields);
       specdev align prompts output and the
       migration templates in prompts/migration/ for steps 06 to 16 still describe
       the 1.1.1 shape; the agent and skill files under .claude/,
       docs/agents/agents.md, the coverage-matrix and gap-hunter docs,
       canon/README.md, docs/developers/workflows/workflow_migration.md (links,
-      trace_refs) and docs/developers/design/migration_system_spec.md still name
-      removed fields or codes;
+      trace_refs) and docs/developers/design/migration_system_spec.md still
+      describe the 1.1.1 shape (removed fields or codes, trace types, the stored
+      trace matrix);
       docs/developers/workflows/workflow_feature_extension.md and
-      docs/architecture/governance_architecture.md still describe specdev matrix
-      as rebuilding the trace links of a spec;
+      docs/architecture/governance_architecture.md still tell the reader to run
+      specdev matrix to refresh a spec's trace links or trace matrix;
       schema/13a_completeness_assessment still describes fr_refs, and the step 13
       title still mentions the trace matrix; tests/fixtures/spec_corpus stays
       1.1.1-shaped. Some procedures in those prompts, skills and agents do not
