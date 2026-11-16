@@ -3,6 +3,8 @@ import pytest
 
 from specdev_tools.validation.validators.step_07 import validate_step_07
 
+from ...graph._synth import unique_id_errors
+
 
 def _render(errors):
     """Render SpecError list to strings for assertion convenience."""
@@ -43,9 +45,9 @@ class TestDuplicateId:
                 {"nfr_id": "nfr-perf-01", "stage": "prod"},
             ]
         }
-        errors = validate_step_07(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("Duplicate" in e and "nfr-perf-01" in e for e in rendered)
+        assert validate_step_07(instance, toolkit_root) == []
+        errors = unique_id_errors({"07_nfrs.json": instance})
+        assert [(e.code, e.owner, e.node_id) for e in errors] == [("E704", "step:07", "nfr-perf-01")]
 
 
 class TestInvalidStage:

@@ -5,7 +5,6 @@ from typing import Dict, Any
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_upstream_ids, kebab_id_re
 from ...core.scope_helpers import dict_items
-from ...validation.linter_utils import check_no_duplicates
 
 FR_ID_PATTERN = kebab_id_re("fr")
 
@@ -13,12 +12,11 @@ FR_ID_PATTERN = kebab_id_re("fr")
 def validate_step_04(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     """
     Validate Step 04 (Functional Requirements) logic.
-    Checks for duplicate fr_ids, fr_id format convention, and capability_ref cross-validation.
+    Checks the fr_id format convention, and capability_ref cross-validation.
     """
     errors: list[SpecError] = []
 
     requirements = dict_items(instance.get("functional_requirements"))
-    check_no_duplicates(requirements, "fr_id", "fr_id", errors)
 
     for i, req in enumerate(requirements):
         fr_id = req.get("fr_id")

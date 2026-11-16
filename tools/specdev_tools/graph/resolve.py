@@ -1,0 +1,231 @@
+"""Link resolver: checks every declared link of a graph (E700-E703) and runs the link hook.
+
+Per link (design Figure 4): the target must exist (E700), be of a kind the field accepts (E701) and sit strictly
+earlier in step order, or in the same step when the field declares that kind (E702).  Links that stay inside one step
+are then searched for cycles (E703).  ``replaces`` and ``removes`` are history links and are not checked.  A node
+whose lifecycle is ``not_applicable`` is not checked as a source.  Deprecated targets raise nothing here; the lock hook
+(M5) is the one place that warns about a new link to one.
+"""
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Protocol
+
+from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.graph.model import Graph, Link, Node, SpecShape
+from specdev_tools.graph.ownership import step_owner
+
+HISTORY_FIELDS = frozenset({"replaces", "removes"})
+RECORD_ROLE = "record"
+
+
+class ResolverHooks(Protocol):
+    """The one interface the resolver offers to later layers (the lock check of M5)."""
+
+    def on_link(self, link: Link, source: Node, target: Node) -> list[SpecError]:
+        """Extra findings for a link that resolved: called once per spec link, never for a record or history link."""
+        ...
+
+
+class _NullHooks:
+    def on_link(self, link: Link, source: Node, target: Node) -> list[SpecError]:
+        return []
+
+
+NULL_HOOKS: ResolverHooks = _NullHooks()
+
+
+@dataclass
+class _SameStepEdges:
+    """Links that resolved inside one step: the edges the cycle search runs on."""
+
+    successors: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    order: list[Node] = field(default_factory=list)
+
+    def add(self, source: Node, target: Node, field_name: str) -> None:
+        if source.id not in self.successors:
+            self.order.append(source)
+        self.successors.setdefault(source.id, []).append((target.id, field_name))
+
+
+def _error(code: str, holder: Node, message: str) -> SpecError:
+    return make_error(
+        code, message, file=holder.file, jq_path=holder.jq_path or None, owner=step_owner(holder), node_id=holder.id
+    )
+
+
+def _ordered(steps: Iterable[str], ranks: Mapping[str, int]) -> list[str]:
+    return sorted(steps, key=lambda step: (ranks.get(step, len(ranks)), step))
+
+
+def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
+    """The steps that declare a kind the link accepts, when none of them has a file in the spec; else nothing."""
+    steps = {step for kind in link.decl.kinds for step in shape.kind_steps.get(kind, ())}
+    if not steps or any(shape.files_by_step.get(step) for step in steps):
+        return []
+    return _ordered(steps, shape.step_ranks)
+
+
+def _missing_target_error(holder: Node, link: Link, shape: SpecShape) -> SpecError:
+    where = f"{holder.id} ({holder.file}), field {link.field}, target '{link.target}'"
+    absent = _absent_steps(link, shape)
+    if absent:
+        return _error(
+            "E700", holder,
+            f"{where}: no file of step {', '.join(absent)} exists in the spec, so the target cannot be found",
+        )
+    return _error("E700", holder, f"{where}: no node has that id")
+
+
+def _wrong_kind_error(holder: Node, link: Link, target: Node) -> SpecError:
+    accepted = ", ".join(link.decl.kinds)
+    return _error(
+        "E701", holder,
+        f"{holder.id}, field {link.field}, target '{target.id}' is a {target.kind}; the field accepts: {accepted}",
+    )
+
+
+def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -> SpecError | None:
+    """E702 when the target is not earlier than the holder and the field does not allow it within one step."""
+    if holder.step is None or target.step is None:
+        return None
+    holder_rank, target_rank = shape.step_ranks.get(holder.step), shape.step_ranks.get(target.step)
+    if holder_rank is None or target_rank is None or target_rank < holder_rank:
+        return None
+    where = f"{holder.id} (step {holder.step}), field {link.field}, target '{target.id}' (step {target.step})"
+    if target_rank > holder_rank:
+        return _error("E702", holder, f"{where}: the target is in a later step; a link points to an earlier step")
+    if target.kind in link.decl.same_step_kinds:
+        return None
+    return _error(
+        "E702", holder,
+        f"{where}: the target is in the same step and a {target.kind} is not declared as a same-step target of the field",
+    )
+
+
+def _find_target(graph: Graph, target_id: str) -> Node | None:
+    """The node with *target_id*, or the node an alias of that name points to."""
+    found = graph.by_id.get(target_id)
+    if found is None:
+        found = graph.by_id.get(graph.alias_index.get(target_id, ""))
+    return found
+
+
+def _link_errors(graph: Graph, holder: Node, link: Link, edges: _SameStepEdges, hooks: ResolverHooks) -> list[SpecError]:
+    target = _find_target(graph, link.target)
+    if target is None:
+        return [_missing_target_error(holder, link, graph.shape)]
+    if not link.decl.accepts(target.kind):
+        return [_wrong_kind_error(holder, link, target)]
+    direction = _direction_error(holder, link, target, graph.shape)
+    if direction is not None:
+        return [direction]
+    if holder.step is not None and holder.step == target.step:
+        edges.add(holder, target, link.field)
+    return [] if holder.role == RECORD_ROLE else hooks.on_link(link, holder, target)
+
+
+class _Tarjan:
+    """Tarjan's strongly connected components over ``successors``, run without recursion."""
+
+    def __init__(self, successors: Mapping[str, Sequence[tuple[str, str]]]) -> None:
+        self._successors = successors
+        self._index: dict[str, int] = {}
+        self._low: dict[str, int] = {}
+        self._stack: list[str] = []
+        self._on_stack: set[str] = set()
+        self.components: list[list[str]] = []
+
+    def run(self, order: Sequence[str]) -> list[list[str]]:
+        """The components, visiting the nodes of *order* (and what they reach) once each."""
+        for root in order:
+            if root not in self._index:
+                self._visit(root)
+        return self.components
+
+    def _open(self, node: str) -> Iterator[tuple[str, str]]:
+        self._index[node] = self._low[node] = len(self._index)
+        self._stack.append(node)
+        self._on_stack.add(node)
+        return iter(self._successors.get(node, ()))
+
+    def _close(self, node: str) -> None:
+        if self._low[node] != self._index[node]:
+            return
+        component: list[str] = []
+        while not component or component[-1] != node:
+            member = self._stack.pop()
+            self._on_stack.discard(member)
+            component.append(member)
+        self.components.append(component)
+
+    def _next_unvisited(self, node: str, pending: Iterator[tuple[str, str]]) -> str | None:
+        """The next successor of *node* not seen yet; the ones on the stack lower *node*'s low-link on the way."""
+        for follower, _field in pending:
+            if follower not in self._index:
+                return follower
+            if follower in self._on_stack:
+                self._low[node] = min(self._low[node], self._index[follower])
+        return None
+
+    def _visit(self, root: str) -> None:
+        work = [(root, self._open(root))]
+        while work:
+            node, pending = work[-1]
+            follower = self._next_unvisited(node, pending)
+            if follower is not None:
+                work.append((follower, self._open(follower)))
+                continue
+            work.pop()
+            self._close(node)
+            if work:
+                parent = work[-1][0]
+                self._low[parent] = min(self._low[parent], self._low[node])
+
+
+def _cycle_errors(graph: Graph, edges: _SameStepEdges, wanted: set[str] | None) -> list[SpecError]:
+    """One E703 per cycle among same-step links: a component of two or more nodes, or a node that links to itself."""
+    components = _Tarjan(edges.successors).run([node.id for node in edges.order])
+    errors: list[SpecError] = []
+    for component in components:
+        members = set(component)
+        fields = sorted({
+            name for member in members for target, name in edges.successors.get(member, ()) if target in members
+        })
+        if len(members) == 1 and not any(
+            target == component[0] for target, _name in edges.successors.get(component[0], ())
+        ):
+            continue
+        first = next(node for node in edges.order if node.id in members)
+        if wanted is not None and first.step not in wanted:
+            continue
+        names = [node.id for node in edges.order if node.id in members]
+        errors.append(_error(
+            "E703", first,
+            f"Link cycle within step {first.step}: {', '.join(names)} (field {', '.join(fields)})",
+        ))
+    return errors
+
+
+def resolve_graph(
+    graph: Graph, *, hooks: ResolverHooks = NULL_HOOKS, steps: Iterable[str] | None = None
+) -> list[SpecError]:
+    """Check every link of *graph*: E700 to E703 plus whatever *hooks* report.
+
+    With *steps*, only links held by nodes of those steps (and cycles in those steps) are reported.  Each finding is
+    owned by the step of the node that holds the link and carries that node's id.  A node whose ``lifecycle`` is
+    ``not_applicable`` is skipped as a holder; a ``replaces`` or ``removes`` link is skipped.  Nothing is raised for a
+    wrong-typed value: the graph holds only what the builder could read.
+    """
+    wanted = None if steps is None else set(steps)
+    edges = _SameStepEdges()
+    errors: list[SpecError] = []
+    for holder in graph.gated_nodes():
+        if wanted is not None and holder.step not in wanted:
+            continue
+        for link in holder.links:
+            if link.field not in HISTORY_FIELDS:
+                errors.extend(_link_errors(graph, holder, link, edges, hooks))
+    errors.extend(_cycle_errors(graph, edges, wanted))
+    return errors

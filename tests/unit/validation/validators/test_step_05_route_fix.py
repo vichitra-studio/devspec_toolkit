@@ -2,6 +2,8 @@ import unittest
 
 from specdev_tools.validation.validators.step_05 import validate_step_05
 
+from ...graph._synth import unique_id_errors
+
 
 def _render(errors):
     """Render SpecError list to strings for assertion convenience."""
@@ -78,18 +80,16 @@ class Step05RouteValidationTests(unittest.TestCase):
         )
 
     def test_duplicate_api_id_still_detected(self):
-        """Existing duplicate api_id check still works."""
+        """A repeated api_id is no longer a step 05 finding: the graph reports it as E704."""
         instance = {
             "apis": [
                 {"api_id": "api-same", "method": "GET", "path": "/api/a"},
                 {"api_id": "api-same", "method": "POST", "path": "/api/b"},
             ]
         }
-        errors = validate_step_05(instance, ".")
-        self.assertTrue(
-            any("Duplicate api_id" in e for e in _render(errors)),
-            f"Expected duplicate api_id error, got: {_render(errors)}",
-        )
+        self.assertEqual(validate_step_05(instance, "."), [])
+        errors = unique_id_errors({"05_interface_contracts.json": instance})
+        self.assertEqual([(e.code, e.owner, e.node_id) for e in errors], [("E704", "step:05", "api-same")])
 
 
 if __name__ == "__main__":

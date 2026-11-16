@@ -150,6 +150,7 @@ def _run_checks(
                 include_canonical_integrity=False,
                 git_root=git_root,
                 spec_root=spec_root,
+                include_id_slice=False,
             )
             schema_errs.extend(
                 stamp_file_owner(file_errs, step_for_file(file_path, read_json_object(file_path)))
@@ -279,6 +280,11 @@ def _run_checks(
             "status": "SKIP",
             "reason": "step_order.json not found",
         }
+
+    # --- 10b. Spec graph: unique ids (E704) and links (E700-E703) ---
+    from ..graph.check import run_graph_check
+
+    checks["graph"] = _check_result(run_graph_check(spec_root or spec_dir, repo_root))
 
     # --- 11. Registry check (R001-R003) ---
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json

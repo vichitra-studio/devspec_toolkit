@@ -71,6 +71,11 @@ def load_ownership_table(repo_root: str) -> tuple[OwnershipRow, ...]:
     )
 
 
+def step_owner(node: Node) -> str | None:
+    """``step:<step>`` of *node*, or ``None`` when the node has no home step."""
+    return STEP_PREFIX + node.step if node.step else None
+
+
 def owner_for(code: str, node: Node | None, ctx: OwnerContext) -> str | None:
     """The owner string of *code* for *node*, or ``None`` when no row lists the code or the rule has no answer.
 
@@ -92,7 +97,7 @@ def _resolve_rule(rule: str, node: Node | None, ctx: OwnerContext) -> str | None
     if node is None:
         return None
     if rule in _NODE_STEP_RULES:
-        return STEP_PREFIX + node.step if node.step else None
+        return step_owner(node)
     if rule == _FURTHEST_STEP_RULE:
         step = ctx.furthest_step.get(node.kind)
         return STEP_PREFIX + step if step else None

@@ -12,7 +12,6 @@ import os
 import re
 from typing import Any, Iterator
 
-from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
 
 
@@ -147,50 +146,6 @@ def is_reference_context(path: str) -> bool:
         "trace", "targets", "target_ids", "mitigations",
         "dependencies", "links", "requires",
     })
-
-
-# ---------------------------------------------------------------------------
-# check_no_duplicates — replaces 11 independent duplicate-ID detection patterns
-# ---------------------------------------------------------------------------
-
-def check_no_duplicates(
-    items: list[dict[str, Any]],
-    id_field: str,
-    label: str,
-    errors: list[SpecError],
-    *,
-    code: str = "",
-) -> None:
-    """Append a :class:`SpecError` for each duplicate *id_field* found in *items*.
-
-    Parameters
-    ----------
-    items : list[dict]
-        Array of objects to check.
-    id_field : str
-        Key to extract the ID value from each item.
-    label : str
-        Human-readable label for error messages (e.g. ``"api_id"``).
-    errors : list[SpecError]
-        Error accumulator.
-    code : str
-        Error code (e.g. ``"E310"``).  Defaults to ``"E520"`` when empty.
-    """
-    seen: set[str] = set()
-    for i, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-        value = item.get(id_field)
-        if not isinstance(value, str):
-            continue
-        if value in seen:
-            errors.append(
-                make_error(
-                    code.strip() or "E520",
-                    f"Duplicate {label} '{value}' at index {i}",
-                )
-            )
-        seen.add(value)
 
 
 # ---------------------------------------------------------------------------

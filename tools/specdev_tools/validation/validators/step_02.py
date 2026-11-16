@@ -4,18 +4,6 @@ from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_json
 from ...core.scope_helpers import dict_items, is_parked
 
-def check_component_ids(components: list[dict]) -> list[SpecError]:
-    errors: list[SpecError] = []
-    seen = set()
-    for comp in components:
-        comp_id = comp.get("component_id")
-        if not isinstance(comp_id, str) or not comp_id:
-            continue
-        if comp_id in seen:
-            errors.append(make_error("E520", f"Duplicate component_id: {comp_id}"))
-        seen.add(comp_id)
-    return errors
-
 def check_rate_limits(connections: list[dict]) -> list[SpecError]:
     errors: list[SpecError] = []
     for idx, conn in enumerate(connections):
@@ -110,7 +98,6 @@ def validate_step_02(
         if isinstance(tp, dict) and isinstance(tp.get("third_party_id"), str) and tp["third_party_id"]
     }
 
-    errors.extend(check_component_ids(components))
     errors.extend(check_rate_limits(connections))
     errors.extend(check_partner_public_rate_limit(connections))
     errors.extend(check_external_trust_boundaries(connections, third_party_ids))

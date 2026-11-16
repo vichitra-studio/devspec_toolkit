@@ -12,15 +12,11 @@ from specdev_tools.core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, 
 
 
 # ---------------------------------------------------------------------------
-# Bug 1: E141, E320 must be in ERROR_CODES registry
+# Bug 1: E320 must be in ERROR_CODES registry
 # ---------------------------------------------------------------------------
 
 class TestErrorCodeRegistry:
     """Verify that specific error codes exist in the registry."""
-
-    def test_e141_exists(self):
-        assert "E141" in ERROR_CODES
-        assert ERROR_CODES["E141"] == "TASK_DEPENDENCY_CYCLE"
 
     def test_e320_exists(self):
         assert "E320" in ERROR_CODES

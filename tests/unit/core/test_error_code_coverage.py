@@ -10,7 +10,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
         """All known error codes are present in ERROR_CODES (bidirectional)."""
         expected = {
             # Canonical integrity (1xx)
-            "E110", "E120", "E125", "E130", "E140", "E141", "E150",
+            "E110", "E120", "E125", "E130", "E140", "E150",
             "W110", "W120", "W130", "W140", "W150",
             # Cross-artifact drift (2xx)
             "E210", "E211",

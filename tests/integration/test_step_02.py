@@ -9,6 +9,8 @@ from functools import lru_cache
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.validation.validators.step_02 import validate_step_02
 
 TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
@@ -17,6 +19,7 @@ FIXTURES_DIR = os.path.join(TOOLKIT_ROOT, "tests", "fixtures", "step_02")
 CAPABILITIES_FIXTURE = os.path.join(FIXTURES_DIR, "step_01_capabilities.json")
 CAPABILITIES_ENV = "STEP_02_CAPABILITIES_PATH"
 STEP_01_FILE_NAME = "01_capabilities.json"
+STEP_02_FILE_NAME = "02_system_sketch.json"
 
 VALID_FIXTURES = [
     "valid_minimal.json",
@@ -72,13 +75,15 @@ def _schema_validator() -> Draft202012Validator:
 
 
 def collect_errors(file_path: str, spec_root: str) -> list[str]:
-    """Return schema errors first, then (only when the schema passes) deep-validator errors, as strings."""
+    """Return schema errors first, then (only when the schema passes) deep-validator and duplicate-id errors, as strings."""
     with open(file_path) as handle:
         instance = json.load(handle)
     schema_errors = [err.message for err in _schema_validator().iter_errors(instance)]
     if schema_errors:
         return schema_errors
-    return [err.render() for err in validate_step_02(instance, TOOLKIT_ROOT, spec_root)]
+    deep_errors = validate_step_02(instance, TOOLKIT_ROOT, spec_root)
+    id_errors = check_unique_ids(build_graph(spec_root, TOOLKIT_ROOT, overrides={STEP_02_FILE_NAME: instance}))
+    return [err.render() for err in (*deep_errors, *id_errors)]
 
 
 def validate_file(file_path: str, should_pass: bool, spec_root: str) -> bool:

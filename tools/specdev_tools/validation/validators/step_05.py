@@ -4,7 +4,6 @@ from typing import Any
 
 from ...core.errors import make_error, SpecError
 from ...core.scope_helpers import dict_items
-from ...validation.linter_utils import check_no_duplicates
 
 
 def validate_step_05(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
@@ -15,7 +14,6 @@ def validate_step_05(instance: dict[str, Any], toolkit_root: str, spec_root: str
     """
     errors: list[SpecError] = []
     apis = dict_items(instance.get("apis"))
-    check_no_duplicates(apis, "api_id", "api_id", errors)
     seen_method_route: set[tuple[str, str]] = set()
     for i, api in enumerate(apis):
         api_id = api.get("api_id")

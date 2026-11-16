@@ -15,6 +15,8 @@ from specdev_tools.validation.validators import (
     step_14,
 )
 
+from ...graph._synth import spec_check_graph_findings, unique_id_errors
+
 
 def _render(errors):
     """Render SpecError list to strings for assertion convenience."""
@@ -47,8 +49,10 @@ class StepValidatorsTests(unittest.TestCase):
         self.assertEqual(step_11.validate_step_11({"threats": [threat], "trace": [3]}, "."), [])
 
     def test_step_12_unknown_require(self):
-        errs = step_12.validate_step_12({"jobs": [{"job_id": "j1", "depends_on": ["j2"], "steps": [{"name": "s", "command": "echo"}]}]}, ".")
-        self.assertTrue(errs)
+        jobs = [{"job_id": "j1", "depends_on": ["j2"], "steps": [{"name": "s", "command": "echo"}]}]
+        self.assertEqual(step_12.validate_step_12({"jobs": jobs}, "."), [])
+        findings = spec_check_graph_findings({"12_ci_gates.json": {"jobs": jobs}})
+        self.assertEqual([(f["code"], f["owner"], f["node_id"]) for f in findings], [("E700", "step:12", "j1")])
 
     def test_step_13_missing_required_schema_sections(self):
         errs = step_13.validate_step_13({"extensions": [{"extension_id": "e1"}]}, ".")
@@ -96,8 +100,9 @@ class StepValidatorsTests(unittest.TestCase):
 
     def test_step_14_duplicate_task_id(self):
         milestone = {"milestone_id": "ms-a", "target_date": "2026-01-01", "tasks": [{"task_id": "task-a"}, {"task_id": "task-a"}]}
-        errs = step_14.validate_step_14({"milestones": [milestone]}, ".")
-        self.assertTrue(any("duplicate task_id" in e for e in _render(errs)))
+        self.assertEqual(step_14.validate_step_14({"milestones": [milestone]}, "."), [])
+        errs = unique_id_errors({"14_roadmap.json": {"milestones": [milestone]}})
+        self.assertEqual([(e.code, e.owner, e.node_id) for e in errs], [("E704", "step:14", "task-a")])
 
     def test_step_14_wrong_typed_values_do_not_raise(self):
         for milestones in ("nope", [None, 3], [{"milestone_id": ["x"], "target_date": 5, "tasks": "t"}],
@@ -126,8 +131,10 @@ class StepValidatorsTests(unittest.TestCase):
         self.assertTrue(any("convention" in e for e in _render(errs)))
 
     def test_step_06_duplicate_inv_id(self):
-        errs = step_06.validate_step_06({"rules": [{"inv_id": "inv-a"}, {"inv_id": "inv-a"}]}, ".")
-        self.assertTrue(any("Duplicate" in e for e in _render(errs)))
+        rules = [{"inv_id": "inv-a"}, {"inv_id": "inv-a"}]
+        self.assertEqual(step_06.validate_step_06({"rules": rules}, "."), [])
+        errs = unique_id_errors({"06_invariants.json": {"rules": rules}})
+        self.assertEqual([(e.code, e.owner, e.node_id) for e in errs], [("E704", "step:06", "inv-a")])
 
     def test_step_06_wrong_typed_rules_do_not_raise(self):
         for rules in (7, {"inv_id": "inv-a"}, ["inv-a", 3, None]):
@@ -163,7 +170,13 @@ class StepValidatorsTests(unittest.TestCase):
                 {"job_id": "j2", "depends_on": ["j1"], "steps": [{"name": "s", "command": "echo"}]},
             ]}, "."
         )
-        self.assertTrue(any("Circular" in e for e in _render(errs)))
+        self.assertEqual(errs, [])
+        jobs = [
+            {"job_id": "j1", "depends_on": ["j2"], "steps": [{"name": "s", "command": "echo"}]},
+            {"job_id": "j2", "depends_on": ["j1"], "steps": [{"name": "s", "command": "echo"}]},
+        ]
+        findings = spec_check_graph_findings({"12_ci_gates.json": {"jobs": jobs}})
+        self.assertEqual([(f["code"], f["owner"]) for f in findings], [("E703", "step:12")])
 
     def test_step_12_valid_dag(self):
         errs = step_12.validate_step_12(
@@ -200,14 +213,16 @@ class StepValidatorsTests(unittest.TestCase):
 
 def test_step_02a_duplicate_gate_id():
     gates = [{"gate_id": "gate-lint"}, {"gate_id": "gate-lint"}]
-    errs = _render(step_02a.validate_step_02a({"ci_gates": gates}, "."))
-    assert len(errs) == 1 and "E520" in errs[0] and "gate_id" in errs[0]
+    assert step_02a.validate_step_02a({"ci_gates": gates}, ".") == []
+    errs = unique_id_errors({"02a_delivery_baseline.json": {"ci_gates": gates}})
+    assert [(e.code, e.owner, e.node_id) for e in errs] == [("E704", "step:02a", "gate-lint")]
 
 
 def test_step_02a_duplicate_secret_id():
     secrets = [{"secret_id": "sec-db"}, {"secret_id": "sec-db"}]
-    errs = _render(step_02a.validate_step_02a({"secrets": secrets}, "."))
-    assert len(errs) == 1 and "E520" in errs[0] and "secret_id" in errs[0]
+    assert step_02a.validate_step_02a({"secrets": secrets}, ".") == []
+    errs = unique_id_errors({"02a_delivery_baseline.json": {"secrets": secrets}})
+    assert [(e.code, e.owner, e.node_id) for e in errs] == [("E704", "step:02a", "sec-db")]
 
 
 if __name__ == "__main__":

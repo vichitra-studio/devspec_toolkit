@@ -980,8 +980,8 @@ class TestStep16(unittest.TestCase):
 
         Writes a plan-only artifact (no execution.execution_results, no
         review.verdict) through the full validate_file pipeline and pins
-        that the 16a-specific checklist-id-uniqueness check fires via
-        dispatch — proving content refinement leaves plan-only artifacts
+        that the 16a-specific remediation-link check fires via dispatch
+        (W584) — proving content refinement leaves plan-only artifacts
         on the 16a path rather than demoting to the base or promoting to
         16b/16c.
         """
@@ -989,14 +989,11 @@ class TestStep16(unittest.TestCase):
         with open(base_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Induce a 16a-specific failure: duplicate checklist IDs (checked by
-        # validate_step_16a, not the base validator).
-        original = data["plan"]["spec_alignment"]["checklist"][0]
-        duplicate = json.loads(json.dumps(original))
-        duplicate["id"] = original["id"]  # force exact id collision
-        data["plan"]["spec_alignment"]["checklist"].append(duplicate)
+        # Induce a 16a-specific finding: a review remediation task that links
+        # a checklist id the plan does not have (checked by validate_step_16a,
+        # not the base validator). No verdict, so the artifact stays plan-only.
         data.pop("execution", None)
-        data["review"] = {}
+        data["review"] = {"findings": [{"remediation_task": {"task_id": "fix-1", "checklist_ids": ["NO_SUCH_ITEM"]}}]}
         data["plan"].pop("review_requirements", None)
 
         with tempfile.TemporaryDirectory() as td:
@@ -1012,14 +1009,11 @@ class TestStep16(unittest.TestCase):
             )
             errors = validate_file(self.repo_root, str(fixture_path))
 
-        # Duplicate checklist id is pinned by validate_step_16a (E520).
-        dup_id_errors = [
-            e for e in errors
-            if e.code == "E520" and "duplicate checklist id" in e.message.lower()
-        ]
+        # The unknown checklist id is pinned by validate_step_16a (W584).
+        link_errors = [e for e in errors if e.code == "W584" and "NO_SUCH_ITEM" in e.message]
         self.assertEqual(
-            len(dup_id_errors), 1,
-            f"Expected exactly one duplicate-checklist-id error from the "
+            len(link_errors), 1,
+            f"Expected exactly one remediation-link warning from the "
             f"16a dispatch path. Got: {errors}"
         )
 

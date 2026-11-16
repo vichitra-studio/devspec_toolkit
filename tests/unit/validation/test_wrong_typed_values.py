@@ -28,12 +28,23 @@ import pytest
 
 from specdev_tools.context.milestone_state import compute_milestone_state
 from specdev_tools.context.scope_resolver import _build_trace_graph
+from specdev_tools.core.loaders import read_json_object
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.check import run_graph_check
+from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.model import Graph
+from specdev_tools.graph.ownership import step_for_file
+from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.validation import _legacy_shim
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
-from specdev_tools.validation.validate import DEEP_VALIDATORS, _build_validation_context, _run_deep_validation
+from specdev_tools.validation.spec_check import run_spec_check_json
+from specdev_tools.validation.validate import (
+    DEEP_VALIDATORS,
+    _build_validation_context,
+    _duplicate_id_errors,
+    _run_deep_validation,
+)
 
 _ROOT = Path(__file__).parents[3]
 _EXAMPLE = _ROOT / "tests" / "fixtures" / "graph_example" / "spec"
@@ -482,3 +493,110 @@ def test_build_graph_reads_a_file_that_is_not_utf8_json_as_a_load_error(tmp_path
         (folder / "04_fr_list.json").write_bytes(raw)
         graph = build_graph(str(folder), str(_ROOT))
         assert [error.file for error in graph.load_errors] == ["04_fr_list.json"]
+
+
+# --- id uniqueness, the link resolver and the graph check of spec-check ---------------------------------------------
+
+_LINK_AND_ID_KEYS = frozenset({
+    "fr_id", "criterion_id", "job_id", "task_id", "milestone_id", "id", "derives_from", "depends_on", "refines",
+    "realises", "verifies", "verified_by", "about", "schedules", "constrains", "mitigated_by", "threatens",
+})
+
+
+def _graph_documents(base: Path) -> dict[str, Any]:
+    """Every JSON file of *base* that the graph reads, parsed, keyed by its path relative to *base*."""
+    names = sorted(str(path.relative_to(base)) for path in base.rglob("*.json"))
+    return {name: _load(base, name) for name in names}
+
+
+def _checked(base: Path, documents: dict[str, Any], name: str, mutated: Any) -> dict[str, Any]:
+    graph = build_graph(str(base), str(_ROOT), overrides={**documents, name: mutated})
+    return {"ids": check_unique_ids(graph), "links": resolve_graph(graph)}
+
+
+def _mutated_graph_cases() -> list[tuple[Path, str, dict[str, Any], dict[str, Any]]]:
+    """``(base, file, documents of base, mutated document)`` for every first-entry mutation of the example and the corpus."""
+    cases = []
+    for base in (_EXAMPLE, _CORPUS):
+        documents = _graph_documents(base)
+        for name in [*_GRAPH_FILES, "impl_context/ms_account_recovery_plan.json"] if base is _EXAMPLE else list(_CORPUS_STEPS):
+            for _path, _wrong, mutated in _first_entries(documents[name], _EXAMPLE_FOLDER_VALUES):
+                cases.append((base, name, documents, mutated))
+            cases += [(base, name, documents, whole) for whole in _WHOLE_DOCUMENTS]
+    return cases
+
+
+def test_unique_ids_does_not_raise_on_a_wrong_value() -> None:
+    """A wrong-typed id or link value, or a whole file of the wrong kind, gives findings or none from ``check_unique_ids``."""
+    failures: list[str] = []
+    for base, name, documents, mutated in _mutated_graph_cases():
+        failures += _raise_of(
+            f"{base.name} {name} = {mutated!r:.80}",
+            lambda: check_unique_ids(build_graph(str(base), str(_ROOT), overrides={**documents, name: mutated})),
+        )
+    assert failures == []
+
+
+def test_resolve_graph_does_not_raise_on_a_wrong_value() -> None:
+    """The same mutations over the whole graph: ``resolve_graph`` gives findings or none, never a traceback."""
+    failures: list[str] = []
+    for base, name, documents, mutated in _mutated_graph_cases():
+        failures += _raise_of(
+            f"{base.name} {name} = {mutated!r:.80}",
+            lambda: _checked(base, documents, name, mutated),
+        )
+    assert failures == []
+
+
+def test_graph_check_and_file_owner_do_not_raise_on_a_wrong_value(tmp_path: Path) -> None:
+    """``run_graph_check`` and the ``step_for_file`` read of ``spec-check`` over a spec folder with one id or link value mutated."""
+    folder = tmp_path / "spec"
+    shutil.copytree(_EXAMPLE, folder)
+    failures: list[str] = []
+    for name in (*_GRAPH_FILES[:-1], _PLAN):
+        original = (folder / name).read_text(encoding="utf-8")
+        for path, wrong, mutated in _first_entries(json.loads(original), _EXAMPLE_FOLDER_VALUES):
+            if path[-1] not in _LINK_AND_ID_KEYS:
+                continue
+            (folder / name).write_text(json.dumps(mutated), encoding="utf-8")
+            failures += _raise_of(
+                f"{name} {list(path)} = {wrong!r}",
+                lambda: [run_graph_check(str(folder), str(_ROOT)), step_for_file(str(folder / name), read_json_object(folder / name))],
+            )
+        (folder / name).write_text(original, encoding="utf-8")
+    assert failures == []
+
+
+def test_spec_check_does_not_raise_on_a_whole_file_of_the_wrong_kind(tmp_path: Path) -> None:
+    """``spec-check`` reads each file once for its step and builds the graph: a file that is not an object gives no traceback.
+
+    ``lint_spec_quality`` is stubbed: it raises on a top level that is not an object (1.1.1 code this milestone does
+    not touch).  Bytes that are not UTF-8 are covered by the graph check and the step read alone, because
+    ``validate_canonical_integrity`` raises on them.
+    """
+    folder = tmp_path / "spec"
+    shutil.copytree(_EXAMPLE, folder)
+    failures: list[str] = []
+    for name in ("04_fr_list.json", "12_ci_gates.json", "14_roadmap.json", _PLAN):
+        original = (folder / name).read_bytes()
+        for document in _WHOLE_DOCUMENTS:
+            (folder / name).write_bytes(json.dumps(document).encode())
+            with mock.patch("specdev_tools.validation.spec_quality_lint.lint_spec_quality", return_value=[]):
+                failures += _raise_of(f"{name} = {document!r}", lambda: list(run_spec_check_json(str(_ROOT), str(folder))))
+        for raw in (b"{", _NOT_UTF8):
+            (folder / name).write_bytes(raw)
+            failures += _raise_of(
+                f"{name} = {raw!r}",
+                lambda: [run_graph_check(str(folder), str(_ROOT)), step_for_file(str(folder / name), read_json_object(folder / name))],
+            )
+        (folder / name).write_bytes(original)
+    assert failures == []
+
+
+def test_one_file_id_check_does_not_raise_on_a_wrong_value() -> None:
+    """The one-file slice of ``validate_file`` (``build_file_graph`` and ``check_unique_ids``) on every first-entry mutation."""
+    failures: list[str] = []
+    for name in _GRAPH_FILES:
+        for _path, _wrong, mutated in _first_entries(_load(_EXAMPLE, name), _EXAMPLE_FOLDER_VALUES):
+            failures += _raise_of(f"{name} = {mutated!r:.80}", lambda: _duplicate_id_errors(str(_ROOT), str(_EXAMPLE / name), mutated))
+    assert failures == []

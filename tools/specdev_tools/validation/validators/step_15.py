@@ -3,25 +3,21 @@ from __future__ import annotations
 from typing import Any
 
 from ...core.errors import make_error, SpecError
-from ...validation.linter_utils import check_no_duplicates
 
 _REQUIRED_FIELDS = ("id", "owner", "created_at", "project_skeleton", "validators", "build_status")
 _BUILD_STATUSES = ("pending", "green", "red")
 
 
 def validate_step_15(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
-    """Deep checks of a step 15 artifact: required fields, field types, ``build_status`` and unique ``row_id``.
+    """Deep checks of a step 15 artifact: required fields, field types, ``build_status``.
 
-    ``row_id`` is the only uniqueness rule: an API may be realised by several rows, so ``realises`` is not checked
-    for overlap here, and whether a ``realises`` id names a real API is the resolver's job. Never raises on
+    An API may be realised by several rows, so ``realises`` is not checked for overlap here; whether a ``realises``
+    id names a real API, and whether a ``row_id`` repeats, is the graph's job (E700, E704). Never raises on
     wrong-typed input; the schema reports the type errors.
     """
     errors: list[SpecError] = []
     errors.extend(_structure_errors(instance))
     errors.extend(_build_status_errors(instance))
-    rows = instance.get("interface_map")
-    if isinstance(rows, list):
-        check_no_duplicates(rows, "row_id", "row_id", errors)
     return errors
 
 

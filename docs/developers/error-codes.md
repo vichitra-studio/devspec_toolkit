@@ -349,7 +349,7 @@
 
 **Trigger (E590, step 02)**: "Missing capability coverage" (`validators/step_02.py` `check_capability_coverage`): a capability in the Step 01 artifact is not named in any component's `derives_from`. A parked capability (`scope` `later` or `out`) is exempt. The check is skipped when the Step 01 artifact is not found.
 
-**Trigger (E590, step 12)**: A job's `depends_on` names an id that is not a `job_id` of the same `12_ci_gates.json` (`validators/step_12.py`). Apart from this check, no step validator of steps 06 to 16 checks that the id in a link field (a field the schema marks `x-link`) exists; a link resolver in a later 1.2.0 change does. A plan's file-level `milestone` is not a link field: E304 reports one that names no roadmap milestone.
+**Note (links)**: No step validator of steps 06 to 16 checks that the id in a link field (a field the schema marks `x-link`) exists; the `graph` check of `spec-check` does (E700). A plan's file-level `milestone` is not a link field: E304 reports one that names no roadmap milestone.
 
 **Trigger (W590)**: The upstream artifact file is missing entirely; cross-step validation is skipped for that upstream.
 
@@ -709,13 +709,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only).
 
-### E141 TASK_DEPENDENCY_CYCLE / Circular job dependency
+### E141 TASK_DEPENDENCY_CYCLE (removed)
 
-**Trigger**: Two independent emitters share this code: (1) `step_12.py` — a CI job's `depends_on[]` graph in `12_ci_gates.json` contains a cycle; (2) `step_14.py` — the task-to-task `depends_on` graph of one step 14 roadmap milestone contains a cycle (a cycle that runs through tasks of two milestones is not checked).
-
-**Resolution**: Break the cycle by removing or reordering the offending `depends_on` (job) or task-dependency edge so the graph is acyclic.
-
-**Promotable**: No (error only).
+Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by the link check (`spec-check`, check `graph`) as E703.
 
 ## Prompt / Schema / Dependency-Order Drift (31x / 54x)
 
@@ -943,7 +939,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E700 LINK_TARGET_NOT_FOUND
 
-**Trigger**: A link field names an id that is not a node.
+**Trigger**: A link field names an id that no node has. Reported by `spec-check` (check `graph`). When no file of any step that holds a kind the field accepts exists in the spec, the message says that no file of those steps exists, instead of "no node has that id". This replaces the step 12 E590 check of a job's `depends_on`.
 
 **Resolution**: Owner `step:<holder step>`. Fix the id, or define the node it names.
 
@@ -967,7 +963,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E703 LINK_CYCLE_SAME_STEP
 
-**Trigger**: Links among nodes of one step form a cycle.
+**Trigger**: Links among nodes of one step form a cycle (a node that links to itself counts). One finding per cycle, naming its members. Reported by `spec-check` (check `graph`); a job `depends_on` cycle or a task `depends_on` cycle is E703, which replaces E141.
 
 **Resolution**: Owner `step:<step>`. Break the cycle.
 
@@ -975,7 +971,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E704 DUPLICATE_NODE_ID
 
-**Trigger**: An id is defined by more than one node.
+**Trigger**: An id is defined by more than one node, in one file or in several, whatever the lifecycle of each. Reported by `spec-check` (check `graph`) for the whole spec, and by `validate` on one file for an id repeated inside that file. The message names both definitions and a free numeric-suffixed id. The row of `tools/error_ownership.json` does not list E704: its owner is set when it is raised.
 
 **Resolution**: Owner `step:<step of the later definition>`. Rename one definition.
 

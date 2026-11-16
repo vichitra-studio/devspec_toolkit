@@ -15,6 +15,8 @@ from jsonschema import Draft202012Validator
 from specdev_tools.core.registry import SchemaRegistry
 from specdev_tools.validation.validators.step_13 import validate_step_13
 
+from ...graph._synth import unique_id_errors
+
 TOOLKIT_ROOT = Path(__file__).resolve().parents[4]
 FIXTURES_DIR = TOOLKIT_ROOT / "tests" / "fixtures" / "step_13"
 
@@ -182,9 +184,9 @@ class TestValidatorDuplicateExtensionId:
         """Two extensions with the same extension_id → duplicate error."""
         base_extension["extension_id"] = "ext-01-dup"
         instance = {"extensions": [base_extension, base_extension.copy()]}
-        errors = validate_step_13(instance, str(TOOLKIT_ROOT))
-        rendered = _render(errors)
-        assert any("E520" in e and "ext-01-dup" in e for e in rendered)
+        assert not any("ext-01-dup" in e and "Duplicate" in e for e in _render(validate_step_13(instance, str(TOOLKIT_ROOT))))
+        errors = unique_id_errors({"13_extension_manifest.json": instance})
+        assert [(e.code, e.owner, e.node_id) for e in errors] == [("E704", "step:13", "ext-01-dup")]
 
 
 class TestValidatorNoW590WhenEmpty:

@@ -12,7 +12,7 @@ CODE_LITERAL_RE = re.compile(r'["\']([EW]\d{3})["\']')
 # Codes whose only input was a removed field. No emitter is left for any of them.
 REMOVED_CODES = (
     "E142", "W574", "W581", "W582", "E581", "E582",
-    "W602", "W605", "W607", "W612", "W616",
+    "W602", "W605", "W607", "W612", "W616", "E141",
 )
 
 # The W->E pairs of PROMOTABLE_PAIRS. A later change that adds or removes a pair
@@ -32,7 +32,7 @@ EXPECTED_PROMOTABLE_PAIRS = {
 # the graph code that writes them exists: each M4 work item that first writes one of them as a literal removes it here.
 REGISTERED_WITHOUT_EMITTER = {
     "E422", "E561", "E604", "E620", "W150", "W591",
-    "E700", "E701", "E702", "E703", "E704", "E705", "E706", "E707", "E708", "E709",
+    "E705", "E706", "E707", "E708", "E709",
     "W720",
 }
 

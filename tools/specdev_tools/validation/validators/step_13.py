@@ -5,7 +5,6 @@ from typing import Any, Optional
 
 from ...core.scope_helpers import as_list, dict_items
 from ...core.errors import make_error, SpecError
-from ...validation.linter_utils import check_no_duplicates
 
 
 # Valid section name patterns: numeric step prefix (00_*, 13a_*) OR any
@@ -18,7 +17,6 @@ _STEP_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 def validate_step_13(instance: dict[str, Any], toolkit_root: str, spec_root: Optional[str] = None) -> list[SpecError]:
     errors: list[SpecError] = []
     extensions = as_list(instance.get("extensions"))
-    check_no_duplicates(extensions, "extension_id", "extension_id", errors)
     for ext in dict_items(extensions):
         ext_id = ext.get("extension_id")
 

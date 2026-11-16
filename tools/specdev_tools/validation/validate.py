@@ -163,6 +163,18 @@ def _refine_impl_context_substep(step: str, data: Any) -> str:
             return "16b"
     return "16a"
 
+def _duplicate_id_errors(repo_root: str, path: str, data: dict[str, Any]) -> list[SpecError]:
+    """E704 for an id defined twice inside the file *path*; nothing when the toolkit has no usable registry."""
+    from ..graph.build import build_file_graph
+    from ..graph.ids import check_unique_ids
+    from ..graph.kinds import KindRegistryError
+
+    try:
+        return check_unique_ids(build_file_graph(path, repo_root, data))
+    except KindRegistryError:
+        return []
+
+
 def validate_file(
     repo_root: str,
     path: str,
@@ -171,7 +183,13 @@ def validate_file(
     project_canon_dir: str | None = None,
     git_root: str | None = None,
     spec_root: str | None = None,
+    include_id_slice: bool = True,
 ) -> list[SpecError]:
+    """Validate one spec file: schema, deep per-step checks and, by default, duplicate ids inside the file (E704).
+
+    ``include_id_slice=False`` drops the duplicate-id check; ``spec-check`` passes it because its ``graph`` check
+    covers the same duplicates across all files.
+    """
     try:
         get_shared_registry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
@@ -262,6 +280,9 @@ def validate_file(
             )
             if canonical_errors:
                 enhanced_errors.extend(canonical_errors)
+
+        if include_id_slice:
+            enhanced_errors.extend(_duplicate_id_errors(repo_root, path, data))
 
         # W->E promotion for single-file validation (mirrors validate_dir logic)
         enhanced_errors = _apply_we_promotion(enhanced_errors)

@@ -10,6 +10,8 @@ from specdev_tools.validation.validators.step_11 import (
     validate_step_11,
 )
 
+from ...graph._synth import unique_id_errors
+
 _SECURITY_REF = {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"}
 
 
@@ -51,8 +53,9 @@ class TestValidMinimal:
 class TestDuplicateThreatId:
     def test_duplicate(self, toolkit_root):
         instance = {"threats": [_threat(threatens=("a",)), _threat(threatens=("b",))]}
-        rendered = _render(validate_step_11(instance, toolkit_root))
-        assert any("Duplicate" in e and "threat-01" in e for e in rendered)
+        assert not any("threat-01" in e for e in _render(validate_step_11(instance, toolkit_root)))
+        errors = unique_id_errors({"11_redteam.json": instance})
+        assert [(e.code, e.owner, e.node_id) for e in errors] == [("E704", "step:11", "threat-01")]
 
 
 class TestRemovedFieldsAreNotRead:

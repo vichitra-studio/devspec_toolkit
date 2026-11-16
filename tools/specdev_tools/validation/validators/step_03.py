@@ -32,19 +32,10 @@ def validate_step_03(
     if len(terms) == 0:
         errors.append(make_error("E520", "Terms array is empty"))
 
-    # Track unique term_id and term values (case-insensitive)
-    seen_term_ids = set()
+    # Track unique term values (case-insensitive); duplicate term_id values are the graph's E704
     seen_terms = set()
 
     for i, term in enumerate(terms):
-        # Validate term_id uniqueness (case-insensitive)
-        term_id = term.get('term_id')
-        if isinstance(term_id, str) and term_id:
-            term_id_lower = term_id.lower()
-            if term_id_lower in seen_term_ids:
-                errors.append(make_error("E520", f"Duplicate term_id '{term_id}' at index {i}"))
-            seen_term_ids.add(term_id_lower)
-
         # Validate term uniqueness (case-insensitive)
         term_text = term.get('term')
         if isinstance(term_text, str) and term_text:

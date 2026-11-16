@@ -8,6 +8,7 @@ import pytest
 
 from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import ERROR_CODES, SpecError, make_error
+from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.model import Node
 from specdev_tools.graph.ownership import (
     OwnerContext,
@@ -17,8 +18,11 @@ from specdev_tools.graph.ownership import (
     stamp_file_owner,
     step_for_file,
 )
+from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import _apply_we_promotion
+
+from ._synth import docs_graph
 
 ROOT = Path(__file__).parents[3]
 OWNED_CODES = ("E700", "E701", "E702", "E703", "W720")
@@ -76,6 +80,33 @@ def test_every_gate_code_has_owner_and_node_id(table):
         err = make_error(code, f"{code} message")
         assert (err.owner, err.node_id) == (None, None), code
         assert owner_for(code, node, ctx) is None, code
+    _assert_emitted_errors_carry_owner_and_node_id(ctx)
+
+
+def _assert_emitted_errors_carry_owner_and_node_id(ctx: OwnerContext) -> None:
+    """E700-E703 from the resolver and E704 from the uniqueness check carry the holder's step and id."""
+    docs = {
+        "04_fr_list.json": {
+            "functional_requirements": [
+                {"fr_id": "fr-a", "derives_from": ["cap-ghost"], "depends_on": ["fr-b"],
+                 "acceptance_criteria": [{"criterion_id": "ac-x"}]},
+                {"fr_id": "fr-b", "depends_on": ["fr-a"]},
+                {"fr_id": "fr-dup"}, {"fr_id": "fr-dup"},
+            ],
+            "ambiguities": [{"id": "amb-a", "about": ["fr-a"]}],
+        },
+        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["ac-x"]}]},
+    }
+    graph = docs_graph(docs)
+    errors = [*resolve_graph(graph), *check_unique_ids(graph)]
+    assert {err.code for err in errors} == {"E700", "E701", "E702", "E703", "E704"}
+    for err in errors:
+        node = graph.by_id[err.node_id]
+        assert err.node_id and err.owner == f"step:{node.step}", err
+        if err.code != "E704":
+            assert err.owner == owner_for(err.code, node, ctx), err
+        else:
+            assert owner_for("E704", node, ctx) is None
 
 
 def test_owner_for_finds_code_in_any_row_list():

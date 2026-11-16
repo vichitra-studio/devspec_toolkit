@@ -1,10 +1,13 @@
 import copy
 import json
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, Callable
 
 from specdev_tools.validation.validate import validate_file
+from unit.graph._synth import graph_check
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FIXTURES = _REPO_ROOT / "tests" / "fixtures" / "step_14"
@@ -138,7 +141,6 @@ class Step14IntegrationTests(unittest.TestCase):
             "invalid_disposition_without_reason.json",
             "invalid_risk_status_enum.json",
             "invalid_task_acceptance_criteria.json",
-            "invalid_task_format.json",
         ):
             errors = validate_file(str(self.repo_root), str(self.fixtures_dir / name))
             self.assertTrue(errors, msg=f"{name} unexpectedly passed validation")
@@ -148,13 +150,29 @@ class Step14IntegrationTests(unittest.TestCase):
         dates = [m.get("target_date") for m in data.get("milestones", [])]
         self.assertEqual(sorted(dates), dates, msg="Milestones are not in chronological order")
 
+    def _as_step_14_file(self, fixture: str, folder: str) -> Path:
+        """Copy *fixture* to ``<folder>/14_roadmap.json``, the name the registry knows."""
+        target = Path(folder) / "14_roadmap.json"
+        shutil.copyfile(self.fixtures_dir / fixture, target)
+        return target
+
     def test_invalid_depends_on_cycle(self):
-        errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "invalid_depends_on_cycle.json"))
-        self.assertTrue(errors, "Cycle fixture should fail validation")
-        self.assertTrue(
-            any(e.code == "E141" for e in errors),
-            f"Expected E141 TASK_DEPENDENCY_CYCLE error. Got: {errors}",
-        )
+        """A task cycle is E703 from ``spec-check``, owned by step 14; the single-file validator no longer reports it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._as_step_14_file("invalid_depends_on_cycle.json", tmp)
+            self.assertEqual([], validate_file(str(self.repo_root), str(path)))
+            graph = graph_check(Path(tmp))
+        self.assertEqual("FAIL", graph["status"])
+        self.assertEqual([("E703", "step:14")], [(f["code"], f["owner"]) for f in graph["findings"]])
+        for task in ("task-a", "task-b", "task-c"):
+            self.assertIn(task, graph["findings"][0]["message"])
+
+    def test_invalid_task_format_duplicate_task_id_is_e704(self):
+        """The fixture repeats a task id: the one-file id check of ``validate`` reports it as E704."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._as_step_14_file("invalid_task_format.json", tmp)
+            errors = validate_file(str(self.repo_root), str(path))
+        self.assertEqual([("E704", "step:14", "setup-health-check")], [(e.code, e.owner, e.node_id) for e in errors])
 
     def test_valid_roadmap_with_refs(self):
         errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "valid_roadmap_with_refs.json"))

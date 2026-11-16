@@ -16,6 +16,8 @@ from jsonschema import Draft202012Validator
 from specdev_tools.core.registry import SchemaRegistry
 from specdev_tools.validation.validators.step_15 import validate_step_15
 
+from ...graph._synth import unique_id_errors
+
 TOOLKIT_ROOT = Path(__file__).resolve().parents[4]
 FIXTURES_DIR = TOOLKIT_ROOT / "tests" / "fixtures" / "step_15"
 
@@ -85,11 +87,11 @@ def test_two_rows_may_realise_the_same_api(schema_validator, instance) -> None:
     assert validate_step_15(instance, str(TOOLKIT_ROOT)) == []
 
 
-def test_duplicate_row_id_is_e520(instance) -> None:
+def test_duplicate_row_id_is_e704(instance) -> None:
     instance["interface_map"].append({**DOC_EXAMPLE_ROW, "realises": ["api-other"], "path": "src/other.ts"})
-    errors = validate_step_15(instance, str(TOOLKIT_ROOT))
-    assert [e.code for e in errors] == ["E520"]
-    assert "Duplicate row_id" in errors[0].message
+    assert validate_step_15(instance, str(TOOLKIT_ROOT)) == []
+    errors = unique_id_errors({"15_scaffold.json": instance})
+    assert [(e.code, e.owner, e.node_id) for e in errors] == [("E704", "step:15", DOC_EXAMPLE_ROW["row_id"])]
 
 
 def test_green_without_validators_is_e520(instance) -> None:

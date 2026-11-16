@@ -27,7 +27,16 @@ from specdev_tools.graph.kinds import (
     KindRegistryError,
     load_kind_registry,
 )
-from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Link, LoadError, Node, node_label
+from specdev_tools.graph.model import (
+    DEFAULT_LIFECYCLE,
+    LIFECYCLES,
+    Graph,
+    Link,
+    LoadError,
+    Node,
+    SpecShape,
+    node_label,
+)
 
 PLAN_FILE_KEY = "impl_context/ms_*_plan.json"
 SEED_PATH_FIELD = "path"
@@ -75,18 +84,44 @@ def _wanted(rel: str, decl: FileDecl, files: set[str] | None, steps: set[str] | 
     return (files is None or rel in files) and (steps is None or decl.step in steps)
 
 
-def _plan(
-    registry: KindRegistry, spec_root: Path, ranks: Mapping[str, int], overrides: Mapping[str, Any],
-    files: set[str] | None, steps: set[str] | None,
-) -> list[tuple[str, FileDecl]]:
-    """The ``(relative path, declaration)`` pairs to read, in step order then path; a file is read once."""
-    unranked = len(ranks)
+def _present_files(registry: KindRegistry, spec_root: Path, overrides: Mapping[str, Any]) -> dict[str, FileDecl]:
+    """Every registered file that exists (on disk or as an override), each once, mapped to its declaration."""
     chosen: dict[str, FileDecl] = {}
     for decl in (*registry.external, *registry.files):
         for rel in _candidate_files(spec_root, decl, overrides):
-            if rel not in chosen and _wanted(rel, decl, files, steps):
-                chosen[rel] = decl
-    return sorted(chosen.items(), key=lambda pair: (ranks.get(pair[1].step, unranked), pair[0]))
+            chosen.setdefault(rel, decl)
+    return chosen
+
+
+def _plan(
+    present: Mapping[str, FileDecl], ranks: Mapping[str, int], files: set[str] | None, steps: set[str] | None
+) -> list[tuple[str, FileDecl]]:
+    """The ``(relative path, declaration)`` pairs to read, in step order then path; a file is read once."""
+    unranked = len(ranks)
+    wanted = [(rel, decl) for rel, decl in present.items() if _wanted(rel, decl, files, steps)]
+    return sorted(wanted, key=lambda pair: (ranks.get(pair[1].step, unranked), pair[0]))
+
+
+def _kind_names_of(decls: Iterable[KindDecl]) -> Iterable[str]:
+    for decl in decls:
+        yield decl.kind
+        yield from _kind_names_of(decl.nested)
+
+
+def _shape(registry: KindRegistry, present: Mapping[str, FileDecl], ranks: Mapping[str, int]) -> SpecShape:
+    """The step ranks, the steps that declare each kind and the present files per step."""
+    kind_steps: dict[str, set[str]] = {}
+    for decl in (*registry.external, *registry.files):
+        for kind in _kind_names_of(decl.kinds):
+            kind_steps.setdefault(kind, set()).add(decl.step)
+    files_by_step: dict[str, list[str]] = {}
+    for rel, decl in present.items():
+        files_by_step.setdefault(decl.step, []).append(rel)
+    return SpecShape(
+        step_ranks=dict(ranks),
+        kind_steps={kind: tuple(sorted(found)) for kind, found in kind_steps.items()},
+        files_by_step={step: tuple(sorted(found)) for step, found in files_by_step.items()},
+    )
 
 
 def _document(spec_root: Path, rel: str, overrides: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -191,11 +226,31 @@ def build_graph(
     given = overrides or {}
     nodes: list[Node] = []
     load_errors: list[LoadError] = []
-    for rel, decl in _plan(registry, root, ranks, given, wanted_files, wanted_steps):
+    present = _present_files(registry, root, given)
+    for rel, decl in _plan(present, ranks, wanted_files, wanted_steps):
         doc = _document(root, rel, given)
         if doc is None:
             load_errors.append(LoadError(rel, UNREADABLE_MESSAGE))
             continue
         ctx = _file_context(rel, decl, doc)
         nodes.extend(n for kind in decl.kinds for n in _collect(doc, kind, ctx, "", None))
-    return Graph.from_nodes(nodes, load_errors)
+    return Graph.from_nodes(nodes, load_errors, _shape(registry, present, ranks))
+
+
+def build_file_graph(path: str, repo_root: str, document: Mapping[str, Any]) -> Graph:
+    """The graph of the single spec file *path*, whose parsed content is *document*.
+
+    The spec root is the file's folder, or its parent when the registry key carries a folder (``impl_context/...``,
+    ``common/...``).  A file the registry does not know gives a graph with no nodes.
+
+    Raises:
+        KindRegistryError: the registry or the step order of the toolkit is missing or unreadable (E520).
+    """
+    absolute = Path(path).resolve()
+    graph = Graph()
+    for root in (absolute.parent, absolute.parent.parent):
+        rel = absolute.relative_to(root).as_posix()
+        graph = build_graph(str(root), repo_root, files=[rel], overrides={rel: document})
+        if graph.nodes:
+            break
+    return graph

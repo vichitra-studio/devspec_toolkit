@@ -7,7 +7,6 @@ from ...core.scope_helpers import as_list, dict_items, str_items
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_artifact, load_sibling_json
 from ...validation._legacy_shim import is_parked_any_shape
-from ...validation.linter_utils import check_no_duplicates
 
 
 def validate_step_11(
@@ -25,7 +24,6 @@ def validate_step_11(
     errors: list[SpecError] = []
 
     threats = as_list(instance.get("threats"))
-    check_no_duplicates(threats, "threat_id", "threat_id", errors)
     for i, threat in enumerate(threats):
         if not isinstance(threat, dict):
             errors.append(make_error("E520", f"threats[{i}] is not an object: {threat!r}"))

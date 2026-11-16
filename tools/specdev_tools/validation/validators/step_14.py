@@ -12,25 +12,17 @@ from ...validation._legacy_shim import LEGACY_ROADMAP_MATRIX_FIELDS, has_legacy_
 
 
 def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path: str | None = None) -> list[SpecError]:
-    """Deep checks of a step 14 artifact: unique milestone and task ids, valid and ordered dates, acyclic task ``depends_on``.
+    """Deep checks of a step 14 artifact: valid and ordered milestone dates.
 
-    Reads only values of the expected type; a malformed ``milestones``, milestone, ``tasks`` or task is skipped and
+    Duplicate milestone and task ids (E704) and a task ``depends_on`` cycle (E703) are the graph's checks, run by
+    ``spec-check``. Reads only values of the expected type; a malformed ``milestones`` or milestone is skipped and
     left to the schema's own error. Never raises on wrong-typed input. Also warns W604 when the trace matrix is stale, on a roadmap
     that still carries the 1.1.1 ``fr_refs`` or ``source_milestones``.
     """
     errors: list[SpecError] = []
     milestone_dates: list[tuple[str, str]] = []
-    seen_milestones: set[str] = set()
-    for i, milestone in enumerate(dict_items(instance.get("milestones"))):
-        mid = milestone.get("milestone_id")
-        if isinstance(mid, str):
-            if mid in seen_milestones:
-                errors.append(make_error("E520", f"Duplicate milestone_id '{mid}' at index {i}"))
-            seen_milestones.add(mid)
+    for milestone in dict_items(instance.get("milestones")):
         errors.extend(_date_errors(milestone, milestone_dates))
-        tasks = dict_items(milestone.get("tasks"))
-        errors.extend(_duplicate_task_errors(tasks, mid))
-        errors.extend(_check_task_dependency_cycles(tasks, mid))
     if milestone_dates != sorted(milestone_dates, key=lambda x: x[0]):
         errors.append(make_error("E520", "Milestone target_date values are not ordered"))
     # AUDIT-033: Trace matrix staleness check (W604)
@@ -54,20 +46,6 @@ def _date_errors(milestone: dict[str, Any], milestone_dates: list[tuple[str, str
     if isinstance(mid, str):
         milestone_dates.append((target_date, mid))
     return []
-
-
-def _duplicate_task_errors(tasks: list[dict[str, Any]], milestone_id: Any) -> list[SpecError]:
-    """E520 for every task id that repeats within one milestone."""
-    errors: list[SpecError] = []
-    seen: set[str] = set()
-    for task in tasks:
-        tid = task.get("task_id")
-        if not isinstance(tid, str):
-            continue
-        if tid in seen:
-            errors.append(make_error("E520", f"Milestone '{milestone_id}' duplicate task_id '{tid}'"))
-        seen.add(tid)
-    return errors
 
 
 def _check_trace_matrix_staleness(artifact_path: str | None) -> list[SpecError]:
@@ -117,45 +95,4 @@ def _check_trace_matrix_staleness(artifact_path: str | None) -> list[SpecError]:
     except (OSError, ValueError, TypeError):
         # Graceful skip on any path or mtime error
         pass
-    return errors
-
-
-def _check_task_dependency_cycles(tasks: list[dict[str, Any]], milestone_id: Any) -> list[SpecError]:
-    """DFS cycle detection on task depends_on graph within a milestone."""
-    task_ids = {task["task_id"] for task in tasks if isinstance(task.get("task_id"), str)}
-    adj: dict[str, list[str]] = {}
-    for task in tasks:
-        tid = task.get("task_id")
-        if not isinstance(tid, str):
-            continue
-        deps = task.get("depends_on", [])
-        if isinstance(deps, list):
-            adj[tid] = [d for d in deps if isinstance(d, str) and d in task_ids]
-        else:
-            adj[tid] = []
-
-    visited: set[str] = set()
-    in_stack: set[str] = set()
-    errors: list[SpecError] = []
-
-    def dfs(node: str) -> bool:
-        visited.add(node)
-        in_stack.add(node)
-        for neighbor in adj.get(node, []):
-            if neighbor not in visited:
-                if dfs(neighbor):
-                    return True
-            elif neighbor in in_stack:
-                errors.append(
-                    make_error("E141", f"TASK_DEPENDENCY_CYCLE: circular dependency detected involving task '{neighbor}' "
-                    f"in milestone '{milestone_id}'")
-                )
-                return True
-        in_stack.discard(node)
-        return False
-
-    for tid in list(adj.keys()):
-        if tid not in visited:
-            dfs(tid)
-
     return errors

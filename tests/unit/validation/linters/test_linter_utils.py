@@ -4,11 +4,9 @@ Created by FIX-044 (Batch 5).
 """
 from __future__ import annotations
 
-from specdev_tools.core.errors import SpecError
 from specdev_tools.validation.linter_utils import (
     CONTENT_STOPWORDS,
     DERIVATION_STOPWORDS,
-    check_no_duplicates,
     collect_ids_and_refs,
     extract_command_string,
     is_reference_context,
@@ -233,55 +231,3 @@ class TestCollectIdsAndRefs:
         obj = {"items": [{"fr_id": "fr-a"}, {"fr_id": "fr-b"}]}
         collect_ids_and_refs(obj, "test.json", ids, refs)
         assert ids == {"fr-a", "fr-b"}
-
-
-# ---------------------------------------------------------------------------
-# check_no_duplicates
-# ---------------------------------------------------------------------------
-
-class TestCheckNoDuplicates:
-    """Tests for check_no_duplicates."""
-
-    def test_no_duplicates(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors == []
-
-    def test_duplicate_found(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"id": "b"}, {"id": "a"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert len(errors) == 1
-        assert isinstance(errors[0], SpecError)
-        assert "Duplicate item_id 'a'" in errors[0].message
-        assert "index 2" in errors[0].message
-
-    def test_with_code(self):
-        errors: list[SpecError] = []
-        items = [{"id": "x"}, {"id": "x"}]
-        check_no_duplicates(items, "id", "item_id", errors, code="E310")
-        assert errors[0].code == "E310"
-
-    def test_non_dict_items_skipped(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, "not-a-dict", {"id": "b"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors == []
-
-    def test_missing_id_field_skipped(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"name": "b"}, {"id": "c"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors == []
-
-    def test_empty_list(self):
-        errors: list[SpecError] = []
-        check_no_duplicates([], "id", "item_id", errors)
-        assert errors == []
-
-    def test_default_code_is_e520(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"id": "a"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors[0].code == "E520"

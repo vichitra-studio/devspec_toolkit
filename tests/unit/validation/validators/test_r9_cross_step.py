@@ -23,6 +23,8 @@ from specdev_tools.validation.validators.step_12 import validate_step_12
 from specdev_tools.validation.validators.step_13 import validate_step_13
 from specdev_tools.validation.validators.step_13a import validate_step_13a
 
+from ...graph._synth import spec_check_graph_findings
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -69,13 +71,26 @@ class TestStep12CrossStep(unittest.TestCase):
         errors = self._validate([self._job("job-a"), self._job("job-b", ["job-a"])])
         self.assertEqual(_render(errors), [])
 
+    @staticmethod
+    def _spec_check_findings(jobs):
+        return spec_check_graph_findings({"12_ci_gates.json": {"jobs": jobs}})
+
     def test_unknown_depends_on_job_yields_e590(self):
-        errors = self._validate([self._job("job-a", ["job-ghost"])])
-        self.assertTrue(any("job-ghost" in msg for msg in _e590(errors)), _render(errors))
+        """The old E590 is now E700 from ``spec-check``; the single-file validator reports nothing."""
+        jobs = [self._job("job-a", ["job-ghost"])]
+        self.assertEqual(_render(self._validate(jobs)), [])
+        findings = self._spec_check_findings(jobs)
+        self.assertEqual([(f["code"], f["owner"], f["node_id"]) for f in findings], [("E700", "step:12", "job-a")])
+        self.assertIn("job-ghost", findings[0]["message"])
 
     def test_depends_on_cycle_yields_e141(self):
-        errors = self._validate([self._job("job-a", ["job-b"]), self._job("job-b", ["job-a"])])
-        self.assertEqual([e.code for e in errors], ["E141"])
+        """The old E141 is now E703 from ``spec-check``; the single-file validator reports nothing."""
+        jobs = [self._job("job-a", ["job-b"]), self._job("job-b", ["job-a"])]
+        self.assertEqual(_render(self._validate(jobs)), [])
+        findings = self._spec_check_findings(jobs)
+        self.assertEqual([(f["code"], f["owner"]) for f in findings], [("E703", "step:12")])
+        self.assertIn("job-a", findings[0]["message"])
+        self.assertIn("job-b", findings[0]["message"])
 
     def test_no_cross_step_checks_on_upstream_ids(self):
         jobs = [dict(self._job("job-lint"), verifies=["nfr-ghost"], realises=["fr-phantom"])]

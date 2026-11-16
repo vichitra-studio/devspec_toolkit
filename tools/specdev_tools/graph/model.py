@@ -72,12 +72,26 @@ class LoadError:
     message: str
 
 
+@dataclass(frozen=True)
+class SpecShape:
+    """What the builder knew about the spec and the registry, for readers that judge links.
+
+    ``step_ranks`` maps each step to its place in the waterfall (``"seed"`` is ``-1``); ``kind_steps`` maps a kind to
+    the steps whose files declare it; ``files_by_step`` lists the files present in the spec folder (relative paths),
+    per step, whether or not the build read them.
+    """
+
+    step_ranks: Mapping[str, int] = field(default_factory=dict)
+    kind_steps: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    files_by_step: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+
+
 @dataclass
 class Graph:
     """Nodes in build order plus the indexes every reader uses.
 
     ``by_id`` keeps the first definition of an id; ``dups`` lists every definition of an id defined more than once;
-    ``alias_index`` is empty until M5 fills it.
+    ``alias_index`` is empty until M5 fills it; ``shape`` is empty for a graph built from nodes alone.
     """
 
     nodes: list[Node] = field(default_factory=list)
@@ -89,11 +103,14 @@ class Graph:
     incoming: dict[str, list[Link]] = field(default_factory=dict)
     children: dict[str, list[str]] = field(default_factory=dict)
     alias_index: dict[str, str] = field(default_factory=dict)
+    shape: SpecShape = field(default_factory=SpecShape)
 
     @classmethod
-    def from_nodes(cls, nodes: list[Node], load_errors: list[LoadError] | None = None) -> Graph:
+    def from_nodes(
+        cls, nodes: list[Node], load_errors: list[LoadError] | None = None, shape: SpecShape | None = None
+    ) -> Graph:
         """Index *nodes* (in the order given) into a ``Graph``."""
-        graph = cls(nodes=list(nodes), load_errors=list(load_errors or []))
+        graph = cls(nodes=list(nodes), load_errors=list(load_errors or []), shape=shape or SpecShape())
         defined: dict[str, list[Node]] = defaultdict(list)
         by_kind: dict[str, list[Node]] = defaultdict(list)
         outgoing: dict[str, list[Link]] = defaultdict(list)

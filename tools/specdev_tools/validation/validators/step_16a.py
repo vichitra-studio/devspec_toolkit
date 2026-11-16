@@ -22,11 +22,9 @@ def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Option
         return errors
 
     seen_ids: set[str] = set()
-    for i, item in enumerate(_checklist_of(plan)):
+    for item in _checklist_of(plan):
         item_id = item.get("id")
         if isinstance(item_id, str) and item_id:
-            if item_id in seen_ids:
-                errors.append(make_error("E520", f"Step 16a: duplicate checklist id '{item_id}' at index {i}"))
             seen_ids.add(item_id)
 
     # W584: review→plan feedback loop.  Under the post-split model (16a/16b/16c

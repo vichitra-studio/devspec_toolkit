@@ -5,7 +5,6 @@ from typing import Any
 
 from ...core.scope_helpers import as_list, dict_items
 from ...core.errors import make_error, SpecError
-from ...validation.linter_utils import check_no_duplicates
 
 
 def validate_step_09(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
@@ -15,7 +14,6 @@ def validate_step_09(instance: dict[str, Any], toolkit_root: str, spec_root: str
     """
     errors: list[SpecError] = []
     milestones = as_list(instance.get("milestones"))
-    check_no_duplicates(milestones, "milestone_id", "milestone_id", errors)
     dates: list[tuple[str, str]] = []
     for milestone in dict_items(milestones):
         milestone_id = milestone.get("milestone_id")
