@@ -7,7 +7,7 @@ Checks that the step DAG is complete and consistent:
   E599 — downstream_consumers entry inconsistent with computed upstream dependency order
   W596 — prompt references undeclared artifact not in computed allowed upstream steps
 
-Terminal step 16c is explicitly exempted from E596.
+Steps 03 (no consumer: its terms are used by label) and 16c (terminal) are exempted from E596.
 """
 
 from __future__ import annotations

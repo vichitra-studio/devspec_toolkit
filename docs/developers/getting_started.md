@@ -124,7 +124,7 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 - Use the two‑phase flow:
   - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.
   - Phase B — Emit: the assistant writes the artifact JSON directly to disk and validates against the referenced step schema.
-- Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (trace/owners/units/methods/security) and stop after asking until you respond.
+- Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (links/owners/units/security) and stop after asking until you respond.
 - If validation fails, consult the guide, address errors, and re-run the emission.
 - Need a quick reminder of the workflow for a given step? Run `./tools/run_specdev.sh ai-help --step NN`.
 

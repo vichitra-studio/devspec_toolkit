@@ -143,7 +143,10 @@ def load_baseline(path: Path) -> dict[str, dict[str, PathInfo]]:
 
 
 def selects(step: str, schema: str) -> bool:
-    """True when a row ``step`` selects the schema named *schema* (equal, or *step* plus ``_`` as prefix)."""
+    """True when *schema* equals *step* or starts with *step* plus ``_`` (``16`` selects ``16_anchor``).
+
+    *step* is a row ``step`` and *schema* a schema name, or *step* a step id and *schema* a row ``step``.
+    """
     return schema == step or schema.startswith(f"{step}_")
 
 

@@ -1,5 +1,8 @@
 """Registry generator for entry_key_registry.json and extraction_paths.json.
 
+``run`` (the ``registry-generate`` command) also writes step_order.json, cli_commands.json and the
+schema-change checklist, each built by its own module.
+
 Implements W3-T1: programmatically derives the entry-key registry and
 extraction-paths from toolkit schemas (schema/*.schema.json), replacing the
 previously hand-curated spec/entry_key_registry.json.
@@ -18,7 +21,7 @@ Design constraints:
       * id_field ends in _id → strip suffix, snake→kebab
         (e.g. fr_id → fr, threat_id → threat)
       * id_field == id → singularise array name snake→kebab
-        (e.g. deliverables → deliverable, edge_cases → edge-case)
+        (e.g. edge_cases → edge-case)
   - Basename overrides: schema name ≠ spec basename in two cases:
       * step 13: schema is 13_extension_manifest.schema.json
                  spec basename is 13_extension_manifest.json
@@ -65,10 +68,12 @@ from specdev_tools.registry.annotations import (
 from specdev_tools.registry.schema_checklist import generate_checklist
 from specdev_tools.registry.step_order_gen import (
     StepOrderError,
+    annotated_steps,
     build_step_order_document,
     declared_edge_pairs,
     derive_from_decls,
     load_hand_kept,
+    load_steps,
 )
 
 
@@ -614,22 +619,24 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         (registry_doc, extraction_paths_doc) — two dicts ready to serialize.
 
     Raises:
-        FileNotFoundError: if step_order.json or core/collections.schema.json
-                           are missing.
+        FileNotFoundError: if core/collections.schema.json is missing.
         json.JSONDecodeError: if any schema file is malformed.
         AnnotationError: if the x-node / x-link annotation lint finds issues.
+        StepOrderError: if ``steps`` of tools/step_order.json cannot be read or leaves out a step
+                        that declares an ``x-node`` kind (the registry would silently lose it).
     """
     return generate_registry_from_decls(repo_root, collect_annotations(repo_root))
 
 
 def generate_registry_from_decls(
-    repo_root: str, decls: AnnotationDecls
+    repo_root: str, decls: AnnotationDecls, steps: list[str] | None = None
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """``generate_registry`` over annotation declarations the caller already collected.
 
     Args:
         repo_root: Absolute path to the toolkit root.
         decls: ``collect_annotations(repo_root)``; the lint runs here.
+        steps: ``steps`` of tools/step_order.json when the caller already read the file (default: read here).
 
     Returns and raises as ``generate_registry``.
     """
@@ -644,7 +651,11 @@ def generate_registry_from_decls(
     scan = scan_annotations(repo_root, decls)
 
     # Load step order
-    steps: list[str] = load_hand_kept(os.path.join(tools_dir, "step_order.json"))["steps"]
+    if steps is None:
+        steps = load_steps(os.path.join(tools_dir, "step_order.json"))
+    unlisted = sorted(annotated_steps(decls) - set(steps))
+    if unlisted:  # the loop below would leave these steps out of the registry without a message
+        raise StepOrderError(f"tools/step_order.json: steps: annotated step(s) {', '.join(unlisted)} are not listed")
 
     # Build $ref resolvers
     items_resolver, array_resolver = _build_ref_resolver(repo_root)
@@ -787,34 +798,31 @@ def run(
     Raises:
         AnnotationError: if the annotation lint fails or no annotated step gives a step order.
         ChecklistError: if ``tools/schema_changes.json`` is not well formed.
-        StepOrderError: if the hand-kept keys of ``tools/step_order.json`` cannot be used, or its ``steps``
-            leave out an annotated step.
+        StepOrderError: if ``steps`` of ``tools/step_order.json`` cannot be used or leaves out an annotated
+            step; with *step_order_out*, also if another hand-kept key cannot be used.
     """
     repo_root = os.path.abspath(repo_root)
     decls = collect_annotations(repo_root)
-    registry_doc, extraction_paths_doc = generate_registry_from_decls(repo_root, decls)
+    # Read the hand-kept keys once; the registry generation takes ``steps`` from the same read.
+    hand_path = os.path.join(repo_root, "tools", "step_order.json")
+    step_order = (os.path.abspath(step_order_out), load_hand_kept(hand_path)) if step_order_out else None
+    registry_doc, extraction_paths_doc = generate_registry_from_decls(
+        repo_root, decls, step_order[1]["steps"] if step_order else None
+    )
     outputs: list[tuple[str, Any]] = [
         (out_path, registry_doc),
         (extraction_paths_out, extraction_paths_doc),
     ]
 
     # Derive everything first (the checklist too), so a failure writes no output file.
-    if step_order_out:
-        hand = load_hand_kept(os.path.join(repo_root, "tools", "step_order.json"))
-        derived = derive_from_decls(decls)
-        if not derived["steps"]:
+    if step_order:
+        step_order_path, hand = step_order
+        if not annotated_steps(decls):
             raise AnnotationError(
                 ["registry-generate --step-order-out: no annotated step to derive an order from"]
             )
-        declared = declared_edge_pairs(hand)
-        if declared:
-            derived = derive_from_decls(decls, declared)
-        unlisted = [s for s in derived["steps"] if s not in hand["steps"]]
-        if unlisted:  # writing would drop these steps from the registry and from step_order.json
-            raise StepOrderError(
-                f"tools/step_order.json: steps: annotated step(s) {', '.join(unlisted)} are not listed"
-            )
-        outputs.append((os.path.abspath(step_order_out), build_step_order_document(derived, hand)))
+        derived = derive_from_decls(decls, declared_edge_pairs(hand))
+        outputs.append((step_order_path, build_step_order_document(derived, hand)))
     if cli_commands_out:
         # Lazy: generate_cli_commands builds the full CLI parser (specdev_tools.cli), which loads
         # this module lazily in turn; a local import keeps loading generate from loading cli.

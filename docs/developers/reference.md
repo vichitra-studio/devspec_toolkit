@@ -102,7 +102,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 # Traceability closure — the 1.1.1-shape coverage checks (E535, E536, E560, W561 to W569,
 # W575, W576). They read 1.1.1 fields and report nothing on a 1.2.0-shaped spec for now,
-# except the empty-milestone half of W567 (a milestone with no tasks);
+# except the empty-milestone half of W567 (a milestone with no tasks, which the schema also rejects);
 # add --json for a machine-readable report; accepts --repo-root, --spec-root, and --git-root
 ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 

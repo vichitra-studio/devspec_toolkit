@@ -140,7 +140,8 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
     removal is tagged D7, EXCEPT a load-bearing deterministic toolkit artifact
     (the GENERATED_ARTIFACT_NAMES set), whose absence is treated as a D9
     generator-integrity defect. For the true generator outputs
-    (entry_key_registry.json, extraction_paths.json) that is literal — the
+    (entry_key_registry.json, extraction_paths.json, step_order.json,
+    cli_commands.json) that is literal — the
     generator would re-emit them, so a committed deletion is provably wrong. For
     the manually-maintained members of the set the D9/P0 tag is a deliberate
     high-severity choice (their loss silently breaks routing, ai-help, or
@@ -156,9 +157,13 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
       canon/**                               → D7, P0  (registry everything references)
       tools/{schema_registry,step_order,
              entry_key_registry,extraction_paths,
+             cli_commands,
              command_prefixes,step_docs}.json → D9, P0  (load-bearing toolkit
                                                           data; see note above —
-                                                          only 2 are generator outputs)
+                                                          schema_registry,
+                                                          command_prefixes and
+                                                          step_docs are hand-kept,
+                                                          the others generated)
       *.schema.json                          → D7, P1
       prompts/**/*.md                        → D7, P1
       tools/specdev_tools/**/*.py            → D7, P1

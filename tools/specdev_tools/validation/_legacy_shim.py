@@ -166,7 +166,8 @@ def removed_paths(step: str, repo_root: str | os.PathLike[str] | None = None) ->
     and ``shim: true`` whose ``step`` is *step* or a schema of it (``16`` selects ``16_anchor`` and
     ``16_impl_context``). Paths use the rows' notation (``a[].b``, ``m{}``). *repo_root* is the
     toolkit root (default: the toolkit this module belongs to). Returns ``[]`` when the rows file is
-    absent or unreadable; a row that is not well formed is left out.
+    absent or unreadable; a row that is not well formed is left out
+    (``registry-generate`` and the closure test report it).
     """
     path = _SCHEMA_CHANGES_FILE if repo_root is None else Path(repo_root) / "tools" / "schema_changes.json"
     try:

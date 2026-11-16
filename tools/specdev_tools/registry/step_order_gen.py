@@ -26,7 +26,7 @@ import itertools
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from specdev_tools.registry.annotation_scan import step_of_schema_file
 from specdev_tools.registry.annotations import (
@@ -363,7 +363,7 @@ def declared_edge_pairs(hand: dict[str, Any]) -> list[Pair]:
     """``declared_edges`` of the file as ``(holder, target)`` pairs, in the order ``extra_edges`` takes.
 
     Each declared edge is ``[producer, consumer]``; the pair returned is ``(consumer, producer)``.
-    Entries that are not two-item lists of strings are skipped (the schema reports them).
+    Entries that are not two-item lists of strings are skipped (``load_hand_kept`` reports them).
     """
     declared = hand.get("declared_edges")
     if not isinstance(declared, list):
@@ -386,34 +386,79 @@ _HAND_KEPT_TYPES: tuple[tuple[str, type, str], ...] = (
 )
 
 
-def _hand_kept_problems(hand: Any) -> list[str]:
-    """Problems of the hand-kept keys of a parsed ``step_order.json`` (empty when usable); never raises."""
-    if not isinstance(hand, dict):
-        return ["the file must be a JSON object"]
-    problems = [f"{key}: must be {what}" for key, kind, what in _HAND_KEPT_TYPES if not isinstance(hand.get(key), kind)]
+def _steps_problems(hand: dict[str, Any]) -> list[str]:
+    """Problems of ``steps``: it must be a non-empty list of distinct step ids."""
     steps = hand.get("steps")
     if not isinstance(steps, list) or not steps or not all(isinstance(s, str) and s for s in steps):
-        problems.append("steps: must be a non-empty list of step ids")
-    elif len(set(steps)) != len(steps):
-        problems.append("steps: a step id is listed twice")
-    return problems
+        return ["steps: must be a non-empty list of step ids"]
+    return ["steps: a step id is listed twice"] if len(set(steps)) != len(steps) else []
 
 
-def load_hand_kept(path: str | os.PathLike[str]) -> dict[str, Any]:
-    """Read ``tools/step_order.json`` at *path* for its hand-kept keys.
+def _declared_edges_problems(hand: dict[str, Any]) -> list[str]:
+    """Problems of ``declared_edges`` (optional): a list of ``[producer, consumer]`` pairs of listed steps."""
+    if "declared_edges" not in hand:
+        return []
+    steps, edges = hand.get("steps"), hand["declared_edges"]
+    listed = set(steps) if isinstance(steps, list) and all(isinstance(s, str) for s in steps) else set()
+    well_formed = isinstance(edges, list) and all(
+        isinstance(e, list) and len(e) == 2 and all(isinstance(x, str) and x in listed for x in e) for e in edges
+    )
+    return [] if well_formed else ["declared_edges: must be a list of [producer, consumer] pairs of steps listed in steps"]
 
-    Raises ``StepOrderError`` naming every problem when the file cannot be read, is not JSON, or its
-    ``version``, ``steps``, ``policy`` or ``coverage_thresholds`` has the wrong type.
-    """
+
+def _exemptions_problems(hand: dict[str, Any]) -> list[str]:
+    """Problems of ``policy.status_write_exemptions`` (optional): an object of lists of field paths."""
+    policy = hand.get("policy")
+    if not isinstance(policy, dict) or "status_write_exemptions" not in policy:
+        return []
+    exemptions = policy["status_write_exemptions"]
+    well_formed = isinstance(exemptions, dict) and all(
+        isinstance(paths, list) and all(isinstance(p, str) for p in paths) for paths in exemptions.values()
+    )
+    return [] if well_formed else ["policy.status_write_exemptions: must be an object of lists of field paths"]
+
+
+def _hand_kept_problems(hand: dict[str, Any]) -> list[str]:
+    """Problems of the hand-kept keys of a parsed ``step_order.json`` (empty when usable); never raises."""
+    types = [f"{key}: must be {what}" for key, kind, what in _HAND_KEPT_TYPES if not isinstance(hand.get(key), kind)]
+    return _steps_problems(hand) + types + _declared_edges_problems(hand) + _exemptions_problems(hand)
+
+
+def _load_checked(path: str | os.PathLike[str], problems_of: Callable[[dict[str, Any]], list[str]]) -> dict[str, Any]:
+    """The JSON object at *path*; ``StepOrderError`` naming every problem *problems_of* finds, or why it cannot be read."""
     try:
         with open(path, encoding="utf-8") as fh:
             hand = json.load(fh)
     except (OSError, ValueError) as exc:
         raise StepOrderError(f"tools/step_order.json: {exc}") from exc
-    problems = _hand_kept_problems(hand)
+    problems = problems_of(hand) if isinstance(hand, dict) else ["the file must be a JSON object"]
     if problems:
         raise StepOrderError("tools/step_order.json: " + "; ".join(problems))
     return hand
+
+
+def load_steps(path: str | os.PathLike[str]) -> list[str]:
+    """``steps`` of ``tools/step_order.json`` at *path*, the one key the registry generation reads.
+
+    Raises ``StepOrderError`` when the file cannot be read, is not a JSON object, or ``steps`` is not a
+    non-empty list of distinct step ids.
+    """
+    return _load_checked(path, _steps_problems)["steps"]
+
+
+def load_hand_kept(path: str | os.PathLike[str]) -> dict[str, Any]:
+    """Read ``tools/step_order.json`` at *path* for the keys the step-order generation copies.
+
+    Raises ``StepOrderError`` naming every problem when the file cannot be read, is not a JSON object, or
+    ``version``, ``steps``, ``policy``, ``coverage_thresholds``, ``declared_edges`` or
+    ``policy.status_write_exemptions`` has the wrong shape.
+    """
+    return _load_checked(path, _hand_kept_problems)
+
+
+def annotated_steps(decls: AnnotationDecls) -> set[str]:
+    """The steps that declare at least one ``x-node`` kind."""
+    return _collect_kinds(decls.nodes)[0]
 
 
 def build_step_order_document(derived: dict[str, Any], hand: dict[str, Any]) -> dict[str, Any]:

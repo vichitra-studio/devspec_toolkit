@@ -2185,24 +2185,15 @@ def main():
             if args.extraction_paths_out
             else os.path.join(repo_root, "tools", "extraction_paths.json")
         )
-        if args.step_order_out:
-            step_order_out = os.path.abspath(args.step_order_out)
-        elif not args.out:
-            step_order_out = os.path.join(repo_root, "tools", "step_order.json")
-        else:
-            step_order_out = None
-        if args.cli_commands_out:
-            cli_commands_out = os.path.abspath(args.cli_commands_out)
-        elif not args.out:
-            cli_commands_out = os.path.join(repo_root, "tools", "cli_commands.json")
-        else:
-            cli_commands_out = None
-        if args.checklist_out:
-            checklist_out = os.path.abspath(args.checklist_out)
-        elif not args.out:
-            checklist_out = os.path.join(repo_root, "docs", "developers", "schema-change-checklist.md")
-        else:
-            checklist_out = None
+        def optional_output(flag_value: str | None, *default: str) -> str | None:
+            """The flag's path; without the flag, the default path unless ``--out`` redirects the run."""
+            if flag_value:
+                return os.path.abspath(flag_value)
+            return None if args.out else os.path.join(repo_root, *default)
+
+        step_order_out = optional_output(args.step_order_out, "tools", "step_order.json")
+        cli_commands_out = optional_output(args.cli_commands_out, "tools", "cli_commands.json")
+        checklist_out = optional_output(args.checklist_out, "docs", "developers", "schema-change-checklist.md")
         from .registry.annotations import AnnotationError
         from .registry.generate import run as registry_generate_run
         from .registry.schema_checklist import ChecklistError

@@ -332,7 +332,14 @@ def _without(key: str):
         (lambda hand: {**hand, "policy": None}, "policy"),
         (lambda hand: [hand], "JSON object"),
         (lambda hand: None, "JSON object"),
-        (lambda hand: {**hand, "steps": ["01"]}, "04"),  # an annotated step left out of the hand list
+        (lambda hand: {**hand, "steps": ["01"]}, "declared_edges"),  # an edge names a step that is not listed
+        (lambda hand: {**_without("declared_edges")(hand), "steps": ["01"]}, "annotated step.*04"),
+        (lambda hand: {**hand, "declared_edges": "abc"}, "declared_edges"),
+        (lambda hand: {**hand, "declared_edges": None}, "declared_edges"),
+        (lambda hand: {**hand, "declared_edges": [["01"], [1, 2]]}, "declared_edges"),
+        (lambda hand: {**hand, "policy": {**hand["policy"], "status_write_exemptions": 5}}, "status_write_exemptions"),
+        (lambda hand: {**hand, "policy": {**hand["policy"], "status_write_exemptions": {"09": "x"}}},
+         "status_write_exemptions"),
     ],
 )
 def test_hand_kept_keys_that_cannot_be_used_fail_and_write_nothing(edit, fragment, tmp_path):
@@ -346,6 +353,28 @@ def test_hand_kept_keys_that_cannot_be_used_fail_and_write_nothing(edit, fragmen
     with pytest.raises(StepOrderError, match=fragment):
         registry_run(str(root), str(r), str(e), step_order_out=str(o))
     assert not r.exists() and not e.exists() and not o.exists()
+
+
+def test_registry_alone_fails_when_steps_leaves_out_an_annotated_step(tmp_path):
+    """Without ``step_order_out`` the registry would silently lose the step; the run fails and writes nothing."""
+    root = _toolkit(tmp_path, [
+        _N("01", "capability"),
+        _N("04", "fr", [("derives_from", ["capability"], None)]),
+    ])
+    _edit_hand(root, lambda hand: {"steps": ["01"]})
+    r, e = tmp_path / "r.json", tmp_path / "e.json"
+    clear_shared_caches()
+    with pytest.raises(StepOrderError, match="annotated step.*04"):
+        registry_run(str(root), str(r), str(e))
+    assert not r.exists() and not e.exists()
+
+
+def test_registry_alone_needs_only_steps_of_the_hand_file(tmp_path):
+    root = _toolkit(tmp_path, [_N("01", "capability")])
+    _edit_hand(root, lambda hand: {"steps": hand["steps"]})
+    clear_shared_caches()
+    registry_run(str(root), str(tmp_path / "r.json"), str(tmp_path / "e.json"))
+    assert (tmp_path / "r.json").exists()
 
 
 def test_a_step_order_file_that_is_not_json_fails_and_writes_nothing(tmp_path):

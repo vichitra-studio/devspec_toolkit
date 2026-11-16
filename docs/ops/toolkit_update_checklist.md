@@ -5,12 +5,14 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 ## Schema Change Workflow
 
 1. [ ] Update the JSON Schema file in `schema/`
-2. [ ] Update the corresponding prompt in `prompts/`
-3. [ ] Run `specdev prompt-sync` to verify prompt ↔ schema alignment
-4. [ ] Update step validator if logic changed (`tools/specdev_tools/validation/validators/step_NN.py`)
-5. [ ] Add/update test fixtures in `tests/fixtures/step_NN/`
-6. [ ] Run `pytest tests/ -v` — all tests pass
-7. [ ] Add changelog entry: create `changelog/vX.Y.Z.yaml` (machine) + `changelog/vX.Y.Z.md` (human) directly (no unreleased staging)
+2. [ ] Add a row to `tools/schema_changes.json` for each path added, removed or changed since the 1.1.1 baseline (the closure test `tests/unit/registry/test_schema_change_checklist.py` fails without it)
+3. [ ] Run `specdev registry-generate --repo-root .` and commit the five generated files (CI's "Registry up-to-date check" diffs them)
+4. [ ] Update the corresponding prompt in `prompts/`
+5. [ ] Run `specdev prompt-sync` to verify prompt ↔ schema alignment
+6. [ ] Update step validator if logic changed (`tools/specdev_tools/validation/validators/step_NN.py`)
+7. [ ] Add/update test fixtures in `tests/fixtures/step_NN/`
+8. [ ] Run `pytest tests/ -v` — all tests pass
+9. [ ] Add changelog entry: create `changelog/vX.Y.Z.yaml` (machine) + `changelog/vX.Y.Z.md` (human) directly (no unreleased staging)
 
 ## Prompt Change Workflow
 

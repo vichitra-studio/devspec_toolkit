@@ -504,8 +504,10 @@ changes:
   - type: change_schema
     description: >
       Interim states until later 1.2.0 changes: the rule text of the step prompts
-      still names removed fields (their Output Contract examples validate, and
-      prompt-sync E310 checks every prompt); specdev align prompts output and the
+      still names removed fields (the last example of each Output Contract section
+      validates, which is the one prompt-sync E310 checks in every prompt; earlier
+      example blocks of prompt_16b_impl_coder.md still show removed fields);
+      specdev align prompts output and the
       migration templates in prompts/migration/ for steps 06 to 16 still describe
       the 1.1.1 shape; the agent and skill files under .claude/,
       docs/agents/agents.md, the coverage-matrix and gap-hunter docs,
