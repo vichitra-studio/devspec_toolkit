@@ -165,6 +165,28 @@ def test_unknown_id_raises_e706(example: Graph) -> None:
     assert raised.value.error.code == "E706" and "fr-no-such" in raised.value.error.message
 
 
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        (TraceOptions(kinds=frozenset({"nosuch"})), "no kind 'nosuch'"),
+        (TraceOptions(verbs=frozenset({"derive_from"})), "no link field 'derive_from'; nearest: derives_from"),
+        (TraceOptions(kinds=frozenset({"fr", "frr"}), verbs=frozenset({"zz"})), "no kind 'frr'"),
+    ],
+    ids=["kind", "verb", "both"],
+)
+def test_a_kind_or_verb_the_graph_does_not_have_is_e706(example: Graph, options: TraceOptions, message: str) -> None:
+    with pytest.raises(UnknownTraceTargetError) as raised:
+        trace_node(example, _CRITERION, options=options)
+    assert raised.value.error.code == "E706" and message in raised.value.error.message
+
+
+def test_every_kind_and_verb_the_registry_declares_is_accepted(example: Graph) -> None:
+    kinds = frozenset(example.decls)
+    verbs = frozenset(link.field for decl in example.decls.values() for link in decl.links)
+    assert "derives_from" in verbs and "replaces" in verbs
+    assert trace_node(example, _CRITERION, options=TraceOptions(kinds=kinds, verbs=verbs)).entry.id == _CRITERION
+
+
 def test_text_groups_by_kind_and_prints_the_five_columns(example: Graph) -> None:
     text = render_text(trace_node(example, _CRITERION, ("up",)))
     assert "up (" in text and "  fr (1)" in text

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from specdev_tools.core.json_utils import JsonUtilsError
+from specdev_tools.graph import commands
 from unit.graph._synth import ROOT, copy_example, run_specdev
 
 _CRITERION = "ac-password-reset-3"
@@ -141,3 +143,120 @@ def test_devspec_265_one_trace_call_and_one_candidates_call(spec: Path) -> None:
     assert "fr-password-reset" in offered
     assert "cap-account-recovery" not in offered  # wrong kind
     assert "fix-password-reset-expired-token" not in offered  # downstream and wrong kind
+
+
+# --- a value the library refuses reaches the library (A1-3) ---------------------------------------------------------
+
+def test_node_status_with_a_bad_value_is_e705_exit_1(spec: Path) -> None:
+    before = {path: path.read_bytes() for path in spec.rglob("*.json")}
+    result = run_specdev("node", "status", _CRITERION, "bogus", *_flags(spec))
+    assert result.returncode == 1 and result.stdout == ""
+    assert result.stderr.strip() == "E705 lifecycle 'bogus' is not one of active, deprecated, not_applicable"
+    envelope = json.loads(run_specdev("node", "status", _CRITERION, "bogus", *_flags(spec), "--json").stdout)
+    assert (envelope["command"], envelope["status"], envelope["errors"][0]["code"]) == ("node", "FAIL", "E705")
+    assert {path: path.read_bytes() for path in spec.rglob("*.json")} == before
+
+
+def test_trace_with_a_bad_recipe_role_is_e706_exit_1(spec: Path) -> None:
+    result = run_specdev("trace", _PLAN_ITEM, "--recipe", "17z", *_flags(spec))
+    assert result.returncode == 1 and result.stdout == ""
+    assert result.stderr.strip() == "E706 no recipe role '17z'; roles: 16a, 16b, 16c"
+    envelope = json.loads(run_specdev("trace", _PLAN_ITEM, "--recipe", "17z", *_flags(spec), "--json").stdout)
+    assert (envelope["command"], envelope["errors"][0]["code"]) == ("trace", "E706")
+
+
+def test_the_help_still_lists_the_values_that_are_no_longer_choices() -> None:
+    assert "active, deprecated, not_applicable" in run_specdev("node", "status", "--help").stdout
+    assert "16a, 16b, 16c" in run_specdev("trace", "--help").stdout
+
+
+def test_node_help_says_flags_follow_the_id() -> None:
+    assert "Flags follow the id" in run_specdev("node", "--help").stdout
+    assert "unrecognized arguments: --json" in run_specdev("node", "--json", _CRITERION).stderr
+
+
+# --- an unknown kind or link field of --kinds / --verbs (B-10) ------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("flag", "value", "message"),
+    [("--kinds", "nosuch", "no kind 'nosuch'"), ("--verbs", "derive_from", "no link field 'derive_from'; nearest: derives_from")],
+)
+def test_trace_with_an_unknown_kind_or_verb_is_e706(spec: Path, flag: str, value: str, message: str) -> None:
+    result = run_specdev("trace", _CRITERION, flag, value, *_flags(spec))
+    assert result.returncode == 1 and result.stdout == ""
+    assert result.stderr.startswith("E706") and message in result.stderr
+    envelope = json.loads(run_specdev("trace", _CRITERION, flag, value, *_flags(spec), "--json").stdout)
+    assert envelope["errors"][0]["code"] == "E706"
+    known = run_specdev("trace", _CRITERION, "--kinds", "fr,seed", "--verbs", "derives_from,refines", *_flags(spec))
+    assert known.returncode == 0, known.stderr
+
+
+# --- a spec file the builder could not read (B-02, C-09) ------------------------------------------------------------
+
+_UNREADABLE = "04_fr_list.json"
+_NOTE = "could not read 04_fr_list.json; the answer may be incomplete"
+
+
+@pytest.fixture
+def broken(spec: Path) -> Path:
+    (spec / _UNREADABLE).write_text('{"a":', encoding="utf-8")
+    return spec
+
+
+@pytest.mark.parametrize(
+    ("command", "name"),
+    [
+        (["node", "cap-account-recovery"], "node"),
+        (["node", "candidates", "--kind", "api", "--field", "derives_from"], "node"),
+        (["trace", "cap-account-recovery"], "trace"),
+        (["trace", _PLAN_ITEM, "--recipe", "16b"], "trace"),
+    ],
+    ids=["node", "candidates", "trace", "recipe"],
+)
+def test_an_unreadable_file_is_named_on_stderr_and_stdout_stays_the_answer(broken: Path, spec: Path, command: list[str], name: str) -> None:
+    result = run_specdev(*command, *_flags(spec))
+    assert result.returncode == 0, result.stderr
+    assert result.stderr.strip() == f"specdev {name}: {_NOTE}"
+    assert result.stdout.strip()
+    assert run_specdev(*command, *_flags(spec), "--json").stdout.lstrip().startswith("{")
+
+
+def test_node_status_names_the_unreadable_file_too(broken: Path, spec: Path) -> None:
+    result = run_specdev("node", "status", "cap-account-recovery", "deprecated", *_flags(spec))
+    assert result.returncode == 0, result.stderr
+    assert result.stderr.strip() == f"specdev node: {_NOTE}"
+
+
+@pytest.mark.parametrize(
+    ("command", "code"),
+    [
+        (["node", "fr-password-reset"], "E706"),
+        (["trace", "fr-password-reset"], "E706"),
+        (["node", "status", "fr-password-reset", "deprecated"], "E705"),
+    ],
+    ids=["node", "trace", "status"],
+)
+def test_an_unknown_id_on_a_graph_with_unreadable_files_says_so(broken: Path, spec: Path, command: list[str], code: str) -> None:
+    result = run_specdev(*command, *_flags(spec))
+    assert result.returncode == 1
+    finding = result.stderr.strip().splitlines()[-1]
+    assert finding.startswith(code) and finding.endswith("these files could not be read, so the node may be in one of them: 04_fr_list.json")
+    envelope = json.loads(run_specdev(*command, *_flags(spec), "--json").stdout)
+    assert "these files could not be read" in envelope["errors"][0]["message"]
+
+
+def test_a_readable_spec_prints_nothing_on_stderr_and_a_plain_unknown_id_has_no_note(spec: Path) -> None:
+    assert run_specdev("node", _CRITERION, *_flags(spec)).stderr == ""
+    unknown = run_specdev("node", "fr-no-such", *_flags(spec))
+    assert unknown.returncode == 1 and "could not be read" not in unknown.stderr
+
+
+def test_a_write_the_json_tools_refuse_is_one_stderr_line_and_exit_1(spec: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def refused(*_args: object) -> None:
+        raise JsonUtilsError("the edit would break the schema of 04_fr_list.json")
+
+    monkeypatch.setattr(commands, "set_lifecycle", refused)
+    code = commands.run_node(["status", _CRITERION, "deprecated", *_flags(spec)])
+    captured = capsys.readouterr()
+    assert code == 1 and captured.out == ""
+    assert captured.err.strip() == "specdev node: the edit would break the schema of 04_fr_list.json"

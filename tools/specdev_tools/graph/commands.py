@@ -12,7 +12,7 @@ import json
 import os
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any
 
 from specdev_tools.core.errors import SpecError, make_error
@@ -83,6 +83,8 @@ NODE_DESCRIPTION = (
     "                         that is also a subcommand name)\n"
     "  candidates             List the nodes a link field may point at\n"
     "  status <id> <value>    Set a node's lifecycle (writes the spec file)\n\n"
+    "Flags follow the id or the subcommand, as for 'specdev json': 'specdev node <id> --json' works, "
+    "'specdev node --json <id>' does not.\n"
     "Run 'specdev node <subcommand> --help' for the flags of one subcommand."
 )
 
@@ -122,7 +124,7 @@ def build_node_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     status.add_argument("id", help="Node id")
-    status.add_argument("value", choices=LIFECYCLES, help="New lifecycle")
+    status.add_argument("value", help=f"New lifecycle: {', '.join(LIFECYCLES)}")
     _add_root_flags(status)
     return parser
 
@@ -152,7 +154,10 @@ def add_graph_parsers(sub: Any) -> None:
     trace_p.add_argument("--kinds", help="Comma-separated kinds to show (the walk still passes through other kinds)")
     trace_p.add_argument("--verbs", help="Comma-separated link fields to follow (default: all)")
     trace_p.add_argument("--no-containment", action="store_true", help="Do not follow the parent / child edge of the JSON tree")
-    trace_p.add_argument("--recipe", choices=RECIPE_ROLES, help="Print the context pack of this role (16a: task, 16b: plan item, 16c: roadmap milestone)")
+    trace_p.add_argument(
+        "--recipe", metavar="ROLE",
+        help=f"Print the context pack of this role: {', '.join(RECIPE_ROLES)} (16a: task, 16b: plan item, 16c: roadmap milestone)",
+    )
     trace_p.add_argument("--expand", action="store_true", help="With --recipe: add the content of every node of the pack")
     trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: where HEAD left the default branch)")
     _add_root_flags(trace_p)
@@ -176,6 +181,18 @@ def _print_json(document: dict[str, Any]) -> None:
     print(json.dumps(document, indent=2))
 
 
+def _is_unknown_id(error: SpecError) -> bool:
+    return error.code in ("E705", "E706") and "no node" in error.message
+
+
+def _with_unreadable_note(error: SpecError, unreadable: Sequence[str]) -> SpecError:
+    """*error* with a sentence that the id may be in a file that could not be read, when it is an unknown-id finding."""
+    if not unreadable or not _is_unknown_id(error):
+        return error
+    note = f"; these files could not be read, so the node may be in one of them: {', '.join(unreadable)}"
+    return replace(error, message=error.message + note)
+
+
 def _report_finding(error: SpecError, command: str, json_output: bool) -> int:
     """Print one finding the way the other commands do (text on stderr, or the JSON envelope on stdout); the exit code."""
     if json_output:
@@ -190,12 +207,18 @@ def _usage_error(command: str, message: str) -> int:
     return EXIT_USAGE
 
 
-def _run_guarded(command: str, json_output: bool, action: Callable[[], int]) -> int:
-    """Run *action*; a library error with a finding in ``.error`` is reported and becomes exit code 1."""
+def _run_guarded(command: str, json_output: bool, action: Callable[[], int], unreadable: Sequence[str] = ()) -> int:
+    """Run *action*; a library error with a finding in ``.error`` is reported and becomes exit code 1.
+
+    *unreadable* is read when a finding is reported: the spec files the builder skipped, which an unknown-id finding names.
+    """
     try:
         return action()
     except _FINDING_ERRORS as exc:
-        return _report_finding(exc.error, command, json_output)
+        return _report_finding(_with_unreadable_note(exc.error, unreadable), command, json_output)
+    except JsonUtilsError as exc:
+        print(f"specdev {command}: {exc}", file=sys.stderr)
+        return EXIT_FINDING
 
 
 def _load_graph(args: argparse.Namespace) -> Graph:
@@ -206,10 +229,30 @@ def _load_graph(args: argparse.Namespace) -> Graph:
     return build_graph(spec_root, os.path.abspath(args.repo_root))
 
 
+def _run_on_graph(command: str, args: argparse.Namespace, action: Callable[[Graph], int]) -> int:
+    """Load the graph of ``--spec-root`` and run *action* on it, under the one error path of ``_run_guarded``.
+
+    When the builder skipped files, one line on stderr names them and says the answer may be incomplete.
+    """
+    unreadable: list[str] = []
+
+    def run() -> int:
+        graph = _load_graph(args)
+        unreadable.extend(error.file for error in graph.load_errors)
+        if unreadable:
+            print(
+                f"specdev {command}: could not read {', '.join(unreadable)}; the answer may be incomplete",
+                file=sys.stderr,
+            )
+        return action(graph)
+
+    return _run_guarded(command, args.json_output, run, unreadable)
+
+
 # --- node -----------------------------------------------------------------------------------------------------------
 
-def _node_show(args: argparse.Namespace) -> int:
-    report = queries.node_view(_load_graph(args), args.ids, full=args.full)
+def _node_show(args: argparse.Namespace, graph: Graph) -> int:
+    report = queries.node_view(graph, args.ids, full=args.full)
     if args.json_output:
         _print_json(queries.node_json(report))
     else:
@@ -217,9 +260,9 @@ def _node_show(args: argparse.Namespace) -> int:
     return EXIT_FINDING if report.errors else 0
 
 
-def _node_candidates(args: argparse.Namespace) -> int:
+def _node_candidates(args: argparse.Namespace, graph: Graph) -> int:
     result = queries.candidates(
-        _load_graph(args), args.field, kind=args.kind, for_id=args.for_id, query=args.query, limit=args.limit
+        graph, args.field, kind=args.kind, for_id=args.for_id, query=args.query, limit=args.limit
     )
     if args.json_output:
         _print_json(queries.candidates_json(result))
@@ -228,12 +271,8 @@ def _node_candidates(args: argparse.Namespace) -> int:
     return 0
 
 
-def _node_status(args: argparse.Namespace) -> int:
-    try:
-        change = set_lifecycle(_load_graph(args), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.id, args.value)
-    except JsonUtilsError as exc:
-        print(f"specdev node: {exc}", file=sys.stderr)
-        return EXIT_FINDING
+def _node_status(args: argparse.Namespace, graph: Graph) -> int:
+    change = set_lifecycle(graph, os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.id, args.value)
     if args.json_output:
         _print_json(asdict(change))
     else:
@@ -241,7 +280,7 @@ def _node_status(args: argparse.Namespace) -> int:
     return 0
 
 
-_NODE_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
+_NODE_HANDLERS: dict[str, Callable[[argparse.Namespace, Graph], int]] = {
     "show": _node_show,
     "candidates": _node_candidates,
     "status": _node_status,
@@ -260,7 +299,7 @@ def run_node(tokens: Sequence[str]) -> int:
     args = build_node_parser().parse_args(_node_tokens(tokens))
     args.repo_root = detect_toolkit_root(args.repo_root)
     handler = _NODE_HANDLERS[args.node_cmd]
-    return _run_guarded("node", args.json_output, lambda: handler(args))
+    return _run_on_graph("node", args, lambda graph: handler(args, graph))
 
 
 # --- trace ----------------------------------------------------------------------------------------------------------
@@ -312,7 +351,7 @@ def run_trace(args: argparse.Namespace) -> int:
     if problem is not None:
         return _usage_error("trace", problem)
     run = _trace_pack if args.recipe else _trace_walk
-    return _run_guarded("trace", args.json_output, lambda: run(args, _load_graph(args)))
+    return _run_on_graph("trace", args, lambda graph: run(args, graph))
 
 
 # --- diff -----------------------------------------------------------------------------------------------------------

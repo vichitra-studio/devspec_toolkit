@@ -137,7 +137,25 @@ def test_a_ref_that_looks_like_an_option_is_e708(host: Path) -> None:
     _two_tag_host(host)
     with pytest.raises(GitViewError) as raised:
         gitview.resolve_ref("--output=x", str(host))
+    assert raised.value.error.code == "E708" and "is not a git ref" in raised.value.error.message
+
+
+def test_a_git_root_that_is_not_a_folder_is_e708_with_its_own_message(tmp_path: Path) -> None:
+    missing = tmp_path / "no-such-folder"
+    with pytest.raises(GitViewError) as raised:
+        gitview.resolve_ref("HEAD", str(missing))
     assert raised.value.error.code == "E708"
+    assert raised.value.error.message == f"the git root {missing} is not a directory"
+    file = tmp_path / "a-file"
+    file.write_text("x", encoding="utf-8")
+    with pytest.raises(GitViewError) as raised:
+        gitview.resolve_ref("HEAD", str(file))
+    assert "is not a directory" in raised.value.error.message
+
+
+def test_diff_with_a_missing_git_root_names_the_git_root(tmp_path: Path) -> None:
+    result = run_specdev("diff", "HEAD", "HEAD", "--repo-root", str(ROOT), "--spec-root", str(tmp_path / "nowhere" / "spec"), "--git-root", str(tmp_path / "nowhere"))
+    assert result.returncode == 1 and result.stderr.startswith("E708") and "git root" in result.stderr and "not a directory" in result.stderr
 
 
 def test_a_folder_that_is_not_a_repository_is_e708(tmp_path: Path) -> None:

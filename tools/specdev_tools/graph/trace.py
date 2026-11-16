@@ -14,16 +14,18 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.json_utils import _nearest_ids
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
 
 Direction = Literal["up", "down"]
 BOTH_DIRECTIONS: tuple[Direction, ...] = ("up", "down")
 _NO_STEP_RANK = 10**6
+_NEAREST_COUNT = 3
 
 
 class UnknownTraceTargetError(Exception):
-    """The id to trace is not a node of the graph; the E706 finding is in ``error``."""
+    """The id to trace, or a kind or link field named in the options, is not on the graph; the E706 finding is in ``error``."""
 
     def __init__(self, error: SpecError) -> None:
         super().__init__(error.message)
@@ -122,6 +124,28 @@ def _side(graph: Graph, entry: Node, direction: Direction, options: TraceOptions
     )
 
 
+def _unknown_names(subject: str, given: Iterable[str], known: set[str]) -> str | None:
+    """The E706 message for the names of *given* that are not in *known*, or ``None`` when all are known."""
+    messages = []
+    for name in sorted(set(given) - known):
+        near = [entry["id"] for entry in _nearest_ids(name, sorted(known), _NEAREST_COUNT)]
+        suffix = f"; nearest: {', '.join(near)}" if near else ""
+        messages.append(f"no {subject} {name!r}{suffix}")
+    return "; ".join(messages) or None
+
+
+def _check_option_names(graph: Graph, options: TraceOptions) -> None:
+    """E706 when ``kinds`` or ``verbs`` names a kind or link field that neither the registry nor the graph has."""
+    kinds = set(graph.decls) | set(graph.by_kind)
+    verbs = {link.field for decl in graph.decls.values() for link in decl.links} | {
+        link.field for links in graph.outgoing.values() for link in links
+    }
+    problems = (_unknown_names("kind", options.kinds, kinds), _unknown_names("link field", options.verbs, verbs))
+    found = [problem for problem in problems if problem is not None]
+    if found:
+        raise UnknownTraceTargetError(make_error("E706", "; ".join(found)))
+
+
 def trace_node(
     graph: Graph,
     node_id: str,
@@ -130,8 +154,10 @@ def trace_node(
 ) -> TraceResult:
     """The trace of *node_id* in each of *directions* (default both).
 
-    The entry itself may have any lifecycle.  Raises ``UnknownTraceTargetError`` (E706) when no node has that id.
+    The entry itself may have any lifecycle.  Raises ``UnknownTraceTargetError`` (E706) when no node has that id, or
+    when ``options.kinds`` or ``options.verbs`` names a kind or link field that does not exist.
     """
+    _check_option_names(graph, options)
     entry = graph.by_id.get(node_id)
     if entry is None:
         raise UnknownTraceTargetError(make_error("E706", f"no node has the id {node_id!r}"))

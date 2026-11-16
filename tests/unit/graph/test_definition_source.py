@@ -14,6 +14,7 @@ from specdev_tools.core.loaders import read_json_object
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import load_kind_registry
 from specdev_tools.validation.hallucination_lint import lint_hallucinations
+from specdev_tools.validation.linter_utils import graph_known_ids
 from specdev_tools.validation.spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 
 from specdev_tools.validation.spec_check import run_spec_check_json
@@ -177,9 +178,21 @@ def test_spec_check_builds_the_graph_once(monkeypatch: pytest.MonkeyPatch) -> No
     assert len(calls) == 1
 
 
-def _trace_spec(tmp_path: Path, target: str, root_id: Any = "charter-v1") -> Path:
-    """1.1.1 shape: a charter with a root ``id`` and an FR file whose ``trace`` entry names *target*."""
-    _write(tmp_path, "00_charter.json", {"id": root_id})
+COVERED_ROOT_FILE = "03_glossary.json"
+UNCOVERED_ROOT_FILE = "00_charter.json"
+_ROOT_FILE_CASES = pytest.mark.parametrize("covered", [True, False], ids=["file-with-a-node", "file-without-a-node"])
+
+
+def _trace_spec(tmp_path: Path, target: str, root_id: Any = "charter-v1", *, covered: bool = False) -> Path:
+    """1.1.1 shape: a file with a root ``id`` and an FR file whose ``trace`` entry names *target*.
+
+    The root-id file holds a node (a glossary term) when *covered*, so the graph covers it and the scan of the file
+    adds none of its ids; else it holds none and the scan of the file is what adds its root id as well.
+    """
+    if covered:
+        _write(tmp_path, COVERED_ROOT_FILE, {"id": root_id, "terms": [{"term_id": "term-a"}]})
+    else:
+        _write(tmp_path, UNCOVERED_ROOT_FILE, {"id": root_id})
     _write(
         tmp_path,
         NODE_FILE,
@@ -188,20 +201,32 @@ def _trace_spec(tmp_path: Path, target: str, root_id: Any = "charter-v1") -> Pat
     return tmp_path
 
 
-def test_artifact_root_id_is_a_known_id(tmp_path: Path) -> None:
-    spec = str(_trace_spec(tmp_path, "charter-v1"))
+@_ROOT_FILE_CASES
+def test_artifact_root_id_is_a_known_id(tmp_path: Path, covered: bool) -> None:
+    spec = str(_trace_spec(tmp_path, "charter-v1", covered=covered))
     assert _lines(lint_hallucinations(spec), "E530") == []
     assert _unresolved_refs(lint_spec_quality(spec)) == []
 
 
-def test_trace_to_an_id_defined_nowhere_is_still_reported(tmp_path: Path) -> None:
-    spec = str(_trace_spec(tmp_path, "charter-v9"))
+def test_the_root_id_of_a_covered_file_comes_from_the_graph_alone(tmp_path: Path) -> None:
+    """For a file with nodes the scan adds no id, so ``graph_known_ids`` is the only source of its root id."""
+    spec = _trace_spec(tmp_path, "charter-v1", covered=True)
+    graph = build_graph(str(spec), str(ROOT))
+    assert COVERED_ROOT_FILE in {node.file for node in graph.nodes}
+    assert "charter-v1" not in graph.by_id
+    assert "charter-v1" in graph_known_ids(graph)
+
+
+@_ROOT_FILE_CASES
+def test_trace_to_an_id_defined_nowhere_is_still_reported(tmp_path: Path, covered: bool) -> None:
+    spec = str(_trace_spec(tmp_path, "charter-v9", covered=covered))
     assert any("charter-v9" in line for line in _lines(lint_hallucinations(spec), "E530"))
     assert any("charter-v9" in line for line in _unresolved_refs(lint_spec_quality(spec)))
 
 
+@_ROOT_FILE_CASES
 @pytest.mark.parametrize("root_id", [["charter-v1"], 7], ids=["list", "number"])
-def test_wrong_typed_root_id_defines_nothing_and_does_not_raise(tmp_path: Path, root_id: Any) -> None:
-    spec = str(_trace_spec(tmp_path, "charter-v1", root_id))
+def test_wrong_typed_root_id_defines_nothing_and_does_not_raise(tmp_path: Path, root_id: Any, covered: bool) -> None:
+    spec = str(_trace_spec(tmp_path, "charter-v1", root_id, covered=covered))
     assert any("charter-v1" in line for line in _lines(lint_hallucinations(spec), "E530"))
     assert any("charter-v1" in line for line in _unresolved_refs(lint_spec_quality(spec)))

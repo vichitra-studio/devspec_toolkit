@@ -110,6 +110,18 @@ def test_same_step_cycle_e703_and_self_link() -> None:
     assert errors[1].message.endswith("d (field depends_on)")
 
 
+def test_steps_filter_keeps_only_the_cycles_of_those_steps() -> None:
+    """A cycle stays inside one step and only holders of the wanted steps give edges, so no other step's cycle can appear."""
+    dep = _decl("depends_on", ["B"], ["B"])
+    graph = _graph([
+        _node("a", "B", "s2", [(dep, "b")]), _node("b", "B", "s2", [(dep, "a")]),
+        _node("x", "B", "s3", [(dep, "y")]), _node("y", "B", "s3", [(dep, "x")]),
+    ])
+    assert _summary(resolve_graph(graph)) == [("E703", "step:s2", "a"), ("E703", "step:s3", "x")]
+    assert _summary(resolve_graph(graph, steps=["s3"])) == [("E703", "step:s3", "x")]
+    assert resolve_graph(graph, steps=["s1"]) == []
+
+
 def test_a_chain_without_a_cycle_gives_no_e703() -> None:
     dep = _decl("depends_on", ["B"], ["B"])
     graph = _graph([_node("a", "B", "s2", [(dep, "b")]), _node("b", "B", "s2", [(dep, "c")]), _node("c", "B", "s2")])
@@ -244,6 +256,34 @@ def test_absent_upstream_message_names_the_step() -> None:
     present = {**docs, "04_fr_list.json": {"functional_requirements": []}}
     (error,) = resolve_graph(docs_graph(present))
     assert "no node has that id" in error.message and "no file of step" not in error.message
+
+
+def test_a_target_in_a_file_that_could_not_be_read_says_so() -> None:
+    """The file was skipped, so "no node has that id" would be false; the finding names the file and its step."""
+    api = {"05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-x"]}]}}
+    for unreadable in ([1, 2], "text"):
+        graph = docs_graph({**api, "04_fr_list.json": unreadable})
+        assert [item.file for item in graph.load_errors] == ["04_fr_list.json"]
+        (error,) = resolve_graph(graph)
+        assert (error.code, error.owner, error.node_id) == ("E700", "step:05", "api-a")
+        assert error.message.endswith("the file 04_fr_list.json of step 04 could not be read, so the target cannot be checked")
+        assert "no node has that id" not in error.message and "no file of step" not in error.message
+
+
+def test_a_file_that_could_not_be_read_does_not_change_the_other_two_e700_messages() -> None:
+    """Only a file of a step that holds a kind the field accepts counts: the glossary is no home of an FR."""
+    docs = {
+        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-x"]}]},
+        "04_fr_list.json": {"functional_requirements": []},
+        "03_glossary.json": [1],
+    }
+    graph = docs_graph(docs)
+    assert [item.file for item in graph.load_errors] == ["03_glossary.json"]
+    (error,) = resolve_graph(graph)
+    assert "no node has that id" in error.message and "could not be read" not in error.message
+    absent = docs_graph({"05_interface_contracts.json": docs["05_interface_contracts.json"], "03_glossary.json": [1]})
+    (error,) = resolve_graph(absent)
+    assert "no file of step 04 exists" in error.message and "could not be read" not in error.message
 
 
 def test_ambiguity_about_same_step_reports_e702() -> None:
@@ -522,7 +562,11 @@ def test_handoff_cases_are_each_in_exactly_one_group() -> None:
 
 @pytest.mark.parametrize("index", sorted(_VALID))
 def test_handoff_valid_links_resolve(index: int) -> None:
-    assert resolve_graph(docs_graph(_case_docs(_VALID[index]))) == []
+    case = _VALID[index]
+    graph = docs_graph(_case_docs(case))
+    holder = graph.by_id[_holder_node_id(case)]
+    assert [(link.field, link.target) for link in holder.links] == [(case.field, target) for target in case.targets]
+    assert resolve_graph(graph) == []
 
 
 @pytest.mark.parametrize("index", sorted(_MISSING))

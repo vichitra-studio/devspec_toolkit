@@ -12,7 +12,7 @@ from pathlib import Path
 
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.json_utils import json_delete, json_patch
-from specdev_tools.graph.kinds import has_lifecycle
+from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
 from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node
 
 LIFECYCLE_KEY = "lifecycle"
@@ -44,6 +44,10 @@ def _refuse(message: str) -> LifecycleRefusedError:
     return LifecycleRefusedError(make_error("E705", message))
 
 
+def _article(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
 def _refusal_for_node(graph: Graph, node_id: str) -> str | None:
     """Why *node_id* cannot take a lifecycle, or ``None`` when it can."""
     if node_id in graph.dups:
@@ -51,8 +55,10 @@ def _refusal_for_node(graph: Graph, node_id: str) -> str | None:
     node = graph.by_id.get(node_id)
     if node is None:
         return f"no node has the id {node_id!r}"
+    if node.kind == SEED_KIND:
+        return f"{node_id!r} is a seed, and a seed has no lifecycle"
     if not has_lifecycle(node.kind, node.role):
-        return f"{node_id!r} is a {node.kind}, a record or seed node; it has no lifecycle"
+        return f"{node_id!r} is {_article(node.kind)} {node.kind}, which is a record, and a record has no lifecycle"
     return None
 
 

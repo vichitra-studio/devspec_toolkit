@@ -32,6 +32,13 @@ def test_mint_slug_numeric_suffix_on_collision() -> None:
     assert first_free_id("fr-free", taken) == "fr-free"
 
 
+@pytest.mark.parametrize("max_len", [0, -1, -50])
+def test_mint_slug_refuses_a_max_len_below_one(max_len: int) -> None:
+    with pytest.raises(ValueError, match="max_len must be 1 or more"):
+        mint_slug("abc def", set(), max_len=max_len)
+    assert mint_slug("abc def", set(), max_len=1) == "a"
+
+
 def test_mint_slug_never_rederived_for_existing() -> None:
     """A text whose slug is an id that exists gets a new id; the taken set and the existing id are left alone."""
     taken = {"ac-login-1"}

@@ -75,6 +75,8 @@ def resolve_ref(ref: str, git_root: str) -> str:
     """
     if ref.startswith("-"):
         raise _fail("E708", f"'{ref}' is not a git ref")
+    if not os.path.isdir(git_root):
+        raise _fail("E708", f"the git root {git_root} is not a directory")
     process = _run_git(git_root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
     if process.returncode == 0:
         return process.stdout.decode("utf-8").strip()

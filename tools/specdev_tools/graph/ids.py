@@ -87,8 +87,10 @@ def mint_slug(text: str, taken: Collection[str], *, prefix: str | None = None, m
     Callers mint only for an item that has no id; an id that exists is never re-derived.
 
     Raises:
-        ValueError: *text* holds no ASCII letter or digit, so no slug can be made.
+        ValueError: *max_len* is below 1, or *text* holds no ASCII letter or digit, so no slug can be made.
     """
+    if max_len < 1:
+        raise ValueError(f"max_len must be 1 or more, not {max_len}")
     slug = _cut_on_word(_ascii_slug(text), max_len)
     if not slug:
         raise ValueError("text has no ASCII letters or digits to make an id from")

@@ -50,6 +50,7 @@ DIRECTIONS = (OUT, IN, PARENT, CHILDREN)
 ABOUT_FIELD = "about"
 ROADMAP_MILESTONE = "roadmap-milestone"
 _TABLE_RELATIVE = os.path.join("tools", "graph_recipes.json")
+PARENT_VIA = "parent of "
 _START_SET_VIA = "start set"
 _WHOLE_KIND_VIA = "whole kind"
 _NO_RANK = 10**6
@@ -346,7 +347,7 @@ class Reached:
 
 def _via(hop: Hop, source: Node) -> str:
     if hop.direction == PARENT:
-        return f"parent of {source.id}"
+        return f"{PARENT_VIA}{source.id}"
     if hop.direction == CHILDREN:
         return f"child of {source.id}"
     return f"{hop.verb} {hop.direction} {source.id}"
@@ -445,6 +446,11 @@ class PackEntry:
     suffix_field: str = ""
     suffix: str = ""
     content: Mapping[str, Any] | None = None
+
+    @property
+    def container(self) -> bool:
+        """True for a node reached by a ``parent`` hop: it holds a member of its section instead of being one."""
+        return self.via.startswith(PARENT_VIA)
 
 
 @dataclass(frozen=True)
@@ -673,14 +679,48 @@ def _row(entry: PackEntry) -> str:
     return f"{entry.id}{suffix}{flag}"
 
 
+def _member_of(entry: PackEntry, by_id: Mapping[str, PackEntry]) -> str | None:
+    """The id of the member a container holds, following a chain of containers (a milestone holds a task holds a criterion)."""
+    seen = {entry.id}
+    while entry.container:
+        source = by_id.get(entry.via[len(PARENT_VIA):])
+        if source is None or source.id in seen:
+            return None
+        if not source.container:
+            return source.id
+        seen.add(source.id)
+        entry = source
+    return None
+
+
+def _grouped_rows(entries: Sequence[PackEntry]) -> list[str]:
+    """One text row per member, the containers it sits in after it in parentheses; a container with no member in the section is a row of its own."""
+    by_id = {entry.id: entry for entry in entries}
+    holders: dict[str, list[PackEntry]] = {}
+    alone: set[str] = set()
+    for entry in entries:
+        member = _member_of(entry, by_id) if entry.container else None
+        if member is not None:
+            holders.setdefault(member, []).append(entry)
+        elif entry.container:
+            alone.add(entry.id)
+    rows = []
+    for entry in entries:
+        if entry.container and entry.id not in alone:
+            continue
+        around = ", ".join(_row(holder) for holder in holders.get(entry.id, ()))
+        rows.append(f"{_row(entry)} ({around})" if around else _row(entry))
+    return rows
+
+
 def _section_lines(name: str, entries: Sequence[PackEntry], width: int) -> list[str]:
     if entries and entries[0].content is not None:
         lines = [name]
         for entry in entries:
-            lines.append(f"  {_row(entry)}")
+            lines.append(f"  {_row(entry)} ({entry.via})" if entry.container else f"  {_row(entry)}")
             lines.extend(f"    {line}" for line in _json_lines(entry.content))
         return lines
-    return [f"{name:<{width}}  {', '.join(_row(entry) for entry in entries) or 'none'}"]
+    return [f"{name:<{width}}  {', '.join(_grouped_rows(entries)) or 'none'}"]
 
 
 def _json_lines(content: Mapping[str, Any] | None) -> list[str]:

@@ -68,8 +68,27 @@ def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
     return _ordered(steps, shape.step_ranks)
 
 
-def _missing_target_error(holder: Node, link: Link, shape: SpecShape) -> SpecError:
+def _unreadable_file(link: Link, graph: Graph) -> tuple[str, str] | None:
+    """The first ``(step, file)`` that the builder skipped, among the files of the steps that declare a kind the link accepts."""
+    skipped = {error.file for error in graph.load_errors}
+    steps = {step for kind in link.decl.kinds for step in graph.shape.kind_steps.get(kind, ())}
+    for step in _ordered(steps, graph.shape.step_ranks):
+        for path in graph.shape.files_by_step.get(step, ()):
+            if path in skipped:
+                return step, path
+    return None
+
+
+def _missing_target_error(holder: Node, link: Link, graph: Graph) -> SpecError:
+    shape = graph.shape
     where = f"{holder.id} ({holder.file}), field {link.field}, target '{link.target}'"
+    unreadable = _unreadable_file(link, graph)
+    if unreadable is not None:
+        step, path = unreadable
+        return _error(
+            "E700", holder,
+            f"{where}: the file {path} of step {step} could not be read, so the target cannot be checked",
+        )
     absent = _absent_steps(link, shape)
     if absent:
         return _error(
@@ -130,7 +149,7 @@ def _find_target(graph: Graph, target_id: str) -> Node | None:
 def _link_errors(graph: Graph, holder: Node, link: Link, edges: _SameStepEdges, hooks: ResolverHooks) -> list[SpecError]:
     target = _find_target(graph, link.target)
     if target is None:
-        return [_missing_target_error(holder, link, graph.shape)]
+        return [_missing_target_error(holder, link, graph)]
     if not link.decl.accepts(target.kind):
         return [_wrong_kind_error(holder, link, target)]
     direction = _direction_error(holder, link, target, graph.shape)

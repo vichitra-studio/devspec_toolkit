@@ -118,6 +118,23 @@ def test_node_status_refused_on_record_and_seed_e705(spec: Path, toolkit: Path, 
 
 
 @pytest.mark.parametrize(
+    ("node_id", "message"),
+    [
+        ("seed-accounts", "'seed-accounts' is a seed, and a seed has no lifecycle"),
+        ("amb-open", "'amb-open' is an ambiguity-item, which is a record, and a record has no lifecycle"),
+        ("rec-note", "'rec-note' is a sample-record, which is a record, and a record has no lifecycle"),
+    ],
+    ids=["seed", "record-an", "record-a"],
+)
+def test_the_e705_message_names_the_case(spec: Path, toolkit: Path, node_id: str, message: str) -> None:
+    graph = _graph(spec, toolkit)
+    with pytest.raises(LifecycleRefusedError) as raised:
+        plan_lifecycle_change(graph, node_id, "deprecated")
+    assert message in raised.value.error.message
+    assert "a record or seed node" not in raised.value.error.message
+
+
+@pytest.mark.parametrize(
     ("node_id", "value"), [("fr-no-such", "deprecated"), (_PROBE, "retired")], ids=["unknown-id", "value-outside-enum"]
 )
 def test_status_refused_for_unknown_id_and_bad_value(spec: Path, toolkit: Path, node_id: str, value: str) -> None:
