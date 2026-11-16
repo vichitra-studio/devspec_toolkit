@@ -28,11 +28,10 @@ EXPECTED_PROMOTABLE_PAIRS = {
 
 # Registered codes with no string literal outside errors.py that are not the E side
 # of a PROMOTABLE_PAIRS row: kept for compatibility or reserved, not emitted.
-# W720 is emitted from M5 (the lock hook); M5 removes it from this set.  E707 is registered in WI-M4-02 before the
-# recipe code that writes it exists: the M4 work item that first writes it as a literal (WI-M4-09) removes it here.
+# W720 is emitted from M5 (the lock hook); M5 removes it from this set.  A code that a work item registers before the
+# code that writes it exists stays here until that work item writes it as a literal.
 REGISTERED_WITHOUT_EMITTER = {
     "E422", "E561", "E604", "E620", "W150", "W591",
-    "E707",
     "W720",
 }
 

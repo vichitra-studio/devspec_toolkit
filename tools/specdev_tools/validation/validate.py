@@ -36,6 +36,7 @@ from .hallucination_lint import lint_hallucinations
 from .linter_utils import build_lint_graph
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
+from ..core.constants import DEFAULT_BRANCH_CANDIDATES
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import SchemaRegistry, get_shared_registry
@@ -685,7 +686,7 @@ def _resolve_replay_base_ref(root: Path) -> str:
     upstream = _git_upstream_branch(root)
     if upstream:
         return upstream
-    for candidate in ("origin/main", "origin/master", "main", "master"):
+    for candidate in DEFAULT_BRANCH_CANDIDATES:
         if _git_ref_exists(root, candidate):
             return candidate
     current = _git_current_branch(root)

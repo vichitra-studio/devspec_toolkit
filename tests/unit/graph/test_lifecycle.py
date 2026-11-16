@@ -13,6 +13,7 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.lifecycle import LifecycleRefusedError, plan_lifecycle_change, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, NOT_APPLICABLE, Graph
 from specdev_tools.graph.queries import candidates
+from specdev_tools.graph.recipes import build_pack, parse_recipes
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.graph.trace import trace_node
 
@@ -22,11 +23,25 @@ LIFECYCLE_SPEC = Path(__file__).parents[2] / "fixtures" / "graph" / "synthetic" 
 _FR = "04_fr_list.json"
 _PROBE = "fr-probe"
 
+# The plan item of the fixture realises the probe, so a one-section recipe over the fixture's own kinds reaches it.
+_PROBE_RECIPES = parse_recipes(
+    {
+        "start_kinds": {"16b": "plan-item"},
+        "sections": [
+            {
+                "name": "probe", "roles": ["16b"], "start_set": ["start"], "kinds": ["fr"],
+                "hops": [{"verb": "realises", "direction": "out", "kinds": ["fr"]}],
+            }
+        ],
+    }
+)
+
 # Each consumer of the graph, as the ids of the nodes it reads or reports on; later work items add their rows.
 CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     "resolver": lambda graph: {error.node_id for error in resolve_graph(graph) if error.node_id},
     "trace": lambda graph: {node.id for node in trace_node(graph, "ac-probe-1", ("up",)).reached},
     "candidates": lambda graph: {item.id for item in candidates(graph, "derives_from", kind="api").candidates},
+    "recipes": lambda graph: set(build_pack(graph, _PROBE_RECIPES, "16b", "LOGIN_ITEM_01").node_ids),
 }
 
 

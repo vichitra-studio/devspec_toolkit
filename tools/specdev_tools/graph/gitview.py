@@ -16,6 +16,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
 from specdev_tools.graph.build import build_graph
@@ -24,6 +25,7 @@ from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph
 
 GIT_TIMEOUT_SECONDS = 30
+PREVIOUS_COMMIT = "HEAD~1"
 _MAX_REASON_CHARS = 240
 
 
@@ -79,6 +81,21 @@ def resolve_ref(ref: str, git_root: str) -> str:
     if "not a git repository" in _reason(process).lower():
         raise _fail("E708", f"{git_root} is not a git repository")
     raise _fail("E708", f"ref '{ref}' does not name a commit in {git_root}")
+
+
+def default_base_ref(git_root: str) -> str:
+    """The commit where HEAD left the default branch, or ``HEAD~1`` when no default branch is found.
+
+    The default branch is the first of ``DEFAULT_BRANCH_CANDIDATES`` that shares history with HEAD.
+
+    Raises:
+        GitViewError: E708 when git is missing or does not answer in time.
+    """
+    for candidate in DEFAULT_BRANCH_CANDIDATES:
+        process = _run_git(git_root, ["merge-base", "HEAD", candidate])
+        if process.returncode == 0:
+            return process.stdout.decode("utf-8").strip()
+    return PREVIOUS_COMMIT
 
 
 def spec_path_in_repo(spec_root: str, git_root: str) -> str:
