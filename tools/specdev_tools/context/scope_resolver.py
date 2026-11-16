@@ -15,7 +15,7 @@ import os
 from typing import Any
 
 from ..core.constants import resolve_extras_path
-from ..validation._legacy_shim import LEGACY_SCOPE_LINK_FIELDS, has_legacy_fields
+from ..validation._legacy_shim import LEGACY_SCOPE_LINK_FIELDS, has_legacy_fields, records_of
 
 
 # ---------------------------------------------------------------------------
@@ -74,9 +74,10 @@ def _iter_spec_files(spec_dir: str):
             continue
         try:
             data = _load_json(full_path)
-        except (OSError, json.JSONDecodeError):
+        except (OSError, ValueError):  # not UTF-8 or not JSON
             continue
-        yield full_path, data
+        if isinstance(data, dict):
+            yield full_path, data
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +116,11 @@ def _collect_entity_ids_and_traces(
     are added so BFS reaches everything).
     """
 
-    edges_on = has_legacy_fields([data], LEGACY_SCOPE_LINK_FIELDS)
+    # The file, the records of its top-level arrays, and the anchor rows (`plan.milestone_index[].fr_refs`).
+    anchor_rows = data.get("plan", {}).get("milestone_index") if isinstance(data.get("plan"), dict) else None
+    edges_on = has_legacy_fields(
+        records_of(data) + (anchor_rows if isinstance(anchor_rows, list) else []), LEGACY_SCOPE_LINK_FIELDS
+    )
 
     def _scan(obj: Any, parent_array_key: str | None, array_index: int | None) -> None:
         if isinstance(obj, dict):

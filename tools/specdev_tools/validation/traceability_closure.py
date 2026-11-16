@@ -12,10 +12,11 @@ from ._legacy_shim import (
     LEGACY_CAPABILITY_METRIC_FIELDS,
     LEGACY_CHARTER_GOAL_FIELDS,
     LEGACY_DELIVERABLE_FIELDS,
-    LEGACY_FIXTURE_COVERAGE_FIELDS,
     LEGACY_PLAN_CHECKLIST_FIELDS,
     LEGACY_PLAN_EVIDENCE_FIELDS,
-    LEGACY_ROADMAP_FR_REF_FIELDS,
+    fr_api_reader_on,
+    fr_fixture_reader_on,
+    fr_milestone_reader_on,
     LEGACY_TRACE_FIELDS,
     reader_on,
     is_parked_any_shape,
@@ -133,7 +134,7 @@ def _load_milestone_plans_from_anchor(
     try:
         with open(anchor_path, encoding="utf-8") as f:
             anchor_data = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):  # not UTF-8 or not JSON
         errors.append(make_error(
             "W570",
             f"GRACEFUL_SKIP unreadable_spec_file {ANCHOR_FILENAME}",
@@ -160,8 +161,11 @@ def _load_milestone_plans_from_anchor(
             continue
         try:
             with open(resolved, encoding="utf-8") as f:
-                plans.append(json.load(f))
-        except (OSError, json.JSONDecodeError) as exc:
+                plan = json.load(f)
+            if not isinstance(plan, dict):
+                raise ValueError("top level is not an object")
+            plans.append(plan)
+        except (OSError, ValueError) as exc:
             errors.append(make_error(
                 "W588",
                 f"ANCHOR_MILESTONE_UNREADABLE {milestone_id}: "
@@ -174,6 +178,11 @@ def _load_milestone_plans_from_anchor(
 def _plan_checklist(plan: Any) -> list[dict[str, Any]]:
     """The object items of ``plan.spec_alignment.checklist`` of *plan*; empty when any level is absent or wrong-typed."""
     return dict_items(as_dict(as_dict(as_dict(plan).get("plan")).get("spec_alignment")).get("checklist"))
+
+
+def _plan_evidence_records(plans: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The records W576 reads: each plan's ``execution`` object (``critical_evidence``) and checklist items (``spec_ref``)."""
+    return [as_dict(plan.get("execution")) for plan in plans] + [item for plan in plans for item in _plan_checklist(plan)]
 
 
 def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecError]]:
@@ -189,8 +198,11 @@ def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecErr
             continue
         try:
             with open(path, encoding="utf-8") as f:
-                data[key] = json.load(f)
-        except (OSError, json.JSONDecodeError):
+                loaded = json.load(f)
+            if not isinstance(loaded, dict):
+                raise ValueError("top level is not an object")
+            data[key] = loaded
+        except (OSError, ValueError):  # not UTF-8, not JSON, or not an object: read as an unreadable file
             if key in _OPTIONAL_KEYS:
                 continue
             errors.append(make_error("W570", f"GRACEFUL_SKIP unreadable_spec_file {filename}"))
@@ -204,25 +216,22 @@ def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecErr
 # file and is skipped. The four below are also the dimensions `completeness-check` reports.
 def _api_reader_on(data: dict[str, Any]) -> bool:
     """W564 / E535 read the `trace` of the apis."""
-    apis = data["apis"]
-    return reader_on([apis], LEGACY_TRACE_FIELDS, entries=apis.get("apis"))
+    return fr_api_reader_on(dict_items(data["apis"].get("apis")))
 
 
 def _fixture_reader_on(data: dict[str, Any]) -> bool:
-    """W565 / E536 read the `targets` and `out_of_scope` of the fixtures."""
-    fixtures = data["fixtures"]
-    return reader_on([fixtures], LEGACY_FIXTURE_COVERAGE_FIELDS, entries=fixtures.get("fixtures"))
+    """W565 / E536 read the `targets` of the fixtures and the file-level `out_of_scope`."""
+    return fr_fixture_reader_on(dict_items(data["fixtures"].get("fixtures")), [data["fixtures"]])
 
 
 def _milestone_reader_on(data: dict[str, Any]) -> bool:
-    """W561 / W566 read the `fr_refs` of the roadmap."""
-    roadmap = data["roadmap"]
-    return reader_on([roadmap], LEGACY_ROADMAP_FR_REF_FIELDS, entries=roadmap.get("milestones"))
+    """W561 / W566 read the `fr_refs` of the roadmap milestones."""
+    return fr_milestone_reader_on(dict_items(data["roadmap"].get("milestones")))
 
 
 def _capability_reader_on(data: dict[str, Any]) -> bool:
     """W568 reads the `trace` of the frs."""
-    return reader_on([data["frs"]], LEGACY_TRACE_FIELDS, when_empty=False)
+    return reader_on(dict_items(data["frs"].get("functional_requirements")), LEGACY_TRACE_FIELDS, when_empty=False)
 
 
 def uncomputed_dimensions(spec_dir: str, repo_root: str | None = None) -> list[str]:
@@ -322,11 +331,12 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # reads capability success_metric_refs; each runs only when the artifacts it reads carry its fields.
     if "charter" in data and "capabilities" in data:
         charter_goals = data["charter"]
+        capability_records = dict_items(data["capabilities"].get("capabilities"))
         goal_half_on = (
-            reader_on([charter_goals], LEGACY_CHARTER_GOAL_FIELDS, when_empty=False)
-            and reader_on([data["capabilities"]], LEGACY_CAPABILITY_GOAL_FIELDS, when_empty=False)
+            reader_on(dict_items(charter_goals.get("goals")), LEGACY_CHARTER_GOAL_FIELDS, when_empty=False)
+            and reader_on(capability_records, LEGACY_CAPABILITY_GOAL_FIELDS, when_empty=False)
         )
-        metric_half_on = reader_on([data["capabilities"]], LEGACY_CAPABILITY_METRIC_FIELDS, when_empty=False)
+        metric_half_on = reader_on(capability_records, LEGACY_CAPABILITY_METRIC_FIELDS, when_empty=False)
         goal_ids: set[str] = set()
         for goal in dict_items(as_dict(charter_goals).get("goals")) if goal_half_on else []:
             if isinstance(goal.get("goal_id"), str) and goal["goal_id"]:
@@ -524,7 +534,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Legacy-guarded (M6c deletes): reads the `deliverables` of the step-09 milestones.
     if (
         "impl_plan" in data and "roadmap" in data
-        and reader_on([data["impl_plan"]], LEGACY_DELIVERABLE_FIELDS, when_empty=False)
+        and reader_on(dict_items(data["impl_plan"].get("milestones")), LEGACY_DELIVERABLE_FIELDS, when_empty=False)
     ):
         # Collect all artifact IDs referenced in Step 14 tasks (fr_refs) and deliverables
         step14_task_fr_ids: set[str] = set()
@@ -559,7 +569,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Legacy-guarded (M6c deletes): reads the `critical_evidence` and checklist `spec_ref` of the plans.
     if (
         "code_execution" in data and "roadmap" in data
-        and reader_on(milestone_plans, LEGACY_PLAN_EVIDENCE_FIELDS, when_empty=False)
+        and reader_on(_plan_evidence_records(milestone_plans), LEGACY_PLAN_EVIDENCE_FIELDS, when_empty=False)
     ):
         # Executed task coverage is sourced from `satisfied_task_ids`, resolved
         # per-plan in `_load_milestone_plans_from_anchor` from each plan's

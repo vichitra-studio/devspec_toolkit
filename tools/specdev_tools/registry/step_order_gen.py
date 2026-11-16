@@ -49,8 +49,9 @@ _NOTES = {
         "1.2.0 keeps, and is live."
     ),
     "downstream_consumers": (
-        "Records which steps actively consume each step's output. Read by 'specdev prompt-context'. "
-        "NOT used by the forward-replay check (which uses positional ordering in 'steps')."
+        "Records which steps actively consume each step's output. Read by 'specdev prompt-context' and by the "
+        "W595 staleness check of forward replay. The E550 order check of forward replay does not read it: "
+        "it uses the positional order in 'steps'."
     ),
     "declared_edges": (
         "Hand-carried [producer, consumer] pairs. Steps 13, 13a, 16a, 16b and 16c keep their 1.1.1 "

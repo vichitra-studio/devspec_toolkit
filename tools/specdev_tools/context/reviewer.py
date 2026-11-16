@@ -18,7 +18,7 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
-from ..validation._legacy_shim import LEGACY_REVIEWER_TRACE_FIELDS, has_legacy_fields
+from ..validation._legacy_shim import LEGACY_REVIEWER_TRACE_FIELDS, has_legacy_fields, records_of
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
 from ._utils import merge_allof as _u_merge_allof
@@ -290,7 +290,7 @@ def _run_structural_pass(
     are skipped and report nothing (M4 / M6a replace them; M6c deletes the guard).
     """
     _ = artifact_path  # currently unused
-    if not has_legacy_fields([artifact], LEGACY_REVIEWER_TRACE_FIELDS):
+    if not has_legacy_fields(records_of(artifact), LEGACY_REVIEWER_TRACE_FIELDS):
         return _empty_structural_review()
 
     # --- Collect upstream entity IDs ---

@@ -1,10 +1,22 @@
 """Guards for readers of 1.1.1 fields that the spec graph retires (M6c deletes this module).
 
-A guarded reader runs only when the artifacts that reader itself reads still carry a field that
-reader itself reads (one constant per reader or group of readers; never "any loaded artifact").
-There is no old-to-new translation: new-shape data skips the reader and yields no finding.
-A guard counts a field anywhere in the whole array it reads: one array that holds entries of both shapes
-(some carrying the 1.1.1 field, some not) turns the 1.1.1 reader on for every entry of that array.
+A guarded reader runs only when the records that reader itself reads still carry a field that reader itself
+reads (one constant per reader or group of readers; never "any loaded artifact"). There is no old-to-new
+translation: new-shape data skips the reader and yields no finding.
+
+A guard decides from record KEYS, never from nested values. ``has_legacy_fields(records, names)`` is true when some
+record (a mapping) of *records* has a key in *names*; it does not descend, so a free-form payload (a fixture
+``input``, an API body) that happens to hold a key named like a 1.1.1 field leaves the reader off. In 1.1.1 every
+guarded field is a key of a record of a top-level array of its file (FR, API, NFR, capability, component ``trace``,
+fixture ``targets``, threat ``target_ids`` and ``mitigations``, roadmap milestone ``fr_refs`` and
+``source_milestones``, step-09 milestone ``deliverables``, charter goal ``goal_id``, capability
+``success_metric_refs``) or of the file itself (``out_of_scope``, a file-level ``trace``). A caller passes the records its
+reader reads; ``records_of(artifact)`` gives the file and the object members of its top-level arrays. The three
+exceptions name their records at the call site: the plan's ``execution`` object (``critical_evidence``), the plan
+checklist items (``spec_ref``) and the anchor rows of ``plan.milestone_index`` (``fr_refs``).
+One array holding records of both shapes turns the 1.1.1 reader on for the whole array. The reader of an empty or
+absent array runs as before (``reader_on(..., when_empty=True)``); the FR-to-API, FR-to-fixture and FR-to-milestone
+decisions below are written once and used by ``matrix.py`` and ``traceability_closure.py`` alike.
 Deleting this module means deleting every use of ``reader_on``, ``has_legacy_fields`` and the ``LEGACY_*``
 names; the callers of ``is_parked_any_shape`` go back to ``core.scope_helpers.is_parked``. Two functions here are
 not guards and go with the retirement of their callers: ``removed_paths`` (``forward_replay_check.py``) and
@@ -37,10 +49,6 @@ LEGACY_COMPONENT_TRACE_FIELDS: frozenset[str] = frozenset({"trace", "trace_refs"
 
 # Fixture `targets`: the fixture-to-API link read by `matrix.py`.
 LEGACY_FIXTURE_TARGET_FIELDS: frozenset[str] = frozenset({"targets"})
-
-# FR-to-fixture coverage (W565, E536 in `traceability_closure.py`, the same dimension in
-# `completeness-check`): fixture `targets` and the step-08 `out_of_scope` exemption.
-LEGACY_FIXTURE_COVERAGE_FIELDS: frozenset[str] = frozenset({"targets", "out_of_scope"})
 
 # NFR `trace`: the NFR-to-API and NFR-to-FR links read by `matrix.py`.
 LEGACY_NFR_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
@@ -95,46 +103,58 @@ def is_parked_any_shape(node: Mapping[str, Any]) -> bool:
     )
 
 
-def _carries(value: Any, names: Collection[str]) -> bool:
-    if isinstance(value, Mapping):
-        return any(key in names or _carries(item, names) for key, item in value.items())
-    if isinstance(value, list):
-        return any(_carries(item, names) for item in value)
-    return False
+def records_of(artifact: Any) -> list[Mapping[str, Any]]:
+    """Return *artifact* itself when it is a mapping, followed by the object members of its top-level arrays.
 
-
-def has_legacy_fields(artifacts: Iterable[Any], names: Collection[str]) -> bool:
-    """Return True when any key in *names* appears at any depth of any artifact in *artifacts*.
-
-    *artifacts* is an iterable of loaded artifact values (dicts); anything that is not a mapping
-    or list is ignored. Never raises on malformed data.
+    These are the records a whole-file guard reads. Anything else gives an empty list; never raises.
     """
-    return any(_carries(artifact, names) for artifact in artifacts)
+    if not isinstance(artifact, Mapping):
+        return []
+    records: list[Mapping[str, Any]] = [artifact]
+    for value in artifact.values():
+        if isinstance(value, list):
+            records.extend(item for item in value if isinstance(item, Mapping))
+    return records
 
 
-_SAME: Any = object()
+def has_legacy_fields(records: Iterable[Any], names: Collection[str]) -> bool:
+    """Return True when some mapping of *records* has a key in *names* (it does not look inside the values).
 
-
-def reader_on(
-    artifacts: Iterable[Any],
-    names: Collection[str],
-    *,
-    entries: Any = _SAME,
-    when_empty: bool = True,
-) -> bool:
-    """Return True when a 1.1.1 reader of *names* runs on *artifacts*.
-
-    The one rule of every guard: when *entries* (default *artifacts*; ``None`` is an absent array) is empty or absent the reader runs as
-    before (*when_empty*; pass False for a reader that has nothing to read then); otherwise it runs only when
-    *artifacts* still carry a key of *names*, so an array whose entries carry none of them is a graph-shape file
-    and is skipped. *entries* is the array whose emptiness decides, when the fields are searched in a larger
-    artifact (a step-05 file for its ``apis``). Never raises on malformed data.
+    Anything in *records* that is not a mapping is ignored. Never raises on malformed data.
     """
-    artifacts = list(artifacts)
-    watched = artifacts if entries is _SAME else entries
-    if not watched:
-        return when_empty
-    return has_legacy_fields(artifacts, names)
+    return any(isinstance(record, Mapping) and any(key in names for key in record) for record in records)
+
+
+def reader_on(records: Iterable[Any], names: Collection[str], *, when_empty: bool = True) -> bool:
+    """Return True when a 1.1.1 reader of *names* runs on *records*.
+
+    With no record the reader runs as before (*when_empty*; False for a reader that then has nothing to read);
+    otherwise it runs only when a record carries a key of *names*, so records that carry none are a graph-shape
+    file and are skipped. Never raises on malformed data.
+    """
+    records = list(records)
+    return has_legacy_fields(records, names) if records else when_empty
+
+
+def fr_api_reader_on(apis: Iterable[Any]) -> bool:
+    """The FR-to-API decision (W564, E535, the matrix FR-to-API links): *apis* are the api records."""
+    return reader_on(apis, LEGACY_TRACE_FIELDS)
+
+
+def fr_fixture_reader_on(fixtures: Iterable[Any], files: Iterable[Any] = ()) -> bool:
+    """The FR-to-fixture decision (W565, E536): *fixtures* are the fixture records, *files* the 08 files.
+
+    A 1.1.1 file also carries the file-level ``out_of_scope`` exemption, so it turns the reader on.
+    """
+    records = list(fixtures)
+    if any(isinstance(file, Mapping) and "out_of_scope" in file for file in files):
+        return True
+    return reader_on(records, LEGACY_FIXTURE_TARGET_FIELDS)
+
+
+def fr_milestone_reader_on(milestones: Iterable[Any]) -> bool:
+    """The FR-to-milestone decision (W561, W566, the matrix milestone coverage): *milestones* are the roadmap records."""
+    return reader_on(milestones, LEGACY_ROADMAP_FR_REF_FIELDS)
 
 
 _SCHEMA_CHANGES_FILE = Path(__file__).resolve().parents[2] / "schema_changes.json"
@@ -172,6 +192,8 @@ def out_of_scope_fr_ids(artifact: Mapping[str, Any]) -> set[str]:
     An entry counts when it is an object with a string ``fr_id`` and a non-empty ``rationale``. A
     new-shape file has no ``out_of_scope`` and yields the empty set. Never raises on a wrong-typed value.
     """
+    if not isinstance(artifact, Mapping):
+        return set()
     entries = artifact.get("out_of_scope")
     if not isinstance(entries, list):
         return set()

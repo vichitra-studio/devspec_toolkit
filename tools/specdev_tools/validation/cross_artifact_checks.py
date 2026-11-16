@@ -177,7 +177,7 @@ def check_step_02_integrity(
         # Capability coverage. This is the legacy block (M6c deletes): it reads component
         # trace / trace_refs. The check that survives is the one in validators/step_02.py,
         # which reads derives_from and exempts parked capabilities.
-        if capability_ids and has_legacy_fields([components], LEGACY_COMPONENT_TRACE_FIELDS):
+        if capability_ids and has_legacy_fields(components, LEGACY_COMPONENT_TRACE_FIELDS):
             traced: set[str] = set()
             for comp in components:
                 traces = (comp.get("trace") or []) + (comp.get("trace_refs") or [])

@@ -588,7 +588,7 @@ def _run_deep_validation(
     spec_root: str | None = None,
 ) -> list[SpecError]:
     validator = DEEP_VALIDATORS.get(step)
-    if validator is None:
+    if validator is None or not isinstance(data, dict):  # a non-object document is reported by the schema
         return []
     context = _build_validation_context(repo_root, path, git_root=git_root, spec_root=spec_root)
     try:

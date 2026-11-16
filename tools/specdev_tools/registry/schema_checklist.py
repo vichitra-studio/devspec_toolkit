@@ -11,6 +11,10 @@ Path notation is that of ``schema_paths``: ``a[].b`` for array items, ``m{}`` fo
 characters, ``*`` any characters except ``.``, ``[``, ``]``, ``{`` and ``}``.  A row's ``step``
 selects every schema whose name equals it or starts with it plus ``_`` (core schemas are
 ``core/<name>``).
+
+``load_baseline``, ``row_holds`` and ``uncovered_paths`` (with ``schema_paths.flatten_schema_dir``)
+are the closure gate: no command calls them, the closure test in
+``tests/unit/registry/test_schema_change_checklist.py`` does.
 """
 from __future__ import annotations
 

@@ -41,17 +41,16 @@ $ specdev prompt-context 04 --repo-root ./devspec_toolkit
 |------|------|
 | 05 | Interface Contracts |
 | 06 | Invariants |
-| 07 | NFRs |
+| 07 | Nfrs |
 | 08 | Fixtures |
-| 09 | Implementation Plan |
-| 11 | Red Team |
-| 13 | Extension Generator |
+| 09 | Impl Plan |
+| 11 | Redteam |
+| 13 | Extension Manifest |
 | 13a | Completeness Assessment |
 | 14 | Roadmap |
-| 15 | Scaffold |
-| 16 | Impl Context |
-| 16a | Impl Planner |
-| 16c | Impl Reviewer |
+| 16a | Step 16a |
+| 16b | Step 16b |
+| 16c | Step 16c |
 ```
 
 ## Error Handling

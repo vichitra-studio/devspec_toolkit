@@ -9,12 +9,12 @@ from ..core.scope_helpers import as_str, dict_items, str_items
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
 from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, ALWAYS_EXCLUDED
 from ._legacy_shim import (
-    LEGACY_FIXTURE_TARGET_FIELDS,
     LEGACY_NFR_TRACE_FIELDS,
-    LEGACY_ROADMAP_FR_REF_FIELDS,
     LEGACY_THREAT_MITIGATION_FIELDS,
     LEGACY_THREAT_TARGET_FIELDS,
-    LEGACY_TRACE_FIELDS,
+    fr_api_reader_on,
+    fr_fixture_reader_on,
+    fr_milestone_reader_on,
     reader_on,
     is_parked_any_shape,
     out_of_scope_fr_ids,
@@ -61,8 +61,12 @@ if _invalid_matrix_link_types:
     )
 
 def load_json(path):
+    """Read a spec file; a file that is not UTF-8 JSON with an object at the top raises ``ValueError`` (or ``OSError``)."""
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: top level is not an object")
+    return data
 
 
 def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[tuple[str, str]]]:
@@ -151,7 +155,7 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[SpecError]:
         try:
             data = load_json(p)
             artifacts[p] = data
-        except (OSError, json.JSONDecodeError):
+        except (OSError, ValueError):
             pass
 
     known_ids, references = collect_definitions_and_references(artifacts)
@@ -290,7 +294,7 @@ def build_trace_matrix(
             data = load_json(p)
             artifacts[data["id"] if isinstance(data.get("id"), str) else p] = data
             path_to_data[p] = data
-        except (OSError, json.JSONDecodeError):
+        except (OSError, ValueError):
             pass
 
     # Entity indexing: registry-driven when the toolkit registry is available,
@@ -366,7 +370,7 @@ def build_trace_matrix(
     # nothing. FR-to-API coverage counts as computed when there is no API at all (coverage is 0
     # by definition, as on main) or when some API carries `trace`; it is not computed when APIs
     # exist and none carries `trace`.
-    fr_to_api_computed = reader_on(apis.values(), LEGACY_TRACE_FIELDS)
+    fr_to_api_computed = fr_api_reader_on(apis.values())
     if fr_to_api_computed:
         for api in apis.values():
             for t in dict_items(api.get("trace")):
@@ -375,7 +379,7 @@ def build_trace_matrix(
 
     # One rule for every link reader: entities of its kind exist and none carries its legacy field, so
     # the reader is skipped and the values it fills are omitted and named in `not_computed`.
-    fixture_links_computed = reader_on(fixtures, LEGACY_FIXTURE_TARGET_FIELDS)
+    fixture_links_computed = fr_fixture_reader_on(fixtures)
     nfr_links_computed = reader_on(nfrs, LEGACY_NFR_TRACE_FIELDS)
     threat_links_computed = reader_on(threats, LEGACY_THREAT_TARGET_FIELDS)
     if fixture_links_computed:
@@ -490,7 +494,7 @@ def build_trace_matrix(
         schema = as_str(data.get("$schema"))
         if "14-roadmap" in schema or "14_roadmap" in schema:
             roadmaps_loaded += 1
-            if not reader_on([data], LEGACY_ROADMAP_FR_REF_FIELDS, when_empty=False):
+            if not fr_milestone_reader_on(dict_items(data.get("milestones"))):
                 continue
             roadmaps_read += 1
             for milestone in dict_items(data.get("milestones")):
@@ -618,5 +622,5 @@ def _load_coverage_thresholds(repo_root: str) -> dict | None | object:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data.get("coverage_thresholds")
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):
         return _MISSING_FILE

@@ -335,7 +335,7 @@
 
 ### E555 SEMANTIC_COVERAGE_REGRESSION
 
-**Trigger**: IDs present in the old version of an upstream artifact are absent from the new version, indicating dropped coverage.
+**Trigger**: IDs present in the old version of an upstream artifact are absent from the new version, indicating dropped coverage. An id that lived only in a field the schema removed is not counted when that field's row in `tools/schema_changes.json` has `shim: true`.
 
 **Resolution**: Restore the dropped IDs or update all downstream artifacts that reference them.
 
@@ -711,7 +711,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E141 TASK_DEPENDENCY_CYCLE / Circular job dependency
 
-**Trigger**: Two independent emitters share this code: (1) `step_12.py` — a CI job's `depends_on[]` graph in `12_ci_gates.json` contains a cycle; (2) `step_14.py` — a step 14 roadmap task's dependency graph (task-to-task, via `dfs`) contains a cycle involving a named milestone.
+**Trigger**: Two independent emitters share this code: (1) `step_12.py` — a CI job's `depends_on[]` graph in `12_ci_gates.json` contains a cycle; (2) `step_14.py` — the task-to-task `depends_on` graph of one step 14 roadmap milestone contains a cycle (a cycle that runs through tasks of two milestones is not checked).
 
 **Resolution**: Break the cycle by removing or reordering the offending `depends_on` (job) or task-dependency edge so the graph is acyclic.
 
@@ -755,7 +755,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Trigger**: Fired by `dependency_order_lint.py` (M4 check) in three shapes, all comparing `tools/step_order.json`'s `step_metadata[].required_spec_inputs` against the `downstream_consumers`-derived inverse graph: (1) a `step_metadata` key references a step not declared in the top-level `steps` array (phantom key); (2) a step's `required_spec_inputs` is missing an entry implied by another step's `downstream_consumers`; (3) a step's `required_spec_inputs` has an extra entry not implied by any `downstream_consumers`.
 
-**Resolution**: Remove the phantom `step_metadata` key, or reconcile `required_spec_inputs` with the corresponding `downstream_consumers` entries so the two stay consistent.
+**Resolution**: `step_metadata` and `downstream_consumers` are generated: correct the hand-kept keys of `tools/step_order.json` (`steps`, `declared_edges`) if the fault comes from them, then run `specdev registry-generate --repo-root <toolkit>`. Do not edit the two generated keys by hand.
 
 **Promotable**: No (error only).
 

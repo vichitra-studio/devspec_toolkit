@@ -8,7 +8,7 @@ from typing import Any
 from ...core.constants import resolve_extras_path
 from ...core.errors import make_error, SpecError
 from ...core.scope_helpers import dict_items
-from ...validation._legacy_shim import LEGACY_ROADMAP_MATRIX_FIELDS, has_legacy_fields
+from ...validation._legacy_shim import LEGACY_ROADMAP_MATRIX_FIELDS, has_legacy_fields, records_of
 
 
 def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path: str | None = None) -> list[SpecError]:
@@ -35,7 +35,7 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
     # AUDIT-033: Trace matrix staleness check (W604)
     # If spec/extras/trace_matrix.json is older than the roadmap artifact, warn that it should be regenerated.
     # The matrix is built from the 1.1.1 `fr_refs` / `source_milestones` (M6c deletes the guard).
-    if has_legacy_fields([instance], LEGACY_ROADMAP_MATRIX_FIELDS):
+    if has_legacy_fields(records_of(instance), LEGACY_ROADMAP_MATRIX_FIELDS):
         errors.extend(_check_trace_matrix_staleness(artifact_path))
     return errors
 

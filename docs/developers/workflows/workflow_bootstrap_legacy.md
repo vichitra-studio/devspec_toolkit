@@ -488,7 +488,7 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > - `spec/impl_context/{step_id}.json` (Plan + Execution)
 > - The actual codebase for the implemented milestone
 >
-> The AI audits the implementation against the plan and spec. If `verdict` is `verified`, it also updates `spec/14_roadmap.json` and `spec/09_impl_plan.json` to set the milestone's status to `done`. If unverified, loop back to Step 16a with the surfaced remediation tasks.
+> The AI audits the implementation against the plan and spec. If `verdict` is `verified`, the milestone's row in the anchor `spec/16_impl_context.json` (`plan.milestone_index[]`) is set to `status: done` with its `close` record; `spec/14_roadmap.json` and `spec/09_impl_plan.json` carry no milestone status. If unverified, loop back to Step 16a with the surfaced remediation tasks.
 
 **Validation ritual after each Trinity Loop iteration:**
 ```bash

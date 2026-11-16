@@ -111,8 +111,9 @@ changes:
       later in this release, and the specdev align status / diff / plan
       commands report nothing for a 1.1.1 spec of steps 00 to 05 against the
       new schemas, top-level renames such as in_scope to scope_items included,
-      because the differ reads only a schema's top-level required, properties
-      and additionalProperties.
+      because the differ reads only a schema's own top-level required,
+      properties and additionalProperties, and these step schemas keep their
+      properties under allOf.
     migration:
       action: ai_assisted
 
@@ -184,9 +185,11 @@ changes:
       Steps 06 to 16 move to the spec-graph shape, with the core schemas they
       share; existing host specs do not validate until migrated. No migration path
       exists yet for a 1.1.1 spec to this shape: the align migration passes land
-      in a later 1.2.0 change, and specdev align status / diff / plan see only a
-      schema's top-level required, properties and additionalProperties, so they
-      miss the nested changes below.
+      in a later 1.2.0 change, and specdev align status / diff / plan read only a
+      schema's own top-level required, properties and additionalProperties, while
+      the step schemas keep most or all of their properties under allOf, so they
+      miss the changes below, top-level ones included (align diff reports a 1.1.1
+      file of step 07, 08, 11 or 14 as OK).
     migration:
       action: ai_assisted
 
@@ -335,8 +338,9 @@ changes:
   - type: change_schema
     description: >
       Step 16 plan (16_impl_context): the file requires a file-level milestone
-      (the roadmap milestone id the plan is about), and a plan is found through
-      it. plan.status, plan.deferred_reason and plan.coverage_status are removed.
+      (the roadmap milestone id the plan is about), and the anchor validator finds
+      the plan of an anchor row through it (milestone-state still finds a plan by
+      its file name). plan.status, plan.deferred_reason and plan.coverage_status are removed.
       A plan item (plan.spec_alignment.checklist[], node kind plan-item) loses
       spec_ref, milestone_ref, nfr_refs, fixture_ref, checklist_status,
       deferred_reason, wont_do_reason, linked_test_expectation and
@@ -387,7 +391,10 @@ changes:
       the E530 check for method are gone. The deep validators of steps 01 to 16 do
       not raise on a value of the wrong type, in the file they validate or in a
       file they read; the schema reports it for the file that holds it (a
-      validator may also report its own finding). The
+      validator may also report its own finding). traceability-check,
+      completeness-check and matrix read a spec file that is not UTF-8 JSON with
+      an object at the top level as an unreadable file, instead of ending with
+      specdev: fatal error. The
       step 16 anchor no longer emits W607 or W612; a plan file with no milestone
       key is skipped with W608, a plan whose milestone no anchor row is about is
       skipped with W611, and W610 pairs a plan with its row through milestone.
@@ -441,8 +448,8 @@ changes:
       cli_commands.json and the checklist. In entry_key_registry.json, the kind
       inv becomes invariant, milestone becomes design-milestone (step 09) and
       roadmap-milestone (step 14), and the step 14 dependency entry is removed;
-      the kinds rule, scaffold-row, anchor-row, plan-item and ambiguity-item are
-      new. Step 16a is registered under the key impl_context/ms_*_plan.json,
+      the step 11 mitigation entry is removed too; the kinds rule, task-criterion,
+      scaffold-row, anchor-row, plan-item and ambiguity-item are new. Step 16a is registered under the key impl_context/ms_*_plan.json,
       which holds the plan items and the two ambiguity lists of a plan file
       (plan.ambiguities, execution.emergent_ambiguities), so registry-check reads
       those lists in plan files; 16b and 16c stay deferred.

@@ -31,7 +31,11 @@ from specdev_tools.validation._legacy_shim import (
     has_legacy_fields,
     is_parked_any_shape,
     out_of_scope_fr_ids,
+    fr_api_reader_on,
+    fr_fixture_reader_on,
+    fr_milestone_reader_on,
     reader_on,
+    records_of,
     removed_paths,
 )
 from specdev_tools.validation.seed_lint import lint_seeds
@@ -83,18 +87,18 @@ _ALL_LEGACY_NAMES = (
 )
 
 
-def test_has_legacy_fields_true_for_1_1_1_shape():
-    assert has_legacy_fields(LEGACY_SHAPE.values(), LEGACY_TRACE_FIELDS)
-    assert has_legacy_fields([LEGACY_SHAPE["00_charter.json"]], LEGACY_CHARTER_GOAL_FIELDS)
-    assert has_legacy_fields([LEGACY_SHAPE["01_capabilities.json"]], LEGACY_CAPABILITY_GOAL_FIELDS)
-    assert has_legacy_fields([_CAPABILITIES_1_1_1], LEGACY_CAPABILITY_METRIC_FIELDS)
+def test_records_of_a_1_1_1_shape_carry_the_legacy_fields():
+    assert has_legacy_fields(records_of(LEGACY_SHAPE["05_interface_contracts.json"]), LEGACY_TRACE_FIELDS)
+    assert has_legacy_fields(records_of(LEGACY_SHAPE["00_charter.json"]), LEGACY_CHARTER_GOAL_FIELDS)
+    assert has_legacy_fields(records_of(LEGACY_SHAPE["01_capabilities.json"]), LEGACY_CAPABILITY_GOAL_FIELDS)
+    assert has_legacy_fields(records_of(_CAPABILITIES_1_1_1), LEGACY_CAPABILITY_METRIC_FIELDS)
     assert has_legacy_fields([{"component_id": "comp-a", "trace": []}], LEGACY_COMPONENT_TRACE_FIELDS)
     assert has_legacy_fields([{"component_id": "comp-a", "trace_refs": []}], LEGACY_COMPONENT_TRACE_FIELDS)
 
 
-def test_has_legacy_fields_false_for_new_shape():
+def test_records_of_a_new_shape_carry_no_legacy_field():
     for names in _ALL_LEGACY_NAMES:
-        assert not has_legacy_fields(NEW_SHAPE.values(), names)
+        assert not any(has_legacy_fields(records_of(artifact), names) for artifact in NEW_SHAPE.values())
 
 
 class _Spec(NamedTuple):
@@ -225,9 +229,28 @@ def test_reader_on_is_the_one_rule_of_the_guards():
     assert reader_on([], {"trace"}, when_empty=False) is False
     assert reader_on([{"id": 1}], {"trace"}) is False
     assert reader_on([{"trace": []}], {"trace"}) is True
-    assert reader_on([{"apis": [{"x": 1}], "trace": 1}], {"trace"}, entries=[]) is True
-    assert reader_on([{"apis": [{"x": 1}]}], {"trace"}, entries=[{"x": 1}]) is False
-    assert reader_on([{"out_of_scope": []}], {"trace"}, entries=None) is True  # an absent array runs the reader
+    assert reader_on(iter([{"trace": []}]), {"trace"}) is True  # any iterable of records
+
+
+def test_has_legacy_fields_reads_keys_of_records_and_does_not_descend():
+    assert has_legacy_fields([{"trace": []}], {"trace"})
+    assert not has_legacy_fields([{"input": {"trace": [1]}, "expected": [{"targets": 1}]}], {"trace", "targets"})
+    assert not has_legacy_fields([7, "trace", None, ["trace"]], {"trace"})
+
+
+def test_records_of_is_the_file_and_the_objects_of_its_top_level_arrays():
+    artifact = {"a": [{"x": 1}, 5, [{"y": 2}]], "b": {"c": [{"z": 3}]}, "d": "s"}
+    assert records_of(artifact) == [artifact, {"x": 1}]
+    assert records_of([1]) == records_of(None) == records_of("x") == []
+
+
+def test_the_three_shared_decisions_use_the_one_empty_rule():
+    for decide in (fr_api_reader_on, fr_milestone_reader_on, fr_fixture_reader_on):
+        assert decide([]) is True
+        assert decide([{"x": 1}]) is False
+    assert fr_api_reader_on([{"trace": []}]) and fr_milestone_reader_on([{"fr_refs": []}])
+    assert fr_fixture_reader_on([{"targets": []}]) and fr_fixture_reader_on([{"x": 1}], [{"out_of_scope": []}])
+    assert not fr_fixture_reader_on([{"x": 1}], [{"fixtures": []}])
 
 
 @pytest.mark.parametrize(("node", "expected"), [
@@ -844,7 +867,7 @@ def test_legacy_shape_suites_unchanged():
 TOOLS_PACKAGE = TOOLKIT_ROOT / "tools" / "specdev_tools"
 SHIM_FILE = "validation/_legacy_shim.py"
 
-# Every function that calls `has_legacy_fields(`, with the shim-table row it belongs to. M6c deletes the module by
+# Every function that calls `has_legacy_fields(` or `reader_on(` (or a shared decision), with the shim-table row it belongs to. M6c deletes the module by
 # following this list; a new guard site must be added here.
 GUARD_SITES = {
     ("context/reviewer.py", "_run_structural_pass"): "context/reviewer.py",
@@ -884,14 +907,17 @@ def _tool_sources() -> dict[str, str]:
     }
 
 
+_GUARD_CALLS = ("has_legacy_fields", "reader_on", "fr_api_reader_on", "fr_fixture_reader_on", "fr_milestone_reader_on")
+
+
 def _guard_calls(source: str) -> set[str]:
-    """The names of the functions (innermost def) that call ``has_legacy_fields`` or ``reader_on``."""
+    """The names of the functions (innermost def) that call ``has_legacy_fields``, ``reader_on`` or a shared decision."""
     found: set[str] = set()
 
     def visit(node: ast.AST, enclosing: str | None) -> None:
         for child in ast.iter_child_nodes(node):
             name = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else enclosing
-            if isinstance(child, ast.Call) and getattr(child.func, "id", getattr(child.func, "attr", "")) in ("has_legacy_fields", "reader_on"):
+            if isinstance(child, ast.Call) and getattr(child.func, "id", getattr(child.func, "attr", "")) in _GUARD_CALLS:
                 found.add(enclosing or "<module>")
             visit(child, name)
 
@@ -899,7 +925,7 @@ def _guard_calls(source: str) -> set[str]:
     return found
 
 
-def test_every_has_legacy_fields_site_is_in_the_table():
+def test_every_guard_site_is_in_the_table():
     sites = {
         (name, function)
         for name, source in _tool_sources().items()

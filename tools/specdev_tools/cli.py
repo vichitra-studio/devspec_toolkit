@@ -1087,9 +1087,10 @@ def main():
                 return {}
             try:
                 with open(path, encoding="utf-8") as _f:
-                    return _json.load(_f)
+                    loaded = _json.load(_f)
             except (OSError, ValueError):
                 return {}
+            return loaded if isinstance(loaded, dict) else {}
 
         # Exclude parked FRs (scope later/out; the 1.1.1 priority:"wont-have" too) from
         # every FR-based denominator below. W564 (API coverage) and W566

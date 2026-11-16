@@ -7,7 +7,8 @@ return a list.  The same is done for the files a validator READS besides its own
 run on the unmutated folder): each is mutated on disk while the validator checks its unmutated document.  A validator
 may report its own finding on a wrong type; raising is the failure.  ``check_traceability_closure``,
 ``uncomputed_dimensions`` and ``build_trace_matrix`` run over a copy of the folder with one file mutated, and
-``compute_milestone_state`` over the mutated plan.
+``compute_milestone_state`` over the mutated plan.  A whole file of the wrong kind (top level not an object, bytes that
+are not UTF-8) is read as an unreadable file by the three folder readers and gives the deep validators no finding.
 """
 from __future__ import annotations
 
@@ -22,9 +23,11 @@ from unittest import mock
 import pytest
 
 from specdev_tools.context.milestone_state import compute_milestone_state
+from specdev_tools.context.scope_resolver import _build_trace_graph
+from specdev_tools.validation import _legacy_shim
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
-from specdev_tools.validation.validate import DEEP_VALIDATORS, _build_validation_context
+from specdev_tools.validation.validate import DEEP_VALIDATORS, _build_validation_context, _run_deep_validation
 
 _ROOT = Path(__file__).parents[3]
 _EXAMPLE = _ROOT / "tests" / "fixtures" / "graph_example" / "spec"
@@ -280,6 +283,99 @@ def test_closure_and_matrix_do_not_raise_on_the_example(tmp_path: Path) -> None:
 def test_closure_and_matrix_do_not_raise_on_the_1_1_1_corpus(tmp_path: Path) -> None:
     names = tuple(sorted(path.name for path in _CORPUS.glob("*.json")))
     assert _mutate_folder(_CORPUS, tmp_path, names, _WRONG_VALUES) == []
+
+
+# A whole file of the wrong kind: JSON whose top level is not an object, and bytes that are not UTF-8.
+_WHOLE_DOCUMENTS: tuple[Any, ...] = ([], 0, None, "x", True, 1.5)
+_NOT_UTF8 = b'{"a": "\xff\xfe"}'
+
+
+def test_deep_validation_gives_no_finding_on_a_whole_document_of_the_wrong_kind() -> None:
+    """``_run_deep_validation`` is where validators are called; it turns a non-object into no finding (the schema reports it)."""
+    failures: list[str] = []
+    for label, base, name, step, _loader in _cases():
+        for document in _WHOLE_DOCUMENTS:
+            found = _run_deep_validation(step, document, str(_ROOT), str(base / name), spec_root=str(base))
+            if found:
+                failures.append(f"{label} {step} = {document!r}: {found}")
+    assert failures == []
+
+
+def _replace_whole_files(source: Path, tmp_path: Path) -> list[str]:
+    """Replace each JSON file of *source* in a copy, once per whole document, and run the three folder readers."""
+    folder = tmp_path / source.parent.name / "spec"
+    shutil.copytree(source, folder)
+    failures: list[str] = []
+    for target in sorted(folder.rglob("*.json")):
+        original = target.read_bytes()
+        name = str(target.relative_to(folder))
+        for document in (*_WHOLE_DOCUMENTS, _NOT_UTF8):
+            target.write_bytes(document if isinstance(document, bytes) else json.dumps(document).encode())
+            failures += _readers_raise(folder, f"{name} = {document!r}")
+        target.write_bytes(original)
+    return failures
+
+
+def test_folder_readers_do_not_raise_on_a_whole_file_of_the_wrong_kind_in_the_example(tmp_path: Path) -> None:
+    assert _replace_whole_files(_EXAMPLE, tmp_path) == []
+
+
+def test_folder_readers_do_not_raise_on_a_whole_file_of_the_wrong_kind_in_the_corpus(tmp_path: Path) -> None:
+    assert _replace_whole_files(_CORPUS, tmp_path) == []
+
+
+# --- free-form payloads: a key named like a 1.1.1 field inside a value the schema does not describe -----------
+
+_GUARDED_NAMES = sorted(
+    {name for const in vars(_legacy_shim).values() if isinstance(const, frozenset) for name in const}
+    | {"out_of_scope", "spec_ref", "critical_evidence", "trace_refs"}
+)
+# Free-form locations of the 1.2.0 schemas: fixture `input` and `expected`, API `parameters` and `errors` entries,
+# the plan item's `implementation`.  (file, path of the object that receives the payload keys)
+_FREE_FORM_LOCATIONS = [
+    ("08_fixtures.json", ("fixtures", 0, "input")),
+    ("08_fixtures.json", ("fixtures", 0, "expected")),
+    ("05_interface_contracts.json", ("apis", 0, "parameters")),
+    ("05_interface_contracts.json", ("apis", 0, "errors")),
+    (_PLAN, ("plan", "spec_alignment", "checklist", 0, "implementation")),
+]
+
+
+def _payload() -> dict[str, Any]:
+    """Every guarded field name as a key: at object depth, and inside an array of objects."""
+    flat = {name: [] for name in _GUARDED_NAMES}
+    return {**flat, "nested": {**flat}, "list": [{**flat}]}
+
+
+def _outputs(folder: Path) -> dict[str, Any]:
+    _, adjacency = _build_trace_graph(str(folder))
+    return {
+        "closure": [error.render() for error in check_traceability_closure(str(folder), str(_ROOT))],
+        "uncomputed": uncomputed_dimensions(str(folder), str(_ROOT)),
+        "matrix": build_trace_matrix(str(_ROOT), str(folder)),
+        "graph": {key: sorted(value) for key, value in adjacency.items()},
+    }
+
+
+@pytest.mark.parametrize(("name", "path"), _FREE_FORM_LOCATIONS, ids=lambda value: str(value))
+def test_a_free_form_payload_with_every_guarded_field_name_leaves_every_reader_off(name: str, path: tuple, tmp_path: Path) -> None:
+    clean = tmp_path / "clean"
+    shutil.copytree(_EXAMPLE, clean)
+    expected = _outputs(clean)
+    document = json.loads((clean / name).read_text(encoding="utf-8"))
+    target = document
+    for key in path[:-1]:
+        target = target[key]
+    existing = target.get(path[-1]) if isinstance(target, dict) else None
+    if isinstance(existing, dict):
+        existing.update(_payload())
+    else:
+        target[path[-1]] = [_payload()] if path[-1] in ("parameters", "errors") else _payload()
+    (clean / name).write_text(json.dumps(document), encoding="utf-8")
+    assert _outputs(clean) == expected
+    assert expected["uncomputed"] == [
+        "fr_api_coverage", "fr_fixture_coverage", "fr_milestone_coverage", "capability_fr_coverage"
+    ]
 
 
 @pytest.mark.parametrize("field", ["trace", "targets", "target_ids"])
