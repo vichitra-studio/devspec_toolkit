@@ -42,7 +42,7 @@
               "text": {
                 "description": "The governance requirement, as one falsifiable sentence a person or a command can check. Example: 'Every pull request runs the contract test suite before merge.' Anti-pattern: 'Follow good review practice' (not checkable).",
                 "type": "string",
-                "minLength": 1
+                "minLength": 10
               },
               "enforcer": {
                 "description": "Who enforces this rule when it is not a command or a job. The only value is 'review': a person decides. Omit it for a rule a CI job enforces (that job names the rule in its own `realises`) and for a rule that names a command in cli_command. A rule never carries both enforcer and cli_command.",

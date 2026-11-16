@@ -796,7 +796,7 @@ def run(
         (extraction_paths_out, extraction_paths_doc),
     ]
 
-    # Derive everything first so a failure leaves no output half-written.
+    # Derive everything first (the checklist too), so a failure writes no output file.
     if step_order_out:
         hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
         derived = derive_from_decls(decls)
@@ -815,7 +815,9 @@ def run(
 
         outputs.append((os.path.abspath(cli_commands_out), generate_cli_commands()))
 
+    checklist = generate_checklist(Path(repo_root)) if checklist_out else None
+
     for path, doc in outputs:
         _write_doc(path, doc)
-    if checklist_out:
-        _write_text(os.path.abspath(checklist_out), generate_checklist(Path(repo_root)))
+    if checklist_out and checklist is not None:
+        _write_text(os.path.abspath(checklist_out), checklist)

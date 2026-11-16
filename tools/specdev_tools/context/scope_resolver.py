@@ -15,6 +15,7 @@ import os
 from typing import Any
 
 from ..core.constants import resolve_extras_path
+from ..core.loaders import read_json_object
 from ..validation._legacy_shim import LEGACY_SCOPE_LINK_FIELDS, has_legacy_fields, records_of
 
 
@@ -56,11 +57,6 @@ def _id_to_bucket(entity_id: str) -> str:
     return "other"
 
 
-def _load_json(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
-
-
 def _iter_spec_files(spec_dir: str):
     """Yield (abs_path, data) for every JSON file directly in *spec_dir* (non-recursive)."""
     spec_dir_abs = os.path.abspath(spec_dir)
@@ -72,11 +68,8 @@ def _iter_spec_files(spec_dir: str):
         full_path = os.path.join(spec_dir_abs, fname)
         if not os.path.isfile(full_path):
             continue
-        try:
-            data = _load_json(full_path)
-        except (OSError, ValueError):  # not UTF-8 or not JSON
-            continue
-        if isinstance(data, dict):
+        data = read_json_object(full_path)
+        if data is not None:
             yield full_path, data
 
 

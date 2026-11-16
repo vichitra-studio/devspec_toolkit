@@ -84,7 +84,7 @@ Defined in `tools/step_order.json`.
 **Structure:**
 
 - `steps`: ordered list of 22 step IDs: `00 01 02 02a 03 04 05 06 07 08 09 10 11 12 13 13a 14 15 16 16a 16b 16c`
-- `allowed_upstream_dependencies`: for each step, the cumulative set of all prior steps it may reference. This is the transitive closure -- step N lists every step before it.
+- `step_metadata[<step>].required_spec_inputs`: the steps whose artifacts this step reads.
 - `downstream_consumers`: declared on the **provider** side. Each step lists which later steps directly consume its output.
 
 **Policy flags:**
@@ -98,18 +98,11 @@ Defined in `tools/step_order.json`.
 }
 ```
 
-**Deriving required inputs:** To compute `required_inputs(step N)`, invert `downstream_consumers`: scan all entries and collect every provider step that lists `N` in its consumers array. Example: `required_inputs("05")` = `{02, 03, 04}` because `downstream_consumers["02"]` contains `"05"`, `downstream_consumers["03"]` contains `"05"`, and `downstream_consumers["04"]` contains `"05"`.
+**Generated, not hand-kept:** `specdev registry-generate` derives `step_metadata` and `downstream_consumers` from the `x-link` declarations of the step schemas and from the hand-kept `declared_edges` pairs; the two keys are each other's inverse (E543 otherwise). Only `version`, `steps`, `policy`, `coverage_thresholds` and `declared_edges` are edited by hand.
 
-**Key fan-out nodes:**
+**Reading the inputs of a step:** `step_metadata["05"].required_spec_inputs` is `["00", "02", "04"]`, and `downstream_consumers["00"]`, `["02"]` and `["04"]` each contain `"05"`. `specdev prompt-context <step>` prints the consumers of a step.
 
-| Step | Consumer count | Role |
-|---|---|---|
-| `04` (FRs) | 13 | Highest fan-out; feeds nearly every downstream step |
-| `05` (APIs) | 9 | Second-highest; drives fixtures, NFRs, scaffold, impl |
-| `00` (Charter) | 8 | Seeds governance, glossary, impl plan |
-| `14` (Roadmap) | 4 | Gates the Trinity Loop (16/16a/16b/16c) |
-
-**Leaf nodes** (no downstream consumers): `08`, `11`, `12`, `15`, `16a`, `16b`, `16c`.
+**Fan-out:** steps `00` (Charter), `04` (FRs) and `05` (APIs) have the most consumers; step `14` (Roadmap) feeds the Trinity Loop (`16`, `16a`, `16b`, `16c`). Steps `03` (Glossary: its terms are used by label, not by link) and `16c` have no consumer.
 
 ---
 

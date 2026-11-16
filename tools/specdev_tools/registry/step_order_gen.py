@@ -49,8 +49,8 @@ _NOTES = {
         "1.2.0 keeps, and is live."
     ),
     "downstream_consumers": (
-        "Records which steps actively consume each step's output. Read by 'specdev prompt-context' and by the "
-        "W595 staleness check of forward replay. The E550 order check of forward replay does not read it: "
+        "Records which steps actively consume each step's output. Read by 'specdev prompt-context', the context loaders, "
+        "'dag-lint', 'dependency-order-lint' and the W595 staleness check of forward replay. The E550 order check of forward replay does not read it: "
         "it uses the positional order in 'steps'."
     ),
     "declared_edges": (

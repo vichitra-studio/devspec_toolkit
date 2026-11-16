@@ -409,8 +409,11 @@ changes:
 
   - type: change_config
     description: >
-      No step validator checks that a link target exists in steps 06 to 16 in this
-      release; the link resolver of a later 1.2.0 change does. The checks that
+      The step validators of steps 06 to 16 do not check that the id in a link
+      field (a field the schema marks x-link, such as verifies, refines or
+      realises) exists, except a step 12 depends_on entry, which must name a job
+      of the same file (E590); the link resolver of a later 1.2.0 change checks
+      the rest. The checks that
       read 1.1.1 plan fields run only on plan items that carry them: E301 (item
       shapes), E305, W599, W600 and W601 key on implementation.status, and E307 on
       an object spec_ref. On a 1.2.0 plan item they report nothing.

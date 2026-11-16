@@ -104,6 +104,9 @@ class Step10IntegrationTests(unittest.TestCase):
         self._assert_fails_naming(lambda spec: spec.update(pr_rules=["validate"]), "pr_rules")
         self._assert_fails_naming(lambda spec: spec.update(spec_first_policy=True), "spec_first_policy")
 
+    def test_rule_text_shorter_than_ten_characters_fails(self):
+        self._assert_fails_naming(lambda spec: spec["rules"][0].update(text="Too short"), "is too short")
+
     def test_artifact_without_rules_fails(self):
         self._assert_fails_naming(lambda spec: spec.pop("rules"), "rules")
 

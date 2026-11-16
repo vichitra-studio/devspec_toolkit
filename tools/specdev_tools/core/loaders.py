@@ -187,7 +187,7 @@ def read_json_object(path: str | Path) -> dict | None:
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, ValueError):  # ValueError covers JSONDecodeError and UnicodeDecodeError
+    except (OSError, ValueError, RecursionError):  # ValueError: JSONDecodeError, UnicodeDecodeError; RecursionError: nesting too deep to parse
         return None
     return data if isinstance(data, dict) else None
 

@@ -167,7 +167,7 @@
               "status": {
                 "$ref": "vc:core:atoms#milestoneStatus",
                 "default": "pending",
-                "description": "Optional; an absent status reads as 'pending'. Progress status of this milestone: 'pending' (default), 'in_progress', 'deferred' or 'done'. Written by the milestone commands, not by hand. 'deferred' requires deferral_reason; 'done' requires close."
+                "description": "Optional; an absent status reads as 'pending'. Progress status of this milestone: 'pending' (default), 'in_progress', 'deferred' or 'done'. 'deferred' requires deferral_reason; 'done' requires close."
               },
               "deferral_reason": {
                 "type": "string",
@@ -180,7 +180,7 @@
                 "required": [
                   "signed_off_by"
                 ],
-                "description": "How the milestone was closed. Required when status is 'done'. Further fields of the close record belong to the milestone commands.",
+                "description": "How the milestone was closed. Required when status is 'done'.",
                 "properties": {
                   "signed_off_by": {
                     "type": "string",

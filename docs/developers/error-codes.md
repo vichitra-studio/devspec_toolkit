@@ -349,7 +349,7 @@
 
 **Trigger (E590, step 02)**: "Missing capability coverage" (`validators/step_02.py` `check_capability_coverage`): a capability in the Step 01 artifact is not named in any component's `derives_from`. A parked capability (`scope` `later` or `out`) is exempt. The check is skipped when the Step 01 artifact is not found.
 
-**Trigger (E590, step 12)**: A job's `depends_on` names an id that is not a `job_id` of the same `12_ci_gates.json` (`validators/step_12.py`). The step validators of 06 to 11 and 14 to 16 do not check that the ids a node links to exist; a link resolver in a later 1.2.0 change does.
+**Trigger (E590, step 12)**: A job's `depends_on` names an id that is not a `job_id` of the same `12_ci_gates.json` (`validators/step_12.py`). Apart from this check, no step validator of steps 06 to 16 checks that the id in a link field (a field the schema marks `x-link`) exists; a link resolver in a later 1.2.0 change does. A plan's file-level `milestone` is not a link field: E304 reports one that names no roadmap milestone.
 
 **Trigger (W590)**: The upstream artifact file is missing entirely; cross-step validation is skipped for that upstream.
 

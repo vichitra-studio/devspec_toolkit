@@ -33,8 +33,8 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 | :--- | :--- | :--- |
 | **Phase** | Discovery (Planning) | Execution (JIT) |
 | **Goal** | **Unlock Downstream Specs** | **Drive Daily Coding** |
-| **Key Output** | Tech Stack, Language, CI Cadence | Atomic User Stories, Sprints, Integration Order |
-| **Why?** | You need to know the *Language* (e.g. Python) before you can write *CI Gates* (Step 12) or *Red Team* scripts (Step 11). | You need to know the *Extensions* (Step 13) before you can sequence the actual work. |
+| **Key Output** | Design milestones: named groups of the requirements, APIs, invariants, NFRs and components one delivery slice schedules | Atomic User Stories, Tasks with acceptance criteria |
+| **Why?** | You need to know which upstream nodes ship together before you can write the *Roadmap* (Step 14) that turns each slice into tasks. | You need to know the *Extensions* (Step 13) before you can sequence the actual work. |
 
 **Rule of Thumb**: Step 09 is the "Architect's Baseline". Step 14 is the "Project Manager's Schedule".
 

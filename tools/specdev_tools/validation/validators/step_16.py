@@ -24,7 +24,6 @@ TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf
 # `disposition.value` of a roadmap task meaning "paused or permanently cancelled, not absent": E304 skips such a task.
 PAUSED_OR_CANCELLED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
 
-PAUSED_OR_CANCELLED_CHECKLIST_STATUSES = PAUSED_OR_CANCELLED_DISPOSITIONS
 
 # Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
 _SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failures")
@@ -485,7 +484,7 @@ def _check_planned_vs_executed(data: dict[str, Any], checklist: list[dict[str, A
     satisfied_ids = set(str_items(as_dict(execution.get("critical_evidence")).get("satisfied_checklist_ids")))
     for item in sorted(checklist, key=lambda i: str(i.get("id"))):
         item_id = item.get("id")
-        if not isinstance(item_id, str) or str_in(item.get("checklist_status"), PAUSED_OR_CANCELLED_CHECKLIST_STATUSES):
+        if not isinstance(item_id, str) or str_in(item.get("checklist_status"), PAUSED_OR_CANCELLED_DISPOSITIONS):
             continue
         if item_id in satisfied_ids:
             continue

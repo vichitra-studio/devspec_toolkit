@@ -26,7 +26,7 @@ import pytest
 
 from specdev_tools.registry.annotations import collect_annotations, lint_annotations
 from specdev_tools.registry.generate import _serialize, generate_registry, run
-from specdev_tools.registry.schema_checklist import CHECKLIST_FILE, generate_checklist
+from specdev_tools.registry.schema_checklist import CHECKLIST_FILE, ChecklistError, generate_checklist
 
 # ---------------------------------------------------------------------------
 # Toolkit root resolution
@@ -353,6 +353,19 @@ class TestRegistryCutover:
         written = Path(paths["checklist.md"]).read_bytes()
         assert written == _CHECKLIST_PATH.read_bytes()
         assert written == generate_checklist(_TOOLKIT_ROOT).encode("utf-8")
+
+    def test_a_rows_file_that_cannot_be_used_writes_no_output_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def unusable(_repo_root: Path) -> str:
+            raise ChecklistError("tools/schema_changes.json: rows[0]: id: duplicate")
+
+        monkeypatch.setattr("specdev_tools.registry.generate.generate_checklist", unusable)
+        paths = {name: str(tmp_path / name) for name in ("reg.json", "paths.json", "order.json", "checklist.md")}
+        with pytest.raises(ChecklistError):
+            run(str(_TOOLKIT_ROOT), paths["reg.json"], paths["paths.json"],
+                step_order_out=paths["order.json"], checklist_out=paths["checklist.md"])
+        assert list(tmp_path.iterdir()) == []
 
 
 # ---------------------------------------------------------------------------

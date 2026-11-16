@@ -69,7 +69,7 @@
                         "properties": {
                           "criterion_id": {
                             "$ref": "vc:core:atoms#kebabId",
-                            "description": "Unique kebab-case identifier of this task criterion across the whole spec. It must not reuse a step 04 criterion id (suggested prefix: 'tc-'). Examples: 'tc-confirm-expired-token', 'tc-confirm-reused-token'. Anti-pattern: 'tc-1' (a sequential label that carries no meaning)."
+                            "description": "Kebab-case identifier of this task criterion. It should be unique across the whole spec and should not reuse a step 04 criterion id (suggested prefix: 'tc-'). Examples: 'tc-confirm-expired-token', 'tc-confirm-reused-token'. Anti-pattern: 'tc-1' (a sequential label that carries no meaning)."
                           },
                           "text": {
                             "type": "string",
