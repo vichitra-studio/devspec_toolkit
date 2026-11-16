@@ -6,11 +6,13 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from specdev_tools.validation.canon_schema_alignment import lint_canon_schema_alignment
 
 _MODULE = "specdev_tools.validation.canon_schema_alignment"
+_TOOLKIT_ROOT = str(Path(__file__).parents[3])
 
 
 def _make_canon_kind(tmp: str, kind: str, labels: list[str]) -> None:
@@ -216,6 +218,13 @@ class CanonSchemaAlignmentTests(unittest.TestCase):
 
             w552 = [e for e in errors if e.code == "W552"]
             self.assertEqual(w552, [])
+
+    # ------------------------------------------------------------------
+    # 8. The real schemas, with the enums the graph shape added
+    #    (enforcer, scope, disposition value, anchor status, lifecycle)
+    # ------------------------------------------------------------------
+    def test_new_enums_aligned_with_canon(self) -> None:
+        self.assertEqual(lint_canon_schema_alignment(_TOOLKIT_ROOT), [])
 
 
 if __name__ == "__main__":

@@ -115,7 +115,8 @@
   "16": {
     "16_impl_context.json": [
       ".plan.ambiguities",
-      ".execution.emergent_ambiguities"
+      ".execution.emergent_ambiguities",
+      ".plan.milestone_index"
     ]
   },
   "16a": {

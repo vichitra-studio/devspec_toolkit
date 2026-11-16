@@ -24,7 +24,9 @@ from typing import Any
 
 import pytest
 
-from specdev_tools.registry.generate import _serialize, generate_registry
+from specdev_tools.registry.annotations import collect_annotations, lint_annotations
+from specdev_tools.registry.generate import _serialize, generate_registry, run
+from specdev_tools.registry.schema_checklist import CHECKLIST_FILE, generate_checklist
 
 # ---------------------------------------------------------------------------
 # Toolkit root resolution
@@ -39,9 +41,17 @@ _GOLDEN_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "entry_key_registry_golden
 _STEP_ORDER_PATH = _TOOLKIT_ROOT / "tools" / "step_order.json"
 """step_order.json for Test 4."""
 
-_ANNOTATED_DEFERRED = frozenset({"16a"})
-"""Step 16a holds the ``plan-item`` kind (registered through its ``x-node`` ``files`` glob) while the generator still
-lists it among the deferred steps; the generator's deferred list is WI-M3-18's."""
+_CHECKLIST_PATH = _TOOLKIT_ROOT / CHECKLIST_FILE
+"""The generated schema-change checklist, committed."""
+
+_KIND_ROLE_TABLE_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "graph" / "kind_role_table.json"
+"""Kind to step and role table of the spec graph (M1 fixture, extended with the M3 kinds)."""
+
+_UNLISTED_KINDS = frozenset({"extension"})
+"""Registered kinds the table leaves out: step 13 extension kinds are declared when they become first-class."""
+
+_UNREGISTERED_KINDS = frozenset({"seed", "evidence-record", "execution-record", "review-record", "verification-record"})
+"""Table kinds with no registry entry: the seed is an external kind, the records arrive with a later milestone."""
 
 
 def _run_generator() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -211,7 +221,7 @@ class TestStepCoverageCompleteness:
         without_and_deferred = without_steps & deferred_steps
 
         assert not reg_and_without, f"Steps in both registry and without-entry-arrays: {reg_and_without}"
-        assert not reg_and_deferred - _ANNOTATED_DEFERRED, f"Steps in both registry and deferred: {reg_and_deferred}"
+        assert not reg_and_deferred, f"Steps in both registry and deferred: {reg_and_deferred}"
         assert not without_and_deferred, f"Steps in both without-entry-arrays and deferred: {without_and_deferred}"
 
 
@@ -238,7 +248,7 @@ class TestNoArraysSteps:
         without_steps = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
         assert "16" not in without_steps
         paths = {a["array_path"] for a in reg_doc["registry"]["16_impl_context.json"]["arrays"]}
-        assert paths == {".plan.ambiguities", ".execution.emergent_ambiguities"}
+        assert paths == {".plan.ambiguities", ".execution.emergent_ambiguities", ".plan.milestone_index"}
 
 
 # ---------------------------------------------------------------------------
@@ -247,12 +257,12 @@ class TestNoArraysSteps:
 
 
 class TestDeferredRegistration:
-    """Steps 16a, 16b, 16c must be in steps_with_deferred_registration only."""
+    """Steps 16b and 16c are in steps_with_deferred_registration only; 16a is registered by annotation."""
 
     def test_deferred_steps_are_present(self) -> None:
         reg_doc, _ = _run_generator()
         deferred = {item["step"]: item for item in reg_doc["steps_with_deferred_registration"]}
-        for step in ("16a", "16b", "16c"):
+        for step in ("16b", "16c"):
             assert step in deferred, f"Step '{step}' not found in steps_with_deferred_registration."
             assert deferred[step]["rationale"], f"Step '{step}' has empty rationale."
 
@@ -270,9 +280,7 @@ class TestDeferredRegistration:
         """Deferred steps must not appear as 'step' values inside the registry."""
         reg_doc, _ = _run_generator()
         registry_steps = {entry["step"] for entry in reg_doc["registry"].values()}
-        for step in ("16a", "16b", "16c"):
-            if step in _ANNOTATED_DEFERRED:
-                continue
+        for step in ("16b", "16c"):
             assert step not in registry_steps, (
                 f"Deferred step '{step}' found as a 'step' value in registry — "
                 "deferred steps should not have registry entries."
@@ -286,6 +294,61 @@ class TestDeferredRegistration:
         arr = next(a for a in entry["arrays"] if a["array_path"] == ".plan.spec_alignment.checklist")
         assert (arr["kind"], arr["id_field"], arr["role"]) == ("plan-item", "id", "plan")
         assert [lk["field"] for lk in arr["links"]] == ["realises", "replaces"]
+
+
+# ---------------------------------------------------------------------------
+# Registry cutover to the graph shape (WI-M3-18)
+# ---------------------------------------------------------------------------
+
+
+def _registered_kinds(registry: dict[str, Any]) -> dict[str, set[tuple[str, str | None, bool]]]:
+    """Map each registered kind to the ``(step, role, coarse)`` triples it is registered with."""
+    found: dict[str, set[tuple[str, str | None, bool]]] = {}
+    for entry in registry.values():
+        for array in _iter_all_arrays(entry):
+            found.setdefault(array["kind"], set()).add((entry["step"], array.get("role"), array.get("coarse", False)))
+    return found
+
+
+class TestRegistryCutover:
+    """The registry the annotated schemas produce, against the kind table and the generator's lists."""
+
+    def test_registry_lint_passes_on_every_real_schema(self) -> None:
+        decls = collect_annotations(str(_TOOLKIT_ROOT))
+        assert not decls.empty
+        assert lint_annotations(decls) == []
+
+    def test_kind_table_equals_registry(self) -> None:
+        table = json.loads(_KIND_ROLE_TABLE_PATH.read_text(encoding="utf-8"))["kinds"]
+        registered = _registered_kinds(_run_generator()[0]["registry"])
+        assert set(registered) - set(table) == _UNLISTED_KINDS
+        unregistered = {k for k in table if k not in registered}
+        assert unregistered == _UNREGISTERED_KINDS | {k for k, row in table.items() if row["role"] == "content"}
+        for kind, triples in registered.items():
+            if kind in _UNLISTED_KINDS:
+                continue
+            row = table[kind]
+            steps = {step for step, _, _ in triples}
+            assert steps <= {row["step"]} or row["step"] == "any", (kind, steps)
+            assert {role for _, role, _ in triples} == {row["role"]}, kind
+            assert {coarse for _, _, coarse in triples} == {row.get("coarse", False)}, kind
+
+    def test_steps_without_entry_arrays_loses_10_15_16(self) -> None:
+        reg_doc, _ = _run_generator()
+        without = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
+        assert without == {"13a"}
+
+    def test_steps_with_deferred_registration_loses_16a(self) -> None:
+        reg_doc, _ = _run_generator()
+        assert [item["step"] for item in reg_doc["steps_with_deferred_registration"]] == ["16b", "16c"]
+        assert "16a" in {entry["step"] for entry in reg_doc["registry"].values()}
+
+    def test_registry_generate_writes_schema_change_checklist_byte_identically(self, tmp_path: Path) -> None:
+        paths = {name: str(tmp_path / name) for name in ("reg.json", "paths.json", "checklist.md")}
+        run(str(_TOOLKIT_ROOT), paths["reg.json"], paths["paths.json"], checklist_out=paths["checklist.md"])
+        written = Path(paths["checklist.md"]).read_bytes()
+        assert written == _CHECKLIST_PATH.read_bytes()
+        assert written == generate_checklist(_TOOLKIT_ROOT).encode("utf-8")
 
 
 # ---------------------------------------------------------------------------

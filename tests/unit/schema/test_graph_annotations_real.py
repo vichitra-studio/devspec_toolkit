@@ -18,9 +18,15 @@ from specdev_tools.registry.annotations import (
     SchemaRefs,
     collect_annotations,
 )
+from specdev_tools.registry.generate import generate_registry
+from specdev_tools.validation.registry_check import run_registry_check
 
 _ROOT = Path(__file__).parents[3]
 _SCHEMA_DIR = _ROOT / "schema"
+_FIXTURES = _ROOT / "tests" / "fixtures"
+_NEW_SHAPE_SPEC = _FIXTURES / "graph_example" / "spec"
+_UNANNOTATED_STEPS = frozenset({"13_extension_manifest.schema.json", "13a_completeness_assessment.schema.json"})
+_OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 _STAR_VERBS = frozenset({"replaces", "removes", "about"})
 _LINK_VERBS = frozenset(
     json.loads((_SCHEMA_DIR / "core" / "graph.schema.json").read_text())["$defs"]["linkVerb"]["enum"]
@@ -90,3 +96,54 @@ def test_every_verb_named_property_carries_x_link(fname: str) -> None:
     for props in _properties_maps(schema):
         for name in _LINK_VERBS & set(props):
             assert "x-link" in props[name], (fname, name)
+
+
+@pytest.fixture(scope="module")
+def registry() -> dict[str, Any]:
+    return generate_registry(str(_ROOT))[0]["registry"]
+
+
+def _kind_arrays(registry: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
+    """The entries of registry *key* by kind, nested entries included."""
+    found: dict[str, dict[str, Any]] = {}
+    pending = list(registry[key]["arrays"])
+    while pending:
+        entry = pending.pop()
+        found[entry["kind"]] = entry
+        pending.extend(entry.get("nested", []))
+    return found
+
+
+def test_registry_check_clean_on_new_shape_fixture() -> None:
+    assert run_registry_check(str(_NEW_SHAPE_SPEC), str(_ROOT)) == []
+
+
+def test_task_criterion_refines_kinds_equal_obligation_kinds(registry: dict[str, Any]) -> None:
+    table = json.loads((_FIXTURES / "graph" / "kind_role_table.json").read_text())["kinds"]
+    obligation_kinds = {kind for kind, row in table.items() if row["role"] in _OBLIGATION_ROLES}
+    (refines,) = [lk for lk in _kind_arrays(registry, "14_roadmap.json")["task-criterion"]["links"] if lk["field"] == "refines"]
+    assert set(refines["kinds"]) == obligation_kinds
+    assert len(refines["kinds"]) == len(obligation_kinds)
+
+
+def test_exactly_13_and_13a_have_no_x_node() -> None:
+    real = sorted(p for p in _SCHEMA_DIR.glob("[0-9][0-9]*_*.schema.json"))
+    assert {p.name for p in real if '"x-node"' not in p.read_text()} == _UNANNOTATED_STEPS
+
+
+def test_extension_entry_unchanged_after_ambiguities_edit(registry: dict[str, Any]) -> None:
+    pre_m1 = json.loads((_FIXTURES / "entry_key_registry_pre_m1.json").read_text())["registry"]
+    extension = lambda reg: [a for a in reg["13_extension_manifest.json"]["arrays"] if a["array_path"] == ".extensions"]  # noqa: E731
+    assert extension(registry) == extension(pre_m1) != []
+
+
+def test_anchor_row_registered_under_step_16(registry: dict[str, Any]) -> None:
+    assert registry["16_impl_context.json"]["step"] == "16"
+    entry = _kind_arrays(registry, "16_impl_context.json")["anchor-row"]
+    assert (entry["array_path"], entry["id_field"], entry["role"]) == (".plan.milestone_index", "anchor_id", "record")
+
+
+def test_plan_item_registered_under_16a_glob(registry: dict[str, Any]) -> None:
+    key = "impl_context/ms_*_plan.json"
+    assert registry[key]["step"] == "16a"
+    assert _kind_arrays(registry, key)["plan-item"]["array_path"] == ".plan.spec_alignment.checklist"

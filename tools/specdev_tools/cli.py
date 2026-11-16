@@ -297,10 +297,10 @@ def build_parser() -> _SpecdevParser:
 
     rg = sub.add_parser(
         "registry-generate",
-        help="Regenerate the entry-key registry, extraction-paths and cli_commands.json (and optionally the step order) from toolkit schemas.",
+        help="Regenerate the entry-key registry, extraction-paths, cli_commands.json and the schema-change checklist (and optionally the step order) from toolkit schemas.",
         description=(
-            "Regenerate the entry-key registry, extraction-paths and cli_commands.json from toolkit\n"
-            "schemas and the CLI parser; with --step-order-out also the step order derived from annotations.\n\n"
+            "Regenerate the entry-key registry, extraction-paths, cli_commands.json and the schema-change\n"
+            "checklist from toolkit schemas and the CLI parser; with --step-order-out also the step order derived from annotations.\n\n"
             "Output is byte-deterministic across runs (sort_keys + indent=2 + trailing newline)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -334,6 +334,15 @@ def build_parser() -> _SpecdevParser:
         help=(
             "Output path for cli_commands.json (default: <repo-root>/tools/cli_commands.json, "
             "written only when --out is also absent)."
+        ),
+    )
+    rg.add_argument(
+        "--checklist-out",
+        default=None,
+        dest="checklist_out",
+        help=(
+            "Output path for the schema-change checklist (default: "
+            "<repo-root>/docs/developers/schema-change-checklist.md, written only when --out is also absent)."
         ),
     )
 
@@ -2178,8 +2187,15 @@ def main():
             cli_commands_out = os.path.join(repo_root, "tools", "cli_commands.json")
         else:
             cli_commands_out = None
+        if args.checklist_out:
+            checklist_out = os.path.abspath(args.checklist_out)
+        elif not args.out:
+            checklist_out = os.path.join(repo_root, "docs", "developers", "schema-change-checklist.md")
+        else:
+            checklist_out = None
         from .registry.annotations import AnnotationError
         from .registry.generate import run as registry_generate_run
+        from .registry.schema_checklist import ChecklistError
         try:
             registry_generate_run(
                 repo_root=repo_root,
@@ -2187,8 +2203,9 @@ def main():
                 extraction_paths_out=extraction_paths_out,
                 step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
                 cli_commands_out=cli_commands_out,
+                checklist_out=checklist_out,
             )
-        except AnnotationError as exc:  # the issue list is in the message
+        except (AnnotationError, ChecklistError) as exc:  # the issue list is in the message
             print(f"registry-generate: failed: {exc}", file=sys.stderr)
             sys.exit(1)
 

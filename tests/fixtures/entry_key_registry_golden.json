@@ -1746,8 +1746,25 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".extensions",
@@ -2005,6 +2022,28 @@
           ],
           "role": "record",
           "source": "x-node"
+        },
+        {
+          "array_path": ".plan.milestone_index",
+          "contract": [
+            "summary",
+            "checklist_id_prefix"
+          ],
+          "id_field": "anchor_id",
+          "kind": "anchor-row",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": [
+                "roadmap-milestone"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         }
       ],
       "step": "16"
@@ -2047,10 +2086,6 @@
     }
   },
   "steps_with_deferred_registration": [
-    {
-      "rationale": "per-milestone files; deferred per Out-of-scope",
-      "step": "16a"
-    },
     {
       "rationale": "per-milestone files; deferred per Out-of-scope",
       "step": "16b"

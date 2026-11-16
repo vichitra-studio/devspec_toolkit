@@ -189,8 +189,11 @@ def test_unannotated_files_are_byte_identical_to_pre_m1():
             continue
         assert view[key] == entry, key
     assert set(view) - set(pre["registry"]) == annotated - set(pre["registry"])
-    for key in ("_sentinels", "steps_with_deferred_registration"):
-        assert reg[key] == pre[key], key
+    assert reg["_sentinels"] == pre["_sentinels"]
+    annotated_deferred = {"16a"}  # registered through an x-node files glob since WI-M3-18
+    assert reg["steps_with_deferred_registration"] == [
+        e for e in pre["steps_with_deferred_registration"] if e["step"] not in annotated_deferred
+    ]
     ambiguity_only = set(reg["registry"]) - set(view)
     annotated_steps = {k.split("_")[0] for k in annotated | ambiguity_only}
     for key in ("steps_without_entry_arrays",):
@@ -199,7 +202,9 @@ def test_unannotated_files_are_byte_identical_to_pre_m1():
         ], key
     differing = {k for k in set(reg) | set(pre) if reg.get(k) != pre.get(k)}
     # the registry map itself differs once any step is annotated; its keys are compared above
-    assert differing - {"registry", "steps_without_entry_arrays"} == {"_format_version", "external_kinds"}
+    assert differing - {"registry", "steps_without_entry_arrays"} == {
+        "_format_version", "external_kinds", "steps_with_deferred_registration",
+    }
 
 
 def test_committed_registry_matches_generator_output():
