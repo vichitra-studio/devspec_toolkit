@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, replace
 from typing import Any
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.core.json_utils import JsonUtilsError
 from specdev_tools.core.toolkit_root import detect_toolkit_root
@@ -23,9 +23,7 @@ from specdev_tools.graph import queries, recipes, trace
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.diff import diff_refs, diff_to_dict
 from specdev_tools.graph.diff import render_text as diff_text
-from specdev_tools.graph.gitview import GitViewError
-from specdev_tools.graph.kinds import KindRegistryError
-from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, LifecycleRefusedError, set_lifecycle
+from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, Graph
 
 NODE_SUBCOMMANDS = ("show", "candidates", "status")
@@ -34,25 +32,11 @@ EXIT_FINDING = 1
 EXIT_USAGE = 2
 
 
-class SpecFolderMissingError(Exception):
+class SpecFolderMissingError(FindingError):
     """The ``--spec-root`` folder does not exist; the E520 finding (the wording of the other commands) is in ``error``."""
 
     def __init__(self, spec_root: str) -> None:
-        error = make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_root}")
-        super().__init__(error.message)
-        self.error = error
-
-
-# Every error that carries its finding in ``.error``.
-_FINDING_ERRORS = (
-    SpecFolderMissingError,
-    queries.QueryTargetError,
-    trace.UnknownTraceTargetError,
-    LifecycleRefusedError,
-    recipes.RecipeError,
-    GitViewError,
-    KindRegistryError,
-)
+        super().__init__(make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_root}"))
 
 
 def _positive_int(text: str) -> int:
@@ -214,7 +198,7 @@ def _run_guarded(command: str, json_output: bool, action: Callable[[], int], unr
     """
     try:
         return action()
-    except _FINDING_ERRORS as exc:
+    except FindingError as exc:
         return _report_finding(_with_unreadable_note(exc.error, unreadable), command, json_output)
     except JsonUtilsError as exc:
         print(f"specdev {command}: {exc}", file=sys.stderr)

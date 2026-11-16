@@ -13,12 +13,11 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.graph.kinds import LinkDecl
+from specdev_tools.graph.kinds import RECORD_ROLE, LinkDecl
 from specdev_tools.graph.model import Graph, Link, Node, SpecShape
 from specdev_tools.graph.ownership import step_owner
 
 HISTORY_FIELDS = frozenset({"replaces", "removes"})
-RECORD_ROLE = "record"
 
 
 class ResolverHooks(Protocol):
@@ -56,8 +55,8 @@ def _error(code: str, holder: Node, message: str) -> SpecError:
     )
 
 
-def _ordered(steps: Iterable[str], ranks: Mapping[str, int]) -> list[str]:
-    return sorted(steps, key=lambda step: (ranks.get(step, len(ranks)), step))
+def _ordered(steps: Iterable[str], shape: SpecShape) -> list[str]:
+    return sorted(steps, key=lambda step: (shape.rank_of(step), step))
 
 
 def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
@@ -65,14 +64,14 @@ def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
     steps = {step for kind in link.decl.kinds for step in shape.kind_steps.get(kind, ())}
     if not steps or any(shape.files_by_step.get(step) for step in steps):
         return []
-    return _ordered(steps, shape.step_ranks)
+    return _ordered(steps, shape)
 
 
 def _unreadable_file(link: Link, graph: Graph) -> tuple[str, str] | None:
     """The first ``(step, file)`` that the builder skipped, among the files of the steps that declare a kind the link accepts."""
     skipped = {error.file for error in graph.load_errors}
     steps = {step for kind in link.decl.kinds for step in graph.shape.kind_steps.get(kind, ())}
-    for step in _ordered(steps, graph.shape.step_ranks):
+    for step in _ordered(steps, graph.shape):
         for path in graph.shape.files_by_step.get(step, ()):
             if path in skipped:
                 return step, path
@@ -218,8 +217,11 @@ class _Tarjan:
                 self._low[parent] = min(self._low[parent], self._low[node])
 
 
-def _cycle_errors(graph: Graph, edges: _SameStepEdges, wanted: set[str] | None) -> list[SpecError]:
-    """One E703 per cycle among same-step links: a component of two or more nodes, or a node that links to itself."""
+def _cycle_errors(edges: _SameStepEdges) -> list[SpecError]:
+    """One E703 per cycle among same-step links: a component of two or more nodes, or a node that links to itself.
+
+    The edges come only from holders of the wanted steps and never leave their step, so no cycle needs a step filter here.
+    """
     components = _Tarjan(edges.successors).run([node.id for node in edges.order])
     errors: list[SpecError] = []
     for component in components:
@@ -232,8 +234,6 @@ def _cycle_errors(graph: Graph, edges: _SameStepEdges, wanted: set[str] | None) 
         ):
             continue
         first = next(node for node in edges.order if node.id in members)
-        if wanted is not None and first.step not in wanted:
-            continue
         names = [node.id for node in edges.order if node.id in members]
         errors.append(_error(
             "E703", first,
@@ -261,5 +261,5 @@ def resolve_graph(
         for link in holder.links:
             if link.field not in HISTORY_FIELDS:
                 errors.extend(_link_errors(graph, holder, link, edges, hooks))
-    errors.extend(_cycle_errors(graph, edges, wanted))
+    errors.extend(_cycle_errors(edges))
     return errors

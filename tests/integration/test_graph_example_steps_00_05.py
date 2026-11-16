@@ -7,24 +7,20 @@ against the real schemas, validators, registry and ``spec-check``, with a known 
 from __future__ import annotations
 
 import copy
-import io
 import json
 import shutil
-import sys
 from collections import Counter
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
 import _graph_example as shared
-from specdev_tools import cli
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import DEEP_VALIDATORS
+from unit.graph._synth import run_cli as _run_cli
 
 _ROOT = shared.ROOT
 _EXAMPLE = shared.EXAMPLE
@@ -204,18 +200,6 @@ def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
     )
     assert subjects == _PINNED_WARNING_SUBJECTS, [e.render() for e in about_00_05]
     assert context["checks"]["seed-lint"]["status"] != "SKIP"
-
-
-def _run_cli(*argv: str) -> tuple[int, str]:
-    buf = io.StringIO()
-    with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", ["specdev", *argv]), \
-            redirect_stdout(buf), redirect_stderr(buf):
-        try:
-            cli.main()
-            code = 0
-        except SystemExit as exc:
-            code = int(exc.code) if isinstance(exc.code, int) else 1
-    return code, buf.getvalue()
 
 
 @pytest.mark.parametrize("bad_scope", [["in"], {"x": 1}])

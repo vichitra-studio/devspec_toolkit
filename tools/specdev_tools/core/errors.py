@@ -24,6 +24,18 @@ class SpecError:
         return f"{self.code} {self.message}"
 
 
+class FindingError(Exception):
+    """An exception that carries one finding: ``error`` is the ``SpecError`` a command prints before exiting 1.
+
+    The base of the graph library's refusals (``QueryTargetError``, ``RecipeError``, ``GitViewError``, ...), so a
+    command catches this one class instead of listing each.
+    """
+
+    def __init__(self, error: SpecError) -> None:
+        super().__init__(error.message)
+        self.error = error
+
+
 ERROR_CODES = {
     # Canonical integrity (1xx)
     "E110": "UNKNOWN_CANONICAL_ID",

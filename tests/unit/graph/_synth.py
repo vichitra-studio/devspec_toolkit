@@ -6,16 +6,20 @@ spec folder ``tests/fixtures/graph/synthetic/builder`` that matches it.
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import redirect_stderr, redirect_stdout
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
+from specdev_tools import cli
 from specdev_tools.core.registry import clear_shared_caches
 from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.build import build_graph
@@ -29,6 +33,7 @@ EXAMPLE_SPEC = ROOT / "tests" / "fixtures" / "graph_example" / "spec"
 MINI_TOOLKIT = ROOT / "tests" / "fixtures" / "graph" / "mini_toolkit"
 BUILD_SPEC = ROOT / "tests" / "fixtures" / "graph" / "synthetic" / "builder"
 _CORE_SCHEMAS = ("graph", "atoms", "collections")
+GIT_IDENTITY = ("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false")
 
 
 def make_toolkit(dest: Path) -> Path:
@@ -104,3 +109,23 @@ def write_json(root: Path, rel: str, document: Any) -> None:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def run_cli(*argv: str) -> tuple[int, str]:
+    """Run ``cli.main()`` in this process with *argv*; the exit code and what it printed (stdout and stderr together)."""
+    buf = io.StringIO()
+    with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", ["specdev", *argv]), \
+            redirect_stdout(buf), redirect_stderr(buf):
+        try:
+            cli.main()
+            code = 0
+        except SystemExit as exc:
+            code = int(exc.code) if isinstance(exc.code, int) else 1
+    return code, buf.getvalue()
+
+
+def git(repo: Path, *args: str) -> str:
+    """Run ``git -C repo`` with a fixed identity and no user or system config; the stripped stdout (raises on failure)."""
+    env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+    done = subprocess.run(["git", "-C", str(repo), *GIT_IDENTITY, *args], capture_output=True, text=True, env=env, check=True)
+    return done.stdout.strip()

@@ -30,19 +30,18 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.scope_helpers import as_str
-from specdev_tools.graph.contract import item_at
+from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.diff import diff_snapshots
 from specdev_tools.graph.gitview import GitViewError, Snapshot, default_base_ref, load_snapshot_at, spec_path_in_repo
 from specdev_tools.graph.kinds import RECORD_ROLE, SEED_KIND
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
-from specdev_tools.graph.queries import node_view
+from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node, collapse_whitespace
+from specdev_tools.graph.queries import own_content
 
 START = "start"
 POINTER_KIND = "pointer"
-DEPRECATED = "deprecated"
 AMBIGUITY, DEPENDENCY = "ambiguity", "dependency"
 REPORT_NAMES = (AMBIGUITY, DEPENDENCY)
 OUT, IN, PARENT, CHILDREN = "out", "in", "parent", "children"
@@ -53,16 +52,10 @@ _TABLE_RELATIVE = os.path.join("tools", "graph_recipes.json")
 PARENT_VIA = "parent of "
 _START_SET_VIA = "start set"
 _WHOLE_KIND_VIA = "whole kind"
-_NO_RANK = 10**6
-_WHITESPACE = re.compile(r"\s+")
 
 
-class RecipeError(Exception):
+class RecipeError(FindingError):
     """A recipe cannot be read or run: an unknown role or start id (E706), a start of the wrong kind (E707), or a broken table (E520)."""
-
-    def __init__(self, error: SpecError) -> None:
-        super().__init__(error.message)
-        self.error = error
 
 
 # --- the recipe table -----------------------------------------------------------------------------------------------
@@ -403,8 +396,7 @@ def _reach(graph: Graph, start: Sequence[Node], hops: Sequence[Hop]) -> dict[str
 
 
 def _order_key(graph: Graph, node: Node) -> tuple[int, str]:
-    rank = graph.shape.step_ranks.get(node.step, _NO_RANK) if node.step is not None else _NO_RANK
-    return rank, node.id
+    return graph.shape.rank_of(node.step), node.id
 
 
 def _start_nodes(names: Iterable[str], start: Node, found: Mapping[str, Sequence[Reached]]) -> dict[str, Node]:
@@ -508,8 +500,7 @@ class Pack:
 
 
 def _item(graph: Graph, node: Node) -> Mapping[str, Any]:
-    document = graph.documents.get(node.file)
-    return (item_at(document, node.jq_path) if document is not None else None) or {}
+    return item_of(graph, node) or {}
 
 
 def _entry(graph: Graph, table: RecipeTable, node: Node, via: str) -> PackEntry:
@@ -524,7 +515,7 @@ def _gated_of_kind(graph: Graph, kind: str) -> list[Node]:
 
 
 def _normal(text: str) -> str:
-    return _WHITESPACE.sub(" ", text).strip().casefold()
+    return collapse_whitespace(text).casefold()
 
 
 def _mentions(graph: Graph, node: Node, rule: MatchRule, pack_text: str) -> bool:
@@ -623,10 +614,7 @@ def dependency_report(graph: Graph, spec: ReportSpec, seed_ids: Collection[str],
 
 def _contents(graph: Graph, ids: Collection[str]) -> dict[str, Mapping[str, Any] | None]:
     """The own content of each node of *ids*, as ``specdev node`` shows it (first definition of an id)."""
-    views: dict[str, Mapping[str, Any] | None] = {}
-    for view in node_view(graph, sorted(ids)).views:
-        views.setdefault(view.id, view.content)
-    return views
+    return {node_id: own_content(graph, graph.by_id[node_id], False) for node_id in ids if node_id in graph.by_id}
 
 
 def build_pack(

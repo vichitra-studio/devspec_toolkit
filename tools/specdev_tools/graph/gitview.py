@@ -17,24 +17,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.contract import collapse_whitespace
 from specdev_tools.graph.kinds import SEED_KIND
-from specdev_tools.graph.model import Graph
+from specdev_tools.graph.model import Graph, collapse_whitespace
 
 GIT_TIMEOUT_SECONDS = 30
 PREVIOUS_COMMIT = "HEAD~1"
 _MAX_REASON_CHARS = 240
 
 
-class GitViewError(Exception):
+class GitViewError(FindingError):
     """A ref could not be viewed; ``error`` is the ``SpecError`` that reports it (E708 or E709)."""
-
-    def __init__(self, error: SpecError) -> None:
-        super().__init__(error.message)
-        self.error = error
 
 
 @dataclass(frozen=True)

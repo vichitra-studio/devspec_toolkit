@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import shutil
-import subprocess
 from collections import deque
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -34,6 +32,7 @@ from specdev_tools.graph.recipes import (
 )
 
 from ._synth import EXAMPLE_SPEC, ROOT
+from ._synth import git as _git
 
 TABLE_PATH = ROOT / "tools" / "graph_recipes.json"
 START_16B = "PWRESET_CONFIRM_EXPIRED_01"
@@ -43,7 +42,6 @@ STARTS = {"16a": START_16A, "16b": START_16B, "16c": START_16C}
 PLAN_FILE = "impl_context/ms_account_recovery_plan.json"
 SKETCH_FILE = "02_system_sketch.json"
 WRONG_VALUES = [None, 5, True, [], {}, ["x"]]
-GIT_IDENTITY = ("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false")
 
 
 @pytest.fixture(scope="module")
@@ -284,12 +282,6 @@ def test_dependency_report_changed_and_unavailable_cases(example: Graph, table: 
     unchanged = compare_dependencies(Snapshot(example, {}), Snapshot(example, {}), spec, seeds, "v2")
     assert unchanged.changes == ()
     assert compare_dependencies(Snapshot(old, {}), Snapshot(example, {}), spec, [], "v1").changes == ()
-
-
-def _git(repo: Path, *args: str) -> str:
-    env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
-    done = subprocess.run(["git", "-C", str(repo), *GIT_IDENTITY, *args], capture_output=True, text=True, env=env, check=True)
-    return done.stdout.strip()
 
 
 def _commit(repo: Path, message: str) -> None:

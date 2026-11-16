@@ -99,8 +99,8 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Schema Sync**: `prompt_11_redteam.md` has an referenced step schema that must match `schema/11_redteam.schema.json`. Ensure they are kept in sync.
 
 ## Step 12 Troubleshooting
-- **Cycle Detected**: The validation tool (`validators/step_12.py`) enforces a DAG. If you have a cycle (A->B->A), you must break it by refactoring job dependencies.
-- **Missing Dependency**: All job IDs listed in `depends_on` must exist in the `jobs` list (the job field was `requires` in 1.1.1).
+- **Cycle Detected**: The `graph` check of `specdev spec-check` reports a cycle among the jobs as E703 ("Link cycle within step 12: ..."); `specdev validate` on `12_ci_gates.json` alone does not. If you have a cycle (A->B->A), you must break it by refactoring job dependencies.
+- **Missing Dependency**: All job IDs listed in `depends_on` must exist in the `jobs` list (the job field was `requires` in 1.1.1); `specdev spec-check` reports one that does not as E700.
 - **Unstructured Steps**: Steps must be objects with `name` and `command`. String steps are forbidden to prevent hallucinations; the step `id` field is gone.
 - **Links**: `realises` (environments, gates, secrets, rules) and `verifies` (NFRs) on a job are optional. The `trace` field is gone.
 - **Command Prefixes**: Commands should theoretically map to standard tools (`python`, `bash`, `npm`). While not strictly enforced as a blocking error yet, stick to known tools.

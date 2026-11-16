@@ -11,22 +11,12 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.schema_nav import effective_schema as _schema_nav_effective_schema
+from ..core.step_order import load_step_order  # noqa: F401  (re-exported: importers of context._utils keep working)
 
 
 def load_json(path: str) -> Any:
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
-
-
-def load_step_order(repo_root: str) -> dict:
-    """Load ``tools/step_order.json`` from *repo_root*.
-
-    The DAG lives only under ``tools/``; there is no repo-root copy. If the file
-    is absent, ``load_json`` raises ``FileNotFoundError`` naming that canonical
-    ``tools/`` path — previously a dead repo-root fallback masked it.
-    """
-    path = os.path.join(os.path.abspath(repo_root), "tools", "step_order.json")
-    return load_json(path)
 
 
 def find_spec_file(step_id: str, spec_dir: str) -> str | None:

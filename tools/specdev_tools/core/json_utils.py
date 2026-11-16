@@ -969,7 +969,7 @@ def _kebab_tokens(s: str) -> List[str]:
     return [t for t in s.replace("_", "-").split("-") if t]
 
 
-def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict[str, Any]]:
+def nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict[str, Any]]:
     """Return top_n nearest ids by normalised token-level Levenshtein distance.
 
     Scoring: 1 - (edit_distance / max_len) so higher = more similar.
@@ -985,6 +985,9 @@ def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dic
         scored.append((score, cand))
     scored.sort(reverse=True, key=lambda x: x[0])
     return [{"id": cand, "score": sc} for sc, cand in scored[:top_n]]
+
+
+_nearest_ids = nearest_ids  # the old private name, kept for existing importers
 
 
 # ---------------------------------------------------------------------------
@@ -1256,7 +1259,7 @@ def _resolve_single_pointer(
         return hit
     else:
         # Miss — compute nearest ids from the file's id corpus
-        nearest = _nearest_ids(id_val, all_ids, top_n=3)
+        nearest = nearest_ids(id_val, all_ids, top_n=3)
         result = {
             "pointer": pointer,
             "exists": False,

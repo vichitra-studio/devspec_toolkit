@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import json_delete, json_patch
 from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
 from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node
@@ -21,12 +21,8 @@ NOT_APPLICABLE_GUIDANCE = (
 )
 
 
-class LifecycleRefusedError(Exception):
+class LifecycleRefusedError(FindingError):
     """A lifecycle change that is refused; the E705 finding is in ``error``."""
-
-    def __init__(self, error: SpecError) -> None:
-        super().__init__(error.message)
-        self.error = error
 
 
 @dataclass(frozen=True)

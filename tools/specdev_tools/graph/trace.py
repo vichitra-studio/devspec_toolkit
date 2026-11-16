@@ -13,23 +13,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.core.json_utils import _nearest_ids
+from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.json_utils import nearest_ids
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
 
 Direction = Literal["up", "down"]
 BOTH_DIRECTIONS: tuple[Direction, ...] = ("up", "down")
-_NO_STEP_RANK = 10**6
 _NEAREST_COUNT = 3
 
 
-class UnknownTraceTargetError(Exception):
+class UnknownTraceTargetError(FindingError):
     """The id to trace, or a kind or link field named in the options, is not on the graph; the E706 finding is in ``error``."""
-
-    def __init__(self, error: SpecError) -> None:
-        super().__init__(error.message)
-        self.error = error
 
 
 @dataclass(frozen=True)
@@ -76,8 +71,7 @@ class TraceResult:
 
 def _step_rank(graph: Graph, node: Node) -> tuple[int, str, str]:
     """Order of *node* in the waterfall: step rank (unknown steps last), step name, id."""
-    rank = graph.shape.step_ranks.get(node.step, _NO_STEP_RANK) if node.step is not None else _NO_STEP_RANK
-    return rank, node.step or "", node.id
+    return graph.shape.rank_of(node.step), node.step or "", node.id
 
 
 def _neighbour_ids(graph: Graph, node: Node, direction: Direction, options: TraceOptions) -> list[str]:
@@ -128,7 +122,7 @@ def _unknown_names(subject: str, given: Iterable[str], known: set[str]) -> str |
     """The E706 message for the names of *given* that are not in *known*, or ``None`` when all are known."""
     messages = []
     for name in sorted(set(given) - known):
-        near = [entry["id"] for entry in _nearest_ids(name, sorted(known), _NEAREST_COUNT)]
+        near = [entry["id"] for entry in nearest_ids(name, sorted(known), _NEAREST_COUNT)]
         suffix = f"; nearest: {', '.join(near)}" if near else ""
         messages.append(f"no {subject} {name!r}{suffix}")
     return "; ".join(messages) or None

@@ -12,23 +12,17 @@ import unicodedata
 from collections.abc import Mapping
 from typing import Any
 
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node, collapse_whitespace
 
 EXCLUDED_FIELDS = frozenset({"status", "notes", "tags", "owner"})
 CRITERION_KIND_OF = {"fr": "criterion", "task": "task-criterion"}
 
-_WHITESPACE = re.compile(r"\s+")
 _TYPOGRAPHY = {
     **dict.fromkeys((0x2018, 0x2019, 0x201A, 0x201B), "'"),
     **dict.fromkeys((0x201C, 0x201D, 0x201E, 0x201F), '"'),
     **dict.fromkeys((*range(0x2010, 0x2016), 0x2212), "-"),
 }
 _PATH_STEP = re.compile(r'\.([^.\[\]]+)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]')
-
-
-def collapse_whitespace(text: str) -> str:
-    """*text* with every run of whitespace replaced by one space and the ends trimmed."""
-    return _WHITESPACE.sub(" ", text).strip()
 
 
 def normalise_text(text: str) -> str:
@@ -75,13 +69,14 @@ def item_at(document: Mapping[str, Any], jq_path: str) -> Mapping[str, Any] | No
     return current if isinstance(current, dict) else None
 
 
-def _item_of(node: Node, graph: Graph) -> Mapping[str, Any] | None:
+def item_of(graph: Graph, node: Node) -> Mapping[str, Any] | None:
+    """The item of the spec file *node* is defined by, as parsed; ``None`` when the graph holds no document for the file or the path misses."""
     document = graph.documents.get(node.file)
     return item_at(document, node.jq_path) if document is not None else None
 
 
 def _own_fields(node: Node, graph: Graph) -> dict[str, Any]:
-    decl, item = graph.decls.get(node.kind), _item_of(node, graph)
+    decl, item = graph.decls.get(node.kind), item_of(graph, node)
     if decl is None or item is None:
         return {}
     names = sorted(name for name in decl.contract if name in item and name not in EXCLUDED_FIELDS)

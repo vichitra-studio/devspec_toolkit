@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -40,6 +39,9 @@ from ..core.constants import DEFAULT_BRANCH_CANDIDATES
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import SchemaRegistry, get_shared_registry
+from ..graph.build import build_file_graph
+from ..graph.ids import check_unique_ids
+from ..graph.kinds import KindRegistryError
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
     step_01,
@@ -67,110 +69,20 @@ from .validators import (
 )
 
 
-STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_")
-STEP_DIR_RE = re.compile(r"^step_(\d{2}[a-z]?)$")
-IMPL_CONTEXT_DIR_RE = re.compile(r"^impl_context$")
+from ..core.step_paths import (  # noqa: F401  (STEP_*_RE and the aliases stay importable from here)
+    IMPL_CONTEXT_DIR_RE,
+    STEP_DIR_RE,
+    STEP_FILE_RE,
+    get_step_from_path,
+    refine_impl_context_substep,
+)
 
-def _get_step_from_path(path: str) -> str:
-    """Extract step number from file path.
+_get_step_from_path = get_step_from_path
+_refine_impl_context_substep = refine_impl_context_substep
 
-    Handles standard ``NN_name.json`` filenames, ``step_NN/`` directories,
-    and ``impl_context/`` directories.
-
-    Routing rules for Step 16 artifacts:
-    - ``16_impl_context.json`` NOT inside ``impl_context/`` → step ``"16"``
-      (Trinity Anchor; dispatches to validate_step_16_anchor).
-    - Any ``.json`` inside an ``impl_context/`` directory → step ``"16a"``
-      by default.  ``_refine_impl_context_substep`` promotes to ``"16b"`` or
-      ``"16c"`` based on artifact content (presence of ``execution.execution_results``
-      or ``review.verdict``).  All three sub-step validators now chain up through
-      their predecessors, so dispatching to the highest-phase validator runs
-      every earlier phase's checks as well.
-    """
-    filename = os.path.basename(path)
-
-    # Anchor: 16_impl_context.json NOT inside impl_context/ → step "16"
-    # Check this before the generic STEP_FILE_RE so the specific filename
-    # takes priority over the numeric-prefix pattern.
-    dirname_full = os.path.dirname(path)
-    if filename == "16_impl_context.json" and os.path.basename(dirname_full) != "impl_context":
-        return "16"
-
-    match = STEP_FILE_RE.match(filename)
-    if match:
-        return match.group(1)
-
-    dirname = os.path.basename(dirname_full) if dirname_full else ""
-    if dirname:
-        match = STEP_DIR_RE.match(dirname)
-        if match:
-            return match.group(1)
-        if IMPL_CONTEXT_DIR_RE.match(dirname):
-            # Default to "16a" for impl_context/ artifacts.  Content-based
-            # refinement (see _refine_impl_context_substep) promotes to
-            # "16b"/"16c" once the artifact is loaded.
-            return "16a"
-
-    return "unknown"
-
-
-def _refine_impl_context_substep(step: str, data: Any) -> str:
-    """Promote/demote ``impl_context/`` dispatch by artifact content.
-
-    All three Trinity sub-step artifacts share ``spec/impl_context/`` and the
-    ``vc:16-impl-context`` schema, so path alone cannot distinguish them.
-    Content signals the highest phase present:
-
-    - ``artifact_role == "anchor"``                      → ``"16"`` (misfiled anchor)
-    - ``review.verdict`` present (non-empty string)      → ``"16c"`` (reviewer output)
-    - ``execution.execution_results`` populated (len>0)  → ``"16b"`` (coder output)
-    - otherwise                                          → ``"16a"`` (planner output)
-
-    ``validate_step_16c`` chains through ``validate_step_16b`` → ``validate_step_16a``,
-    so routing to the highest phase runs every earlier phase's checks as well.
-    Non-``"16a"`` inputs are returned unchanged — this function is a no-op for
-    charter artifacts, scaffold artifacts, etc.
-
-    Anchor demotion rationale: when an author drops the anchor file inside
-    ``spec/impl_context/`` by mistake, ``_get_step_from_path`` classifies it as
-    ``"16a"`` by directory.  Without this demotion the file would be deep-validated
-    by ``validate_step_16a`` and emit confusing 16a-specific errors (missing
-    ``plan.status``, missing ``spec_alignment.checklist``) instead of being
-    routed to the anchor validator.  The anchor validator's ``_is_anchor`` + W586
-    signal then surfaces the real problem — wrong location for this artifact_role.
-
-    Note on invalid verdicts: promotion triggers on *any* non-empty string in
-    ``review.verdict`` — including values outside the ``VALID_VERDICTS`` enum
-    (e.g. ``"TOTALLY_INVALID"``).  This is intentional: the enum check lives
-    inside ``validate_step_16c``, so routing must reach it *first* for the
-    E520 signal to fire.  Demoting unknown verdicts back to 16a would silence
-    that diagnostic.
-    """
-    if step != "16a" or not isinstance(data, dict):
-        return step
-    # ``.strip()`` for consistency with the verdict check below — schema enforces
-    # the const ``"anchor"`` exactly, but defensive normalisation keeps routing
-    # symmetric (a stray trailing space in either field shouldn't break dispatch
-    # silently while the schema validator separately complains).
-    artifact_role = data.get("artifact_role")
-    if isinstance(artifact_role, str) and artifact_role.strip() == "anchor":
-        return "16"
-    review = data.get("review")
-    if isinstance(review, dict) and isinstance(review.get("verdict"), str) and review["verdict"].strip():
-        return "16c"
-    execution = data.get("execution")
-    if isinstance(execution, dict):
-        results = execution.get("execution_results")
-        if isinstance(results, list) and len(results) > 0:
-            return "16b"
-    return "16a"
 
 def _duplicate_id_errors(repo_root: str, path: str, data: dict[str, Any]) -> list[SpecError]:
     """E704 for an id defined twice inside the file *path*; nothing when the toolkit has no usable registry."""
-    from ..graph.build import build_file_graph
-    from ..graph.ids import check_unique_ids
-    from ..graph.kinds import KindRegistryError
-
     try:
         return check_unique_ids(build_file_graph(path, repo_root, data))
     except KindRegistryError:

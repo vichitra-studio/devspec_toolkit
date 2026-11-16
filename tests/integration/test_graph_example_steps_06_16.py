@@ -14,12 +14,9 @@ folder and each artifact as raw text for a token overlap, never a field of it.
 from __future__ import annotations
 
 import fnmatch
-import io
 import json
 import shutil
-import sys
 from collections import Counter
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
@@ -27,7 +24,6 @@ from unittest.mock import Mock, patch
 import _graph_example as shared
 import pytest
 
-from specdev_tools import cli
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
 from specdev_tools.context.reviewer import _run_structural_pass
 from specdev_tools.context.scope_resolver import resolve_scope
@@ -38,6 +34,7 @@ from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 from specdev_tools.validation.validate import DEEP_VALIDATORS
+from unit.graph._synth import run_cli as _run_cli
 
 _ROOT = shared.ROOT
 _SPEC = shared.SPEC
@@ -149,18 +146,6 @@ def stamped_example(tmp_path_factory: pytest.TempPathFactory) -> Path:
     version = get_toolkit_version(_ROOT)
     (copied / "spec" / "specdev_version").write_text(json.dumps({"toolkit_version": version}), encoding="utf-8")
     return copied
-
-
-def _run_cli(*argv: str) -> tuple[int, str]:
-    buf = io.StringIO()
-    with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", ["specdev", *argv]), \
-            redirect_stdout(buf), redirect_stderr(buf):
-        try:
-            cli.main()
-            code = 0
-        except SystemExit as exc:
-            code = int(exc.code) if isinstance(exc.code, int) else 1
-    return code, buf.getvalue()
 
 
 # --- the files ------------------------------------------------------------------------------------

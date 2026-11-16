@@ -17,6 +17,8 @@ from ..core.config import reset_config
 from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
+from ..graph.check import run_graph_check
+from ..graph.model import Graph
 from ..graph.ownership import stamp_file_owner, step_for_file
 from .linter_utils import build_lint_graph
 
@@ -113,6 +115,12 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
             ),
         )
     ]
+
+
+def _graph_check_result(repo_root: str, spec_dir: str, spec_root: str | None, lint_graph: Graph | None) -> dict[str, Any]:
+    """The ``graph`` check (E700-E704) over *spec_root*; it reuses the lint graph only when that is the same folder as *spec_dir*."""
+    shares_lint_graph = os.path.abspath(spec_root or spec_dir) == os.path.abspath(spec_dir)
+    return _check_result(run_graph_check(spec_root or spec_dir, repo_root, graph=lint_graph if shares_lint_graph else None))
 
 
 def _run_checks(
@@ -285,12 +293,7 @@ def _run_checks(
         }
 
     # --- 10b. Spec graph: unique ids (E704) and links (E700-E703) ---
-    from ..graph.check import run_graph_check
-
-    shares_lint_graph = os.path.abspath(spec_root or spec_dir) == os.path.abspath(spec_dir)
-    checks["graph"] = _check_result(
-        run_graph_check(spec_root or spec_dir, repo_root, graph=lint_graph if shares_lint_graph else None)
-    )
+    checks["graph"] = _graph_check_result(repo_root, spec_dir, spec_root, lint_graph)
 
     # --- 11. Registry check (R001-R003) ---
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json

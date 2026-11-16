@@ -12,10 +12,17 @@ from specdev_tools.graph.kinds import KindDecl, LinkDecl
 LIFECYCLES = ("active", "deprecated", "not_applicable")
 DEFAULT_LIFECYCLE = "active"
 NOT_APPLICABLE = "not_applicable"
+DEPRECATED = "deprecated"
 # First non-empty field of a node item that names it for a reader (PD-09); one rule for every kind.
 LABEL_FIELDS = ("title", "name", "statement", "text", "description", "summary", "label", "preferred_label")
 LABEL_MAX_CHARS = 120
+UNRANKED = 10**6  # sort rank of a node with no step, or a step that is not in the waterfall: after every real rank
 _WHITESPACE = re.compile(r"\s+")
+
+
+def collapse_whitespace(text: str) -> str:
+    """*text* with every run of whitespace replaced by one space and the ends trimmed."""
+    return _WHITESPACE.sub(" ", text).strip()
 
 
 def node_label(item: Mapping[str, Any]) -> str:
@@ -25,7 +32,7 @@ def node_label(item: Mapping[str, Any]) -> str:
     """
     for name in LABEL_FIELDS:
         value = item.get(name)
-        text = _WHITESPACE.sub(" ", value).strip() if isinstance(value, str) else ""
+        text = collapse_whitespace(value) if isinstance(value, str) else ""
         if text:
             return text[:LABEL_MAX_CHARS]
     return ""
@@ -84,6 +91,10 @@ class SpecShape:
     step_ranks: Mapping[str, int] = field(default_factory=dict)
     kind_steps: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     files_by_step: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def rank_of(self, step: str | None) -> int:
+        """Sort rank of *step*: its place in the waterfall; ``None`` (no home step) and an unknown step rank ``UNRANKED``, last."""
+        return self.step_ranks.get(step, UNRANKED) if step is not None else UNRANKED
 
 
 @dataclass

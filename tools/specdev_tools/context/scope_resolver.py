@@ -9,6 +9,7 @@ import os
 import sys
 from typing import Any
 
+from ..graph.build import build_graph
 from ..graph.kinds import SEED_STEP, KindRegistryError
 from ..graph.model import Node
 from ..graph.trace import group_by_kind, trace_node
@@ -36,8 +37,6 @@ def resolve_scope(entry_id: str | None, spec_dir: str, repo_root: str) -> dict[s
     print(DEPRECATION_NOTE, file=sys.stderr)
     if not entry_id:
         return {"entry": None, "resolved_ids": {}, "source_files": {}, "scope": "all"}
-
-    from ..graph.build import build_graph  # graph.build imports context._utils: a module-level import is a cycle
 
     spec_dir_abs = os.path.abspath(spec_dir)
     result: dict[str, Any] = {"entry": entry_id, "resolved_ids": {}, "source_files": {}}

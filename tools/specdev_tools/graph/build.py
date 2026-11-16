@@ -12,11 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from specdev_tools.context._utils import load_step_order
 from specdev_tools.core.entry_key_registry import iter_nodes, match_glob_key
 from specdev_tools.core.errors import make_error
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.scope_helpers import as_str, str_in, str_items
+from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.kinds import (
     EXTRAS_STEP,
     SEED_KIND,

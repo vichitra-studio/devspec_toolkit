@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from specdev_tools.core.entry_key_registry import is_glob_key
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items, str_items
 
 SEED_KIND = "seed"
@@ -27,12 +27,8 @@ def has_lifecycle(kind: str, role: str | None) -> bool:
     return role != RECORD_ROLE and kind != SEED_KIND
 
 
-class KindRegistryError(Exception):
+class KindRegistryError(FindingError):
     """The registry cannot be read; ``error`` is the E520 ``SpecError`` that reports it."""
-
-    def __init__(self, error: SpecError) -> None:
-        super().__init__(error.message)
-        self.error = error
 
 
 @dataclass(frozen=True)

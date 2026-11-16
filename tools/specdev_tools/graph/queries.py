@@ -14,25 +14,20 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.core.json_utils import _nearest_ids
-from specdev_tools.graph.contract import item_at
+from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.json_utils import nearest_ids
+from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.kinds import LinkDecl
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
-DEPRECATED = "deprecated"
 NEAREST_COUNT = 3
 _NO_VALUE = "-"
 
 
-class QueryTargetError(Exception):
+class QueryTargetError(FindingError):
     """A read command was given an id, kind or field the graph does not know; the E706 finding is in ``error``."""
-
-    def __init__(self, error: SpecError) -> None:
-        super().__init__(error.message)
-        self.error = error
 
 
 def _unknown(message: str) -> QueryTargetError:
@@ -120,7 +115,7 @@ class CandidateList:
 
 
 def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
-    near = [entry["id"] for entry in _nearest_ids(wanted, sorted(known), NEAREST_COUNT)]
+    near = [entry["id"] for entry in nearest_ids(wanted, sorted(known), NEAREST_COUNT)]
     suffix = f"; nearest: {', '.join(near)}" if near else ""
     return f"no {subject} {wanted!r}{suffix}"
 
@@ -150,10 +145,9 @@ def _kind_of(graph: Graph, node_id: str) -> str | None:
     return node.kind if node is not None else None
 
 
-def _own_content(graph: Graph, node: Node, full: bool) -> Mapping[str, Any] | None:
+def own_content(graph: Graph, node: Node, full: bool) -> Mapping[str, Any] | None:
     """The node's item; unless *full*, each nested collection of the kind is replaced by the ids of its child nodes."""
-    document = graph.documents.get(node.file)
-    item = item_at(document, node.jq_path) if document is not None else None
+    item = item_of(graph, node)
     decl = graph.decls.get(node.kind)
     if item is None or full or decl is None:
         return item
@@ -176,7 +170,7 @@ def _view(graph: Graph, node: Node, full: bool) -> NodeView:
         file=node.file,
         jq_path=node.jq_path,
         label=node.label,
-        content=_own_content(graph, node, full),
+        content=own_content(graph, node, full),
         children=node.children,
         outgoing=tuple(_link_view(graph, link.field, link.target) for link in node.links),
         incoming=_incoming(graph, node),
@@ -297,7 +291,6 @@ def candidates(
     excluded = holder.linked
     if holder.node is not None:
         excluded = excluded | {holder.node.id} | _same_step_ancestors(graph, holder.node)
-    ranks = graph.shape.step_ranks
     matches = sorted(
         (
             node
@@ -306,7 +299,7 @@ def candidates(
             and any(link_target_allowed(decl, step, node, graph.shape) for step in holder.steps or (None,))
             and _matches(node, query)
         ),
-        key=lambda node: (ranks.get(node.step or "", len(ranks)), node.id),
+        key=lambda node: (graph.shape.rank_of(node.step), node.id),
     )
     shown = matches if limit is None else matches[: max(limit, 0)]
     return CandidateList(holder.kind, link_field, tuple(_candidate(node) for node in shown), len(matches))

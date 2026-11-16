@@ -939,7 +939,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E700 LINK_TARGET_NOT_FOUND
 
-**Trigger**: A link field names an id that no node has. Reported by `spec-check` (check `graph`). When no file of any step that holds a kind the field accepts exists in the spec, the message says that no file of those steps exists, instead of "no node has that id". This replaces the step 12 E590 check of a job's `depends_on`.
+**Trigger**: A link field names an id that no node has. Reported by `spec-check` (check `graph`). When no file of any step that holds a kind the field accepts exists in the spec, the message says that no file of those steps exists, instead of "no node has that id"; when such a file exists but could not be read (for example, it is not valid JSON, or its top level is not an object), the message says that the file could not be read, so the target cannot be checked. This replaces the step 12 E590 check of a job's `depends_on`.
 
 **Resolution**: Owner `step:<holder step>`. Fix the id, or define the node it names.
 
@@ -963,7 +963,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E703 LINK_CYCLE_SAME_STEP
 
-**Trigger**: Links among nodes of one step form a cycle (a node that links to itself counts). One finding per cycle, naming its members. Reported by `spec-check` (check `graph`); a job `depends_on` cycle or a task `depends_on` cycle is E703, which replaces E141.
+**Trigger**: Links among nodes of one step form a cycle (a node that links to itself counts). One finding per cycle, naming its members. Reported by `spec-check` (check `graph`); a job `depends_on` cycle or a task `depends_on` cycle is E703, which replaces E141. The tasks of the whole roadmap are checked together, so a cycle that runs through the tasks of two milestones is reported too (1.1.1 did not check it). A single-file `validate` does not report a cycle.
 
 **Resolution**: Owner `step:<step>`. Break the cycle.
 
@@ -979,7 +979,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E705 LIFECYCLE_CHANGE_REFUSED
 
-**Trigger**: A `node status` change was refused (unknown or ambiguous id, bad value, or a node of role `record` or `seed`).
+**Trigger**: A `node status` change was refused (unknown or ambiguous id, a value that is not `active`, `deprecated` or `not_applicable`, or a node of role `record` or `seed`).
 
 **Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
 
@@ -987,7 +987,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E706 GRAPH_COMMAND_TARGET_UNKNOWN
 
-**Trigger**: A read command was given an id, field, kind or role the graph does not know.
+**Trigger**: A read command was given an id, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace` or a `--recipe` role that is not `16a`, `16b` or `16c`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints `specdev <command>: could not read <file>; the answer may be incomplete` on stderr first.
 
 **Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
 
@@ -1003,7 +1003,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E708 DIFF_REF_UNRESOLVED
 
-**Trigger**: A ref given to `diff` does not resolve.
+**Trigger**: A ref given to `diff` does not resolve, or the spec folder cannot be read at it: for example a `--git-root` that is not a folder or not a git repository, a spec folder that is absent at the ref or outside the git root, or git failing.
 
 **Resolution**: Command usage error: no owner, no node id. Give a ref that exists.
 

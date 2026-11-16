@@ -16,8 +16,8 @@ from dataclasses import dataclass, field, replace
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.scope_helpers import as_str, dict_items, str_items
+from specdev_tools.core.step_paths import get_step_from_path, refine_impl_context_substep
 from specdev_tools.graph.model import Node
-from specdev_tools.validation.validate import _get_step_from_path, _refine_impl_context_substep
 
 STEP_PREFIX = "step:"
 FIXED_STEP_PREFIX = "fixed_step:"
@@ -110,7 +110,7 @@ def step_for_file(path: str, data: object) -> str | None:
     Uses the routing ``validate_file`` itself uses, so an ``impl_context/ms_*_plan.json`` is ``16a``, ``16b`` or
     ``16c`` by its content.  *data* is the parsed document; a non-object gives the path-only step.
     """
-    step = _refine_impl_context_substep(_get_step_from_path(path), data)
+    step = refine_impl_context_substep(get_step_from_path(path), data)
     return None if step == _UNKNOWN_STEP else step
 
 

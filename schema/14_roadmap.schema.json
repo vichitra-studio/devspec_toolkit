@@ -219,7 +219,7 @@
                       "description": "Canonical reference to the metric used to measure task completion. Kind is structurally pinned to 'metric'. Example: {\"id\": \"cn:core:metric:error-rate\", \"kind\": \"metric\", \"label\": \"Error Rate\"}. Use when task completion is gated on a measurable metric (e.g., performance benchmark, coverage threshold). Omit for tasks with qualitative acceptance criteria only."
                     },
                     "depends_on": {
-                      "description": "Ids of the tasks of this roadmap that must be done before this task. Optional. The tasks of one milestone must not form a cycle (E703). Example: [\"task-add-reset-token-table\"].",
+                      "description": "Ids of the tasks of this roadmap that must be done before this task. Optional. The tasks of the roadmap must not form a cycle (E703). Example: [\"task-add-reset-token-table\"].",
                       "type": "array",
                       "items": {
                         "$ref": "vc:core:atoms#kebabId"

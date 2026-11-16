@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -13,17 +12,11 @@ from specdev_tools.graph import gitview
 from specdev_tools.graph.diff import ADDED, CHANGED, MINOR, NO_BUMP, diff_refs
 from specdev_tools.graph.gitview import GitViewError, archive_ref, load_graph_at, spec_path_in_repo
 from unit.graph._synth import ROOT, run_specdev, write_json, write_spec
+from unit.graph._synth import git as _git
 
 _FR_FILE = "04_fr_list.json"
 _SEED_MANIFEST = "common/seed_manifest.json"
 _SEED_FILE = "docs/seed/notes.md"
-_GIT_IDENTITY = ("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false")
-
-
-def _git(repo: Path, *args: str) -> str:
-    env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
-    result = subprocess.run(["git", "-C", str(repo), *_GIT_IDENTITY, *args], capture_output=True, text=True, env=env, check=True)
-    return result.stdout.strip()
 
 
 def _commit(repo: Path, tag: str) -> None:
