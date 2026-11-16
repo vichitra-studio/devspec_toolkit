@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from typing import Any
 
 PARKED_SCOPES: frozenset[str] = frozenset({"later", "out"})
-_WONT_HAVE_PRIORITY = "wont-have"
 
 
 def scope_in(node: Mapping[str, Any], scopes: frozenset[str]) -> bool:
@@ -15,11 +14,9 @@ def scope_in(node: Mapping[str, Any], scopes: frozenset[str]) -> bool:
 
 
 def is_parked(node: Mapping[str, Any]) -> bool:
-    """Return True when *node* is parked: ``scope`` is ``later`` or ``out``, or ``priority`` is ``wont-have``.
+    """Return True when *node* is parked: its ``scope`` is ``later`` or ``out``.
 
-    Works for any node mapping; a missing ``scope`` or ``priority`` key (a capability has no
-    ``priority``) counts as not parked on that criterion. Never raises on missing keys or on a
-    wrong-typed value (a list or dict ``scope`` is not parked).
-    The ``priority`` branch is the 1.1.1 spelling and goes away with the 04 ``priority`` field.
+    Works for any node mapping; a missing ``scope`` key counts as not parked. Never raises on
+    missing keys or on a wrong-typed value (a list or dict ``scope`` is not parked).
     """
-    return scope_in(node, PARKED_SCOPES) or node.get("priority") == _WONT_HAVE_PRIORITY
+    return scope_in(node, PARKED_SCOPES)

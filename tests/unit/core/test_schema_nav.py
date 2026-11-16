@@ -713,6 +713,9 @@ def test_schema_ref_sibling_census():
     nodes (``$ref`` plus ``description``). Per file, old -> new: 00 charter 12 -> 26,
     01 capabilities 10 -> 11, 02 system sketch 14 -> 15, 02a delivery baseline
     6 -> 15, 03 glossary 2 -> 3, 04 FR list 6 -> 11, 05 interfaces 11 -> 16.
+    256 after M3 WI-M3-02 and WI-M3-22: 02 system sketch 15 -> 14 (``tech_stack``
+    removed), core collections 26 -> 23 (the ingested-ref definitions removed, the
+    ambiguity item added), core step_base 8 -> 6 (the two ingested fields removed).
     """
     from collections import Counter
 
@@ -731,9 +734,9 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 262
+    assert sum(counts.values()) == 256
     assert dict(counts) == {
-        ("description",): 255,
+        ("description",): 249,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
         ("default", "description"): 1,

@@ -48,10 +48,18 @@ _EXPECTED_KINDS: dict[str, dict[str, str | None]] = {
 _ROLE_TABLE = json.loads((_ROOT / "tests" / "fixtures" / "graph" / "kind_role_table.json").read_text())["kinds"]
 
 
+_STEP_FILE_RE = re.compile(r"(\d{2}[a-z]?)_")
+
+
 def _step_of(schema_file: str) -> str:
-    match = re.match(r"(\d{2}[a-z]?)_", Path(schema_file).name)
+    match = _STEP_FILE_RE.match(Path(schema_file).name)
     assert match, schema_file
     return match.group(1)
+
+
+def _is_step_schema(schema_file: str) -> bool:
+    """False for a ``schema/core`` file: a kind declared there (the ambiguity item) belongs to no step."""
+    return _STEP_FILE_RE.match(Path(schema_file).name) is not None
 
 
 def _m2_schema_files() -> list[str]:
@@ -158,7 +166,7 @@ def test_every_link_kind_is_declared_or_seed(decls, fname: str) -> None:
 
 @pytest.mark.parametrize("fname", _FILES)
 def test_no_forward_links_in_steps_00_05(decls, fname: str) -> None:
-    kind_step = {n.kind: _step_of(n.schema_file) for n in decls.nodes if n.kind != "seed"}
+    kind_step = {n.kind: _step_of(n.schema_file) for n in decls.nodes if n.kind != "seed" and _is_step_schema(n.schema_file)}
     holder_step = _step_of(fname)
     for link in _links(decls, fname):
         kinds = link.value["kinds"]
@@ -243,7 +251,7 @@ def _same_step_edges(decls) -> set[tuple[str, str]]:
     return {
         (holder, target)
         for link in decls.links
-        if _step_of(link.schema_file) in _M2_STEPS
+        if _is_step_schema(link.schema_file) and _step_of(link.schema_file) in _M2_STEPS
         for holder in link.holders
         for target in link.value.get("same_step_kinds", [])
     }

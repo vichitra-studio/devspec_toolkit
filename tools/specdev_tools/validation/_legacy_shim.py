@@ -24,18 +24,25 @@ LEGACY_CHARTER_CHAIN_FIELDS: frozenset[str] = frozenset({"goal_id", "trace", "su
 # Step-02 capability-coverage reader in `cross_artifact_checks.py` (component `trace` / `trace_refs`).
 LEGACY_COMPONENT_TRACE_FIELDS: frozenset[str] = frozenset({"trace", "trace_refs"})
 
-# The 1.1.1 spelling of a parked capability (`scope: future`). The W568 reader in
-# `traceability_closure.py` and the completeness denominator in `cli.py` call `is_parked_any_shape`.
+# The 1.1.1 spellings of a parked node: a capability with `scope: future` and an FR with
+# `priority: wont-have`. Readers that can meet a legacy file (`matrix.py`, `traceability_closure.py`,
+# `validators/step_11.py`, `cli.py`) call `is_parked_any_shape`.
 LEGACY_PARKED_SCOPES: frozenset[str] = frozenset({"future"})
+LEGACY_PARKED_PRIORITY = "wont-have"
 
 
 def is_parked_any_shape(node: Mapping[str, Any]) -> bool:
     """Return True when *node* is parked in the current shape (``is_parked``) or the 1.1.1 one.
 
-    For readers that can meet a legacy file and a new-shape file in the same run. When this
-    module is deleted its two callers go back to ``is_parked``.
+    The 1.1.1 forms are ``scope: future`` and ``priority: wont-have``. For readers that can meet
+    a legacy file and a new-shape file in the same run. When this module is deleted its callers
+    go back to ``is_parked``. Never raises on a wrong-typed value.
     """
-    return is_parked(node) or scope_in(node, LEGACY_PARKED_SCOPES)
+    return (
+        is_parked(node)
+        or scope_in(node, LEGACY_PARKED_SCOPES)
+        or node.get("priority") == LEGACY_PARKED_PRIORITY
+    )
 
 
 def _carries(value: Any, names: Collection[str]) -> bool:

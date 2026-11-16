@@ -226,9 +226,10 @@
         "unit",
         "contract",
         "e2e",
+        "manual",
         "redteam"
       ],
-      "description": "Testing mode for fixture definitions. Decision rules: 'unit' — test a single function or rule in isolation, no network calls, all dependencies mocked; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but HTTP layer is live; 'e2e' — test a full user journey across integrated components (database, queue, external calls may be stubbed but service layer is real); 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. Anti-pattern: using 'unit' for tests that make real HTTP calls — those are 'contract' or 'e2e'."
+      "description": "Testing mode for fixture definitions. Decision rules: 'unit' — test a single function or rule in isolation, no network calls, all dependencies mocked; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but HTTP layer is live; 'e2e' — test a full user journey across integrated components (database, queue, external calls may be stubbed but service layer is real); 'manual' — verified by a person following written steps, not by an automated run; 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. Anti-pattern: using 'unit' for tests that make real HTTP calls — those are 'contract' or 'e2e'."
     },
     "threatCategory": {
       "$anchor": "threatCategory",

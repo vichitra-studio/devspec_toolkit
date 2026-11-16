@@ -7,8 +7,7 @@ from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
 from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, ALWAYS_EXCLUDED
-from ..core.scope_helpers import is_parked
-from ._legacy_shim import LEGACY_TRACE_FIELDS, has_legacy_fields
+from ._legacy_shim import LEGACY_TRACE_FIELDS, has_legacy_fields, is_parked_any_shape
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -382,13 +381,13 @@ def build_trace_matrix(
                 api_to_threat[t["id"]].add(th["threat_id"])
 
     # Exclude FRs that will never be built from the coverage denominator:
-    # priority:"wont-have" FRs (explicitly parked, no API/fixture/threat
+    # parked FRs (scope later/out, or the 1.1.1 priority:"wont-have"; explicitly parked, no API/fixture/threat
     # expected by design) and FRs listed in a Step 05 out_of_scope[] entry
     # (acknowledged as having no HTTP API surface). Mirrors the equivalent
     # exclusions already applied in traceability_closure.py's W561/W564/W565/
     # W566 checks (DEVSPEC-122 follow-up) — without this, either category
     # silently drags down fr_coverage and can fail SPECDEV_MATRIX_STRICT=1 CI.
-    wont_have_fr_ids = {fr.get("fr_id") for fr in frs if is_parked(fr)}
+    wont_have_fr_ids = {fr.get("fr_id") for fr in frs if is_parked_any_shape(fr)}
     step05_oos_fr_ids: set[str] = set()
     step08_oos_fr_ids: set[str] = set()
     for data in artifacts.values():

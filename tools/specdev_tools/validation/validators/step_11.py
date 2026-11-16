@@ -9,8 +9,8 @@ from typing import Any
 
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_artifact
-from ...core.scope_helpers import is_parked
 from ...core.trace_types import is_valid_trace_type, normalize_trace_type
+from ...validation._legacy_shim import is_parked_any_shape
 from ...validation.linter_utils import check_no_duplicates
 
 # ---------------------------------------------------------------------------
@@ -377,7 +377,8 @@ def _load_security_invariant_ids(
 
 
 def _load_wont_have_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
-    """Load the set of step-04 fr_ids that are parked (``is_parked``).
+    """Load the set of step-04 fr_ids that are parked (``is_parked_any_shape``: a 1.1.1 FR parks with
+    ``priority: wont-have``).
 
     Mirrors ``_load_security_invariant_ids``'s sibling-first / fallback
     resolution. Returns an empty set when step 04 is absent or contains no
@@ -405,7 +406,7 @@ def _load_wont_have_fr_ids(toolkit_root: str, artifact_path: str | None = None) 
             if not isinstance(fr, dict):
                 continue
             fr_id = fr.get("fr_id")
-            if fr_id and is_parked(fr):
+            if fr_id and is_parked_any_shape(fr):
                 result.add(str(fr_id))
         return result
 

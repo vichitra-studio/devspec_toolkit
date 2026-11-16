@@ -5,7 +5,6 @@ import warnings
 from typing import Any
 
 from ..core.errors import SpecError, make_error
-from ..core.scope_helpers import is_parked
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 from ._legacy_shim import (
     LEGACY_CHARTER_CHAIN_FIELDS,
@@ -316,7 +315,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             # are explicitly out-of-scope (parked for a later phase) and have
             # no APIs, fixtures, or milestones by design. Including them
             # produces false-positive W561/W564/W565/W566 warnings.
-            if is_parked(fr):
+            if is_parked_any_shape(fr):
                 continue
             if "fr_id" in fr:
                 fr_ids.add(fr["fr_id"])

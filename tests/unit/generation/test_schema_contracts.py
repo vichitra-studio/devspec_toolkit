@@ -283,6 +283,39 @@ class SchemaContractsTests(unittest.TestCase):
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
         self.assertTrue(errors, msg="String dependency payload unexpectedly passed")
 
+    def _schema_errors(self, schema_uri: str, fixture: str, mutate) -> list:
+        """Validate the fixture payload, after *mutate* edits it, against the schema *schema_uri*."""
+        registry = SchemaRegistry(str(self.repo_root))
+        validator = Draft202012Validator(registry.load(schema_uri), registry=registry.to_referencing_registry())
+        payload = json.loads((self.repo_root / "tests" / "fixtures" / fixture).read_text(encoding="utf-8"))
+        payload.pop("$schema", None)
+        mutate(payload)
+        return list(validator.iter_errors(payload))
+
+    def test_fr_schema_rejects_priority_wont_have(self):
+        def mutate(payload):
+            payload["functional_requirements"][0]["priority"] = "wont-have"
+
+        fixture = "step_04/valid_comprehensive.json"
+        self.assertEqual([], self._schema_errors("vc:04-fr-list", fixture, lambda payload: None))
+        self.assertTrue(self._schema_errors("vc:04-fr-list", fixture, mutate))
+
+    def test_interface_contracts_schema_rejects_out_of_scope(self):
+        def mutate(payload):
+            payload["out_of_scope"] = [{"fr_id": "fr-user-logout", "rationale": "no API surface"}]
+
+        fixture = "step_05/valid_rest_api.json"
+        self.assertEqual([], self._schema_errors("vc:05-interface-contracts", fixture, lambda payload: None))
+        self.assertTrue(self._schema_errors("vc:05-interface-contracts", fixture, mutate))
+
+    def test_system_sketch_schema_rejects_tech_stack(self):
+        def mutate(payload):
+            payload["tech_stack"] = {"languages": [], "frameworks": [], "infrastructure": [], "tools": []}
+
+        fixture = "step_02/valid_minimal.json"
+        self.assertEqual([], self._schema_errors("vc:02-system-sketch", fixture, lambda payload: None))
+        self.assertTrue(self._schema_errors("vc:02-system-sketch", fixture, mutate))
+
     def test_validate_file_enforces_metadata_top_level_fields_for_step_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

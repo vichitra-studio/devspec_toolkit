@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .core.config import get_config, reset_config
 from .core.errors import SpecError
-from .core.scope_helpers import is_parked
+from .validation._legacy_shim import is_parked_any_shape
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
 # Also match warnings prefixed with file paths (e.g., "spec/05_x.json: W590 ...")
@@ -1079,7 +1079,7 @@ def main():
             except (OSError, ValueError):
                 return {}
 
-        # Exclude parked FRs (scope later/out, or priority:"wont-have") from
+        # Exclude parked FRs (scope later/out; the 1.1.1 priority:"wont-have" too) from
         # every FR-based denominator below. W564 (API coverage) and W566
         # (milestone coverage) additionally exempt FRs listed in Step 05's
         # apis.out_of_scope[]; W565 (fixture coverage) exempts a *different*
@@ -1095,7 +1095,7 @@ def main():
         }
         wont_have_fr_ids = {
             fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
-            if is_parked(fr) and fr.get("fr_id")
+            if is_parked_any_shape(fr) and fr.get("fr_id")
         }
         apis_data = _load_spec_json("05_interface_contracts.json")
         step05_oos_fr_ids = {
@@ -1114,7 +1114,6 @@ def main():
         # excluded; the 1.1.1 "future" too) are not expected to have an FR yet, so
         # they leave the W568 denominator.
         # Same predicate as the W568 exemption in traceability_closure.py (any shape).
-        from .validation._legacy_shim import is_parked_any_shape
         caps_data = _load_spec_json("01_capabilities.json")
         total_caps = sum(
             1 for cap in caps_data.get("capabilities", [])

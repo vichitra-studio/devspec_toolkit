@@ -141,36 +141,6 @@ Consult the schema for valid `schema_ref` formats and the `rate_limit` object sh
     }
   ],
   "connections": [],
-  "tech_stack": {
-    "languages": [
-      {
-        "name": "TypeScript",
-        "version": "5.4",
-        "rationale": "Team expertise and type safety for API development"
-      }
-    ],
-    "frameworks": [
-      {
-        "name": "Express",
-        "version": "^4.19",
-        "rationale": "Lightweight HTTP framework matching team experience"
-      }
-    ],
-    "infrastructure": [
-      {
-        "name": "PostgreSQL",
-        "version": "16",
-        "rationale": "JSONB support for flexible schema evolution"
-      }
-    ],
-    "tools": [
-      {
-        "name": "ESLint",
-        "version": "^9.0",
-        "rationale": "Standard linting for TypeScript projects"
-      }
-    ]
-  },
   "canonical_refs_used": []
 }
 ```

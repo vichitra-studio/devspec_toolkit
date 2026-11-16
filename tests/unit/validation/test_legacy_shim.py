@@ -21,6 +21,7 @@ from specdev_tools.validation._legacy_shim import (
 from specdev_tools.validation.cross_artifact_checks import check_step_02_integrity, check_step_04_integrity
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure
+from specdev_tools.validation.validators.step_11 import _load_wont_have_fr_ids
 
 _CLOSURE_CODES = ("E560", "E535", "W564", "W568")
 
@@ -171,7 +172,7 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     ({"scope": "later"}, True),
     ({"scope": "out"}, True),
     ({"scope": "in"}, False),
-    ({"priority": "wont-have"}, True),
+    ({"priority": "wont-have"}, False),
     ({"capability_id": "cap-a"}, False),
     ({"scope": ["in"]}, False),
     ({"scope": {}}, False),
@@ -292,6 +293,8 @@ def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
     ({"capability_id": "cap-a"}, False),
     ({"scope": ["future"]}, False),
     ({"scope": {}}, False),
+    ({"scope": 7, "priority": ["wont-have"]}, False),
+    ({"priority": ["wont-have"]}, False),
 ])
 def test_is_parked_any_shape_contract(node, expected):
     assert is_parked_any_shape(node) is expected
@@ -300,6 +303,24 @@ def test_is_parked_any_shape_contract(node, expected):
 def test_legacy_parked_scopes_is_the_1_1_1_value():
     assert LEGACY_PARKED_SCOPES == frozenset({"future"})
     assert not is_parked({"scope": "future"})  # the shared helper stays new-shape only
+
+
+def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
+    # A legacy FR parked by `priority: wont-have` stays out of every FR denominator of the readers
+    # that can meet a 1.1.1 file: closure, matrix, the step-11 sibling loader and the CLI.
+    files = {
+        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
+            {"fr_id": "fr-a", "priority": "must-have", "trace": []},
+            {"fr_id": "fr-legacy-export", "priority": "wont-have", "trace": []}]},
+        "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "fr_refs": [], "tasks": []}]},
+    }
+    spec_dir = _write_spec(tmp_path, files)
+    messages = [e.message for e in check_traceability_closure(spec_dir)]
+    assert any("UNCOVERED_FR_MILESTONE fr-a" in m for m in messages)
+    assert not any("fr-legacy-export" in m for m in messages)
+    assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
+    artifact = str(Path(spec_dir) / "11_adversarial.json")
+    assert _load_wont_have_fr_ids(str(tmp_path), artifact) == {"fr-legacy-export"}
 
 
 def _w568_ids(tmp_path: Path, capabilities: list[dict]) -> set[str]:

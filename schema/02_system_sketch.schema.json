@@ -364,18 +364,6 @@
             ]
           }
         },
-        "tech_stack": {
-          "description": "Technology decisions for the system, extracted from seed_tech_stack.md. Declares the languages, frameworks, infrastructure, and tools that downstream steps (05 Interface Contracts, 07 NFRs, 08 Fixtures, 15 Scaffold) should use when making technology-dependent decisions. Step 09 (Implementation Plan) inherits and may refine these choices. Deprecated: no longer required; third_parties records the pinned third-party versions and this field is removed in a later release.",
-          "allOf": [
-            {
-              "$ref": "vc:core:collections#techStack",
-              "description": "Inherits the structured technology stack definition from core collections."
-            },
-            {
-              "required": ["languages", "frameworks", "infrastructure", "tools"]
-            }
-          ]
-        },
         "third_parties": {
           "description": "Third-party services, libraries and platforms the system depends on, one node per separately versioned or contracted thing. Each carries the exact pinned version it was specified against. Optional; omit when the system has no third-party dependency.",
           "type": "array",
