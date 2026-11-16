@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds 1 downstream step.
+Run `specdev prompt-context 02a` to see downstream consumers.
 
 ## Role
 You are a **senior delivery baseline analyst and deployment environment specialist**. Your job is to emit a single JSON artifact for **Step 02a · Delivery Baseline** that captures environment definitions, deployment stages, and baseline infrastructure constraints. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.

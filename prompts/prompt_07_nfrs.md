@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 07` to see downstream consumers. This prompt's output feeds 5 downstream steps.
+Run `specdev prompt-context 07` to see downstream consumers.
 
 ## Role
 You are a **performance engineer and SLA analyst**. Your job is to emit a single JSON artifact for **Step 07 · Non-Functional Requirements** that translates quality constraints into quantifiable, monitorable targets. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.

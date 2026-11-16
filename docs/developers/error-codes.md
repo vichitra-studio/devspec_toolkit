@@ -789,7 +789,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP
 
-**Trigger (E550)**: Fired by `forward_replay_check.py` in four shapes: (1) `SPECDEV_REPLAY_DIFF_ERROR_MODE` is set to an invalid value (must be `error` or `ignore`); (2) the diff against the base ref could not be computed at all; (3) a changed spec file belongs to a step that `steps` does not list (`unknown_step_in_diff`); (4) a step that comes after a changed step in the `steps` order of `tools/step_order.json`, and has a spec file, was not changed too (the first such step is named; `downstream_consumers` is not read).
+**Trigger (E550)**: Fired by `forward_replay_check.py` in four shapes: (1) the diff against the base ref could not be computed and `SPECDEV_REPLAY_DIFF_ERROR_MODE` holds a value other than `error` or `ignore`; (2) the diff could not be computed and the mode is `error` (with `ignore` nothing is reported); (3) a changed spec file belongs to a step that `steps` does not list (`unknown_step_in_diff`); (4) a step that comes after a changed step in the `steps` order of `tools/step_order.json`, and has a spec file, was not changed too (the first such step is named; `downstream_consumers` is not read).
 
 **Trigger (W550)**: Fired when semantic coverage checking could not read the base-ref version of an artifact (e.g. the file didn't exist at the base ref), so the coverage-regression check for that artifact is skipped rather than failing closed.
 
@@ -879,7 +879,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W610 ANCHOR_PREFIX_VIOLATION
 
-**Trigger**: A checklist item `id` in a milestone plan does not start with the `checklist_id_prefix` declared for that milestone in the anchor's `milestone_index` (the row whose `about` equals the plan's file-level `milestone`; a plan that no row is about is skipped, see W611).
+**Trigger**: A checklist item `id` in a milestone plan does not start with `<checklist_id_prefix>_` (the prefix and an underscore), the `checklist_id_prefix` being the one declared for that milestone in the anchor's `milestone_index` (the row whose `about` equals the plan's file-level `milestone`; a plan that no row is about is skipped, see W611).
 
 **Resolution**: Rename the checklist item `id` to start with the declared prefix (`{prefix}_`), or correct the `checklist_id_prefix` in `milestone_index` if the item's ID is actually correct.
 

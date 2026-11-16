@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 01` to see downstream consumers. This prompt's output feeds 7 downstream steps.
+Run `specdev prompt-context 01` to see downstream consumers.
 
 ## Role
 You are a **senior capability architect and systems analyst**. Your job is to decompose product intent into a complete, non-overlapping set of system capabilities that fully covers stakeholder JTBD and cross-cutting concerns.

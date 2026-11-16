@@ -242,7 +242,7 @@ Validates the completeness and consistency of the dependency DAG defined in `too
 
 #### `extraction-intent-check`
 
-Validates that each prompt's `### Extraction Intent` section is consistent with `tools/step_order.json`: an entry may name only a step that the `steps` list holds (E598 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise). It also reports a missing or empty section (E591) and vague intent text (W597). An entry that names a step which does not precede the current one is reported by `dag-lint` (W596), not by this command.
+Validates that each prompt's `### Extraction Intent` section is consistent with `tools/step_order.json`: an entry may name only a step that the `steps` list holds (E598 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise). It also reports an empty section (E591: the `### Extraction Intent` header is present and no entry parses) and vague intent text (W597). A prompt without that header is skipped with no message. An entry that names a step which does not precede the current one is reported by `dag-lint` (W596), not by this command.
 
 **What it checks:**
 - Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).
@@ -374,11 +374,11 @@ specdev align rollback spec --repo-root ./devspec_toolkit --backup-dir <backup-n
 
 
 ### Step-Specific Verification
-For deep validation of specific steps (DAGs, cycles, logic), use `pytest` to run the dedicated integration tests:
+The toolkit's own step tests run with `pytest`; two of the files are also scripts that check one file given as the argument (step 12: DAG and cycles; step 15: `validate`):
 ```bash
-pytest devspec_toolkit/tests/integration/test_step_02.py --spec spec/02_system_sketch.json -v
-pytest devspec_toolkit/tests/integration/test_step_12.py --spec tests/fixtures/step_12/valid_dag.json -v
-pytest devspec_toolkit/tests/integration/test_step_15.py --spec tests/fixtures/step_15/valid_full.json -v
+pytest devspec_toolkit/tests/integration/test_step_02.py -v
+python devspec_toolkit/tests/integration/test_step_12.py devspec_toolkit/tests/fixtures/step_12/valid_dag.json
+python devspec_toolkit/tests/integration/test_step_15.py devspec_toolkit/tests/fixtures/step_15/valid_full.json
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
@@ -411,7 +411,8 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm [tools/schema_registry.json](../../tools/schema_registry.json).
 - **Fixture without a link**: every fixture needs `verifies` (ids of acceptance criteria, APIs, invariants or NFRs) or `removes`; `targets` is no longer part of the schema.
 - **Invariant evaluation null**: check referenced keys in fixtures or adjust the invariant expression.
-- **Governance rejection**: match the commit pattern defined in Step 10; ensure each `rules[]` entry has `rule_id`, `text` and `derives_from`.
+- **Governance rejection**: match the commit pattern defined in Step 10 (`governance-check` reads only `commit_message_rules`).
+- **Step 10 schema failure**: each `rules[]` entry needs `rule_id`, `text` and `derives_from`; `validate` reports a missing one.
 - **Glossary failures**:
   - `minItems` error: Ensure `terms` array has at least one item.
   - `minLength` error: Definitions must be >20 chars.

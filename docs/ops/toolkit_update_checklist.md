@@ -5,8 +5,8 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 ## Schema Change Workflow
 
 1. [ ] Update the JSON Schema file in `schema/`
-2. [ ] Add a row to `tools/schema_changes.json` for each path added, removed or changed since the 1.1.1 baseline (the closure test `tests/unit/registry/test_schema_change_checklist.py` fails without it). For a new property of an annotated node, also declare it in the schema: list it in the node's `x-node.contract`, or give it an `x-link` when it holds ids (`tests/unit/toolkit_invariants/test_m3_graph_declarations.py` fails otherwise; see `docs/developers/schema-annotations.md`)
-3. [ ] Run `specdev registry-generate --repo-root .` and commit the five generated files (CI's "Registry up-to-date check" diffs them)
+2. [ ] Add a row to `tools/schema_changes.json` for each path added, removed or changed since the 1.1.1 baseline (the closure test `tests/unit/registry/test_schema_change_checklist.py` fails when no row covers the path or a path above it). For a new property of an annotated node, also declare it in the schema: list it in the node's `x-node.contract`, or give it an `x-link` when it holds ids (`tests/unit/toolkit_invariants/test_m2_graph_declarations.py` for steps 00 to 05 and `test_m3_graph_declarations.py` for steps 06 to 16 fail otherwise; see `docs/developers/schema-annotations.md`)
+3. [ ] Run `specdev registry-generate --repo-root .` then `cp tools/entry_key_registry.json tests/fixtures/entry_key_registry_golden.json`, and commit the five generated files and the golden copy (CI's "Registry up-to-date check" diffs all six; `tests/unit/registry/test_generate.py` compares the golden copy)
 4. [ ] Update the corresponding prompt in `prompts/`
 5. [ ] Run `specdev prompt-sync` to verify prompt ↔ schema alignment
 6. [ ] Update step validator if logic changed (`tools/specdev_tools/validation/validators/step_NN.py`)

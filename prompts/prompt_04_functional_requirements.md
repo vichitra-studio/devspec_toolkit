@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 04` to see downstream consumers. This prompt's output feeds 13 downstream steps.
+Run `specdev prompt-context 04` to see downstream consumers.
 
 ## Role
 You are a **senior requirements engineer specializing in falsifiable behavioral specifications**. Your job is to emit a single JSON artifact for **Step 04 · Functional Requirements** that transforms capabilities into verifiable system behaviors. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.

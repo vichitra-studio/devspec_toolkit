@@ -462,8 +462,10 @@ changes:
       cli_commands.json and the checklist. In entry_key_registry.json, the kind
       inv becomes invariant, milestone becomes design-milestone (step 09) and
       roadmap-milestone (step 14), and the step 14 dependency entry is removed;
-      the step 11 mitigation entry is removed too; the kinds rule, task-criterion,
-      scaffold-row, anchor-row, plan-item and ambiguity-item are new. Step 16a is registered under the key impl_context/ms_*_plan.json,
+      the step 11 mitigation entry is removed too; the step 14 kind criterion (a
+      task's acceptance criteria) becomes task-criterion, while step 04 keeps
+      criterion; the kinds rule, scaffold-row, anchor-row, plan-item and
+      ambiguity-item are new. Step 16a is registered under the key impl_context/ms_*_plan.json,
       which holds the plan items and the two ambiguity lists of a plan file
       (plan.ambiguities, execution.emergent_ambiguities), so registry-check reads
       those lists in plan files; 16b and 16c stay deferred.
@@ -496,8 +498,9 @@ changes:
       matrix-staleness check; the scope resolver's edges for trace, targets,
       fr_refs and source_milestones; the reviewer's structural pass, which is
       skipped for an artifact without a trace array, so it gives no FAIL on
-      structure; and the step 16 checks of 1.1.1 plan items and E308 / E309 arms
-      named above. specdev upstream-backlog and milestone-state read both
+      structure; and the step 16 checks of 1.1.1 plan items, E308 [ownership]
+      (reads fr_refs) and E309 [mapping] (reads spec_ref); E308 [scope] and E309
+      [prefix] read fields that stay and still fire. specdev upstream-backlog and milestone-state read both
       ambiguity shapes: an open item (about, no severity) is listed with severity
       null and status open in the unclassified bucket, never fires W613, is never
       hidden by --severity (it passes --severity critical), and never blocks a
@@ -519,8 +522,7 @@ changes:
       canon/README.md, docs/developers/workflows/workflow_migration.md (links,
       trace_refs) and docs/developers/design/migration_system_spec.md still name
       removed fields or codes;
-      docs/developers/workflows/workflow_feature_extension.md,
-      docs/developers/workflows/spec_to_impl.md and
+      docs/developers/workflows/workflow_feature_extension.md and
       docs/architecture/governance_architecture.md still describe specdev matrix
       as rebuilding the trace links of a spec;
       schema/13a_completeness_assessment still describes fr_refs, and the step 13

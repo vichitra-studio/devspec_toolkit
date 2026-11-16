@@ -109,3 +109,12 @@ def test_severity_filter_high_keeps_plan_blocking_drops_plan_non_blocking():
     ]
     out = filter_records(records, "high", "all")
     assert {r["ambiguity_id"] for r in out} == {"a1"}
+
+
+def test_open_item_without_severity_survives_every_threshold():
+    """An open item (``severity`` None) ranks as critical, so no ``--severity`` threshold hides it."""
+    for origin in ("plan", "execution"):
+        record = _rec(ambiguity_id="open", severity=None, origin=origin)
+        assert _severity_rank(record) == SEVERITY_ORDER["critical"]
+        for threshold in SEVERITY_ORDER:
+            assert filter_records([record], severity_min=threshold, status_filter="all") == [record]
