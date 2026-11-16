@@ -1,10 +1,11 @@
 from __future__ import annotations
-import json
+
 import os
 import warnings
 from typing import Any
 
 from ..core.errors import SpecError, make_error
+from ..core.loaders import read_json_object
 from ..core.scope_helpers import as_dict, as_list, dict_items, str_items
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 from ._legacy_shim import (
@@ -131,17 +132,12 @@ def _load_milestone_plans_from_anchor(
             f"(Trinity Anchor — required for milestone plan registry)",
         ))
         return [], errors
-    try:
-        with open(anchor_path, encoding="utf-8") as f:
-            anchor_data = json.load(f)
-    except (OSError, ValueError):  # not UTF-8 or not JSON
+    anchor_data = read_json_object(anchor_path)
+    if anchor_data is None:  # not UTF-8, not JSON, or not an object
         errors.append(make_error(
             "W570",
             f"GRACEFUL_SKIP unreadable_spec_file {ANCHOR_FILENAME}",
         ))
-        return [], errors
-
-    if not isinstance(anchor_data, dict):
         return [], errors
     milestone_index = as_dict(anchor_data.get("plan")).get("milestone_index")
     if not isinstance(milestone_index, list):
@@ -159,19 +155,15 @@ def _load_milestone_plans_from_anchor(
         if not os.path.isfile(resolved):
             # A declared plan file that is absent is skipped silently.
             continue
-        try:
-            with open(resolved, encoding="utf-8") as f:
-                plan = json.load(f)
-            if not isinstance(plan, dict):
-                raise ValueError("top level is not an object")
-            plans.append(plan)
-        except (OSError, ValueError) as exc:
+        plan = read_json_object(resolved)
+        if plan is None:
             errors.append(make_error(
                 "W588",
                 f"ANCHOR_MILESTONE_UNREADABLE {milestone_id}: "
-                f"{context_path} is not valid JSON ({exc})",
+                f"{context_path} is not valid JSON (not a UTF-8 JSON object)",
             ))
             continue
+        plans.append(plan)
     return plans, errors
 
 
@@ -196,17 +188,11 @@ def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecErr
                 continue  # Silently skip optional spec files
             errors.append(make_error("W570", f"GRACEFUL_SKIP missing_spec_file {filename}"))
             continue
-        try:
-            with open(path, encoding="utf-8") as f:
-                loaded = json.load(f)
-            if not isinstance(loaded, dict):
-                raise ValueError("top level is not an object")
+        loaded = read_json_object(path)  # None: not UTF-8, not JSON, or not an object, read as unreadable
+        if loaded is not None:
             data[key] = loaded
-        except (OSError, ValueError):  # not UTF-8, not JSON, or not an object: read as an unreadable file
-            if key in _OPTIONAL_KEYS:
-                continue
+        elif key not in _OPTIONAL_KEYS:
             errors.append(make_error("W570", f"GRACEFUL_SKIP unreadable_spec_file {filename}"))
-            continue
     return data, errors
 
 
@@ -221,7 +207,7 @@ def _api_reader_on(data: dict[str, Any]) -> bool:
 
 def _fixture_reader_on(data: dict[str, Any]) -> bool:
     """W565 / E536 read the `targets` of the fixtures and the file-level `out_of_scope`."""
-    return fr_fixture_reader_on(dict_items(data["fixtures"].get("fixtures")), [data["fixtures"]])
+    return "out_of_scope" in data["fixtures"] or fr_fixture_reader_on(dict_items(data["fixtures"].get("fixtures")))
 
 
 def _milestone_reader_on(data: dict[str, Any]) -> bool:

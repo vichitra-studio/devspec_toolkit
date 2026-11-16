@@ -30,19 +30,14 @@ Developer reference for the enforcement and traceability subsystems that keep sp
 
 **Alias resolution:** `normalize_trace_type(value)` strips whitespace and checks `CANONICAL_TRACE_TYPE`; if the value is a known alias (e.g., `"inv"`), it returns the canonical label (`"invariant"`). `is_valid_trace_type(value)` normalizes first, then checks membership in `TRACE_TYPES`.
 
-**Consumers (10 modules):**
+**Consumers (5 modules):**
 
 | Module | Imports used |
 |---|---|
 | `validation/matrix.py` | `normalize_trace_type`, `is_valid_trace_type` |
-| `validation/cross_artifact_checks.py` | `is_valid_trace_type` |
-| `validation/fixtures_lint.py` | `is_valid_trace_type`, `normalize_trace_type` |
+| `validation/cross_artifact_checks.py` | `normalize_trace_type`, `is_valid_trace_type` |
 | `validation/hallucination_lint.py` | `is_valid_trace_type` |
-| `validation/traceability_closure.py` | `is_valid_trace_type` |
-| `validation/validators/step_01.py` | `is_valid_trace_type`, `normalize_trace_type` |
-| `validation/validators/step_02.py` | `is_valid_trace_type`, `normalize_trace_type` |
-| `validation/validators/step_10.py` | `is_valid_trace_type` |
-| `validation/validators/step_11.py` | `is_valid_trace_type`, `normalize_trace_type` |
+| `validation/traceability_closure.py` | `normalize_trace_type`, `is_valid_trace_type` |
 | `core/__init__.py` | re-exports `normalize_trace_type`, `is_valid_trace_type` |
 
 **Business-rule constant pattern (OPT-003):** Each validation module that depends on specific trace types declares them as module-level constants (e.g., `_TRACE_TYPE_FR = "fr"`). These constants are guarded by a `warnings.warn()` call at import time that fires if the value is not present in the canon registry, providing early detection of canon drift without crashing at runtime.
@@ -170,7 +165,7 @@ The required sequence after any spec edit:
 1. validate          -- JSON Schema validation of the changed artifact
 2. seed-lint         -- verify seed usage matches seed_manifest step_requirements
 3. matrix            -- regenerate spec/extras/trace_matrix.json (if traceability changed)
-4. fixtures-lint     -- verify fixture targets resolve (after matrix rebuild)
+4. fixtures-lint     -- check that each fixture has input and expected
 ```
 
 **When to run each check:**
@@ -178,7 +173,8 @@ The required sequence after any spec edit:
 | Trigger | Required checks |
 |---|---|
 | Any spec file edit | `validate`, `seed-lint` |
-| Trace field changed (`trace`, `targets`, `_ref`) | Add `matrix` + `fixtures-lint` |
+| Trace field changed on a 1.1.1-shaped spec (`trace`, `targets`, `_ref`) | Add `matrix` |
+| Fixture `input` or `expected` changed | Add `fixtures-lint` |
 | New canon entry added | `canonical-lint`, `canonical-integrity` |
 | Commit | `governance-check` against commit message |
 | Upstream step changed | `forward-replay-check` to verify all downstream steps are replayed |

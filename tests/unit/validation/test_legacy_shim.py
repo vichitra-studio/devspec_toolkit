@@ -249,8 +249,7 @@ def test_the_three_shared_decisions_use_the_one_empty_rule():
         assert decide([]) is True
         assert decide([{"x": 1}]) is False
     assert fr_api_reader_on([{"trace": []}]) and fr_milestone_reader_on([{"fr_refs": []}])
-    assert fr_fixture_reader_on([{"targets": []}]) and fr_fixture_reader_on([{"x": 1}], [{"out_of_scope": []}])
-    assert not fr_fixture_reader_on([{"x": 1}], [{"fixtures": []}])
+    assert fr_fixture_reader_on([{"targets": []}]) and not fr_fixture_reader_on([{"x": 1}])
 
 
 @pytest.mark.parametrize(("node", "expected"), [

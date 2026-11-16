@@ -249,7 +249,7 @@ def render_checklist(rows: Iterable[ChangeRow]) -> str:
         "",
         f"{len(rows)} changes since the 1.1.1 baseline across {len(groups)} schema groups. "
         "Each row says what happened to one path (or a glob of paths) of a schema; "
-        "`replaced_by` names where the content went, `shim` marks a removed field a legacy reader still reads.",
+        "`replaced_by` names where the content went, `shim` marks a removed field or value a legacy reader still reads.",
     ]
     for step, group in groups.items():
         lines += [
@@ -266,9 +266,13 @@ def render_checklist(rows: Iterable[ChangeRow]) -> str:
 def generate_checklist(repo_root: Path) -> str:
     """Render the checklist of ``<repo_root>/tools/schema_changes.json``.
 
-    Raises ``ChecklistError`` naming every problem when the rows file is not well formed.
+    Raises ``ChecklistError`` naming every problem when the rows file is not well formed, cannot be read or
+    is not JSON.
     """
-    rows, problems = load_rows(repo_root / ROWS_FILE)
+    try:
+        rows, problems = load_rows(repo_root / ROWS_FILE)
+    except (OSError, ValueError) as exc:
+        raise ChecklistError(f"{ROWS_FILE.as_posix()}: {exc}") from exc
     if problems:
         raise ChecklistError(f"{ROWS_FILE.as_posix()}: " + "; ".join(problems))
     return render_checklist(rows)

@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Any, Optional
 import fnmatch
 from collections import defaultdict
-import json
 import os
 import re
 from pathlib import Path
 
 from ...core.errors import make_error, SpecError
+from ...core.loaders import read_json_object
 from ...core.scope_helpers import as_dict, dict_items, str_in, str_items
 from ..linter_utils import extract_command_string
 
@@ -24,9 +24,6 @@ TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf
 # `disposition.value` of a roadmap task meaning "paused or permanently cancelled, not absent": E304 skips such a task.
 PAUSED_OR_CANCELLED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
 
-# checklist_status values of a 1.1.1-shaped plan with the same meaning (DEVSPEC-122 follow-up); read only by the
-# legacy-guarded E305. M8 deletes this name; the set above stays.
-# M8 rewrites
 PAUSED_OR_CANCELLED_CHECKLIST_STATUSES = PAUSED_OR_CANCELLED_DISPOSITIONS
 
 # Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
@@ -127,24 +124,20 @@ def _load_roadmap(spec_path: str) -> Optional[dict[str, Any]]:
     - 16a plan (spec/impl_context/ms_auth_plan.json) → spec/14_roadmap.json
 
     Returns:
-        Parsed roadmap dict, or None if 14_roadmap.json does not exist.
-
-    Raises:
-        OSError: If the file exists but cannot be read.
-        json.JSONDecodeError: If the file is not valid JSON.
+        The roadmap object; ``None`` when 14_roadmap.json is missing, unreadable, not UTF-8, not JSON or not an
+        object.  Never raises.  A caller that reports a present file it cannot use tests ``roadmap_path`` itself.
     """
+    return read_json_object(_roadmap_path(spec_path))
+
+
+def _roadmap_path(spec_path: str) -> Path:
+    """Where ``14_roadmap.json`` lies for the artifact at *spec_path*."""
     artifact_path = Path(spec_path)
-    if artifact_path.parent.name == "impl_context":
-        roadmap_path = artifact_path.parent.parent / "14_roadmap.json"
-    else:
-        roadmap_path = artifact_path.parent / "14_roadmap.json"
-
-    if not roadmap_path.exists():
-        return None
-    return json.loads(roadmap_path.read_text())
+    base = artifact_path.parent.parent if artifact_path.parent.name == "impl_context" else artifact_path.parent
+    return base / "14_roadmap.json"
 
 
-# M8 rewrites
+# M8 rewrites: E307 keys on the 1.1.1 `spec_ref`
 def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
 
@@ -190,7 +183,7 @@ def _checklist_of(plan: dict[str, Any]) -> list[dict[str, Any]]:
     return dict_items(as_dict(plan.get("spec_alignment")).get("checklist"))
 
 
-# M8 rewrites
+# M8 rewrites: reads the 1.1.1 `implementation.status`
 def _legacy_status(item: dict[str, Any]) -> Optional[str]:
     """``implementation.status`` of a 1.1.1-shaped plan item; ``None`` on the 1.2.0 shape, which stores none.
 
@@ -256,7 +249,7 @@ def _check_action_evidence(item_id: str, item_type: str, actions: list[dict[str,
         errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
 
 
-# M8 rewrites
+# M8 rewrites: E301 and the evidence checks key on `implementation.status`
 def _check_legacy_verified_items(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E301 and the evidence-quality checks (W599, W600, W601) of 1.1.1-shaped plans.
 
@@ -274,7 +267,7 @@ def _check_legacy_verified_items(checklist: list[dict[str, Any]], errors: list[S
             _check_action_evidence(item_id, item.get("type", ""), actions, errors)
 
 
-# M8 rewrites
+# M8 rewrites: reads the 1.1.1 `implementation.files_touched`
 def _legacy_touched_files(checklist: list[dict[str, Any]]) -> set[str]:
     """The ``implementation.files_touched`` of the started items (``in_progress`` or ``verified``) of a 1.1.1-shaped plan."""
     touched: set[str] = set()
@@ -318,13 +311,11 @@ def _load_doc_patterns(spec_path: Optional[str], spec_root: Optional[str], error
     if not manifest_path:
         errors.append(make_error("W570", "seed_manifest.json not found; cannot validate docs_impact doc paths."))
         return None
-    try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
-    except (OSError, ValueError):
+    manifest = read_json_object(manifest_path)
+    if manifest is None:
         errors.append(make_error("W570", "Failed to read seed_manifest.json; cannot validate docs_impact doc paths."))
         return None
-    doc_patterns = as_dict(manifest).get("doc_paths") or []
+    doc_patterns = manifest.get("doc_paths") or []
     if not isinstance(doc_patterns, list) or not doc_patterns:
         errors.append(make_error("W570", "seed_manifest.json missing doc_paths; cannot validate docs_impact doc paths."))
         return None
@@ -470,13 +461,17 @@ def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]
         if not isinstance(task_id, str) or _is_set_aside(task):
             continue
         criteria = {c["criterion_id"] for c in dict_items(task.get("acceptance_criteria")) if isinstance(c.get("criterion_id"), str)}
-        if not criteria & realised:
+        if not criteria:
+            errors.append(
+                make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' of milestone '{milestone_id}' has no acceptance criterion, so no plan item can realise it; add a criterion to the task or give it a disposition")
+            )
+        elif not criteria & realised:
             errors.append(
                 make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' of milestone '{milestone_id}' has no plan item that realises one of its acceptance criteria")
             )
 
 
-# M8 rewrites
+# M8 rewrites: E305 keys on `implementation.status` and `critical_evidence`
 def _check_planned_vs_executed(data: dict[str, Any], checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E305 PLANNED_UNEXECUTED: a green legacy plan lists an active item that ``critical_evidence`` does not satisfy.
 
@@ -510,13 +505,10 @@ def _check_fr_coverage_against_step_04(data: dict[str, Any], spec_path: str, err
     # When artifact lives inside impl_context/, step 04 is one level up
     fr_base = artifact_path.parent.parent if artifact_path.parent.name == "impl_context" else artifact_path.parent
     fr_list_path = fr_base / "04_fr_list.json"
-    if not fr_list_path.exists():
-        return
-    try:
-        fr_data = json.loads(fr_list_path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return  # Step 04 unreadable -- skip E306
-    known_fr_ids = {fr["fr_id"] for fr in dict_items(as_dict(fr_data).get("functional_requirements")) if isinstance(fr.get("fr_id"), str) and fr["fr_id"]}
+    fr_data = read_json_object(fr_list_path)
+    if fr_data is None:
+        return  # Step 04 absent or unreadable -- skip E306
+    known_fr_ids = {fr["fr_id"] for fr in dict_items(fr_data.get("functional_requirements")) if isinstance(fr.get("fr_id"), str) and fr["fr_id"]}
     for entry in dict_items(fr_coverage):
         fr_id = entry.get("fr_id")
         if isinstance(fr_id, str) and fr_id not in known_fr_ids:
@@ -529,15 +521,11 @@ def _check_fr_coverage_against_step_04(data: dict[str, Any], spec_path: str, err
 
 def _check_roadmap(data: dict[str, Any], checklist: list[dict[str, Any]], spec_path: str, errors: list[SpecError]) -> None:
     """Load ``14_roadmap.json`` beside *spec_path* and run E304 on it (a 16a plan, never the anchor)."""
-    try:
-        roadmap = _load_roadmap(spec_path)
-    except (OSError, json.JSONDecodeError) as exc:
-        errors.append(make_error("E304", f"ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}"))
-        return
-    if isinstance(roadmap, dict):
+    roadmap = _load_roadmap(spec_path)
+    if roadmap is not None:
         _check_roadmap_coverage(data, checklist, roadmap, errors)
-    elif roadmap is not None:
-        errors.append(make_error("E304", "ROADMAP_STRUCTURE_ERROR: 14_roadmap.json is not an object"))
+    elif _roadmap_path(spec_path).exists():  # present but not a UTF-8 JSON object
+        errors.append(make_error("E304", "ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: not a UTF-8 JSON object"))
 
 
 def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
@@ -563,7 +551,7 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
     _check_legacy_verified_items(checklist, errors)
     _check_target_patterns_and_scope(data, plan, checklist, errors)
     _check_docs_impact(plan, checklist, spec_path, spec_root, errors)
-    # E307 keys on `spec_ref`, which the 1.2.0 plan item no longer has: it finds nothing there. # M8 rewrites
+    # E307 keys on `spec_ref`, which the 1.2.0 plan item no longer has: it finds nothing there.
     _check_behavior_validation_pairing(checklist, errors)
     _check_proof_closure(data, plan, errors)
     if spec_path and not _is_anchor(spec_path, data):

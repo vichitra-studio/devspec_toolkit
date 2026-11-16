@@ -181,15 +181,22 @@ def _sibling_candidates(
     ]
 
 
+def read_json_object(path: str | Path) -> dict | None:
+    """The JSON object in the file at *path*; ``None`` when the file is missing, unreadable, not UTF-8, not JSON
+    or has a top level that is not an object.  Never raises."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):  # ValueError covers JSONDecodeError and UnicodeDecodeError
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _first_json_object(candidates: list[Path]) -> dict | None:
     """Return the first candidate that reads and parses as a JSON object, else ``None``."""
     for path in candidates:
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            continue
-        if isinstance(data, dict):
+        data = read_json_object(path)
+        if data is not None:
             return data
     return None
 

@@ -1211,6 +1211,23 @@ class TestStep16AnchorW588UnreadableMilestone(_AnchorTestBase):
             f"Expected W588 mentioning ms_broken.json. Got: {errors}"
         )
 
+    def test_w588_fires_on_a_milestone_file_that_is_not_an_object(self):
+        """A plan file whose top level is not an object is reported like an unreadable one, so W611 has a cause."""
+        for name, raw in (("ms_list.json", b"[]"), ("ms_bytes.json", b'{"a": "\xff\xfe"}')):
+            with tempfile.TemporaryDirectory() as td:
+                tmp_dir = Path(td)
+                impl_context_dir = tmp_dir / "impl_context"
+                impl_context_dir.mkdir()
+                anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+                (impl_context_dir / name).write_bytes(raw)
+
+                errors = validate_file(self.repo_root, str(anchor_path))
+
+            self.assertTrue(
+                any(e.code == "W588" and name in e.message for e in errors),
+                f"Expected W588 mentioning {name}. Got: {errors}"
+            )
+
     def test_no_w588_when_all_milestone_files_parse(self):
         """W588 does not fire when every milestone file in impl_context/ parses cleanly."""
         with tempfile.TemporaryDirectory() as td:

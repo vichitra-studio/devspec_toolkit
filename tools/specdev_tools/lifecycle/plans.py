@@ -7,8 +7,9 @@ from 1.1.1 data (``cli.py`` ``milestone-state`` by name, ``traceability_closure.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+from ..core.loaders import read_json_object
 
 PLAN_DIR_NAME = "impl_context"
 MILESTONE_KEY = "milestone"
@@ -29,9 +30,5 @@ def find_plan(spec_root: str | Path, milestone_id: str) -> Path | None:
 
 def _milestone_key(path: Path) -> str | None:
     """The file-level ``milestone`` of the JSON file at *path*; ``None`` when absent, mistyped or unreadable."""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    value = data.get(MILESTONE_KEY) if isinstance(data, dict) else None
+    value = (read_json_object(path) or {}).get(MILESTONE_KEY)
     return value if isinstance(value, str) else None

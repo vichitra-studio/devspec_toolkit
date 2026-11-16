@@ -20,11 +20,11 @@ multiple files from the filesystem.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
+from ...core.loaders import read_json_object
 from ...core.scope_helpers import as_dict, as_list
 from ...lifecycle.plans import MILESTONE_KEY, PLAN_DIR_NAME, find_plan
 from .step_16 import _is_anchor
@@ -237,19 +237,16 @@ def _scan_plan_files(
     orphans: list[str] = []
     files = sorted(impl_context_dir.glob("*.json"))
     for ms_file in files:
-        try:
-            ms_data = json.loads(ms_file.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
+        ms_data = read_json_object(ms_file)
+        if ms_data is None:
             errors.append(
                 make_error(
                     "W588",
                     f"ANCHOR_MILESTONE_UNREADABLE: '{ms_file.name}' in impl_context/ "
-                    f"could not be read or parsed ({type(exc).__name__}: {exc}); "
+                    f"could not be read or parsed as a UTF-8 JSON object; "
                     f"drift detection skipped this file.",
                 )
             )
-            continue
-        if not isinstance(ms_data, dict):
             continue
         notice = _plan_notice(ms_file, ms_data)
         if notice is not None:

@@ -16,7 +16,7 @@
         },
         "milestones": {
           "type": "array",
-          "description": "Roadmap milestones with user stories and tasks. The order of the array carries no meaning: a milestone's target_date carries the schedule. Milestone status is not stored here: it lives on the step 16 anchor row.",
+          "description": "Roadmap milestones with user stories and tasks, listed in ascending target_date order (E520 otherwise). The order states no dependency between milestones: a milestone's target_date carries the schedule. Milestone status is not stored here: it lives on the step 16 anchor row.",
           "items": {
             "type": "object",
             "additionalProperties": false,

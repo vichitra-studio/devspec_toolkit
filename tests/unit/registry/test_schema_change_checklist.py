@@ -265,6 +265,19 @@ def test_generate_checklist_raises_naming_the_problem(tmp_path: Path) -> None:
         generate_checklist(tmp_path)
 
 
+@pytest.mark.parametrize("content", ["{", "\xff\xfe"])
+def test_generate_checklist_raises_on_a_rows_file_that_is_not_json(content: str, tmp_path: Path) -> None:
+    (tmp_path / "tools").mkdir()
+    (tmp_path / ROWS_FILE).write_bytes(content.encode("latin-1"))
+    with pytest.raises(ChecklistError, match="schema_changes.json"):
+        generate_checklist(tmp_path)
+
+
+def test_generate_checklist_raises_on_a_missing_rows_file(tmp_path: Path) -> None:
+    with pytest.raises(ChecklistError, match="schema_changes.json"):
+        generate_checklist(tmp_path)
+
+
 def test_generated_markdown_equals_committed_file() -> None:
     assert (_ROOT / CHECKLIST_FILE).read_text(encoding="utf-8") == generate_checklist(_ROOT)
 

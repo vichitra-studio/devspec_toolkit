@@ -8,7 +8,11 @@ run on the unmutated folder): each is mutated on disk while the validator checks
 may report its own finding on a wrong type; raising is the failure.  ``check_traceability_closure``,
 ``uncomputed_dimensions`` and ``build_trace_matrix`` run over a copy of the folder with one file mutated, and
 ``compute_milestone_state`` over the mutated plan.  A whole file of the wrong kind (top level not an object, bytes that
-are not UTF-8) is read as an unreadable file by the three folder readers and gives the deep validators no finding.
+are not UTF-8) is read as an unreadable file by the three folder readers and gives the deep validators no finding;
+a sibling file replaced by ``{`` or by non-UTF-8 bytes does not make a validator raise, except through the three
+1.1.1 loaders of ``_LOADERS_THAT_RAISE`` (steps 03 and 04), and a present roadmap that cannot be read keeps
+``ROADMAP_PARSE_ERROR``.  A free-form payload holding every guarded field name, put in each of
+nine free-form locations of the 1.2.0 schemas, leaves the readers' output unchanged.
 """
 from __future__ import annotations
 
@@ -199,6 +203,12 @@ def _files_read(step: str, document: dict[str, Any], base: Path, name: str) -> s
     return opened
 
 
+# Readers of a sibling file that raise on one that is not JSON or not UTF-8, by documented contract: ``load_upstream_ids``
+# (step 04 reading 01; ``tests/unit/core/test_loaders.py`` pins the ``JSONDecodeError``) and the step 03 context loaders of
+# ``validate.py`` (07 and 16).  1.1.1 code the milestone did not touch; ``_run_deep_validation`` turns the raise into E521.
+_LOADERS_THAT_RAISE = {("03", "07_nfrs.json"), ("03", "16_impl_context.json"), ("04", "01_capabilities.json")}
+
+
 def test_deep_validators_do_not_raise_on_a_wrong_value_in_a_file_they_read(tmp_path: Path) -> None:
     """Mutate, on disk, each file a validator reads besides its own; the validator checks its unmutated document."""
     failures: list[str] = []
@@ -228,9 +238,31 @@ def test_deep_validators_do_not_raise_on_a_wrong_value_in_a_file_they_read(tmp_p
                     f"{label} {step} reads {sibling} {list(path)} = {wrong!r}",
                     lambda: _call(step, document, str(folder / name), folder),
                 )
+        for raw in (b"{", _NOT_UTF8):  # a sibling that is not JSON, and one that is not UTF-8
+            target.write_bytes(raw)
+            for label, _folder, name, step, document in users:
+                if (step, sibling) in _LOADERS_THAT_RAISE:
+                    continue
+                failures += _raise_of(
+                    f"{label} {step} reads {sibling} = {raw!r}",
+                    lambda: _call(step, document, str(folder / name), folder),
+                )
         target.write_text(original, encoding="utf-8")
     assert siblings_mutated > 0
     assert failures == []
+
+
+def test_a_roadmap_that_is_not_utf8_json_gives_roadmap_parse_error(tmp_path: Path) -> None:
+    """A present ``14_roadmap.json`` the reader cannot use keeps its E304; an absent one gives none."""
+    folder = tmp_path / "spec"
+    shutil.copytree(_EXAMPLE, folder)
+    plan = _load(folder, _PLAN)
+    for raw in (b"{", _NOT_UTF8, b"[]"):
+        (folder / "14_roadmap.json").write_bytes(raw)
+        found = [e.render() for e in _call("16a", plan, str(folder / _PLAN), folder)]
+        assert any("ROADMAP_PARSE_ERROR" in line for line in found), (raw, found)
+    (folder / "14_roadmap.json").unlink()
+    assert not any("ROADMAP_" in e.render() for e in _call("16a", plan, str(folder / _PLAN), folder))
 
 
 def test_milestone_state_does_not_raise_on_a_wrong_value_in_the_plan(tmp_path: Path) -> None:
@@ -331,14 +363,21 @@ _GUARDED_NAMES = sorted(
     | {"out_of_scope", "spec_ref", "critical_evidence", "trace_refs"}
 )
 # Free-form locations of the 1.2.0 schemas: fixture `input` and `expected`, API `parameters` and `errors` entries,
-# the plan item's `implementation`.  (file, path of the object that receives the payload keys)
+# the plan item's `implementation`, a CI job's `token_permissions`, a plan's `command_overrides` and
+# `test_results[]`, the `environments{}` map of 02a.  (file, path of the object that receives the payload keys;
+# a missing parent object is created)
 _FREE_FORM_LOCATIONS = [
     ("08_fixtures.json", ("fixtures", 0, "input")),
     ("08_fixtures.json", ("fixtures", 0, "expected")),
     ("05_interface_contracts.json", ("apis", 0, "parameters")),
     ("05_interface_contracts.json", ("apis", 0, "errors")),
     (_PLAN, ("plan", "spec_alignment", "checklist", 0, "implementation")),
+    ("12_ci_gates.json", ("jobs", 0, "token_permissions")),
+    (_PLAN, ("extensions", "execution_context", "command_overrides")),
+    (_PLAN, ("execution", "final_status", "test_results")),
+    ("02a_delivery_baseline.json", ("environments",)),
 ]
+_ARRAYS_OF_OBJECTS = ("parameters", "errors", "test_results")
 
 
 def _payload() -> dict[str, Any]:
@@ -365,12 +404,12 @@ def test_a_free_form_payload_with_every_guarded_field_name_leaves_every_reader_o
     document = json.loads((clean / name).read_text(encoding="utf-8"))
     target = document
     for key in path[:-1]:
-        target = target[key]
+        target = target.setdefault(key, {}) if isinstance(target, dict) else target[key]
     existing = target.get(path[-1]) if isinstance(target, dict) else None
     if isinstance(existing, dict):
         existing.update(_payload())
     else:
-        target[path[-1]] = [_payload()] if path[-1] in ("parameters", "errors") else _payload()
+        target[path[-1]] = [_payload()] if path[-1] in _ARRAYS_OF_OBJECTS else _payload()
     (clean / name).write_text(json.dumps(document), encoding="utf-8")
     assert _outputs(clean) == expected
     assert expected["uncomputed"] == [

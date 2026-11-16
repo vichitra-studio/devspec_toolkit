@@ -11,7 +11,7 @@
     "milestones": {
       "type": "array",
       "minItems": 1,
-      "description": "List of design milestones: named groups of the upstream nodes a delivery slice schedules. The order of the array is not stored and carries no meaning; a milestone names no predecessor.",
+      "description": "List of design milestones: named groups of the upstream nodes a delivery slice schedules. Milestones are listed in ascending target_date order (E520 otherwise); the order states no dependency, and a milestone names no predecessor.",
       "items": {
         "type": "object",
         "additionalProperties": false,
