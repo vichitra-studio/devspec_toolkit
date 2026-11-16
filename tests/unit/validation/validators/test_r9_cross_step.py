@@ -1,7 +1,6 @@
 """Comprehensive tests for R9 cross-step ID validators.
 
 Tests the remaining validators that perform cross-step reference validation:
-- step_09: Capability refs in milestone deliverables/capability_refs
 - step_12: FR + NFR refs in CI job trace
 - step_13: Governance label refs in extensions
 - step_13a: FR + API refs in missing_elements spec_refs/related_ids
@@ -48,115 +47,6 @@ def _w590(errors) -> list[str]:
 
 def _e590(errors) -> list[str]:
     return [e for e in _render(errors) if "E590" in e]
-
-
-# ---------------------------------------------------------------------------
-# Step 09 — Capability refs in milestone deliverables/capability_refs
-# ---------------------------------------------------------------------------
-
-class TestStep09CrossStep(unittest.TestCase):
-    """Cross-step validation: step_09 checks capability refs against 01_capabilities.json."""
-
-    def test_valid_upstream_refs_pass(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "01_capabilities.json", {
-                "capabilities": [
-                    {"capability_id": "cap-authentication"},
-                    {"capability_id": "cap-dashboard"},
-                ]
-            })
-            instance = {
-                "milestones": [
-                    {
-                        "milestone_id": "ms-alpha",
-                        "target_date": "2026-04-01",
-                        "deliverables": [
-                            {"type": "capability", "id": "cap-authentication"},
-                        ],
-                        "capability_refs": ["cap-dashboard"],
-                    }
-                ]
-            }
-            errors = validate_step_09(instance, tmp)
-            self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
-            self.assertEqual(len(_e590(errors)), 0, f"Unexpected E590: {_e590(errors)}")
-
-    def test_missing_upstream_emits_w590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            # No 01_capabilities.json
-            instance = {
-                "milestones": [
-                    {
-                        "milestone_id": "ms-alpha",
-                        "target_date": "2026-04-01",
-                        "deliverables": [
-                            {"type": "capability", "id": "cap-authentication"},
-                        ],
-                    }
-                ]
-            }
-            errors = validate_step_09(instance, tmp)
-            w = _w590(errors)
-            self.assertGreaterEqual(len(w), 1, "Expected W590 for missing 01_capabilities.json")
-            self.assertTrue(
-                any("01_capabilities.json" in msg for msg in w),
-                f"W590 should mention 01_capabilities.json: {w}"
-            )
-
-    def test_broken_ref_emits_e590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "01_capabilities.json", {
-                "capabilities": [
-                    {"capability_id": "cap-authentication"},
-                ]
-            })
-            instance = {
-                "milestones": [
-                    {
-                        "milestone_id": "ms-alpha",
-                        "target_date": "2026-04-01",
-                        "deliverables": [
-                            {"type": "capability", "id": "cap-nonexistent"},
-                        ],
-                    }
-                ]
-            }
-            errors = validate_step_09(instance, tmp)
-            e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, "Expected E590 for broken capability ref")
-            self.assertTrue(
-                any("cap-nonexistent" in msg for msg in e),
-                f"E590 should mention the broken ref: {e}"
-            )
-
-    def test_capability_refs_field_not_validated(self):
-        """capability_refs is not a schema field; validator ignores it."""
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "01_capabilities.json", {
-                "capabilities": [
-                    {"capability_id": "cap-authentication"},
-                ]
-            })
-            instance = {
-                "milestones": [
-                    {
-                        "milestone_id": "ms-beta",
-                        "target_date": "2026-05-01",
-                        "capability_refs": ["cap-unknown"],
-                    }
-                ]
-            }
-            errors = validate_step_09(instance, tmp)
-            e = _e590(errors)
-            self.assertEqual(len(e), 0, "capability_refs is not a schema field; no E590 expected")
 
 
 # ---------------------------------------------------------------------------
@@ -606,9 +496,9 @@ class TestCrossStepNoSpecDir(unittest.TestCase):
 
     def test_step_09_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
-            instance = {"milestones": [{"milestone_id": "ms-x", "target_date": "2026-04-01", "capability_refs": ["cap-x"]}]}
+            instance = {"milestones": [{"milestone_id": "ms-x", "target_date": "2026-04-01", "schedules": ["fr-x"]}]}
             errors = validate_step_09(instance, tmp)
-            self.assertGreaterEqual(len(_w590(errors)), 1)
+            self.assertEqual(_w590(errors), [])  # no cross-step check: the resolver owns link targets
 
     def test_step_12_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:

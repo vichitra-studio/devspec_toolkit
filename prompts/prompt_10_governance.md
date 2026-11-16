@@ -120,7 +120,20 @@ If any organizational constraint from the upstream specs cannot be mapped to a g
   "id": "governance-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "spec_first_policy": true,
+  "rules": [
+    {
+      "rule_id": "rule-spec-check-on-every-pr",
+      "text": "Every pull request passes the spec merge check.",
+      "derives_from": ["risk-spec-drift"],
+      "cli_command": "spec-check"
+    },
+    {
+      "rule_id": "rule-security-review-of-token-handling",
+      "text": "A person reviews every change to token handling before release.",
+      "derives_from": ["risk-spec-drift"],
+      "enforcer": "review"
+    }
+  ],
   "commit_message_rules": {
     "require_spec_ids": true,
     "pattern": "^(feat|fix|chore|docs|refactor|test)\\(spec\\): .+ \\[[a-z]+-[a-z0-9-]+\\]$",

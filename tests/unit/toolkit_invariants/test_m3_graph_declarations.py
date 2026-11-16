@@ -39,7 +39,17 @@ _EXPECTED_KINDS: dict[str, dict[str, str]] = {
     "06": {"invariant": "inv_id"},
     "07": {"nfr": "nfr_id"},
     "08": {"fixture": "fixture_id"},
+    "09": {"design-milestone": "milestone_id"},
+    "10": {"rule": "rule_id"},
+    "11": {"threat": "threat_id", "edge-case": "id"},
 }
+
+# The kinds a threat or an edge case may be ``mitigated_by``: every obligation kind except capability, and fixtures.
+_MITIGATION_KINDS = ["api", "api-error", "constraint", "criterion", "environment", "fixture", "fr", "gate", "invariant", "nfr", "rule", "secret"]
+
+# Link fields that count toward the built computation (link table of the M3 plan, section 3.2). Step 12 and 14 add
+# ``realises`` and ``refines``.
+_BUILT_LINK_FIELDS = frozenset({"derives_from", "mitigated_by"})
 
 # Every ``x-link`` of the M3 schemas: (schema file, JSON pointer of the link field, sorted ``kinds`` or "*").
 # Written out by hand on purpose: a change of one link's ``kinds`` list must be a deliberate change of this table.
@@ -55,6 +65,20 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/verifies", ["api", "criterion", "invariant", "nfr"]),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/removes", "*"),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/replaces", "*"),
+    ("09_impl_plan.schema.json", "/properties/milestones/items/properties/schedules", ["api", "component", "criterion", "environment", "fr", "invariant", "nfr", "risk"]),
+    ("09_impl_plan.schema.json", "/properties/milestones/items/properties/replaces", "*"),
+    ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/derives_from", ["constraint", "environment", "gate", "risk", "scope-item", "stakeholder"]),
+    ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/assumes", ["assumption"]),
+    ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/replaces", "*"),
+    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/derives_from", ["risk"]),
+    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/threatens", ["api", "component", "connection", "third-party"]),
+    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/mitigated_by", _MITIGATION_KINDS),
+    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/assumes", ["assumption"]),
+    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/replaces", "*"),
+    ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/threatens", ["api", "component", "fr"]),
+    ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/mitigated_by", _MITIGATION_KINDS),
+    ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/assumes", ["assumption"]),
+    ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/replaces", "*"),
 ]
 
 
@@ -84,7 +108,10 @@ def _assert_links(decls_, fname: str, expected: dict[str, tuple[Any, bool]]) -> 
 
 
 def test_m3_schema_files_are_found() -> None:
-    assert set(_FILES) == {"06_invariants.schema.json", "07_nfrs.schema.json", "08_fixtures.schema.json"}
+    assert set(_FILES) == {
+        "06_invariants.schema.json", "07_nfrs.schema.json", "08_fixtures.schema.json",
+        "09_impl_plan.schema.json", "10_governance.schema.json", "11_redteam.schema.json",
+    }
 
 
 @pytest.mark.parametrize("fname", _FILES)
@@ -179,9 +206,9 @@ def test_contract_equals_computed_content_set(decls, reader, fname: str) -> None
 
 
 @pytest.mark.parametrize("fname", _FILES)
-def test_built_true_only_on_derives_from(decls, fname: str) -> None:
+def test_built_true_only_on_the_built_link_fields(decls, fname: str) -> None:
     for link in _links(decls, fname):
-        assert link.value.get("built", False) is (link.field_name == "derives_from"), link.field_name
+        assert link.value.get("built", False) is (link.field_name in _BUILT_LINK_FIELDS), link.field_name
 
 
 @pytest.mark.parametrize("fname", _FILES)
@@ -241,3 +268,54 @@ def test_step_08_fixture_declares_verifies_and_removes_links(decls) -> None:
             "replaces": ("*", False),
         },
     )
+
+
+def test_step_09_x_links_are_schedules_and_assumes_only(decls) -> None:
+    """The design milestone declares ``schedules`` (required) and the shared ``replaces``: no order link, no same-step kinds."""
+    fname = "09_impl_plan.schema.json"
+    _assert_links(
+        decls, fname,
+        {
+            "schedules": (["api", "component", "criterion", "environment", "fr", "invariant", "nfr", "risk"], True),
+            "replaces": ("*", False),
+        },
+    )
+    assert not [lk for lk in _links(decls, fname) if "same_step_kinds" in lk.value]
+
+
+def test_step_10_rule_declares_derives_from_assumes_and_replaces_links(decls) -> None:
+    fname = "10_governance.schema.json"
+    _assert_links(
+        decls, fname,
+        {
+            "derives_from": (["constraint", "environment", "gate", "risk", "scope-item", "stakeholder"], True),
+            "assumes": (["assumption"], False),
+            "replaces": ("*", False),
+        },
+    )
+    assert _link(decls, fname, "derives_from").value["built"] is True
+
+
+def test_step_11_threat_and_edge_case_declare_threatens_and_mitigated_by(decls) -> None:
+    by_holder: dict[str, dict[str, tuple[Any, bool]]] = {}
+    for link in _links(decls, "11_redteam.schema.json"):
+        kinds = link.value["kinds"]
+        for holder in link.holders:
+            by_holder.setdefault(holder, {})[link.field_name] = (kinds if kinds == "*" else sorted(kinds), link.value["required"])
+    assert by_holder == {
+        "threat": {
+            "derives_from": (["risk"], False),
+            "threatens": (["api", "component", "connection", "third-party"], True),
+            "mitigated_by": (sorted(_MITIGATION_KINDS), False),
+            "assumes": (["assumption"], False),
+            "replaces": ("*", False),
+        },
+        "edge-case": {
+            "threatens": (["api", "component", "fr"], True),
+            "mitigated_by": (sorted(_MITIGATION_KINDS), True),
+            "assumes": (["assumption"], False),
+            "replaces": ("*", False),
+        },
+    }
+    for link in _links(decls, "11_redteam.schema.json"):
+        assert link.field_name != "mitigated_by" or link.value["built"] is True

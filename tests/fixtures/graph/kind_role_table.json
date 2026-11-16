@@ -106,7 +106,7 @@
       "step": "09",
       "role": "plan"
     },
-    "governance-rule": {
+    "rule": {
       "step": "10",
       "role": "obligation-system"
     },

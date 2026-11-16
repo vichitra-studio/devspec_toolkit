@@ -195,10 +195,10 @@ class TestMergeAllofUnionInvariant:
 # step-base keys will be ABSENT from the result — that is the expected behavior.
 #
 # Steps selected:
-#   "09"  — root properties: tech_stack, tech_stack_ref, milestones, …
+#   "09"  — root properties: milestones, migration_plan, environment_ref, …
 #   "16"  — root properties: extensions, plan, execution, review, …
 _GET_ALL_PROPS_CASES: list[tuple[str, frozenset[str]]] = [
-    ("09", frozenset({"milestones", "tech_stack"})),
+    ("09", frozenset({"milestones", "migration_plan"})),
     ("16", frozenset({"plan", "execution"})),
 ]
 

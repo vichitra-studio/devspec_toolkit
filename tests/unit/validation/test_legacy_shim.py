@@ -21,7 +21,7 @@ from specdev_tools.validation._legacy_shim import (
 from specdev_tools.validation.cross_artifact_checks import check_step_02_integrity, check_step_04_integrity
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure
-from specdev_tools.validation.validators.step_11 import _load_wont_have_fr_ids
+from specdev_tools.validation.validators.step_11 import _load_parked_fr_ids
 
 _CLOSURE_CODES = ("E560", "E535", "W564", "W568")
 
@@ -320,7 +320,7 @@ def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
     assert not any("fr-legacy-export" in m for m in messages)
     assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
     artifact = str(Path(spec_dir) / "11_adversarial.json")
-    assert _load_wont_have_fr_ids(str(tmp_path), artifact) == {"fr-legacy-export"}
+    assert _load_parked_fr_ids(str(tmp_path), artifact) == {"fr-legacy-export"}
 
 
 def _w568_ids(tmp_path: Path, capabilities: list[dict]) -> set[str]:

@@ -113,67 +113,23 @@ Before emitting, verify:
   "id": "impl-plan-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "tech_stack": {
-    "languages": [
-      {
-        "name": "python",
-        "version": "^3.9",
-        "rationale": "Required for ONNX Runtime compatibility"
-      }
-    ],
-    "frameworks": [
-      {
-        "name": "FastAPI",
-        "version": "^0.110.0",
-        "rationale": "High-performance web framework"
-      }
-    ],
-    "infrastructure": [
-      {
-        "name": "Raspberry Pi 4",
-        "version": "Model B 4GB",
-        "rationale": "Primary deployment target"
-      }
-    ],
-    "tools": [
-      {
-        "name": "structlog",
-        "version": "^24.1.0",
-        "rationale": "Structured logging implementation"
-      }
-    ]
-  },
   "milestones": [
     {
       "milestone_id": "milestone-setup-core-infrastructure",
       "name": "Setup Core Infrastructure and Environment",
       "target_date": "2025-11-15",
-      "status": "pending",
       "risks": [
         "Raspberry Pi 4 setup and performance profiling may reveal unexpected constraints"
       ],
       "spikes": [
         "Performance testing with small dataset on Raspberry Pi 4 to validate target latency"
       ],
-      "deliverables": [
-        {
-          "type": "fr",
-          "id": "fr-search-hybrid-retrieval"
-        }
+      "schedules": [
+        "fr-search-hybrid-retrieval"
       ]
     }
   ],
   "migration_plan": "No migration required as this is a new implementation of the personal knowledge RAG system.",
-  "dependencies": [
-    "Raspberry Pi 4 hardware (for deployment)",
-    "Cloudflare Access for admin authentication"
-  ],
-  "trace": [
-    {
-      "type": "doc",
-      "id": "personal-knowledge-rag-system"
-    }
-  ],
   "canonical_refs_used": []
 }
 ```

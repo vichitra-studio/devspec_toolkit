@@ -77,7 +77,8 @@
   },
   "10": {
     "10_governance.json": [
-      ".ambiguities"
+      ".ambiguities",
+      ".rules"
     ]
   },
   "11": {

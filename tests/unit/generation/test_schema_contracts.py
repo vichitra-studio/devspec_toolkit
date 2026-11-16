@@ -106,7 +106,7 @@ class SchemaContractsTests(unittest.TestCase):
             "06": {"policy", "risk_category"},
             "07": {"metric", "unit", "stage", "environment"},
             "08": {"tag"},
-            "09": {"environment", "tech_stack", "dependency"},
+            "09": {"environment"},
             "10": {"policy", "command", "id_pattern"},
             "11": {"risk_category", "policy"},
             "12": {"command", "environment", "role"},
@@ -137,10 +137,6 @@ class SchemaContractsTests(unittest.TestCase):
             },
             "07_nfrs.schema.json": {
                 "#stageName",
-            },
-            "09_impl_plan.schema.json": {
-                "#techStack",
-                "#dependencyList",
             },
             "14_roadmap.schema.json": {
                 "#techStack",
@@ -511,21 +507,6 @@ class SchemaContractsTests(unittest.TestCase):
             errs = validate_file(str(root), str(sample))
             self.assertTrue(any("canonical_refs_used_missing" in e.render() for e in errs))
 
-    def test_step_09_allows_string_dependencies_without_oneof_overlap(self):
-        registry = SchemaRegistry(str(self.repo_root))
-        schema = registry.load("vc:09-impl-plan")
-        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
-
-        with (self.repo_root / "tests" / "fixtures" / "step_09" / "valid_complete.json").open(
-            "r", encoding="utf-8"
-        ) as f:
-            payload = json.load(f)
-        payload.pop("$schema", None)
-        payload["dependencies"] = ["dep-one"]
-
-        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        self.assertEqual([], errors, msg=f"Unexpected errors for string dependencies: {errors}")
-
     def test_step_16_plan_requires_explicit_status(self):
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:16-impl-context")
@@ -766,6 +747,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:11-redteam": "schema/11_redteam.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
                 "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
@@ -780,6 +762,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "schema" / "canon.schema.json").write_text(
@@ -823,9 +809,9 @@ class SchemaContractsTests(unittest.TestCase):
                                 "threat_id": "threat-authz-bypass",
                                 "description": "Unauthorized access through missing authorization check.",
                                 "vector": "parameter tampering",
-                                "target_ids": [{"type": "api", "id": "api-auth"}],
+                                "threatens": ["api-auth"],
                                 "category": "authz",
-                                "mitigations": [{"type": "fr", "id": "fr-authz-enforced"}],
+                                "mitigated_by": ["fr-authz-enforced"],
                                 "severity": "high",
                             }
                         ],
@@ -1025,8 +1011,8 @@ class SchemaContractsTests(unittest.TestCase):
         threats_errors = [e for e in errors if list(e.path) == ["threats"]]
         self.assertTrue(threats_errors, msg="Empty threats[] must be rejected by minItems constraint")
 
-    def test_step_11_rejects_empty_target_ids_on_threat(self):
-        """Step 11 schema requires minItems: 1 on target_ids within a threat — empty array must fail."""
+    def test_step_11_rejects_empty_threatens_on_threat(self):
+        """Step 11 schema requires minItems: 1 on threatens within a threat — empty array must fail."""
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:11-redteam")
         validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
@@ -1036,15 +1022,15 @@ class SchemaContractsTests(unittest.TestCase):
         ) as f:
             payload = json.load(f)
         payload.pop("$schema", None)
-        payload["threats"][0]["target_ids"] = []
+        payload["threats"][0]["threatens"] = []
 
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        target_errors = [
+        threatens_errors = [
             e for e in errors
             if len(e.path) >= 3 and list(e.path)[:2] == ["threats", 0]
-            and "target_ids" in str(list(e.path))
+            and "threatens" in str(list(e.path))
         ]
-        self.assertTrue(target_errors, msg="Empty target_ids[] on a threat must be rejected by minItems constraint")
+        self.assertTrue(threatens_errors, msg="Empty threatens[] on a threat must be rejected by minItems constraint")
 
     def test_step_12_rejects_empty_jobs_array(self):
         """Step 12 schema requires minItems: 1 on jobs — empty array must fail."""

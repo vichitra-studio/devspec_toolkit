@@ -170,8 +170,8 @@ class CanonicalIntegrityTests(unittest.TestCase):
                                 "vector": "v",
                                 "severity": "low",
                                 "category": "authn",
-                                "target_ids": [],
-                                "mitigations": [],
+                                "threatens": [],
+                                "mitigated_by": [],
                             }
                         ],
                         "edge_cases": [],

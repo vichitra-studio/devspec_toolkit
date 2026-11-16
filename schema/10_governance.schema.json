@@ -14,37 +14,140 @@
           "$ref": "vc:core:collections#ambiguityList",
           "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
         },
+        "rules": {
+          "description": "Array of governance rules. A rule is one requirement on how the project is changed or released, with the upstream reason it exists and, optionally, who enforces it: a command named in cli_command, or a person (enforcer 'review'). A rule with neither is enforced by a CI job of step 12 that realises it. At least one rule.",
+          "type": "array",
+          "minItems": 1,
+          "x-node": {
+            "kind": "rule",
+            "role": "obligation-system",
+            "contract": [
+              "text",
+              "enforcer",
+              "cli_command",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "rule_id"
+          },
+          "items": {
+            "description": "A single governance rule: id, text, upstream reason, optional enforcer.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule_id": {
+                "description": "Unique kebab-case identifier for this governance rule. Format: rule-{what-is-required}. Example: 'rule-contract-tests-on-every-pr'. Should be stable across spec versions. Anti-pattern: rule-1 (non-descriptive).",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "text": {
+                "description": "The governance requirement, as one falsifiable sentence a person or a command can check. Example: 'Every pull request runs the contract test suite before merge.' Anti-pattern: 'Follow good review practice' (not checkable).",
+                "type": "string",
+                "minLength": 1
+              },
+              "enforcer": {
+                "description": "Who enforces this rule when it is not a command or a job. The only value is 'review': a person decides, and the decision is attested at release. Omit it for a rule a CI job enforces (that job names the rule in its own `realises`) and for a rule that names a command in cli_command. A rule never carries both enforcer and cli_command.",
+                "type": "string",
+                "enum": [
+                  "review"
+                ]
+              },
+              "cli_command": {
+                "description": "Name of the specdev command that checks this rule, as listed in the CLI command list that registry-generate writes. Example: 'spec-check'. Omit for a review rule and for a rule a CI job enforces. A rule never carries both enforcer and cli_command.",
+                "type": "string",
+                "minLength": 1
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes that give this rule its reason: a charter constraint, risk or scope item, an environment or gate of step 02a, or an approver-only stakeholder. At least one. Example: [\"risk-reset-link-takeover\"]. Anti-pattern: leaving a rule without a reason, or naming a functional requirement here.",
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "constraint",
+                    "risk",
+                    "scope-item",
+                    "gate",
+                    "environment",
+                    "stakeholder"
+                  ],
+                  "required": true,
+                  "built": true
+                }
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this rule relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this rule: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "scope": {
+                "description": "Delivery scope for this rule: 'in' for the current release (the default when the field is omitted), 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope",
+                "default": "in"
+              },
+              "scope_reason": {
+                "description": "Why this rule is 'later' or 'out' of scope. Required when scope is 'later' or 'out'.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this rule, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this rule replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "rule_id",
+              "text",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              },
+              {
+                "not": {
+                  "required": [
+                    "enforcer",
+                    "cli_command"
+                  ]
+                }
+              }
+            ]
+          }
+        },
         "versioning": {
           "type": "string",
           "description": "Versioning scheme applied to spec artifacts. Decision rule: use 'semver' for public APIs or schemas with explicit breaking-change semantics (MAJOR.MINOR.PATCH); use 'date-based' for internal artifact versioning where freshness matters more than compatibility (YYYY-MM-DD); use 'sequential' for simple monotonic increment when breaking changes are managed out-of-band. Examples: public REST API → 'semver'; internal spec artifacts → 'date-based'. Anti-pattern: using 'sequential' for public APIs (consumers cannot determine breaking changes from the version number alone)."
-        },
-        "pr_rules": {
-          "type": "array",
-          "description": "Pull request rules governing how spec changes are submitted, reviewed, and merged. Decision matrix for which rules to include: always include 'validate-all' (mandatory for every PR touching spec files). Include conditionally: 'matrix' (when traceability links changed — new FR/API pairs), 'fixtures-lint' (when fixture targets changed), 'seed-lint' (when seed document references changed), 'security' (when auth, PII handling, or threat model changed), 'audit' (for regulated environments requiring immutable evidence). Anti-pattern: including all rules for every PR regardless of what changed — this makes CI slow and signals that the rules are not being considered.",
-          "items": {
-            "type": "string",
-            "enum": [
-              "validate",
-              "validate-all",
-              "matrix",
-              "fixtures-lint",
-              "invariants-check",
-              "governance-check",
-              "seed-lint",
-              "test",
-              "build",
-              "lint",
-              "format",
-              "audit",
-              "security"
-            ],
-            "description": "A single CI/governance check required on pull requests. Selection guide: always include 'validate-all' (schema validation of all spec files) and 'governance-check' (commit message pattern enforcement). Add 'matrix' when FR, NFR, or API traceability links change. Add 'test' and 'build' for repos containing implementation code alongside the spec. Add 'seed-lint' when seed document references changed. Add 'security' for production services handling PII or payment data. Add 'audit' for regulated environments requiring immutable evidence. Anti-pattern: including 'deploy' in a spec-only repo — deploy rules belong in the CI gates spec (Step 12)."
-          },
-          "uniqueItems": true
-        },
-        "spec_first_policy": {
-          "type": "boolean",
-          "description": "Enforces the spec-first rule: spec artifacts must be updated and merged before corresponding implementation code is written. When true, PRs that introduce new code without a preceding spec change will be blocked by governance-check."
         },
         "commit_message_rules": {
           "type": "object",
@@ -62,8 +165,16 @@
             "id_pattern_ref": {
               "description": "Canonical reference to the ID pattern used in commit messages. Kind is structurally pinned to 'id_pattern'. Example: {\"id\": \"cn:core:id_pattern:conventional-commit\", \"kind\": \"id_pattern\"}. Omit if the pattern is fully defined by the 'pattern' field.",
               "allOf": [
-                { "$ref": "vc:core:collections#canonicalRef" },
-                { "properties": { "kind": { "const": "id_pattern" } } }
+                {
+                  "$ref": "vc:core:collections#canonicalRef"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "id_pattern"
+                    }
+                  }
+                }
               ]
             },
             "error_message": {
@@ -75,92 +186,39 @@
             "require_spec_ids"
           ]
         },
-        "review_policy": {
-          "type": "object",
-          "description": "Policy governing spec review requirements and evidence collection. Specifies what reviewers must verify (verdict_requirements), what metadata must accompany each review, and which evidence sources are acceptable at each deployment phase.",
-          "additionalProperties": false,
-          "properties": {
-            "verdict_requirements": {
-              "type": "array",
-              "description": "Concrete, checkable conditions that reviewers must verify before approving a spec change. Each item should be a specific, testable condition — not a vague quality aspiration. Examples: 'All referenced IDs exist in their source spec files', 'Changelog entry present for breaking changes', 'New FRs have at least 2 acceptance criteria'. Should be achievable by a reviewer in under 5 minutes per item.",
-              "minItems": 1,
-              "items": {
-                "type": "string",
-                "description": "A single verdict requirement — a specific, falsifiable condition an approver must confirm before approving. Write as an affirmative declarative sentence that can be checked off. Examples: 'All fr-* IDs referenced in the changed artifact exist in spec/04_fr_list.json', 'No capability has been removed without a corresponding out_of_scope entry in the charter', 'All trace links in the changed artifact resolve to existing upstream IDs'. Anti-pattern: 'Review quality of the spec' — verdicts must be checkable without subjective judgment."
-              }
-            },
-            "required_metadata": {
-              "$ref": "vc:core:collections#stringArray",
-              "description": "Field names that every review submission must include (e.g., 'reviewer_id', 'review_date', 'evidence_link'). Acts as a checklist enforcing consistent review records."
-            },
-            "evidence_source_by_phase": {
-              "type": "object",
-              "description": "Maps each deployment phase to the authoritative evidence source that satisfies review for that phase. Ensures reviewers know which artifact or system to consult at dev, staging, and production.",
-              "additionalProperties": false,
-              "properties": {
-                "dev": {
-                  "type": "string",
-                  "description": "Evidence source accepted during the development phase. Dev phase evidence = automatically generated outputs from the developer's local or CI run: 'unit-test-report', 'lint-report', 'type-check-output'. Examples: 'unit-test-report', 'lint-report'. Anti-pattern: 'manual-review', 'slack-approval' (not reproducible artifacts); 'all-tests-pass' (not a named artifact)."
-                },
-                "staging": {
-                  "type": "string",
-                  "description": "Evidence source accepted during the staging phase. Staging phase evidence = outputs from the integration CI pipeline: 'ci-pipeline-output', 'integration-test-report', 'smoke-test-results', 'coverage-report'. Examples: 'integration-test-report', 'smoke-test-results'. Anti-pattern: staging evidence that is the same as dev evidence (staging should include higher-level integration tests)."
-                },
-                "prod": {
-                  "type": "string",
-                  "description": "Evidence source required before production deployment. Prod phase evidence = formal sign-off artifacts: 'qa-sign-off', 'penetration-test-report', 'load-test-report', 'security-scan-report'. At least one human approval artifact is typically required for prod phase. Examples: 'qa-sign-off', 'penetration-test-report'. Anti-pattern: prod evidence that is identical to staging (production gating should be stricter)."
-                }
-              },
-              "required": [
-                "dev",
-                "staging",
-                "prod"
-              ]
-            }
-          },
-          "required": [
-            "verdict_requirements",
-            "required_metadata",
-            "evidence_source_by_phase"
-          ]
-        },
-        "reviewers": {
-          "$ref": "vc:core:collections#stringArray",
-          "description": "GitHub handles or team names of designated reviewers responsible for approving spec changes. Decision rule: use '@username' for individual reviewers when specific domain expertise is required; use '@org/team-name' for team reviews when any member of the team can approve. Use team handle when 3 or more members could validly review; use individual handle only for unique expertise (e.g., a specific security engineer for PII policy review). Examples: '@acme/platform-team', '@alice', '@acme/security-team'. Anti-pattern: email addresses ('alice@company.com'), full names without @ prefix, empty array for production gates."
-        },
-        "trace": {
-          "type": "array",
-          "description": "Traceability links connecting this governance spec to upstream artifacts. Governance artifacts trace to upstream artifacts using type = the canonical kind of the target: use type='fr' for fr-* IDs, type='capability' for cap-* IDs, type='charter-goal' for charter policy sources (goal-* form). The relationship verb (depends_on, verified_by, derives_from) goes in note. Example: [{\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"depends_on: authentication governance applies only when auth FRs are in scope\"}]. Every governance rule should trace to its origin; un-traced rules cannot be validated against charter scope.",
-          "items": {
-            "$ref": "vc:core:collections#traceRef",
-            "description": "A single traceability reference for this governance spec. At step 10, type = the canonical kind of the target: use type='invariant' for inv-* IDs, type='fr' for fr-* IDs, type='charter-goal' for charter policy sources (goal-* form). The relationship verb (depends_on, verified_by, derives_from) goes in note. Example: {\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"depends_on: governance enforces this FR is spec-first reviewed\"}. Note: gate-* IDs (CI gate refs) have no canonical kind and cannot be used as trace targets — reference the governing spec artifact instead. Anti-pattern: omitting the 'note' field on governance traces — unannotated governance links cannot be audited."
-          }
-        },
-        "links": {
-          "type": "array",
-          "description": "External links to governance resources — wikis, runbooks, branch protection settings, or policy documents that supplement this spec.",
-          "items": {
-            "$ref": "vc:core:collections#link",
-            "description": "A link to an external governance resource. Include a 'rel' that describes the resource's relationship to this spec (e.g., 'branch-protection-rules', 'codeowners-file')."
-          }
-        },
         "policy_ref": {
           "description": "Canonical reference to the governance policy. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Omit if no canonical policy entry applies.",
           "allOf": [
-            { "$ref": "vc:core:collections#canonicalRef" },
-            { "properties": { "kind": { "const": "policy" } } }
+            {
+              "$ref": "vc:core:collections#canonicalRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "policy"
+                }
+              }
+            }
           ]
         },
         "command_ref": {
           "description": "Canonical reference to the CLI command this governance rule triggers. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:governance-check\", \"kind\": \"command\"}. Omit when the governance rule does not map to an automated command.",
           "allOf": [
-            { "$ref": "vc:core:collections#canonicalRef" },
-            { "properties": { "kind": { "const": "command" } } }
+            {
+              "$ref": "vc:core:collections#canonicalRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "command"
+                }
+              }
+            }
           ]
         }
       },
       "required": [
-        "spec_first_policy",
+        "rules",
         "commit_message_rules"
       ],
       "description": "Step-specific properties for 10_governance."

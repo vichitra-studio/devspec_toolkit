@@ -167,12 +167,6 @@ Before emitting, verify:
   "id": "redteam-catalog",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "trace": [
-    {
-      "type": "doc",
-      "id": "spec-11"
-    }
-  ],
   "threats": [
     {
       "threat_id": "threat-authz-admin-bypass",
@@ -180,19 +174,8 @@ Before emitting, verify:
       "vector": "Mass Assignment",
       "category": "authz",
       "severity": "critical",
-      "target_ids": [
-        {
-          "type": "api",
-          "id": "api-users-update-profile"
-        }
-      ],
-      "mitigations": [
-        {
-          "type": "inv",
-          "id": "inv-profile-immutable-fields",
-          "note": "Strict whitelist on updates"
-        }
-      ],
+      "threatens": ["api-users-update-profile"],
+      "mitigated_by": ["inv-profile-immutable-fields"],
       "risk_category_ref": {
         "id": "cn:core:risk_category:authz",
         "kind": "risk_category"
@@ -203,7 +186,9 @@ Before emitting, verify:
     {
       "id": "ec-db-timeout",
       "description": "Primary DB timeout under load",
-      "trigger": "Connection Pool Exhaustion"
+      "trigger": "Connection Pool Exhaustion",
+      "threatens": ["api-users-update-profile"],
+      "mitigated_by": ["inv-profile-immutable-fields"]
     }
   ],
   "canonical_refs_used": [

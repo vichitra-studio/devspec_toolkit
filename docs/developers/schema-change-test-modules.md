@@ -117,30 +117,30 @@ Terms: `targets`, `out_of_scope`
 Terms: `deliverables`, `tech_stack`, `tech_stack_ref`, `trace`, `depends_on`, `dependencies`, `dependency_ref`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `deliverables`, `trace`
-- [ ] `tests/fixtures/entry_key_registry_golden.json`: `dependencies`, `depends_on`
+- [x] `tests/fixtures/entry_key_registry_golden.json`: `dependencies`, `depends_on`
 - [ ] `tests/fixtures/entry_key_registry_pre_m1.json`: `dependencies`
 - [ ] `tests/fixtures/graph/`: `depends_on`
 - [ ] `tests/fixtures/spec_corpus/`: `deliverables`, `dependencies`, `trace`
-- [ ] `tests/fixtures/step_09/`: `deliverables`, `dependencies`, `depends_on`, `tech_stack`, `trace`
+- [x] `tests/fixtures/step_09/`: `deliverables`, `dependencies`, `depends_on`, `tech_stack`, `trace`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
 - [ ] `tests/integration/test_step_04.py`: `depends_on`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
 - [ ] `tests/integration/test_step_14.py`: `deliverables`, `tech_stack`
 - [ ] `tests/integration/test_step_16.py`: `trace`
 - [ ] `tests/integration/test_step_16_anchor.py`: `deliverables`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_09/ fixtures
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_09/ fixtures
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer_seed_distillation.py`: `tech_stack`
 - [ ] `tests/unit/core/test_entry_key_registry.py`: `deliverables`, `dependencies`, `trace`
-- [ ] `tests/unit/core/test_merge_allof_preservation.py`: `tech_stack`, `tech_stack_ref`
+- [x] `tests/unit/core/test_merge_allof_preservation.py`: `tech_stack`, `tech_stack_ref`
 - [ ] `tests/unit/core/test_resolve_pointers.py`: `deliverables`, `dependencies`, `trace`
-- [ ] `tests/unit/generation/test_prompt_schema_sync.py`: `dependencies`, `trace`
-- [ ] `tests/unit/generation/test_schema_contracts.py`: `dependencies`, `tech_stack`
+- [x] `tests/unit/generation/test_prompt_schema_sync.py`: `dependencies`, `trace`
+- [x] `tests/unit/generation/test_schema_contracts.py`: `dependencies`, `tech_stack`
 - [ ] `tests/unit/registry/test_annotation_scan.py`: `depends_on`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `depends_on`, `trace`
 - [ ] `tests/unit/registry/test_annotations.py`: `depends_on`
-- [ ] `tests/unit/registry/test_generate.py`: `deliverables`, `dependencies`, `trace`
+- [x] `tests/unit/registry/test_generate.py`: `deliverables`, `dependencies`, `trace`
 - [ ] `tests/unit/registry/test_step_order_gen.py`: `depends_on`
 - [ ] `tests/unit/test_cli.py`: `dependencies`, `dependency_ref`, `tech_stack`, `tech_stack_ref`, `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
@@ -155,29 +155,29 @@ Terms: `deliverables`, `tech_stack`, `tech_stack_ref`, `trace`, `depends_on`, `d
 - [ ] `tests/unit/validation/linters/test_registry_check.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_spec_quality_lint.py`: `tech_stack`
 - [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `deliverables`, `trace`
-- [ ] `tests/unit/validation/test_legacy_shim.py`: `trace`
+- [x] `tests/unit/validation/test_legacy_shim.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `deliverables`, `trace`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `deliverables`, `trace`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `deliverables`, `trace`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `deliverables`, `trace`
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `dependencies`, `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `dependencies`, `trace`
 
 ## WI-M3-08: step 10 governance
 
 Terms: `pr_rules`, `spec_first_policy`, `review_policy`, `verdict_requirements`, `required_metadata`, `evidence_source_by_phase`, `reviewers`, `trace`, `links`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `trace`
-- [ ] `tests/fixtures/entry_key_registry_golden.json`: `links`
+- [x] `tests/fixtures/entry_key_registry_golden.json`: `links`
 - [ ] `tests/fixtures/spec_corpus/`: `trace`
-- [ ] `tests/fixtures/step_10/`: `pr_rules`, `reviewers`, `spec_first_policy`, `trace`
+- [x] `tests/fixtures/step_10/`: `pr_rules`, `reviewers`, `spec_first_policy`, `trace`
 - [ ] `tests/integration/test_annotation_pipeline.py`: `links`
 - [ ] `tests/integration/test_graph_example_steps_00_05.py`: `links`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
 - [ ] `tests/integration/test_step_16.py`: `trace`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_10/ fixtures
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_10/ fixtures
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer.py`: `trace`
 - [ ] `tests/unit/core/test_entry_key_registry.py`: `trace`
@@ -187,13 +187,13 @@ Terms: `pr_rules`, `spec_first_policy`, `review_policy`, `verdict_requirements`,
 - [ ] `tests/unit/registry/test_annotation_scan.py`: `links`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
 - [ ] `tests/unit/registry/test_annotations.py`: `links`
-- [ ] `tests/unit/registry/test_generate.py`: `trace`
+- [x] `tests/unit/registry/test_generate.py`: `trace`
 - [ ] `tests/unit/registry/test_step_order_gen.py`: `links`
 - [ ] `tests/unit/test_cli.py`: `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
 - [ ] `tests/unit/toolkit_invariants/test_m2_graph_declarations.py`: `links`
 - [ ] `tests/unit/toolkit_invariants/test_m2_prerequisites.py`: `links`
-- [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `pr_rules`, `trace`
+- [x] `tests/unit/validation/linters/test_hallucination_lint.py`: `pr_rules`, `trace`
 - [ ] `tests/unit/validation/linters/test_invariants.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_invariants_cel.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_linter_utils.py`: `trace`
@@ -204,7 +204,7 @@ Terms: `pr_rules`, `spec_first_policy`, `review_policy`, `verdict_requirements`,
 - [ ] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `pr_rules`, `trace`
+- [x] `tests/unit/validation/validators/test_step_10_deep.py`: `pr_rules`, `trace`
 - [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `trace`
@@ -214,16 +214,16 @@ Terms: `pr_rules`, `spec_first_policy`, `review_policy`, `verdict_requirements`,
 Terms: `trace`, `target_ids`, `mitigations`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `trace`
-- [ ] `tests/fixtures/entry_key_registry_golden.json`: `mitigations`
+- [x] `tests/fixtures/entry_key_registry_golden.json`: `mitigations`
 - [ ] `tests/fixtures/entry_key_registry_pre_m1.json`: `mitigations`
 - [ ] `tests/fixtures/spec_corpus/`: `mitigations`, `target_ids`, `trace`
-- [ ] `tests/fixtures/step_11/`: `mitigations`, `target_ids`, `trace`
+- [x] `tests/fixtures/step_11/`: `mitigations`, `target_ids`, `trace`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
-- [ ] `tests/integration/test_step_11.py`: `mitigations`, `target_ids`
+- [x] `tests/integration/test_step_11.py`: `mitigations`, `target_ids`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
 - [ ] `tests/integration/test_step_16.py`: `trace`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_11/ fixtures
-- [ ] `tests/unit/canonical/test_canonical_integrity.py`: `mitigations`, `target_ids`
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_11/ fixtures
+- [x] `tests/unit/canonical/test_canonical_integrity.py`: `mitigations`, `target_ids`
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer.py`: `trace`
 - [ ] `tests/unit/core/test_entry_key_registry.py`: `trace`
@@ -232,7 +232,7 @@ Terms: `trace`, `target_ids`, `mitigations`
 - [ ] `tests/unit/generation/test_schema_contracts.py`: `mitigations`, `target_ids`
 - [ ] `tests/unit/registry/test_annotation_scan.py`: `mitigations`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
-- [ ] `tests/unit/registry/test_generate.py`: `trace`
+- [x] `tests/unit/registry/test_generate.py`: `trace`
 - [ ] `tests/unit/test_cli.py`: `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `trace`
@@ -248,7 +248,7 @@ Terms: `trace`, `target_ids`, `mitigations`
 - [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `mitigations`, `target_ids`, `trace`
+- [x] `tests/unit/validation/validators/test_step_11_deep.py`: `mitigations`, `target_ids`, `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `mitigations`, `target_ids`, `trace`
 

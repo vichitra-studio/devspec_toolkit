@@ -212,22 +212,6 @@ def _scan_node(
                             jq_path=f".{p}",
                             value=prefix,
                         ))
-            if key == "pr_rules" and isinstance(value, list):
-                allowed_pr_rules = {
-                    "validate", "validate-all", "matrix", "fixtures-lint", "invariants-check",
-                    "governance-check", "seed-lint", "test", "build", "lint",
-                    "format", "audit", "security"
-                }
-                for idx, item in enumerate(value):
-                    if isinstance(item, str) and item not in allowed_pr_rules:
-                        errs.append(make_error(
-                            "E530",
-                            f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}",
-                            subcode="INVENTED_ENUM_OR_ID",
-                            file=rel,
-                            jq_path=f".{p}[{idx}]",
-                            value=item,
-                        ))
             errs.extend(_scan_node(rel, value, canon, known_command_prefixes, p, stages=active_stages))
     elif isinstance(node, list):
         for idx, item in enumerate(node):

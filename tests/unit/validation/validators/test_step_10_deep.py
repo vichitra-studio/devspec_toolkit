@@ -1,4 +1,4 @@
-"""Tests for step_10 deep validation: commit patterns, trace types, link targets."""
+"""Tests for step_10 deep validation: owner values and commit message rules."""
 import pytest
 from specdev_tools.validation.validators.step_10 import validate_step_10
 
@@ -25,8 +25,6 @@ class TestValidMinimal:
                 "pattern": r"^(feat|fix|docs)\(.+\):.+$",
                 "allowed_types": ["feat", "fix", "docs"],
             },
-            "pr_rules": ["validate", "test"],
-            "trace": [{"type": "fr", "targets": ["fr-login"]}],
         }
         errors = validate_step_10(instance, toolkit_root)
         assert errors == []
@@ -60,37 +58,21 @@ class TestCommitPattern:
         assert not any("regex" in e.lower() for e in rendered)
 
 
-class TestTraceType:
-    def test_invalid_trace_type(self, toolkit_root):
-        instance = {"trace": [{"type": "completely-fake-type"}]}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("Invalid trace type" in e for e in rendered)
+class TestWrongTypedValues:
+    @pytest.mark.parametrize("owner", [["api"], {"a": 1}, 7])
+    def test_wrong_typed_owner_does_not_raise(self, toolkit_root, owner):
+        assert validate_step_10({"owner": owner}, toolkit_root) == []
+
+    @pytest.mark.parametrize("commit_rules", [7, ["pattern"], "pattern", None])
+    def test_wrong_typed_commit_message_rules_do_not_raise(self, toolkit_root, commit_rules):
+        assert validate_step_10({"commit_message_rules": commit_rules}, toolkit_root) == []
+
+    @pytest.mark.parametrize("pattern", [7, ["^feat"], {"p": 1}])
+    def test_wrong_typed_pattern_does_not_raise(self, toolkit_root, pattern):
+        assert validate_step_10({"commit_message_rules": {"pattern": pattern}}, toolkit_root) == []
 
 
-class TestLinkTarget:
-    def test_valid_fr_target(self, toolkit_root):
-        instance = {"trace": [{"type": "fr", "targets": ["fr-login"]}]}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("invalid link target" in e.lower() for e in rendered)
-
-    def test_valid_step_target(self, toolkit_root):
-        instance = {"trace": [{"type": "fr", "targets": ["04"]}]}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("invalid link target" in e.lower() for e in rendered)
-
-    def test_invalid_target(self, toolkit_root):
-        instance = {"trace": [{"type": "fr", "targets": ["INVALID"]}]}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("invalid link target" in e.lower() for e in rendered)
-
-
-class TestPrRules:
-    def test_invalid_pr_rule(self, toolkit_root):
-        instance = {"pr_rules": ["validate", "nonexistent-rule"]}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("Invalid pr_rule" in e for e in rendered)
+class TestRemovedFieldsAreNotRead:
+    def test_pr_rules_and_trace_are_ignored(self, toolkit_root):
+        instance = {"pr_rules": ["nonexistent-rule"], "trace": [{"type": "completely-fake-type", "targets": ["INVALID"]}]}
+        assert validate_step_10(instance, toolkit_root) == []

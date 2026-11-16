@@ -443,24 +443,6 @@
       ],
       "description": "A milestone or external dependency that must be resolved before work can proceed."
     },
-    "dependencyList": {
-      "$anchor": "dependencyList",
-      "type": "array",
-      "items": {
-        "oneOf": [
-          {
-            "type": "string",
-            "description": "A simple string dependency identifier."
-          },
-          {
-            "$ref": "vc:core:collections#dependencyItem",
-            "description": "A structured dependency item with type, ID, and optional owner."
-          }
-        ],
-        "description": "A dependency entry: either a simple string ID or a structured dependency item."
-      },
-      "description": "Array of dependencies, each either a simple string ID or a structured dependency item."
-    },
     "dependencyObjectList": {
       "$anchor": "dependencyObjectList",
       "type": "array",

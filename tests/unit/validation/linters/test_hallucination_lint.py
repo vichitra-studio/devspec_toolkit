@@ -1204,10 +1204,10 @@ class StructuredFieldTests(unittest.TestCase):
         errs = self._lint({"jobs": [{"steps": [{"command": "frobnicatecli run tests"}]}]})
         self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="command", value="frobnicatecli")
 
-    def test_pr_rules_invented_has_structured_fields(self):
-        """INVENTED_ENUM_OR_ID on .pr_rules[i] must carry all four structured fields."""
+    def test_pr_rules_enum_branch_removed(self):
+        """Step 10 no longer stores pr_rules, so the lint has no enum branch for it."""
         errs = self._lint({"pr_rules": ["validate", "hyperspacecheck"]})
-        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="pr_rules", value="hyperspacecheck")
+        self.assertEqual([e for e in errs if e.code == "E530"], [])
 
     def test_cross_ref_invented_id_has_structured_fields(self):
         """INVENTED_ENUM_OR_ID from the cross-ref loop must carry all four structured fields."""

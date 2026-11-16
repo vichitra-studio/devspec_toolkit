@@ -1361,13 +1361,63 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".milestones",
+          "contract": [
+            "name",
+            "target_date",
+            "risks",
+            "spikes"
+          ],
           "id_field": "milestone_id",
-          "kind": "milestone"
+          "kind": "design-milestone",
+          "links": [
+            {
+              "built": false,
+              "field": "schedules",
+              "kinds": [
+                "fr",
+                "criterion",
+                "api",
+                "invariant",
+                "nfr",
+                "component",
+                "environment",
+                "risk"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "plan",
+          "source": "x-node"
         }
       ],
       "step": "09"
@@ -1376,8 +1426,71 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".rules",
+          "contract": [
+            "text",
+            "enforcer",
+            "cli_command",
+            "scope",
+            "scope_reason"
+          ],
+          "id_field": "rule_id",
+          "kind": "rule",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "constraint",
+                "risk",
+                "scope-item",
+                "gate",
+                "environment",
+                "stakeholder"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "10"
@@ -1386,25 +1499,163 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".threats",
+          "contract": [
+            "description",
+            "vector",
+            "category",
+            "severity",
+            "risk_category_ref",
+            "policy_ref",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "threat_id",
           "kind": "threat",
-          "nested": [
+          "links": [
             {
-              "array_path": ".mitigations",
-              "id_field": "id",
-              "kind": "mitigation"
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "risk"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "threatens",
+              "kinds": [
+                "api",
+                "component",
+                "connection",
+                "third-party"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": true,
+              "field": "mitigated_by",
+              "kinds": [
+                "fr",
+                "criterion",
+                "api",
+                "api-error",
+                "invariant",
+                "nfr",
+                "rule",
+                "gate",
+                "secret",
+                "environment",
+                "constraint",
+                "fixture"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
             }
-          ]
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         },
         {
           "array_path": ".edge_cases",
+          "contract": [
+            "description",
+            "trigger",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "id",
-          "kind": "edge-case"
+          "kind": "edge-case",
+          "links": [
+            {
+              "built": false,
+              "field": "threatens",
+              "kinds": [
+                "api",
+                "component",
+                "fr"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": true,
+              "field": "mitigated_by",
+              "kinds": [
+                "fr",
+                "criterion",
+                "api",
+                "api-error",
+                "invariant",
+                "nfr",
+                "rule",
+                "gate",
+                "secret",
+                "environment",
+                "constraint",
+                "fixture"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "11"

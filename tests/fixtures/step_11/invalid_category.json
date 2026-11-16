@@ -8,27 +8,30 @@
       "threat_id": "threat-input-injection",
       "description": "Malicious input in queries or document content can lead to injection attacks that bypass validation and potentially affect system behavior",
       "vector": "input-injection",
-      "target_ids": [
-        {
-          "type": "api",
-          "id": "api-ask"
-        }
-      ],
       "category": "invalid-category",
-      "risk_category_ref": {"id": "cn:core:risk_category:auth", "kind": "risk_category"},
-      "mitigations": [
-        {
-          "type": "inv",
-          "id": "inv-input-validation"
-        }
+      "risk_category_ref": {
+        "id": "cn:core:risk_category:auth",
+        "kind": "risk_category"
+      },
+      "severity": "high",
+      "threatens": [
+        "api-ask"
       ],
-      "severity": "high"
+      "mitigated_by": [
+        "inv-input-validation"
+      ]
     }
   ],
   "edge_cases": [
     {
       "id": "ec-query-timeout",
-      "description": "Query timeouts during complex retrieval operations"
+      "description": "Query timeouts during complex retrieval operations",
+      "threatens": [
+        "api-ask"
+      ],
+      "mitigated_by": [
+        "inv-input-validation"
+      ]
     }
   ],
   "canonical_refs_used": []

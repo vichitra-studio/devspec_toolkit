@@ -1,65 +1,12 @@
 from __future__ import annotations
 
-import json
-import os
-import warnings
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from ...core.errors import make_error, SpecError
-from ...core.loaders import load_sibling_artifact
-from ...core.trace_types import is_valid_trace_type, normalize_trace_type
+from ...core.loaders import load_sibling_artifact, load_sibling_json
 from ...validation._legacy_shim import is_parked_any_shape
 from ...validation.linter_utils import check_no_duplicates
-
-# ---------------------------------------------------------------------------
-# Business-rule trace-type sets
-# ---------------------------------------------------------------------------
-
-# Business rule: threats can only target APIs or components.
-# Rationale: attack surfaces are runtime artifacts (endpoints, services,
-# modules) -- not requirements (FRs, NFRs) or test artefacts (fixtures).
-_ALLOWED_THREAT_TARGET_TYPES: frozenset[str] = frozenset({"api", "component"})
-
-# Business rule: mitigations reference requirement-level or documentation
-# artifacts that *prove* a threat is addressed.
-# Rationale: a mitigation can cite an FR (feature guards the path), an API
-# (endpoint enforces auth), an NFR (latency SLA limits blast radius), an
-# invariant (system-wide rule), a fixture (regression test), a doc (runbook
-# or ADR), or a capability (high-level feature that covers the risk).
-# Threats themselves are never mitigations (circular), nor are components
-# (components are targets, not evidence).
-_ALLOWED_MITIGATION_TYPES: frozenset[str] = frozenset({
-    "fr", "api", "nfr", "invariant", "fixture", "doc", "capability",
-})
-
-# Deferred validation: checks are performed once on first call to
-# validate_step_11(), not at import time, to avoid noisy warnings when
-# the module is simply imported.
-_TRACE_TYPE_VALIDATED: bool = False
-
-
-def _validate_trace_types_once() -> None:
-    """Validate business-rule trace-type sets once per process."""
-    global _TRACE_TYPE_VALIDATED
-    if _TRACE_TYPE_VALIDATED:
-        return
-    _TRACE_TYPE_VALIDATED = True
-
-    invalid_targets = {t for t in _ALLOWED_THREAT_TARGET_TYPES if not is_valid_trace_type(t)}
-    if invalid_targets:
-        warnings.warn(
-            f"step_11: _ALLOWED_THREAT_TARGET_TYPES contains unknown canon trace types: {invalid_targets}",
-            stacklevel=2,
-        )
-
-    invalid_mitigations = {t for t in _ALLOWED_MITIGATION_TYPES if not is_valid_trace_type(t)}
-    if invalid_mitigations:
-        warnings.warn(
-            f"step_11: _ALLOWED_MITIGATION_TYPES contains unknown canon trace types: {invalid_mitigations}",
-            stacklevel=2,
-        )
 
 
 def validate_step_11(
@@ -69,373 +16,148 @@ def validate_step_11(
 ) -> list[SpecError]:
     """Validate Step 11 (Red Team / Threat Modeling) logic.
 
-    Checks threat_id uniqueness, target ID cross-references against steps 02/05,
-    mitigation ID cross-references against upstream spec steps (01/04/05/06/07/08),
-    mitigation constraints, API-to-threat coverage (W583), and invariant coverage (W615).
+    Checks threat_id uniqueness, API-to-threat coverage (W583: an API no threat ``threatens``) and
+    invariant coverage (W615: a security invariant no threat is ``mitigated_by``). An API or invariant
+    whose every linked FR is parked is exempt from both. The existence of the ids a threat names is
+    not checked here. A wrong-typed value is left to the schema and never raises.
     """
-    _validate_trace_types_once()
     errors: list[SpecError] = []
 
-    check_no_duplicates(instance.get("threats", []), "threat_id", "threat_id", errors)
-
-    # Load cross-reference data for target validation (steps 02, 05)
-    component_ids = _load_component_ids(toolkit_root, artifact_path)
-    api_ids = _load_api_ids(toolkit_root, artifact_path)
-
-    # Load cross-reference data for mitigation validation (steps 01, 04, 06, 07, 08)
-    # Each loader returns None (upstream absent → skip check) or a set[str].
-    invariant_ids = _load_invariant_ids(toolkit_root, artifact_path)
-    fr_ids = _load_fr_ids(toolkit_root, artifact_path)
-    nfr_ids = _load_nfr_ids(toolkit_root, artifact_path)
-    fixture_ids = _load_fixture_ids(toolkit_root, artifact_path)
-    capability_ids = _load_capability_ids(toolkit_root, artifact_path)
-
-    # Mapping from normalised mitigation type to the loaded ID set.
-    # "doc" is intentionally absent — there is no doc-ID registry in the toolkit,
-    # so doc mitigations are exempt from cross-ref validation.
-    # A .get() on a missing key returns None, which triggers the "skip" guard below.
-    _mitigation_id_sets: dict[str, set[str] | None] = {
-        "invariant": invariant_ids,
-        "fr": fr_ids,
-        "nfr": nfr_ids,
-        "fixture": fixture_ids,
-        "capability": capability_ids,
-        "api": api_ids,
-    }
-
-    # Collect the invariant IDs that have a risk_category_ref (security-relevant)
-    # for the W615 coverage check.  Derived from step-06 full objects, not just IDs.
-    security_invariant_ids: set[str] = _load_security_invariant_ids(toolkit_root, artifact_path)
-
-    # An API/invariant whose only tracing FR(s) are priority:"wont-have" will
-    # never be built, so it shouldn't be falsely demanded to have threat
-    # coverage either (DEVSPEC-122 follow-up, mirrors the equivalent exclusion
-    # already applied in matrix.py/traceability_closure.py).
-    wont_have_fr_ids = _load_wont_have_fr_ids(toolkit_root, artifact_path)
-    api_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "05", "apis", "api_id", _fr_ids_from_derives_from)
-    invariant_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "06", "rules", "inv_id", _fr_ids_from_trace)
-
-    for i, threat in enumerate(instance.get("threats", [])):
+    threats = instance.get("threats", [])
+    check_no_duplicates(threats, "threat_id", "threat_id", errors)
+    for i, threat in enumerate(threats):
         if not isinstance(threat, dict):
             errors.append(make_error("E520", f"threats[{i}] is not an object: {threat!r}"))
-            continue
-        threat_id = threat.get("threat_id")
 
-        # Target validation
-        if not threat.get("target_ids"):
-            errors.append(make_error("E520", f"Threat '{threat_id}' has no target_ids"))
-        for j, target in enumerate(threat.get("target_ids", [])):
-            if not isinstance(target, dict):
-                errors.append(make_error("E520", f"Threat '{threat_id}' target_ids[{j}] is not an object: {target!r}"))
-                continue
-            t = normalize_trace_type(target.get("type", ""))
-            if t and t not in _ALLOWED_THREAT_TARGET_TYPES:
-                errors.append(make_error("E530", f"Threat '{threat_id}' has invalid target type '{t}'"))
+    api_ids = _load_api_ids(toolkit_root, artifact_path)
+    invariant_ids = _load_invariant_ids(toolkit_root, artifact_path)
+    parked_fr_ids = _load_parked_fr_ids(toolkit_root, artifact_path)
 
-            # Cross-ref validation against steps 02 (components) and 05 (APIs).
-            # NOTE: these individual comparisons route to different validation
-            # pools and must stay in sync with _ALLOWED_THREAT_TARGET_TYPES.
-            target_id = target.get("id", "")
-            if t == "component" and component_ids is not None and target_id:
-                if target_id not in component_ids:
-                    errors.append(
-                        make_error("E590", f"Threat '{threat_id}' references unknown component '{target_id}' "
-                        "(not in 02_system_sketch.json)")
-                    )
-            elif t == "api" and api_ids is not None and target_id:
-                if target_id not in api_ids:
-                    errors.append(
-                        make_error("E590", f"Threat '{threat_id}' references unknown API '{target_id}' "
-                        "(not in 05_interface_contracts.json)")
-                    )
-
-        # Mitigation validation
-        mitigations = threat.get("mitigations", [])
-        if not mitigations:
-            errors.append(make_error("E520", f"Threat '{threat_id}' has no mitigations"))
-        for mitigation in mitigations:
-            if not isinstance(mitigation, dict):
-                errors.append(make_error("E520", f"Threat '{threat_id}' has non-object mitigation: {mitigation!r}"))
-                continue
-            t = normalize_trace_type(mitigation.get("type", ""))
-            if t and t not in _ALLOWED_MITIGATION_TYPES:
-                errors.append(make_error("E530", f"Threat '{threat_id}' has invalid mitigation type '{t}'"))
-
-            # Schema guarantees `type` and `id` are present.  Keep a safety
-            # net for the `id` field so fixtures that bypass schema checks
-            # still surface a clear error.
-            mid = mitigation.get("id", "")
-            if not mid:
-                errors.append(
-                    make_error("E520", f"Threat '{threat_id}' has mitigation missing required 'id'")
-                )
-
-            # Cross-ref validation: check the mitigation ID against its source spec.
-            # Uses the same is-not-None guard as target cross-ref — absent upstream
-            # file → skip silently (None), present but id not found → E590.
-            # "doc" mitigations are exempt: there is no doc-ID registry in the toolkit.
-            if t and mid:
-                id_set = _mitigation_id_sets.get(t)
-                if id_set is not None and mid not in id_set:
-                    errors.append(
-                        make_error(
-                            "E590",
-                            f"Threat '{threat_id}' mitigation type '{mitigation.get('type')}' "
-                            f"references unknown id '{mid}' (not found in upstream step for type '{t}')",
-                        )
-                    )
-
-    # W583: API-to-threat coverage — each public API should be targeted by at
-    # least one threat.  Only fires when step 05 is present (api_ids is not None).
     if api_ids is not None:
-        threatened_api_ids: set[str] = set()
-        for threat in instance.get("threats", []):
-            if not isinstance(threat, dict):
-                continue
-            for target in threat.get("target_ids", []):
-                if not isinstance(target, dict):
-                    continue
-                t = normalize_trace_type(target.get("type", ""))
-                if t == "api":
-                    tid = target.get("id", "")
-                    if tid:
-                        threatened_api_ids.add(tid)
-        for api_id in sorted(api_ids):
-            if api_id in threatened_api_ids:
-                continue
-            if _only_traces_wont_have_frs(api_fr_traces.get(api_id, set()), wont_have_fr_ids):
-                continue
-            errors.append(
-                make_error("W583", f"API_UNCOVERED_BY_THREAT {api_id} has no corresponding threat in Step 11")
-            )
+        api_fr_links = _load_fr_links_by_id(toolkit_root, artifact_path, "05", "apis", "api_id", _fr_ids_from_derives_from)
+        errors.extend(_api_coverage_errors(_linked_ids(threats, "threatens"), api_ids, api_fr_links, parked_fr_ids))
 
-    # W615: Invariant coverage — each step-06 invariant with a risk_category_ref
-    # should be referenced by at least one threat's mitigation of type 'inv'.
-    # Only fires when step 06 is present (invariant_ids is not None).
-    # Firing condition: invariant has risk_category_ref AND no threat mitigation
-    # of normalised type 'invariant' references it.
-    if invariant_ids is not None and security_invariant_ids:
-        mitigated_invariant_ids: set[str] = set()
-        for threat in instance.get("threats", []):
-            if not isinstance(threat, dict):
-                continue
-            for mitigation in threat.get("mitigations", []):
-                if not isinstance(mitigation, dict):
-                    continue
-                t = normalize_trace_type(mitigation.get("type", ""))
-                if t == "invariant":
-                    mid = mitigation.get("id", "")
-                    if mid:
-                        mitigated_invariant_ids.add(mid)
-        for inv_id in sorted(security_invariant_ids):
-            if inv_id in mitigated_invariant_ids:
-                continue
-            if _only_traces_wont_have_frs(invariant_fr_traces.get(inv_id, set()), wont_have_fr_ids):
-                continue
-            errors.append(
-                make_error(
-                    "W615",
-                    f"INVARIANT_UNEXERCISED_BY_THREAT {inv_id} has a risk_category_ref "
-                    "but no threat mitigation references it",
-                )
-            )
+    if invariant_ids is not None:
+        invariant_fr_links = _load_fr_links_by_id(toolkit_root, artifact_path, "06", "rules", "inv_id", _fr_ids_from_constrains)
+        security_ids = _load_security_invariant_ids(toolkit_root, artifact_path)
+        errors.extend(
+            _invariant_coverage_errors(_linked_ids(threats, "mitigated_by"), security_ids, invariant_fr_links, parked_fr_ids)
+        )
 
     return errors
 
 
-def _load_component_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load component IDs from step 02 if available.
+def _linked_ids(threats: list[Any], link_field: str) -> set[str]:
+    """Every non-empty string named by *link_field* on the object entries of *threats*."""
+    named: set[str] = set()
+    for threat in threats:
+        links = threat.get(link_field) if isinstance(threat, dict) else None
+        if isinstance(links, list):
+            named.update(link for link in links if isinstance(link, str) and link)
+    return named
 
-    Delegates to the shared ``load_sibling_artifact`` helper, which searches
-    ``artifact_path``'s sibling directory first and falls back to
-    ``<toolkit_root>/spec``.  Returns ``None`` (not an empty set) when no
-    upstream file is found — callers use ``None`` as "upstream absent, skip
-    cross-ref check" (see the ``component_ids is not None`` guard above).
-    """
-    return load_sibling_artifact(
-        artifact_path or "",
-        "02",
-        "components",
-        "component_id",
-        fallback_root=toolkit_root,
-    )
+
+def _api_coverage_errors(
+    threatened_ids: set[str],
+    api_ids: set[str],
+    api_fr_links: dict[str, set[str]],
+    parked_fr_ids: set[str],
+) -> list[SpecError]:
+    """W583 for each API no threat ``threatens``, except an API that only derives from parked FRs."""
+    return [
+        make_error("W583", f"API_UNCOVERED_BY_THREAT {api_id} has no corresponding threat in Step 11")
+        for api_id in sorted(api_ids)
+        if api_id not in threatened_ids
+        and not _only_links_parked_frs(api_fr_links.get(api_id, set()), parked_fr_ids)
+    ]
+
+
+def _invariant_coverage_errors(
+    mitigating_ids: set[str],
+    security_invariant_ids: set[str],
+    invariant_fr_links: dict[str, set[str]],
+    parked_fr_ids: set[str],
+) -> list[SpecError]:
+    """W615 for each security invariant no threat is ``mitigated_by``, except one that only constrains parked FRs."""
+    return [
+        make_error(
+            "W615",
+            f"INVARIANT_UNEXERCISED_BY_THREAT {inv_id} has a risk_category_ref "
+            "but no threat mitigated_by references it",
+        )
+        for inv_id in sorted(security_invariant_ids)
+        if inv_id not in mitigating_ids
+        and not _only_links_parked_frs(invariant_fr_links.get(inv_id, set()), parked_fr_ids)
+    ]
 
 
 def _load_api_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load API IDs from step 05 if available.
-
-    Delegates to ``load_sibling_artifact``, matching ``_load_component_ids``.
-    Step 05 schema uses ``apis[].api_id`` exclusively; the legacy
-    ``endpoints[].endpoint_id`` shape no longer appears in schema or fixtures.
-    """
-    return load_sibling_artifact(
-        artifact_path or "",
-        "05",
-        "apis",
-        "api_id",
-        fallback_root=toolkit_root,
-    )
+    """Load API IDs from step 05, or ``None`` when step 05 is absent (the caller skips the check)."""
+    return load_sibling_artifact(artifact_path or "", "05", "apis", "api_id", fallback_root=toolkit_root)
 
 
 def _load_invariant_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load invariant IDs from step 06 if available.
+    """Load invariant IDs from step 06, or ``None`` when step 06 is absent (the caller skips the check)."""
+    return load_sibling_artifact(artifact_path or "", "06", "rules", "inv_id", fallback_root=toolkit_root)
 
-    Returns None when the upstream file is absent (skip cross-ref check),
-    or a set[str] of inv_id values (possibly empty when the file has no rules).
+
+def _load_entities(
+    toolkit_root: str, artifact_path: str | None, step_prefix: str, array_key: str
+) -> list[dict[str, Any]]:
+    """The object entries of the sibling step artifact's *array_key* array; empty when the step is absent.
+
+    Resolves the sibling with ``load_sibling_json`` (beside the artifact first, then ``<toolkit_root>/spec``;
+    the first candidate that parses wins).
     """
-    return load_sibling_artifact(
-        artifact_path or "",
-        "06",
-        "rules",
-        "inv_id",
-        fallback_root=toolkit_root,
-    )
+    data = load_sibling_json(artifact_path, step_prefix, fallback_root=toolkit_root)
+    items = data.get(array_key) if data is not None else None
+    return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
 
 
-def _load_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load functional requirement IDs from step 04 if available."""
-    return load_sibling_artifact(
-        artifact_path or "",
-        "04",
-        "functional_requirements",
-        "fr_id",
-        fallback_root=toolkit_root,
-    )
-
-
-def _load_nfr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load NFR IDs from step 07 if available."""
-    return load_sibling_artifact(
-        artifact_path or "",
-        "07",
-        "nfrs",
-        "nfr_id",
-        fallback_root=toolkit_root,
-    )
-
-
-def _load_fixture_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load fixture IDs from step 08 if available."""
-    return load_sibling_artifact(
-        artifact_path or "",
-        "08",
-        "fixtures",
-        "fixture_id",
-        fallback_root=toolkit_root,
-    )
-
-
-def _load_capability_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
-    """Load capability IDs from step 01 if available."""
-    return load_sibling_artifact(
-        artifact_path or "",
-        "01",
-        "capabilities",
-        "capability_id",
-        fallback_root=toolkit_root,
-    )
-
-
-def _load_security_invariant_ids(
-    toolkit_root: str, artifact_path: str | None = None
-) -> set[str]:
-    """Load the set of step-06 inv_ids that carry a non-empty risk_category_ref.
-
-    These are the "security-relevant" invariants that W615 checks against.
-    Shares the same sibling-first / fallback-to-toolkit resolution path as
-    ``_load_invariant_ids`` so both sets are always derived from the same file.
+def _load_security_invariant_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
+    """Load the set of step-06 inv_ids that carry a non-empty risk_category_ref (the invariants W615 checks).
 
     Returns an empty set when step 06 is absent or contains no such invariants.
     """
-    candidates: list[Path] = []
-    if artifact_path:
-        artifact_dir = Path(artifact_path).resolve().parent
-        for fn in _iter_step_files(artifact_dir, "06"):
-            candidates.append(artifact_dir / fn)
-    fallback_spec = Path(toolkit_root).resolve() / "spec"
-    for fn in _iter_step_files(fallback_spec, "06"):
-        candidates.append(fallback_spec / fn)
-
-    for candidate in candidates:
-        if not candidate.exists():
-            continue
-        try:
-            with candidate.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            return set()
-        result: set[str] = set()
-        for rule in data.get("rules", []):
-            if not isinstance(rule, dict):
-                continue
-            inv_id = rule.get("inv_id")
-            if inv_id and rule.get("risk_category_ref"):
-                result.add(str(inv_id))
-        return result
-
-    return set()
-
-
-def _load_wont_have_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
-    """Load the set of step-04 fr_ids that are parked (``is_parked_any_shape``: a 1.1.1 FR parks with
-    ``priority: wont-have``).
-
-    Mirrors ``_load_security_invariant_ids``'s sibling-first / fallback
-    resolution. Returns an empty set when step 04 is absent or contains no
-    such FRs.
-    """
-    candidates: list[Path] = []
-    if artifact_path:
-        artifact_dir = Path(artifact_path).resolve().parent
-        for fn in _iter_step_files(artifact_dir, "04"):
-            candidates.append(artifact_dir / fn)
-    fallback_spec = Path(toolkit_root).resolve() / "spec"
-    for fn in _iter_step_files(fallback_spec, "04"):
-        candidates.append(fallback_spec / fn)
-
-    for candidate in candidates:
-        if not candidate.exists():
-            continue
-        try:
-            with candidate.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            return set()
-        result: set[str] = set()
-        for fr in data.get("functional_requirements", []):
-            if not isinstance(fr, dict):
-                continue
-            fr_id = fr.get("fr_id")
-            if fr_id and is_parked_any_shape(fr):
-                result.add(str(fr_id))
-        return result
-
-    return set()
-
-
-def _fr_ids_from_trace(entity: dict[str, Any]) -> set[str]:
-    """FR ids named by an entity's 1.1.1 ``trace[]`` (entries with ``type == "fr"``); other types are ignored."""
     return {
-        str(trace_ref["id"])
-        for trace_ref in entity.get("trace", [])
-        if isinstance(trace_ref, dict)
-        and normalize_trace_type(trace_ref.get("type", "")) == "fr"
-        and trace_ref.get("id")
+        str(rule["inv_id"])
+        for rule in _load_entities(toolkit_root, artifact_path, "06", "rules")
+        if rule.get("inv_id") and rule.get("risk_category_ref")
     }
+
+
+def _load_parked_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
+    """Load the set of step-04 fr_ids that are parked (``is_parked_any_shape``: a 1.1.1 FR parks with
+    ``priority: wont-have``). Returns an empty set when step 04 is absent or contains no such FRs."""
+    return {
+        str(fr["fr_id"])
+        for fr in _load_entities(toolkit_root, artifact_path, "04", "functional_requirements")
+        if fr.get("fr_id") and is_parked_any_shape(fr)
+    }
+
+
+def _fr_ids_from_constrains(entity: dict[str, Any]) -> set[str]:
+    """Every non-empty string in an entity's ``constrains``, not filtered to FR ids.
+
+    An invariant's ``constrains`` lists FRs, APIs, components and connections; an id that is not a
+    parked FR keeps the invariant out of the "only parked FRs" subset test of ``_only_links_parked_frs``."""
+    return _non_empty_strings(entity.get("constrains"))
 
 
 def _fr_ids_from_derives_from(entity: dict[str, Any]) -> set[str]:
     """Every non-empty string in an entity's ``derives_from``, not filtered to FR ids.
 
     An API's ``derives_from`` lists FRs only; an id that is not a parked FR keeps the entity out of the
-    "only parked FRs" subset test of ``_only_traces_wont_have_frs``."""
-    refs = entity.get("derives_from")
-    if not isinstance(refs, list):
-        return set()
-    return {ref for ref in refs if isinstance(ref, str) and ref}
+    "only parked FRs" subset test of ``_only_links_parked_frs``."""
+    return _non_empty_strings(entity.get("derives_from"))
 
 
-def _load_fr_traces_by_id(
+def _non_empty_strings(value: Any) -> set[str]:
+    """The non-empty strings of *value* when it is a list; an empty set for any other type."""
+    return {item for item in value if isinstance(item, str) and item} if isinstance(value, list) else set()
+
+
+def _load_fr_links_by_id(
     toolkit_root: str,
     artifact_path: str | None,
     step_prefix: str,
@@ -445,56 +167,21 @@ def _load_fr_traces_by_id(
 ) -> dict[str, set[str]]:
     """Load {entity_id: {linked fr_ids}} from a step artifact's *array_key* entities.
 
-    Used to walk each API's/invariant's link back to its FR(s), so callers
-    can determine whether an entity's *only* FR(s) are parked. *fr_ids_of*
-    extracts the FR ids from one entity (``_fr_ids_from_trace`` for the
-    1.1.1 shape, ``_fr_ids_from_derives_from`` for the graph shape). Returns
-    an empty dict when the upstream step is absent.
+    Used to walk each API's/invariant's link back to its FR(s), so callers can determine whether an
+    entity's *only* FR(s) are parked. *fr_ids_of* extracts the linked ids from one entity
+    (``_fr_ids_from_derives_from`` for an API, ``_fr_ids_from_constrains`` for an invariant).
+    Returns an empty dict when the upstream step is absent.
     """
-    candidates: list[Path] = []
-    if artifact_path:
-        artifact_dir = Path(artifact_path).resolve().parent
-        for fn in _iter_step_files(artifact_dir, step_prefix):
-            candidates.append(artifact_dir / fn)
-    fallback_spec = Path(toolkit_root).resolve() / "spec"
-    for fn in _iter_step_files(fallback_spec, step_prefix):
-        candidates.append(fallback_spec / fn)
-
-    for candidate in candidates:
-        if not candidate.exists():
-            continue
-        try:
-            with candidate.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            return {}
-        result: dict[str, set[str]] = {}
-        for entity in data.get(array_key, []):
-            if not isinstance(entity, dict):
-                continue
-            entity_id = entity.get(id_field)
-            if not entity_id:
-                continue
-            result[str(entity_id)] = fr_ids_of(entity)
-        return result
-
-    return {}
+    return {
+        str(entity[id_field]): fr_ids_of(entity)
+        for entity in _load_entities(toolkit_root, artifact_path, step_prefix, array_key)
+        if entity.get(id_field)
+    }
 
 
-def _only_traces_wont_have_frs(traced_fr_ids: set[str], wont_have_fr_ids: set[str]) -> bool:
-    """True when an entity has at least one FR link and every linked FR is parked.
+def _only_links_parked_frs(linked_ids: set[str], parked_fr_ids: set[str]) -> bool:
+    """True when an entity has at least one link and every linked id is a parked FR.
 
-    An entity with zero FR traces (e.g. only a capability trace) is not
-    excluded here -- there is nothing wont-have to exempt it on.
+    An entity with no link at all is not excluded here: there is nothing parked to exempt it on.
     """
-    return bool(traced_fr_ids) and traced_fr_ids.issubset(wont_have_fr_ids)
-
-
-def _iter_step_files(directory: Path, prefix: str) -> list[str]:
-    """Return filenames in *directory* matching ``<prefix>_*.json``."""
-    if not directory.is_dir():
-        return []
-    return [
-        fn for fn in os.listdir(str(directory))
-        if fn.startswith(f"{prefix}_") and fn.endswith(".json")
-    ]
+    return bool(linked_ids) and linked_ids.issubset(parked_fr_ids)

@@ -721,6 +721,12 @@ def test_schema_ref_sibling_census():
     271 after M3 WI-M3-04..06 (steps 06, 07, 08): the removed ``trace``, ``targets`` and ``scope.components`` /
     ``scope.apis`` ``$ref`` nodes (-5, all ``description``-only) and the added ``lifecycle`` (3), ``scope_reason`` (2)
     and ``scope`` (2, a ``default`` beside the ``$ref``; steps 06 and 07 only, a fixture is a verifier) nodes (+7).
+    269 after M3 WI-M3-07..09 (steps 09, 10, 11), per file old -> new: 09 impl plan 10 -> 6 (``tech_stack``, ``trace``,
+    ``dependencies``, ``status`` and ``deliverables`` ``$ref`` nodes removed, ``lifecycle`` added), 10 governance 6 -> 6
+    (``reviewers``, ``trace``, ``links`` and ``required_metadata`` removed; the rule's ``rule_id``, ``lifecycle``,
+    ``scope`` and ``scope_reason`` added), 11 red team 9 -> 12 (``trace`` and ``target_ids`` removed; ``lifecycle``,
+    ``scope`` and ``scope_reason`` added on the threat and the edge case), and the unreferenced core definition
+    ``dependencyList`` removed (-1, its ``oneOf`` arm ``$ref`` carried a ``description``).
     """
     from collections import Counter
 
@@ -739,11 +745,11 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 271
+    assert sum(counts.values()) == 269
     assert dict(counts) == {
-        ("description",): 262,
+        ("description",): 257,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
-        ("default", "description"): 3,
+        ("default", "description"): 6,
         ("$anchor", "description"): 1,
     }

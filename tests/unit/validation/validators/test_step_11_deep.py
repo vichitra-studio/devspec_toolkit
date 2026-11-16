@@ -1,13 +1,26 @@
-"""Tests for step_11 deep validation: threat_id uniqueness, target cross-ref, mitigations."""
+"""Tests for step_11 deep validation: threat_id uniqueness, API coverage (W583), invariant coverage (W615)."""
 import json
 import os
+
 import pytest
-from specdev_tools.validation.validators.step_11 import validate_step_11
+
+from specdev_tools.validation.validators.step_11 import (
+    _fr_ids_from_constrains,
+    _fr_ids_from_derives_from,
+    validate_step_11,
+)
+
+_SECURITY_REF = {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"}
 
 
 def _render(errors):
     """Render SpecError list to strings for assertion convenience."""
     return [e.render() for e in errors]
+
+
+def _threat(threat_id="threat-01", threatens=("api-x",), mitigated_by=("fr-x",), **extra):
+    """A graph-shape threat object."""
+    return {"threat_id": threat_id, "threatens": list(threatens), "mitigated_by": list(mitigated_by), **extra}
 
 
 @pytest.fixture
@@ -17,1165 +30,251 @@ def toolkit_root(tmp_path):
     return str(tmp_path)
 
 
-class TestValidMinimal:
-    def test_empty_threats(self, toolkit_root):
-        errors = validate_step_11({"threats": []}, toolkit_root)
-        assert errors == []
-
-    def test_valid_threat(self, toolkit_root):
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-login"}],
-                "mitigations": [{"type": "fr", "description": "Rate limiting"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        # May have cross-ref errors if step files don't exist, but no structural errors
-        structural = [e for e in rendered if "Duplicate" in e or "invalid target type" in e or "invalid mitigation type" in e]
-        assert structural == []
-
-
-class TestDuplicateThreatId:
-    def test_duplicate(self, toolkit_root):
-        instance = {
-            "threats": [
-                {"threat_id": "threat-01", "target_ids": [{"type": "api", "id": "a"}], "mitigations": [{"type": "fr", "description": "x"}]},
-                {"threat_id": "threat-01", "target_ids": [{"type": "api", "id": "b"}], "mitigations": [{"type": "fr", "description": "y"}]},
-            ]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("Duplicate" in e and "threat-01" in e for e in rendered)
-
-
-class TestInvalidTargetType:
-    def test_bad_target_type(self, toolkit_root):
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "database", "id": "db-main"}],
-                "mitigations": [{"type": "fr", "description": "x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("invalid target type" in e for e in rendered)
-
-
-class TestNoTargets:
-    def test_missing_target_ids(self, toolkit_root):
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [],
-                "mitigations": [{"type": "fr", "description": "x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("no target_ids" in e for e in rendered)
-
-
-class TestInvalidMitigationType:
-    def test_bad_mitigation_type(self, toolkit_root):
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "unknown-type", "description": "x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("invalid mitigation type" in e for e in rendered)
-
-
-class TestNoMitigations:
-    def test_empty_mitigations(self, toolkit_root):
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("no mitigations" in e for e in rendered)
-
-
-class TestMitigationMissingFields:
-    def test_missing_id(self, toolkit_root):
-        """Mitigation with no `id` should be flagged (schema also enforces this;
-        linter keeps it as a safety net for fixture-based tests)."""
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fr"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("missing required 'id'" in e for e in rendered)
-
-    def test_current_shape_passes(self, toolkit_root):
-        """The current {type, id, note} mitigation shape must not trip E520."""
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{
-                    "type": "inv",
-                    "id": "inv-auth-required",
-                    "note": "Enforced by auth middleware",
-                }],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("without description or ref" in e for e in rendered)
-        assert not any("missing required 'id'" in e for e in rendered)
-
-
-class TestComponentCrossRef:
-    def test_unknown_component(self, toolkit_root):
-        """When step 02 exists, unknown component IDs should be flagged."""
-        spec_dir = os.path.join(toolkit_root, "spec")
-        sketch = {"components": [{"component_id": "comp-auth"}]}
-        with open(os.path.join(spec_dir, "02_system_sketch.json"), "w") as f:
-            json.dump(sketch, f)
-
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "component", "id": "comp-nonexistent"}],
-                "mitigations": [{"type": "fr", "description": "x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("comp-nonexistent" in e and "unknown component" in e for e in rendered)
-
-    def test_known_component(self, toolkit_root):
-        spec_dir = os.path.join(toolkit_root, "spec")
-        sketch = {"components": [{"component_id": "comp-auth"}]}
-        with open(os.path.join(spec_dir, "02_system_sketch.json"), "w") as f:
-            json.dump(sketch, f)
-
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "component", "id": "comp-auth"}],
-                "mitigations": [{"type": "fr", "description": "x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("unknown component" in e for e in rendered)
-
-
-class TestEmptyUpstreamFlagsStrayRefs:
-    """Regression: when an upstream step file exists but contains an empty
-    ``apis``/``components`` list, any threat targeting an ID from that step
-    must still fire E590. Previously the loaders converted empty-set → None,
-    which silently skipped cross-ref validation against an empty upstream."""
-
-    def test_empty_apis_flags_unknown_api_target(self, tmp_path):
-        host_spec = tmp_path / "host" / "spec"
-        host_spec.mkdir(parents=True)
-        (host_spec / "05_interface_contracts.json").write_text(json.dumps({"apis": []}))
-        artifact_path = str(host_spec / "11_redteam.json")
-        toolkit_root = tmp_path / "toolkit"
-        (toolkit_root / "spec").mkdir(parents=True)
-
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-ghost"}],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
-        rendered = _render(errors)
-        assert any("api-ghost" in e and "unknown API" in e for e in rendered), (
-            f"empty upstream apis must still flag stray targets: {rendered}"
-        )
-
-    def test_empty_components_flags_unknown_component_target(self, tmp_path):
-        host_spec = tmp_path / "host" / "spec"
-        host_spec.mkdir(parents=True)
-        (host_spec / "02_system_sketch.json").write_text(json.dumps({"components": []}))
-        artifact_path = str(host_spec / "11_redteam.json")
-        toolkit_root = tmp_path / "toolkit"
-        (toolkit_root / "spec").mkdir(parents=True)
-
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "component", "id": "comp-ghost"}],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
-        rendered = _render(errors)
-        assert any("comp-ghost" in e and "unknown component" in e for e in rendered), (
-            f"empty upstream components must still flag stray targets: {rendered}"
-        )
-
-
-class TestNonObjectMitigation:
-    def test_string_mitigation(self, toolkit_root):
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": ["just a string"],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("non-object mitigation" in e for e in rendered)
-
-
-class TestNonObjectThreat:
-    """Defensive guard: non-dict entries in threats[] must emit E520, not AttributeError."""
-
-    def test_string_threat_emits_e520_not_attributeerror(self, toolkit_root):
-        """A string entry in threats[] must produce a structured E520, not raise AttributeError."""
-        instance = {
-            "threats": ["not-a-dict"],
-        }
-        # Must not raise — previously would blow up with AttributeError on .get()
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("E520" in e and "threats[0]" in e and "not an object" in e for e in rendered), (
-            f"expected E520 for non-dict threat entry, got: {rendered}"
-        )
-
-    def test_int_threat_emits_e520(self, toolkit_root):
-        """An int entry in threats[] must produce a structured E520."""
-        instance = {
-            "threats": [42],
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("E520" in e and "threats[0]" in e and "not an object" in e for e in rendered), (
-            f"expected E520 for non-dict threat entry, got: {rendered}"
-        )
-
-    def test_mixed_threats_only_bad_entry_flagged(self, toolkit_root):
-        """A valid threat followed by a non-dict entry: only the non-dict emits E520 for this guard."""
-        instance = {
-            "threats": [
-                {
-                    "threat_id": "threat-01",
-                    "target_ids": [{"type": "api", "id": "api-x"}],
-                    "mitigations": [{"type": "fr", "id": "fr-x"}],
-                },
-                "bad-entry",
-            ]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("E520" in e and "threats[1]" in e and "not an object" in e for e in rendered), (
-            f"expected E520 for threats[1]: {rendered}"
-        )
-        assert not any("threats[0]" in e and "not an object" in e for e in rendered), (
-            f"threats[0] is valid and must not be flagged as non-object: {rendered}"
-        )
-
-
-class TestNonObjectTarget:
-    """Defensive guard: non-dict entries in target_ids[] must emit E520, not AttributeError."""
-
-    def test_string_target_emits_e520_not_attributeerror(self, toolkit_root):
-        """A string entry in target_ids[] must produce a structured E520, not raise AttributeError."""
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": ["not-a-dict"],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("E520" in e and "target_ids[0]" in e and "not an object" in e for e in rendered), (
-            f"expected E520 for non-dict target_ids entry, got: {rendered}"
-        )
-
-    def test_int_target_emits_e520(self, toolkit_root):
-        """An int entry in target_ids[] must produce a structured E520."""
-        instance = {
-            "threats": [{
-                "threat_id": "threat-42",
-                "target_ids": [99],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("E520" in e and "target_ids[0]" in e and "not an object" in e for e in rendered), (
-            f"expected E520 for non-dict target_ids entry, got: {rendered}"
-        )
-
-    def test_mixed_targets_only_bad_entry_flagged(self, toolkit_root):
-        """A valid target followed by a non-dict entry: only the non-dict emits the guard E520."""
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [
-                    {"type": "api", "id": "api-x"},
-                    "bad-target",
-                ],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("E520" in e and "target_ids[1]" in e and "not an object" in e for e in rendered), (
-            f"expected E520 for target_ids[1]: {rendered}"
-        )
-        assert not any("target_ids[0]" in e and "not an object" in e for e in rendered), (
-            f"target_ids[0] is valid and must not be flagged as non-object: {rendered}"
-        )
-
-
-class TestApiCoverageCheck:
-    """W583: every public API in Step 05 should be targeted by at least one threat."""
-
-    def _write_step05(self, toolkit_root, apis):
-        spec_dir = os.path.join(toolkit_root, "spec")
-        data = {"apis": apis}
-        with open(os.path.join(spec_dir, "05_interface_contracts.json"), "w") as f:
-            json.dump(data, f)
-
-    def test_no_step05_no_warning(self, toolkit_root):
-        """When step 05 is absent, no W583 warnings should fire."""
-        instance = {"threats": []}
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("W583" in e for e in rendered)
-
-    def test_uncovered_api_emits_w583(self, toolkit_root):
-        """When step 05 exists and an API has no threat, W583 should fire."""
-        self._write_step05(toolkit_root, [{"api_id": "api-login"}, {"api_id": "api-logout"}])
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-login"}],
-                "mitigations": [{"type": "fr", "description": "Rate limiting"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("W583" in e and "api-logout" in e for e in rendered)
-        assert not any("W583" in e and "api-login" in e for e in rendered)
-
-    def test_all_apis_covered_no_w583(self, toolkit_root):
-        """When all APIs have at least one threat, no W583 should fire."""
-        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-login"}],
-                "mitigations": [{"type": "fr", "description": "Rate limiting"}],
-            }]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("W583" in e for e in rendered)
-
-    def test_empty_apis_list_no_w583(self, toolkit_root):
-        """When step 05 exists but has no APIs, no W583 should fire."""
-        self._write_step05(toolkit_root, [])
-        instance = {"threats": []}
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("W583" in e for e in rendered)
-
-    def test_multiple_threats_cover_same_api(self, toolkit_root):
-        """Multiple threats targeting the same API should not cause W583."""
-        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
-        instance = {
-            "threats": [
-                {
-                    "threat_id": "threat-01",
-                    "target_ids": [{"type": "api", "id": "api-login"}],
-                    "mitigations": [{"type": "fr", "description": "Rate limiting"}],
-                },
-                {
-                    "threat_id": "threat-02",
-                    "target_ids": [{"type": "api", "id": "api-login"}],
-                    "mitigations": [{"type": "fr", "description": "Auth check"}],
-                },
-            ]
-        }
-        errors = validate_step_11(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("W583" in e for e in rendered)
-
-
-class TestApiCoverageWontHaveFrExclusion:
-    """W583 must not demand threat coverage for an API whose only tracing FR
-    is priority:"wont-have" -- it will never be built (DEVSPEC-122 follow-up)."""
-
-    def _write_step04(self, toolkit_root, frs):
-        spec_dir = os.path.join(toolkit_root, "spec")
-        with open(os.path.join(spec_dir, "04_fr_list.json"), "w") as f:
-            json.dump({"functional_requirements": frs}, f)
-
-    def _write_step05(self, toolkit_root, apis):
-        spec_dir = os.path.join(toolkit_root, "spec")
-        with open(os.path.join(spec_dir, "05_interface_contracts.json"), "w") as f:
-            json.dump({"apis": apis}, f)
-
-    def test_api_tracing_only_to_wont_have_fr_does_not_fire_w583(self, toolkit_root):
-        self._write_step04(toolkit_root, [{"fr_id": "fr-legacy-export", "priority": "wont-have"}])
-        self._write_step05(toolkit_root, [
-            {"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]}
-        ])
-        errors = validate_step_11({"threats": []}, toolkit_root)
-        rendered = _render(errors)
-        assert not any("W583" in e and "api-legacy-export" in e for e in rendered), rendered
-
-    def test_control_api_tracing_to_must_have_fr_still_fires_w583(self, toolkit_root):
-        """Control: an API tracing only to a must-have FR must still fire W583."""
-        self._write_step04(toolkit_root, [{"fr_id": "fr-login", "priority": "must-have"}])
-        self._write_step05(toolkit_root, [
-            {"api_id": "api-login", "derives_from": ["fr-login"]}
-        ])
-        errors = validate_step_11({"threats": []}, toolkit_root)
-        rendered = _render(errors)
-        assert any("W583" in e and "api-login" in e for e in rendered), rendered
-
-    def test_api_tracing_to_mixed_fr_priorities_still_fires_w583(self, toolkit_root):
-        """Control: an API tracing to BOTH a wont-have and a must-have FR must
-        still fire W583 -- not every tracing FR is wont-have."""
-        self._write_step04(toolkit_root, [
-            {"fr_id": "fr-legacy-export", "priority": "wont-have"},
-            {"fr_id": "fr-login", "priority": "must-have"},
-        ])
-        self._write_step05(toolkit_root, [
-            {
-                "api_id": "api-mixed",
-                "derives_from": ["fr-legacy-export", "fr-login"],
-            }
-        ])
-        errors = validate_step_11({"threats": []}, toolkit_root)
-        rendered = _render(errors)
-        assert any("W583" in e and "api-mixed" in e for e in rendered), rendered
-
-
 def _write_spec(toolkit_root, filename, data):
     with open(os.path.join(toolkit_root, "spec", filename), "w") as f:
         json.dump(data, f)
 
 
-def _w583_ids(toolkit_root):
-    return [e for e in _render(validate_step_11({"threats": []}, toolkit_root)) if "W583" in e]
+def _codes(toolkit_root, instance, code, artifact_path=None):
+    """Rendered errors of *instance* that carry *code*."""
+    return [e for e in _render(validate_step_11(instance, toolkit_root, artifact_path)) if code in e]
 
 
-def test_w583_wont_have_only_api_exempt_via_derives_from(toolkit_root):
-    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
-        {"fr_id": "fr-parked", "priority": "wont-have", "scope": "in"}]})
-    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
-        {"api_id": "api-parked", "derives_from": ["fr-parked"]}]})
-    assert _w583_ids(toolkit_root) == []
+class TestValidMinimal:
+    def test_empty_threats(self, toolkit_root):
+        assert validate_step_11({"threats": []}, toolkit_root) == []
+
+    def test_valid_threat(self, toolkit_root):
+        assert validate_step_11({"threats": [_threat()]}, toolkit_root) == []
 
 
-def test_w583_scope_out_only_api_exempt_via_derives_from(toolkit_root):
-    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
-        {"fr_id": "fr-out", "priority": "must-have", "scope": "out", "scope_reason": "dropped"}]})
-    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
-        {"api_id": "api-out", "derives_from": ["fr-out"]}]})
-    assert _w583_ids(toolkit_root) == []
+class TestDuplicateThreatId:
+    def test_duplicate(self, toolkit_root):
+        instance = {"threats": [_threat(threatens=("a",)), _threat(threatens=("b",))]}
+        rendered = _render(validate_step_11(instance, toolkit_root))
+        assert any("Duplicate" in e and "threat-01" in e for e in rendered)
 
 
-def test_w583_in_scope_fr_api_still_fires(toolkit_root):
-    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
-        {"fr_id": "fr-live", "priority": "must-have", "scope": "in"}]})
-    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
-        {"api_id": "api-live", "derives_from": ["fr-live"]}]})
-    assert any("api-live" in e for e in _w583_ids(toolkit_root))
+class TestRemovedFieldsAreNotRead:
+    def test_target_ids_and_mitigations_are_ignored(self, toolkit_root):
+        instance = {"threats": [{
+            "threat_id": "threat-01",
+            "target_ids": [{"type": "weird", "id": "nowhere"}],
+            "mitigations": [{"type": "weird"}, "not-an-object"],
+        }]}
+        assert validate_step_11(instance, toolkit_root) == []
+
+    def test_no_existence_check_of_named_ids(self, toolkit_root):
+        _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [{"api_id": "api-real"}]})
+        instance = {"threats": [_threat(threatens=("api-real", "api-unknown"), mitigated_by=("inv-unknown",))]}
+        assert validate_step_11(instance, toolkit_root) == []
 
 
-def test_w583_api_deriving_from_parked_fr_and_other_id_not_exempt(toolkit_root):
-    """Only parked FRs exempt: one id that is not a parked FR (here a capability) keeps W583 on."""
-    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
-        {"fr_id": "fr-parked", "priority": "wont-have", "scope": "in"}]})
-    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
-        {"api_id": "api-mixed-ids", "derives_from": ["fr-parked", "cap-x"]},
-        {"api_id": "api-only-parked", "derives_from": ["fr-parked"]}]})
-    fired = _w583_ids(toolkit_root)
-    assert any("api-mixed-ids" in e for e in fired), fired
-    assert not any("api-only-parked" in e for e in fired), fired
+class TestNonObjectThreat:
+    """Defensive guard: non-dict entries in threats[] must emit E520, not AttributeError."""
+
+    @pytest.mark.parametrize("entry", ["not-a-dict", 42])
+    def test_non_object_threat_emits_e520(self, toolkit_root, entry):
+        rendered = _render(validate_step_11({"threats": [entry]}, toolkit_root))
+        assert any("E520" in e and "threats[0]" in e and "not an object" in e for e in rendered), rendered
+
+    def test_mixed_threats_only_bad_entry_flagged(self, toolkit_root):
+        rendered = _render(validate_step_11({"threats": [_threat(), "bad-entry"]}, toolkit_root))
+        assert any("E520" in e and "threats[1]" in e and "not an object" in e for e in rendered), rendered
+        assert not any("threats[0]" in e and "not an object" in e for e in rendered), rendered
 
 
-def test_w583_invariant_trace_via_06_unchanged(tmp_path):
-    spec_dir = tmp_path / "spec"
-    spec_dir.mkdir()
-    (spec_dir / "04_fr_list.json").write_text(json.dumps({"functional_requirements": [
-        {"fr_id": "fr-out", "scope": "out", "scope_reason": "dropped"}]}))
-    (spec_dir / "06_invariants.json").write_text(json.dumps({"rules": [{
-        "inv_id": "inv-out",
-        "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
-        "trace": [{"type": "fr", "id": "fr-out"}],
-    }]}))
-    errors = validate_step_11({"threats": []}, str(tmp_path), str(spec_dir / "11_redteam.json"))
-    assert not any("W615" in e and "inv-out" in e for e in _render(errors))
+class TestWrongTypedLinks:
+    @pytest.mark.parametrize("bad", [7, None, "api-x", {"x": 1}, [7, None, ["api-x"]]])
+    def test_wrong_typed_threatens_and_mitigated_by_do_not_raise(self, toolkit_root, bad):
+        _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [{"api_id": "api-x"}]})
+        _write_spec(toolkit_root, "06_invariants.json", {"rules": [{"inv_id": "inv-x", "risk_category_ref": _SECURITY_REF}]})
+        rendered = _render(validate_step_11({"threats": [{"threat_id": "t", "threatens": bad, "mitigated_by": bad}]}, toolkit_root))
+        assert any("W583" in e and "api-x" in e for e in rendered)
+        assert any("W615" in e and "inv-x" in e for e in rendered)
 
 
-class TestMitigationCrossRef:
-    """DEVSPEC-89: mitigation IDs are cross-referenced against upstream specs."""
+class TestApiCoverageCheck:
+    """W583: every public API in Step 05 should be named by the ``threatens`` of at least one threat."""
 
-    # ------------------------------------------------------------------
-    # inv (step 06) cross-ref
-    # ------------------------------------------------------------------
+    def _write_step05(self, toolkit_root, apis):
+        _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": apis})
 
-    def test_unknown_inv_id_emits_e590(self, tmp_path):
-        """When step 06 exists, a mitigation with an unknown inv id fires E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{"inv_id": "inv-known"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "inv", "id": "inv-unknown"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "inv-unknown" in e for e in rendered), rendered
+    def test_no_step05_no_warning(self, toolkit_root):
+        assert _codes(toolkit_root, {"threats": []}, "W583") == []
 
-    def test_valid_inv_id_no_e590(self, tmp_path):
-        """A mitigation referencing an inv_id that exists in step 06 should not fire E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{"inv_id": "inv-known"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "inv", "id": "inv-known"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("inv-known" in e and "E590" in e for e in rendered), rendered
+    def test_uncovered_api_emits_w583(self, toolkit_root):
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}, {"api_id": "api-logout"}])
+        rendered = _codes(toolkit_root, {"threats": [_threat(threatens=("api-login",))]}, "W583")
+        assert any("api-logout" in e for e in rendered)
+        assert not any("api-login" in e for e in rendered)
 
-    def test_absent_step06_no_e590(self, tmp_path):
-        """When step 06 is absent, inv mitigations are not cross-referenced (guard)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "inv", "id": "inv-anything"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("inv-anything" in e and "E590" in e for e in rendered), rendered
+    def test_w583_api_named_by_threatens_is_covered(self, toolkit_root):
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
+        assert _codes(toolkit_root, {"threats": [_threat(threatens=("api-login",))]}, "W583") == []
 
-    # ------------------------------------------------------------------
-    # fr (step 04) cross-ref
-    # ------------------------------------------------------------------
+    def test_empty_apis_list_no_w583(self, toolkit_root):
+        self._write_step05(toolkit_root, [])
+        assert _codes(toolkit_root, {"threats": []}, "W583") == []
 
-    def test_unknown_fr_id_emits_e590(self, tmp_path):
-        """When step 04 exists, a mitigation with an unknown fr id fires E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "04_fr_list.json").write_text(json.dumps({
-            "functional_requirements": [{"fr_id": "fr-known"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fr", "id": "fr-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "fr-ghost" in e for e in rendered), rendered
+    def test_multiple_threats_cover_same_api(self, toolkit_root):
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
+        instance = {"threats": [_threat("threat-01", ("api-login",)), _threat("threat-02", ("api-login",))]}
+        assert _codes(toolkit_root, instance, "W583") == []
 
-    def test_valid_fr_id_no_e590(self, tmp_path):
-        """A mitigation referencing an fr_id that exists in step 04 should not fire E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "04_fr_list.json").write_text(json.dumps({
-            "functional_requirements": [{"fr_id": "fr-known"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fr", "id": "fr-known"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("fr-known" in e and "E590" in e for e in rendered), rendered
+    def test_edge_case_threatens_does_not_cover_an_api(self, toolkit_root):
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
+        instance = {"threats": [], "edge_cases": [{"id": "ec-x", "threatens": ["api-login"], "mitigated_by": ["fr-x"]}]}
+        assert any("api-login" in e for e in _codes(toolkit_root, instance, "W583"))
 
-    # ------------------------------------------------------------------
-    # capability (step 01) cross-ref
-    # ------------------------------------------------------------------
 
-    def test_unknown_capability_id_emits_e590(self, tmp_path):
-        """When step 01 exists, a mitigation with an unknown capability id fires E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "01_capabilities.json").write_text(json.dumps({
-            "capabilities": [{"capability_id": "cap-auth"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "capability", "id": "cap-phantom"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "cap-phantom" in e for e in rendered), rendered
+class TestApiCoverageWontHaveFrExclusion:
+    """W583 must not demand threat coverage for an API whose every FR is parked: it will never be built."""
 
-    def test_absent_step01_no_e590(self, tmp_path):
-        """When step 01 is absent, capability mitigations are not cross-referenced."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "capability", "id": "cap-anything"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("cap-anything" in e and "E590" in e for e in rendered), rendered
+    def _setup(self, toolkit_root, frs, apis):
+        _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": frs})
+        _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": apis})
 
-    # ------------------------------------------------------------------
-    # capability (step 01) — valid id (negative control)
-    # ------------------------------------------------------------------
-
-    def test_valid_capability_id_no_e590(self, tmp_path):
-        """A mitigation referencing a cap-* ID that exists in step 01 must NOT fire E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "01_capabilities.json").write_text(json.dumps({
-            "capabilities": [{"capability_id": "cap-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "capability", "id": "cap-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("cap-x" in e and "E590" in e for e in rendered), rendered
-
-    # ------------------------------------------------------------------
-    # nfr (step 07) cross-ref
-    # ------------------------------------------------------------------
-
-    def test_valid_nfr_id_no_e590(self, tmp_path):
-        """A mitigation referencing an nfr_id that exists in step 07 must NOT fire E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "07_nfrs.json").write_text(json.dumps({
-            "nfrs": [{"nfr_id": "nfr-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "nfr", "id": "nfr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("nfr-x" in e and "E590" in e for e in rendered), rendered
-
-    def test_unknown_nfr_id_emits_e590(self, tmp_path):
-        """When step 07 exists, a mitigation with an unknown nfr id fires E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "07_nfrs.json").write_text(json.dumps({
-            "nfrs": [{"nfr_id": "nfr-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "nfr", "id": "nfr-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "nfr-ghost" in e for e in rendered), rendered
-
-    # ------------------------------------------------------------------
-    # fixture (step 08) cross-ref
-    # ------------------------------------------------------------------
-
-    def test_valid_fixture_id_no_e590(self, tmp_path):
-        """A mitigation referencing a fixture_id that exists in step 08 must NOT fire E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "08_fixtures.json").write_text(json.dumps({
-            "fixtures": [{"fixture_id": "fix-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fixture", "id": "fix-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("fix-x" in e and "E590" in e for e in rendered), rendered
-
-    def test_unknown_fixture_id_emits_e590(self, tmp_path):
-        """When step 08 exists, a mitigation with an unknown fixture id fires E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "08_fixtures.json").write_text(json.dumps({
-            "fixtures": [{"fixture_id": "fix-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fixture", "id": "fix-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "fix-ghost" in e for e in rendered), rendered
-
-    # ------------------------------------------------------------------
-    # api mitigation (step 05) cross-ref
-    # ------------------------------------------------------------------
-
-    def test_valid_api_mitigation_no_e590(self, tmp_path):
-        """A mitigation referencing an api_id that exists in step 05 must NOT fire E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "05_interface_contracts.json").write_text(json.dumps({
-            "apis": [{"api_id": "api-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "api", "id": "api-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("api-x" in e and "E590" in e for e in rendered), rendered
-
-    def test_unknown_api_mitigation_emits_e590(self, tmp_path):
-        """When step 05 exists, a mitigation with an unknown api id fires E590."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "05_interface_contracts.json").write_text(json.dumps({
-            "apis": [{"api_id": "api-x"}]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "api", "id": "api-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "api-ghost" in e for e in rendered), rendered
-
-    # ------------------------------------------------------------------
-    # empty upstream — present-but-empty file must still fire E590
-    # ------------------------------------------------------------------
-
-    def test_empty_upstream_mitigation_still_fires_e590(self, tmp_path):
-        """An upstream step file that exists but has an empty rules array must still
-        fire E590 for an unresolved inv mitigation (empty-set != None)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "06_invariants.json").write_text(json.dumps({"rules": []}))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "inv", "id": "inv-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "inv-ghost" in e for e in rendered), (
-            f"empty upstream rules must still flag inv-ghost: {rendered}"
+    def test_w583_api_deriving_only_from_parked_frs_stays_exempt(self, toolkit_root):
+        self._setup(
+            toolkit_root,
+            [{"fr_id": "fr-legacy-export", "priority": "wont-have"},
+             {"fr_id": "fr-out", "scope": "out", "scope_reason": "dropped"}],
+            [{"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]},
+             {"api_id": "api-out", "derives_from": ["fr-out"]}],
         )
+        assert _codes(toolkit_root, {"threats": []}, "W583") == []
 
-    def test_empty_upstream_fr_mitigation_still_fires_e590(self, tmp_path):
-        """An upstream step 04 file that exists but has an empty functional_requirements
-        array must still fire E590 for an unresolved fr mitigation (empty-set != None)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "04_fr_list.json").write_text(json.dumps({"functional_requirements": []}))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fr", "id": "fr-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "fr-ghost" in e for e in rendered), (
-            f"empty upstream functional_requirements must still flag fr-ghost: {rendered}"
+    def test_control_api_deriving_from_live_fr_still_fires_w583(self, toolkit_root):
+        self._setup(
+            toolkit_root,
+            [{"fr_id": "fr-login", "priority": "must-have", "scope": "in"}],
+            [{"api_id": "api-login", "derives_from": ["fr-login"]}],
         )
+        assert any("api-login" in e for e in _codes(toolkit_root, {"threats": []}, "W583"))
 
-    def test_empty_upstream_nfr_mitigation_still_fires_e590(self, tmp_path):
-        """An upstream step 07 file that exists but has an empty nfrs array must still
-        fire E590 for an unresolved nfr mitigation (empty-set != None)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "07_nfrs.json").write_text(json.dumps({"nfrs": []}))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "nfr", "id": "nfr-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "nfr-ghost" in e for e in rendered), (
-            f"empty upstream nfrs must still flag nfr-ghost: {rendered}"
+    def test_api_deriving_from_parked_fr_and_other_id_not_exempt(self, toolkit_root):
+        self._setup(
+            toolkit_root,
+            [{"fr_id": "fr-parked", "priority": "wont-have"}, {"fr_id": "fr-login", "priority": "must-have"}],
+            [{"api_id": "api-mixed", "derives_from": ["fr-parked", "fr-login"]},
+             {"api_id": "api-mixed-ids", "derives_from": ["fr-parked", "cap-x"]},
+             {"api_id": "api-only-parked", "derives_from": ["fr-parked"]}],
         )
-
-    def test_empty_upstream_fixture_mitigation_still_fires_e590(self, tmp_path):
-        """An upstream step 08 file that exists but has an empty fixtures array must still
-        fire E590 for an unresolved fixture mitigation (empty-set != None)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "08_fixtures.json").write_text(json.dumps({"fixtures": []}))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fixture", "id": "fix-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "fix-ghost" in e for e in rendered), (
-            f"empty upstream fixtures must still flag fix-ghost: {rendered}"
-        )
-
-    def test_empty_upstream_capability_mitigation_still_fires_e590(self, tmp_path):
-        """An upstream step 01 file that exists but has an empty capabilities array must still
-        fire E590 for an unresolved capability mitigation (empty-set != None)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "01_capabilities.json").write_text(json.dumps({"capabilities": []}))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "capability", "id": "cap-ghost"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("E590" in e and "cap-ghost" in e for e in rendered), (
-            f"empty upstream capabilities must still flag cap-ghost: {rendered}"
-        )
-
-    # ------------------------------------------------------------------
-    # inv alias — type 'inv' must not produce E530 (alias → 'invariant')
-    # ------------------------------------------------------------------
-
-    def test_inv_alias_no_e530(self, tmp_path):
-        """Mitigation type 'inv' normalizes to 'invariant' and must NOT produce E530."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "inv", "id": "inv-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("E530" in e for e in rendered), (
-            f"type 'inv' alias must not produce E530: {rendered}"
-        )
-
-    # ------------------------------------------------------------------
-    # doc mitigation — always exempt from cross-ref
-    # ------------------------------------------------------------------
-
-    def test_doc_mitigation_never_e590(self, tmp_path):
-        """doc mitigations with any id must never fire E590 regardless of upstreams present."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        # Create multiple upstream files — doc should still be exempt
-        (spec_dir / "04_fr_list.json").write_text(json.dumps({"functional_requirements": [{"fr_id": "fr-x"}]}))
-        (spec_dir / "06_invariants.json").write_text(json.dumps({"rules": [{"inv_id": "inv-x"}]}))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "doc", "id": "doc-arbitrary-runbook-id"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("doc-arbitrary-runbook-id" in e and "E590" in e for e in rendered), rendered
+        fired = _codes(toolkit_root, {"threats": []}, "W583")
+        assert any("api-mixed " in e for e in fired), fired
+        assert any("api-mixed-ids" in e for e in fired), fired
+        assert not any("api-only-parked" in e for e in fired), fired
 
 
 class TestInvariantCoverageW615:
-    """DEVSPEC-89: W615 fires for security-relevant invariants with no referencing threat."""
+    """W615 fires for security-relevant invariants (with a risk_category_ref) that no threat is ``mitigated_by``."""
 
-    def test_invariant_with_risk_category_ref_and_no_threat_emits_w615(self, tmp_path):
-        """An invariant WITH risk_category_ref and no referencing threat fires W615."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{
-                "inv_id": "inv-auth-required",
-                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
-            }]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        # No mitigation references inv-auth-required
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("W615" in e and "inv-auth-required" in e for e in rendered), rendered
+    def _write_step06(self, toolkit_root, rules):
+        _write_spec(toolkit_root, "06_invariants.json", {"rules": rules})
 
-    def test_invariant_without_risk_category_ref_no_w615(self, tmp_path):
-        """An invariant WITHOUT risk_category_ref and no referencing threat must NOT fire W615."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{
-                "inv_id": "inv-no-risk-cat",
-                # No risk_category_ref field
-            }]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "fr", "id": "fr-x"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("W615" in e and "inv-no-risk-cat" in e for e in rendered), rendered
+    def test_invariant_with_risk_category_ref_and_no_threat_emits_w615(self, toolkit_root):
+        self._write_step06(toolkit_root, [{"inv_id": "inv-auth-required", "risk_category_ref": _SECURITY_REF}])
+        rendered = _codes(toolkit_root, {"threats": [_threat()]}, "W615")
+        assert any("inv-auth-required" in e for e in rendered), rendered
 
-    def test_invariant_with_risk_category_ref_and_referencing_threat_no_w615(self, tmp_path):
-        """An invariant WITH risk_category_ref that IS referenced by a threat mitigation must NOT fire W615."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{
-                "inv_id": "inv-auth-required",
-                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
-            }]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-x"}],
-                "mitigations": [{"type": "inv", "id": "inv-auth-required"}],
-            }]
-        }
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("W615" in e and "inv-auth-required" in e for e in rendered), rendered
+    def test_invariant_without_risk_category_ref_no_w615(self, toolkit_root):
+        self._write_step06(toolkit_root, [{"inv_id": "inv-no-risk-cat"}])
+        assert _codes(toolkit_root, {"threats": [_threat()]}, "W615") == []
 
-    def test_absent_step06_no_w615(self, tmp_path):
-        """When step 06 is absent, W615 must not fire (guard)."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {"threats": []}
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("W615" in e for e in rendered), rendered
+    def test_w615_invariant_named_by_mitigated_by_is_covered(self, toolkit_root):
+        self._write_step06(toolkit_root, [{"inv_id": "inv-auth-required", "risk_category_ref": _SECURITY_REF}])
+        instance = {"threats": [_threat(mitigated_by=("inv-auth-required",))]}
+        assert _codes(toolkit_root, instance, "W615") == []
+
+    def test_absent_step06_no_w615(self, toolkit_root):
+        assert _codes(toolkit_root, {"threats": []}, "W615") == []
+
+    def test_old_mitigations_do_not_cover_an_invariant(self, toolkit_root):
+        self._write_step06(toolkit_root, [{"inv_id": "inv-auth-required", "risk_category_ref": _SECURITY_REF}])
+        instance = {"threats": [{"threat_id": "t", "mitigations": [{"type": "inv", "id": "inv-auth-required"}]}]}
+        assert any("inv-auth-required" in e for e in _codes(toolkit_root, instance, "W615"))
 
 
 class TestInvariantCoverageWontHaveFrExclusion:
-    """W615 must not demand threat coverage for an invariant whose only
-    tracing FR is priority:"wont-have" (DEVSPEC-122 follow-up)."""
+    """W615 must not demand threat coverage for an invariant that only ``constrains`` parked FRs."""
 
-    def test_invariant_tracing_only_to_wont_have_fr_does_not_fire_w615(self, tmp_path):
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "04_fr_list.json").write_text(json.dumps({
-            "functional_requirements": [{"fr_id": "fr-legacy-export", "priority": "wont-have"}]
-        }))
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{
-                "inv_id": "inv-legacy-export-integrity",
-                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
-                "trace": [{"type": "fr", "id": "fr-legacy-export"}],
-            }]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {"threats": []}
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert not any("W615" in e and "inv-legacy-export-integrity" in e for e in rendered), rendered
+    def _setup(self, toolkit_root, frs, constrains):
+        _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": frs})
+        _write_spec(toolkit_root, "06_invariants.json", {"rules": [
+            {"inv_id": "inv-guarded", "risk_category_ref": _SECURITY_REF, "constrains": constrains}]})
 
-    def test_control_invariant_tracing_to_must_have_fr_still_fires_w615(self, tmp_path):
-        """Control: an invariant tracing only to a must-have FR must still fire W615."""
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "04_fr_list.json").write_text(json.dumps({
-            "functional_requirements": [{"fr_id": "fr-login", "priority": "must-have"}]
-        }))
-        (spec_dir / "06_invariants.json").write_text(json.dumps({
-            "rules": [{
-                "inv_id": "inv-auth-required",
-                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
-                "trace": [{"type": "fr", "id": "fr-login"}],
-            }]
-        }))
-        artifact_path = str(spec_dir / "11_redteam.json")
-        instance = {"threats": []}
-        errors = validate_step_11(instance, str(tmp_path), artifact_path)
-        rendered = _render(errors)
-        assert any("W615" in e and "inv-auth-required" in e for e in rendered), rendered
+    def test_w615_invariant_constraining_only_parked_frs_stays_exempt(self, toolkit_root):
+        self._setup(toolkit_root, [{"fr_id": "fr-legacy-export", "priority": "wont-have"}], ["fr-legacy-export"])
+        assert _codes(toolkit_root, {"threats": []}, "W615") == []
+
+    def test_invariant_constraining_a_scope_out_fr_stays_exempt(self, toolkit_root):
+        self._setup(toolkit_root, [{"fr_id": "fr-out", "scope": "out", "scope_reason": "dropped"}], ["fr-out"])
+        assert _codes(toolkit_root, {"threats": []}, "W615") == []
+
+    def test_control_invariant_constraining_a_live_fr_still_fires_w615(self, toolkit_root):
+        self._setup(toolkit_root, [{"fr_id": "fr-login", "priority": "must-have"}], ["fr-login"])
+        assert any("inv-guarded" in e for e in _codes(toolkit_root, {"threats": []}, "W615"))
+
+    def test_invariant_constraining_a_parked_fr_and_an_api_is_not_exempt(self, toolkit_root):
+        self._setup(toolkit_root, [{"fr_id": "fr-parked", "priority": "wont-have"}], ["fr-parked", "api-x"])
+        assert any("inv-guarded" in e for e in _codes(toolkit_root, {"threats": []}, "W615"))
+
+    def test_old_trace_is_not_a_fallback(self, toolkit_root):
+        _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
+            {"fr_id": "fr-legacy-export", "priority": "wont-have"}]})
+        _write_spec(toolkit_root, "06_invariants.json", {"rules": [{
+            "inv_id": "inv-guarded", "risk_category_ref": _SECURITY_REF,
+            "trace": [{"type": "fr", "id": "fr-legacy-export"}]}]})
+        assert any("inv-guarded" in e for e in _codes(toolkit_root, {"threats": []}, "W615"))
 
 
 class TestHostSpecSiblingResolution:
-    """Bug 1 regression: when the Step 11 artifact lives in a host spec dir
-    (e.g. ``host_repo/spec/11_redteam.json``) the linter must resolve sibling
-    upstream files from that same directory, not from ``<toolkit_root>/spec``.
-    """
+    """The Step 11 artifact in a host spec dir resolves sibling upstream files from that dir, not ``<toolkit>/spec``."""
 
     def test_sibling_dir_wins_over_toolkit_spec(self, tmp_path):
-        # Toolkit-side spec: has fictional APIs that should NOT be consulted
-        toolkit_root = tmp_path / "toolkit"
-        toolkit_spec = toolkit_root / "spec"
+        toolkit_spec = tmp_path / "toolkit" / "spec"
         toolkit_spec.mkdir(parents=True)
-        (toolkit_spec / "05_interface_contracts.json").write_text(json.dumps({
-            "apis": [{"api_id": "api-toolkit-only"}]
-        }))
-
-        # Host-side spec: the real APIs the artifact is cross-referenced against
+        (toolkit_spec / "05_interface_contracts.json").write_text(json.dumps({"apis": [{"api_id": "api-toolkit-only"}]}))
         host_spec = tmp_path / "host" / "spec"
         host_spec.mkdir(parents=True)
-        (host_spec / "05_interface_contracts.json").write_text(json.dumps({
-            "apis": [{"api_id": "api-host-login"}]
-        }))
-        artifact_path = str(host_spec / "11_redteam.json")
+        (host_spec / "05_interface_contracts.json").write_text(json.dumps({"apis": [{"api_id": "api-host-login"}]}))
+        instance = {"threats": [_threat(threatens=("api-host-login",))]}
 
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [{"type": "api", "id": "api-host-login"}],
-                "mitigations": [{"type": "fr", "id": "fr-login"}],
-            }]
-        }
-
-        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
-        rendered = _render(errors)
-        # Must not flag api-host-login as unknown: sibling dir resolves it.
-        assert not any("api-host-login" in e and "unknown API" in e for e in rendered)
-        # Must not flag api-toolkit-only as uncovered: the toolkit spec must
-        # not shadow the host spec when sibling resolution succeeds.
+        rendered = _render(validate_step_11(instance, str(tmp_path / "toolkit"), str(host_spec / "11_redteam.json")))
         assert not any("api-toolkit-only" in e for e in rendered)
+        assert not any("api-host-login" in e for e in rendered)
 
-    def test_component_sibling_dir_wins_over_toolkit_spec(self, tmp_path):
-        """Symmetric to the API test: component cross-ref must also resolve
-        from the artifact's sibling dir before falling back to toolkit/spec."""
-        toolkit_root = tmp_path / "toolkit"
-        toolkit_spec = toolkit_root / "spec"
-        toolkit_spec.mkdir(parents=True)
-        (toolkit_spec / "02_system_sketch.json").write_text(json.dumps({
-            "components": [{"component_id": "comp-toolkit-only"}]
-        }))
+    def test_malformed_first_candidate_falls_through_to_valid_sibling(self, tmp_path):
+        spec = tmp_path / "spec"
+        spec.mkdir()
+        (spec / "04_aaa_broken.json").write_text("{not json")
+        (spec / "04_fr_list.json").write_text(json.dumps({"functional_requirements": [
+            {"fr_id": "fr-legacy-export", "priority": "wont-have"}]}))
+        (spec / "05_aaa_broken.json").write_text("[1, 2]")
+        (spec / "05_interface_contracts.json").write_text(json.dumps({"apis": [
+            {"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]}, {"api_id": "api-live"}]}))
+        (spec / "06_aaa_broken.json").write_text("{not json")
+        (spec / "06_invariants.json").write_text(json.dumps({"rules": [
+            {"inv_id": "inv-legacy", "risk_category_ref": _SECURITY_REF, "constrains": ["fr-legacy-export"]},
+            {"inv_id": "inv-live", "risk_category_ref": _SECURITY_REF}]}))
 
-        host_spec = tmp_path / "host" / "spec"
-        host_spec.mkdir(parents=True)
-        (host_spec / "02_system_sketch.json").write_text(json.dumps({
-            "components": [{"component_id": "comp-host-auth"}]
-        }))
-        artifact_path = str(host_spec / "11_redteam.json")
-
-        # Target BOTH the host component (must resolve) AND the toolkit-only
-        # component (must be flagged unknown — proves the toolkit spec was
-        # NOT consulted as a fallback once the sibling dir resolved).
-        instance = {
-            "threats": [{
-                "threat_id": "threat-01",
-                "target_ids": [
-                    {"type": "component", "id": "comp-host-auth"},
-                    {"type": "component", "id": "comp-toolkit-only"},
-                ],
-                "mitigations": [{"type": "fr", "id": "fr-auth"}],
-            }]
-        }
-
-        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
+        errors = validate_step_11({"threats": []}, str(tmp_path), str(spec / "11_redteam.json"))
         rendered = _render(errors)
-        # Host-side component must resolve (not flagged unknown).
-        assert not any("comp-host-auth" in e and "unknown component" in e for e in rendered)
-        # Toolkit-side component MUST be flagged unknown: the sibling dir
-        # resolved successfully, so the toolkit spec must not shadow it.
-        assert any("comp-toolkit-only" in e and "unknown component" in e for e in rendered)
+        assert any("W583" in e and "api-live" in e for e in rendered), rendered
+        assert not any("api-legacy-export" in e for e in rendered), rendered
+        assert any("W615" in e and "inv-live" in e for e in rendered), rendered
+        assert not any("inv-legacy" in e for e in rendered), rendered
 
 
 def test_fr_ids_from_derives_from_ignores_wrong_typed_value():
-    from specdev_tools.validation.validators.step_11 import _fr_ids_from_derives_from
-
     for bad in (7, None, "fr-a", {"x": 1}):
         assert _fr_ids_from_derives_from({"derives_from": bad}) == set()
     assert _fr_ids_from_derives_from({"derives_from": ["fr-a", 7, "", None]}) == {"fr-a"}
+
+
+def test_fr_ids_from_constrains_ignores_wrong_typed_value_and_does_not_filter_ids():
+    for bad in (7, None, "fr-a", {"x": 1}):
+        assert _fr_ids_from_constrains({"constrains": bad}) == set()
+    assert _fr_ids_from_constrains({"constrains": ["fr-a", 7, "", None, "api-b"]}) == {"fr-a", "api-b"}
+    assert _fr_ids_from_constrains({"trace": [{"type": "fr", "id": "fr-a"}]}) == set()

@@ -38,24 +38,13 @@ class StepValidatorsTests(unittest.TestCase):
         errs = step_09.validate_step_09({"milestones": [{"milestone_id": "m1", "target_date": "2026-12-01"}, {"milestone_id": "m2", "target_date": "2026-01-01"}]}, ".")
         self.assertTrue(errs)
 
-    def test_step_11_invalid_target_type(self):
-        errs = step_11.validate_step_11({"threats": [{"threat_id": "t1", "target_ids": [{"type": "weird"}]}]}, ".")
-        self.assertTrue(errs)
+    def test_step_09_does_not_read_removed_milestone_fields(self):
+        milestone = {"milestone_id": "m1", "status": 7, "deliverables": "x", "depends_on": {"a": 1}, "dependencies": [3]}
+        self.assertEqual(step_09.validate_step_09({"milestones": [milestone], "tech_stack": 5, "trace": "x"}, "."), [])
 
-    def test_step_11_invalid_mitigation_type(self):
-        errs = step_11.validate_step_11(
-            {
-                "threats": [
-                    {
-                        "threat_id": "t1",
-                        "target_ids": [{"type": "api", "id": "api-a"}],
-                        "mitigations": [{"type": "component", "id": "component-a"}],
-                    }
-                ]
-            },
-            ".",
-        )
-        self.assertTrue(any("invalid mitigation type" in e for e in _render(errs)))
+    def test_step_11_does_not_read_target_ids_or_mitigations(self):
+        threat = {"threat_id": "t1", "target_ids": [{"type": "weird"}], "mitigations": "not-a-list"}
+        self.assertEqual(step_11.validate_step_11({"threats": [threat], "trace": [3]}, "."), [])
 
     def test_step_12_unknown_require(self):
         errs = step_12.validate_step_12({"jobs": [{"job_id": "j1", "requires": ["j2"], "steps": [{"id": "s", "command": "echo"}]}]}, ".")
