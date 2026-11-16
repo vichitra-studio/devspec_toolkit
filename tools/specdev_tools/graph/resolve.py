@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.graph.kinds import LinkDecl
 from specdev_tools.graph.model import Graph, Link, Node, SpecShape
 from specdev_tools.graph.ownership import step_owner
 
@@ -86,18 +87,32 @@ def _wrong_kind_error(holder: Node, link: Link, target: Node) -> SpecError:
     )
 
 
+def direction_allowed(decl: LinkDecl, holder_step: str | None, target: Node, shape: SpecShape) -> bool:
+    """True when a link of *decl* from a node in *holder_step* may point at *target* as far as step order goes.
+
+    The target is in an earlier step, or in the holder's step when the field declares the target's kind as same-step.
+    A holder or target with no step, or one the step order does not rank, is not constrained.
+    """
+    if holder_step is None or target.step is None:
+        return True
+    holder_rank, target_rank = shape.step_ranks.get(holder_step), shape.step_ranks.get(target.step)
+    if holder_rank is None or target_rank is None or target_rank < holder_rank:
+        return True
+    return target_rank == holder_rank and target.kind in decl.same_step_kinds
+
+
+def link_target_allowed(decl: LinkDecl, holder_step: str | None, target: Node, shape: SpecShape) -> bool:
+    """True when the resolver would report neither E701 nor E702 for a link of *decl* from *holder_step* to *target*."""
+    return decl.accepts(target.kind) and direction_allowed(decl, holder_step, target, shape)
+
+
 def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -> SpecError | None:
     """E702 when the target is not earlier than the holder and the field does not allow it within one step."""
-    if holder.step is None or target.step is None:
-        return None
-    holder_rank, target_rank = shape.step_ranks.get(holder.step), shape.step_ranks.get(target.step)
-    if holder_rank is None or target_rank is None or target_rank < holder_rank:
+    if direction_allowed(link.decl, holder.step, target, shape):
         return None
     where = f"{holder.id} (step {holder.step}), field {link.field}, target '{target.id}' (step {target.step})"
-    if target_rank > holder_rank:
+    if shape.step_ranks[target.step or ""] > shape.step_ranks[holder.step or ""]:
         return _error("E702", holder, f"{where}: the target is in a later step; a link points to an earlier step")
-    if target.kind in link.decl.same_step_kinds:
-        return None
     return _error(
         "E702", holder,
         f"{where}: the target is in the same step and a {target.kind} is not declared as a same-step target of the field",
