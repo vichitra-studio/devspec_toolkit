@@ -18,7 +18,7 @@ specdev prompt-context 04 --repo-root ./devspec_toolkit
 ## Arguments
 
 ### `<step>` (required)
-The step ID to query. Use either the numeric form (`04`) or full name form (`04_fr_list`). Examples:
+The step ID to query, as listed in `steps` of `tools/step_order.json` (`04`, `13a`, `16b`). Examples:
 - `00` — Project Charter
 - `04` — Functional Requirements
 - `16c` — Implementation Review
@@ -55,7 +55,7 @@ $ specdev prompt-context 04 --repo-root ./devspec_toolkit
 
 ## Error Handling
 
-- **Unknown Step**: If the step ID does not exist in `tools/step_order.json`, the command exits with an error and lists valid step IDs.
+- **Unknown Step**: If the step ID does not exist in `tools/step_order.json`, the command exits 1 with `Error: Unknown step '<step>'`.
 - **Missing downstream_consumers**: If the step has no entries in the `downstream_consumers` field of `tools/step_order.json`, the command returns an empty table.
 
 ## See Also

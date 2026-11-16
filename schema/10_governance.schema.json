@@ -202,7 +202,7 @@
           ]
         },
         "command_ref": {
-          "description": "Canonical reference to the CLI command this governance rule triggers. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:governance-check\", \"kind\": \"command\"}. Omit when the governance rule does not map to an automated command.",
+          "description": "Canonical reference to the CLI command that enforces this governance file as a whole. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:governance-check\", \"kind\": \"command\"}. Omit when no single command does. A rule of 'rules' names its own command in 'cli_command'.",
           "allOf": [
             {
               "$ref": "vc:core:collections#canonicalRef"

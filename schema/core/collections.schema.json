@@ -240,7 +240,7 @@
         "description",
         "about"
       ],
-      "description": "An open question the spec or the implementation work cannot yet answer. An item is open or it is deleted: it carries no status, severity or resolved flag, and every open item gates in the same way. Where the item sits, and what its `about` names, say what it concerns.",
+      "description": "An open question the spec or the implementation work cannot yet answer. An item is open or it is deleted: it carries no status, severity or resolved flag, and all open items are treated alike. Where the item sits, and what its `about` names, say what it concerns.",
       "properties": {
         "id": {
           "$ref": "vc:core:atoms#kebabId",

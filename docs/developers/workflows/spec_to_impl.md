@@ -40,7 +40,7 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 
 ## Command Cadence
 - Generate scaffolds manually or using framework tools, ensuring alignment with `15_scaffold.json`.
-- **Verify**: Use `python devspec_toolkit/tests/integration/test_step_15.py <path_to_scaffold>` to check schema compliance, strict method enums, and traceability.
+- **Verify**: Use `python devspec_toolkit/tests/integration/test_step_15.py <path_to_scaffold>` to run `specdev validate` on it (schema compliance and the `build_status` rules).
 - Run the [core validation commands](../reference.md#core-validation-commands) to track fixture progress and trace coverage as implementation evolves.
 
 ## CI Integration

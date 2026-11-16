@@ -421,7 +421,7 @@
 
 ### E597 / W597 EXTRACTION_INTENT_UPSTREAM_GAP / EXTRACTION_INTENT_VAGUE
 
-**Trigger (E597)**: A step has an allowed upstream step (computed at runtime from the `steps` order in step_order.json), but the prompt's extraction intent has no entry for that upstream artifact.
+**Trigger (E597)**: A step reads an upstream step (its `step_metadata.required_spec_inputs` in step_order.json; every preceding step of the `steps` order when a step has no such list), but the prompt's extraction intent has no entry for that upstream artifact.
 
 **Trigger (W597)**: An extraction intent entry has vague text (fewer than 10 words or contains "relevant", "as needed", "as appropriate", "various", "TBD", "TODO").
 

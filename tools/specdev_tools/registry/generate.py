@@ -819,5 +819,5 @@ def run(
 
     for path, doc in outputs:
         _write_doc(path, doc)
-    if checklist_out and checklist is not None:
+    if checklist is not None:
         _write_text(os.path.abspath(checklist_out), checklist)

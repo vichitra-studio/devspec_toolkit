@@ -72,7 +72,7 @@ def _row_problems(raw: Any) -> list[str]:
         problems.append(f"change: must be one of {', '.join(CHANGE_KINDS)}")
     if not isinstance(raw.get("owner"), str):
         problems.append("owner: must be a string")
-    if raw.get("replaced_by") is not None and not isinstance(raw.get("replaced_by"), str):
+    if "replaced_by" not in raw or not isinstance(raw["replaced_by"], (str, type(None))):
         problems.append("replaced_by: must be a string or null")
     problems += [f"{key}: must be a list of strings" for key in _STRING_LISTS if not _is_str_list(raw.get(key))]
     if not isinstance(raw.get("shim"), bool):

@@ -242,7 +242,7 @@ Validates the completeness and consistency of the dependency DAG defined in `too
 
 #### `extraction-intent-check`
 
-Validates that each prompt's `### Extraction Intent` section is consistent with the allowed upstream steps computed at runtime from `tools/step_order.json` (all steps preceding the current step in the `steps` list).
+Validates that each prompt's `### Extraction Intent` section is consistent with `tools/step_order.json`: an entry may name any step that precedes the current one in the `steps` list (W596 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise).
 
 **What it checks:**
 - Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).

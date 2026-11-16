@@ -192,6 +192,10 @@ def _legacy_status(item: dict[str, Any]) -> Optional[str]:
     return status if isinstance(status, str) else None
 
 
+# M8 rewrites: values of the 1.1.1 `checklist_status` that E305 skips
+_LEGACY_SET_ASIDE_STATUSES = frozenset({"deferred", "wont_do"})
+
+
 def _check_type_and_layer(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E530: every plan item's ``type`` and ``layer`` is one of the declared enum values."""
     for item in checklist:
@@ -484,7 +488,7 @@ def _check_planned_vs_executed(data: dict[str, Any], checklist: list[dict[str, A
     satisfied_ids = set(str_items(as_dict(execution.get("critical_evidence")).get("satisfied_checklist_ids")))
     for item in sorted(checklist, key=lambda i: str(i.get("id"))):
         item_id = item.get("id")
-        if not isinstance(item_id, str) or str_in(item.get("checklist_status"), PAUSED_OR_CANCELLED_DISPOSITIONS):
+        if not isinstance(item_id, str) or str_in(item.get("checklist_status"), _LEGACY_SET_ASIDE_STATUSES):
             continue
         if item_id in satisfied_ids:
             continue

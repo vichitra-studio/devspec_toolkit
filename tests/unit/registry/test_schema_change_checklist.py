@@ -136,6 +136,14 @@ def test_parse_rows_reports_a_wrong_typed_value_without_raising(raw: Any, fragme
     assert len(rows_found) <= 1
 
 
+@pytest.mark.parametrize("key", sorted(_row()))
+def test_parse_rows_reports_a_row_without_a_key_without_raising(key: str) -> None:
+    row = _row()
+    del row[key]
+    rows_found, problems = parse_rows({"rows": [row]})
+    assert rows_found == [] and any(key in p for p in problems)
+
+
 def test_parse_rows_accepts_core_step_ids() -> None:
     parsed, problems = parse_rows({"rows": [_row(id="SC-core-atoms-01", step="core/atoms")]})
     assert problems == [] and [r.step for r in parsed] == ["core/atoms"]

@@ -284,8 +284,8 @@ def _readers_raise(spec_dir: Path, label: str) -> list[str]:
 
 
 def _first_entries(document: dict[str, Any], values: tuple[Any, ...]) -> Iterator[tuple[tuple, Any, dict[str, Any]]]:
-    """The mutations of *document* on the first entry of every array (the other entries of an
-    array have the same shape and are read alike)."""
+    """The mutations of *document* on the first entry of every array.  Later entries are not mutated (run time);
+    a rule that compares the entries of one array is exercised only through its first entry."""
     for path, wrong, mutated in _mutations(document, values):
         if all(key == 0 for key in path if isinstance(key, int)):
             yield path, wrong, mutated

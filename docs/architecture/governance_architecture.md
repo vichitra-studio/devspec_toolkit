@@ -48,7 +48,7 @@ All paths route through `core/trace_types.py` -- there is a single loading path 
 
 ## Dynamic Entity Indexing
 
-`tools/specdev_tools/validation/matrix.py` lines 178-196 implement schema-agnostic entity discovery for the trace matrix.
+`tools/specdev_tools/validation/matrix.py` (`_legacy_scan_data`) implements schema-agnostic entity discovery for the trace matrix. It is the fallback, used when `tools/entry_key_registry.json` is absent and for a file the registry does not know; for every other file the matrix lists entities from the registry's entry keys.
 
 **Algorithm:**
 

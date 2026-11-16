@@ -12,7 +12,7 @@ changes:
       the scope-reason rule). The seed manifest
       (schema/seed_manifest.schema.json, top-of-graph seed kind) and the step
       schemas 00, 01, 02, 02a, 03, 04 and 05 are annotated; the schemas of
-      steps 06 to 12, 14, 15 and 16 are annotated too; the schemas of steps 13 and 13a carry no annotation.
+      steps 06 to 12, 14, 15 and 16 are annotated too; the schemas of steps 13 and 13a carry no annotation of their own (step 13 gets the shared ambiguity-item node through the core ambiguityList).
     migration:
       action: none
 
@@ -364,8 +364,8 @@ changes:
       docs/developers/error-codes.md: E142, E581, E582, W574, W581, W582, W602,
       W605, W607, W612 and W616. The fields they read are gone, and no emitter is
       left. The E530 sub-code LINKED_TEST_FILE_NOT_FOUND is removed with its guide
-      (specdev guide E530-LINKED_TEST_FILE_NOT_FOUND no longer exists) and its
-      JSON remediation advice. hallucination-lint no longer checks
+      (specdev guide E530-LINKED_TEST_FILE_NOT_FOUND now prints the base E530
+      guide) and its JSON remediation advice. hallucination-lint no longer checks
       linked_test_expectation paths and no longer reports INVENTED_ENUM_OR_ID for
       pr_rules. E305, E307 and E596 stay.
     migration:
