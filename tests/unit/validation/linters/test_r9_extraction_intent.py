@@ -10,9 +10,13 @@ Covers all error/warning codes:
 
 import json
 import os
+import re
 import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
+from specdev_tools.validation._legacy_shim import EXTRACTION_INTENT_DEFERRED
 from specdev_tools.validation.extraction_intent_check import check_extraction_intent
 from specdev_tools.core.errors import render_errors
 
@@ -435,6 +439,22 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self.assertIn("E597", codes, "Missing upstream dep should trigger E597")
             self.assertIn("W597", codes, "Short intent should trigger W597")
             self.assertIn("E598", codes, "Invalid step ref should trigger E598")
+
+    def test_extraction_intent_deferral_generated_from_computed_diff(self):
+        """The deferral holds exactly the pairs E597 reports on the toolkit's prompts without it.
+
+        The cutover derives the required inputs from the annotations; a prompt that lacks an entry
+        for one of them is the only pair worth deferring, and a pair whose check passes is not.
+        """
+        gap = re.compile(r"prompt_(\w+) has no extraction intent for required upstream dependency '(\w+)'")
+        repo_root = str(Path(__file__).resolve().parents[4])
+        with mock.patch(
+            "specdev_tools.validation.extraction_intent_check.EXTRACTION_INTENT_DEFERRED", frozenset()
+        ):
+            reported = render_errors(check_extraction_intent(repo_root))
+        computed = {m.groups() for m in map(gap.search, reported) if m}
+        self.assertEqual(computed, set(EXTRACTION_INTENT_DEFERRED))
+        self.assertEqual(render_errors(check_extraction_intent(repo_root)), [])
 
 
 if __name__ == "__main__":

@@ -68,7 +68,8 @@ LEGACY_REVIEWER_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
 
 # (prompt step, upstream step) pairs `extraction_intent_check.py` does not report as E597: the
 # derived-only edges of the `step_order.json` cutover whose prompt text still lacks an entry.
-# WI-M3-16 sets the pairs from the computed cutover diff; empty until then.
+# Empty: on the generated step order every prompt of the toolkit has an entry for each required
+# input (test_extraction_intent_deferral_generated_from_computed_diff pins this).
 EXTRACTION_INTENT_DEFERRED: frozenset[tuple[str, str]] = frozenset()
 
 # The 1.1.1 spellings of a parked node: a capability with `scope: future` and an FR with

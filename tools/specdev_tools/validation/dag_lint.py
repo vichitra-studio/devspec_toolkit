@@ -26,8 +26,10 @@ from ._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE  # re
 # Matches prompt filenames like prompt_04_functional_requirements.md -> "04"
 _PROMPT_STEP_RE = re.compile(r"prompt_(\d{2}[a-z]?)_")
 
-# Terminal steps exempted from the dead-end check (E596)
-_TERMINAL_STEPS = frozenset({"16c"})
+# Terminal steps exempted from the dead-end check (E596).  16c ends the pipeline.  03 (glossary
+# terms) is read by label (the ``context`` role), which no stored x-link carries, so the generated
+# step order lists no consumer for it.
+_TERMINAL_STEPS = frozenset({"03", "16c"})
 
 
 def lint_dag(repo_root: str) -> list[SpecError]:

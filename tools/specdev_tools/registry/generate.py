@@ -63,7 +63,11 @@ from specdev_tools.registry.annotations import (
     lint_annotations,
 )
 from specdev_tools.registry.schema_checklist import generate_checklist
-from specdev_tools.registry.step_order_gen import build_step_order_document, derive_from_decls
+from specdev_tools.registry.step_order_gen import (
+    build_step_order_document,
+    declared_edge_pairs,
+    derive_from_decls,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -754,8 +758,9 @@ def run(
         repo_root: Absolute or relative path to the toolkit root.
         out_path: Destination path for entry_key_registry.json.
         extraction_paths_out: Destination path for extraction_paths.json.
-        step_order_out: Optional destination for the step order derived from the
-            annotations (``None`` writes nothing; ``tools/step_order.json`` is never touched).
+        step_order_out: Optional destination for the step order derived from the annotations
+            and the hand-carried keys of ``tools/step_order.json`` (``None`` writes nothing; the
+            command line defaults it to ``tools/step_order.json`` when ``out_path`` is defaulted).
         cli_commands_out: Optional destination for cli_commands.json (``None`` writes nothing).
         checklist_out: Optional destination for the schema-change checklist rendered from
             ``tools/schema_changes.json`` (``None`` writes nothing).
@@ -774,12 +779,15 @@ def run(
 
     # Derive everything first so a failure leaves no output half-written.
     if step_order_out:
+        hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
         derived = derive_from_decls(decls)
         if not derived["steps"]:
             raise AnnotationError(
                 ["registry-generate --step-order-out: no annotated step to derive an order from"]
             )
-        hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
+        declared = declared_edge_pairs(hand)
+        if declared:
+            derived = derive_from_decls(decls, declared)
         outputs.append((os.path.abspath(step_order_out), build_step_order_document(derived, hand)))
     if cli_commands_out:
         # Lazy: generate_cli_commands builds the full CLI parser (specdev_tools.cli), which loads

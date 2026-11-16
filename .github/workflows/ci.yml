@@ -55,7 +55,7 @@ jobs:
         run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"
       - name: Registry up-to-date check (W6-T5)
         run: |
-          # Regenerate registry + extraction_paths + cli_commands to tmpfiles; fail if the
+          # Regenerate registry + extraction_paths + step_order + cli_commands + checklist to tmpfiles; fail if the
           # committed artifacts diverge. Catches "schema changed but registry
           # not regenerated" PRs at CI time.
           TMPDIR=$(mktemp -d)
@@ -63,7 +63,9 @@ jobs:
             --repo-root . \
             --out "$TMPDIR/entry_key_registry.json" \
             --extraction-paths-out "$TMPDIR/extraction_paths.json" \
-            --cli-commands-out "$TMPDIR/cli_commands.json"
+            --step-order-out "$TMPDIR/step_order.json" \
+            --cli-commands-out "$TMPDIR/cli_commands.json" \
+            --checklist-out "$TMPDIR/schema-change-checklist.md"
           REGEN_CMD="specdev registry-generate --repo-root ."
           if ! diff -q "$TMPDIR/entry_key_registry.json" tools/entry_key_registry.json; then
             echo "::error::Registry out of date. Run '$REGEN_CMD' and commit the result."
@@ -71,6 +73,14 @@ jobs:
           fi
           if ! diff -q "$TMPDIR/extraction_paths.json" tools/extraction_paths.json; then
             echo "::error::extraction_paths out of date. Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/step_order.json" tools/step_order.json; then
+            echo "::error::step_order out of date (generated; do not hand-edit). Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/schema-change-checklist.md" docs/developers/schema-change-checklist.md; then
+            echo "::error::schema-change checklist out of date. Run '$REGEN_CMD' and commit the result."
             exit 1
           fi
           if ! diff -q "$TMPDIR/cli_commands.json" tools/cli_commands.json; then

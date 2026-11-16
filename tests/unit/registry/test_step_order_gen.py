@@ -269,7 +269,8 @@ def test_step_order_out_validates_against_schema_and_copies_policy(tmp_path):
     )
     doc = json.loads(out.read_text())
     hand = json.loads(before)
-    assert doc["steps"] == ["01", "04"]
+    assert doc["steps"] == hand["steps"]
+    assert doc["step_metadata"]["04"]["required_spec_inputs"] == ["01"]
     assert doc["policy"] == hand["policy"] and doc["coverage_thresholds"] == hand["coverage_thresholds"]
     reg = SchemaRegistry(str(_ROOT))
     schema = json.loads((_ROOT / "schema" / "step_order.schema.json").read_text())

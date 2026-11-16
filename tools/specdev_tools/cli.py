@@ -297,10 +297,10 @@ def build_parser() -> _SpecdevParser:
 
     rg = sub.add_parser(
         "registry-generate",
-        help="Regenerate the entry-key registry, extraction-paths, cli_commands.json and the schema-change checklist (and optionally the step order) from toolkit schemas.",
+        help="Regenerate the entry-key registry, extraction-paths, step_order.json, cli_commands.json and the schema-change checklist from toolkit schemas and annotations.",
         description=(
-            "Regenerate the entry-key registry, extraction-paths, cli_commands.json and the schema-change\n"
-            "checklist from toolkit schemas and the CLI parser; with --step-order-out also the step order derived from annotations.\n\n"
+            "Regenerate the entry-key registry, extraction-paths, step_order.json, cli_commands.json and the\n"
+            "schema-change checklist from toolkit schemas, annotations and the CLI parser.\n\n"
             "Output is byte-deterministic across runs (sort_keys + indent=2 + trailing newline)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -325,7 +325,10 @@ def build_parser() -> _SpecdevParser:
         "--step-order-out",
         default=None,
         dest="step_order_out",
-        help="Also write the step order derived from the x-node/x-link annotations to this path (default: not written).",
+        help=(
+            "Output path for step_order.json, derived from the x-node/x-link annotations plus the hand-carried keys "
+            "(default: <repo-root>/tools/step_order.json, written only when --out is also absent)."
+        ),
     )
     rg.add_argument(
         "--cli-commands-out",
@@ -2181,6 +2184,12 @@ def main():
             if args.extraction_paths_out
             else os.path.join(repo_root, "tools", "extraction_paths.json")
         )
+        if args.step_order_out:
+            step_order_out = os.path.abspath(args.step_order_out)
+        elif not args.out:
+            step_order_out = os.path.join(repo_root, "tools", "step_order.json")
+        else:
+            step_order_out = None
         if args.cli_commands_out:
             cli_commands_out = os.path.abspath(args.cli_commands_out)
         elif not args.out:
@@ -2201,7 +2210,7 @@ def main():
                 repo_root=repo_root,
                 out_path=out_path,
                 extraction_paths_out=extraction_paths_out,
-                step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
+                step_order_out=step_order_out,
                 cli_commands_out=cli_commands_out,
                 checklist_out=checklist_out,
             )
