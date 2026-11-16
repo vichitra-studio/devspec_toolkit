@@ -117,8 +117,15 @@ def graph_covered_files(graph: Graph | None) -> frozenset[str]:
 
 
 def graph_known_ids(graph: Graph | None) -> set[str]:
-    """Every id the graph defines (the first definition of each; duplicates are E704's)."""
-    return set(graph.by_id) if graph is not None else set()
+    """Every id a reference may name: the graph's nodes (first definition of each) and the root ``id`` of each document read.
+
+    An artifact's own ``id`` is no node; a 1.1.1 ``trace`` entry may still name it.
+    """
+    if graph is None:
+        return set()
+    known = set(graph.by_id)
+    known.update(root_id for document in graph.documents.values() if isinstance(root_id := document.get("id"), str))
+    return known
 
 
 # ---------------------------------------------------------------------------

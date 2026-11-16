@@ -175,3 +175,33 @@ def test_spec_check_builds_the_graph_once(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr("specdev_tools.graph.check.build_graph", counting_build)
     run_spec_check_json(str(ROOT), str(EXAMPLE_SPEC))
     assert len(calls) == 1
+
+
+def _trace_spec(tmp_path: Path, target: str, root_id: Any = "charter-v1") -> Path:
+    """1.1.1 shape: a charter with a root ``id`` and an FR file whose ``trace`` entry names *target*."""
+    _write(tmp_path, "00_charter.json", {"id": root_id})
+    _write(
+        tmp_path,
+        NODE_FILE,
+        {"functional_requirements": [{"fr_id": "fr-a", "trace": [{"type": "capability", "id": target}]}]},
+    )
+    return tmp_path
+
+
+def test_artifact_root_id_is_a_known_id(tmp_path: Path) -> None:
+    spec = str(_trace_spec(tmp_path, "charter-v1"))
+    assert _lines(lint_hallucinations(spec), "E530") == []
+    assert _unresolved_refs(lint_spec_quality(spec)) == []
+
+
+def test_trace_to_an_id_defined_nowhere_is_still_reported(tmp_path: Path) -> None:
+    spec = str(_trace_spec(tmp_path, "charter-v9"))
+    assert any("charter-v9" in line for line in _lines(lint_hallucinations(spec), "E530"))
+    assert any("charter-v9" in line for line in _unresolved_refs(lint_spec_quality(spec)))
+
+
+@pytest.mark.parametrize("root_id", [["charter-v1"], 7], ids=["list", "number"])
+def test_wrong_typed_root_id_defines_nothing_and_does_not_raise(tmp_path: Path, root_id: Any) -> None:
+    spec = str(_trace_spec(tmp_path, "charter-v1", root_id))
+    assert any("charter-v1" in line for line in _lines(lint_hallucinations(spec), "E530"))
+    assert any("charter-v1" in line for line in _unresolved_refs(lint_spec_quality(spec)))

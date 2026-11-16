@@ -255,3 +255,13 @@ def test_cli_diff_unresolvable_ref_as_json_envelope(host: Path) -> None:
     _two_tag_host(host)
     document = json.loads(_diff_cli(host, "v1", "v9", "--json").stdout)
     assert (document["command"], document["status"], document["errors"][0]["code"]) == ("diff", "FAIL", "E708")
+
+
+def test_diff_submodule_flags(host: Path) -> None:
+    """``diff --repo-root <toolkit> --spec-root <absolute spec> --git-root <host>`` reads the spec folder at its path relative to the git root."""
+    nested = _two_tag_host(host)
+    assert nested == host / "spec" and nested.is_absolute()
+    result = run_specdev("diff", "v1", "v2", "--repo-root", str(ROOT), "--spec-root", str(nested), "--git-root", str(host))
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[0] == "diff v1 -> v2: 2 node(s) changed"
+    assert spec_path_in_repo(str(nested), str(host)) == "spec"

@@ -118,3 +118,26 @@ def test_missing_spec_folder_is_e520_like_the_other_commands(tmp_path: Path, com
     envelope = json.loads(run_specdev(*command, *flags, "--json").stdout)
     assert (envelope["command"], envelope["errors"][0]["code"]) == (command[0], "E520")
     assert not missing.exists()
+
+
+def _ids(groups: dict[str, list[dict[str, str]]]) -> set[str]:
+    return {node["id"] for nodes in groups.values() for node in nodes}
+
+
+def test_devspec_265_one_trace_call_and_one_candidates_call(spec: Path) -> None:
+    """The pair the ticket asks for: one call gives the lineage and impact of a node, one gives a field's valid targets.
+
+    ``test_trace_up_lists_ancestors_and_never_the_entry_again`` overlaps the up half only for ``fr-password-reset``.
+    """
+    trace = run_specdev("trace", _CRITERION, *_flags(spec), "--json")
+    assert trace.returncode == 0, trace.stderr
+    document = json.loads(trace.stdout)
+    assert {"fr-password-reset", "cap-account-recovery", "scope-password-reset"} <= _ids(document["up"]["groups"])
+    assert {"err-password-reset-confirm-token-expired", "fix-password-reset-expired-token", "threat-reset-token-replay"} <= _ids(document["down"]["groups"])
+
+    listed = run_specdev("node", "candidates", "--kind", "api", "--field", "derives_from", *_flags(spec), "--json")
+    assert listed.returncode == 0, listed.stderr
+    offered = {item["id"] for item in json.loads(listed.stdout)["candidates"]}
+    assert "fr-password-reset" in offered
+    assert "cap-account-recovery" not in offered  # wrong kind
+    assert "fix-password-reset-expired-token" not in offered  # downstream and wrong kind
