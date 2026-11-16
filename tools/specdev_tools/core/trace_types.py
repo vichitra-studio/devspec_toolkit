@@ -68,7 +68,7 @@ def get_trace_types(
 
 
 def normalize_trace_type(value: str) -> str:
-    normalized = (value or "").strip()
+    normalized = value.strip() if isinstance(value, str) else ""
     if not normalized:
         return normalized
     return CANONICAL_TRACE_TYPE.get(normalized, normalized)

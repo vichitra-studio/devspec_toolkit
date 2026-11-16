@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
+from ...core.scope_helpers import as_list, dict_items
 from ...core.errors import make_error, SpecError
 from ...validation.linter_utils import check_no_duplicates
 
@@ -16,8 +17,9 @@ _STEP_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 def validate_step_13(instance: dict[str, Any], toolkit_root: str, spec_root: Optional[str] = None) -> list[SpecError]:
     errors: list[SpecError] = []
-    check_no_duplicates(instance.get("extensions", []), "extension_id", "extension_id", errors)
-    for ext in instance.get("extensions", []):
+    extensions = as_list(instance.get("extensions"))
+    check_no_duplicates(extensions, "extension_id", "extension_id", errors)
+    for ext in dict_items(extensions):
         ext_id = ext.get("extension_id")
 
         # required_schema_sections must be present and non-empty

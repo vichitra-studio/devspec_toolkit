@@ -7,6 +7,7 @@ from typing import Any
 
 from ...core.constants import resolve_extras_path
 from ...core.errors import make_error, SpecError
+from ...core.scope_helpers import dict_items
 from ...validation._legacy_shim import LEGACY_ROADMAP_MATRIX_FIELDS, has_legacy_fields
 
 
@@ -19,14 +20,14 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
     errors: list[SpecError] = []
     milestone_dates: list[tuple[str, str]] = []
     seen_milestones: set[str] = set()
-    for i, milestone in enumerate(_dicts(instance.get("milestones"))):
+    for i, milestone in enumerate(dict_items(instance.get("milestones"))):
         mid = milestone.get("milestone_id")
         if isinstance(mid, str):
             if mid in seen_milestones:
                 errors.append(make_error("E520", f"Duplicate milestone_id '{mid}' at index {i}"))
             seen_milestones.add(mid)
         errors.extend(_date_errors(milestone, milestone_dates))
-        tasks = _dicts(milestone.get("tasks"))
+        tasks = dict_items(milestone.get("tasks"))
         errors.extend(_duplicate_task_errors(tasks, mid))
         errors.extend(_check_task_dependency_cycles(tasks, mid))
     if milestone_dates != sorted(milestone_dates, key=lambda x: x[0]):
@@ -37,11 +38,6 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
     if has_legacy_fields([instance], LEGACY_ROADMAP_MATRIX_FIELDS):
         errors.extend(_check_trace_matrix_staleness(artifact_path))
     return errors
-
-
-def _dicts(value: Any) -> list[dict[str, Any]]:
-    """The object entries of *value*; empty when *value* is not a list."""
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
 def _date_errors(milestone: dict[str, Any], milestone_dates: list[tuple[str, str]]) -> list[SpecError]:

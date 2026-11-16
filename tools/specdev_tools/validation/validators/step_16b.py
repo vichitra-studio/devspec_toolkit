@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from ...core.scope_helpers import str_in
 from ...core.errors import make_error, SpecError
 from .step_16a import validate_step_16a
 
@@ -51,7 +52,7 @@ def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Option
                 seen_commands.add(cmd_stripped)
 
             status = result.get("status")
-            if status and status not in _EXECUTION_STATUSES:
+            if status and not str_in(status, _EXECUTION_STATUSES):
                 errors.append(
                     make_error(
                         "E520",

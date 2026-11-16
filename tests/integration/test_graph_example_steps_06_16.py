@@ -4,7 +4,12 @@ Continues ``test_graph_example_steps_00_05.py`` on the same folder, ``tests/fixt
 files of steps 06-16 and the one plan file of ``spec/impl_context/``.  These tests pin that they are valid against
 the real schemas, validators, registry and ``spec-check`` with a known set of warnings, that every link of the whole
 folder (00-16) names an existing id of an allowed kind, and that the readers meant to stay silent on the new shape
-(matrix, closure, completeness, forward replay, milestone state, upstream backlog, scope resolver, reviewer) do.
+(matrix, closure, completeness, forward replay, milestone state, upstream backlog, scope resolver, reviewer) do,
+as does the W604 staleness check of step 14.
+
+Two consumers are not run on the folder because they read no 1.1.1 field of a spec artifact: ``extraction-intent-check``
+reads the prompts and ``tools/step_order.json`` only, and seed-lint (W140, W551) reads the seed manifest, the seed
+folder and each artifact as raw text for a token overlap, never a field of it.
 """
 from __future__ import annotations
 
@@ -268,6 +273,20 @@ def test_matrix_names_every_value_it_cannot_compute() -> None:
 def test_traceability_closure_is_silent() -> None:
     assert check_traceability_closure(str(_SPEC)) == []
     assert uncomputed_dimensions(str(_SPEC)) == _SKIPPED_DIMENSIONS
+
+
+def test_step_14_skips_the_stale_matrix_warning_on_the_full_folder(stamped_example: Path) -> None:
+    """W604 reads the 1.1.1 ``fr_refs`` / ``source_milestones``: the folder has none, so it does not fire.
+
+    The example is copied outside ``tests`` (the check skips test fixtures) and has no ``extras/trace_matrix.json``,
+    so a reader that ran would report W604; a roadmap that still carries ``fr_refs`` is the control.
+    """
+    artifact_path = stamped_example / "spec" / "14_roadmap.json"
+    roadmap = json.loads(artifact_path.read_text(encoding="utf-8"))
+    context = {"spec_root": str(stamped_example / "spec"), "artifact_path": str(artifact_path)}
+    assert [e.code for e in DEEP_VALIDATORS["14"](roadmap, str(_ROOT), context) if e.code == "W604"] == []
+    roadmap["milestones"][0]["fr_refs"] = ["fr-password-reset"]
+    assert [e.code for e in DEEP_VALIDATORS["14"](roadmap, str(_ROOT), context) if e.code == "W604"] == ["W604"]
 
 
 def test_completeness_check_json_skips_the_dimensions_it_cannot_compute() -> None:

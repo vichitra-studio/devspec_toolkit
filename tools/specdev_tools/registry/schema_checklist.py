@@ -223,14 +223,18 @@ def _cell(value: str) -> str:
 
 def _row_line(row: ChangeRow) -> str:
     cells = [
-        row.id, f"`{_cell(row.path)}`", row.change, _cell(row.replaced_by or ""), row.owner,
-        ", ".join(row.design), ", ".join(row.tickets), "yes" if row.shim else "",
+        row.id, f"`{_cell(row.path)}`", row.change, _cell(row.replaced_by or ""),
+        ", ".join(row.tickets), "yes" if row.shim else "",
     ]
     return "| " + " | ".join(cells) + " |"
 
 
 def render_checklist(rows: Iterable[ChangeRow]) -> str:
-    """Render the rows as the markdown checklist, grouped by step in order of first appearance."""
+    """Render the rows as the markdown checklist, grouped by step in order of first appearance.
+
+    The ``owner`` and ``design`` fields of a row are planning references: they stay in the rows
+    file and are not rendered.
+    """
     rows = list(rows)
     groups: dict[str, list[ChangeRow]] = {}
     for row in rows:
@@ -249,8 +253,8 @@ def render_checklist(rows: Iterable[ChangeRow]) -> str:
             "",
             f"## {step}",
             "",
-            "| ID | Path | Change | Replaced by | Owner | Design | Tickets | Shim |",
-            "|---|---|---|---|---|---|---|---|",
+            "| ID | Path | Change | Replaced by | Tickets | Shim |",
+            "|---|---|---|---|---|---|",
             *(_row_line(r) for r in group),
         ]
     return "\n".join(lines) + "\n"

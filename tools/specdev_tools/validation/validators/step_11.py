@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from ...core.scope_helpers import as_list, dict_items, str_items
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_artifact, load_sibling_json
 from ...validation._legacy_shim import is_parked_any_shape
@@ -23,7 +24,7 @@ def validate_step_11(
     """
     errors: list[SpecError] = []
 
-    threats = instance.get("threats", [])
+    threats = as_list(instance.get("threats"))
     check_no_duplicates(threats, "threat_id", "threat_id", errors)
     for i, threat in enumerate(threats):
         if not isinstance(threat, dict):
@@ -111,7 +112,7 @@ def _load_entities(
     """
     data = load_sibling_json(artifact_path, step_prefix, fallback_root=toolkit_root)
     items = data.get(array_key) if data is not None else None
-    return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
+    return dict_items(items)
 
 
 def _load_security_invariant_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
@@ -154,7 +155,7 @@ def _fr_ids_from_derives_from(entity: dict[str, Any]) -> set[str]:
 
 def _non_empty_strings(value: Any) -> set[str]:
     """The non-empty strings of *value* when it is a list; an empty set for any other type."""
-    return {item for item in value if isinstance(item, str) and item} if isinstance(value, list) else set()
+    return {item for item in str_items(value) if item}
 
 
 def _load_fr_links_by_id(

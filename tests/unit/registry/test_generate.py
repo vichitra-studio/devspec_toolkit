@@ -248,7 +248,11 @@ class TestNoArraysSteps:
         without_steps = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
         assert "16" not in without_steps
         paths = {a["array_path"] for a in reg_doc["registry"]["16_impl_context.json"]["arrays"]}
-        assert paths == {".plan.ambiguities", ".execution.emergent_ambiguities", ".plan.milestone_index"}
+        # The anchor file holds what 16_anchor.schema.json declares; the plan schema's lists
+        # belong to the plan files and are registered under their glob key.
+        assert paths == {".plan.ambiguities", ".plan.milestone_index"}
+        plan_paths = {a["array_path"] for a in reg_doc["registry"]["impl_context/ms_*_plan.json"]["arrays"]}
+        assert plan_paths == {".plan.spec_alignment.checklist", ".plan.ambiguities", ".execution.emergent_ambiguities"}
 
 
 # ---------------------------------------------------------------------------

@@ -246,8 +246,9 @@ changes:
   - type: change_schema
     description: >
       Step 09: the top-level tech_stack, tech_stack_ref, trace, dependencies and
-      dependency_ref are removed, and milestones is the only required top-level
-      field. Each milestone loses status, deliverables and depends_on and requires
+      dependency_ref are removed, and milestones is the step's own required
+      top-level field (the step-base fields id, owner, created_at and
+      canonical_refs_used stay required). Each milestone loses status, deliverables and depends_on and requires
       schedules (at least one id of a functional requirement, acceptance
       criterion, API, invariant, NFR, component, environment or risk); it gains
       lifecycle, aliases and replaces. The node kind is design-milestone.
@@ -347,7 +348,8 @@ changes:
       execution.critical_evidence, execution.execution_results[].evidence_binding,
       review.fixture_status.test_results and extensions.review_state; review.findings[].spec_ref loses line_range and commit_hash;
       review.fixture_status.implemented_interfaces[] items are plain kebab-case
-      ids. A passed execution.execution_results[] entry requires evidence_ref.
+      ids. A passed execution.execution_results[] entry no longer needs evidence_binding
+      beside evidence_ref.
     migration:
       action: ai_assisted
 
@@ -369,7 +371,9 @@ changes:
     description: >
       Step validators, in the 1.2.0 shape: step 06, 07 and 08 no longer report
       E520 for a missing trace or targets, E530 for a trace-target pattern, or
-      E590 / W590 for a link target; fixtures-lint no longer checks targets. Step
+      E590 / W590 for a link target; fixtures-lint no longer reports E520 (missing
+      targets) or E590 (targets unknown API / FR / Invariant / NFR), a 1.1.1
+      fixture file with targets included; its input / expected checks stay. Step
       09 no longer checks that a deliverable names a capability (E590 / W590).
       Step 10 no longer reports E530 for pr_rules or for a trace type or link
       target. Step 11 no longer reports E520, E530 or E590 for the ids a threat
@@ -380,8 +384,9 @@ changes:
       fr_refs or capability_refs, or E520 / E530 for dependency entries; the cycle
       check (E141), duplicate ids and date checks stay. Step 15: a duplicate
       row_id is reported as E520; the E520 check for a duplicate interface_ref and
-      the E530 check for method are gone. The validators of steps 11, 12, 14, 15
-      and 16 leave a value of the wrong type to the schema instead of raising. The
+      the E530 check for method are gone. The deep validators of steps 06 to 16 do
+      not raise on a value of the wrong type; the schema reports it (a validator
+      may also report its own finding). The
       step 16 anchor no longer emits W607 or W612; a plan file with no milestone
       key is skipped with W608, a plan whose milestone no anchor row is about is
       skipped with W611, and W610 pairs a plan with its row through milestone.
@@ -436,8 +441,10 @@ changes:
       inv becomes invariant, milestone becomes design-milestone (step 09) and
       roadmap-milestone (step 14), and the step 14 dependency entry is removed;
       the kinds rule, scaffold-row, anchor-row, plan-item and ambiguity-item are
-      new. Step 16a is registered under the key impl_context/ms_*_plan.json; 16b
-      and 16c stay deferred.
+      new. Step 16a is registered under the key impl_context/ms_*_plan.json,
+      which holds the plan items and the two ambiguity lists of a plan file
+      (plan.ambiguities, execution.emergent_ambiguities), so registry-check reads
+      those lists in plan files; 16b and 16c stay deferred.
     migration:
       action: none
 
@@ -471,8 +478,9 @@ changes:
       named above. specdev upstream-backlog and milestone-state read both
       ambiguity shapes: an open item (about, no severity) is listed with severity
       null and status open in the unclassified bucket, never fires W613, is never
-      hidden by --severity or --status, and never blocks a group in
-      milestone-state. forward-replay-check no longer reports E555 for an id that lived only in a field removed from the schema when its row in tools/schema_changes.json has shim: true.
+      hidden by --severity (it passes --severity critical), and never blocks a
+      group in milestone-state. --status resolved hides it, as it hides any open
+      record, and reports W617. forward-replay-check no longer reports E555 for an id that lived only in a field removed from the schema when its row in tools/schema_changes.json has shim: true.
     migration:
       action: none
 
@@ -483,8 +491,10 @@ changes:
       prompt-sync E310 checks every prompt); specdev align prompts output and the
       migration templates in prompts/migration/ for steps 06 to 16 still describe
       the 1.1.1 shape; the agent and skill files under .claude/,
-      docs/agents/agents.md, the coverage-matrix and gap-hunter docs and
-      canon/README.md still name removed fields or codes;
+      docs/agents/agents.md, the coverage-matrix and gap-hunter docs,
+      canon/README.md, docs/developers/workflows/workflow_migration.md (links,
+      trace_refs) and docs/developers/design/migration_system_spec.md still name
+      removed fields or codes;
       schema/13a_completeness_assessment still describes fr_refs, and the step 13
       title still mentions the trace matrix; tests/fixtures/spec_corpus stays
       1.1.1-shaped.

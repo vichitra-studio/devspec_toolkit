@@ -2,7 +2,7 @@
   "_notes": {
     "declared_edges": "Hand-carried [producer, consumer] pairs. Steps 13, 13a, 16a, 16b and 16c keep their 1.1.1 context reads (the Trinity steps have no stored links to them yet): M6c retires 13a and M8 gives 16a-16c records with links, and both remove their pairs. [09, 14] and [14, 16] are computed links no annotation carries.",
     "downstream_consumers": "Records which steps actively consume each step's output. Read by 'specdev prompt-context'. NOT used by the forward-replay check (which uses positional ordering in 'steps').",
-    "status_write_exemptions": "Step 16c writes milestones[].status='done' to Steps 09/14 on verified milestones. Without this exemption, file-level change detection triggers E550 requiring full downstream replay, creating an infinite cycle.",
+    "status_write_exemptions": "policy.status_write_exemptions maps a step to field paths whose change alone does not count as a change of that step in forward replay (E550). Only 1.1.1-shaped specs use it: there step 16c wrote milestones[].status to steps 09 and 14. No 1.2.0 schema of step 09 or 14 has that field, so the entries are inert for a 1.2.0 spec; the key stays until a later change removes it.",
     "step_metadata": "Per-step declarative metadata. required_spec_inputs is the inverse of downstream_consumers (producers that feed into this step) \u2014 kept redundant for O(1) lookup and consistency validation."
   },
   "coverage_thresholds": {

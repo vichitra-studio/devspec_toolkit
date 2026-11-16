@@ -448,7 +448,7 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 
 *Prompt: `prompts/prompt_16a_impl_planner.md`*
 
-**Purpose:** Produce a **machine-checkable blueprint** for implementation using the Checklist-Driven Architecture. Every piece of work must be traceable (linked to a specific spec requirement with commit hash), atomic (one checklist item = one testable behavior), explicit (zero "common sense" references), and evidence-bound (every checklist item has a concrete `linked_test_expectation`).
+**Purpose:** Produce a **machine-checkable blueprint** for implementation using the Checklist-Driven Architecture. Every piece of work must be traceable (every checklist item names in `realises` at least one task criterion of the roadmap), atomic (one checklist item = one testable behavior) and explicit (zero "common sense" references).
 
 **User Action:**
 > Open `prompts/prompt_16a_impl_planner.md` in your AI assistant.

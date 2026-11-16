@@ -4,6 +4,7 @@ import os
 import re
 from typing import Any
 
+from ...core.scope_helpers import str_in
 from ...core.errors import make_error, SpecError
 from ...validation.linter_utils import check_no_duplicates, load_canonical_stages
 
@@ -41,7 +42,7 @@ def validate_step_07(instance: dict[str, Any], toolkit_root: str, spec_root: str
         # Stage validation against canonical values
         stage = nfr.get("stage")
         valid_stages = canon_stages if canon_stages else KNOWN_STAGES
-        if stage and stage not in valid_stages:
+        if stage and not str_in(stage, valid_stages):
             errors.append(make_error("E530", f"NFR '{nfr_id}' has invalid stage '{stage}'"))
 
     return errors

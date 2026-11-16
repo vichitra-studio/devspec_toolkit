@@ -252,8 +252,10 @@ def test_render_groups_rows_by_step_and_escapes_pipes() -> None:
     ]})[0]
     text = render_checklist(parsed)
     assert text.count("\n## ") == 2 and text.index("## 00") < text.index("## 01")
-    assert "| SC-00-01 | `a\\|b` | add | c | M2 |" in text
-    assert "| SC-00-02 | `z` | add |  | M2 | DS L1, DS L2 | DEVSPEC-9 | yes |" in text
+    assert "| ID | Path | Change | Replaced by | Tickets | Shim |" in text
+    assert "| SC-00-01 | `a\\|b` | add | c |  |  |" in text
+    assert "| SC-00-02 | `z` | add |  | DEVSPEC-9 | yes |" in text
+    assert "Owner" not in text and "Design" not in text and "DS L1" not in text
 
 
 def test_generate_checklist_raises_naming_the_problem(tmp_path: Path) -> None:

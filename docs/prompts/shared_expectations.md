@@ -44,7 +44,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 - **Objective:** produce a complete, falsifiable artifact for **{{STEP_NAME}}**.
 - **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace`, `links` or `derives_from`, connect to at least one upstream or downstream artifact.
+- **Traceability:** if this step's schema declares link fields (fields marked `x-link`, such as `derives_from`), connect to at least one upstream or downstream artifact.
 
 ## 6. Output Rules (Discovery Phase)
 
@@ -56,7 +56,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
 6. Set `owner` to one of the values defined in `schema/core/atoms.schema.json` owner enum.
-7. If the schema supports `trace`, `links` or `derives_from`, include at least one reference to connect artifacts across steps.
+7. If the schema declares link fields (fields marked `x-link`, such as `derives_from`), include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
 ## 7. Seed Order Protocol

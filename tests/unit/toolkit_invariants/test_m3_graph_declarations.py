@@ -319,7 +319,7 @@ def test_step_08_fixture_declares_verifies_and_removes_links(decls) -> None:
     )
 
 
-def test_step_09_x_links_are_schedules_and_assumes_only(decls) -> None:
+def test_step_09_x_links_are_schedules_and_replaces_only(decls) -> None:
     """The design milestone declares ``schedules`` (required) and the shared ``replaces``: no order link, no same-step kinds."""
     fname = "09_impl_plan.schema.json"
     _assert_links(

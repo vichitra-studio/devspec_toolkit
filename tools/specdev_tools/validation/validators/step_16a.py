@@ -8,7 +8,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
-from .step_16 import _checklist_of, _dicts, validate_step_16
+from ...core.scope_helpers import dict_items, str_items
+from .step_16 import _checklist_of, validate_step_16
 
 
 def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
@@ -40,13 +41,13 @@ def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Option
     # this check in every real Trinity run.
     review = data.get("review")
     if isinstance(review, dict):
-        for finding in _dicts(review.get("findings")):
+        for finding in dict_items(review.get("findings")):
             rem = finding.get("remediation_task")
             if not isinstance(rem, dict):
                 continue
             task_id = rem.get("task_id", "<unknown>")
             linked_ids = rem.get("checklist_ids")
-            unknown = [cid for cid in linked_ids if cid not in seen_ids] if isinstance(linked_ids, list) else []
+            unknown = [cid for cid in str_items(linked_ids) if cid not in seen_ids]
             if unknown:
                 errors.append(make_error(
                     "W584",

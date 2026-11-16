@@ -13,7 +13,6 @@ from unittest import mock
 import pytest
 
 from specdev_tools import cli
-from specdev_tools.validation.extraction_intent_check import check_extraction_intent
 from specdev_tools.validation.forward_replay_check import _prune_removed_paths, check_forward_replay
 from specdev_tools.validation.validators.step_14 import validate_step_14
 
@@ -23,7 +22,9 @@ from specdev_tools.context.scope_resolver import _build_trace_graph, resolve_sco
 from specdev_tools.core.errors import render_errors
 from specdev_tools.core.scope_helpers import is_parked
 from specdev_tools.validation._legacy_shim import (
-    LEGACY_CHARTER_CHAIN_FIELDS,
+    LEGACY_CAPABILITY_GOAL_FIELDS,
+    LEGACY_CAPABILITY_METRIC_FIELDS,
+    LEGACY_CHARTER_GOAL_FIELDS,
     LEGACY_COMPONENT_TRACE_FIELDS,
     LEGACY_PARKED_SCOPES,
     LEGACY_TRACE_FIELDS,
@@ -76,13 +77,16 @@ def _closure_codes(spec_dir: str) -> set[str]:
 
 
 _ALL_LEGACY_NAMES = (
-    LEGACY_TRACE_FIELDS, LEGACY_CHARTER_CHAIN_FIELDS, LEGACY_COMPONENT_TRACE_FIELDS,
+    LEGACY_TRACE_FIELDS, LEGACY_CHARTER_GOAL_FIELDS, LEGACY_CAPABILITY_GOAL_FIELDS,
+    LEGACY_CAPABILITY_METRIC_FIELDS, LEGACY_COMPONENT_TRACE_FIELDS,
 )
 
 
 def test_has_legacy_fields_true_for_1_1_1_shape():
     assert has_legacy_fields(LEGACY_SHAPE.values(), LEGACY_TRACE_FIELDS)
-    assert has_legacy_fields([LEGACY_SHAPE["00_charter.json"]], LEGACY_CHARTER_CHAIN_FIELDS)
+    assert has_legacy_fields([LEGACY_SHAPE["00_charter.json"]], LEGACY_CHARTER_GOAL_FIELDS)
+    assert has_legacy_fields([LEGACY_SHAPE["01_capabilities.json"]], LEGACY_CAPABILITY_GOAL_FIELDS)
+    assert has_legacy_fields([_CAPABILITIES_1_1_1], LEGACY_CAPABILITY_METRIC_FIELDS)
     assert has_legacy_fields([{"component_id": "comp-a", "trace": []}], LEGACY_COMPONENT_TRACE_FIELDS)
     assert has_legacy_fields([{"component_id": "comp-a", "trace_refs": []}], LEGACY_COMPONENT_TRACE_FIELDS)
 
@@ -184,6 +188,25 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     assert "cap-missing" in adjacency["fr-a"], "scope_resolver _build_trace_graph reader"
     review = _run_structural_pass(LEGACY_SHAPE["05_interface_contracts.json"], "", [("", {"fr_id": "fr-a"})])
     assert review.upstream_coverage["covered"] == ["fr-a"], "reviewer _run_structural_pass reader"
+
+
+_CHARTER_METRIC = {"metric_id": "metric-a"}
+_CHARTER_1_1_1 = {"goals": [{"goal_id": "goal-a"}], "success_metrics": [_CHARTER_METRIC]}
+_CHARTER_1_2_0 = {"goals": [{"id": "goal-a"}], "success_metrics": [_CHARTER_METRIC]}
+_CAPABILITIES_1_1_1 = {"capabilities": [{"capability_id": "cap-a", "scope": "in", "trace": [], "success_metric_refs": []}]}
+_CAPABILITIES_1_1_1_TRACE_ONLY = {"capabilities": [{"capability_id": "cap-a", "scope": "in", "trace": []}]}
+_CAPABILITIES_1_2_0 = {"capabilities": [{"capability_id": "cap-a", "scope": "in", "derives_from": ["goal-a"]}]}
+
+
+@pytest.mark.parametrize(("charter", "capabilities", "reports"), [
+    (_CHARTER_1_1_1, _CAPABILITIES_1_1_1, True),
+    (_CHARTER_1_2_0, _CAPABILITIES_1_2_0, False),
+    (_CHARTER_1_1_1, _CAPABILITIES_1_2_0, False),
+    (_CHARTER_1_2_0, _CAPABILITIES_1_1_1_TRACE_ONLY, False),
+], ids=["both-1.1.1", "both-1.2.0", "charter-only-1.1.1", "capabilities-only-1.1.1"])
+def test_e560_chain_runs_only_when_both_sides_carry_the_1_1_1_fields(tmp_path, charter, capabilities, reports):
+    spec_dir = _write_spec(tmp_path, {"00_charter.json": charter, "01_capabilities.json": capabilities})
+    assert ("E560" in _closure_codes(spec_dir)) is reports
 
 
 @pytest.mark.parametrize(("node", "expected"), [
@@ -694,24 +717,6 @@ def test_out_of_scope_fr_ids_needs_a_rationale_and_never_raises():
     assert out_of_scope_fr_ids({}) == set()
 
 
-def _intent_repo(root: Path) -> str:
-    (root / "tools").mkdir(parents=True)
-    (root / "prompts").mkdir()
-    (root / "tools" / "step_order.json").write_text(json.dumps({"steps": ["00", "01", "02"]}), encoding="utf-8")
-    (root / "prompts" / "prompt_02_system_sketch.md").write_text(
-        "### Extraction Intent\n\n- **01_capabilities.json**: Extract capability identifiers and descriptions "
-        "so that every component can be mapped back to one of them accurately\n", encoding="utf-8")
-    return str(root)
-
-
-def test_extraction_intent_deferred_pairs_not_flagged_e597(tmp_path):
-    repo = _intent_repo(tmp_path)
-    assert [e.code for e in check_extraction_intent(repo)] == ["E597"]
-    with mock.patch("specdev_tools.validation.extraction_intent_check.EXTRACTION_INTENT_DEFERRED",
-                    frozenset({("02", "00")})):
-        assert check_extraction_intent(repo) == []
-
-
 @pytest.mark.parametrize(("doc", "paths", "expected"), [
     ({"a": 1, "trace": [1]}, ["trace"], {"a": 1}),
     ({"items": [{"trace": 1, "k": 2}, {"k": 3}]}, ["items[].trace"], {"items": [{"k": 2}, {"k": 3}]}),
@@ -833,13 +838,12 @@ GUARD_SITES = {
     ("validation/validators/step_14.py", "validate_step_14"): "validators/step_14.py W604",
 }
 
-# Every module that imports the shim (guard sites, the other shim functions and the deferral constants).
+# Every module that imports the shim (guard sites and the other shim functions).
 SHIM_CONSUMERS = {
     "cli.py": "completeness-check",
     "context/reviewer.py": "context/reviewer.py",
     "context/scope_resolver.py": "context/scope_resolver.py",
     "validation/cross_artifact_checks.py": "step-02 capability coverage (M2)",
-    "validation/extraction_intent_check.py": "EXTRACTION_INTENT_DEFERRED",
     "validation/forward_replay_check.py": "removed_paths",
     "validation/matrix.py": "validation/matrix.py",
     "validation/traceability_closure.py": "validation/traceability_closure.py",

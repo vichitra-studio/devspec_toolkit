@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ...core.scope_helpers import dict_items, str_items
 from ...core.errors import make_error, SpecError
 from ...validation.linter_utils import check_no_duplicates
 
@@ -13,28 +14,16 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str, spec_root: str
     left to the schema's own error. Never raises on wrong-typed input.
     """
     errors: list[SpecError] = []
-    jobs = _job_dicts(instance)
+    jobs = dict_items(instance.get("jobs"))
     check_no_duplicates(jobs, "job_id", "job_id", errors)
     job_ids = {j["job_id"] for j in jobs if isinstance(j.get("job_id"), str)}
     for job in jobs:
         errors.extend(_step_errors(job))
         errors.extend(_unknown_dependency_errors(job, job_ids))
-    cycle = _has_cycle({j["job_id"]: _depends_on(j) for j in jobs if isinstance(j.get("job_id"), str)})
+    cycle = _has_cycle({j["job_id"]: str_items(j.get("depends_on")) for j in jobs if isinstance(j.get("job_id"), str)})
     if cycle:
         errors.append(make_error("E141", f"Circular dependency detected in job depends_on graph: {cycle}"))
     return errors
-
-
-def _job_dicts(instance: dict[str, Any]) -> list[dict[str, Any]]:
-    """The object entries of ``jobs``; empty when ``jobs`` is not a list."""
-    jobs = instance.get("jobs")
-    return [j for j in jobs if isinstance(j, dict)] if isinstance(jobs, list) else []
-
-
-def _depends_on(job: dict[str, Any]) -> list[str]:
-    """The string entries of a job's ``depends_on``; empty when the field is absent or not a list."""
-    deps = job.get("depends_on")
-    return [d for d in deps if isinstance(d, str)] if isinstance(deps, list) else []
 
 
 def _step_errors(job: dict[str, Any]) -> list[SpecError]:
@@ -53,7 +42,7 @@ def _unknown_dependency_errors(job: dict[str, Any], job_ids: set[str]) -> list[S
     """E590 for every ``depends_on`` entry of *job* that names no job of this spec."""
     return [
         make_error("E590", f"Job '{job.get('job_id')}' depends_on unknown job '{dep}'")
-        for dep in _depends_on(job)
+        for dep in str_items(job.get("depends_on"))
         if dep not in job_ids
     ]
 

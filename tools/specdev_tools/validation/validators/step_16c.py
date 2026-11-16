@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from ...core.scope_helpers import as_dict, dict_items, str_in
 from ...core.errors import make_error, SpecError
 from .step_16b import validate_step_16b
 
@@ -31,7 +32,7 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
     # Verdict must be a valid enum
     verdict = review.get("verdict")
     semantic_review = review.get("semantic_review")
-    if verdict is not None and verdict not in VALID_VERDICTS:
+    if verdict is not None and not str_in(verdict, VALID_VERDICTS):
         errors.append(
             make_error("E520", f"Step 16c: invalid verdict '{verdict}'. "
             f"Must be one of: {', '.join(sorted(VALID_VERDICTS))}")
@@ -44,18 +45,18 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
         elif not semantic_review.get("fr_coverage"):
             errors.append(make_error("E520", "Step 16c: verdict is 'verified' but 'review.semantic_review.fr_coverage' is empty"))
 
-    # Semantic review coverage check
-    if isinstance(semantic_review, dict):
-        fr_coverage = semantic_review.get("fr_coverage", [])
-        if isinstance(fr_coverage, list):
-            seen_fr_ids: set[str] = set()
-            for entry in fr_coverage:
-                if not isinstance(entry, dict):
-                    continue
-                fr_id = entry.get("fr_id")
-                if isinstance(fr_id, str):
-                    if fr_id in seen_fr_ids:
-                        errors.append(make_error("E520", f"Step 16c: duplicate fr_id '{fr_id}' in semantic_review.fr_coverage"))
-                    seen_fr_ids.add(fr_id)
+    errors.extend(_duplicate_fr_id_errors(as_dict(semantic_review).get("fr_coverage")))
+    return errors
 
+
+def _duplicate_fr_id_errors(fr_coverage: Any) -> list[SpecError]:
+    """E520 for every ``fr_id`` that a later ``fr_coverage`` entry repeats."""
+    seen: set[str] = set()
+    errors: list[SpecError] = []
+    for fr_id in (entry.get("fr_id") for entry in dict_items(fr_coverage)):
+        if not isinstance(fr_id, str):
+            continue
+        if fr_id in seen:
+            errors.append(make_error("E520", f"Step 16c: duplicate fr_id '{fr_id}' in semantic_review.fr_coverage"))
+        seen.add(fr_id)
     return errors

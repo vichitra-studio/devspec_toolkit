@@ -5,6 +5,7 @@ import os, json, warnings
 
 from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
+from ..core.scope_helpers import as_str, dict_items, str_items
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
 from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, ALWAYS_EXCLUDED
 from ._legacy_shim import (
@@ -64,18 +65,6 @@ def load_json(path):
         return json.load(f)
 
 
-def _link_entries(entity: dict, field: str) -> list[dict]:
-    """The object entries of the list ``entity[field]``; empty when the field is absent or not a list."""
-    value = entity.get(field)
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
-
-
-def _fr_refs(node: dict) -> list[str]:
-    """The string entries of ``node["fr_refs"]``; empty when the field is absent or not a list."""
-    value = node.get("fr_refs")
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
-
-
 def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[tuple[str, str]]]:
     """
     Generic traversal to find all ID definitions and references.
@@ -114,7 +103,7 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
                 # Check for explicit references (lists of objects with id)
                 if k in REFERENCE_CONTEXTS and isinstance(v, list):
                     for item in v:
-                        if isinstance(item, dict) and "id" in item:
+                        if isinstance(item, dict) and isinstance(item.get("id"), str):
                              references.append((source_file, item["id"]))
                 
                 # Check for direct references (field_ref: "target-id" or field_refs: ["id1", "id2"])
@@ -299,7 +288,7 @@ def build_trace_matrix(
     for p in iter_spec_artifacts(spec_dir):
         try:
             data = load_json(p)
-            artifacts[data.get("id", p)] = data
+            artifacts[data["id"] if isinstance(data.get("id"), str) else p] = data
             path_to_data[p] = data
         except (OSError, json.JSONDecodeError):
             pass
@@ -356,12 +345,12 @@ def build_trace_matrix(
     # Index extension files
     extensions = []
     for art_key, data in artifacts.items():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         # Check if this artifact is an extension file
         art_basename = os.path.basename(art_key) if os.sep in art_key else art_key
         if "13-extension-manifest" in schema or art_basename.startswith("ext_"):
             if "extensions" in data:
-                extensions.extend(data.get("extensions", []))
+                extensions.extend(dict_items(data.get("extensions")))
 
     # Build links
     fr_to_api = collections.defaultdict(set)
@@ -381,8 +370,8 @@ def build_trace_matrix(
     fr_to_api_computed = legacy_api_trace or not apis
     if legacy_api_trace:
         for api in apis.values():
-            for t in _link_entries(api, "trace"):
-                if t.get("type") == _MATRIX_LINK_FR_TYPE and "id" in t:
+            for t in dict_items(api.get("trace")):
+                if t.get("type") == _MATRIX_LINK_FR_TYPE and isinstance(t.get("id"), str):
                     fr_to_api[t["id"]].add(api["api_id"])
 
     # One rule for every link reader: entities of its kind exist and none carries its legacy field, so
@@ -392,23 +381,23 @@ def build_trace_matrix(
     threat_links_computed = has_legacy_fields(threats, LEGACY_THREAT_TARGET_FIELDS) or not threats
     if fixture_links_computed:
         for fx in fixtures:
-            for t in _link_entries(fx, "targets"):
-                if t.get("type") == _MATRIX_LINK_API_TYPE and "id" in t:
+            for t in dict_items(fx.get("targets")):
+                if t.get("type") == _MATRIX_LINK_API_TYPE and isinstance(t.get("id"), str):
                     api_to_fixture[t["id"]].add(fx["fixture_id"])
 
     if nfr_links_computed:
         for n in nfrs:
-            for t in _link_entries(n, "trace"):
-                if t.get("type") == _MATRIX_LINK_API_TYPE and "id" in t:
+            for t in dict_items(n.get("trace")):
+                if t.get("type") == _MATRIX_LINK_API_TYPE and isinstance(t.get("id"), str):
                     api_to_nfr[t["id"]].add(n["nfr_id"])
-                elif t.get("type") == _MATRIX_LINK_FR_TYPE and "id" in t:
+                elif t.get("type") == _MATRIX_LINK_FR_TYPE and isinstance(t.get("id"), str):
                     fr_to_nfr[t["id"]].add(n["nfr_id"])
 
     # Link Threats to APIs
     if threat_links_computed:
         for th in threats:
-            for t in _link_entries(th, "target_ids"):
-                if t.get("type") == _MATRIX_LINK_API_TYPE and "id" in t:
+            for t in dict_items(th.get("target_ids")):
+                if t.get("type") == _MATRIX_LINK_API_TYPE and isinstance(t.get("id"), str):
                     api_to_threat[t["id"]].add(th["threat_id"])
 
     # Exclude FRs that will never be built from the coverage denominator:
@@ -482,7 +471,7 @@ def build_trace_matrix(
         "fr_with_fixture": sum(1 for r in covered_matrix_fixture if r.get("fixtures")),
         "fr_with_nfr": sum(1 for r in covered_matrix if r.get("nfrs")),
         "fr_with_threat": sum(1 for r in covered_matrix if r.get("threats")),
-        "scaffolds_found": len([a for a in artifacts.values() if "15_scaffold" in a.get("$schema", "")]),
+        "scaffolds_found": len([a for a in artifacts.values() if "15_scaffold" in as_str(a.get("$schema"))]),
     }
     if not fr_to_api_computed:
         del coverage["fr_with_api"]
@@ -499,22 +488,22 @@ def build_trace_matrix(
     fr_to_milestones: dict[str, set[str]] = collections.defaultdict(set)
     roadmaps_loaded = roadmaps_read = 0
     for data in artifacts.values():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         if "14-roadmap" in schema or "14_roadmap" in schema:
             roadmaps_loaded += 1
             if not has_legacy_fields([data], LEGACY_ROADMAP_FR_REF_FIELDS):
                 continue
             roadmaps_read += 1
-            for milestone in _link_entries(data, "milestones"):
+            for milestone in dict_items(data.get("milestones")):
                 ms_id = milestone.get("milestone_id")
-                if not ms_id:
+                if not isinstance(ms_id, str) or not ms_id:
                     continue
                 # Collect fr_refs at milestone level
-                for fr_ref in _fr_refs(milestone):
+                for fr_ref in str_items(milestone.get("fr_refs")):
                     fr_to_milestones[fr_ref].add(ms_id)
                 # Collect fr_refs at task level
-                for task in _link_entries(milestone, "tasks"):
-                    for fr_ref in _fr_refs(task):
+                for task in dict_items(milestone.get("tasks")):
+                    for fr_ref in str_items(task.get("fr_refs")):
                         fr_to_milestones[fr_ref].add(ms_id)
     if fr_to_milestones:
         milestone_coverage = {fr: sorted(ms_ids) for fr, ms_ids in sorted(fr_to_milestones.items())}
@@ -539,10 +528,11 @@ def build_trace_matrix(
     mitigation_links_computed = has_legacy_fields(threats, LEGACY_THREAT_MITIGATION_FIELDS) or not threats
     if mitigation_links_computed:
         for th in threats:
-            for mitigation in _link_entries(th, "mitigations"):
-                if _normalize_type(mitigation.get("type", "")) == "invariant":
-                    inv_id = mitigation.get("id", "")
-                    if inv_id:
+            for mitigation in dict_items(th.get("mitigations")):
+                mitigation_type = mitigation.get("type")
+                if isinstance(mitigation_type, str) and _normalize_type(mitigation_type) == "invariant":
+                    inv_id = mitigation.get("id")
+                    if isinstance(inv_id, str) and inv_id:
                         inv_to_threats[inv_id].add(th["threat_id"])
     if inv_to_threats:
         result["invariant_threat_coverage"] = {

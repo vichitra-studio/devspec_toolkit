@@ -213,11 +213,12 @@ class TestCollectIdsAndRefs:
         collect_ids_and_refs({"nfr_refs": ["nfr-a", "nfr-b"]}, "test.json", ids, refs)
         assert len(refs) == 2
 
-    def test_collects_requires_list(self):
+    def test_requires_list_is_not_a_reference_source(self):
+        """No schema declares ``requires`` any more, so a ``requires`` list names no reference."""
         ids: set[str] = set()
         refs: list[tuple[str, str, str]] = []
         collect_ids_and_refs({"requires": ["fr-a", "fr-b"]}, "test.json", ids, refs)
-        assert len(refs) == 2
+        assert refs == []
 
     def test_id_in_reference_context_is_ref(self):
         ids: set[str] = set()

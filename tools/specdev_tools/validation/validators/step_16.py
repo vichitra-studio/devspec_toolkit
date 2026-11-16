@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from ...core.errors import make_error, SpecError
+from ...core.scope_helpers import as_dict, dict_items, str_in, str_items
 from ..linter_utils import extract_command_string
 
 # Checklist type and layer enums — currently hardcoded.  These values mirror the
@@ -20,12 +21,13 @@ VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "meta
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf", "security"})
 
-# checklist_status values of a 1.1.1-shaped plan meaning "paused or permanently cancelled, not absent"
-# (DEVSPEC-122 follow-up); read only by the legacy-guarded E305. # M8 rewrites
-PAUSED_OR_CANCELLED_CHECKLIST_STATUSES = frozenset({"deferred", "wont_do"})
-
 # `disposition.value` of a roadmap task meaning "paused or permanently cancelled, not absent": E304 skips such a task.
 PAUSED_OR_CANCELLED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
+
+# checklist_status values of a 1.1.1-shaped plan with the same meaning (DEVSPEC-122 follow-up); read only by the
+# legacy-guarded E305. M8 deletes this name; the set above stays.
+# M8 rewrites
+PAUSED_OR_CANCELLED_CHECKLIST_STATUSES = PAUSED_OR_CANCELLED_DISPOSITIONS
 
 # Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
 _SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failures")
@@ -148,16 +150,16 @@ def _load_roadmap(spec_path: str) -> Optional[dict[str, Any]]:
     return json.loads(roadmap_path.read_text())
 
 
+# M8 rewrites
 def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
 
-    Keyed on the 1.1.1 ``spec_ref``; a 1.2.0 plan item has none, so on that shape this finds nothing. # M8 rewrites
+    Keyed on the 1.1.1 ``spec_ref``; a 1.2.0 plan item has none, so on that shape this finds nothing.
 
     Groups checklist items by their spec_ref.id and checks that each group has
     both a 'behavior' and a 'validation' type item. Deferred items are included
     in this grouping -- a deferred 'validation' item still satisfies the pairing
-    requirement (it's paused, not absent); only its own proof-of-work fields
-    (implementation, linked_test_expectation) are exempted elsewhere.
+    requirement (it's paused, not absent).
     Non-behavioral spec_ref types ('doc', 'code', 'task') are excluded — these are work items,
     not testable behaviors, and do not require behavior+validation pairing.
     """
@@ -171,13 +173,13 @@ def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: 
         if not isinstance(spec_ref, dict):
             continue
         ref_id = spec_ref.get("id")
-        if not ref_id:
+        if not isinstance(ref_id, str) or not ref_id:
             continue
         # Skip non-behavioral spec_ref types (doc, code, task) — work items, not testable behaviors
-        if spec_ref.get("type") in {"doc", "code", "task"}:
+        if spec_ref.get("type") in ("doc", "code", "task"):
             continue
-        item_type = item.get("type", "")
-        if item_type:
+        item_type = item.get("type")
+        if isinstance(item_type, str) and item_type:
             groups[ref_id].add(item_type)
 
     for ref_id, types in groups.items():
@@ -193,32 +195,18 @@ def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: 
             )
 
 
-def _dict(value: Any) -> dict[str, Any]:
-    """*value* when it is a dict, else an empty dict (a wrong-typed value reads as absent)."""
-    return value if isinstance(value, dict) else {}
-
-
-def _dicts(value: Any) -> list[dict[str, Any]]:
-    """The dict members of *value* when it is a list, else an empty list."""
-    return [v for v in value if isinstance(v, dict)] if isinstance(value, list) else []
-
-
-def _strings(value: Any) -> list[str]:
-    """The string members of *value* when it is a list, else an empty list."""
-    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
-
-
 def _checklist_of(plan: dict[str, Any]) -> list[dict[str, Any]]:
     """The plan items (``plan.spec_alignment.checklist``) that are objects."""
-    return _dicts(_dict(plan.get("spec_alignment")).get("checklist"))
+    return dict_items(as_dict(plan.get("spec_alignment")).get("checklist"))
 
 
+# M8 rewrites
 def _legacy_status(item: dict[str, Any]) -> Optional[str]:
     """``implementation.status`` of a 1.1.1-shaped plan item; ``None`` on the 1.2.0 shape, which stores none.
 
-    The status-keyed rules below run only when this returns a value. # M8 rewrites
+    The status-keyed rules below run only when this returns a value.
     """
-    status = _dict(item.get("implementation")).get("status")
+    status = as_dict(item.get("implementation")).get("status")
     return status if isinstance(status, str) else None
 
 
@@ -228,9 +216,9 @@ def _check_type_and_layer(checklist: list[dict[str, Any]], errors: list[SpecErro
         item_id = item.get("id", "unknown")
         item_type = item.get("type", "")
         item_layer = item.get("layer", "")
-        if item_type not in VALID_CHECKLIST_TYPES:
+        if not str_in(item_type, VALID_CHECKLIST_TYPES):
             errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid type '{item_type}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_TYPES))}"))
-        if item_layer not in VALID_CHECKLIST_LAYERS:
+        if not str_in(item_layer, VALID_CHECKLIST_LAYERS):
             errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_LAYERS))}"))
 
 
@@ -266,7 +254,7 @@ def _check_action_evidence(item_id: str, item_type: str, actions: list[dict[str,
         # AUDIT-032: check that evidence content references at least one spec artifact ID.
         # Only proof-types (TYPES_REQUIRING_PROOF) have an honest fr-/nfr-/inv- tie to
         # cite; non-proof types (metadata, docs, logging, config) legitimately have none.
-        if item_type in TYPES_REQUIRING_PROOF:
+        if str_in(item_type, TYPES_REQUIRING_PROOF):
             combined = " ".join(filter(None, [
                 content if isinstance(content, str) else "",
                 evidence.get("stdout") if isinstance(evidence.get("stdout"), str) else "",
@@ -278,41 +266,48 @@ def _check_action_evidence(item_id: str, item_type: str, actions: list[dict[str,
         errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
 
 
+# M8 rewrites
 def _check_legacy_verified_items(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E301 and the evidence-quality checks (W599, W600, W601) of 1.1.1-shaped plans.
 
-    Runs only for an item that carries ``implementation.status``; a 1.2.0 plan item stores none. # M8 rewrites
+    Runs only for an item that carries ``implementation.status``; a 1.2.0 plan item stores none.
     """
     for item in checklist:
         status = _legacy_status(item)
         if status not in ("verified", "in_progress"):
             continue
         item_id = item.get("id", "unknown")
-        actions = _dicts(_dict(item.get("implementation")).get("actions"))
+        actions = dict_items(as_dict(item.get("implementation")).get("actions"))
         if status == "verified" and not actions:
             errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but has no actions."))
         elif status == "verified":
             _check_action_evidence(item_id, item.get("type", ""), actions, errors)
 
 
+# M8 rewrites
+def _legacy_touched_files(checklist: list[dict[str, Any]]) -> set[str]:
+    """The ``implementation.files_touched`` of the started items (``in_progress`` or ``verified``) of a 1.1.1-shaped plan."""
+    touched: set[str] = set()
+    for item in checklist:
+        if _legacy_status(item) in ("in_progress", "verified"):
+            touched.update(str_items(as_dict(item.get("implementation")).get("files_touched")))
+    return touched
+
+
 def _touched_files(checklist: list[dict[str, Any]], execution_files: set[str]) -> set[str]:
     """Files the plan says it touches: ``execution.files_touched`` plus, on legacy plans, the files of started items."""
-    touched = set(execution_files)
-    for item in checklist:
-        if _legacy_status(item) in ("in_progress", "verified"):  # M8 rewrites
-            touched.update(_strings(_dict(item.get("implementation")).get("files_touched")))
-    return touched
+    return set(execution_files) | _legacy_touched_files(checklist)
 
 
 def _check_target_patterns_and_scope(data: dict[str, Any], plan: dict[str, Any], checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E520 for touched files outside ``target_file_patterns``; W603 for execution files outside any declared scope."""
-    summary = _dict(plan.get("summary"))
-    summary_patterns = set(_strings(summary.get("target_file_patterns")))
-    execution_files = set(_strings(_dict(data.get("execution")).get("files_touched")))
+    summary = as_dict(plan.get("summary"))
+    summary_patterns = set(str_items(summary.get("target_file_patterns")))
+    execution_files = set(str_items(as_dict(data.get("execution")).get("files_touched")))
 
     # AUDIT-087: scope-binding check -- execution.files_touched not declared in any item's files_touched.
-    declared = {f for item in checklist for f in _strings(_dict(item.get("implementation")).get("files_touched"))}
-    milestone_files = set(_strings(summary.get("milestone_supporting_files")))
+    declared = {f for item in checklist for f in str_items(as_dict(item.get("implementation")).get("files_touched"))}
+    milestone_files = set(str_items(summary.get("milestone_supporting_files")))
     for f in execution_files:
         if f not in declared and f not in milestone_files:
             errors.append(make_error(
@@ -339,7 +334,7 @@ def _load_doc_patterns(spec_path: Optional[str], spec_root: Optional[str], error
     except (OSError, ValueError):
         errors.append(make_error("W570", "Failed to read seed_manifest.json; cannot validate docs_impact doc paths."))
         return None
-    doc_patterns = _dict(manifest).get("doc_paths") or []
+    doc_patterns = as_dict(manifest).get("doc_paths") or []
     if not isinstance(doc_patterns, list) or not doc_patterns:
         errors.append(make_error("W570", "seed_manifest.json missing doc_paths; cannot validate docs_impact doc paths."))
         return None
@@ -362,7 +357,7 @@ def _check_docs_impact(plan: dict[str, Any], checklist: list[dict[str, Any]], sp
     code_change_targets = [
         target
         for item in checklist
-        for action in _dicts(_dict(item.get("implementation")).get("actions"))
+        for action in dict_items(as_dict(item.get("implementation")).get("actions"))
         if action.get("type") in ("file_create", "file_edit")
         for target in [action.get("target", "")]
         if isinstance(target, str) and target and not _is_doc_path(target, doc_patterns)
@@ -379,7 +374,7 @@ def _check_docs_impact(plan: dict[str, Any], checklist: list[dict[str, Any]], sp
     if not docs_touched:
         errors.append(make_error("E520", "plan.docs_impact.docs_touched must be provided when code changes are present."))
     elif doc_patterns:
-        for doc_path in _strings(docs_touched):
+        for doc_path in str_items(docs_touched):
             if not _is_doc_path(doc_path, doc_patterns):
                 errors.append(make_error("E520", f"plan.docs_impact.docs_touched contains non-doc path: {doc_path}"))
 
@@ -392,7 +387,7 @@ def _executed_commands(data: dict[str, Any]) -> tuple[set[str], set[str]]:
     """
     passed: set[str] = set()
     acknowledged: set[str] = set()
-    for result in _dicts(_dict(data.get("execution")).get("execution_results")):
+    for result in dict_items(as_dict(data.get("execution")).get("execution_results")):
         status, cmd = result.get("status"), result.get("command")
         if not isinstance(cmd, str):
             continue
@@ -405,11 +400,11 @@ def _executed_commands(data: dict[str, Any]) -> tuple[set[str], set[str]]:
 
 def _check_proof_closure(data: dict[str, Any], plan: dict[str, Any], errors: list[SpecError]) -> None:
     """E301 MISSING_PROOF_CLOSURE (D22), E302 UNPROVEN_VERIFIED_REVIEW (D23) and E303 CI_GATE_VIOLATION."""
-    review_reqs = _dict(plan.get("review_requirements"))
+    review_reqs = as_dict(plan.get("review_requirements"))
     test_commands = review_reqs.get("test_commands", [])
     test_commands = test_commands if isinstance(test_commands, list) else []
     execution = data.get("execution", {})
-    execution_results = _dict(execution).get("execution_results")
+    execution_results = as_dict(execution).get("execution_results")
     passed_commands, acknowledged_commands = _executed_commands(data)
 
     # A plan stores no status since 1.2.0 (the anchor holds a milestone's deferral): an absent status is an active plan.
@@ -422,7 +417,7 @@ def _check_proof_closure(data: dict[str, Any], plan: dict[str, Any], errors: lis
                     f"by review_requirements but not found in execution_results with status=passed")
                 )
 
-    review = _dict(data.get("review"))
+    review = as_dict(data.get("review"))
     verdict = review.get("verdict")
     if verdict != "verified":
         return
@@ -443,7 +438,7 @@ def _check_proof_closure(data: dict[str, Any], plan: dict[str, Any], errors: lis
         )
 
     # E303 -- ci_status gate (Task 7-04 AUDIT-032: strengthened to reject anything not explicitly 'green')
-    ci_status_val = _dict(review.get("fixture_status")).get("ci_status")
+    ci_status_val = as_dict(review.get("fixture_status")).get("ci_status")
     if ci_status_val is None:
         errors.append(
             make_error("E303", "CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status is absent or "
@@ -458,12 +453,12 @@ def _check_proof_closure(data: dict[str, Any], plan: dict[str, Any], errors: lis
 
 def _realised_criteria(checklist: list[dict[str, Any]]) -> set[str]:
     """Every criterion id some plan item ``realises``."""
-    return {cid for item in checklist for cid in _strings(item.get("realises"))}
+    return {cid for item in checklist for cid in str_items(item.get("realises"))}
 
 
 def _is_set_aside(task: dict[str, Any]) -> bool:
     """True when the roadmap task carries a ``disposition`` of ``deferred`` or ``wont_do`` (paused or cancelled, not absent)."""
-    return _dict(task.get("disposition")).get("value") in PAUSED_OR_CANCELLED_DISPOSITIONS
+    return str_in(as_dict(task.get("disposition")).get("value"), PAUSED_OR_CANCELLED_DISPOSITIONS)
 
 
 def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]], roadmap: dict[str, Any], errors: list[SpecError]) -> None:
@@ -475,36 +470,37 @@ def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]
     milestone_id = data.get("milestone")
     if not isinstance(milestone_id, str):
         return
-    milestone = next((m for m in _dicts(roadmap.get("milestones")) if m.get("milestone_id") == milestone_id), None)
+    milestone = next((m for m in dict_items(roadmap.get("milestones")) if m.get("milestone_id") == milestone_id), None)
     if milestone is None:
         errors.append(make_error("E304", f"ROADMAP_MILESTONE_UNKNOWN: plan milestone '{milestone_id}' is not a milestone of 14_roadmap.json"))
         return
     realised = _realised_criteria(checklist)
-    for task in _dicts(milestone.get("tasks")):
+    for task in dict_items(milestone.get("tasks")):
         task_id = task.get("task_id")
         if not isinstance(task_id, str) or _is_set_aside(task):
             continue
-        criteria = {c.get("criterion_id") for c in _dicts(task.get("acceptance_criteria"))}
+        criteria = {c.get("criterion_id") for c in dict_items(task.get("acceptance_criteria"))}
         if not criteria & realised:
             errors.append(
                 make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' of milestone '{milestone_id}' has no plan item that realises one of its acceptance criteria")
             )
 
 
+# M8 rewrites
 def _check_planned_vs_executed(data: dict[str, Any], checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E305 PLANNED_UNEXECUTED: a green legacy plan lists an active item that ``critical_evidence`` does not satisfy.
 
-    Runs only when a plan item carries ``implementation.status``; the 1.2.0 shape stores neither. # M8 rewrites
+    Runs only when a plan item carries ``implementation.status``; the 1.2.0 shape stores neither.
     """
     if not any(_legacy_status(item) for item in checklist):
         return
-    execution = _dict(data.get("execution"))
-    if _dict(execution.get("final_status")).get("ci_status") != "green":
+    execution = as_dict(data.get("execution"))
+    if as_dict(execution.get("final_status")).get("ci_status") != "green":
         return
-    satisfied_ids = set(_strings(_dict(execution.get("critical_evidence")).get("satisfied_checklist_ids")))
+    satisfied_ids = set(str_items(as_dict(execution.get("critical_evidence")).get("satisfied_checklist_ids")))
     for item in sorted(checklist, key=lambda i: str(i.get("id"))):
         item_id = item.get("id")
-        if not isinstance(item_id, str) or item.get("checklist_status") in PAUSED_OR_CANCELLED_CHECKLIST_STATUSES:
+        if not isinstance(item_id, str) or str_in(item.get("checklist_status"), PAUSED_OR_CANCELLED_CHECKLIST_STATUSES):
             continue
         if item_id in satisfied_ids:
             continue
@@ -517,7 +513,7 @@ def _check_planned_vs_executed(data: dict[str, Any], checklist: list[dict[str, A
 
 def _check_fr_coverage_against_step_04(data: dict[str, Any], spec_path: str, errors: list[SpecError]) -> None:
     """E306: every ``review.semantic_review.fr_coverage[].fr_id`` is a functional requirement of Step 04."""
-    fr_coverage = _dict(_dict(data.get("review")).get("semantic_review")).get("fr_coverage")
+    fr_coverage = as_dict(as_dict(data.get("review")).get("semantic_review")).get("fr_coverage")
     if not isinstance(fr_coverage, list) or not fr_coverage:
         return
     artifact_path = Path(spec_path)
@@ -530,8 +526,8 @@ def _check_fr_coverage_against_step_04(data: dict[str, Any], spec_path: str, err
         fr_data = json.loads(fr_list_path.read_text())
     except (OSError, json.JSONDecodeError):
         return  # Step 04 unreadable -- skip E306
-    known_fr_ids = {fr.get("fr_id") for fr in _dicts(_dict(fr_data).get("functional_requirements")) if fr.get("fr_id")}
-    for entry in _dicts(fr_coverage):
+    known_fr_ids = {fr.get("fr_id") for fr in dict_items(as_dict(fr_data).get("functional_requirements")) if fr.get("fr_id")}
+    for entry in dict_items(fr_coverage):
         fr_id = entry.get("fr_id")
         if isinstance(fr_id, str) and fr_id not in known_fr_ids:
             errors.append(
@@ -576,7 +572,7 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
         return list(_step16_cache[cache_key])  # Return a copy
 
     errors: list[SpecError] = []
-    plan = _dict(data.get("plan"))
+    plan = as_dict(data.get("plan"))
     checklist = _checklist_of(plan)
 
     _check_type_and_layer(checklist, errors)

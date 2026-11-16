@@ -93,8 +93,7 @@ def collect_ids_and_refs(
 
     An ID is any value under a key ending in ``_id``, or ``"id"`` when NOT in
     a reference context.  A ref is ``"id"`` or ``"target_id"`` inside a
-    reference context, any ``*_ref`` string, any item in ``*_refs`` lists,
-    or items in ``"requires"`` lists.
+    reference context, any ``*_ref`` string, or any item in ``*_refs`` lists.
 
     Parameters
     ----------
@@ -121,10 +120,6 @@ def collect_ids_and_refs(
             if k.endswith("_ref") and isinstance(v, str):
                 refs.append((rel, p, v))
             if k.endswith("_refs") and isinstance(v, list):
-                for idx, item in enumerate(v):
-                    if isinstance(item, str):
-                        refs.append((rel, f"{p}[{idx}]", item))
-            if k == "requires" and isinstance(v, list):
                 for idx, item in enumerate(v):
                     if isinstance(item, str):
                         refs.append((rel, f"{p}[{idx}]", item))

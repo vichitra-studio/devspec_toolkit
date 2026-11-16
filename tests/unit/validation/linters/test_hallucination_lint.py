@@ -39,7 +39,7 @@ class HallucinationLintTests(unittest.TestCase):
                             {
                                 "job_id": "job-1",
                                 "steps": [{"id": "s-1", "command": "inventcmd run"}],
-                                "requires": ["job-x"],
+                                "job_refs": ["job-x"],
                             }
                         ]
                     }

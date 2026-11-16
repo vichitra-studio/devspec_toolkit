@@ -112,7 +112,8 @@ def test_fixture_registry_has_nested_map_keyed_roles_and_links(mini_toolkit):
     assert env[0]["links"][0]["field"] == "derives_from"
 
     assert _arrays(reg, "05_interface_contracts.json")[0]["array_path"] == ".interface.apis"
-    assert _arrays(reg, "16_impl_context.json")[0]["array_path"] == ".plan_items"
+    # the plan schema describes the per-milestone plan files: its entries sit under their glob key
+    assert _arrays(reg, "impl_context/ms_*_plan.json")[0]["array_path"] == ".plan_items"
     assert _arrays(reg, "01_capabilities.json")[0]["array_path"] == ".capabilities"
     assert reg["external_kinds"] == [{
         "kind": "seed", "source_file": "common/seed_manifest.json",
@@ -378,8 +379,8 @@ def test_files_glob_becomes_registry_key(edit_json, mini_toolkit):
     reg, ext = _generate(root)
     assert "16_impl_context.json" not in reg["registry"]
     entry = reg["registry"]["impl_context/ms_*_plan.json"]
-    assert entry["step"] == "16" and entry["arrays"][0]["array_path"] == ".plan_items"
-    assert "impl_context/ms_*_plan.json" in ext["16"]
+    assert entry["step"] == "16a" and entry["arrays"][0]["array_path"] == ".plan_items"
+    assert "impl_context/ms_*_plan.json" in ext["16a"]
     assert list(Draft202012Validator(json.loads(_REG_SCHEMA.read_text())).iter_errors(reg)) == []
     assert not any(s["step"] == "16" for s in reg["steps_without_entry_arrays"])
 

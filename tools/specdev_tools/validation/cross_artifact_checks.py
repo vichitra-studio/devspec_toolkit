@@ -14,6 +14,7 @@ import warnings
 from typing import Any
 
 from ..core.errors import SpecError, make_error
+from ..core.scope_helpers import as_str
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 from ._legacy_shim import LEGACY_COMPONENT_TRACE_FIELDS, has_legacy_fields
 
@@ -60,7 +61,7 @@ def collect_capability_ids(artifacts: dict[str, Any]) -> set[str]:
     """Index capability IDs across all Step 01 artifacts."""
     capability_ids: set[str] = set()
     for data in artifacts.values():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         if "01_capabilities" in schema:
             for cap in data.get("capabilities", []):
                 if cap.get("capability_id"):
@@ -141,7 +142,7 @@ def check_step_02_integrity(
     errors: list[SpecError] = []
 
     for path, data in artifacts.items():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         if "02_system_sketch" not in schema:
             continue
 
@@ -221,7 +222,7 @@ def collect_glossary_term_ids(artifacts: dict[str, Any]) -> set[str]:
     """Index glossary term IDs (lowercased) across all Step 03 artifacts."""
     glossary_term_ids: set[str] = set()
     for data in artifacts.values():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         if "03_glossary" not in schema:
             continue
         for term in data.get("terms", []):
@@ -242,7 +243,7 @@ def check_step_03_integrity(artifacts: dict[str, Any]) -> list[SpecError]:
     errors: list[SpecError] = []
 
     for path, data in artifacts.items():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         if "03_glossary" not in schema:
             continue
 
@@ -314,7 +315,7 @@ def check_step_04_integrity(
     errors: list[SpecError] = []
 
     for path, data in artifacts.items():
-        schema = data.get("$schema", "")
+        schema = as_str(data.get("$schema"))
         if "04_fr_list" not in schema:
             continue
 

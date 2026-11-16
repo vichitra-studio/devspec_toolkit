@@ -115,13 +115,14 @@
   "16": {
     "16_impl_context.json": [
       ".plan.ambiguities",
-      ".execution.emergent_ambiguities",
       ".plan.milestone_index"
     ]
   },
   "16a": {
     "impl_context/ms_*_plan.json": [
-      ".plan.spec_alignment.checklist"
+      ".plan.spec_alignment.checklist",
+      ".plan.ambiguities",
+      ".execution.emergent_ambiguities"
     ]
   },
   "_meta": {

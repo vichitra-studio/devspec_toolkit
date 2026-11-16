@@ -2002,28 +2002,6 @@
           "source": "x-node"
         },
         {
-          "array_path": ".execution.emergent_ambiguities",
-          "contract": [
-            "description",
-            "decision",
-            "proposed_assumption",
-            "missing_kind"
-          ],
-          "id_field": "id",
-          "kind": "ambiguity-item",
-          "links": [
-            {
-              "built": false,
-              "field": "about",
-              "kinds": "*",
-              "required": true,
-              "same_step_kinds": []
-            }
-          ],
-          "role": "record",
-          "source": "x-node"
-        },
-        {
           "array_path": ".plan.milestone_index",
           "contract": [
             "summary",
@@ -2079,6 +2057,50 @@
             }
           ],
           "role": "plan",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".plan.ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
+          "id_field": "id",
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".execution.emergent_ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
+          "id_field": "id",
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
           "source": "x-node"
         }
       ],

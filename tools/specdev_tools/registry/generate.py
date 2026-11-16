@@ -99,6 +99,14 @@ STEP_EXTRA_HOSTS: dict[str, tuple[str, ...]] = {
     "16": ("16_anchor.schema.json",),
 }
 
+#: Host schemas that describe per-milestone files, not the step's own spec file: every entry of
+#: such a host without its own ``files`` registers under this glob, for this step.  Key: schema
+#: path relative to the toolkit root.  (``16_impl_context.schema.json`` is the plan-file schema;
+#: the anchor file ``16_impl_context.json`` is ``16_anchor.schema.json``.)
+PLAN_FILE_HOSTS: dict[str, tuple[str, str]] = {
+    "schema/16_impl_context.schema.json": ("16a", "impl_context/ms_*_plan.json"),
+}
+
 #: Steps whose entries live in per-milestone files, not spec/NN_*.json, and no annotation registers.
 DEFERRED_STEPS: frozenset[str] = frozenset(["16b", "16c"])
 
@@ -537,11 +545,16 @@ def _in_slot(registry: dict[str, dict[str, Any]], key: str, entry: dict[str, Any
 
 
 def _register_host_entries(
-    registry: dict[str, dict[str, Any]], host: HostScan, step: str, arrays: list[dict[str, Any]]
+    registry: dict[str, dict[str, Any]],
+    host: HostScan,
+    step: str,
+    arrays: list[dict[str, Any]],
+    default_files: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], set[str]]:
     """Register one step host's annotation entries; return ``(arrays, claimed glob keys)``.
 
-    An occurrence with ``files`` goes under each glob key (step *step* unless it names its own).
+    An occurrence with ``files`` (or, lacking its own, *default_files*) goes under each glob key
+    (step *step* unless it names its own).
     Any other occurrence is added to the returned *arrays*; when the heuristic scan already
     found its path, the declared entry replaces the heuristic one in place, so a kind declared
     once carries one name in every host.  The *arrays* argument itself is not modified.
@@ -549,8 +562,9 @@ def _register_host_entries(
     out = list(arrays)
     claimed: set[str] = set()
     for occ in host.occurrences:
-        if occ.files:
-            for glob_key in occ.files:
+        files = occ.files or default_files
+        if files:
+            for glob_key in files:
                 _register_glob_entry(registry, glob_key, occ.step or step, occ.entry)
                 claimed.add(glob_key)
             continue
@@ -572,13 +586,18 @@ def _register_step_hosts(
     """Register the annotation entries of every host schema file of *step*, in *schema_files* order.
 
     Each file is a schema path relative to the toolkit root; a file that is no host adds nothing.
+    A file in ``PLAN_FILE_HOSTS`` registers all its entries under its plan-file glob.
     Returns the step's ``(arrays, claimed glob keys)`` as ``_register_host_entries`` does.
     """
     claimed: set[str] = set()
     for rel in schema_files:
         host = scan.host(rel)
         if host is not None:
-            arrays, keys = _register_host_entries(registry, host, step, arrays)
+            if rel in PLAN_FILE_HOSTS:
+                plan_step, glob_key = PLAN_FILE_HOSTS[rel]
+                arrays, keys = _register_host_entries(registry, host, plan_step, arrays, [glob_key])
+            else:
+                arrays, keys = _register_host_entries(registry, host, step, arrays)
             claimed |= keys
     return arrays, claimed
 

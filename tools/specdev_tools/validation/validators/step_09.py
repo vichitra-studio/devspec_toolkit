@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from ...core.scope_helpers import as_list, dict_items
 from ...core.errors import make_error, SpecError
 from ...validation.linter_utils import check_no_duplicates
 
@@ -13,9 +14,10 @@ def validate_step_09(instance: dict[str, Any], toolkit_root: str, spec_root: str
     ``toolkit_root`` and ``spec_root`` are the dispatcher's common signature; no check reads another step.
     """
     errors: list[SpecError] = []
-    check_no_duplicates(instance.get("milestones", []), "milestone_id", "milestone_id", errors)
+    milestones = as_list(instance.get("milestones"))
+    check_no_duplicates(milestones, "milestone_id", "milestone_id", errors)
     dates: list[tuple[str, str]] = []
-    for milestone in instance.get("milestones", []):
+    for milestone in dict_items(milestones):
         milestone_id = milestone.get("milestone_id")
         target_date = milestone.get("target_date")
         if isinstance(target_date, str):

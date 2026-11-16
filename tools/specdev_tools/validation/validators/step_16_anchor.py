@@ -25,25 +25,16 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
+from ...core.scope_helpers import as_dict, as_list
 from ...lifecycle.plans import MILESTONE_KEY, PLAN_DIR_NAME, find_plan
 from .step_16 import _is_anchor
 
 _PLAN_SCHEMA = "vc:16-impl-context"
 
 
-def _as_list(value: Any) -> list[Any]:
-    """*value* when it is a list, else an empty list (a wrong-typed value is the schema's finding, not a crash)."""
-    return value if isinstance(value, list) else []
-
-
-def _as_dict(value: Any) -> dict[str, Any]:
-    """*value* when it is an object, else an empty dict."""
-    return value if isinstance(value, dict) else {}
-
-
 def _row_milestone(row: dict[str, Any]) -> str:
     """The milestone a ``milestone_index`` row is about: its ``about`` item, else the row id, else the old ``milestone_id``."""
-    about = _as_list(row.get("about"))
+    about = as_list(row.get("about"))
     for candidate in (about[0] if about else None, row.get("anchor_id"), row.get("milestone_id")):
         if isinstance(candidate, str) and candidate:
             return candidate
@@ -82,8 +73,8 @@ def validate_step_16_anchor(
         ]
 
     errors = _legacy_schema_errors(data)
-    plan = _as_dict(data.get("plan"))
-    rows = [row for row in _as_list(plan.get("milestone_index")) if isinstance(row, dict)]
+    plan = as_dict(data.get("plan"))
+    rows = [row for row in as_list(plan.get("milestone_index")) if isinstance(row, dict)]
     errors.extend(_drift_staleness_errors(plan, rows))
     errors.extend(_row_errors(rows))
 
@@ -135,7 +126,7 @@ def _legacy_schema_errors(data: dict[str, Any]) -> list[SpecError]:
 
 def _drift_staleness_errors(plan: dict[str, Any], rows: list[dict[str, Any]]) -> list[SpecError]:
     """W587 when milestones are registered but ``plan.drift.checks`` records no drift check."""
-    checks = _as_list(_as_dict(plan.get("drift")).get("checks"))
+    checks = as_list(as_dict(plan.get("drift")).get("checks"))
     if not rows or checks:
         return []
     return [
@@ -184,7 +175,7 @@ def _ownership_errors(row: dict[str, Any], milestone: str, owner_of: dict[str, s
     Reads the removed ``fr_refs``: a no-op on the 1.2.0 row shape, which has none.
     """
     errors: list[SpecError] = []
-    for ref_id in _as_list(row.get("fr_refs")):  # M8 rewrites: re-keyed onto the computed 14 fr_refs
+    for ref_id in as_list(row.get("fr_refs")):  # M8 rewrites: re-keyed onto the computed 14 fr_refs
         if not isinstance(ref_id, str):
             continue
         if ref_id not in owner_of:
@@ -224,8 +215,8 @@ def _cross_file_errors(anchor_path: Path, plan: dict[str, Any], rows: list[dict[
         return []  # No milestone plans yet — a valid state for a fresh anchor.
     row_milestones = {_row_milestone(row) for row in rows}
     contexts, errors = _scan_plan_files(impl_context_dir, row_milestones)
-    summary = _as_dict(plan.get("summary"))
-    errors.extend(_scope_drift_errors(_as_list(summary.get("scope_in")), _as_list(summary.get("scope_out")), contexts))
+    summary = as_dict(plan.get("summary"))
+    errors.extend(_scope_drift_errors(as_list(summary.get("scope_in")), as_list(summary.get("scope_out")), contexts))
     errors.extend(_mapping_drift_errors(contexts))
     errors.extend(_prefix_errors(spec_root, rows, contexts))
     return errors
@@ -319,10 +310,10 @@ def _scope_drift_errors(
     in_set = {s.strip().lower() for s in anchor_scope_in if isinstance(s, str)}
     out_set = {s.strip().lower() for s in anchor_scope_out if isinstance(s, str)}
     for ms_file, ms_data in contexts.items():
-        ms_summary = _as_dict(_as_dict(ms_data.get("plan")).get("summary"))
+        ms_summary = as_dict(as_dict(ms_data.get("plan")).get("summary"))
         ms_name = Path(ms_file).name
         for field, anchor_set, anchor_field in (("scope_in", out_set, "scope_out"), ("scope_out", in_set, "scope_in")):
-            for item in _as_list(ms_summary.get(field)):
+            for item in as_list(ms_summary.get(field)):
                 if isinstance(item, str) and item.strip().lower() in anchor_set:
                     errors.append(
                         make_error(
@@ -336,7 +327,7 @@ def _scope_drift_errors(
 
 def _checklist(ms_data: dict[str, Any]) -> list[Any]:
     """The ``plan.spec_alignment.checklist`` list of a plan file."""
-    return _as_list(_as_dict(_as_dict(ms_data.get("plan")).get("spec_alignment")).get("checklist"))
+    return as_list(as_dict(as_dict(ms_data.get("plan")).get("spec_alignment")).get("checklist"))
 
 
 def _mapping_drift_errors(contexts: dict[str, dict[str, Any]]) -> list[SpecError]:

@@ -3,6 +3,8 @@
 A guarded reader runs only when the artifacts that reader itself reads still carry a field that
 reader itself reads (one constant per reader or group of readers; never "any loaded artifact").
 There is no old-to-new translation: new-shape data skips the reader and yields no finding.
+A guard counts a field anywhere in the whole array it reads: one array that holds entries of both shapes
+(some carrying the 1.1.1 field, some not) turns the 1.1.1 reader on for every entry of that array.
 Deleting this module means deleting every use of ``has_legacy_fields`` and the ``LEGACY_*`` names;
 the callers of ``is_parked_any_shape`` go back to ``core.scope_helpers.is_parked``.
 """
@@ -20,9 +22,13 @@ from ..core.scope_helpers import is_parked, scope_in
 # `traceability_closure.py`, and FR-to-API coverage (05 apis) in `matrix.py`.
 LEGACY_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
 
-# Charter -> capabilities chain: read by E560 in `traceability_closure.py` (charter `goal_id`,
-# capability `trace` and `success_metric_refs`).
-LEGACY_CHARTER_CHAIN_FIELDS: frozenset[str] = frozenset({"goal_id", "trace", "success_metric_refs"})
+# Charter -> capabilities chain, read by E560 in `traceability_closure.py`. Each half needs both sides, so a pair
+# with one side migrated reports nothing for it: the goal half runs only when the charter carries `goal_id` AND the
+# capabilities carry `trace`; the metric half runs when the capabilities carry `success_metric_refs` (the charter
+# `metric_id` exists in both shapes, so it cannot gate).
+LEGACY_CHARTER_GOAL_FIELDS: frozenset[str] = frozenset({"goal_id"})
+LEGACY_CAPABILITY_GOAL_FIELDS: frozenset[str] = frozenset({"trace"})
+LEGACY_CAPABILITY_METRIC_FIELDS: frozenset[str] = frozenset({"success_metric_refs"})
 
 # Step-02 capability-coverage reader in `cross_artifact_checks.py` (component `trace` / `trace_refs`).
 LEGACY_COMPONENT_TRACE_FIELDS: frozenset[str] = frozenset({"trace", "trace_refs"})
@@ -65,12 +71,6 @@ LEGACY_SCOPE_LINK_FIELDS: frozenset[str] = frozenset({"trace", "targets", "fr_re
 
 # `trace` arrays: the structural review in `context/reviewer.py` (coverage and reverse trace) counts them.
 LEGACY_REVIEWER_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
-
-# (prompt step, upstream step) pairs `extraction_intent_check.py` does not report as E597: the
-# derived-only edges of the `step_order.json` cutover whose prompt text still lacks an entry.
-# Empty: on the generated step order every prompt of the toolkit has an entry for each required
-# input (test_extraction_intent_deferral_generated_from_computed_diff pins this).
-EXTRACTION_INTENT_DEFERRED: frozenset[tuple[str, str]] = frozenset()
 
 # The 1.1.1 spellings of a parked node: a capability with `scope: future` and an FR with
 # `priority: wont-have`. Readers that can meet a legacy file (`matrix.py`, `traceability_closure.py`,

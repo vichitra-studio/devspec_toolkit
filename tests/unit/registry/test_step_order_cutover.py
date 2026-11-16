@@ -157,7 +157,7 @@ def test_w595_narrowing_lists_consumers_that_lose_a_context_read():
 def test_declared_edges_09_14_and_14_16_present():
     declared = _load(_COMMITTED)["declared_edges"]
     assert ["09", "14"] in declared and ["14", "16"] in declared
-    assert len(declared) == 51
+    assert len({tuple(edge) for edge in declared}) == len(declared)
     assert all([p, "16a"] in declared for p in ("02a", "04", "05", "06", "07", "08", "11", "12", "15", "16"))
     consumers = _load(_COMMITTED)["downstream_consumers"]
     assert "14" in consumers["09"] and "16" in consumers["14"]

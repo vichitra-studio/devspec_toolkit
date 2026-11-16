@@ -5,9 +5,12 @@ import warnings
 from typing import Any
 
 from ..core.errors import SpecError, make_error
+from ..core.scope_helpers import as_dict, as_list, dict_items, str_items
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 from ._legacy_shim import (
-    LEGACY_CHARTER_CHAIN_FIELDS,
+    LEGACY_CAPABILITY_GOAL_FIELDS,
+    LEGACY_CAPABILITY_METRIC_FIELDS,
+    LEGACY_CHARTER_GOAL_FIELDS,
     LEGACY_DELIVERABLE_FIELDS,
     LEGACY_FIXTURE_COVERAGE_FIELDS,
     LEGACY_PLAN_CHECKLIST_FIELDS,
@@ -139,7 +142,7 @@ def _load_milestone_plans_from_anchor(
 
     if not isinstance(anchor_data, dict):
         return [], errors
-    milestone_index = anchor_data.get("plan", {}).get("milestone_index", [])
+    milestone_index = as_dict(anchor_data.get("plan")).get("milestone_index")
     if not isinstance(milestone_index, list):
         return [], errors
 
@@ -168,14 +171,9 @@ def _load_milestone_plans_from_anchor(
     return plans, errors
 
 
-def _dict_items(value: Any) -> list[dict[str, Any]]:
-    """The object entries of *value*; empty when *value* is not a list."""
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
-
-
-def _str_items(value: Any) -> list[str]:
-    """The string entries of *value*; empty when *value* is not a list."""
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+def _plan_checklist(plan: Any) -> list[dict[str, Any]]:
+    """The object items of ``plan.spec_alignment.checklist`` of *plan*; empty when any level is absent or wrong-typed."""
+    return dict_items(as_dict(as_dict(as_dict(plan).get("plan")).get("spec_alignment")).get("checklist"))
 
 
 def _load_closure_artifacts(spec_dir: str) -> tuple[dict[str, Any], list[SpecError]]:
@@ -267,8 +265,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                     "checklist": [
                         item
                         for plan in milestone_plans
-                        for item in plan.get("plan", {}).get("spec_alignment", {}).get("checklist", [])
-                        if isinstance(item, dict)
+                        for item in _plan_checklist(plan)
                     ]
                 }
             }
@@ -281,13 +278,9 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         # checklist item is the roadmap task it verifies).
         satisfied_task_ids: set[str] = set()
         for plan in milestone_plans:
-            results = plan.get("execution", {}).get("execution_results", [])
-            if isinstance(results, list):
-                execution_results.extend(r for r in results if isinstance(r, dict))
+            execution_results.extend(dict_items(as_dict(plan.get("execution")).get("execution_results")))
             local_checklist_to_task: dict[str, str] = {}
-            for item in plan.get("plan", {}).get("spec_alignment", {}).get("checklist", []):
-                if not isinstance(item, dict):
-                    continue
+            for item in _plan_checklist(plan):
                 checklist_id = item.get("id")
                 spec_ref = item.get("spec_ref")
                 if (
@@ -297,17 +290,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                     spec_ref_id = spec_ref.get("id")
                     if isinstance(spec_ref_id, str) and spec_ref_id:
                         local_checklist_to_task[checklist_id] = spec_ref_id
-            satisfied = (
-                plan.get("execution", {})
-                .get("critical_evidence", {})
-                .get("satisfied_checklist_ids", [])
-            )
-            if isinstance(satisfied, list):
-                for sat_id in satisfied:
-                    if isinstance(sat_id, str):
-                        resolved = local_checklist_to_task.get(sat_id)
-                        if resolved:
-                            satisfied_task_ids.add(resolved)
+            satisfied = as_dict(as_dict(plan.get("execution")).get("critical_evidence")).get("satisfied_checklist_ids")
+            for sat_id in str_items(satisfied):
+                resolved = local_checklist_to_task.get(sat_id)
+                if resolved:
+                    satisfied_task_ids.add(resolved)
         if execution_results or satisfied_task_ids:
             data["code_execution"] = {
                 "execution": {
@@ -322,30 +309,34 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # the new shape) are not expected to have an FR yet and are exempted from W568 below.
     capability_parked_ids: set[str] = set()
     if "capabilities" in data:
-        capability_ids = {c.get("capability_id") for c in data["capabilities"].get("capabilities", []) if c.get("capability_id")}
+        capabilities = dict_items(as_dict(data["capabilities"]).get("capabilities"))
+        capability_ids = {c["capability_id"] for c in capabilities if isinstance(c.get("capability_id"), str) and c["capability_id"]}
         capability_parked_ids = {
-            c.get("capability_id")
-            for c in data["capabilities"].get("capabilities", [])
-            if c.get("capability_id") and is_parked_any_shape(c)
+            c["capability_id"]
+            for c in capabilities
+            if isinstance(c.get("capability_id"), str) and c["capability_id"] and is_parked_any_shape(c)
         }
 
     # Charter → Capabilities chain
-    # Legacy-guarded (M6c deletes): reads charter goal_id, capability trace / success_metric_refs.
-    if (
-        "charter" in data and "capabilities" in data
-        and has_legacy_fields([data["charter"], data["capabilities"]], LEGACY_CHARTER_CHAIN_FIELDS)
-    ):
+    # Legacy-guarded (M6c deletes): the goal half reads charter goal_id and capability trace, the metric half
+    # reads capability success_metric_refs; each runs only when the artifacts it reads carry its fields.
+    if "charter" in data and "capabilities" in data:
         charter_goals = data["charter"]
+        goal_half_on = (
+            has_legacy_fields([charter_goals], LEGACY_CHARTER_GOAL_FIELDS)
+            and has_legacy_fields([data["capabilities"]], LEGACY_CAPABILITY_GOAL_FIELDS)
+        )
+        metric_half_on = has_legacy_fields([data["capabilities"]], LEGACY_CAPABILITY_METRIC_FIELDS)
         goal_ids: set[str] = set()
-        for goal in charter_goals.get("goals", []):
-            if isinstance(goal, dict) and goal.get("goal_id"):
+        for goal in dict_items(as_dict(charter_goals).get("goals")) if goal_half_on else []:
+            if isinstance(goal.get("goal_id"), str) and goal["goal_id"]:
                 goal_ids.add(goal["goal_id"])
 
         if goal_ids:
             cap_traced_goals: set[str] = set()
-            for cap in data["capabilities"].get("capabilities", []):
-                for trace_ref in cap.get("trace", []):
-                    if isinstance(trace_ref, dict) and normalize_trace_type(trace_ref.get("type") or "") == _CHARTER_GOAL_TRACE_TYPE and "id" in trace_ref:
+            for cap in dict_items(as_dict(data["capabilities"]).get("capabilities")):
+                for trace_ref in dict_items(cap.get("trace")):
+                    if normalize_trace_type(trace_ref.get("type") or "") == _CHARTER_GOAL_TRACE_TYPE and isinstance(trace_ref.get("id"), str):
                         cap_traced_goals.add(trace_ref["id"])
 
             for goal_id in sorted(goal_ids - cap_traced_goals):
@@ -354,15 +345,15 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         # Task 7-01 (AUDIT-022): success_metrics traceability
         # Each charter success_metric must be referenced by at least one capability's success_metric_refs
         metric_ids: set[str] = set()
-        for metric in charter_goals.get("success_metrics", []):
-            if isinstance(metric, dict) and metric.get("metric_id"):
+        for metric in dict_items(as_dict(charter_goals).get("success_metrics")):
+            if isinstance(metric.get("metric_id"), str) and metric["metric_id"]:
                 metric_ids.add(metric["metric_id"])
 
-        if metric_ids:
+        if metric_ids and metric_half_on:
             cap_traced_metrics: set[str] = set()
-            for cap in data["capabilities"].get("capabilities", []):
-                for metric_ref in cap.get("success_metric_refs", []):
-                    if isinstance(metric_ref, str) and metric_ref:
+            for cap in dict_items(as_dict(data["capabilities"]).get("capabilities")):
+                for metric_ref in str_items(cap.get("success_metric_refs")):
+                    if metric_ref:
                         cap_traced_metrics.add(metric_ref)
             for metric_id in sorted(metric_ids - cap_traced_metrics):
                 errors.append(make_error("E560", f"TRACEABILITY_GAP charter_success_metric_without_capability {metric_id}"))
@@ -370,11 +361,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     fr_traced_caps: set[str] = set()
     fr_ids: set[str] = set()
     if "frs" in data:
-        for fr in _dict_items(data["frs"].get("functional_requirements")):
+        for fr in dict_items(data["frs"].get("functional_requirements")):
             # Capability traces are always collected — a `wont-have` FR still
             # anchors its capability so W568 UNCOVERED_CAPABILITY does not fire.
-            for cap_ref in _dict_items(fr.get("trace")):
-                if normalize_trace_type(cap_ref.get("type") or "") == _CAPABILITY_TRACE_TYPE and "id" in cap_ref:
+            for cap_ref in dict_items(fr.get("trace")):
+                if normalize_trace_type(cap_ref.get("type") or "") == _CAPABILITY_TRACE_TYPE and isinstance(cap_ref.get("id"), str):
                     fr_traced_caps.add(cap_ref["id"])
             # Exclude `wont-have` FRs from downstream coverage checks — they
             # are explicitly out-of-scope (parked for a later phase) and have
@@ -382,7 +373,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             # produces false-positive W561/W564/W565/W566 warnings.
             if is_parked_any_shape(fr):
                 continue
-            if "fr_id" in fr:
+            if isinstance(fr.get("fr_id"), str):
                 fr_ids.add(fr["fr_id"])
 
     # Compute FR IDs exempted by Step 05 out_of_scope[] from W564 (API coverage),
@@ -406,25 +397,25 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     milestone_fr_set: dict[str, set[str]] = {}
     milestone_task_fr_refs: dict[str, set[str]] = {}
     if "roadmap" in data:
-        for ms in _dict_items(data["roadmap"].get("milestones")):
+        for ms in dict_items(data["roadmap"].get("milestones")):
             ms_id = ms.get("milestone_id")
-            tasks = _dict_items(ms.get("tasks"))
-            if ms_id:
+            tasks = dict_items(ms.get("tasks"))
+            if isinstance(ms_id, str) and ms_id:
                 milestone_ids.add(ms_id)
-                milestone_task_ids[ms_id] = [t["task_id"] for t in tasks if t.get("task_id")]
-                milestone_fr_set[ms_id] = set(_str_items(ms.get("fr_refs")))
-                milestone_task_fr_refs[ms_id] = {fr for t in tasks for fr in _str_items(t.get("fr_refs"))}
-            milestone_fr_refs.update(_str_items(ms.get("fr_refs")))
+                milestone_task_ids[ms_id] = [t["task_id"] for t in tasks if isinstance(t.get("task_id"), str) and t["task_id"]]
+                milestone_fr_set[ms_id] = set(str_items(ms.get("fr_refs")))
+                milestone_task_fr_refs[ms_id] = {fr for t in tasks for fr in str_items(t.get("fr_refs"))}
+            milestone_fr_refs.update(str_items(ms.get("fr_refs")))
 
     checklist_milestone_refs: set[str] = set()
     checklist_task_refs: set[str] = set()
     # Legacy-guarded (M6c deletes): W562 / W563 read the checklist `spec_ref` of the milestone plans.
-    checklist = data.get("impl_planner", {}).get("plan", {}).get("spec_alignment", {}).get("checklist", [])
+    checklist = _plan_checklist(data.get("impl_planner"))
     checklist_reader_on = not checklist or has_legacy_fields(checklist, LEGACY_PLAN_CHECKLIST_FIELDS)
     if "impl_planner" in data and checklist_reader_on:
         for item in checklist:
-            spec_ref = item.get("spec_ref", {})
-            if isinstance(spec_ref, dict) and "id" in spec_ref:
+            spec_ref = item.get("spec_ref")
+            if isinstance(spec_ref, dict) and isinstance(spec_ref.get("id"), str):
                 checklist_task_refs.add(spec_ref["id"])
 
         for ms_id, tasks in milestone_task_ids.items():
@@ -456,9 +447,9 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Legacy-guarded (M6c deletes): reads the `trace` of the apis.
     if "frs" in data and "apis" in data and _api_reader_on(data):
         api_fr_refs: set[str] = set()
-        for api in _dict_items(data["apis"].get("apis")):
-            for trace_ref in _dict_items(api.get("trace")):
-                if normalize_trace_type(trace_ref.get("type") or "") == _FR_TRACE_TYPE and "id" in trace_ref:
+        for api in dict_items(data["apis"].get("apis")):
+            for trace_ref in dict_items(api.get("trace")):
+                if normalize_trace_type(trace_ref.get("type") or "") == _FR_TRACE_TYPE and isinstance(trace_ref.get("id"), str):
                     api_fr_refs.add(trace_ref["id"])
         # E535: FR declared in out_of_scope[] ("no API surface") but also referenced by
         # an API's trace[] — the two claims contradict. out_of_scope[] suppresses W564,
@@ -473,10 +464,10 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Legacy-guarded (M6c deletes): reads the `targets` and `out_of_scope` of the fixtures.
     if "frs" in data and "fixtures" in data and _fixture_reader_on(data):
         fixture_fr_refs: set[str] = set()
-        for fixture in _dict_items(data["fixtures"].get("fixtures")):
-            for target in _dict_items(fixture.get("targets")):
+        for fixture in dict_items(data["fixtures"].get("fixtures")):
+            for target in dict_items(fixture.get("targets")):
                 # "type" field confirmed by 08_fixtures.schema.json targets[].type (via vc:core:collections#traceRef)
-                if normalize_trace_type(target.get("type") or "") == _FR_TRACE_TYPE and "id" in target:
+                if normalize_trace_type(target.get("type") or "") == _FR_TRACE_TYPE and isinstance(target.get("id"), str):
                     fixture_fr_refs.add(target["id"])
         # E536: FR declared in out_of_scope[] ("no fixture needed") but also referenced by
         # a fixture's targets[] — the two claims contradict. out_of_scope[] suppresses W565,
@@ -538,16 +529,16 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         # Collect all artifact IDs referenced in Step 14 tasks (fr_refs) and deliverables
         step14_task_fr_ids: set[str] = set()
         step14_deliverable_ids: set[str] = set()
-        for ms in _dict_items(data["roadmap"].get("milestones")):
-            for task in _dict_items(ms.get("tasks")):
-                step14_task_fr_ids.update(_str_items(task.get("fr_refs")))
-            for deliverable in _dict_items(ms.get("deliverables")):
-                if "id" in deliverable:
+        for ms in dict_items(data["roadmap"].get("milestones")):
+            for task in dict_items(ms.get("tasks")):
+                step14_task_fr_ids.update(str_items(task.get("fr_refs")))
+            for deliverable in dict_items(ms.get("deliverables")):
+                if isinstance(deliverable.get("id"), str):
                     step14_deliverable_ids.add(deliverable["id"])
         step14_covered_ids = step14_task_fr_ids | step14_deliverable_ids
-        for ms09 in _dict_items(data["impl_plan"].get("milestones")):
+        for ms09 in dict_items(data["impl_plan"].get("milestones")):
             ms09_id = ms09.get("milestone_id") or ms09.get("id", "<unknown>")
-            for deliverable in _dict_items(ms09.get("deliverables")):
+            for deliverable in dict_items(ms09.get("deliverables")):
                 deliverable_id = deliverable.get("id")
                 if not isinstance(deliverable_id, str) or not deliverable_id:
                     continue
@@ -584,9 +575,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         # already been marked deferred/wont_do, is transitionally paused too --
         # mirrors the coverage-counting logic in step_16.py's E304 check.
         checklist_item_statuses: dict[str, list[str]] = {}
-        for item in data.get("impl_planner", {}).get("plan", {}).get("spec_alignment", {}).get("checklist", []):
-            if not isinstance(item, dict):
-                continue
+        for item in _plan_checklist(data.get("impl_planner")):
             spec_ref = item.get("spec_ref")
             if not isinstance(spec_ref, dict):
                 continue
@@ -597,8 +586,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 item.get("checklist_status", "active")
             )
         # Check each non-done, non-deferred, non-wont_do task
-        for ms in _dict_items(data["roadmap"].get("milestones")):
-            for task in _dict_items(ms.get("tasks")):
+        for ms in dict_items(data["roadmap"].get("milestones")):
+            for task in dict_items(ms.get("tasks")):
                 task_id = task.get("task_id")
                 task_status = task.get("status", "pending")
                 if not isinstance(task_id, str) or not task_id:
@@ -617,16 +606,14 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Task 7-07 (AUDIT-077): governance-to-CI cross-validation
     # For each pr_rule in Step 10, verify a corresponding CI job step command references it.
     if "governance" in data and "ci_gates" in data:
-        pr_rules = data["governance"].get("pr_rules", [])
-        ci_jobs = data["ci_gates"].get("jobs", [])
+        pr_rules = as_list(data["governance"].get("pr_rules"))
+        ci_jobs = as_list(data["ci_gates"].get("jobs"))
         # Collect all step commands from all CI jobs
         ci_commands: list[str] = []
         for job in ci_jobs:
             if not isinstance(job, dict):
                 continue
-            for step in job.get("steps", []):
-                if not isinstance(step, dict):
-                    continue
+            for step in dict_items(job.get("steps")):
                 cmd = step.get("command", "")
                 if isinstance(cmd, str) and cmd:
                     ci_commands.append(cmd)

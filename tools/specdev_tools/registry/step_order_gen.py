@@ -41,9 +41,11 @@ Pair = tuple[str, str]  # (holder step, target step): the holder requires the ta
 
 _NOTES = {
     "status_write_exemptions": (
-        "Step 16c writes milestones[].status='done' to Steps 09/14 on verified milestones. "
-        "Without this exemption, file-level change detection triggers E550 requiring full "
-        "downstream replay, creating an infinite cycle."
+        "policy.status_write_exemptions maps a step to field paths whose change alone does not "
+        "count as a change of that step in forward replay (E550). Only 1.1.1-shaped specs use it: "
+        "there step 16c wrote milestones[].status to steps 09 and 14. No 1.2.0 schema of step 09 "
+        "or 14 has that field, so the entries are inert for a 1.2.0 spec; the key stays until a "
+        "later change removes it."
     ),
     "downstream_consumers": (
         "Records which steps actively consume each step's output. Read by 'specdev prompt-context'. "
