@@ -1,0 +1,6 @@
+{
+  "$schema": "vc:01-capabilities",
+  "capabilities": [
+    {"capability_id": "cap-login", "title": "Sign in", "derives_from": ["seed-accounts"]}
+  ]
+}

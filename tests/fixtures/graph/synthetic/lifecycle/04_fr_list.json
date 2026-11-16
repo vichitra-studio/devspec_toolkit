@@ -1,0 +1,18 @@
+{
+  "$schema": "vc:04-fr-list",
+  "functional_requirements": [
+    {
+      "fr_id": "fr-probe",
+      "statement": "The node whose lifecycle the tests change; its link target does not exist.",
+      "derives_from": ["cap-missing"],
+      "acceptance_criteria": [
+        {"criterion_id": "ac-probe-1", "text": "A nested node accepts any lifecycle."}
+      ]
+    },
+    {"fr_id": "fr-twin", "statement": "First definition of a twice-defined id."},
+    {"fr_id": "fr-twin", "statement": "Second definition of a twice-defined id."}
+  ],
+  "ambiguities": [
+    {"ambiguity_id": "amb-open", "about": ["fr-probe"]}
+  ]
+}

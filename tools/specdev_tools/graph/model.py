@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from specdev_tools.graph.kinds import LinkDecl
+from specdev_tools.graph.kinds import KindDecl, LinkDecl
 
 LIFECYCLES = ("active", "deprecated", "not_applicable")
 DEFAULT_LIFECYCLE = "active"
@@ -91,7 +91,8 @@ class Graph:
     """Nodes in build order plus the indexes every reader uses.
 
     ``by_id`` keeps the first definition of an id; ``dups`` lists every definition of an id defined more than once;
-    ``alias_index`` is empty until M5 fills it; ``shape`` is empty for a graph built from nodes alone.
+    ``alias_index`` is empty until M5 fills it; ``shape``, ``documents`` (the parsed files the build read,
+    by path relative to the spec root) and ``decls`` (kind name to declaration) are empty for a graph built from nodes alone.
     """
 
     nodes: list[Node] = field(default_factory=list)
@@ -104,6 +105,8 @@ class Graph:
     children: dict[str, list[str]] = field(default_factory=dict)
     alias_index: dict[str, str] = field(default_factory=dict)
     shape: SpecShape = field(default_factory=SpecShape)
+    documents: dict[str, Mapping[str, Any]] = field(default_factory=dict, repr=False, compare=False)
+    decls: dict[str, KindDecl] = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
     def from_nodes(

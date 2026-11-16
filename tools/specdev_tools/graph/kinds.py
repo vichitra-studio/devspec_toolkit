@@ -16,9 +16,15 @@ from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items, str_it
 
 SEED_KIND = "seed"
 SEED_STEP = "seed"
+RECORD_ROLE = "record"
 EXTRAS_STEP = "extras"
 ANY_KIND = "*"
 _REGISTRY_RELATIVE = os.path.join("tools", "entry_key_registry.json")
+
+
+def has_lifecycle(kind: str, role: str | None) -> bool:
+    """False for a record-role kind and for the seed kind: their nodes have no lifecycle and always read ``active``."""
+    return role != RECORD_ROLE and kind != SEED_KIND
 
 
 class KindRegistryError(Exception):

@@ -25,6 +25,7 @@ from specdev_tools.graph.kinds import (
     KindDecl,
     KindRegistry,
     KindRegistryError,
+    has_lifecycle,
     load_kind_registry,
 )
 from specdev_tools.graph.model import (
@@ -108,6 +109,20 @@ def _kind_names_of(decls: Iterable[KindDecl]) -> Iterable[str]:
         yield from _kind_names_of(decl.nested)
 
 
+def _decls_by_kind(registry: KindRegistry) -> dict[str, KindDecl]:
+    """Every declared kind by name (the first declaration wins when a kind is declared in several files)."""
+    found: dict[str, KindDecl] = {}
+
+    def add(decls: Iterable[KindDecl]) -> None:
+        for decl in decls:
+            found.setdefault(decl.kind, decl)
+            add(decl.nested)
+
+    for file_decl in (*registry.external, *registry.files):
+        add(file_decl.kinds)
+    return found
+
+
 def _shape(registry: KindRegistry, present: Mapping[str, FileDecl], ranks: Mapping[str, int]) -> SpecShape:
     """The step ranks, the steps that declare each kind and the present files per step."""
     kind_steps: dict[str, set[str]] = {}
@@ -146,6 +161,13 @@ def _links_of(item: Mapping[str, Any], decl: KindDecl, node_id: str) -> tuple[Li
     )
 
 
+def _lifecycle_of(item: Mapping[str, Any], decl: KindDecl) -> str:
+    """The item's lifecycle; ``active`` when absent, unknown or wrong-typed, and always for a kind with no lifecycle."""
+    if has_lifecycle(decl.kind, decl.role) and str_in(item.get("lifecycle"), LIFECYCLES):
+        return item["lifecycle"]
+    return DEFAULT_LIFECYCLE
+
+
 def _seed_file(item: Mapping[str, Any], default: str) -> str:
     """The seed's own file path from its manifest entry; the manifest path when the entry has none."""
     return as_str(item.get(SEED_PATH_FIELD)) or default
@@ -173,7 +195,7 @@ def _collect(
             jq_path=jq_path,
             parent=parent,
             children=tuple(n.id for n in nested if n.parent == node_id),
-            lifecycle=item["lifecycle"] if str_in(item.get("lifecycle"), LIFECYCLES) else DEFAULT_LIFECYCLE,
+            lifecycle=_lifecycle_of(item, decl),
             scope=scope if isinstance(scope, str) else None,
             links=_links_of(item, decl, node_id),
             label=node_label(item),
@@ -226,15 +248,19 @@ def build_graph(
     given = overrides or {}
     nodes: list[Node] = []
     load_errors: list[LoadError] = []
+    documents: dict[str, Mapping[str, Any]] = {}
     present = _present_files(registry, root, given)
     for rel, decl in _plan(present, ranks, wanted_files, wanted_steps):
         doc = _document(root, rel, given)
         if doc is None:
             load_errors.append(LoadError(rel, UNREADABLE_MESSAGE))
             continue
+        documents[rel] = doc
         ctx = _file_context(rel, decl, doc)
         nodes.extend(n for kind in decl.kinds for n in _collect(doc, kind, ctx, "", None))
-    return Graph.from_nodes(nodes, load_errors, _shape(registry, present, ranks))
+    graph = Graph.from_nodes(nodes, load_errors, _shape(registry, present, ranks))
+    graph.documents, graph.decls = documents, _decls_by_kind(registry)
+    return graph
 
 
 def build_file_graph(path: str, repo_root: str, document: Mapping[str, Any]) -> Graph:

@@ -1,0 +1,5 @@
+{
+  "seeds": [
+    {"seed_id": "seed-accounts", "path": "docs/seed/accounts.md", "description": "Account lifecycle."}
+  ]
+}

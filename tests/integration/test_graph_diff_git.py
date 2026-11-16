@@ -1,0 +1,217 @@
+"""Library cases of ``diff`` over a real git history (WI-M4-10): a temporary repository with tags the test creates."""
+from __future__ import annotations
+
+import os
+import subprocess
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from specdev_tools.graph import gitview
+from specdev_tools.graph.diff import ADDED, CHANGED, MINOR, NO_BUMP, diff_refs
+from specdev_tools.graph.gitview import GitViewError, archive_ref, load_graph_at, spec_path_in_repo
+from unit.graph._synth import ROOT, write_json, write_spec
+
+_FR_FILE = "04_fr_list.json"
+_SEED_MANIFEST = "common/seed_manifest.json"
+_SEED_FILE = "docs/seed/notes.md"
+_GIT_IDENTITY = ("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false")
+
+
+def _git(repo: Path, *args: str) -> str:
+    env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+    result = subprocess.run(["git", "-C", str(repo), *_GIT_IDENTITY, *args], capture_output=True, text=True, env=env, check=True)
+    return result.stdout.strip()
+
+
+def _commit(repo: Path, tag: str) -> None:
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", tag)
+    _git(repo, "tag", tag)
+
+
+@pytest.fixture
+def host(tmp_path: Path) -> Path:
+    repo = tmp_path / "host"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    return repo
+
+
+def _fr_doc(statement: str, *criteria: str) -> dict[str, Any]:
+    requirement: dict[str, Any] = {
+        "fr_id": "fr-a",
+        "statement": statement,
+        "acceptance_criteria": [{"criterion_id": f"ac-{i}", "text": text} for i, text in enumerate(criteria, 1)],
+    }
+    return {"functional_requirements": [requirement]}
+
+
+def _seed_manifest() -> dict[str, Any]:
+    return {"seeds": [{"seed_id": "seed-notes", "path": _SEED_FILE}]}
+
+
+def _two_tag_host(host: Path) -> Path:
+    spec = host / "spec"
+    write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a.", "It works.")})
+    _commit(host, "v1")
+    write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a, quickly.", "It works.", "It is fast.")})
+    _commit(host, "v2")
+    return spec
+
+
+def test_two_tags_give_node_diff_and_bump_suggestion(host: Path) -> None:
+    spec = _two_tag_host(host)
+    diff = diff_refs("v1", "v2", str(host), str(spec), str(ROOT))
+    assert {change.id: change.changes for change in diff.changes} == {"fr-a": (CHANGED,), "ac-2": (ADDED,)}
+    assert (diff.bump, diff.old_ref, diff.new_ref) == (MINOR, "v1", "v2")
+
+
+def test_diff_of_a_ref_with_itself_is_empty(host: Path) -> None:
+    spec = _two_tag_host(host)
+    diff = diff_refs("v2", "v2", str(host), str(spec), str(ROOT))
+    assert (diff.changes, diff.bump) == ((), NO_BUMP)
+
+
+def test_diff_reads_history_not_the_working_tree(host: Path) -> None:
+    spec = _two_tag_host(host)
+    write_spec(spec, {_FR_FILE: _fr_doc("Uncommitted edit.")})
+    assert diff_refs("v2", "v2", str(host), str(spec), str(ROOT)).changes == ()
+
+
+def test_load_graph_at_builds_the_graph_of_the_tag(host: Path) -> None:
+    _two_tag_host(host)
+    graph = load_graph_at("v1", str(host), "spec", str(ROOT))
+    assert sorted(graph.by_id) == ["ac-1", "fr-a"]
+
+
+def test_diff_seed_whitespace_only_is_unchanged(host: Path) -> None:
+    spec = host / "spec"
+    write_json(spec, _SEED_MANIFEST, _seed_manifest())
+    (spec / _SEED_FILE).parent.mkdir(parents=True)
+    (spec / _SEED_FILE).write_text("Users sign in.\nThey can reset a password.\n", encoding="utf-8")
+    write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a.")})
+    _commit(host, "v1")
+    (spec / _SEED_FILE).write_text("Users   sign in.\n\n\nThey can reset a   password.", encoding="utf-8")
+    _commit(host, "v2")
+    assert diff_refs("v1", "v2", str(host), str(spec), str(ROOT)).changes == ()
+    (spec / _SEED_FILE).write_text("Users sign in. They can reset a password by email.", encoding="utf-8")
+    _commit(host, "v3")
+    changes = diff_refs("v2", "v3", str(host), str(spec), str(ROOT)).changes
+    assert [(change.id, change.changes) for change in changes] == [("seed-notes", (CHANGED,))]
+
+
+def test_diff_seed_file_absent_at_a_tag_counts_as_removed(host: Path) -> None:
+    spec = host / "spec"
+    write_json(spec, _SEED_MANIFEST, _seed_manifest())
+    write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a.")})
+    _commit(host, "v1")
+    (spec / _SEED_FILE).parent.mkdir(parents=True)
+    (spec / _SEED_FILE).write_text("Now it exists.", encoding="utf-8")
+    _commit(host, "v2")
+    changes = diff_refs("v1", "v2", str(host), str(spec), str(ROOT)).changes
+    assert [(change.id, change.changes) for change in changes] == [("seed-notes", (ADDED,))]
+
+
+def test_diff_spec_dir_absent_at_tag_e708(host: Path) -> None:
+    (host / "README.md").write_text("no spec yet\n", encoding="utf-8")
+    _commit(host, "v0")
+    spec = write_spec(host / "spec", {_FR_FILE: _fr_doc("The system shall do a.")})
+    _commit(host, "v1")
+    with pytest.raises(GitViewError) as raised:
+        diff_refs("v0", "v1", str(host), str(spec), str(ROOT))
+    assert raised.value.error.code == "E708"
+    assert "spec" in raised.value.error.message and "'v0'" in raised.value.error.message
+
+
+def test_ref_unresolved_e708(host: Path) -> None:
+    spec = _two_tag_host(host)
+    with pytest.raises(GitViewError) as raised:
+        diff_refs("v1", "v9", str(host), str(spec), str(ROOT))
+    assert raised.value.error.code == "E708" and "'v9'" in raised.value.error.message
+
+
+def test_a_ref_that_looks_like_an_option_is_e708(host: Path) -> None:
+    _two_tag_host(host)
+    with pytest.raises(GitViewError) as raised:
+        gitview.resolve_ref("--output=x", str(host))
+    assert raised.value.error.code == "E708"
+
+
+def test_a_folder_that_is_not_a_repository_is_e708(tmp_path: Path) -> None:
+    folder = tmp_path / "plain"
+    folder.mkdir()
+    with pytest.raises(GitViewError) as raised:
+        gitview.resolve_ref("v1", str(folder))
+    assert raised.value.error.code == "E708" and "not a git repository" in raised.value.error.message
+
+
+def test_missing_git_is_e708(host: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def no_git(*_args: Any, **_kwargs: Any) -> None:
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(gitview.subprocess, "run", no_git)
+    with pytest.raises(GitViewError) as raised:
+        gitview.resolve_ref("v1", str(host))
+    assert raised.value.error.code == "E708" and "git" in raised.value.error.message
+
+
+def test_git_that_times_out_is_e708(host: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def slow_git(*args: Any, **_kwargs: Any) -> None:
+        raise subprocess.TimeoutExpired(args[0], 1)
+
+    monkeypatch.setattr(gitview.subprocess, "run", slow_git)
+    with pytest.raises(GitViewError) as raised:
+        gitview.resolve_ref("v1", str(host))
+    assert raised.value.error.code == "E708" and "did not finish" in raised.value.error.message
+
+
+def test_ref_predates_model_e709(host: Path) -> None:
+    spec = host / "spec"
+    legacy = {"functional_requirements": [{"statement": "Legacy requirement with no id."}]}
+    write_spec(spec, {_FR_FILE: legacy})
+    (spec / "specdev_version").write_text("toolkit_version: 1.1.0\n", encoding="utf-8")
+    _commit(host, "v1")
+    with pytest.raises(GitViewError) as raised:
+        diff_refs("v1", "v1", str(host), str(spec), str(ROOT))
+    assert raised.value.error.code == "E709" and "1.1.0" in raised.value.error.message
+
+
+def test_ref_predates_model_e709_when_the_stamp_is_absent(host: Path) -> None:
+    write_spec(host / "spec", {_FR_FILE: {"functional_requirements": []}})
+    _commit(host, "v1")
+    with pytest.raises(GitViewError) as raised:
+        load_graph_at("v1", str(host), "spec", str(ROOT))
+    assert raised.value.error.code == "E709" and "no toolkit stamp" in raised.value.error.message
+
+
+def test_spec_path_is_relative_to_the_git_root(host: Path) -> None:
+    nested = host / "services" / "api" / "spec"
+    nested.mkdir(parents=True)
+    assert spec_path_in_repo(str(nested), str(host)) == "services/api/spec"
+    assert spec_path_in_repo(str(host / "spec"), str(host / "spec" / "..")) == "spec"
+
+
+def test_diff_of_a_spec_folder_below_the_repository_root(host: Path) -> None:
+    spec = write_spec(host / "services" / "spec", {_FR_FILE: _fr_doc("The system shall do a.")})
+    _commit(host, "v1")
+    write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a, quickly.")})
+    _commit(host, "v2")
+    diff = diff_refs("v1", "v2", str(host), str(spec), str(ROOT))
+    assert [(change.id, change.changes) for change in diff.changes] == [("fr-a", (CHANGED,))]
+
+
+def test_spec_root_outside_git_root_is_e708(host: Path, tmp_path: Path) -> None:
+    with pytest.raises(GitViewError) as raised:
+        spec_path_in_repo(str(tmp_path / "elsewhere"), str(host))
+    assert raised.value.error.code == "E708" and "not inside the git root" in raised.value.error.message
+
+
+def test_archive_ref_extracts_the_paths_at_the_ref(host: Path) -> None:
+    spec = _two_tag_host(host)
+    with archive_ref("v1", str(host), ["spec"]) as archived:
+        text = (Path(archived) / "spec" / _FR_FILE).read_text(encoding="utf-8")
+    assert "It is fast." not in text and "It works." in text
+    assert "It is fast." in (spec / _FR_FILE).read_text(encoding="utf-8")
+    assert not Path(archived).exists()
