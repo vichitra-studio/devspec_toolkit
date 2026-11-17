@@ -1077,7 +1077,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E767 WRITE_REFUSED
 
-**Trigger**: A command that writes a spec file or the lock refused the write. Registered in 1.2.0; the commands that raise it are not built yet.
+**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>` and `specdev json insert --step NN` when the node is a seed or is defined more than once (E704), the field path is not a plain jq path inside the node or names the node's id, the edit adds a schema violation, or the edit would leave a link that does not resolve (E700 to E703) or a duplicate id. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written.
 
 **Resolution**: Command refusal: no owner, no node id. The message names the reason.
 

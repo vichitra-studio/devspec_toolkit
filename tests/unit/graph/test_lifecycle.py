@@ -19,6 +19,7 @@ from specdev_tools.graph.recipes import build_pack, parse_recipes
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.graph.trace import trace_node
 from specdev_tools.trace.history import historical_node_ids
+from specdev_tools.trace.id_writes import broken_holders
 from specdev_tools.trace.lockfile import Lock, LockEntry
 from specdev_tools.trace.suspects import find_suspects, lock_links, missing_entries, orphan_entries
 
@@ -79,6 +80,8 @@ CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
         entry.source for entry in orphan_entries(graph, Lock((LockEntry(_PROBE, "derives_from", "cap-gone", _ZERO_HASH, _ZERO_HASH),)))
     },
     "historical": lambda graph: historical_node_ids(_with_probe_in_closed_milestone(graph)),
+    # An id write reports the live nodes whose links point at a deleted id; the probe links to a target that is gone.
+    "broken_holders": lambda graph: {link.holder for link in broken_holders(graph, ["cap-missing"])},
 }
 
 

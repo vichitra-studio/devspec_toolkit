@@ -585,3 +585,87 @@ def test_lock_install_driver_refuses_a_spec_folder_outside_the_git_root(host: Pa
     outside = copy_example(tmp_path / "outside" / "spec")
     code, out = run_cli("lock", "install-driver", "--driver-command", "x", *_flags(outside, host))
     assert code == 1 and out.startswith("E708")
+
+
+# --- json patch|insert|delete --id / --step: the id forms of the json subcommands (WI-M5-09) ---------------------------------
+
+_FR_FILE = "04_fr_list.json"
+_FR_REQUEST = "fr-password-reset-request"
+_API_FILE = "05_interface_contracts.json"
+
+
+@pytest.fixture
+def id_host(tmp_path: Path) -> Path:
+    """The worked example with its seed documents and lock, as a host folder."""
+    root = tmp_path / "id_host"
+    shutil.copytree(EXAMPLE_HOST, root)
+    return root
+
+
+def _fr_ids(host: Path) -> list[str]:
+    return [item["fr_id"] for item in json.loads((host / "spec" / _FR_FILE).read_text(encoding="utf-8"))["functional_requirements"]]
+
+
+def _statement(host: Path, node_id: str) -> str:
+    items = json.loads((host / "spec" / _FR_FILE).read_text(encoding="utf-8"))["functional_requirements"]
+    return next(item["statement"] for item in items if item["fr_id"] == node_id)
+
+
+def test_json_id_names_the_node_the_write_applies_to(id_host: Path) -> None:
+    flags = _flags(id_host / "spec", id_host)
+    other = _statement(id_host, "fr-password-reset")
+    text = "The system shall email a single-use reset link to the address of the account."
+    assert run_cli("json", "patch", "--id", _FR_REQUEST, ".statement", json.dumps(text), *flags)[0] == 0
+    assert (_statement(id_host, _FR_REQUEST), _statement(id_host, "fr-password-reset")) == (text, other)
+    code, out = run_cli("json", "patch", "--id", "fr-password-reset", ".statement", json.dumps(other + " (reworded)"), *flags)
+    assert code == 0 and _statement(id_host, "fr-password-reset").endswith("(reworded)") and _statement(id_host, _FR_REQUEST) == text
+    missing = run_cli("json", "patch", "--id", "fr-nobody", ".statement", json.dumps(text), *flags)
+    assert missing[0] == 1 and missing[1].startswith("E706")
+    assert run_cli("json", "patch", ".statement", json.dumps(text), *flags)[0] == 2
+
+
+def test_json_step_names_the_file_of_a_new_top_level_node(id_host: Path) -> None:
+    flags = _flags(id_host / "spec", id_host)
+    fr = {
+        "statement": "The system shall let an admin revoke an outstanding reset token before it expires.", "scope": "in", "priority": "must-have",
+        "capability_ref": {"id": "cn:project:capability:account-recovery", "kind": "capability", "version": "1.0.0"},
+        "derives_from": ["cap-account-recovery"],
+        "acceptance_criteria": [{"text": "Given a revoked token, when it is redeemed, then no password changes.", "scope": "in"}] * 2,
+    }
+    code, out = run_cli("json", "insert", "--step", "04", ".functional_requirements", json.dumps(fr), *flags, "--json")
+    assert code == 0 and json.loads(out)["file"] == _FR_FILE and len(_fr_ids(id_host)) == 3
+    unknown = run_cli("json", "insert", "--step", "99", ".functional_requirements", json.dumps(fr), *flags)
+    assert unknown[0] == 1 and unknown[1].startswith("E706")
+    wrong_step = run_cli("json", "insert", "--step", "05", ".functional_requirements", json.dumps(fr), *flags)
+    assert wrong_step[0] == 1 and "step 05 has no node collection .functional_requirements" in wrong_step[1]
+    assert run_cli("json", "insert", ".functional_requirements", json.dumps(fr), *flags)[0] == 2
+
+
+def test_json_id_full_shows_the_whole_target_text(id_host: Path) -> None:
+    flags = _flags(id_host / "spec", id_host)
+    links = json.dumps(["fr-password-reset", _FR_REQUEST])
+    short = json.loads(run_cli("json", "patch", "--id", "api-password-reset-confirm", ".derives_from", links, *flags, "--dry-run", "--json")[1])
+    full = json.loads(run_cli("json", "patch", "--id", "api-password-reset-confirm", ".derives_from", links, *flags, "--dry-run", "--full", "--json")[1])
+    (short_target,), (full_target,) = short["targets"], full["targets"]
+    assert short_target["text"].endswith("...") and len(short_target["text"]) == 303
+    assert len(full_target["text"]) > 303 and full_target["text"].startswith(short_target["text"][:-3])
+
+
+def test_json_id_dry_run_writes_nothing(id_host: Path) -> None:
+    flags = _flags(id_host / "spec", id_host)
+    before = {path: path.read_bytes() for path in (id_host / "spec").rglob("*") if path.is_file()}
+    argv = ["json", "insert", "--id", "api-password-reset-confirm", ".derives_from", json.dumps(_FR_REQUEST), *flags]
+    code, out = run_cli(*argv, "--dry-run")
+    assert code == 0 and out.startswith("[dry-run] would insert into api-password-reset-confirm") and "lock entry written" in out
+    assert {path: path.read_bytes() for path in (id_host / "spec").rglob("*") if path.is_file()} == before
+    assert json.loads(run_cli(*argv, "--dry-run", "--json")[1])["written"] is False
+    assert run_cli(*argv)[0] == 0 and (id_host / "spec" / _API_FILE).read_bytes() != before[id_host / "spec" / _API_FILE]
+
+
+def test_json_id_raw_takes_the_value_as_a_string(id_host: Path) -> None:
+    flags = _flags(id_host / "spec", id_host)
+    text = "The system shall email a single-use reset link to the address of the account."
+    bare = run_cli("json", "patch", "--id", _FR_REQUEST, ".statement", text, *flags)
+    assert bare[0] == 1 and bare[1].startswith("E767") and "not valid JSON" in bare[1]
+    assert run_cli("json", "patch", "--id", _FR_REQUEST, ".statement", text, "--raw", *flags)[0] == 0
+    assert _statement(id_host, _FR_REQUEST) == text

@@ -47,8 +47,9 @@ message)`` pairs, hint-agnostic.  The hint-enhancement loop stays in
 from __future__ import annotations
 
 import json
+from typing import NamedTuple
 
-from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
+from jsonschema.exceptions import ValidationError, _WrappedReferencingError  # type: ignore[attr-defined]
 
 from .registry import SchemaRegistry, get_schema_validator, get_shared_registry
 
@@ -137,8 +138,16 @@ class SchemaRuntimeError(SchemaValidationError):
 
 
 # ---------------------------------------------------------------------------
-# Public helper
+# Public helpers
 # ---------------------------------------------------------------------------
+
+class SchemaViolation(NamedTuple):
+    """One schema violation: where (``path``), which JSON Schema keyword failed (``keyword``) and the message."""
+
+    path: tuple
+    keyword: str
+    message: str
+
 
 def validate_data_against_schema(
     repo_root: str,
@@ -192,6 +201,21 @@ def validate_data_against_schema(
     All of the above are subclasses of ``SchemaValidationError`` so a single
     ``except SchemaValidationError`` clause handles the whole family.
     """
+    return [(tuple(e.path), e.message) for e in _schema_errors(repo_root, data)]
+
+
+def schema_violations(repo_root: str, data: dict) -> list[SchemaViolation]:
+    """The violations of *data* against its own ``$schema``, each with the keyword that failed.
+
+    Same contract and exceptions as ``validate_data_against_schema``; the list is unsorted.  A caller that must tell a
+    violation that already existed from one an edit caused compares ``(path, keyword)``: the message of a keyword such
+    as ``minItems`` or ``anyOf`` quotes the instance and so changes with any edit inside it.
+    """
+    return [SchemaViolation(tuple(e.path), str(e.validator), e.message) for e in _schema_errors(repo_root, data)]
+
+
+def _schema_errors(repo_root: str, data: dict) -> list[ValidationError]:
+    """The raw ``jsonschema`` errors of *data*; the typed exceptions are those of ``validate_data_against_schema``."""
     # --- Step 1: validate and extract $schema ---
     schema_uri = data.get("$schema")
     if schema_uri is None:
@@ -249,4 +273,4 @@ def validate_data_against_schema(
     except Exception as exc:
         raise SchemaRuntimeError(original=exc) from exc
 
-    return [(tuple(e.path), e.message) for e in raw_errors]
+    return raw_errors

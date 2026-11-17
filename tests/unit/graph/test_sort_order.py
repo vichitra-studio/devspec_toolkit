@@ -300,3 +300,26 @@ def test_attest_step_lists_its_nodes_in_replay_order_whatever_the_hash_seed(seed
     assert result.returncode == 0, result.stderr
     holders = list(dict.fromkeys(link["holder"] for link in json.loads(result.stdout)["attested"]))
     assert holders == _STALE_STEP_00
+
+
+# --- trace/id_writes.py  the targets, the newly suspect steps and the broken links of a write ---------------------------------
+
+_WRITE_STEPS = ["05", "06", "07", "08", "09", "11", "14", "15", "16a"]
+_WRITE_TARGETS = ["ac-password-reset-1", "ac-password-reset-2", "ac-password-reset-request-1", "ac-password-reset-request-2"]
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_write_report_lists_targets_and_newly_suspect_steps_in_step_then_id_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    flags = ["--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host), "--dry-run", "--json"]
+    links = json.dumps(["ac-password-reset-request-2", "ac-password-reset-2", "ac-password-reset-1", "ac-password-reset-request-1"])
+    patched = run_specdev_seeded(seed, "json", "patch", "--id", "err-password-reset-confirm-token-expired", ".derives_from", links, *flags)
+    assert patched.returncode == 0, patched.stderr
+    assert [target["target"] for target in json.loads(patched.stdout)["targets"]] == _WRITE_TARGETS
+    deleted = run_specdev_seeded(seed, "json", "delete", "--id", _CRITERION, *flags)
+    assert deleted.returncode == 0, deleted.stderr
+    report = json.loads(deleted.stdout)
+    assert [item["step"] for item in report["newly_suspect"]] == _WRITE_STEPS
+    pairs = [(link["holder"], link["field"]) for link in report["broken"]]
+    assert len(pairs) >= 2 and pairs == sorted(pairs)

@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
@@ -34,7 +35,8 @@ from specdev_tools.core.schema_validate import (
     SchemaReferencingError,
     SchemaRuntimeError,
     SchemaValidationError,
-    validate_data_against_schema,
+    SchemaViolation,
+    schema_violations,
 )
 
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
@@ -413,11 +415,11 @@ def _path_tuple_to_jq(path_tuple: tuple) -> str:
     return "".join(parts) if parts else "."
 
 
-def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> list:
-    """Run validate_data_against_schema, mapping every schema-validation failure
+def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> List[SchemaViolation]:
+    """Run schema_violations, mapping every schema-validation failure
     to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
     try:
-        return validate_data_against_schema(eff_root, doc)
+        return schema_violations(eff_root, doc)
     except NoSchemaError:
         raise JsonUtilsError(
             f"{file_path} declares no $schema; json patch validates writes against "
@@ -502,17 +504,92 @@ def _ws1_differential_check(
     # Step 4: Compute errors_before to distinguish pre-existing from newly introduced.
     errors_before = _call_validate_or_raise(eff_root, original, file_path)
 
-    new_errors = set(errors_after) - set(errors_before)
-    if new_errors:
-        # Sort for deterministic output.
-        sorted_errors = sorted(new_errors, key=lambda x: (x[0], x[1]))
+    added = _added_violations(errors_before, errors_after)
+    if added:
         lines = [
-            f"  path {_path_tuple_to_jq(path)}: {msg}"
-            for path, msg in sorted_errors
+            f"  path {_path_tuple_to_jq(violation.path)}: {violation.message}"
+            for violation in added
         ]
         raise JsonUtilsError(
             "Write refused: this edit introduces schema violation(s):\n" + "\n".join(lines)
         )
+
+
+def _added_violations(
+    before: List[SchemaViolation], after: List[SchemaViolation]
+) -> List[SchemaViolation]:
+    """The violations of *after* that an edit added, sorted by path then message.
+
+    A violation is identified by ``(path, keyword)``, not by its message: the message of ``minItems`` or ``anyOf``
+    quotes the instance and so changes with any edit inside it.  For each identity the violations beyond the count
+    that *before* already had are the added ones, so one more violation of a kind that was already there at a path is
+    still refused (DEVSPEC-317).
+    """
+    already = Counter((violation.path, violation.keyword) for violation in before)
+    added: List[SchemaViolation] = []
+    for violation in sorted(after, key=lambda v: (v.path, v.keyword, v.message)):
+        key = (violation.path, violation.keyword)
+        if already[key] > 0:
+            already[key] -= 1
+        else:
+            added.append(violation)
+    return sorted(added, key=lambda v: (v.path, v.message))
+
+
+def check_edit(file_path: str, content: str, new_content: str, repo_root: Optional[str]) -> None:
+    """Refuse (``JsonUtilsError``) *new_content* when it adds a schema violation to *content*, the text of *file_path*.
+
+    The same differential check ``json patch`` and ``json insert`` run before they write, for a caller that holds the
+    edited text in memory.  Violations that *content* already had are ignored.
+    """
+    _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root))
+
+
+def _run_value_filter(filter_expr: str, content: str, value: str, is_json: bool) -> str:
+    """Run *filter_expr* over the JSON text *content* with ``$v`` bound to *value* (JSON when *is_json*, else a string)."""
+    args = ['--indent', str(JQ_INDENT), '--argjson' if is_json else '--arg', 'v', value, filter_expr]
+    return run_jq(args, input_data=content, timeout=10)
+
+
+def patch_text(content: str, path_selector: str, value: str, is_json: bool = True) -> str:
+    """The JSON text *content* with the value at *path_selector* replaced by *value*; nothing is read or written.
+
+    Raises ``JsonUtilsError`` for a jq filter that does not parse or fails on the document.
+    """
+    _require_valid_filter(path_selector)
+    return _run_value_filter(f'({path_selector}) = $v', content, value, is_json)
+
+
+def insert_text(content: str, path_selector: str, value: str, is_json: bool = True, *, create: bool = False) -> str:
+    """The JSON text *content* with *value* appended to the array (or merged into the object) at *path_selector*.
+
+    With *create*, a missing (null) target becomes ``[value]``.  Raises ``JsonUtilsError`` for a jq filter that does not
+    parse, or when the target is neither an array nor an object (nor null with *create*).
+    """
+    _require_valid_filter(path_selector)
+    return _run_value_filter(_insert_filter(path_selector, create=create), content, value, is_json)
+
+
+def delete_text(content: str, path_selector: str) -> str:
+    """The JSON text *content* without the value at *path_selector*.
+
+    Raises ``JsonUtilsError`` for a jq filter that does not parse or fails on the document.
+    """
+    _require_valid_filter(path_selector)
+    return run_jq(['--indent', str(JQ_INDENT), f'del({path_selector})'], input_data=content, timeout=10)
+
+
+def _insert_filter(path_selector: str, *, create: bool) -> str:
+    """The jq filter that appends ``$v`` to the array or merges it into the object at *path_selector*.
+
+    With *create*, a null target (a missing field) becomes ``[$v]`` instead of an error.
+    """
+    on_null = 'elif type=="null" then [$v] ' if create else ''
+    return (
+        f'({path_selector}) |= (if type=="array" then . + [$v] '
+        f'elif type=="object" then . + $v '
+        f'{on_null}else error("Cannot insert into " + type) end)'
+    )
 
 
 def json_patch(
@@ -535,21 +612,11 @@ def json_patch(
     — only violations *introduced* by this edit are refused.
     """
     _check_file(file_path)
-    _require_valid_filter(path_selector)
-
-    args = ['--indent', str(JQ_INDENT)]
-    if is_json:
-        args.extend(['--argjson', 'v', value])
-    else:
-        args.extend(['--arg', 'v', value])
-
-    filter_expr = f'({path_selector}) = $v'
-    args.append(filter_expr)
 
     with open(file_path, 'r') as f:
         content = f.read()
 
-    new_content = run_jq(args, input_data=content, timeout=10)
+    new_content = patch_text(content, path_selector, value, is_json)
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
@@ -591,45 +658,23 @@ def json_insert(
     # ``_check_file`` is normally the first statement and raises ``File not found``
     # before any other logic.  The ``--create-schema`` seed branch MUST be the
     # function's first action so it short-circuits ``_check_file`` for missing files.
-    # Normal (error-on-null) filter: used for existing files.
-    _normal_filter = (
-        f'({path_selector}) |= (if type=="array" then . + [$v] '
-        f'elif type=="object" then . + $v '
-        f'else error("Cannot insert into " + type) end)'
-    )
-    # Create-variant filter: null-coalesces the target so a missing array field is
-    # bootstrapped to [$v] instead of erroring "Cannot insert into null".
-    # (The normal filter hits ``else error(...)`` on a null/missing field.)
-    _create_filter = (
-        f'({path_selector}) |= (if type=="array" then . + [$v] '
-        f'elif type=="object" then . + $v '
-        f'elif type=="null" then [$v] '
-        f'else error("Cannot insert into " + type) end)'
-    )
-
+    # ``_insert_filter(create=True)`` (seed path) null-coalesces the target so a missing array field is
+    # bootstrapped to [$v]; the normal filter errors "Cannot insert into null" for an existing file.
     using_seed = False
     if create_schema and not os.path.isfile(file_path):
         # Seed path: create the file content in memory; do NOT call _check_file.
         content = json.dumps({"$schema": create_schema})
         using_seed = True
-        active_filter = _create_filter
+        active_filter = _insert_filter(path_selector, create=True)
     else:
         _check_file(file_path)
         with open(file_path, 'r') as f:
             content = f.read()
-        active_filter = _normal_filter
+        active_filter = _insert_filter(path_selector, create=False)
 
     _require_valid_filter(path_selector)
 
-    args = ['--indent', str(JQ_INDENT)]
-    if is_json:
-        args.extend(['--argjson', 'v', value])
-    else:
-        args.extend(['--arg', 'v', value])
-
-    args.append(active_filter)
-
-    new_content = run_jq(args, input_data=content, timeout=10)
+    new_content = _run_value_filter(active_filter, content, value, is_json)
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
@@ -654,23 +699,26 @@ def json_delete(
     file_path: str,
     path_selector: str,
     dry_run: bool = False,
+    repo_root: Optional[str] = None,
+    validate: bool = False,
 ) -> str:
     """Delete item at path.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
     (no file is written).
+
+    ``validate`` defaults to False: the classic ``json delete`` and ``node status <id> active`` validate nothing.  When
+    True, the edit is checked against the document's own ``$schema`` as ``json patch`` is: only a violation the
+    deletion adds refuses it.
     """
     _check_file(file_path)
-    _require_valid_filter(path_selector)
-
-    args = ['--indent', str(JQ_INDENT)]
-    filter_expr = f'del({path_selector})'
-    args.append(filter_expr)
 
     with open(file_path, 'r') as f:
         content = f.read()
 
-    new_content = run_jq(args, input_data=content, timeout=10)
+    new_content = delete_text(content, path_selector)
+    if validate:
+        _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root))
     if dry_run:
         return f"[dry-run] Would delete {path_selector} in {file_path}:\n{new_content}"
     json_write_atomic(file_path, new_content)
@@ -1365,6 +1413,11 @@ def _write_report(report: Dict[str, Any], out_path: Optional[str]) -> None:
 
 # --- CLI Setup ---
 
+def _add_repo_root(parser: argparse.ArgumentParser, command: str) -> None:
+    """Give *parser* the ``--repo-root`` flag the rest of the ``json`` family takes (unused by *command*)."""
+    parser.add_argument("--repo-root", default=".", help=f"Accepted for CLI consistency; unused by {command}")
+
+
 def build_json_parser() -> argparse.ArgumentParser:
     """Build the ``specdev json`` argparse parser (no parsing, no side effects)."""
     parser = argparse.ArgumentParser(description="Smart JSON Tool for AI Agents")
@@ -1432,16 +1485,19 @@ def build_json_parser() -> argparse.ArgumentParser:
     p_del.add_argument("file", help="JSON file path")
     p_del.add_argument("path", help="jq path to target")
     p_del.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    _add_repo_root(p_del, "delete")
 
     # Keys
     p_keys = subparsers.add_parser("keys", help="List keys")
     p_keys.add_argument("file", help="JSON file path")
     p_keys.add_argument("path", help="jq path (optional)", default=".", nargs="?")
+    _add_repo_root(p_keys, "keys")
 
     # Structure
     p_struct = subparsers.add_parser("structure", help="Show visual hierarchical structure")
     p_struct.add_argument("file", help="JSON file path")
     p_struct.add_argument("path", help="jq path (optional)", default=".", nargs="?")
+    _add_repo_root(p_struct, "structure")
 
     # Schema
     p_schema = subparsers.add_parser("schema", help="Query schema capabilities")

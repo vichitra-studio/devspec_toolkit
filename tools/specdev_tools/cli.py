@@ -567,6 +567,9 @@ def build_parser() -> _SpecdevParser:
             "  schema             Resolve the schema URI for a file\n"
             "  structure          Print the structural outline of a file\n"
             "  resolve-pointers   Verify a list of file:jq pointers\n\n"
+            "patch, insert and delete also write a node by id: 'specdev json patch --id <node-id> <field-path> <value>',\n"
+            "'json insert --id <node-id> ...', 'json insert --step NN <collection-path> <value>', 'json delete --id <node-id>'\n"
+            "(add --help after --id to see them).\n\n"
             "Run 'specdev json <subcommand> --help' for subcommand details."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2116,6 +2119,10 @@ def main():
                 ctx_p.print_help()
 
     elif args.cmd == "json":
+        from .trace.id_write_commands import is_id_write, run_id_write
+        if is_id_write(args.args):
+            # An id-keyed write needs the spec folder, so --spec-root and --git-root are NOT stripped.
+            sys.exit(run_id_write(args.args))
         from .core.json_utils import main as json_main
         # Strip --spec-root / --git-root if present — the json subcommand family
         # accepts --repo-root only, but agents frequently over-apply the
