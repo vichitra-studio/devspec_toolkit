@@ -98,6 +98,8 @@ Defined in `tools/step_order.json`.
 }
 ```
 
+`require_full_forward_replay_on_change` no longer decides whether replay is required. Replay is the set of suspect links in the trace lock (`spec/extras/trace.lock.json`, E763); `spec-check` and `validate-all` report them whatever this flag says (checked on the worked example with the flag set to `false`: 21 E763 findings from each). `validate-all` still reads the flag: only while it is true does it run the base-ref check for id regressions (E555, W598, W550; on a copy of the worked example, a run with the flag true reported W550 and a run with it false did not). File-level forward replay (the old requirement that every step after a changed step has a changed file) is retired; see [reference.md](../developers/reference.md#trace-lock-replay-and-attest).
+
 **Generated, not hand-kept:** `specdev registry-generate` derives `step_metadata` and `downstream_consumers` from the `x-link` declarations of the step schemas and from the hand-kept `declared_edges` pairs; the two keys are each other's inverse (E543 otherwise). Only `version`, `steps`, `policy`, `coverage_thresholds` and `declared_edges` are edited by hand.
 
 **Reading the inputs of a step:** `step_metadata["05"].required_spec_inputs` is `["00", "02", "04"]`, and `downstream_consumers["00"]`, `["02"]` and `["04"]` each contain `"05"`. `specdev prompt-context <step>` prints the consumers of a step.
@@ -172,5 +174,5 @@ The required sequence after any spec edit:
 | Fixture `input` or `expected` changed | Add `fixtures-lint` (reads no `vc:08-fixtures` file, see the note above) |
 | New canon entry added | `canonical-lint`, `canonical-integrity` |
 | Commit | `governance-check` against commit message |
-| Upstream step changed | `forward-replay-check` to verify all downstream steps are replayed |
+| Upstream step changed | `stale` to list the suspect links, `attest` once each is read, then `spec-check` (`forward-replay-check` is a deprecated alias) |
 | Schema enum modified | `hallucination-lint` to verify specs still conform |

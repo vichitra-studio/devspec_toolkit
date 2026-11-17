@@ -1225,7 +1225,7 @@ def main():
         from .validation.validate import _resolve_replay_base_ref
         print(
             "specdev: forward-replay-check is deprecated; use `specdev stale` for the pending replay "
-            "(it now reports suspect links of the trace lock and id regressions only)",
+            "(it now reports suspect links of the trace lock and id regressions)",
             file=sys.stderr,
         )
         repo_root = os.path.abspath(args.repo_root)

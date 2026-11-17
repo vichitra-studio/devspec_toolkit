@@ -393,9 +393,9 @@
 
 ### E595 / W595 CONTENT_STALENESS
 
-**Trigger**: An upstream artifact has been modified with new content tokens, but none of those new tokens appear in downstream artifacts that consume it.
+**Trigger**: Reported by `specdev context freshness` and by the seed indexer for the two seed sub-reasons below. File-level forward replay, which reported W595 when an upstream artifact gained content tokens that no downstream artifact shows, is retired: `specdev forward-replay-check` and `validate-all` no longer report W595 for that reason, and `SPECDEV_STALENESS_THRESHOLD` has no effect. The suspect links of the trace lock ([E763](#e763-suspect_link)) replace that check.
 
-**Resolution**: Review the upstream changes and update downstream artifacts to reflect the new content.
+**Resolution**: For the seed sub-reasons, re-index the seeds (below). For a change in a spec artifact, run `specdev stale` and read what is pending.
 
 **Promotable**: W595 → E595.
 
@@ -785,11 +785,13 @@ Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by 
 
 ### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP
 
-**Trigger (E550)**: Fired by `forward_replay_check.py` in four shapes: (1) the diff against the base ref could not be computed and `SPECDEV_REPLAY_DIFF_ERROR_MODE` holds a value other than `error` or `ignore`; (2) the diff could not be computed and the mode is `error` (with `ignore` nothing is reported); (3) a changed spec file belongs to a step that `steps` does not list (`unknown_step_in_diff`); (4) a step that comes after a changed step in the `steps` order of `tools/step_order.json`, and has a spec file, was not changed too (the first such step is named; `downstream_consumers` is not read).
+File-level forward replay is retired. `specdev forward-replay-check` is a deprecated alias: it prints one line on stderr, runs the id-regression check (E555, W598, W550) and reports trace-lock findings (for example E763 and E778, with the messages of `spec-check`); `specdev stale` and `specdev attest` take its place. The E550 that remains is the one of the id-regression check.
+
+**Trigger (E550)**: The diff against the base ref could not be computed (for example the ref does not exist) and the diff error mode is `error` (the default of `forward-replay-check`; `validate-all` reads `SPECDEV_REPLAY_DIFF_ERROR_MODE`). Example, from `specdev forward-replay-check --base-ref no-such-ref`: `E550 FORWARD_REPLAY_MISSING unable_to_compute_diff base_ref=no-such-ref reason=fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in the working tree.` With the mode `ignore` nothing is reported and the id-regression check is skipped. A step that changed while a later step did not (for example a changed step 03 with no change to the steps after it) is no longer an E550.
 
 **Trigger (W550)**: Fired when semantic coverage checking could not read the base-ref version of an artifact (e.g. the file didn't exist at the base ref), so the coverage-regression check for that artifact is skipped rather than failing closed.
 
-**Resolution (E550)**: Fix the `SPECDEV_REPLAY_DIFF_ERROR_MODE` value, ensure the base ref is reachable and diffable, or replay the missing downstream artifacts.
+**Resolution (E550)**: Make the base ref reachable and diffable (`--base-ref`, `SPECDEV_REPLAY_BASE_REF`), or set the mode to `ignore` to skip the check.
 
 **Resolution (W550)**: Confirm the base ref genuinely predates the artifact (expected for newly-added files); no action needed if so.
 
@@ -935,7 +937,7 @@ Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by 
 
 ## Spec Graph (70x / 72x)
 
-Errors E700-E704 and W720 are findings about the spec: each is given an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and a `node_id` when it is raised. The table of owners is `tools/error_ownership.json`.
+A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and, when a node is involved, a `node_id`. `spec-check --json` prints both. The codes of the spec graph that do this are E700 to E704, W720, E761 to E763, E768, E771, E772, E774, E778 and E882 (E760 carries an owner and no node id). The rows of `tools/error_ownership.json` give the owner of some of them (the others set it when they are raised): the owner of a link finding is the step of the node that holds the link, and E762 and E763 are for the merge check. The codes that refuse a command (E705 to E709, E764, E765, E767, E769, E770, E773) carry no owner.
 
 ### E700 LINK_TARGET_NOT_FOUND
 
@@ -1019,57 +1021,57 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### W720 LINK_TO_DEPRECATED_NODE
 
-**Trigger**: A link names a node whose lifecycle is `deprecated` and the trace lock has no entry for that link yet, so the link is new. Reported by `spec-check` (check `graph`) through the lock hook, in the same run that reports the missing entry (E761). A link that already has a lock entry raises nothing.
+**Trigger**: A link names a node whose lifecycle is `deprecated` and the trace lock has no entry for that link yet, so the link is new. Reported by `spec-check` (check `graph`), together with the missing entry (E761), and by `validate-all`. A link that already has a lock entry raises nothing. Example, after `specdev node status fr-password-reset-request deprecated` and a hand edit that makes `api-password-reset-confirm` link to it: `W720 api-password-reset-confirm, field derives_from, target 'fr-password-reset-request': 'fr-password-reset-request' is deprecated; point the link at the node that replaces it`.
 
 **Resolution**: Owner `step:<holder step>`. Point the link at the node that replaces the deprecated one. Not promotable (no E counterpart).
 
 ## Trace Lock (76x)
 
-The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the hashes of the target as the holder last accepted it. Its format is `schema/extras/trace_lock.schema.json`.
+The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the content hash and the chain stamp of the target as the holder last accepted them. Its format is `schema/extras/trace_lock.schema.json`. A link whose target now has another chain stamp is a suspect link. The messages below are copied from runs on a copy of the worked example (`tests/fixtures/graph_example`); the host path is left out of one of them.
 
 ### E760 TRACE_LOCK_MALFORMED
 
-**Trigger**: The trace lock cannot be read. The file is not valid JSON, is not an object of the lock format (a missing or unknown key, a `version` other than 1, a hash that is not `sha256:` and 64 lower-case hex digits, a `baseline` that is not `true`), names the same (source, field, target) triple twice, or holds git merge conflict markers (`<<<<<<<`). The marker case is checked before the JSON is parsed, and the message names the repair.
+**Trigger**: The trace lock cannot be read. The file is not valid JSON, is not an object of the lock format (a missing or unknown key, a `version` other than 1, a hash that is not `sha256:` and 64 lower-case hex digits, a `baseline` that is not `true`), names the same (source, field, target) triple twice, or holds git merge conflict markers (`<<<<<<<`). The marker case is checked before the JSON is parsed, and the message names the repair. Reported by `spec-check` (check `trace-lock`) and `stale`; `specdev lock merge` reports it for an input version that is not a valid lock. Example (`specdev lock merge`, a version that is cut off): `E760 trace lock bad.json: not valid JSON (Expecting ',' delimiter: line 2 column 1 (char 14))`; for a file that holds `{"version": 2}`: `E760 trace lock <host>/spec/extras/trace.lock.json: $schema must be vc:extras:trace-lock`.
 
-**Resolution**: Owner `merge-check`. For conflict markers: install the lock merge driver with `git config merge.specdev-trace-lock.driver "<specdev> lock merge %O %A %B %P"`, then run `git checkout -m -- spec/extras/trace.lock.json` (it re-runs the driver and writes the merged file, but git still lists the path as unmerged), then `git add spec/extras/trace.lock.json`. For any other cause, restore the file from git or fix the entry the message names.
+**Resolution**: Owner `merge-check`, no node id. For conflict markers: install the merge driver (`specdev lock install-driver --driver-command '<path to specdev> lock merge'`; it sets the driver and adds the `merge=specdev-trace-lock` line to `.git/info/attributes`), then run `git checkout -m -- spec/extras/trace.lock.json` (it re-runs the driver and writes the merged file, but git still lists the path as unmerged), then `git add spec/extras/trace.lock.json`. The message prints the same repair with a `git config` command in place of `install-driver`. For any other cause, restore the file from git or fix the entry the message names.
 
 **Promotable**: No (error only).
 
 ### E761 LINK_LOCK_ENTRY_MISSING
 
-**Trigger**: A link that the resolver accepts has no entry in the trace lock. Reported by `spec-check` (check `graph`), once per link, in the same resolver run as E700-E703. Links of a record, `replaces` and `removes` links, and links to a `not_applicable` node need no entry. Links of historical nodes (a milestone whose anchor row is `done`) still need one.
+**Trigger**: A link that the resolver accepts has no entry in the trace lock. Reported by `spec-check` (check `graph`), by `validate-all` and by `forward-replay-check`, once per link, in the same resolver run as E700-E703; `stale` does not list it. Links of a record and `replaces` links need no entry. Links of historical nodes (a milestone whose anchor row is `done`) still need one. Example (a hand edit through `specdev json patch <file> <path> <value>` added the link): `E761 api-password-reset-confirm, field derives_from, target 'fr-password-reset-request': the trace lock has no entry for this link; accept it with `specdev attest api-password-reset-confirm` once the target is checked`.
 
-**Resolution**: Owner `step:<holder step>`. Check the target, then run `specdev attest <holder id>`; with no entry it creates one. A link written through a command that writes the lock gets its entry at once.
+**Resolution**: Owner `step:<holder step>`. Check the target, then run `specdev attest <holder id> --yes`; for a link with no entry it creates the entry. A link written through `specdev json patch|insert|delete --id`, `specdev json insert --step` or `specdev step create` gets its entry at once; `specdev node rename` re-keys the entries it touches. The path form of `specdev json` (`json patch <file> <path> <value>`) writes no entry, which is what the example shows.
 
 **Promotable**: No (error only).
 
 ### E762 LOCK_ENTRY_ORPHAN
 
-**Trigger**: A trace lock entry names a holder, field and target that no node declares any more (the link was removed or the holder was deleted). Reported by `spec-check` (check `trace-lock`). An entry whose target resolves through an alias, an entry whose holder still declares the link while the target node is gone (a resolver error of the holder's step), and an entry whose holder or target is `not_applicable` are not orphans.
+**Trigger**: A trace lock entry names a holder, field and target that no node declares any more (the link was removed or the holder was deleted). Reported by `spec-check` (check `trace-lock`). Example, after the `constrains` list of an invariant was shortened by a hand edit: `E762 trace lock entry (inv-reset-token-single-use, field constrains, target 'identity-service') has no link any more; remove it with `specdev attest --prune``.
 
-**Resolution**: Owner `merge-check`. Remove the entry with `specdev attest --prune`.
+**Resolution**: Owner `merge-check`. Remove the entry with `specdev attest --prune` (it writes at once; `--dry-run` lists what it would remove).
 
 **Promotable**: No (error only).
 
 ### E763 SUSPECT_LINK
 
-**Trigger**: The target of a link has changed since the holder accepted it: the chain stamp stored in the lock differs from the one the target has now. The message gives the cause (the target itself was edited, or something above it changed) and up to three nearest changed nodes above it. Reported by `spec-check` (check `trace-lock`) for links held by nodes that are not historical and not `not_applicable`.
+**Trigger**: The target of a link has changed since the holder accepted it: the chain stamp stored in the lock differs from the one the target has now. The message gives the cause (the target itself was edited, or something above it changed) and up to three nearest changed nodes above it. Reported by `spec-check` (check `trace-lock`), by `validate-all` and by `forward-replay-check` for links held by nodes that are not historical and not `not_applicable`. Example, after the text of a criterion was edited: `E763 api-password-reset-confirm, field derives_from, target 'fr-password-reset': suspect link, the target itself was edited; changed above: ac-password-reset-3. Review the change, then edit api-password-reset-confirm or run `specdev attest api-password-reset-confirm``.
 
-**Resolution**: Owner `merge-check`: the step gate lists these as pending replay and does not block on them; the merge check does. Read the change, then edit the holder or run `specdev attest <holder id>`. Replay works upward-first.
+**Resolution**: Owner `merge-check`. `specdev stale` lists the suspect links by step, and `specdev stale --diff` shows the change; `step ready` reports a step with suspect links above it as not ready. Read the change, then edit the holder or run `specdev attest <holder id> --yes`. Replay works upward first: `specdev attest --step NN --yes` does it for a step.
 
 **Promotable**: No (error only).
 
 ### E764 ATTEST_REFUSED_TARGET_SUSPECT
 
-**Trigger**: `specdev attest` refused a node because one of its own targets is itself a suspect node: a node that holds a suspect link. The message names the node and the links that block it. With `--step`, the nodes that can be attested are, and the rest are named in one E764; the exit code is 1.
+**Trigger**: `specdev attest` refused a node because one of its own targets is itself a suspect node: a node that holds a suspect link. The message names the node and the links that block it. With `--step`, the blocked nodes are named in one E764. The exit code is 1. Example: `E764 attest refused: 'inv-reset-token-single-use' links to suspect nodes (constrains -> api-password-reset-confirm); attest those nodes first`.
 
-**Resolution**: Command refusal: no owner, no node id. Attest the blocking node first (`specdev attest <blocking id>`), then this one; `specdev attest --step NN` does this upward-first for a whole step.
+**Resolution**: Command refusal: no owner, no node id. Attest the blocking node first (`specdev attest <blocking id> --yes`), then this one; `specdev attest --step NN --yes` does this upward first for a whole step.
 
 **Promotable**: No (error only).
 
 ### E765 ATTEST_REFUSED_HISTORICAL
 
-**Trigger**: `specdev attest` refused a node of a closed milestone (a historical node). Its lock entries stay as they were.
+**Trigger**: `specdev attest` refused a node of a closed milestone (a historical node). Its lock entries stay as they were. Example: `E765 'tc-confirm-expired-token' is historical (it belongs to a closed milestone), so its links are not re-attested; its lock entries stay as they were`.
 
 **Resolution**: Command refusal: no owner, no node id. Links of a closed milestone are not re-attested.
 
@@ -1077,23 +1079,23 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E767 WRITE_REFUSED
 
-**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>` and `specdev json insert --step NN` when the node is a seed or is defined more than once (E704), the field path is not a plain jq path inside the node or names the node's id, the edit adds a schema violation, or the edit would leave a link that does not resolve (E700 to E703) or a duplicate id. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written.
+**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>`, `specdev json insert --step NN` and `specdev step create NN --from DRAFT`. The reasons include: the node is a seed; the field path names the node's id; the edit adds a schema violation; the edit would leave a link that does not resolve (for example E700) or an alias collision (E771); for `insert --step`, a path that is not a node collection of the step; for `step create`, a step that already has its file, step 13a or 16, a draft that cannot be read, or a draft whose `$schema` is not the step's own. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written. Examples: `E767 .fr_id is the id of 'fr-password-reset'; an id is changed with `specdev node rename``; `E767 'seed-accounts' is a seed; a seed is edited as a file, not by id`; `E767 step 07 already has a spec file (07_nfrs.json); edit it with `specdev json patch|insert|delete --id``; `E767 step 13a has no spec file that step create writes; it creates steps 00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15`.
 
-**Resolution**: Command refusal: no owner, no node id. The message names the reason.
+**Resolution**: Command refusal: no owner. With `--json` the error names the node in `node_id`. The message names the reason.
 
 **Promotable**: No (error only).
 
 ### E768 STORED_COMPUTED_FIELD
 
-**Trigger**: A spec node stores a field that the toolkit computes (for example `fr_refs` on a roadmap task, `milestone_ref` on a plan item, `content_hash` on any node). Raised by the `computed-fields` check of `spec-check`; the message names the node id, the view and the command that computes it.
+**Trigger**: A spec node stores a field that the toolkit computes (for example `fr_refs` on a roadmap task, `milestone_ref` on a plan item, `content_hash` on any node). Raised by the `computed-fields` check of `spec-check`, and by `specdev json patch --id` when the payload stores one (E768 is the code of the refusal, exit 1); the message names the node id, the view and where the value comes from. Example: `E768 fr-password-reset (fr) stores 'content_hash', which is computed (content hash and chain stamp); remove it and compute it with the trace lock (`specdev attest` writes it)`.
 
-**Resolution**: Owner `step:<node step>`. Remove the stored field.
+**Resolution**: Owner `step:<node step>` (from `spec-check`). Remove the stored field.
 
 **Promotable**: No (error only).
 
 ### E769 LOCK_WRITE_CONFLICT
 
-**Trigger**: A command that writes the lock found another specdev write running: the exclusive lock on `spec/extras/` is held by another process. The message says "another specdev write is running".
+**Trigger**: A command that writes the lock found another specdev write running: the exclusive lock on `spec/extras/` is held by another process. Example: `E769 another specdev write is running (the lock on <host>/spec/extras is held); wait for it to finish, then run the command again`.
 
 **Resolution**: Command refusal: no owner, no node id. Wait for the other command to finish and run this one again.
 
@@ -1101,7 +1103,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E770 RENAME_REFUSED
 
-**Trigger**: `specdev node rename` (or `node rename --label`) refused a rename and wrote nothing: the node is a seed, a record, a node whose id is a map key or an id defined twice; the old and the new id are the same; the new id is the id or an alias of a node, or not an id; the trace lock already has entries under the new id; or an edit would add a schema violation or a link finding. An unknown id is E706, not E770. Exit 1.
+**Trigger**: `specdev node rename` (or `node rename --label`) refused a rename and wrote nothing: the node is a seed or a record (for example), the old and the new id are the same, the new id is the id or an alias of a node, the new id is not an id (`Bad Id`), or, with `--label`, the id is not a glossary term. An unknown id is E706, not E770. Exit 1. Example: `E770 'fr-password-reset' is an alias of 'fr-reset-password'; choose an id no node or alias has`.
 
 **Resolution**: Command refusal: no owner, no node id. The message names the reason.
 
@@ -1109,7 +1111,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E771 ALIAS_COLLISION
 
-**Trigger**: An alias equals a live node id or an alias another node lists. Aliases share the id space of the nodes, whatever a node's lifecycle. Reported by `spec-check` (check `graph`), and an id write that would create the collision is refused (E767).
+**Trigger**: An alias equals a live node id or an alias another node lists. Aliases share the id space of the nodes, whatever a node's lifecycle. Reported by `spec-check` (check `graph`); an id write that would create the collision is refused (E767 naming E771). Example: `E771 fr-reset-password: alias 'fr-password-reset-request' is the id of a fr; give the node a different alias`.
 
 **Resolution**: Owner `step:<node step>`. Give the node a different alias.
 
@@ -1117,7 +1119,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E772 REPLACES_NAMES_LIVE_NODE
 
-**Trigger**: A `replaces` link names a node that is still in the spec (by its id or one of its aliases). Reported by `spec-check` (check `graph`); the git history is not read.
+**Trigger**: A `replaces` link names a node that is still in the spec (by its id or one of its aliases). Reported by `spec-check` (check `graph`). Example: `E772 fr-password-reset-request, field replaces, target 'fr-password-reset': 'fr-password-reset' is still in the spec; delete it or drop the link`.
 
 **Resolution**: Owner `step:<node step>`. Deprecate or remove the replaced node, or drop the link.
 
@@ -1125,7 +1127,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E773 STEP_NOT_READY
 
-**Trigger**: `specdev step ready NN` found that step NN may not start: a step above it has no spec file, or holds pending replay (a suspect link, or a coverage gap). The steps checked are the steps NN's nodes link to, plus (for the presence check only) the `required_spec_inputs` of NN in `tools/step_order.json`; NN's own step is never checked. Exit 1; the report lists each blocker (node, link, roots) and the step to replay first.
+**Trigger**: `specdev step ready NN` found that step NN may not start: a step above it has no spec file, or holds pending replay (a suspect link, or a coverage gap as counted by `specdev stale`). The steps checked are the steps NN's nodes link to, plus (for the presence check only) the `required_spec_inputs` of NN in `tools/step_order.json`; the file of NN itself is not required (`step ready 07` with no 07 file reports `step 07: ready` on the worked example). Exit 1; the report lists each blocker (node, link, roots) and the step to replay first. Example: `E773 step 06 is not ready: step 05 (2 blockers); replay step 05 first`. On the worked example `step ready 14` reports `E773 step 14 is not ready: step 13a (1 blocker); replay step 13a first`, because `tools/step_order.json` still lists 13a as an input of 14 and the example has no 13a file; that lasts until a later 1.2.0 change retires step 13a.
 
 **Resolution**: Command refusal: no owner, no node id. Finish the replay of the steps the message names, earliest step first (`specdev stale`, then `specdev attest`).
 
@@ -1133,15 +1135,15 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E774 RECORD_INVALID
 
-**Trigger**: A file under `spec/extras/verification/` is not a valid record. Reported by `spec-check` (check `records`) for a file that is not a JSON object, violates the schema its `$schema` names (a second record in the file, an id with the wrong prefix, no `output_guard`, an unknown `stage`, a malformed `output_hash`), holds no record of the kind its name prefix declares (`ver-` for a verification record, `evd-` for an evidence record), or has a file name that is not its record id. A `verifies` or `about` id that no node has is E700 from the `graph` check, not E774.
+**Trigger**: A record file under `spec/extras/verification/` (`ver-<id>.json` for a verification record, `evd-<id>.json` for an evidence record) is not valid. Reported by `spec-check` (check `records`) for a file that is not a JSON object, violates the schema its `$schema` names (for example a second record in the file, an id with the wrong prefix, no `output_guard`, an unknown `stage`, a malformed `output_hash`), holds no record of the kind its name prefix declares, or has a file name that is not its record id. A `verifies` or `about` id that no node has is E700 from the `graph` check, not E774. Examples: `E774 extras/verification/ver-bad.json: unreadable or not a JSON object`; `E774 extras/verification/ver-other-name.json: the file name 'ver-other-name' is not the record id 'ver-password-reset-expired-token'`.
 
-**Resolution**: Owner `merge-check`. Fix the record the message names. Records are written by the toolkit, not by hand.
+**Resolution**: Owner `merge-check`. Fix the record the message names; the file name has to be the record id.
 
 **Promotable**: No (error only).
 
 ### E778 STALE_ALIAS_USE
 
-**Trigger**: A live node's link names an alias of a node instead of the node's current id. Reported by `spec-check` (check `graph`), `validate-all` and `forward-replay-check` with the trace lock; a link of a historical node (a closed milestone) or of a record keeps the old id and is not reported. `specdev node rename` rewrites the links of live nodes itself.
+**Trigger**: A live node's link names an alias of a node instead of the node's current id. Reported by `spec-check` (check `graph`), `validate-all` and `forward-replay-check`; a link of a historical node (a closed milestone) or of a record keeps the old id and is not reported. `specdev node rename` rewrites the links of live nodes itself, so this appears after a hand edit. Example: `E778 api-password-reset-confirm, field derives_from, target 'fr-password-reset': 'fr-password-reset' is an old id of 'fr-reset-password'; use the current id 'fr-reset-password'`.
 
 **Resolution**: Owner `step:<holder step>`. Rewrite the link to the current id.
 
@@ -1149,9 +1151,9 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E882 MIGRATION_BASELINE_NOT_REATTESTED
 
-**Trigger**: A trace lock entry still carries the `baseline` marker that a migration stamps, and its holder is not a historical node. Reported by `spec-check` (check `trace-lock`). Entries of historical holders keep the marker without error.
+**Trigger**: A trace lock entry still carries the `baseline` marker that a migration stamps, and its holder is not a historical node. Reported by `spec-check` (check `trace-lock`). Entries of historical holders keep the marker without error. Example: `E882 trace lock entry (PWRESET_CONFIRM_EXPIRED_01, field realises, target 'tc-confirm-expired-token') still carries the migration baseline marker; check the link, then run `specdev attest PWRESET_CONFIRM_EXPIRED_01` to clear it`.
 
-**Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id>`: it updates the stored hashes and clears the marker.
+**Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id> --yes`: it writes the current stored hashes and clears the marker.
 
 **Promotable**: No (error only).
 

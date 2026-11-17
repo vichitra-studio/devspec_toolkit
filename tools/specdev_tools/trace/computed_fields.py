@@ -67,7 +67,10 @@ COMPUTED_VIEWS: tuple[ComputedView, ...] = (
     ComputedView("step order", (), None, "the x-link declarations", _NO_FIELD),
     ComputedView("context packs", (), None, "links, per role recipe", _NO_FIELD),
     ComputedView(
-        "content hash and chain stamp", ("content_hash", "chain_stamp"), None, "specdev lock (the trace lock)"
+        "content hash and chain stamp",
+        ("content_hash", "chain_stamp"),
+        None,
+        "the trace lock (`specdev attest` writes it)",
     ),
 )
 

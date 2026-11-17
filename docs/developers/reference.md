@@ -5,10 +5,15 @@
 The following flags are available on most spec-operating commands, including
 `validate`, `validate-all`, `spec-check`, `matrix`, `seed-lint`, `fixtures-lint`,
 `invariants-check`, `governance-check`, `canonical-lint`, `canonical-integrity`,
-`spec-quality-lint`, `hallucination-lint`, `forward-replay-check`,
-`milestone-state`, and `canon-schema-alignment`. Per-command exceptions (per
+`spec-quality-lint`, `hallucination-lint`, `forward-replay-check` (deprecated),
+`milestone-state`, and `canon-schema-alignment`; the trace commands `stale`,
+`attest`, `coverage`, `step create`, `step ready`, `node rename` and
+`lock install-driver` take all three (and `--json`). Per-command exceptions (per
 CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
-`--spec-root`; most `specdev json` subcommands take `--repo-root` only; and
+`--spec-root`; the path forms of `specdev json` (`read`, `patch`, `insert`, ...)
+take `--repo-root` only, while `json patch|insert|delete --id` and
+`json insert --step` take all three; `lock merge` takes only its four positional
+arguments (git runs it); and
 diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
 `dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root`
 only; `update` takes `spec_dir` (positional) + `--repo-root` only and does
@@ -37,8 +42,8 @@ Run `<command> --help` to confirm the supported flags for any subcommand:
   --spec-root ./spec \
   --git-root .
 
-# Forward replay check with explicit roots
-./tools/run_specdev.sh forward-replay-check \
+# What is still to be replayed after an upstream change, with explicit roots
+./tools/run_specdev.sh stale \
   --repo-root ./devspec_toolkit \
   --git-root . \
   --spec-root ./spec
@@ -126,6 +131,11 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 # Step-order integrity (strict waterfall)
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
+
+# Replay after an upstream change: see "Trace lock, replay and attest" below.
+# forward-replay-check is a deprecated alias: one line on stderr, the id-regression check (E555)
+# against --base-ref, and the trace-lock findings of spec-check
+./tools/run_specdev.sh stale --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --base-ref origin/main
 
 # DAG completeness lint (validates downstream_consumers consistency)
@@ -156,8 +166,12 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 # Targeted JSON edit of a spec artifact (avoids direct Edit/Write)
 ./tools/run_specdev.sh json patch  spec/03_glossary.json '.terms[0].domain' '"infrastructure"' --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh json insert spec/03_glossary.json '.terms' '<term-object-json>' --repo-root ./devspec_toolkit
-# delete/keys/structure take no --repo-root (jq-only ops)
-./tools/run_specdev.sh json delete spec/03_glossary.json '.terms[3]'
+# delete/keys/structure accept --repo-root too (delete does not use it)
+./tools/run_specdev.sh json delete spec/03_glossary.json '.terms[3]' --repo-root ./devspec_toolkit
+
+# By node id (see the json section below): writes the trace lock entries of the links it adds or removes
+./tools/run_specdev.sh json patch --id fr-password-reset .priority '"should-have"' \
+  --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### `specdev json` — artifact read/query/edit family
@@ -165,33 +179,41 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 Surgical, schema-aware access to `spec/*.json` artifacts; preferred over direct
 file reads/writes (the `/specdev-context` skill drives these under the hood). All
 positional path arguments are **jq paths/filters** (e.g. `.terms[0].id`), not RFC-6901
-JSON pointers. `--spec-root`/`--git-root` are not accepted by the read/query/write
-subcommands; `resolve-pointers` is the exception — it accepts `--git-root` (used, to
+JSON pointers. The path forms (a file and a jq path) do not accept
+`--spec-root`/`--git-root`; `resolve-pointers` is the exception — it accepts `--git-root` (used, to
 anchor relative file-path resolution) and a deprecated `--spec-root` (accepted but
-warned-then-ignored; slated for removal). `--repo-root` support is per-subcommand (see the column below):
+warned-then-ignored; slated for removal). The id forms, `json patch|insert|delete --id <node-id>` and
+`json insert --step NN`, are the other exception: they take `--repo-root`, `--spec-root` (default `./spec`),
+`--git-root` (default `.`) and `--json`, so the three-flag default of CLAUDE.md is accepted by them.
+`--repo-root` support is per-subcommand (see the column below):
 it is **required** by `resolve-pointers` (registry lookup), used by `schema` for schema
 discovery (optional — falls back to `find_schema_dir`) and by `patch`/`insert` for
-differential validation, accepted-but-ignored by `read`/`read-multi`, and **not
-accepted at all** by `keys`/`structure`/`delete` (passing it errors with "unrecognized
-arguments").
+differential validation, and accepted by `read`/`read-multi`/`keys`/`structure`/`delete`
+without being used.
 
 | Subcommand | `--repo-root` | Purpose |
 |------------|:---:|---------|
 | `specdev json read <file> <jq-filter>` | accepted (unused) | Evaluate a single jq filter against the artifact |
 | `specdev json read-multi <file> <jq...>` | accepted (unused) | Evaluate several jq filters in one call |
-| `specdev json keys <file> [jq-path]` | ✗ | List object keys at a jq path |
-| `specdev json structure <file> [jq-path]` | ✗ | Print the artifact's shape (keys/types) |
+| `specdev json keys <file> [jq-path]` | accepted (unused) | List object keys at a jq path |
+| `specdev json structure <file> [jq-path]` | accepted (unused) | Print the artifact's shape (keys/types) |
 | `specdev json schema <file> <jq-path>` | used (optional) | Navigate the resolved schema at a path (own-first property merge; unions `oneOf`/`anyOf`/`if-then-else`) |
 | `specdev json patch <file> <jq-path> <value>` | used | Set one value; differential schema-validated before write |
 | `specdev json insert <file> <jq-path> <value>` | used | Append into an array; differential schema-validated before write |
-| `specdev json delete <file> <jq-path>` | ✗ | Remove one node (jq `del()`; **no** schema validation) |
+| `specdev json delete <file> <jq-path>` | accepted (unused) | Remove one node (jq `del()`; **no** schema validation) |
+| `specdev json patch --id <id> <field-path> <value> [--raw] [--dry-run] [--full]` | used | Set a field of the node with that id (an id or an alias); `<field-path>` is a jq path inside the node, for example `.statement`. The edit is checked as above and, in addition, refused (E767) when it would leave a link that does not resolve or names the node's id; a payload that stores a computed field is E768. The lock entries of the links the edit adds or removes are written in the same run, and the command lists the links it leaves suspect (`newly suspect: 21 links (step 05: 2, ...); see `specdev stale``) |
+| `specdev json insert --id <id> <field-path> <value> [--raw] [--dry-run] [--full]` | used | Append to an array field of the node with that id |
+| `specdev json delete --id <id> [--dry-run] [--full]` | used | Delete the node with that id and drop the lock entries of its links; links that now point at it are listed as `now broken` |
+| `specdev json insert --step NN <collection-path> <value> [--raw] [--dry-run] [--full]` | used | Add a new node to a node collection of the step's file, for example `.functional_requirements` for step 04; ids the item leaves out are minted (`ids minted: ...`) and the lock entries of its links are written. A path that is not a node collection of the step is E767 and the message lists the collections |
+
+With `--dry-run` an id write prints the same report (the lines `lock entry written` and `lock entry removed` included) and writes nothing.
 | `specdev json resolve-pointers` (pointer list on **stdin**) | required | Resolve a canonical-ref pointer list; report to `--out <path>` or stdout (also accepts `--git-root`, default cwd). An id defined more than once in the file is reported with `"ambiguous": true` and each definition under `locations` |
 
 `patch` and `insert` perform always-on differential whole-document validation using
 the file's own `$schema` URI: a write is refused only if it *introduces* a new
 violation (before/after diff), so one-patch-at-a-time repair is never deadlocked.
-There is no `--no-validate` bypass. `delete` does **not** validate — it applies a
-jq `del()` and writes atomically. `specdev json insert --create-schema <uri>`
+There is no `--no-validate` bypass. The path form of `delete` does **not** validate — it applies a
+jq `del()` and writes atomically; `delete --id` does check the edit. `specdev json insert --create-schema <uri>`
 seeds a missing target file with `{"$schema": "<uri>"}` and bootstraps the
 array-valued field before validating — enabling first-use creation of an artifact
 (e.g. `spec/canon/command_prefixes.json`) without a separate file-creation step.
@@ -219,9 +241,11 @@ These commands read the spec as a graph: a node is an entry with an id (an FR, a
 | `specdev node <id> [<id> ...] [--full]` | For each id: kind, step, role, lifecycle, scope, file and jq path, the node's content (child nodes by id; `--full` includes them), its links out with each target's kind, step and label, and the number of links in by field and kind. `node show <id>` is the same command and also reads an id that is itself a subcommand name. An unknown id is E706 and names the nearest ids |
 | `specdev node candidates (--kind KIND \| --for ID) --field FIELD [--query TEXT] [--limit N]` | List the nodes a link field may point at, for a node of kind `KIND` or for the existing node `ID` (which also leaves out the node itself, what it already links to in that field and, in a field that stays within one step, the nodes that would close a cycle (E703)). Exactly one of `--kind` and `--for` is required |
 | `specdev node status <id> active\|deprecated\|not_applicable` | Write the node's `lifecycle` into its spec file (`active` removes the key from a node that has another value) and print `<id>: <old> -> <new> (<file>)`; a node that already has the value is not written, an explicit `"lifecycle": "active"` in its file included, and the line reads `<id>: already <value>, nothing written (<file>)`. `not_applicable` is for a closed milestone's historical step-14 nodes whose built target was deleted. E705 for an unknown or duplicated id, for a node with no lifecycle (for example a seed), and for a write the JSON tools refuse |
+| `specdev node rename <old> <new> [--dry-run]` | Change a node's id in one change under the lock on `spec/extras/`: the node gets the new id and its old id is added to its `aliases`; the links that live nodes write to it are rewritten, and so are the trace lock entries of those links and of the node's own links (their stored hashes do not change, so a rename makes nothing suspect). Links held by closed milestones and by records keep the old id and resolve through the alias. Refused under E770 with nothing written (for example a seed, a record, an id a node or alias already has, the same id twice). An unknown id is E706 |
+| `specdev node rename --label <term-id> "<new label>" [--dry-run]` | Change the label (`term`) of a glossary term and rewrite every use of the old label (whole words, the same spelling) in the text of nodes of steps 04 to 15, listing each use with its node, field path and old and new text. The nodes whose text changes, and the nodes that link to them, become suspect (`specdev stale`); the lock is not touched. E770 when the id is not a glossary term |
 | `specdev trace <id> [--up] [--down] [--depth N] [--kinds K,K] [--verbs V,V] [--no-containment]` | List what the node rests on (`--up`) and what rests on it (`--down`); neither flag prints both. `--depth` counts edges, `--kinds` keeps the listed kinds in the output, `--verbs` limits the link fields followed, `--no-containment` stops following the parent / child edge of the JSON tree |
 | `specdev trace <id> --recipe 16a\|16b\|16c [--expand] [--since REF]` | Print the context pack of a role from a start node: a task for `16a`, a plan item for `16b`, a roadmap milestone for `16c` (E707 for another kind). `--expand` adds each node's content; `--since` sets the git ref the `16b` dependency report compares against. Not combined with the walk flags above |
-| `specdev diff <refA> <refB>` | Compare the graph at two git refs (tags, branches or commits; the working tree is not read): nodes added, removed, changed, whose lifecycle or kind changed, grouped by role and kind, then a suggested version bump (advisory). E708 for a ref that does not resolve and for a spec folder that cannot be read at it (not a git repository, absent at the ref, outside the git root, git failing); E709 for a tree with no graph node (seeds do not count); a tree from before 1.2.0 that has ids the registry reads is compared as it is, and the result is not meaningful |
+| `specdev diff <refA> <refB>` | Compare the graph at two git refs (tags, branches or commits; the working tree is not read): nodes added, removed, changed, whose lifecycle or kind changed, grouped by role and kind, then a suggested version bump (advisory). A node renamed with `node rename` prints one line `<new id>: renamed from <old id>` (suggested bump `patch`); the nodes that link to it are not listed. E708 for a ref that does not resolve and for a spec folder that cannot be read at it (not a git repository, absent at the ref, outside the git root, git failing); E709 for a tree with no graph node (seeds do not count); a tree from before 1.2.0 that has ids the registry reads is compared as it is, and the result is not meaningful |
 
 ```bash
 ./tools/run_specdev.sh node ac-password-reset-3 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -232,7 +256,38 @@ These commands read the spec as a graph: a node is an entry with an id (an FR, a
 ./tools/run_specdev.sh diff v1.0.0 v1.1.0 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-`spec-check` also runs a `graph` check over these links: E700 to E704 (a link to an id no node has, to a node of a kind the field does not accept, to a node of a later step; a cycle within one step; an id defined twice). A single-file `validate` does not report a link cycle, an unknown job in `depends_on` or an id defined in two files; `spec-check` does. Codes: [Spec Graph (70x / 72x)](error-codes.md#spec-graph-70x--72x).
+`spec-check` also runs a `graph` check over these links: E700 to E704 (a link to an id no node has, to a node of a kind the field does not accept, to a node of a later step; a cycle within one step; an id defined twice), and, with the trace lock below, E761 (a link with no lock entry), W720 (a new link to a deprecated node), E771 and E772 (aliases, `replaces`) and E778 (a live node that uses an old id). A single-file `validate` does not report a link cycle, an unknown job in `depends_on` or an id defined in two files; `spec-check` does. Codes: [Spec Graph (70x / 72x)](error-codes.md#spec-graph-70x--72x).
+
+### Trace lock, replay and attest
+
+A link is accepted by the node that holds it: `spec/extras/trace.lock.json` stores, for each link (holder, field, target), the content hash and the chain stamp the target had when the holder accepted it. A link whose target has changed since is **suspect** (E763): the cause is `content_changed` when the target itself was edited and `upstream_changed` when a node above it was (the chain stamp covers what a node rests on, so an edit reaches every node below it). Replay is the work of reading each suspect link, upward first, and either editing the holder or accepting the link with `attest`. Suspect links of nodes of a closed milestone are not listed. The file is written by the commands below, not by hand, and its format is `schema/extras/trace_lock.schema.json`.
+
+Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root` (default `.`) and `--json`, except `lock merge`.
+
+| Command | Purpose |
+|---------|---------|
+| `specdev stale [--step NN] [--diff]` | What is still to be re-read: the suspect links grouped by owning step in waterfall order, nodes upward first, each with its cause (`content_changed`, `upstream_changed`) and the nodes the change started from (`roots`), and a count of coverage gaps. A link with no lock entry is not listed (E761 of `spec-check`). `--step NN` limits it to the links the nodes of that step hold; `--diff` adds, per root, the unified diff of its contract text against the text it had when the link was accepted, recovered from git (`no earlier version found` when no commit matches). Exit 0 whatever it finds; an unknown step is E706, exit 1 |
+| `specdev attest <node-id> [--field F] [--target T] [--yes] [--dry-run]` | Accept the links of a node as they are now: the lock entry of each suspect link, each link with no entry (the entry is created) and each entry that still carries the migration baseline marker (E882) is written with the hashes its target has today. The command takes no hash from the user. **Without `--yes` it prints what it would write and exits 0, writing nothing**; `--dry-run` never writes. Refused, exit 1: E764 while a node the holder links to is itself suspect (attest that one first), E765 for a node of a closed milestone, E706 for an unknown id, E704 for an id defined twice |
+| `specdev attest --step NN [--yes] [--dry-run]` | The same for every node of step NN that holds a suspect link, upward first in one run |
+| `specdev attest --prune [--dry-run]` | Remove the lock entries whose link no longer exists (E762). It writes at once, without `--yes` |
+| `specdev lock merge BASE OURS THEIRS PATH` | The git merge driver of the lock: merges the three versions entry by entry and writes the result over OURS. Git runs it with `%O %A %B %P`; it takes no root flags. E760 for an input that is not a valid lock, E520 for a file that cannot be read |
+| `specdev lock install-driver --driver-command CMD` | Set up the merge driver in the clone at `--git-root`: add `<spec>/extras/trace.lock.json merge=specdev-trace-lock` to the file `git rev-parse --git-path info/attributes` names, and set `merge.specdev-trace-lock.driver` to `CMD %O %A %B %P`. Running it again changes nothing. Quote what a shell needs quoted in `CMD`, for example `'<venv>/bin/specdev lock merge'` |
+| `specdev step create NN --from DRAFT [--dry-run]` | Write the file of step NN from a JSON draft that holds the whole artifact (ids of sub-items may be left out; they are minted). The draft is checked against the step's schema, every link must resolve, and the lock entries of its links are written. E767 when the step already has its file (use `json ... --id`), for steps 13a and 16, for a draft that cannot be read or whose `$schema` is not the step's; `step create` has no `--full` |
+| `specdev step ready NN` | Exit 0 and `step NN: ready` when every step NN links to has a spec file and no pending replay; otherwise E773 with the blockers, exit 1. `--json` adds `ready`, `upstream`, `replay_first` and `blockers`. The step's own file is not required |
+| `specdev coverage [--by fr]` | Information only (exit 0): how many FRs have an API, how many have a fixture and how many capabilities have an FR, with the ids that are not linked; the criteria that have a current refinement; and the exempt nodes (lifecycle `not_applicable`, scope `later` or `out`), which no count includes. `--by fr` prints, per FR and criterion, the nodes that link to it directly, each with `current`, `suspect` and `historical` in `--json` (the text prints `[not current, suspect]` for a suspect link). No rule requires an FR to have an API |
+
+```bash
+./tools/run_specdev.sh stale --step 05 --diff --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh attest --step 05 --yes --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh lock install-driver --driver-command './devspec_env/bin/specdev lock merge' --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh step ready 06 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
+
+`spec-check` reports the lock in two checks: `graph` (E761 for a link with no entry, W720) and `trace-lock` (E760 for a lock that cannot be read, E762 for an entry with no link, E763 for a suspect link, E882 for a baseline marker that was not re-attested). `validate-all` reports the same findings and no longer reads file-level forward replay, so a change in step N that leaves step N+1 untouched is not reported by it; `forward-replay-check` stays as a deprecated alias (one line on stderr; it runs the id-regression check and reports the trace-lock findings). Two more `spec-check` checks belong to this family: `computed-fields` (E768 for a stored computed field such as `content_hash`) and `records` (E774 for an invalid record file).
+
+**Verification and evidence records** are the files `spec/extras/verification/ver-<id>.json` and `evd-<id>.json`. Each is `{"$schema": "vc:extras:verification-record" | "vc:extras:evidence-record", "records": [one record]}`, and the file name is the record id. The worked example has `ver-password-reset-expired-token.json`. A record is a node of role `record`: its `verifies` (or `about`) link is resolved by the `graph` check (E700 for an id no node has) and needs no lock entry; `records` reports E774 for a file that is not valid.
+
+**Interim states** until later 1.2.0 changes: `lock install-driver` is not run by any setup script, so a host has to run it once; `step ready 14` and `step ready 16a` report E773 on a spec with no step 13a file, because `tools/step_order.json` still lists 13a as an input; the skills and agents under `.claude/` still call `forward-replay-check` and write links with the path form of `specdev json`, which writes no lock entry; and the role-rule findings of `coverage` and the coverage gaps of `stale` are empty because no role rule is registered yet.
 
 ### Registry, Canon & Prompt Maintenance Commands
 
@@ -415,8 +470,9 @@ Invoke commands from the root of your host repository so relative paths to `spec
 ## Strict Execution Policy
 - Workflow is forward-only.
 - There is no refinement mode.
-- Any accepted upstream change requires full replay of all downstream steps before merge.
-- In strict mode, host-repo CI should run quality, hallucination, dependency-order, and replay checks as blocking gates.
+- Any accepted upstream change is replayed through the steps below it before merge. The replay is the set of suspect links of the trace lock (`specdev stale`): each is read and either the holder is edited or the link is accepted with `specdev attest`, upward first. `spec-check` reports a suspect link as E763 and a link with no lock entry as E761, both as errors.
+- File-level forward replay (a changed step N requires a changed file for every later step) is retired. `forward-replay-check` is a deprecated alias that stays for now, and `SPECDEV_STALENESS_THRESHOLD` has no effect.
+- In strict mode, host-repo CI should run quality, hallucination, dependency-order, and `spec-check` (which includes the trace-lock checks) as blocking gates.
 
 ## Two-Phase AI Runner Mode
 - Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first JSON artifact write).
@@ -462,7 +518,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 
 ### `step_order.json` schema changes
 - `tools/step_order.json` is generated by `specdev registry-generate`; do not edit it by hand. The hand-carried keys are `version`, `steps`, `policy`, `coverage_thresholds` and `declared_edges` (`[producer, consumer]` pairs for context reads no stored link carries).
-- `downstream_consumers` maps each step ID to the list of step IDs that consume its output (e.g., `"04": ["05", "06", ...]`), derived from the `x-link` declarations of the step schemas plus `declared_edges`. `prompt-context`, `context` and the W595 staleness check of forward replay read it.
+- `downstream_consumers` maps each step ID to the list of step IDs that consume its output (e.g., `"04": ["05", "06", ...]`), derived from the `x-link` declarations of the step schemas plus `declared_edges`. `prompt-context` and `context` read it.
 
 ### `prompt-context` output format
 The `prompt-context` command now outputs a 2-column table (`Step`, `Name`) instead of the previous 3-column format (`Step`, `Name`, `Extraction Intent`). Consumer lists are derived from the `downstream_consumers` field in `step_order.json`.
