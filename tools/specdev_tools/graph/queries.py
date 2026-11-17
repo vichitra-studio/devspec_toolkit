@@ -124,12 +124,8 @@ def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
     return f"no {subject} {wanted!r}{nearest_suffix(wanted, known)}"
 
 
-def _find(graph: Graph, node_id: str) -> Node | None:
-    return graph.by_id.get(node_id) or graph.by_id.get(graph.alias_index.get(node_id, ""))
-
-
 def _link_view(graph: Graph, link_field: str, target_id: str) -> LinkView:
-    target = _find(graph, target_id)
+    target = graph.find(target_id)
     if target is None:
         return LinkView(link_field, target_id, None, None, None, "")
     return LinkView(link_field, target_id, target.kind, target.step, target.lifecycle, target.label)
@@ -145,7 +141,7 @@ def _incoming(graph: Graph, node: Node) -> tuple[IncomingCount, ...]:
 
 
 def _kind_of(graph: Graph, node_id: str) -> str | None:
-    node = graph.by_id.get(node_id)
+    node = graph.find(node_id)
     return node.kind if node is not None else None
 
 
@@ -191,7 +187,7 @@ def node_view(graph: Graph, ids: Sequence[str], *, full: bool = False) -> NodeRe
     Raises:
         QueryTargetError: one or more ids are not on the graph (E706, one message naming each with its nearest ids).
     """
-    resolved = [(node_id, _find(graph, node_id)) for node_id in ids]
+    resolved = [(node_id, graph.find(node_id)) for node_id in ids]
     missing = [node_id for node_id, found in resolved if found is None]
     if missing:
         raise _unknown(
@@ -226,7 +222,7 @@ def _holder_of_kind(graph: Graph, kind: str) -> _Holder:
 
 
 def _holder_of_node(graph: Graph, node_id: str, link_field: str) -> _Holder:
-    node = _find(graph, node_id)
+    node = graph.find(node_id)
     if node is None:
         raise _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
     linked = frozenset(link.target for link in node.links if link.field == link_field)
@@ -305,7 +301,7 @@ def candidates(
             and any(link_target_allowed(decl, step, node, graph.shape) for step in holder.steps or (None,))
             and _matches(node, query)
         ),
-        key=lambda node: (graph.shape.rank_of(node.step), node.id),
+        key=graph.shape.order_key,
     )
     shown = matches if limit is None else matches[: max(limit, 0)]
     return CandidateList(holder.kind, link_field, tuple(_candidate(node) for node in shown), len(matches))

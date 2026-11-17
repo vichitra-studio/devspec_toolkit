@@ -379,7 +379,7 @@ def json_write_atomic(file_path: str, data_str: str) -> None:
 
 # --- WS1: Differential schema validation helpers ---
 
-def _resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
+def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
     """Resolve the effective toolkit root for schema validation.
 
     If ``repo_root`` is falsy (None/empty) **or** ``repo_root/tools/schema_registry.json``
@@ -470,7 +470,7 @@ def _ws1_differential_check(
     new_content:
         The post-edit document (JSON string).
     eff_root:
-        Already-resolved toolkit root (from ``_resolve_effective_toolkit_root``).
+        Already-resolved toolkit root (from ``resolve_effective_toolkit_root``).
     """
     try:
         original = json.loads(content)
@@ -552,7 +552,7 @@ def json_patch(
     new_content = run_jq(args, input_data=content, timeout=10)
 
     if validate:
-        eff_root = _resolve_effective_toolkit_root(repo_root)
+        eff_root = resolve_effective_toolkit_root(repo_root)
         _ws1_differential_check(file_path, content, new_content, eff_root)
 
     if dry_run:
@@ -632,7 +632,7 @@ def json_insert(
     new_content = run_jq(args, input_data=content, timeout=10)
 
     if validate:
-        eff_root = _resolve_effective_toolkit_root(repo_root)
+        eff_root = resolve_effective_toolkit_root(repo_root)
         _ws1_differential_check(file_path, content, new_content, eff_root)
 
     if dry_run:
@@ -987,9 +987,6 @@ def nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict
     return [{"id": cand, "score": sc} for sc, cand in scored[:top_n]]
 
 
-_nearest_ids = nearest_ids  # the old private name, kept for existing importers
-
-
 # ---------------------------------------------------------------------------
 # All entry-id lookups now go through entry_key_registry exclusively.
 # Callers must pass spec_root (required) so the registry can be loaded.
@@ -1090,6 +1087,8 @@ def _collect_ids_from_file(
     repo_root: str,
 ) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
     """Like ``_collect_id_definitions`` but ``id_map`` keeps the first definition of each id as a tuple.
+
+    Only tests call it (``test_entry_key_registry.py``, ``test_annotation_scan.py``); the toolkit reads definitions.
 
     Returns ``(all_ids, {id_value -> (kind, jq_path, entry_object)})``; on a collision the first
     occurrence wins (deterministic).

@@ -44,18 +44,18 @@ def _article(word: str) -> str:
     return "an" if word[:1].lower() in "aeiou" else "a"
 
 
-def _refusal_for_node(graph: Graph, node_id: str) -> str | None:
-    """Why *node_id* cannot take a lifecycle, or ``None`` when it can."""
-    if node_id in graph.dups:
-        return f"node id {node_id!r} is defined more than once (E704); fix the duplicate first"
-    node = graph.by_id.get(node_id)
+def _node_to_change(graph: Graph, node_id: str) -> Node:
+    """The node *node_id* names (an id or an alias), or E705 when it cannot take a lifecycle; an unknown id is marked as such."""
+    node = graph.find(node_id)
     if node is None:
-        return f"no node has the id {node_id!r}"
+        raise _refuse(f"no node has the id {node_id!r}", unknown_id=True)
+    if node.id in graph.dups:
+        raise _refuse(f"node id {node.id!r} is defined more than once (E704); fix the duplicate first")
     if node.kind == SEED_KIND:
-        return f"{node_id!r} is a seed, and a seed has no lifecycle"
+        raise _refuse(f"{node.id!r} is a seed, and a seed has no lifecycle")
     if not has_lifecycle(node.kind, node.role):
-        return f"{node_id!r} is {_article(node.kind)} {node.kind}, which is a record, and a record has no lifecycle"
-    return None
+        raise _refuse(f"{node.id!r} is {_article(node.kind)} {node.kind}, which is a record, and a record has no lifecycle")
+    return node
 
 
 def plan_lifecycle_change(graph: Graph, node_id: str, value: str) -> LifecycleChange:
@@ -66,11 +66,8 @@ def plan_lifecycle_change(graph: Graph, node_id: str, value: str) -> LifecycleCh
     """
     if value not in LIFECYCLES:
         raise _refuse(f"lifecycle {value!r} is not one of {', '.join(LIFECYCLES)}")
-    problem = _refusal_for_node(graph, node_id)
-    if problem is not None:
-        raise _refuse(problem, unknown_id=node_id not in graph.by_id)
-    node: Node = graph.by_id[node_id]
-    return LifecycleChange(node_id, node.lifecycle, value, node.file, node.jq_path)
+    node = _node_to_change(graph, node_id)
+    return LifecycleChange(node.id, node.lifecycle, value, node.file, node.jq_path)
 
 
 def apply_lifecycle_change(spec_root: str, repo_root: str, change: LifecycleChange) -> None:
@@ -88,7 +85,11 @@ def apply_lifecycle_change(spec_root: str, repo_root: str, change: LifecycleChan
 
 
 def set_lifecycle(graph: Graph, spec_root: str, repo_root: str, node_id: str, value: str) -> LifecycleChange:
-    """Plan and apply the change of *node_id* to *value*; returns the change.  Raises what the two steps raise."""
+    """Plan and apply the change of *node_id* to *value*; returns the change.  Raises what the two steps raise.
+
+    A node that already has *value* is not written: the file stays as it is and the change has ``old == new``.
+    """
     change = plan_lifecycle_change(graph, node_id, value)
-    apply_lifecycle_change(spec_root, repo_root, change)
+    if change.old != change.new:
+        apply_lifecycle_change(spec_root, repo_root, change)
     return change

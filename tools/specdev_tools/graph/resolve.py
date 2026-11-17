@@ -56,7 +56,7 @@ def _error(code: str, holder: Node, message: str) -> SpecError:
 
 
 def _ordered(steps: Iterable[str], shape: SpecShape) -> list[str]:
-    return sorted(steps, key=lambda step: (shape.rank_of(step), step))
+    return sorted(steps, key=shape.step_key)
 
 
 def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
@@ -137,16 +137,8 @@ def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -
     )
 
 
-def _find_target(graph: Graph, target_id: str) -> Node | None:
-    """The node with *target_id*, or the node an alias of that name points to."""
-    found = graph.by_id.get(target_id)
-    if found is None:
-        found = graph.by_id.get(graph.alias_index.get(target_id, ""))
-    return found
-
-
 def _link_errors(graph: Graph, holder: Node, link: Link, edges: _SameStepEdges, hooks: ResolverHooks) -> list[SpecError]:
-    target = _find_target(graph, link.target)
+    target = graph.find(link.target)
     if target is None:
         return [_missing_target_error(holder, link, graph)]
     if not link.decl.accepts(target.kind):

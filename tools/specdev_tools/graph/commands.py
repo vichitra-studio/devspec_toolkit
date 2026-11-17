@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, replace
@@ -23,7 +24,7 @@ from specdev_tools.graph import queries, recipes, trace
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.diff import diff_refs, diff_to_dict
 from specdev_tools.graph.diff import render_text as diff_text
-from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, set_lifecycle
+from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, LifecycleChange, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, Graph
 
 NODE_SUBCOMMANDS = ("show", "candidates", "status")
@@ -143,7 +144,7 @@ def add_graph_parsers(sub: Any) -> None:
         help=f"Print the context pack of this role: {', '.join(RECIPE_ROLES)} (16a: task, 16b: plan item, 16c: roadmap milestone)",
     )
     trace_p.add_argument("--expand", action="store_true", help="With --recipe: add the content of every node of the pack")
-    trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: where HEAD left the default branch)")
+    trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: the commit where HEAD left the default branch, or HEAD~1 when no default branch shares history with HEAD; on the default branch itself that is HEAD, so the report lists only changes not yet committed)")
     _add_root_flags(trace_p)
 
     diff_p = sub.add_parser(
@@ -187,6 +188,17 @@ def _usage_error(command: str, message: str) -> int:
     return EXIT_USAGE
 
 
+_CODED_MESSAGE = re.compile(r"^[EW]\d{3}\s")
+
+
+def _refused_write(exc: JsonUtilsError) -> SpecError:
+    """The finding for a write the json tools refuse: E705 unless the message already starts with a code of its own."""
+    text = str(exc)
+    if _CODED_MESSAGE.match(text):
+        return ensure_spec_errors([text])[0]
+    return make_error("E705", text)
+
+
 def _run_guarded(command: str, json_output: bool, action: Callable[[], int], unreadable: Sequence[str] = ()) -> int:
     """Run *action*; a library error with a finding in ``.error`` is reported and becomes exit code 1.
 
@@ -197,10 +209,7 @@ def _run_guarded(command: str, json_output: bool, action: Callable[[], int], unr
     except FindingError as exc:
         return _report_finding(_with_unreadable_note(exc, unreadable), command, json_output)
     except JsonUtilsError as exc:
-        if json_output:
-            return _report_finding(ensure_spec_errors([str(exc)])[0], command, True)
-        print(f"specdev {command}: {exc}", file=sys.stderr)
-        return EXIT_FINDING
+        return _report_finding(_refused_write(exc), command, json_output)
 
 
 def _load_graph(args: argparse.Namespace) -> Graph:
@@ -253,12 +262,18 @@ def _node_candidates(args: argparse.Namespace, graph: Graph) -> int:
     return 0
 
 
+def _status_line(change: LifecycleChange) -> str:
+    if change.old == change.new:
+        return f"{change.node_id}: already {change.new}, nothing written ({change.file})"
+    return f"{change.node_id}: {change.old} -> {change.new} ({change.file})"
+
+
 def _node_status(args: argparse.Namespace, graph: Graph) -> int:
     change = set_lifecycle(graph, os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.id, args.value)
     if args.json_output:
         _print_json(asdict(change))
     else:
-        print(f"{change.node_id}: {change.old} -> {change.new} ({change.file})")
+        print(_status_line(change))
     return 0
 
 

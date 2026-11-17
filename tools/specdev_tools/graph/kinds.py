@@ -187,11 +187,6 @@ def _parse(raw: dict[str, Any]) -> KindRegistry:
 _CACHE: dict[str, tuple[tuple[int, int], KindRegistry]] = {}
 
 
-def clear_kind_registry_cache() -> None:
-    """Forget every parsed registry (tests that regenerate the registry in place call this)."""
-    _CACHE.clear()
-
-
 def load_kind_registry(repo_root: str) -> KindRegistry:
     """Read ``<repo_root>/tools/entry_key_registry.json`` into a ``KindRegistry`` (cached per file mtime and size).
 

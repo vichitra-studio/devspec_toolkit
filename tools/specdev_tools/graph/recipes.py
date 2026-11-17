@@ -332,10 +332,20 @@ def load_recipes(repo_root: str) -> RecipeTable:
 
 @dataclass(frozen=True)
 class Reached:
-    """A node a hop reached and how: ``via`` names the node it was reached from and the verb."""
+    """A node a hop reached and how: ``via`` is the label naming the node it was reached from and the verb.
+
+    ``container`` and ``source_id`` carry the same fact as data: a ``parent`` hop sets ``container`` and ``source_id`` is
+    the id of the node it was reached from (empty for a node of the start set or a whole kind).
+    """
 
     node: Node
     via: str
+    container: bool = False
+    source_id: str = ""
+
+
+def _reached(hop: Hop, source: Node, other: Node) -> Reached:
+    return Reached(other, _via(hop, source), hop.direction == PARENT, source.id)
 
 
 def _via(hop: Hop, source: Node) -> str:
@@ -375,7 +385,7 @@ def _apply(graph: Graph, hop: Hop, frontier: Iterable[Node], known: dict[str, No
         if node.role == RECORD_ROLE or node.kind == SEED_KIND:
             continue
         for other in _admitted(graph, node, hop):
-            reached.setdefault(other.id, Reached(other, _via(hop, node)))
+            reached.setdefault(other.id, _reached(hop, node, other))
             if other.id not in known:
                 known[other.id] = other
                 added.append(other)
@@ -395,10 +405,6 @@ def _reach(graph: Graph, start: Sequence[Node], hops: Sequence[Hop]) -> dict[str
     return reached
 
 
-def _order_key(graph: Graph, node: Node) -> tuple[int, str]:
-    return graph.shape.rank_of(node.step), node.id
-
-
 def _start_nodes(names: Iterable[str], start: Node, found: Mapping[str, Sequence[Reached]]) -> dict[str, Node]:
     nodes: dict[str, Node] = {}
     for name in names:
@@ -416,7 +422,7 @@ def _traverse(graph: Graph, section: Section, start: Node, found: Mapping[str, S
             if node.kind in section.kinds:
                 hits.setdefault(key, Reached(node, _START_SET_VIA))
     hits.pop(start.id, None)
-    return sorted(hits.values(), key=lambda hit: _order_key(graph, hit.node))
+    return sorted(hits.values(), key=lambda hit: graph.shape.order_key(hit.node))
 
 
 # --- the pack -------------------------------------------------------------------------------------------------------
@@ -426,7 +432,9 @@ class PackEntry:
     """One row of a pack: a node (or the pointer to a file), how it was reached, and what is shown beside its label.
 
     ``suffix`` is the value of the node field ``suffix_field`` (a third party's pin), already part of ``label``;
-    ``content`` is the node's own item, present only when the pack was expanded.
+    ``content`` is the node's own item, present only when the pack was expanded.  ``container`` is true for a node
+    reached by a ``parent`` hop: it holds a member of its section instead of being one, and ``source_id`` is that
+    member's id.  ``via`` is only the label printed for a reader.
     """
 
     id: str
@@ -438,11 +446,8 @@ class PackEntry:
     suffix_field: str = ""
     suffix: str = ""
     content: Mapping[str, Any] | None = None
-
-    @property
-    def container(self) -> bool:
-        """True for a node reached by a ``parent`` hop: it holds a member of its section instead of being one."""
-        return self.via.startswith(PARENT_VIA)
+    container: bool = False
+    source_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -503,11 +508,13 @@ def _item(graph: Graph, node: Node) -> Mapping[str, Any]:
     return item_of(graph, node) or {}
 
 
-def _entry(graph: Graph, table: RecipeTable, node: Node, via: str) -> PackEntry:
+def _entry(graph: Graph, table: RecipeTable, node: Node, via: str, container: bool = False, source_id: str = "") -> PackEntry:
     suffix_field = table.suffix_fields.get(node.kind, "")
     suffix = as_str(_item(graph, node).get(suffix_field)) if suffix_field else ""
     label = f"{node.label} {suffix}".strip() if suffix else node.label
-    return PackEntry(node.id, node.kind, node.step, label, via, node.lifecycle, suffix_field if suffix else "", suffix)
+    return PackEntry(
+        node.id, node.kind, node.step, label, via, node.lifecycle, suffix_field if suffix else "", suffix, None, container, source_id
+    )
 
 
 def _gated_of_kind(graph: Graph, kind: str) -> list[Node]:
@@ -527,7 +534,7 @@ def _universal(graph: Graph, table: RecipeTable, section: Section, pack_text: st
     nodes = [(node, _WHOLE_KIND_VIA) for kind in sorted(section.whole_kinds) for node in _gated_of_kind(graph, kind)]
     for rule in section.matched:
         nodes.extend((node, f"{rule.field} named in the pack") for node in _gated_of_kind(graph, rule.kind) if _mentions(graph, node, rule, pack_text))
-    entries = [_entry(graph, table, node, via) for node, via in sorted(nodes, key=lambda pair: _order_key(graph, pair[0]))]
+    entries = [_entry(graph, table, node, via) for node, via in sorted(nodes, key=lambda pair: graph.shape.order_key(pair[0]))]
     pointer = section.pointer
     if pointer is not None and pointer.file in graph.documents:
         entries.append(PackEntry(pointer.file, POINTER_KIND, None, pointer.path, "pointer"))
@@ -539,7 +546,7 @@ def _start_node(graph: Graph, table: RecipeTable, role: str, start_id: str) -> N
     expected = table.start_kinds.get(role)
     if expected is None:
         raise RecipeError(make_error("E706", f"no recipe role {role!r}; roles: {', '.join(table.roles)}"))
-    node = graph.by_id.get(start_id)
+    node = graph.find(start_id)
     if node is None:
         raise RecipeError(make_error("E706", f"no node has the id {start_id!r}"), unknown_id=True)
     if node.kind != expected:
@@ -598,7 +605,7 @@ def dependency_report(graph: Graph, spec: ReportSpec, seed_ids: Collection[str],
     """The dependency report of the nodes *seed_ids*: *graph* (the working tree) against the spec at ``git.since``.
 
     The default ref is where HEAD left the default branch (``HEAD~1`` without one).  A ref or spec folder that cannot be
-    read, or one that predates the node model, gives a report with ``unavailable`` set to the E708 / E709 finding.
+    read, or one whose tree has no graph node, gives a report with ``unavailable`` set to the E708 / E709 finding.
 
     Raises:
         KindRegistryError: the registry of the toolkit at ``git.repo_root`` is missing or unreadable (E520).
@@ -645,7 +652,7 @@ def build_pack(
         if section.is_universal:
             entries[section.name] = _universal(graph, table, section, pack_text)
         else:
-            entries[section.name] = [_entry(graph, table, hit.node, hit.via) for hit in found[section.name]]
+            entries[section.name] = [_entry(graph, table, hit.node, hit.via, hit.container, hit.source_id) for hit in found[section.name]]
     pack = Pack(role, _entry(graph, table, start, ""), {name: tuple(rows) for name, rows in entries.items()})
     if expand:
         contents = _contents(graph, pack.node_ids | {start.id})
@@ -676,7 +683,7 @@ def _member_of(entry: PackEntry, by_id: Mapping[str, PackEntry]) -> tuple[str, i
     seen = {entry.id}
     distance = 0
     while entry.container:
-        source = by_id.get(entry.via[len(PARENT_VIA):])
+        source = by_id.get(entry.source_id)
         distance += 1
         if source is None or source.id in seen:
             return None

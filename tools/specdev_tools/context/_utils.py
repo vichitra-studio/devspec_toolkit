@@ -11,7 +11,7 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.schema_nav import effective_schema as _schema_nav_effective_schema
-from ..core.step_order import load_step_order  # noqa: F401  (re-exported: importers of context._utils keep working)
+from ..core.step_order import load_step_order  # noqa: F401  (re-exported for context/structure.py)
 
 
 def load_json(path: str) -> Any:

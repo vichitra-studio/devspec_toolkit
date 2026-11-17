@@ -69,13 +69,7 @@ from .validators import (
 )
 
 
-from ..core.step_paths import (  # noqa: F401  (STEP_*_RE and the aliases stay importable from here)
-    IMPL_CONTEXT_DIR_RE,
-    STEP_DIR_RE,
-    STEP_FILE_RE,
-    get_step_from_path,
-    refine_impl_context_substep,
-)
+from ..core.step_paths import get_step_from_path, refine_impl_context_substep
 
 _get_step_from_path = get_step_from_path
 _refine_impl_context_substep = refine_impl_context_substep
@@ -506,7 +500,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
     # "16" → Trinity Anchor validator (spec/16_impl_context.json, not in impl_context/).
     # "16a" / "16b" / "16c" → all live under spec/impl_context/ and initially land on "16a"
-    #   via path regex. _refine_impl_context_substep(step, data) then promotes the step
+    #   via path regex. refine_impl_context_substep(step, data) (core/step_paths.py) then promotes the step
     #   based on content:  non-empty review.verdict → "16c",  non-empty
     #   execution.execution_results → "16b",  else stays at "16a". Chain-up inside the
     #   validators (16c→16b→16a→base) preserves downstream checks.

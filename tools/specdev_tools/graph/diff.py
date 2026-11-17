@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from specdev_tools.graph.contract import contract_view
-from specdev_tools.graph.gitview import Snapshot, load_snapshot_at, spec_path_in_repo
+from specdev_tools.graph.gitview import Snapshot, load_snapshot_at, require_git_root_folder, spec_path_in_repo
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import NOT_APPLICABLE, Node
 
@@ -146,10 +146,12 @@ def diff_refs(old_ref: str, new_ref: str, git_root: str, spec_root: str, repo_ro
     """The diff of the spec folder *spec_root* between the refs *old_ref* and *new_ref* of the repository at *git_root*.
 
     Raises:
-        GitViewError: E708 when *spec_root* is outside *git_root* or a ref or the spec folder at a ref cannot be
-            read; E709 when a ref predates the node model.
+        GitViewError: E708 when *git_root* is not a folder, *spec_root* is outside it, or a ref or the spec folder at a
+            ref cannot be read; E709 when the tree at a ref has no graph
+            node (seeds do not count).
         KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
     """
+    require_git_root_folder(git_root)
     spec_path = spec_path_in_repo(spec_root, git_root)
     old = load_snapshot_at(old_ref, git_root, spec_path, repo_root)
     new = load_snapshot_at(new_ref, git_root, spec_path, repo_root)

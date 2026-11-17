@@ -68,11 +68,6 @@ class TraceResult:
     reached: tuple[Node, ...]
 
 
-def _step_rank(graph: Graph, node: Node) -> tuple[int, str, str]:
-    """Order of *node* in the waterfall: step rank (unknown steps last), step name, id."""
-    return graph.shape.rank_of(node.step), node.step or "", node.id
-
-
 def _neighbour_ids(graph: Graph, node: Node, direction: Direction, options: TraceOptions) -> list[str]:
     """Ids one edge away from *node* in *direction*: link targets or sources, then the containment edge."""
     verbs = options.verbs
@@ -109,7 +104,7 @@ def _walk(graph: Graph, entry: Node, direction: Direction, options: TraceOptions
 
 def _side(graph: Graph, entry: Node, direction: Direction, options: TraceOptions) -> TraceSide:
     reached = [node for node in _walk(graph, entry, direction, options) if not options.kinds or node.kind in options.kinds]
-    ordered = sorted(reached, key=lambda node: _step_rank(graph, node))
+    ordered = sorted(reached, key=graph.shape.order_key)
     return TraceSide(
         direction,
         tuple(node for node in ordered if node.role != RECORD_ROLE),
@@ -149,7 +144,7 @@ def trace_node(
     when ``options.kinds`` or ``options.verbs`` names a kind or link field that does not exist.
     """
     _check_option_names(graph, options)
-    entry = graph.by_id.get(node_id)
+    entry = graph.find(node_id)
     if entry is None:
         raise UnknownTraceTargetError(make_error("E706", f"no node has the id {node_id!r}"), unknown_id=True)
     wanted = set(directions)
@@ -159,7 +154,7 @@ def trace_node(
     for side in (up, down):
         if side is not None:
             found.update((node.id, node) for node in (*side.nodes, *side.records))
-    return TraceResult(entry, up, down, tuple(sorted(found.values(), key=lambda node: _step_rank(graph, node))))
+    return TraceResult(entry, up, down, tuple(sorted(found.values(), key=graph.shape.order_key)))
 
 
 def group_by_kind(nodes: Iterable[Node]) -> dict[str, list[Node]]:

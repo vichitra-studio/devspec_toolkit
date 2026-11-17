@@ -28,7 +28,7 @@ from unittest.mock import patch
 from specdev_tools.core.json_utils import (
     _is_valid_pointer_shape,
     _levenshtein,
-    _nearest_ids,
+    nearest_ids,
     resolve_pointers,
     resolve_pointers_from_stdin,
 )
@@ -248,21 +248,21 @@ class TestLevenshtein:
 class TestNearestIds:
     def test_returns_top_n(self) -> None:
         candidates = ["fr-newsletter-subscribe", "fr-newsletter-confirm", "fr-user-login", "fr-other"]
-        results = _nearest_ids("fr-newslettr-subscribe", candidates, top_n=2)
+        results = nearest_ids("fr-newslettr-subscribe", candidates, top_n=2)
         assert len(results) == 2
         # closest should be fr-newsletter-subscribe (typo)
         assert results[0]["id"] == "fr-newsletter-subscribe"
 
     def test_empty_candidates(self) -> None:
-        assert _nearest_ids("fr-x", [], top_n=3) == []
+        assert nearest_ids("fr-x", [], top_n=3) == []
 
     def test_scores_between_0_and_1(self) -> None:
-        results = _nearest_ids("fr-x", ["fr-x", "fr-y"], top_n=3)
+        results = nearest_ids("fr-x", ["fr-x", "fr-y"], top_n=3)
         for r in results:
             assert 0.0 <= r["score"] <= 1.0
 
     def test_exact_match_scores_1(self) -> None:
-        results = _nearest_ids("fr-x", ["fr-x", "fr-y"], top_n=3)
+        results = nearest_ids("fr-x", ["fr-x", "fr-y"], top_n=3)
         assert results[0]["score"] == 1.0
         assert results[0]["id"] == "fr-x"
 

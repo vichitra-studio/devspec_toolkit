@@ -13,7 +13,7 @@ import re
 from collections.abc import Collection
 from typing import Any, Iterator
 
-from ..core.json_utils import _resolve_effective_toolkit_root
+from ..core.json_utils import resolve_effective_toolkit_root
 from ..core.loaders import iter_spec_artifacts
 from ..graph.build import build_file_graph, build_graph
 from ..graph.kinds import KindRegistryError
@@ -92,7 +92,7 @@ def build_lint_graph(spec_dir: str, repo_root: str | None = None) -> Graph | Non
     *repo_root* is the toolkit root; ``None`` selects the toolkit this package belongs to.  ``None`` is the "no graph" answer: callers then scan every file for ids, as before the graph.
     """
     try:
-        return build_graph(spec_dir, repo_root or _resolve_effective_toolkit_root(None))
+        return build_graph(spec_dir, repo_root or resolve_effective_toolkit_root(None))
     except KindRegistryError:
         return None
 
@@ -100,7 +100,7 @@ def build_lint_graph(spec_dir: str, repo_root: str | None = None) -> Graph | Non
 def build_file_graph_or_none(path: str, document: dict[str, Any]) -> Graph | None:
     """The one-file graph slice of the spec file *path* (parsed content *document*), or ``None`` without a registry."""
     try:
-        return build_file_graph(path, _resolve_effective_toolkit_root(None), document)
+        return build_file_graph(path, resolve_effective_toolkit_root(None), document)
     except KindRegistryError:
         return None
 

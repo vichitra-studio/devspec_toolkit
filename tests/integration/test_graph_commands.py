@@ -274,7 +274,7 @@ def test_a_write_the_json_tools_refuse_is_one_stderr_line_and_exit_1(spec: Path,
     code = commands.run_node(["status", _CRITERION, "deprecated", *_flags(spec)])
     captured = capsys.readouterr()
     assert code == 1 and captured.out == ""
-    assert captured.err.strip() == "specdev node: the edit would break the schema of 04_fr_list.json"
+    assert captured.err.strip() == "E705 the edit would break the schema of 04_fr_list.json"
 
 
 def test_a_write_the_json_tools_refuse_under_json_is_the_envelope_on_stdout(spec: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -284,7 +284,32 @@ def test_a_write_the_json_tools_refuse_under_json_is_the_envelope_on_stdout(spec
     assert code == 1 and captured.err == ""
     envelope = json.loads(captured.out)
     assert (envelope["command"], envelope["status"]) == ("node", "FAIL")
+    assert envelope["errors"][0]["code"] == "E705"
     assert envelope["errors"][0]["message"] == "the edit would break the schema of 04_fr_list.json"
+
+
+def test_a_refused_write_whose_message_carries_a_code_keeps_it(spec: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def refused(*_args: object) -> None:
+        raise JsonUtilsError("E520 04_fr_list.json is unreadable")
+
+    monkeypatch.setattr(commands, "set_lifecycle", refused)
+    assert commands.run_node(["status", _CRITERION, "deprecated", *_flags(spec)]) == 1
+    assert capsys.readouterr().err.strip() == "E520 04_fr_list.json is unreadable"
+
+
+def test_a_status_the_node_already_has_writes_nothing_and_says_so(spec: Path) -> None:
+    before = {path: path.read_bytes() for path in spec.rglob("*.json")}
+    plain = run_specdev("node", "status", _CRITERION, "active", *_flags(spec))
+    assert plain.returncode == 0 and plain.stdout.strip() == f"{_CRITERION}: already active, nothing written (04_fr_list.json)"
+    as_json = run_specdev("node", "status", _CRITERION, "active", *_flags(spec), "--json")
+    document = json.loads(as_json.stdout)
+    assert as_json.returncode == 0 and document["old"] == document["new"] == "active"
+    assert {path: path.read_bytes() for path in spec.rglob("*.json")} == before
+    assert run_specdev("node", "status", _CRITERION, "deprecated", *_flags(spec)).returncode == 0
+    written = (spec / "04_fr_list.json").read_bytes()
+    again = run_specdev("node", "status", _CRITERION, "deprecated", *_flags(spec))
+    assert again.stdout.strip() == f"{_CRITERION}: already deprecated, nothing written (04_fr_list.json)"
+    assert (spec / "04_fr_list.json").read_bytes() == written
 
 
 @pytest.mark.parametrize(

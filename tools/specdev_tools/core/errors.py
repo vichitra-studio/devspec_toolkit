@@ -180,7 +180,7 @@ ERROR_CODES = {
     "W608": "ANCHOR_LEGACY_SCHEMA",
     # Misfiled anchor: an artifact_role="anchor" file landed inside
     # spec/impl_context/ instead of at spec/ root.  Routing
-    # (validate.py:_refine_impl_context_substep) demotes the dispatch back
+    # (core/step_paths.py:refine_impl_context_substep) demotes the dispatch back
     # to "16" so the anchor validator runs, but every drift check then
     # resolves impl_context_dir to spec/impl_context/impl_context/ — which
     # does not exist — so E308/E309/W588/W589 silently no-op.  Without

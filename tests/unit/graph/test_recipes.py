@@ -325,6 +325,16 @@ def test_dependency_report_default_base_is_the_fork_point(tmp_path: Path, table:
     assert [(change.id, change.changes) for change in report.changes] == [("tp-mailrelay", ("changed",))]
 
 
+def test_the_default_base_tries_origin_main_before_main(tmp_path: Path) -> None:
+    repo, spec = _host(tmp_path, "main")
+    first = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", "refs/remotes/origin/main", first)
+    _repin(spec, "api-v4")
+    _commit(repo, "repin")
+    assert _git(repo, "rev-parse", "main") != first
+    assert default_base_ref(str(repo)) == first
+
+
 def test_dependency_report_without_a_default_branch_uses_the_previous_commit(tmp_path: Path, table: RecipeTable) -> None:
     repo, spec = _host(tmp_path, "trunk")
     _repin(spec, "api-v4")
@@ -333,6 +343,26 @@ def test_dependency_report_without_a_default_branch_uses_the_previous_commit(tmp
     report = _report(table, repo, spec, None)
     assert (report.base, [change.id for change in report.changes]) == (PREVIOUS_COMMIT, ["tp-mailrelay"])
     assert _report(table, repo, spec, "HEAD").changes == ()
+
+
+def test_a_seed_is_never_admitted_to_a_pack_by_a_hop() -> None:
+    """A hop with no ``kinds`` filter walks ``derives_from`` up to the seed of the example; the seed does not enter the pack."""
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    open_table = parse_recipes(
+        {
+            "start_kinds": {"16b": "scope-item"},
+            "sections": [
+                {
+                    "name": "upstream", "roles": ["16b"], "start_set": ["start"], "kinds": ["seed", "scope-item"],
+                    "hops": [{"verb": "derives_from", "direction": "out", "kinds": [], "repeat": True}],
+                }
+            ],
+        }
+    )
+    seed_ids = {node.id for node in graph.by_kind["seed"]}
+    assert any(link.target in seed_ids for link in graph.by_id["scope-password-reset"].links)
+    pack = build_pack(graph, open_table, "16b", "scope-password-reset")
+    assert pack.sections["upstream"] == () and not pack.node_ids & seed_ids
 
 
 def test_dependency_report_unavailable_for_an_unknown_ref(tmp_path: Path, table: RecipeTable) -> None:

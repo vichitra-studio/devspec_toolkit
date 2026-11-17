@@ -166,3 +166,12 @@ def test_validate_reports_a_duplicate_in_a_plan_file(spec: Path) -> None:
     write_json(spec, plan_rel, plan)
     errors = [e for e in validate_file(str(ROOT), str(spec / plan_rel)) if e.code == "E704"]
     assert [(e.owner, e.node_id) for e in errors] == [("step:16a", checklist[0]["id"])]
+
+
+def test_validate_reports_a_duplicate_in_the_seed_manifest(spec: Path) -> None:
+    manifest_rel = "common/seed_manifest.json"
+    manifest = load_doc(spec, manifest_rel)
+    manifest["seeds"].append(copy.deepcopy(manifest["seeds"][0]))
+    write_json(spec, manifest_rel, manifest)
+    errors = [e for e in validate_file(str(ROOT), str(spec / manifest_rel)) if e.code == "E704"]
+    assert [e.node_id for e in errors] == [manifest["seeds"][0]["seed_id"]]

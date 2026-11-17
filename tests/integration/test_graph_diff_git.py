@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tarfile
 from pathlib import Path
 from typing import Any
 
@@ -196,6 +197,73 @@ def test_ref_predates_model_e709_when_the_stamp_is_absent(host: Path) -> None:
     with pytest.raises(GitViewError) as raised:
         load_graph_at("v1", str(host), "spec", str(ROOT))
     assert raised.value.error.code == "E709" and "no toolkit stamp" in raised.value.error.message
+
+
+def test_ref_with_only_seeds_is_e709(host: Path) -> None:
+    spec = host / "spec"
+    write_spec(spec, {_SEED_MANIFEST: _seed_manifest()})
+    (spec / _SEED_FILE).parent.mkdir(parents=True)
+    (spec / _SEED_FILE).write_text("notes\n", encoding="utf-8")
+    _commit(host, "seeds-only")
+    with pytest.raises(GitViewError) as raised:
+        load_graph_at("seeds-only", str(host), "spec", str(ROOT))
+    assert raised.value.error.code == "E709"
+
+
+def test_ref_with_a_node_beside_its_seeds_is_not_refused(host: Path) -> None:
+    spec = host / "spec"
+    write_spec(spec, {_SEED_MANIFEST: _seed_manifest(), _FR_FILE: _fr_doc("The system shall do a.")})
+    (spec / _SEED_FILE).parent.mkdir(parents=True)
+    (spec / _SEED_FILE).write_text("notes\n", encoding="utf-8")
+    _commit(host, "seeds-and-fr")
+    assert "fr-a" in load_graph_at("seeds-and-fr", str(host), "spec", str(ROOT)).by_id
+
+
+@pytest.mark.parametrize("failure", [tarfile.ReadError("truncated"), OSError("disk full")], ids=["tar error", "os error"])
+def test_an_archive_that_cannot_be_unpacked_is_e708(host: Path, monkeypatch: pytest.MonkeyPatch, failure: Exception) -> None:
+    _two_tag_host(host)
+
+    def broken(*_args: Any, **_kwargs: Any) -> None:
+        raise failure
+
+    monkeypatch.setattr(gitview.tarfile, "open", broken)
+    with pytest.raises(GitViewError) as raised:
+        archive_ref("v1", str(host), ["spec"])
+    assert raised.value.error.code == "E708" and "cannot be unpacked" in raised.value.error.message
+
+
+def test_a_1_1_1_tree_that_has_ids_is_compared_not_refused(host: Path) -> None:
+    spec = host / "spec"
+    spec.mkdir()
+    for source in (ROOT / "tests" / "fixtures" / "spec_corpus").iterdir():
+        (spec / source.name).write_bytes(source.read_bytes())
+    _commit(host, "corpus")
+    for stale in spec.iterdir():
+        stale.unlink()
+    for source in (ROOT / "tests" / "fixtures" / "graph_example" / "spec").rglob("*"):
+        if source.is_file():
+            target = spec / source.relative_to(ROOT / "tests" / "fixtures" / "graph_example" / "spec")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+    _commit(host, "example")
+    result = run_specdev(
+        "diff", "HEAD~1", "HEAD", "--repo-root", str(ROOT), "--spec-root", str(spec), "--git-root", str(host)
+    )
+    assert result.returncode == 0, result.stderr
+    assert "E709" not in result.stdout + result.stderr
+    assert "FR-CORPUS-001: removed" in result.stdout and "fr-password-reset: added" in result.stdout
+
+
+def test_a_git_root_that_is_not_a_folder_is_named_before_the_spec_folder_is_checked(host: Path) -> None:
+    spec = _two_tag_host(host)
+    missing = host / "no-such-folder"
+    with pytest.raises(GitViewError) as raised:
+        diff_refs("v1", "v2", str(missing), str(spec), str(ROOT))
+    assert raised.value.error.code == "E708" and "is not a directory" in raised.value.error.message
+    result = run_specdev(
+        "diff", "v1", "v2", "--repo-root", str(ROOT), "--spec-root", str(spec), "--git-root", str(missing)
+    )
+    assert result.returncode == 1 and result.stderr.startswith("E708") and "is not a directory" in result.stderr
 
 
 def test_spec_path_is_relative_to_the_git_root(host: Path) -> None:

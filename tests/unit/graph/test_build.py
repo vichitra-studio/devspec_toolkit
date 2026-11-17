@@ -107,6 +107,19 @@ def test_registry_missing_is_e520(toolkit: Path, spec: Path, registry_text: str 
     assert "entry_key_registry.json" in raised.value.error.message
 
 
+@pytest.mark.parametrize("order_text", ["[1, 2]", "{", None], ids=["not-an-object", "not-json", "missing"])
+def test_step_order_that_is_not_an_object_is_e520(toolkit: Path, spec: Path, order_text: str | None) -> None:
+    path = toolkit / "tools" / "step_order.json"
+    if order_text is None:
+        path.unlink()
+    else:
+        path.write_text(order_text, encoding="utf-8")
+    with pytest.raises(KindRegistryError) as raised:
+        build_graph(str(spec), str(toolkit))
+    assert raised.value.error.code == "E520"
+    assert "step_order.json" in raised.value.error.message
+
+
 def test_registry_regenerated_in_place_is_read_again(toolkit: Path) -> None:
     before = load_kind_registry(str(toolkit))
     document = json.loads((toolkit / "tools" / "entry_key_registry.json").read_text(encoding="utf-8"))

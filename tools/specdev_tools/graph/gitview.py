@@ -62,6 +62,12 @@ def _run_git(git_root: str, args: Sequence[str]) -> subprocess.CompletedProcess[
         raise _fail("E708", f"git {args[0]} did not finish within {GIT_TIMEOUT_SECONDS} seconds") from None
 
 
+def require_git_root_folder(git_root: str) -> None:
+    """E708 when *git_root* is not a folder."""
+    if not os.path.isdir(git_root):
+        raise _fail("E708", f"the git root {git_root} is not a directory")
+
+
 def resolve_ref(ref: str, git_root: str) -> str:
     """The commit id that *ref* (a tag, branch or commit id) names in the repository at *git_root*.
 
@@ -70,8 +76,7 @@ def resolve_ref(ref: str, git_root: str) -> str:
     """
     if ref.startswith("-"):
         raise _fail("E708", f"'{ref}' is not a git ref")
-    if not os.path.isdir(git_root):
-        raise _fail("E708", f"the git root {git_root} is not a directory")
+    require_git_root_folder(git_root)
     process = _run_git(git_root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
     if process.returncode == 0:
         return process.stdout.decode("utf-8").strip()
@@ -147,7 +152,7 @@ def _seed_texts(spec_dir: str, graph: Graph) -> dict[str, str]:
 def _predates_message(ref: str, spec_dir: str) -> str:
     stamp = get_user_version(Path(spec_dir))
     seen = f"its spec is stamped toolkit {stamp}" if stamp else "its spec carries no toolkit stamp"
-    return f"the tree at ref '{ref}' has no graph nodes (it predates the 1.2.0 node model; {seen})"
+    return f"the tree at ref '{ref}' has no graph nodes (it may predate the 1.2.0 node model; {seen})"
 
 
 def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) -> Snapshot:
@@ -155,7 +160,8 @@ def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) ->
 
     Raises:
         GitViewError: E708 when the ref or the spec folder at the ref cannot be read; E709 when the tree at the ref has
-            no graph node (seeds do not count).
+            no graph node (seeds do not count); a tree from before 1.2.0 that has ids the registry reads is compared as
+            it is.
         KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
     """
     with archive_ref(ref, git_root, [spec_path]) as archived:

@@ -200,6 +200,38 @@ def test_contract_view_maps_aliases_so_a_rename_changes_no_view() -> None:
     assert renamed == contract_view(new_node, after.graph)
 
 
+def _fixture_docs(message: str) -> dict[str, Any]:
+    return {"08_fixtures.json": {"fixtures": [{"fixture_id": "fix-a", "input": {"body": {"message": message}}}]}}
+
+
+def test_text_inside_a_nested_field_is_normalised_too() -> None:
+    old, new = _fixture_docs('He said "stop"  now'), _fixture_docs("He said \u201cstop\u201d now")
+    assert _diff(old, new).changes == ()
+    assert _changes_by_id(_diff(old, _fixture_docs("He said go"))) == {"fix-a": (CHANGED,)}
+
+
+def test_the_contract_view_of_an_fr_leaves_out_a_not_applicable_criterion() -> None:
+    def view(lifecycle: str | None) -> dict[str, Any]:
+        second = {**_criterion("ac-2", "It is fast."), **({"lifecycle": lifecycle} if lifecycle else {})}
+        graph = _snapshot(_docs(_fr("fr-a", "Do a.", acceptance_criteria=[_criterion("ac-1", "It works."), second]))).graph
+        return contract_view(graph.by_id["fr-a"], graph)
+
+    assert set(view(None)["criteria"]) == {"ac-1", "ac-2"}
+    assert set(view("deprecated")["criteria"]) == {"ac-1", "ac-2"}
+    assert set(view("not_applicable")["criteria"]) == {"ac-1"}
+
+
+def test_a_removes_link_of_a_not_applicable_node_is_not_a_new_removal() -> None:
+    def roadmap(removes: list[str], lifecycle: str | None) -> dict[str, Any]:
+        criterion = {**_criterion("tc-a", "Done."), "removes": removes, **({"lifecycle": lifecycle} if lifecycle else {})}
+        task = {"task_id": "task-a", "description": "Do it.", "acceptance_criteria": [criterion]}
+        return {_TASK_FILE: {"milestones": [{"milestone_id": "ms-a", "tasks": [task]}]}}
+
+    diff = _diff(roadmap([], None), roadmap(["ac-old"], "not_applicable"))
+    assert diff.new_removes == ()
+    assert diff.bump != MAJOR
+
+
 @pytest.mark.parametrize("field", ["status", "notes", "tags", "owner"])
 def test_contract_view_ignores_status_notes_tags_and_owner(field: str) -> None:
     old = _docs(_fr("fr-a", "Do a."))

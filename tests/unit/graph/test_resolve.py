@@ -229,6 +229,15 @@ def test_target_found_through_the_alias_index() -> None:
     assert resolve_graph(graph) == []
 
 
+def test_a_step_the_order_does_not_rank_is_not_constrained() -> None:
+    """The ranks hold ``s1`` only: a link to or from the unranked ``zz`` is never E702, in either direction or inside ``zz``."""
+    shape = SpecShape(step_ranks={"s1": 0}, kind_steps={"A": ("zz",), "B": ("s1", "zz")}, files_by_step={"s1": ("s1.json",), "zz": ("zz.json",)})
+    decl = _decl("to", ["B"])
+    for holder_step, target_step in (("s1", "zz"), ("zz", "s1"), ("zz", "zz")):
+        graph = Graph.from_nodes([_node("a", "A", holder_step, [(decl, "b")]), _node("b", "B", target_step)], shape=shape)
+        assert resolve_graph(graph) == [], (holder_step, target_step)
+
+
 def test_a_graph_without_a_shape_reports_missing_and_wrong_kind_only() -> None:
     """Built from nodes alone (no step ranks), no direction can be judged and no absent step is known."""
     graph = Graph.from_nodes([_node("a", "A", "s2", [(_decl("to", ["B"]), "ghost"), (_decl("to", ["B"]), "c")]), _node("c", "C", "s3")])

@@ -13,6 +13,7 @@ from specdev_tools.graph.model import Node
 from specdev_tools.graph.ownership import (
     OwnerContext,
     OwnershipRow,
+    OwnershipTableError,
     load_ownership_table,
     owner_for,
     stamp_file_owner,
@@ -125,6 +126,30 @@ def test_owner_for_finds_code_in_any_row_list():
     assert owner_for("E904", None, ctx) == "close-gate"
     assert owner_for("E905", node, ctx) == "step:07"
     assert owner_for("E999", node, ctx) is None
+
+
+def test_a_step_rule_with_no_node_has_no_answer():
+    """M6a asks for emitters that own no node: a rule that needs the node answers ``None``, a rule that does not still answers."""
+    ctx = OwnerContext(
+        rows=(
+            OwnershipRow("a", "fixed_step:14", ("E901",), ""),
+            OwnershipRow("b", "node_step", ("E902",), ""),
+            OwnershipRow("d", "furthest_usable_step", ("E905",), ""),
+        ),
+        furthest_step={"fr": "07"},
+    )
+    assert owner_for("E901", None, ctx) == "step:14"
+    assert owner_for("E902", None, ctx) is None
+    assert owner_for("E905", None, ctx) is None
+
+
+def test_a_missing_or_unreadable_ownership_table_is_an_error(tmp_path):
+    (tmp_path / "tools").mkdir()
+    with pytest.raises(OwnershipTableError):
+        load_ownership_table(str(tmp_path))
+    (tmp_path / "tools" / "error_ownership.json").write_text("[1]", encoding="utf-8")
+    with pytest.raises(OwnershipTableError):
+        load_ownership_table(str(tmp_path))
 
 
 def test_ownership_table_codes_exist(table):

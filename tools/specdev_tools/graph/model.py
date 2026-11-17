@@ -101,6 +101,14 @@ class SpecShape:
         """Sort rank of *step* (see ``rank``)."""
         return rank(step, self.step_ranks)
 
+    def step_key(self, step: str | None) -> tuple[int, str]:
+        """Sort key of a step: its rank (unranked last), then its name, so unranked steps keep a fixed order."""
+        return self.rank_of(step), step or ""
+
+    def order_key(self, node: Node) -> tuple[int, str, str]:
+        """Sort key of a node in every listing: its step's key, then its id."""
+        return (*self.step_key(node.step), node.id)
+
 
 @dataclass
 class Graph:
@@ -147,8 +155,16 @@ class Graph:
         graph.by_kind, graph.outgoing, graph.incoming = dict(by_kind), dict(outgoing), dict(incoming)
         return graph
 
+    def find(self, node_id: str) -> Node | None:
+        """The node a caller means by *node_id*: the node with that id, else the node an alias of that name points to.
+
+        Every reader that takes an id from a person or a file uses this one lookup; an id the graph itself produced
+        (a link target already resolved, a parent id) may be read from ``by_id`` directly.
+        """
+        return self.by_id.get(node_id) or self.by_id.get(self.alias_index.get(node_id, ""))
+
     def live_nodes(self) -> list[Node]:
-        """Every node; used only by the uniqueness check."""
+        """Every node, whatever its lifecycle (``gated_nodes`` is the reader that skips ``not_applicable``)."""
         return list(self.nodes)
 
     def gated_nodes(self) -> list[Node]:

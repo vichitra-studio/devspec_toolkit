@@ -146,6 +146,22 @@ def test_records_are_shown_apart_in_down(example: Graph) -> None:
     assert "anchor-ms-account-recovery" not in _ids(side.nodes)
 
 
+def test_a_record_is_shown_but_never_walked_through() -> None:
+    decl = LinkDecl(field="derives_from", kinds=("*",), required=True, built=True, same_step_kinds=())
+
+    def node(node_id: str, kind: str, role: str, target: str | None = None) -> Node:
+        links = (Link(node_id, "derives_from", target, decl),) if target else ()
+        return Node(node_id, kind, "s1", role, "s1.json", f".{kind}[0]", None, (), "active", None, links, node_id)
+
+    graph = Graph.from_nodes(
+        [node("fr-a", "fr", "obligation-system", "amb-r"), node("amb-r", "ambiguity", "record", "fr-b"), node("fr-b", "fr", "obligation-system")],
+        shape=SpecShape(step_ranks=_RANKS),
+    )
+    side = trace_node(graph, "fr-a", ("up",)).up
+    assert side is not None
+    assert _ids(side.records) == {"amb-r"} and _ids(side.nodes) == set()
+
+
 def test_results_are_ordered_by_step_then_id(example: Graph) -> None:
     side = trace_node(example, "task-implement-password-reset-confirm", ("up",)).up
     assert side is not None

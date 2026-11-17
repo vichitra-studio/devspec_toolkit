@@ -536,7 +536,7 @@ changes:
       1.1.1-shaped. Some procedures in those prompts, skills and agents do not
       work on a 1.2.0-shaped spec until then: the milestone-close steps of
       prompt_16c_impl_reviewer.md and of the specdev-trinity skill (the anchor
-      row refuses status done without close, and a step 09 or step 14 milestone
+      row refuses status: done without close, and a step 09 or step 14 milestone
       has no status); the emergent-ambiguity insert in
       .claude/agents/specdev-trinity-impl.md (it writes severity and no about);
       the matrix checks of prompt_14_roadmap.md and prompt_16b_impl_coder.md
@@ -556,7 +556,9 @@ changes:
       (--kind KIND | --for ID) --field FIELD [--query TEXT] [--limit N] lists the
       nodes a link field may point at. specdev node status <id>
       active|deprecated|not_applicable writes the node's lifecycle into its spec
-      file (active removes the key) and prints <id>: <old> -> <new> (<file>).
+      file (active removes the key) and prints <id>: <old> -> <new> (<file>); a node
+      that already has the value is not written, and the line reads <id>: already
+      <value>, nothing written (<file>).
       specdev trace <id> [--up] [--down] [--depth N] [--kinds K,K] [--verbs V,V]
       [--no-containment] lists what the node rests on and what rests on it.
       specdev trace <id> --recipe 16a|16b|16c [--expand] [--since REF] prints the
@@ -565,11 +567,13 @@ changes:
       A command that cannot answer prints one finding on stderr (with --json, the
       status / errors envelope on stdout) and exits 1, for example:
       E705 for a lifecycle change that is refused (a seed node, an unknown id, a
-      lifecycle value that is not one of the three), E706 for an unknown id, kind,
+      lifecycle value that is not one of the three, a write the JSON tools refuse),
+      E706 for an unknown id, kind,
       link field or recipe role, E707 for a recipe start node of the wrong kind,
       E708 for a ref that does not resolve or a spec folder that cannot be read at
-      it, E709 for a ref whose tree has no node ids, E520 for a spec folder that is
-      missing. When a spec file cannot be read, node, node candidates, node status
+      it, E709 for a ref whose tree has no graph node (a tree from before 1.2.0 that
+      has ids the registry reads is compared as it is, and the result is not
+      meaningful), E520 for a spec folder that is missing. When a spec file cannot be read, node, node candidates, node status
       and trace print one more line on stderr that names the file and says the
       answer may be incomplete, and an unknown id then says the node may be in one
       of those files. The commands are listed in tools/cli_commands.json.
@@ -603,6 +607,12 @@ changes:
       14_roadmap.json equal to the id of an FR criterion in 04_fr_list.json: a
       single-file validate of each file is OK).
       validate still reports an id defined twice inside the one file (E704).
+      Until the step prompts are rewritten they do not say that an id must differ
+      from the ids of nodes of other kinds; for example a step 12 job_id equal to
+      the 02a gate_id it implements, or a glossary term_id equal to a charter
+      metric_id, is now reported by spec-check as E704 (1.1.1 reported nothing);
+      give the job its own id and link it to the gate with realises. The E704
+      message names both places.
     migration:
       action: none
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,16 @@ def test_pack_16b_text_puts_the_containers_after_their_member(expected: dict[str
     assert rows["core criteria"] == "tc-confirm-expired-token (task-implement-password-reset-confirm, ms-account-recovery)"
     assert rows["obligations"] == "ac-password-reset-3 (fr-password-reset)"
     assert rows["lineage"] == "scope-password-reset, cap-account-recovery, fr-password-reset"
+
+
+def test_pack_16b_text_does_not_read_the_via_label_to_group_containers(expected: dict[str, Any]) -> None:
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    pack = build_pack(graph, load_recipes(str(ROOT)), expected["role"], expected["start"])
+    relabelled = replace(
+        pack, sections={name: tuple(replace(entry, via="reworded") for entry in rows) for name, rows in pack.sections.items()}
+    )
+    assert any(entry.container and entry.source_id for rows in pack.sections.values() for entry in rows)
+    assert render_text(relabelled) == render_text(pack)
 
 
 def test_pack_16b_expand_text_names_what_each_container_holds(expected: dict[str, Any]) -> None:
