@@ -433,8 +433,9 @@ class PackEntry:
 
     ``suffix`` is the value of the node field ``suffix_field`` (a third party's pin), already part of ``label``;
     ``content`` is the node's own item, present only when the pack was expanded.  ``container`` is true for a node
-    reached by a ``parent`` hop: it holds a member of its section instead of being one, and ``source_id`` is that
-    member's id.  ``via`` is only the label printed for a reader.
+    reached by a ``parent`` hop: it holds a member of its section instead of being one.  ``source_id`` is the id of the
+    node a hop reached this one from (empty for the start set and for a whole kind); with ``container`` it names the
+    member the container holds.  ``via`` is only the label printed for a reader.
     """
 
     id: str
@@ -513,7 +514,17 @@ def _entry(graph: Graph, table: RecipeTable, node: Node, via: str, container: bo
     suffix = as_str(_item(graph, node).get(suffix_field)) if suffix_field else ""
     label = f"{node.label} {suffix}".strip() if suffix else node.label
     return PackEntry(
-        node.id, node.kind, node.step, label, via, node.lifecycle, suffix_field if suffix else "", suffix, None, container, source_id
+        id=node.id,
+        kind=node.kind,
+        step=node.step,
+        label=label,
+        via=via,
+        lifecycle=node.lifecycle,
+        suffix_field=suffix_field if suffix else "",
+        suffix=suffix,
+        content=None,
+        container=container,
+        source_id=source_id,
     )
 
 

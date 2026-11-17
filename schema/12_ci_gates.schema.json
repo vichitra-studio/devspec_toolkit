@@ -24,7 +24,7 @@
             "properties": {
               "job_id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this CI job. Recommended format: gate-{phase}-{check}. Example: 'gate-build-unit-tests', 'gate-deploy-security-scan'. Should be unique across all jobs in this spec (enforced by linters, not the schema)."
+                "description": "Unique kebab-case identifier for this CI job. Recommended format: gate-{phase}-{check}. Example: 'gate-build-unit-tests', 'gate-deploy-security-scan'. It should be unique across the whole spec, not only among jobs: a CI gate's `gate_id` with the same value is reported as E704 by `spec-check`."
               },
               "name": {
                 "type": "string",

@@ -78,7 +78,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 
 ## Step 08 Troubleshooting
 - **Orphan Fixtures**: Validation fails if a fixture carries neither `verifies` nor `removes`. `verifies` takes one or more ids of acceptance criteria, APIs, invariants or NFRs (not FRs).
-- **Link Targets**: This release checks that a `verifies` id has the right shape, not that it exists in Steps 4 to 7; a link resolver in a later 1.2.0 change does.
+- **Link Targets**: `specdev spec-check` reports a `verifies` id that no node has (E700) and one that names a node of a kind the field does not accept (E701); `specdev validate` of the fixtures file alone does not.
 - **Mode Strictness**: If `mode` is `contract`, you must provide an `expected` object with `status` (integer 100-599).
 - **Manual Mode**: `mode: manual` requires `manual_reason`, a string of at least 10 characters.
 

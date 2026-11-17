@@ -908,7 +908,7 @@ class TestStep16(unittest.TestCase):
     def test_impl_context_16a_dispatch_stays_16a_for_plan_only_artifact(self):
         """An impl_context/ artifact with no execution.execution_results and
         no review.verdict stays on the 16a path (default)."""
-        from specdev_tools.validation.validate import _refine_impl_context_substep
+        from specdev_tools.core.step_paths import refine_impl_context_substep
 
         plan_only = {
             "$schema": "vc:16-impl-context",
@@ -920,11 +920,11 @@ class TestStep16(unittest.TestCase):
             "execution": {"execution_results": []},
             "review": {},
         }
-        self.assertEqual(_refine_impl_context_substep("16a", plan_only), "16a")
-        self.assertEqual(_refine_impl_context_substep("16a", plan_plus_empty_exec), "16a")
+        self.assertEqual(refine_impl_context_substep("16a", plan_only), "16a")
+        self.assertEqual(refine_impl_context_substep("16a", plan_plus_empty_exec), "16a")
         # Non-impl_context steps are never refined
-        self.assertEqual(_refine_impl_context_substep("04", plan_only), "04")
-        self.assertEqual(_refine_impl_context_substep("unknown", plan_only), "unknown")
+        self.assertEqual(refine_impl_context_substep("04", plan_only), "04")
+        self.assertEqual(refine_impl_context_substep("unknown", plan_only), "unknown")
 
     def test_e307_doc_spec_ref_type_excluded(self):
         """E307 does NOT fire when spec_ref.type is 'doc' — task references are work

@@ -71,9 +71,6 @@ from .validators import (
 
 from ..core.step_paths import get_step_from_path, refine_impl_context_substep
 
-_get_step_from_path = get_step_from_path
-_refine_impl_context_substep = refine_impl_context_substep
-
 
 def _duplicate_id_errors(repo_root: str, path: str, data: dict[str, Any]) -> list[SpecError]:
     """E704 for an id defined twice inside the file *path*; nothing when the toolkit has no usable registry."""
@@ -153,7 +150,7 @@ def validate_file(
         # Resolve step once — use content-based refinement for impl_context/
         # artifacts so 16b/16c sub-step validators actually run during
         # validate_file (path-only routing always yielded "16a").
-        step = _refine_impl_context_substep(_get_step_from_path(path), data)
+        step = refine_impl_context_substep(get_step_from_path(path), data)
 
         # Enhance error messages with context
         enhanced_errors: list[SpecError] = []

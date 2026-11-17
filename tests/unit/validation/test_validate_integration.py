@@ -6,9 +6,9 @@ from unittest.mock import patch
 import os
 
 
+from specdev_tools.core.step_paths import get_step_from_path
 from specdev_tools.validation.validate import (
     DEEP_VALIDATORS,
-    _get_step_from_path,
     _resolve_replay_base_ref,
     _run_deep_validation,
     validate_dir,
@@ -18,8 +18,8 @@ from specdev_tools.validation.validate import (
 
 class ValidateIntegrationTests(unittest.TestCase):
     def test_get_step_from_path_supports_lettered_steps(self):
-        self.assertEqual("13a", _get_step_from_path("13a_completeness_assessment.json"))
-        self.assertEqual("16c", _get_step_from_path("tests/fixtures/step_16c/something.json"))
+        self.assertEqual("13a", get_step_from_path("13a_completeness_assessment.json"))
+        self.assertEqual("16c", get_step_from_path("tests/fixtures/step_16c/something.json"))
 
     def test_validate_dir_runs_b2_repo_level_checks(self):
         with tempfile.TemporaryDirectory() as td:

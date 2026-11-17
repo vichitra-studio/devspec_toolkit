@@ -556,9 +556,10 @@ changes:
       (--kind KIND | --for ID) --field FIELD [--query TEXT] [--limit N] lists the
       nodes a link field may point at. specdev node status <id>
       active|deprecated|not_applicable writes the node's lifecycle into its spec
-      file (active removes the key) and prints <id>: <old> -> <new> (<file>); a node
-      that already has the value is not written, and the line reads <id>: already
-      <value>, nothing written (<file>).
+      file (active removes the key from a node that has another value) and prints
+      <id>: <old> -> <new> (<file>); a node that already has the value is not
+      written, an explicit "lifecycle": "active" in its file included, and the line
+      reads <id>: already <value>, nothing written (<file>).
       specdev trace <id> [--up] [--down] [--depth N] [--kinds K,K] [--verbs V,V]
       [--no-containment] lists what the node rests on and what rests on it.
       specdev trace <id> --recipe 16a|16b|16c [--expand] [--since REF] prints the
@@ -607,10 +608,11 @@ changes:
       14_roadmap.json equal to the id of an FR criterion in 04_fr_list.json: a
       single-file validate of each file is OK).
       validate still reports an id defined twice inside the one file (E704).
-      Until the step prompts are rewritten they do not say that an id must differ
-      from the ids of nodes of other kinds; for example a step 12 job_id equal to
-      the 02a gate_id it implements, or a glossary term_id equal to a charter
-      metric_id, is now reported by spec-check as E704 (1.1.1 reported nothing);
+      Until the step prompts are rewritten, the prompts for steps 12 and 03 do not
+      say that a job_id or a term_id must differ from the ids of nodes of other
+      kinds; for example a step 12 job_id equal to the 02a gate_id it implements,
+      or a glossary term_id equal to a charter metric_id, is now reported by
+      spec-check as E704 (1.1.1 reported nothing);
       give the job its own id and link it to the gate with realises. The E704
       message names both places.
     migration:

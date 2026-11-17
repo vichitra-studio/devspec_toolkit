@@ -979,7 +979,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E705 LIFECYCLE_CHANGE_REFUSED
 
-**Trigger**: A `node status` change was refused: an unknown or ambiguous id, a value that is not `active`, `deprecated` or `not_applicable`, a node of role `record` or `seed`, or a write the JSON tools refuse (for example an edit that would introduce a schema violation; the file is left as it was). When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints `specdev node: could not read <file>; the answer may be incomplete` on stderr first.
+**Trigger**: A `node status` change was refused: an unknown or ambiguous id, a value that is not `active`, `deprecated` or `not_applicable`, a node of role `record` or `seed`, or a write the JSON tools refuse (for example an edit that would introduce a schema violation; the file is left as it was). When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints `specdev node: could not read <files>; the answer may be incomplete` on stderr first, where `<files>` are the unreadable files joined by ", ".
 
 **Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
 
@@ -987,7 +987,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E706 GRAPH_COMMAND_TARGET_UNKNOWN
 
-**Trigger**: A read command was given an id, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace` or a `--recipe` role that is not `16a`, `16b` or `16c`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints `specdev <command>: could not read <file>; the answer may be incomplete` on stderr first.
+**Trigger**: A read command was given an id, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace` or a `--recipe` role that is not `16a`, `16b` or `16c`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints `specdev <command>: could not read <files>; the answer may be incomplete` on stderr first, where `<files>` are the unreadable files joined by ", ".
 
 **Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
 
@@ -1011,7 +1011,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E709 DIFF_REF_PREDATES_GRAPH_MODEL
 
-**Trigger**: The tree at a ref given to `diff` has no graph node (seeds do not count), which is what a tree from before the 1.2.0 node model can look like. The message says the tree may predate the model and names the toolkit version its spec is stamped with, or says it carries no stamp. A tree from before 1.2.0 that has ids the registry reads is not refused: it is compared as it is, and the result is not meaningful.
+**Trigger**: The tree at a ref given to `diff` has no graph node (seeds do not count), which is what a tree from before the 1.2.0 node model can look like. The message says the tree may predate the model and names the toolkit version its spec is stamped with, or says it carries no stamp (it says so also when the stamp file cannot be read). A tree from before 1.2.0 that has ids the registry reads is not refused: it is compared as it is, and the result is not meaningful.
 
 **Resolution**: Command usage error: no owner, no node id. Give a ref whose spec folder has graph nodes.
 

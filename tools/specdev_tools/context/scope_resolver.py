@@ -45,11 +45,12 @@ def resolve_scope(entry_id: str | None, spec_dir: str, repo_root: str) -> dict[s
     except KindRegistryError as exc:
         result["scope_warning"] = f"the spec graph could not be built ({exc}): scope is empty"
         return result
-    if entry_id not in graph.by_id:
+    entry = graph.find(entry_id)
+    if entry is None:
         result["scope_warning"] = f"entry_id '{entry_id}' not found in any spec file — scope may be incomplete"
         return result
 
-    reached = trace_node(graph, entry_id).reached
+    reached = trace_node(graph, entry.id).reached
     result["resolved_ids"] = {kind: sorted(node.id for node in nodes) for kind, nodes in group_by_kind(reached).items()}
     result["source_files"] = {
         node.id: {"file": _source_file(spec_dir_abs, node), "path": node.jq_path} for node in reached

@@ -1,7 +1,7 @@
 """Tests for gap-remediation features added during the v0.3.0 release cycle.
 
 Covers:
-- ``_get_step_from_path`` handling of ``impl_context/`` directories
+- ``get_step_from_path`` handling of ``impl_context/`` directories
 - ``DEEP_VALIDATORS`` entries for steps 16a, 16b, 16c
 - ``validators`` sub-package importability
 - Migration runner ``execute_single_step`` importability
@@ -18,36 +18,37 @@ from typing import Any
 
 import pytest
 
-from specdev_tools.validation.validate import DEEP_VALIDATORS, _get_step_from_path
+from specdev_tools.core.step_paths import get_step_from_path
+from specdev_tools.validation.validate import DEEP_VALIDATORS
 
 
 # ---------------------------------------------------------------------------
-# 1. _get_step_from_path: impl_context/ paths
+# 1. get_step_from_path: impl_context/ paths
 # ---------------------------------------------------------------------------
 
 class TestGetStepFromPathImplContext:
     """Files inside an ``impl_context/`` directory should map to step 16a (milestone plans)."""
 
     def test_relative_path(self):
-        assert _get_step_from_path("spec/impl_context/step-api-core.json") == "16a"
+        assert get_step_from_path("spec/impl_context/step-api-core.json") == "16a"
 
     def test_absolute_path(self):
-        assert _get_step_from_path("/abs/path/spec/impl_context/my-file.json") == "16a"
+        assert get_step_from_path("/abs/path/spec/impl_context/my-file.json") == "16a"
 
     def test_normal_step_still_works(self):
-        assert _get_step_from_path("spec/04_frs.json") == "04"
+        assert get_step_from_path("spec/04_frs.json") == "04"
 
     def test_unknown_file(self):
-        assert _get_step_from_path("random_file.json") == "unknown"
+        assert get_step_from_path("random_file.json") == "unknown"
 
     def test_step_16a(self):
-        assert _get_step_from_path("spec/16a_impl_planner.json") == "16a"
+        assert get_step_from_path("spec/16a_impl_planner.json") == "16a"
 
     def test_step_16b(self):
-        assert _get_step_from_path("spec/16b_code.json") == "16b"
+        assert get_step_from_path("spec/16b_code.json") == "16b"
 
     def test_step_16c(self):
-        assert _get_step_from_path("spec/16c_review.json") == "16c"
+        assert get_step_from_path("spec/16c_review.json") == "16c"
 
 
 # ---------------------------------------------------------------------------

@@ -103,7 +103,7 @@ def build_node_parser() -> argparse.ArgumentParser:
         "status",
         help="Set the lifecycle of a node",
         description=(
-            "Set the lifecycle of a node and write it to its spec file. 'active' removes the lifecycle key.\n"
+            "Set the lifecycle of a node and write it to its spec file. 'active' removes the lifecycle key from a node that has another value; a node that already has the value is left as it is.\n"
             f"Guidance: {NOT_APPLICABLE_GUIDANCE}."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -144,7 +144,7 @@ def add_graph_parsers(sub: Any) -> None:
         help=f"Print the context pack of this role: {', '.join(RECIPE_ROLES)} (16a: task, 16b: plan item, 16c: roadmap milestone)",
     )
     trace_p.add_argument("--expand", action="store_true", help="With --recipe: add the content of every node of the pack")
-    trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: the commit where HEAD left the default branch, or HEAD~1 when no default branch shares history with HEAD; on the default branch itself that is HEAD, so the report lists only changes not yet committed)")
+    trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: the commit where HEAD left the default branch, or HEAD~1 when no default branch shares history with HEAD)")
     _add_root_flags(trace_p)
 
     diff_p = sub.add_parser(

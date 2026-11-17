@@ -1,10 +1,11 @@
 """One lookup of an id and one order of nodes: ``Graph.find`` and ``SpecShape.order_key`` (round 3, D-1 and D-2)."""
 from __future__ import annotations
 
-from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
+from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.graph import queries
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.lifecycle import plan_lifecycle_change
@@ -60,6 +61,14 @@ def test_node_status_plans_the_change_of_the_node_an_alias_names(aliased: Graph)
 def test_a_recipe_starts_from_the_node_an_alias_names(aliased: Graph) -> None:
     table = load_recipes(str(ROOT))
     assert build_pack(aliased, table, "16b", "plan-old-name").start.id == _PLAN_ITEM
+
+
+def test_context_scope_finds_the_entry_by_its_alias(aliased: Graph) -> None:
+    with patch("specdev_tools.context.scope_resolver.build_graph", return_value=aliased):
+        by_alias = resolve_scope("fr-old-name", str(EXAMPLE_SPEC), str(ROOT))
+        by_id = resolve_scope(_FR, str(EXAMPLE_SPEC), str(ROOT))
+    assert "scope_warning" not in by_alias
+    assert by_alias["resolved_ids"] == by_id["resolved_ids"] and by_id["resolved_ids"]
 
 
 def _node(node_id: str, step: str | None) -> Node:

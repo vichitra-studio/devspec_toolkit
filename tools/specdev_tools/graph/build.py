@@ -56,15 +56,14 @@ class _FileContext:
 
 def _step_ranks(repo_root: str) -> dict[str, int]:
     """Sort rank of each step: seeds first, then ``tools/step_order.json`` order; any other step sorts last."""
+    path = os.path.join(repo_root, "tools", "step_order.json")
     try:
         order = load_step_order(repo_root)
-        if not isinstance(order, dict):
-            raise ValueError("not a JSON object")
-        steps = str_items(order.get("steps"))
     except (OSError, ValueError) as exc:
-        path = os.path.join(repo_root, "tools", "step_order.json")
         raise KindRegistryError(make_error("E520", f"step order {path} is unreadable: {exc}", path)) from exc
-    ranks = {step: index for index, step in enumerate(steps)}
+    if not isinstance(order, dict):
+        raise KindRegistryError(make_error("E520", f"step order {path} is unreadable: not a JSON object", path))
+    ranks = {step: index for index, step in enumerate(str_items(order.get("steps")))}
     ranks[SEED_STEP] = -1
     return ranks
 

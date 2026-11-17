@@ -73,7 +73,8 @@ def plan_lifecycle_change(graph: Graph, node_id: str, value: str) -> LifecycleCh
 def apply_lifecycle_change(spec_root: str, repo_root: str, change: LifecycleChange) -> None:
     """Write *change* into its file under *spec_root*.
 
-    ``active`` deletes the ``lifecycle`` key; another value patches it.  Raises ``JsonUtilsError`` when the file is
+    ``active`` deletes the ``lifecycle`` key; another value patches it.  ``set_lifecycle`` does not call this for a
+    node that already has the value, so a file that holds an explicit ``active`` keeps its key.  Raises ``JsonUtilsError`` when the file is
     missing or the edit would introduce a schema violation; nothing is written then.
     """
     path = str(Path(spec_root) / change.file)

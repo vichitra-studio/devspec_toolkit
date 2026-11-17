@@ -163,10 +163,12 @@ def test_a_record_is_shown_but_never_walked_through() -> None:
 
 
 def test_results_are_ordered_by_step_then_id(example: Graph) -> None:
-    side = trace_node(example, "task-implement-password-reset-confirm", ("up",)).up
+    side = trace_node(example, "fr-password-reset", ("up",)).up
     assert side is not None
+    ids = [node.id for node in side.nodes]
+    assert ids != sorted(ids), "the entry must be one whose id order is not its step order, or this test checks nothing"
     keys = [(example.shape.step_ranks[node.step], node.id) for node in side.nodes if node.step]
-    assert keys == sorted(keys)
+    assert len(keys) == len(ids) and keys == sorted(keys)
 
 
 def test_a_direction_not_asked_for_is_none(example: Graph) -> None:

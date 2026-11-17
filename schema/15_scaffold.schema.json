@@ -45,7 +45,7 @@
         "properties": {
           "row_id": {
             "$ref": "vc:core:atoms#kebabId",
-            "description": "Unique kebab-case identifier of this scaffold row. Recommended format: scaffold-{api slug}. Example: 'scaffold-password-reset-confirm'. Unique across the rows of this step."
+            "description": "Unique kebab-case identifier of this scaffold row. Recommended format: scaffold-{api slug}. Example: 'scaffold-password-reset-confirm'. It should be unique across the whole spec, not only among the rows of this step: an API id with the same value is reported as E704 by `spec-check`."
           },
           "realises": {
             "type": "array",
