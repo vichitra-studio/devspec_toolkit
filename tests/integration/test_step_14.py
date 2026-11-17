@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from specdev_tools.validation.validate import validate_file
-from unit.graph._synth import graph_check
+from unit.graph._synth import accept_links, graph_check
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FIXTURES = _REPO_ROOT / "tests" / "fixtures" / "step_14"
@@ -161,7 +161,7 @@ class Step14IntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._as_step_14_file("invalid_depends_on_cycle.json", tmp)
             self.assertEqual([], validate_file(str(self.repo_root), str(path)))
-            graph = graph_check(Path(tmp))
+            graph = graph_check(accept_links(Path(tmp)))
         self.assertEqual("FAIL", graph["status"])
         self.assertEqual([("E703", "step:14")], [(f["code"], f["owner"]) for f in graph["findings"]])
         for task in ("task-a", "task-b", "task-c"):

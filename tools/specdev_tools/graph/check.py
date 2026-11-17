@@ -6,11 +6,18 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.kinds import KindRegistryError
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.resolve import resolve_graph
+from specdev_tools.graph.resolve import NULL_HOOKS, resolve_graph
+from specdev_tools.trace.lockfile import Lock
+from specdev_tools.trace.suspects import LockHook
 
 
-def run_graph_check(spec_root: str, repo_root: str, *, graph: Graph | None = None) -> list[SpecError]:
+def run_graph_check(
+    spec_root: str, repo_root: str, *, graph: Graph | None = None, lock: Lock | None = None
+) -> list[SpecError]:
     """E704 for duplicate ids, then E700-E703 for links, over the spec folder *spec_root*.
+
+    With *lock* (the trace lock of the folder) the one resolver run also reports E761 for a link with no lock entry and
+    W720 for a new link to a deprecated node; ``None`` leaves both out (a lock that could not be read).
 
     A file the builder cannot read (invalid JSON, a root that is not an object) adds nothing here: ``validate_file``
     already reports it.  *graph* is a graph already built from *spec_root* and *repo_root* (no ``files``/``steps``
@@ -21,4 +28,5 @@ def run_graph_check(spec_root: str, repo_root: str, *, graph: Graph | None = Non
             graph = build_graph(spec_root, repo_root)
         except KindRegistryError as exc:
             return [exc.error]
-    return [*check_unique_ids(graph), *resolve_graph(graph)]
+    hooks = NULL_HOOKS if lock is None else LockHook(graph, lock)
+    return [*check_unique_ids(graph), *resolve_graph(graph, hooks=hooks)]

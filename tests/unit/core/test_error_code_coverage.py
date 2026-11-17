@@ -67,7 +67,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W617",
             # Spec graph (7xx)
             "E700", "E701", "E702", "E703", "E704", "E705", "E706", "E707", "E708", "E709",
-            "E760", "E769", "W720",
+            "E760", "E761", "E762", "E763", "E764", "E765", "E767", "E768", "E769", "E770", "E771", "E772", "E773",
+            "E774", "E778", "E882", "W720",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

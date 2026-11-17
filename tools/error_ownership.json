@@ -8,6 +8,7 @@
         "E701",
         "E702",
         "E703",
+        "E761",
         "W720"
       ],
       "authority": "DOC L824-840 row 1; DS L420"
@@ -81,7 +82,9 @@
     {
       "class": "orphan-lock-entry",
       "owner": "merge-check",
-      "codes": [],
+      "codes": [
+        "E762"
+      ],
       "authority": "DOC L824-840 row 13; DS L402; DS L420"
     },
     {

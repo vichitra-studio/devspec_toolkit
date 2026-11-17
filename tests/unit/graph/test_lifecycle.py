@@ -4,18 +4,23 @@ from __future__ import annotations
 import json
 import shutil
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.kinds import LinkDecl
 from specdev_tools.graph.lifecycle import LifecycleRefusedError, plan_lifecycle_change, set_lifecycle
-from specdev_tools.graph.model import LIFECYCLES, NOT_APPLICABLE, Graph
+from specdev_tools.graph.model import LIFECYCLES, NOT_APPLICABLE, Graph, Link, Node
 from specdev_tools.graph.queries import candidates
 from specdev_tools.graph.recipes import build_pack, parse_recipes
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.graph.trace import trace_node
+from specdev_tools.trace.history import historical_node_ids
+from specdev_tools.trace.lockfile import Lock, LockEntry
+from specdev_tools.trace.suspects import find_suspects, lock_links, missing_entries, orphan_entries
 
 from ._synth import EXAMPLE_SPEC, ROOT, load_doc, make_toolkit, write_json
 
@@ -36,12 +41,44 @@ _PROBE_RECIPES = parse_recipes(
     }
 )
 
+_ZERO_HASH = "sha256:" + "0" * 64
+
+
+def _stale_lock(graph: Graph) -> Lock:
+    """A lock that holds an entry with a wrong chain stamp for every link of the graph that carries one."""
+    return Lock(tuple(
+        LockEntry(item.holder.id, item.link.field, item.link.target, _ZERO_HASH, _ZERO_HASH) for item in lock_links(graph)
+    ))
+
+
+def _with_probe_in_closed_milestone(graph: Graph) -> Graph:
+    """*graph* plus a milestone whose anchor row is ``done`` and a plan file of that milestone holding the probe."""
+    about = LinkDecl(field="about", kinds=("roadmap-milestone",), required=False, built=True, same_step_kinds=())
+    milestone = replace(graph.by_id["fr-twin"], id="ms-closed", kind="roadmap-milestone", children=(), links=(), milestone=None)
+    anchor = replace(
+        milestone, id="anchor-closed", kind="anchor-row", file="anchor.json", jq_path=".row",
+        links=(Link("anchor-closed", "about", "ms-closed", about),),
+    )
+    nodes = [replace(node, milestone="ms-closed") if node.id == _PROBE else node for node in graph.nodes]
+    closed = Graph.from_nodes([*nodes, milestone, anchor], shape=graph.shape)
+    closed.documents["anchor.json"] = {"row": {"status": "done"}}
+    return closed
+
+
 # Each consumer of the graph, as the ids of the nodes it reads or reports on; later work items add their rows.
 CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     "resolver": lambda graph: {error.node_id for error in resolve_graph(graph) if error.node_id},
     "trace": lambda graph: {node.id for node in trace_node(graph, "ac-probe-1", ("up",)).reached},
     "candidates": lambda graph: {item.id for item in candidates(graph, "derives_from", kind="api").candidates},
     "recipes": lambda graph: set(build_pack(graph, _PROBE_RECIPES, "16b", "LOGIN_ITEM_01").node_ids),
+    "suspects": lambda graph: {
+        end for suspect in find_suspects(graph, _stale_lock(graph), {}) for end in (suspect.holder, suspect.target)
+    },
+    "missing_entries": lambda graph: {end for item in missing_entries(graph, Lock()) for end in (item.holder.id, item.target.id)},
+    "orphan_entries": lambda graph: {
+        entry.source for entry in orphan_entries(graph, Lock((LockEntry(_PROBE, "derives_from", "cap-gone", _ZERO_HASH, _ZERO_HASH),)))
+    },
+    "historical": lambda graph: historical_node_ids(_with_probe_in_closed_milestone(graph)),
 }
 
 

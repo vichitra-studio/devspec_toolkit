@@ -333,12 +333,13 @@ def test_upstream_backlog_is_empty() -> None:
 
 
 def test_scope_resolver_finds_the_fr_and_its_lineage_but_not_its_sibling(tmp_path: Path) -> None:
-    # `resolve_scope` writes nothing: neither the fixture folder nor the copy gains an `extras` folder.
+    # `resolve_scope` writes nothing: neither the fixture folder nor the copy gains a trace matrix.
     spec = tmp_path / "spec"
     shutil.copytree(_SPEC, spec)
+    before = {path: path.read_bytes() for path in spec.rglob("*") if path.is_file()}
     scope = resolve_scope("fr-password-reset", str(spec), str(_ROOT))
-    assert not (_SPEC / "extras").exists()
-    assert not (spec / "extras").exists()
+    assert not (_SPEC / "extras" / "trace_matrix.json").exists()
+    assert {path: path.read_bytes() for path in spec.rglob("*") if path.is_file()} == before
     assert not scope.get("errors")
     assert scope["resolved_ids"]["fr"] == ["fr-password-reset"]
     assert "cap-account-recovery" in scope["resolved_ids"]["capability"]

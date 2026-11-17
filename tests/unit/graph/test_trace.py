@@ -238,7 +238,7 @@ def test_context_scope_alias_directed_and_no_matrix_write(tmp_path: Path, capsys
     before = {path: path.read_bytes() for path in spec.rglob("*") if path.is_file()}
     scope = resolve_scope("fr-password-reset-request", str(spec), str(ROOT))
     assert {path: path.read_bytes() for path in spec.rglob("*") if path.is_file()} == before
-    assert not (spec / "extras").exists()
+    assert not (spec / "extras" / "trace_matrix.json").exists()
     assert set(scope) == {"entry", "resolved_ids", "source_files"}
     assert scope["entry"] == "fr-password-reset-request"
     assert scope["resolved_ids"]["fr"] == ["fr-password-reset-request"]

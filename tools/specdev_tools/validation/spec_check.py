@@ -18,8 +18,11 @@ from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.check import run_graph_check
+from ..graph.gitview import read_seed_texts
 from ..graph.model import Graph
 from ..graph.ownership import stamp_file_owner, step_for_file
+from ..trace.lockfile import Lock, LockError, lock_path, read_lock
+from ..trace.suspects import check_lock
 from .linter_utils import build_lint_graph
 
 
@@ -117,10 +120,38 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
     ]
 
 
-def _graph_check_result(repo_root: str, spec_dir: str, spec_root: str | None, lint_graph: Graph | None) -> dict[str, Any]:
-    """The ``graph`` check (E700-E704) over *spec_root*; it reuses the lint graph only when that is the same folder as *spec_dir*."""
-    shares_lint_graph = os.path.abspath(spec_root or spec_dir) == os.path.abspath(spec_dir)
-    return _check_result(run_graph_check(spec_root or spec_dir, repo_root, graph=lint_graph if shares_lint_graph else None))
+def _graph_for_checks(repo_root: str, spec_dir: str, spec_root: str | None, lint_graph: Graph | None) -> Graph | None:
+    """The graph of *spec_root* for the ``graph`` and ``trace-lock`` checks: the lint graph when that is the same folder as *spec_dir*, else a new build.
+
+    ``None`` when the registry is unavailable (the ``graph`` check then reports that one E520).
+    """
+    if os.path.abspath(spec_root or spec_dir) == os.path.abspath(spec_dir):
+        return lint_graph
+    return build_lint_graph(spec_root or spec_dir, repo_root)
+
+
+def _read_lock(lock_dir: str) -> tuple[Lock | None, SpecError | None]:
+    """The trace lock under *lock_dir* (empty when the file is absent), or the E760 finding when it cannot be read."""
+    try:
+        return read_lock(lock_dir), None
+    except LockError as exc:
+        return None, exc.error
+
+
+def _trace_lock_result(
+    graph: Graph | None, lock: Lock | None, lock_error: SpecError | None, lock_dir: str, host_root: str
+) -> dict[str, Any]:
+    """The ``trace-lock`` check: E760 for a lock that cannot be read, else E762, E763 and E882 (E761 is the ``graph`` check's).
+
+    SKIP when there is no graph, or the graph has no links and no lock file exists.
+    """
+    if lock_error is not None:
+        return _check_result([lock_error])
+    if graph is None or lock is None:
+        return {"status": "SKIP", "reason": "no spec graph"}
+    if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
+        return {"status": "SKIP", "reason": "no links and no trace lock"}
+    return _check_result(check_lock(graph, lock, read_seed_texts(graph, host_root)))
 
 
 def _run_checks(
@@ -293,7 +324,9 @@ def _run_checks(
         }
 
     # --- 10b. Spec graph: unique ids (E704) and links (E700-E703) ---
-    checks["graph"] = _graph_check_result(repo_root, spec_dir, spec_root, lint_graph)
+    check_graph = _graph_for_checks(repo_root, spec_dir, spec_root, lint_graph)
+    lock, lock_error = _read_lock(spec_root or spec_dir)
+    checks["graph"] = _check_result(run_graph_check(spec_root or spec_dir, repo_root, graph=check_graph, lock=lock))
 
     # --- 11. Registry check (R001-R003) ---
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json
@@ -364,6 +397,9 @@ def _run_checks(
             "status": "SKIP",
             "reason": "use --include-forward-replay to enable",
         }
+
+    # --- 15. Trace lock: suspect links, orphan entries, baseline markers ---
+    checks["trace-lock"] = _trace_lock_result(check_graph, lock, lock_error, spec_root or spec_dir, project_root)
 
     return checks
 

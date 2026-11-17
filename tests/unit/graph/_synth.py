@@ -26,7 +26,10 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.model import Graph
 from specdev_tools.registry.generate import generate_registry
+from specdev_tools.trace.lockfile import write_lock
 from specdev_tools.validation.spec_check import run_spec_check_json
+
+from ..trace._lock_support import lock_for
 
 ROOT = Path(__file__).parents[3]
 EXAMPLE_SPEC = ROOT / "tests" / "fixtures" / "graph_example" / "spec"
@@ -118,10 +121,17 @@ def graph_check(spec_dir: Path) -> dict[str, Any]:
     return context["checks"]["graph"]
 
 
+def accept_links(spec_dir: Path) -> Path:
+    """Write the trace lock of *spec_dir* accepting every link it holds, so the ``graph`` check reports no E761; returns *spec_dir*."""
+    graph = build_graph(str(spec_dir), str(ROOT))
+    write_lock(str(spec_dir), lock_for(graph, spec_dir.parent))
+    return spec_dir
+
+
 def spec_check_graph_findings(docs: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The findings of the ``graph`` check of ``spec-check`` over *docs*, written to a temporary spec folder."""
+    """The findings of the ``graph`` check of ``spec-check`` over *docs*, written to a temporary spec folder with every link accepted in its lock."""
     with tempfile.TemporaryDirectory() as tmp:
-        return graph_check(write_spec(Path(tmp), docs))["findings"]
+        return graph_check(accept_links(write_spec(Path(tmp), docs)))["findings"]
 
 
 def write_json(root: Path, rel: str, document: Any) -> None:

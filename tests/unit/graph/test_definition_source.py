@@ -1,10 +1,13 @@
 """One definition source (WI-M4-05): the linters take the ids a spec defines from the graph, not from a scan of ``*_id``."""
 from __future__ import annotations
 
+import importlib
 import json
+import pkgutil
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -12,6 +15,7 @@ import pytest
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.graph.build import build_graph
+from specdev_tools import trace
 from specdev_tools.graph.kinds import load_kind_registry
 from specdev_tools.validation.hallucination_lint import lint_hallucinations
 from specdev_tools.validation.linter_utils import graph_known_ids
@@ -174,8 +178,17 @@ def test_spec_check_builds_the_graph_once(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr("specdev_tools.validation.linter_utils.build_graph", counting_build)
     monkeypatch.setattr("specdev_tools.graph.check.build_graph", counting_build)
+    for module in _trace_modules():
+        monkeypatch.setattr(module, "build_graph", counting_build, raising=False)
     run_spec_check_json(str(ROOT), str(EXAMPLE_SPEC))
     assert len(calls) == 1
+
+
+def _trace_modules() -> list[ModuleType]:
+    """Every module of ``specdev_tools.trace``: a ``build_graph`` import in any of them is counted by the build test."""
+    return [
+        importlib.import_module(f"{trace.__name__}.{info.name}") for info in pkgutil.iter_modules(trace.__path__)
+    ]
 
 
 COVERED_ROOT_FILE = "03_glossary.json"

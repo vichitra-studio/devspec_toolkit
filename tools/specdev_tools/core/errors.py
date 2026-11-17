@@ -240,9 +240,25 @@ ERROR_CODES = {
     "E707": "RECIPE_START_KIND_INVALID",
     "E708": "DIFF_REF_UNRESOLVED",
     "E709": "DIFF_REF_PREDATES_GRAPH_MODEL",
-    # Trace lock (76x). E760 is a finding about the spec (owner merge-check); E769 is a command refusal.
+    # Trace lock (76x, 77x). E760 is a finding about the spec (owner merge-check); E761, E762, E763, E768, E771, E772,
+    # E774, E778 and E882 are findings (an owner and a node id, or the merge check); E764, E765, E767, E769, E770 and
+    # E773 are command refusals. E766 is unassigned (an unknown id is E706).
     "E760": "TRACE_LOCK_MALFORMED",
+    "E761": "LINK_LOCK_ENTRY_MISSING",
+    "E762": "LOCK_ENTRY_ORPHAN",
+    "E763": "SUSPECT_LINK",
+    "E764": "ATTEST_REFUSED_TARGET_SUSPECT",
+    "E765": "ATTEST_REFUSED_HISTORICAL",
+    "E767": "WRITE_REFUSED",
+    "E768": "STORED_COMPUTED_FIELD",
     "E769": "LOCK_WRITE_CONFLICT",
+    "E770": "RENAME_REFUSED",
+    "E771": "ALIAS_COLLISION",
+    "E772": "REPLACES_NAMES_LIVE_NODE",
+    "E773": "STEP_NOT_READY",
+    "E774": "RECORD_INVALID",
+    "E778": "STALE_ALIAS_USE",
+    "E882": "MIGRATION_BASELINE_NOT_REATTESTED",
     "W720": "LINK_TO_DEPRECATED_NODE",
 }
 

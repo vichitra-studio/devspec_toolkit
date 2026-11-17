@@ -1019,9 +1019,9 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### W720 LINK_TO_DEPRECATED_NODE
 
-**Trigger**: A link field names a node whose lifecycle is `deprecated`.
+**Trigger**: A link names a node whose lifecycle is `deprecated` and the trace lock has no entry for that link yet, so the link is new. Reported by `spec-check` (check `graph`) through the lock hook, in the same run that reports the missing entry (E761). A link that already has a lock entry raises nothing.
 
-**Resolution**: Owner `step:<holder step>`. Not promotable (no E counterpart). Registered in 1.2.0; the check that emits it is not built yet.
+**Resolution**: Owner `step:<holder step>`. Point the link at the node that replaces the deprecated one. Not promotable (no E counterpart).
 
 ## Trace Lock (76x)
 
@@ -1035,11 +1035,123 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 **Promotable**: No (error only).
 
+### E761 LINK_LOCK_ENTRY_MISSING
+
+**Trigger**: A link that the resolver accepts has no entry in the trace lock. Reported by `spec-check` (check `graph`), once per link, in the same resolver run as E700-E703. Links of a record, `replaces` and `removes` links, and links to a `not_applicable` node need no entry. Links of historical nodes (a milestone whose anchor row is `done`) still need one.
+
+**Resolution**: Owner `step:<holder step>`. Check the target, then run `specdev attest <holder id>`; with no entry it creates one. A link written through a command that writes the lock gets its entry at once.
+
+**Promotable**: No (error only).
+
+### E762 LOCK_ENTRY_ORPHAN
+
+**Trigger**: A trace lock entry names a holder, field and target that no node declares any more (the link was removed or the holder was deleted). Reported by `spec-check` (check `trace-lock`). An entry whose target resolves through an alias, an entry whose holder still declares the link while the target node is gone (a resolver error of the holder's step), and an entry whose holder or target is `not_applicable` are not orphans.
+
+**Resolution**: Owner `merge-check`. Remove the entry with `specdev attest --prune`.
+
+**Promotable**: No (error only).
+
+### E763 SUSPECT_LINK
+
+**Trigger**: The target of a link has changed since the holder accepted it: the chain stamp stored in the lock differs from the one the target has now. The message gives the cause (the target itself was edited, or something above it changed) and up to three nearest changed nodes above it. Reported by `spec-check` (check `trace-lock`) for links held by nodes that are not historical and not `not_applicable`.
+
+**Resolution**: Owner `merge-check`: the step gate lists these as pending replay and does not block on them; the merge check does. Read the change, then edit the holder or run `specdev attest <holder id>`. Replay works upward-first.
+
+**Promotable**: No (error only).
+
+### E764 ATTEST_REFUSED_TARGET_SUSPECT
+
+**Trigger**: `specdev attest` refused a node because one of its own targets is itself a suspect node. Registered in 1.2.0; the command that raises it is not built yet.
+
+**Resolution**: Command refusal: no owner, no node id. Attest the blocking node first.
+
+**Promotable**: No (error only).
+
+### E765 ATTEST_REFUSED_HISTORICAL
+
+**Trigger**: `specdev attest` refused a link held by a historical node. Registered in 1.2.0; the command that raises it is not built yet.
+
+**Resolution**: Command refusal: no owner, no node id. Links of a closed milestone are not re-attested.
+
+**Promotable**: No (error only).
+
+### E767 WRITE_REFUSED
+
+**Trigger**: A command that writes a spec file or the lock refused the write. Registered in 1.2.0; the commands that raise it are not built yet.
+
+**Resolution**: Command refusal: no owner, no node id. The message names the reason.
+
+**Promotable**: No (error only).
+
+### E768 STORED_COMPUTED_FIELD
+
+**Trigger**: A spec file stores a field that the toolkit computes. Registered in 1.2.0; the check that raises it is not built yet.
+
+**Resolution**: Owner `step:<node step>`. Remove the stored field.
+
+**Promotable**: No (error only).
+
 ### E769 LOCK_WRITE_CONFLICT
 
 **Trigger**: A command that writes the lock found another specdev write running: the exclusive lock on `spec/extras/` is held by another process. The message says "another specdev write is running".
 
 **Resolution**: Command refusal: no owner, no node id. Wait for the other command to finish and run this one again.
+
+**Promotable**: No (error only).
+
+### E770 RENAME_REFUSED
+
+**Trigger**: `specdev node rename` refused a rename. Registered in 1.2.0; the command is not built yet.
+
+**Resolution**: Command refusal: no owner, no node id. The message names the reason.
+
+**Promotable**: No (error only).
+
+### E771 ALIAS_COLLISION
+
+**Trigger**: An alias equals a live node id or another alias. Registered in 1.2.0; the check that raises it is not built yet.
+
+**Resolution**: Owner `step:<node step>`. Give the node a different alias.
+
+**Promotable**: No (error only).
+
+### E772 REPLACES_NAMES_LIVE_NODE
+
+**Trigger**: A `replaces` link names a node that is still live. Registered in 1.2.0; the check that raises it is not built yet.
+
+**Resolution**: Owner `step:<node step>`. Deprecate or remove the replaced node, or drop the link.
+
+**Promotable**: No (error only).
+
+### E773 STEP_NOT_READY
+
+**Trigger**: `specdev step ready` found pending replay in a step the named step links to. Registered in 1.2.0; the command is not built yet.
+
+**Resolution**: Command refusal: no owner, no node id. Finish the replay of the steps the message names.
+
+**Promotable**: No (error only).
+
+### E774 RECORD_INVALID
+
+**Trigger**: A verification or evidence record does not have the record format. Registered in 1.2.0; the check that raises it is not built yet.
+
+**Resolution**: Owner `merge-check`. Fix the record the message names.
+
+**Promotable**: No (error only).
+
+### E778 STALE_ALIAS_USE
+
+**Trigger**: A live node's link names an alias of a node instead of the node's current id. Registered in 1.2.0; the check that raises it is not built yet.
+
+**Resolution**: Owner `step:<holder step>`. Rewrite the link to the current id.
+
+**Promotable**: No (error only).
+
+### E882 MIGRATION_BASELINE_NOT_REATTESTED
+
+**Trigger**: A trace lock entry still carries the `baseline` marker that a migration stamps, and its holder is not a historical node. Reported by `spec-check` (check `trace-lock`). Entries of historical holders keep the marker without error.
+
+**Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id>`: it updates the stored hashes and clears the marker.
 
 **Promotable**: No (error only).
 

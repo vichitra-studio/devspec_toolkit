@@ -19,6 +19,7 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
 from typing import Any
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME, resolve_extras_path
@@ -70,6 +71,7 @@ class Lock:
     """
 
     entries: tuple[LockEntry, ...] = ()
+    _by_key: dict[tuple[str, str, str], LockEntry] = dataclass_field(default_factory=dict, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         ordered = tuple(sorted(self.entries, key=lambda entry: entry.key))
@@ -82,6 +84,11 @@ class Lock:
                     owner=MERGE_CHECK_OWNER,
                 ))
         object.__setattr__(self, "entries", ordered)
+        self._by_key.update((entry.key, entry) for entry in ordered)
+
+    def get(self, holder: str, field: str, target: str) -> LockEntry | None:
+        """The entry for the link (*holder*, *field*, *target*) with the ids exactly as written, or ``None``."""
+        return self._by_key.get((holder, field, target))
 
 
 def lock_path(spec_dir: str) -> str:
