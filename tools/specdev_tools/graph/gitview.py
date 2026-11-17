@@ -134,9 +134,13 @@ def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.Tempo
     return directory
 
 
-def _seed_texts(spec_dir: str, graph: Graph) -> dict[str, str]:
-    """Whitespace-collapsed content of each seed file found inside *spec_dir*; other seeds have no entry."""
-    root = os.path.realpath(spec_dir)
+def read_seed_texts(graph: Graph, host_root: str) -> dict[str, str]:
+    """Whitespace-collapsed content of the file of each seed of *graph*, found under the directory *host_root*.
+
+    A seed's path (``Node.file``) is read relative to *host_root*: the host root of the working tree, or the root of an
+    archive extraction.  A seed whose file is missing, unreadable or outside *host_root* has no entry.
+    """
+    root = os.path.realpath(host_root)
     texts: dict[str, str] = {}
     for node in (n for n in graph.nodes if n.kind == SEED_KIND):
         path = os.path.realpath(os.path.join(root, node.file))
@@ -169,7 +173,7 @@ def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) ->
         graph = build_graph(spec_dir, repo_root)
         if all(node.kind == SEED_KIND for node in graph.nodes):
             raise _fail("E709", _predates_message(ref, spec_dir))
-        return Snapshot(graph, _seed_texts(spec_dir, graph))
+        return Snapshot(graph, read_seed_texts(graph, spec_dir))
 
 
 def load_graph_at(ref: str, git_root: str, spec_path: str, repo_root: str) -> Graph:
