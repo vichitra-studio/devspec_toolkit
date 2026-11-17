@@ -79,6 +79,11 @@ class LoadError:
     message: str
 
 
+def rank(step: str | None, step_ranks: Mapping[str, int]) -> int:
+    """Sort rank of *step* in *step_ranks*: its place in the waterfall; ``None`` (no home step) and an unknown step rank ``UNRANKED``, last."""
+    return step_ranks.get(step, UNRANKED) if step is not None else UNRANKED
+
+
 @dataclass(frozen=True)
 class SpecShape:
     """What the builder knew about the spec and the registry, for readers that judge links.
@@ -93,8 +98,8 @@ class SpecShape:
     files_by_step: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def rank_of(self, step: str | None) -> int:
-        """Sort rank of *step*: its place in the waterfall; ``None`` (no home step) and an unknown step rank ``UNRANKED``, last."""
-        return self.step_ranks.get(step, UNRANKED) if step is not None else UNRANKED
+        """Sort rank of *step* (see ``rank``)."""
+        return rank(step, self.step_ranks)
 
 
 @dataclass

@@ -37,6 +37,7 @@ from specdev_tools.graph.model import (
     Node,
     SpecShape,
     node_label,
+    rank,
 )
 
 PLAN_FILE_KEY = "impl_context/ms_*_plan.json"
@@ -98,9 +99,8 @@ def _plan(
     present: Mapping[str, FileDecl], ranks: Mapping[str, int], files: set[str] | None, steps: set[str] | None
 ) -> list[tuple[str, FileDecl]]:
     """The ``(relative path, declaration)`` pairs to read, in step order then path; a file is read once."""
-    unranked = len(ranks)
     wanted = [(rel, decl) for rel, decl in present.items() if _wanted(rel, decl, files, steps)]
-    return sorted(wanted, key=lambda pair: (ranks.get(pair[1].step, unranked), pair[0]))
+    return sorted(wanted, key=lambda pair: (rank(pair[1].step, ranks), pair[0]))
 
 
 def _kind_names_of(decls: Iterable[KindDecl]) -> Iterable[str]:

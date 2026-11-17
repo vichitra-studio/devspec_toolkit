@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, replace
 from typing import Any
 
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, ensure_spec_errors, make_error
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.core.json_utils import JsonUtilsError
 from specdev_tools.core.toolkit_root import detect_toolkit_root
@@ -92,7 +92,7 @@ def build_node_parser() -> argparse.ArgumentParser:
     )
     holder = cand.add_mutually_exclusive_group(required=True)
     holder.add_argument("--kind", help="Kind of the node that will hold the link")
-    holder.add_argument("--for", dest="for_id", metavar="ID", help="Id of the node that holds the link (also leaves out targets it already links to)")
+    holder.add_argument("--for", dest="for_id", metavar="ID", help="Id of the node that holds the link (also leaves out targets it already links to and, in a same-step field, targets that would close a cycle)")
     cand.add_argument("--field", required=True, help="The link field (verb), for example derives_from")
     cand.add_argument("--query", help="Keep candidates whose id or label contains this text")
     cand.add_argument("--limit", type=_positive_int, help="Show at most this many candidates")
@@ -165,16 +165,12 @@ def _print_json(document: dict[str, Any]) -> None:
     print(json.dumps(document, indent=2))
 
 
-def _is_unknown_id(error: SpecError) -> bool:
-    return error.code in ("E705", "E706") and "no node" in error.message
-
-
-def _with_unreadable_note(error: SpecError, unreadable: Sequence[str]) -> SpecError:
-    """*error* with a sentence that the id may be in a file that could not be read, when it is an unknown-id finding."""
-    if not unreadable or not _is_unknown_id(error):
-        return error
+def _with_unreadable_note(exc: FindingError, unreadable: Sequence[str]) -> SpecError:
+    """The finding of *exc* with a sentence that the id may be in a file that could not be read, when *exc* is an unknown-id one."""
+    if not unreadable or not exc.unknown_id:
+        return exc.error
     note = f"; these files could not be read, so the node may be in one of them: {', '.join(unreadable)}"
-    return replace(error, message=error.message + note)
+    return replace(exc.error, message=exc.error.message + note)
 
 
 def _report_finding(error: SpecError, command: str, json_output: bool) -> int:
@@ -199,8 +195,10 @@ def _run_guarded(command: str, json_output: bool, action: Callable[[], int], unr
     try:
         return action()
     except FindingError as exc:
-        return _report_finding(_with_unreadable_note(exc.error, unreadable), command, json_output)
+        return _report_finding(_with_unreadable_note(exc, unreadable), command, json_output)
     except JsonUtilsError as exc:
+        if json_output:
+            return _report_finding(ensure_spec_errors([str(exc)])[0], command, True)
         print(f"specdev {command}: {exc}", file=sys.stderr)
         return EXIT_FINDING
 
@@ -334,7 +332,7 @@ def run_trace(args: argparse.Namespace) -> int:
     problem = _recipe_flags_problem(args)
     if problem is not None:
         return _usage_error("trace", problem)
-    run = _trace_pack if args.recipe else _trace_walk
+    run = _trace_pack if args.recipe is not None else _trace_walk
     return _run_on_graph("trace", args, lambda graph: run(args, graph))
 
 

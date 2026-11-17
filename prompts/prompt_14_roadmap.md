@@ -144,10 +144,10 @@ Before emitting, verify:
 
 ### milestones[].tasks
 - Use objects with `task_id` and `description` (optional `status`).
-- `task_id` must be kebab-case and unique within the milestone.
+- `task_id` must be kebab-case and unique across the whole spec, not only within its milestone: the same `task_id` in two milestones is reported as E704.
 - `description` must be atomic and specific (at least two words).
 - Use imperative verb form in `description` (e.g., "Implement authentication module").
-- Use `acceptance_criteria` for non-trivial tasks; include `criterion_id` and a `text` meeting the schema's minimum length (optional `fixture_ref`).
+- Use `acceptance_criteria` for non-trivial tasks; include `criterion_id` (unique across the whole spec, like `task_id`: an id used by two criteria of the roadmap, or by a criterion of another spec file, is reported as E704) and a `text` meeting the schema's minimum length (optional `fixture_ref`).
 
 ### tasks[].depends_on
 - List `task_id` values this task depends on (within the same milestone only).

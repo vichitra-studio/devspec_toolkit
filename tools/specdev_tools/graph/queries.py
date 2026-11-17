@@ -30,8 +30,8 @@ class QueryTargetError(FindingError):
     """A read command was given an id, kind or field the graph does not know; the E706 finding is in ``error``."""
 
 
-def _unknown(message: str) -> QueryTargetError:
-    return QueryTargetError(make_error("E706", message))
+def _unknown(message: str, *, unknown_id: bool = False) -> QueryTargetError:
+    return QueryTargetError(make_error("E706", message), unknown_id=unknown_id)
 
 
 @dataclass(frozen=True)
@@ -114,10 +114,14 @@ class CandidateList:
     total: int = 0
 
 
-def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
+def nearest_suffix(wanted: str, known: Iterable[str]) -> str:
+    """The text ``; nearest: a, b, c`` naming the names of *known* closest to *wanted*, or ``""`` when none is close."""
     near = [entry["id"] for entry in nearest_ids(wanted, sorted(known), NEAREST_COUNT)]
-    suffix = f"; nearest: {', '.join(near)}" if near else ""
-    return f"no {subject} {wanted!r}{suffix}"
+    return f"; nearest: {', '.join(near)}" if near else ""
+
+
+def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
+    return f"no {subject} {wanted!r}{nearest_suffix(wanted, known)}"
 
 
 def _find(graph: Graph, node_id: str) -> Node | None:
@@ -190,7 +194,9 @@ def node_view(graph: Graph, ids: Sequence[str], *, full: bool = False) -> NodeRe
     resolved = [(node_id, _find(graph, node_id)) for node_id in ids]
     missing = [node_id for node_id, found in resolved if found is None]
     if missing:
-        raise _unknown("; ".join(_nearest_message("node with the id", node_id, graph.by_id) for node_id in missing))
+        raise _unknown(
+            "; ".join(_nearest_message("node with the id", node_id, graph.by_id) for node_id in missing), unknown_id=True
+        )
     views = [
         _view(graph, definition, full)
         for _, found in resolved
@@ -222,7 +228,7 @@ def _holder_of_kind(graph: Graph, kind: str) -> _Holder:
 def _holder_of_node(graph: Graph, node_id: str, link_field: str) -> _Holder:
     node = _find(graph, node_id)
     if node is None:
-        raise _unknown(_nearest_message("node with the id", node_id, graph.by_id))
+        raise _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
     linked = frozenset(link.target for link in node.links if link.field == link_field)
     return _Holder(node.kind, (node.step,) if node.step is not None else (), node, linked)
 

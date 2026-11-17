@@ -541,7 +541,7 @@ def _start_node(graph: Graph, table: RecipeTable, role: str, start_id: str) -> N
         raise RecipeError(make_error("E706", f"no recipe role {role!r}; roles: {', '.join(table.roles)}"))
     node = graph.by_id.get(start_id)
     if node is None:
-        raise RecipeError(make_error("E706", f"no node has the id {start_id!r}"))
+        raise RecipeError(make_error("E706", f"no node has the id {start_id!r}"), unknown_id=True)
     if node.kind != expected:
         raise RecipeError(make_error("E707", f"recipe {role} starts from a {expected}, but {start_id!r} is a {node.kind}"))
     return node
@@ -667,36 +667,42 @@ def _row(entry: PackEntry) -> str:
     return f"{entry.id}{suffix}{flag}"
 
 
-def _member_of(entry: PackEntry, by_id: Mapping[str, PackEntry]) -> str | None:
-    """The id of the member a container holds, following a chain of containers (a milestone holds a task holds a criterion)."""
+def _member_of(entry: PackEntry, by_id: Mapping[str, PackEntry]) -> tuple[str, int] | None:
+    """The member a container holds and how many containers lie between them, following a chain of containers.
+
+    A milestone holds a task holds a criterion: for the milestone the answer is the criterion and 2, for the task the
+    criterion and 1.  ``None`` when the chain ends in no member of the section or loops.
+    """
     seen = {entry.id}
+    distance = 0
     while entry.container:
         source = by_id.get(entry.via[len(PARENT_VIA):])
+        distance += 1
         if source is None or source.id in seen:
             return None
         if not source.container:
-            return source.id
+            return source.id, distance
         seen.add(source.id)
         entry = source
     return None
 
 
 def _grouped_rows(entries: Sequence[PackEntry]) -> list[str]:
-    """One text row per member, the containers it sits in after it in parentheses; a container with no member in the section is a row of its own."""
+    """One text row per member, the containers it sits in after it in parentheses, nearest first; a container with no member in the section is a row of its own."""
     by_id = {entry.id: entry for entry in entries}
-    holders: dict[str, list[PackEntry]] = {}
+    holders: dict[str, list[tuple[int, PackEntry]]] = {}
     alone: set[str] = set()
     for entry in entries:
-        member = _member_of(entry, by_id) if entry.container else None
-        if member is not None:
-            holders.setdefault(member, []).append(entry)
+        found = _member_of(entry, by_id) if entry.container else None
+        if found is not None:
+            holders.setdefault(found[0], []).append((found[1], entry))
         elif entry.container:
             alone.add(entry.id)
     rows = []
     for entry in entries:
         if entry.container and entry.id not in alone:
             continue
-        around = ", ".join(_row(holder) for holder in holders.get(entry.id, ()))
+        around = ", ".join(_row(holder) for _, holder in sorted(holders.get(entry.id, ()), key=lambda pair: pair[0]))
         rows.append(f"{_row(entry)} ({around})" if around else _row(entry))
     return rows
 

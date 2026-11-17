@@ -36,8 +36,8 @@ class LifecycleChange:
     jq_path: str
 
 
-def _refuse(message: str) -> LifecycleRefusedError:
-    return LifecycleRefusedError(make_error("E705", message))
+def _refuse(message: str, *, unknown_id: bool = False) -> LifecycleRefusedError:
+    return LifecycleRefusedError(make_error("E705", message), unknown_id=unknown_id)
 
 
 def _article(word: str) -> str:
@@ -68,7 +68,7 @@ def plan_lifecycle_change(graph: Graph, node_id: str, value: str) -> LifecycleCh
         raise _refuse(f"lifecycle {value!r} is not one of {', '.join(LIFECYCLES)}")
     problem = _refusal_for_node(graph, node_id)
     if problem is not None:
-        raise _refuse(problem)
+        raise _refuse(problem, unknown_id=node_id not in graph.by_id)
     node: Node = graph.by_id[node_id]
     return LifecycleChange(node_id, node.lifecycle, value, node.file, node.jq_path)
 

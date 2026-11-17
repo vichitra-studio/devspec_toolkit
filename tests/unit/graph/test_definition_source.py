@@ -172,7 +172,7 @@ def test_spec_check_builds_the_graph_once(monkeypatch: pytest.MonkeyPatch) -> No
             calls.append(str(args[0]))
         return build_graph(*args, **kwargs)
 
-    monkeypatch.setattr("specdev_tools.graph.build.build_graph", counting_build)
+    monkeypatch.setattr("specdev_tools.validation.linter_utils.build_graph", counting_build)
     monkeypatch.setattr("specdev_tools.graph.check.build_graph", counting_build)
     run_spec_check_json(str(ROOT), str(EXAMPLE_SPEC))
     assert len(calls) == 1

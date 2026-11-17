@@ -28,12 +28,14 @@ class FindingError(Exception):
     """An exception that carries one finding: ``error`` is the ``SpecError`` a command prints before exiting 1.
 
     The base of the graph library's refusals (``QueryTargetError``, ``RecipeError``, ``GitViewError``, ...), so a
-    command catches this one class instead of listing each.
+    command catches this one class instead of listing each.  ``unknown_id`` is set by the raiser when the finding says that
+    no node has the id the user typed; a command may then add what it knows about files it could not read.
     """
 
-    def __init__(self, error: SpecError) -> None:
+    def __init__(self, error: SpecError, *, unknown_id: bool = False) -> None:
         super().__init__(error.message)
         self.error = error
+        self.unknown_id = unknown_id
 
 
 ERROR_CODES = {

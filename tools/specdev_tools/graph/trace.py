@@ -14,13 +14,12 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error
-from specdev_tools.core.json_utils import nearest_ids
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.queries import nearest_suffix
 
 Direction = Literal["up", "down"]
 BOTH_DIRECTIONS: tuple[Direction, ...] = ("up", "down")
-_NEAREST_COUNT = 3
 
 
 class UnknownTraceTargetError(FindingError):
@@ -122,9 +121,7 @@ def _unknown_names(subject: str, given: Iterable[str], known: set[str]) -> str |
     """The E706 message for the names of *given* that are not in *known*, or ``None`` when all are known."""
     messages = []
     for name in sorted(set(given) - known):
-        near = [entry["id"] for entry in nearest_ids(name, sorted(known), _NEAREST_COUNT)]
-        suffix = f"; nearest: {', '.join(near)}" if near else ""
-        messages.append(f"no {subject} {name!r}{suffix}")
+        messages.append(f"no {subject} {name!r}{nearest_suffix(name, known)}")
     return "; ".join(messages) or None
 
 
@@ -154,7 +151,7 @@ def trace_node(
     _check_option_names(graph, options)
     entry = graph.by_id.get(node_id)
     if entry is None:
-        raise UnknownTraceTargetError(make_error("E706", f"no node has the id {node_id!r}"))
+        raise UnknownTraceTargetError(make_error("E706", f"no node has the id {node_id!r}"), unknown_id=True)
     wanted = set(directions)
     up = _side(graph, entry, "up", options) if "up" in wanted else None
     down = _side(graph, entry, "down", options) if "down" in wanted else None

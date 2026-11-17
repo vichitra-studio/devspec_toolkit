@@ -128,7 +128,8 @@ changes:
       carries a non-empty trace and the step 02 check for a missing tech_stack
       go with those fields. The step 02 capability-coverage check (E590)
       stays; it now reads component derives_from and exempts capabilities
-      whose scope is later or out. The other content checks stay.
+      whose scope is later or out. Other content checks stay, for example the
+      duplicate method and route check of step 05 (E520).
     migration:
       action: none
 
@@ -598,7 +599,9 @@ changes:
       task depends_on cycle that runs through the tasks of two milestones is
       reported too (E703); 1.1.1 checked a cycle only among the tasks of one
       milestone. An id defined in two files is new in spec-check (E704): the 1.1.1
-      commands did not report it (for example an NFR id equal to an FR id).
+      commands did not report it (for example a task criterion id in
+      14_roadmap.json equal to the id of an FR criterion in 04_fr_list.json: a
+      single-file validate of each file is OK).
       validate still reports an id defined twice inside the one file (E704).
     migration:
       action: none
@@ -610,13 +613,14 @@ changes:
       the entry reaches in both directions, with resolved_ids grouped by node kind,
       and one deprecation line on stderr. It no longer writes
       spec/extras/trace_matrix.json, which the 1.1.1 command wrote.
-      Three procedures still read that file, which only specdev matrix writes now,
-      so it can be missing or stale: Step 2 of prompts/prompt_16b_impl_coder.md
-      ("Query trace_matrix.json", in two places; the prompt still says context
-      commands regenerate the file) and .claude/skills/specdev-context/SKILL.md (the
-      concept lookup by FR prefix and the milestone-id lookup of the Orientation
-      flow, and the impact set of the Action flow). Running specdev matrix
-      <spec_dir> --repo-root <toolkit> does not make them work on a 1.2.0-shaped
+      Procedures that still read that file include Step 2 of
+      prompts/prompt_16b_impl_coder.md ("Query trace_matrix.json", in two places;
+      the prompt still says context commands regenerate the file) and
+      .claude/skills/specdev-context/SKILL.md (the concept lookup by FR prefix and
+      the milestone-id lookup of the Orientation flow, and the impact set of the
+      Action flow). specdev matrix writes the file, so it can be missing or stale.
+      Running specdev matrix <spec_dir> --repo-root <toolkit> does not make these
+      two work on a 1.2.0-shaped
       spec: the file it writes then holds one row per FR with its fr_id only (no
       apis, fixtures, nfrs or threats, which not_computed names), and a record read
       for its .trace returns null, so the procedures find no linked entity and

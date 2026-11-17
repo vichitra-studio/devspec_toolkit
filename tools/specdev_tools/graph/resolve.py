@@ -14,7 +14,7 @@ from typing import Protocol
 
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.graph.kinds import RECORD_ROLE, LinkDecl
-from specdev_tools.graph.model import Graph, Link, Node, SpecShape
+from specdev_tools.graph.model import UNRANKED, Graph, Link, Node, SpecShape
 from specdev_tools.graph.ownership import step_owner
 
 HISTORY_FIELDS = frozenset({"replaces", "removes"})
@@ -113,8 +113,8 @@ def direction_allowed(decl: LinkDecl, holder_step: str | None, target: Node, sha
     """
     if holder_step is None or target.step is None:
         return True
-    holder_rank, target_rank = shape.step_ranks.get(holder_step), shape.step_ranks.get(target.step)
-    if holder_rank is None or target_rank is None or target_rank < holder_rank:
+    holder_rank, target_rank = shape.rank_of(holder_step), shape.rank_of(target.step)
+    if UNRANKED in (holder_rank, target_rank) or target_rank < holder_rank:
         return True
     return target_rank == holder_rank and target.kind in decl.same_step_kinds
 
@@ -129,7 +129,7 @@ def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -
     if direction_allowed(link.decl, holder.step, target, shape):
         return None
     where = f"{holder.id} (step {holder.step}), field {link.field}, target '{target.id}' (step {target.step})"
-    if shape.step_ranks[target.step or ""] > shape.step_ranks[holder.step or ""]:
+    if shape.rank_of(target.step) > shape.rank_of(holder.step):
         return _error("E702", holder, f"{where}: the target is in a later step; a link points to an earlier step")
     return _error(
         "E702", holder,

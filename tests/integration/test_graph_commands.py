@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.core.json_utils import JsonUtilsError
-from specdev_tools.graph import commands
+from specdev_tools.graph import commands, lifecycle, queries, recipes, trace
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.model import Graph
 from unit.graph._synth import ROOT, copy_example, run_specdev
 
 _CRITERION = "ac-password-reset-3"
@@ -165,6 +169,13 @@ def test_trace_with_a_bad_recipe_role_is_e706_exit_1(spec: Path) -> None:
     assert (envelope["command"], envelope["errors"][0]["code"]) == ("trace", "E706")
 
 
+def test_trace_with_an_empty_recipe_role_is_e706_not_a_plain_trace(spec: Path) -> None:
+    result = run_specdev("trace", _PLAN_ITEM, "--recipe", "", *_flags(spec))
+    assert result.returncode == 1 and result.stdout == ""
+    assert result.stderr.strip() == "E706 no recipe role ''; roles: 16a, 16b, 16c"
+    assert run_specdev("trace", _PLAN_ITEM, "--recipe", "", "--expand", *_flags(spec)).returncode == 1
+
+
 def test_the_help_still_lists_the_values_that_are_no_longer_choices() -> None:
     assert "active, deprecated, not_applicable" in run_specdev("node", "status", "--help").stdout
     assert "16a, 16b, 16c" in run_specdev("trace", "--help").stdout
@@ -251,12 +262,68 @@ def test_a_readable_spec_prints_nothing_on_stderr_and_a_plain_unknown_id_has_no_
     assert unknown.returncode == 1 and "could not be read" not in unknown.stderr
 
 
-def test_a_write_the_json_tools_refuse_is_one_stderr_line_and_exit_1(spec: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def _refuse_the_write(monkeypatch: pytest.MonkeyPatch) -> None:
     def refused(*_args: object) -> None:
         raise JsonUtilsError("the edit would break the schema of 04_fr_list.json")
 
     monkeypatch.setattr(commands, "set_lifecycle", refused)
+
+
+def test_a_write_the_json_tools_refuse_is_one_stderr_line_and_exit_1(spec: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    _refuse_the_write(monkeypatch)
     code = commands.run_node(["status", _CRITERION, "deprecated", *_flags(spec)])
     captured = capsys.readouterr()
     assert code == 1 and captured.out == ""
     assert captured.err.strip() == "specdev node: the edit would break the schema of 04_fr_list.json"
+
+
+def test_a_write_the_json_tools_refuse_under_json_is_the_envelope_on_stdout(spec: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    _refuse_the_write(monkeypatch)
+    code = commands.run_node(["status", _CRITERION, "deprecated", *_flags(spec), "--json"])
+    captured = capsys.readouterr()
+    assert code == 1 and captured.err == ""
+    envelope = json.loads(captured.out)
+    assert (envelope["command"], envelope["status"]) == ("node", "FAIL")
+    assert envelope["errors"][0]["message"] == "the edit would break the schema of 04_fr_list.json"
+
+
+@pytest.mark.parametrize(
+    ("unknown_id", "noted"), [(True, True), (False, False)], ids=["marked unknown id", "not marked, same words"]
+)
+def test_the_unreadable_note_follows_the_mark_of_the_raiser_not_the_words_of_the_message(unknown_id: bool, noted: bool) -> None:
+    finding = make_error("E706", "no node has the id 'x'" if not unknown_id else "nothing is called 'x'")
+    result = commands._with_unreadable_note(FindingError(finding, unknown_id=unknown_id), ["04_fr_list.json"])
+    assert ("these files could not be read" in result.message) is noted
+    assert result.message.startswith(finding.message)
+
+
+@pytest.mark.parametrize(
+    "raiser",
+    [
+        lambda graph: queries.node_view(graph, ["fr-no-such"], full=False),
+        lambda graph: queries.candidates(graph, "derives_from", for_id="fr-no-such"),
+        lambda graph: trace.trace_node(graph, "fr-no-such"),
+        lambda graph: recipes.build_pack(graph, recipes.load_recipes(str(ROOT)), "16b", "fr-no-such"),
+        lambda graph: lifecycle.plan_lifecycle_change(graph, "fr-no-such", "deprecated"),
+    ],
+    ids=["node", "candidates --for", "trace", "recipe start", "status"],
+)
+def test_every_unknown_id_refusal_is_marked(spec: Path, raiser: Callable[[Graph], object]) -> None:
+    with pytest.raises(FindingError) as caught:
+        raiser(build_graph(str(spec), str(ROOT)))
+    assert caught.value.unknown_id
+
+
+@pytest.mark.parametrize(
+    "raiser",
+    [
+        lambda graph: queries.candidates(graph, "derives_from", kind="no-such-kind"),
+        lambda graph: trace.trace_node(graph, _CRITERION, options=trace.TraceOptions(kinds=frozenset({"no-such-kind"}))),
+        lambda graph: lifecycle.plan_lifecycle_change(graph, _CRITERION, "bogus"),
+    ],
+    ids=["kind", "trace option", "lifecycle value"],
+)
+def test_a_refusal_that_is_not_about_an_unknown_id_is_not_marked(spec: Path, raiser: Callable[[Graph], object]) -> None:
+    with pytest.raises(FindingError) as caught:
+        raiser(build_graph(str(spec), str(ROOT)))
+    assert not caught.value.unknown_id

@@ -59,9 +59,17 @@ def test_pack_16b_text_puts_the_containers_after_their_member(expected: dict[str
     graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
     lines = render_text(build_pack(graph, load_recipes(str(ROOT)), expected["role"], expected["start"])).splitlines()
     rows = {line.split("  ")[0].strip(): line.split("  ", 1)[1].strip() for line in lines[1:] if line[:1].isalpha()}
-    assert rows["core criteria"] == "tc-confirm-expired-token (ms-account-recovery, task-implement-password-reset-confirm)"
+    assert rows["core criteria"] == "tc-confirm-expired-token (task-implement-password-reset-confirm, ms-account-recovery)"
     assert rows["obligations"] == "ac-password-reset-3 (fr-password-reset)"
     assert rows["lineage"] == "scope-password-reset, cap-account-recovery, fr-password-reset"
+
+
+def test_pack_16b_expand_text_names_what_each_container_holds(expected: dict[str, Any]) -> None:
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    text = render_text(build_pack(graph, load_recipes(str(ROOT)), expected["role"], expected["start"], expand=True))
+    assert "  ms-account-recovery (parent of task-implement-password-reset-confirm)\n" in text
+    assert "  task-implement-password-reset-confirm (parent of tc-confirm-expired-token)\n" in text
+    assert "  fr-password-reset (parent of ac-password-reset-3)\n" in text
 
 
 def test_pack_16b_universal_row_follows_the_fixture_files(pack_json: dict[str, Any]) -> None:
