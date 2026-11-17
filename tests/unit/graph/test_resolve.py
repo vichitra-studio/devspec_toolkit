@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -226,6 +227,13 @@ def test_steps_filter_limits_holders_and_cycles() -> None:
 def test_target_found_through_the_alias_index() -> None:
     graph = _graph([_node("a", "A", "s2", [(_decl("to", ["B"]), "old-name")]), _node("b", "B", "s1")])
     graph.alias_index["old-name"] = "b"
+    assert resolve_graph(graph) == []
+
+
+def test_target_found_through_the_aliases_a_node_lists() -> None:
+    owner = replace(_node("b", "B", "s1"), aliases=("old-name",))
+    graph = _graph([_node("a", "A", "s2", [(_decl("to", ["B"]), "old-name")]), owner])
+    assert graph.alias_index == {"old-name": "b"} and [link.source for link in graph.incoming["b"]] == ["a"]
     assert resolve_graph(graph) == []
 
 

@@ -167,7 +167,7 @@
                         "$ref": "vc:core:graph#lifecycle"
                       },
                       "aliases": {
-                        "description": "Former or alternative ids of this API error, kept so that older references still resolve. Optional.",
+                        "description": "Former ids of this API error; `specdev node rename` adds the old id here. Optional.",
                         "type": "array",
                         "items": {
                           "$ref": "vc:core:atoms#kebabId"
@@ -400,7 +400,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this API, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this API; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

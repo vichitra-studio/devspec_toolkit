@@ -95,7 +95,7 @@ def check_forward_replay_alias(
 ) -> list[SpecError]:
     """The findings of the deprecated ``specdev forward-replay-check``: ``check_forward_replay`` plus the suspect links of the trace lock.
 
-    The suspect findings are those of ``lock_link_findings`` (E760 to E763, E882, W720).  *step* limits the suspect
+    The suspect findings are those of ``lock_link_findings`` (E760 to E763, E778, E882, W720).  *step* limits the suspect
     findings to links held by that step's nodes (the slice of ``specdev stale --step``) and the per-file findings
     (E555, W598, W550) to that step's file; findings that name no file pass through.
     """

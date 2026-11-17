@@ -541,9 +541,7 @@ changes:
       the matrix checks of prompt_14_roadmap.md and prompt_16b_impl_coder.md
       (the values they read are among those specdev matrix leaves out); and
       prompt_13a_completeness_assessment.md, which copies the four coverage
-      numbers that completeness-check does not compute on that shape. aliases
-      are stored and not yet followed: a link whose target is an alias of a node
-      is reported as E700 until a later 1.2.0 change resolves aliases.
+      numbers that completeness-check does not compute on that shape.
     migration:
       action: none
 

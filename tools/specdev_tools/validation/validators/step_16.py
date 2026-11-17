@@ -446,7 +446,7 @@ def _is_set_aside(task: dict[str, Any]) -> bool:
 
 
 def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]], roadmap: dict[str, Any], errors: list[SpecError]) -> None:
-    """E304: the plan's ``milestone`` names a roadmap milestone, and each of its tasks has a criterion some item realises.
+    """E304: the plan's ``milestone`` names a roadmap milestone (by its id or an alias, so a renamed milestone is found), and each of its tasks has a criterion some item realises.
 
     A task set aside by its ``disposition`` (deferred or wont_do) needs no item. A plan without a ``milestone`` has no
     scope to check: the schema reports the missing key.
@@ -454,7 +454,9 @@ def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]
     milestone_id = data.get("milestone")
     if not isinstance(milestone_id, str):
         return
-    milestone = next((m for m in dict_items(roadmap.get("milestones")) if m.get("milestone_id") == milestone_id), None)
+    milestone = next(
+        (m for m in dict_items(roadmap.get("milestones")) if milestone_id in (m.get("milestone_id"), *str_items(m.get("aliases")))), None
+    )
     if milestone is None:
         errors.append(make_error("E304", f"ROADMAP_MILESTONE_UNKNOWN: plan milestone '{milestone_id}' is not a milestone of 14_roadmap.json"))
         return

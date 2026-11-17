@@ -13,12 +13,16 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.trace import history
 from specdev_tools.trace.history import MAX_COMMITS, NOTE_BASELINE, NOTE_NO_EARLIER, NOTE_NO_HISTORY, OldTextResolver
 from specdev_tools.trace.lockfile import Lock, lock_path, read_lock, write_lock
+from specdev_tools.trace.merge_driver import install_driver
 
 from unit.graph._synth import ROOT, git, run_cli
 from unit.trace._lock_support import EXAMPLE_HOST
 from unit.trace.test_suspects import CRITERION, Example
 
+from .test_merge_driver_git import DRIVER_COMMAND
+
 FR_FILE = "04_fr_list.json"
+RENAMED = "ac-password-reset-3b"
 API = "api-password-reset-confirm"
 INVARIANT = "inv-reset-token-single-use"
 EDIT = " Also reject a token issued for another account."
@@ -202,18 +206,21 @@ def test_the_resolver_probes_at_most_fifty_commits_of_the_target_file(host: Exam
 
 
 def test_rename_and_merge_driver_commits_do_not_hide_old_text(host: Example) -> None:
-    """After the edit, commits that touch the target's file without changing its hash and commits that rewrite the lock follow it.
-
-    The ``node rename`` and merge-driver commands are built by later work items: the same effects are made by hand
-    (a note on the criterion, which no hash covers; the lock rewritten in another layout).
-    """
+    """After the edit, a real ``node rename`` commit (it touches the target's file and re-keys the lock) and a real merge
+    commit made by the lock merge driver sit between the edit and today; the old text of the changed criterion is still found."""
+    install_driver(str(host.host), "spec", DRIVER_COMMAND)
     _edit_criterion(host)
     _commit(host, "two")
-    host.edit_item(CRITERION, lambda item: item.update(notes="reviewed"))
-    _commit(host, "three: touches the file, no hash moves")
-    path = Path(lock_path(str(host.spec)))
-    path.write_text(json.dumps(json.loads(path.read_text(encoding="utf-8")), indent=1) + "\n", encoding="utf-8")
-    _commit(host, "four: lock lines rewritten")
+    git(host.host, "checkout", "-q", "-b", "theirs")
+    host.attest("api-password-reset-confirm")
+    _commit(host, "three: another holder attested on a branch")
+    git(host.host, "checkout", "-q", "main")
+    code, out = run_cli("node", "rename", CRITERION, RENAMED, "--repo-root", str(ROOT), "--spec-root", str(host.spec), "--git-root", str(host.host))
+    assert code == 0, out
+    _commit(host, "four: node rename")
+    git(host.host, "merge", "--no-edit", "theirs")
+    assert "<<<<<<<" not in Path(lock_path(str(host.spec))).read_text(encoding="utf-8")
+    assert (host.spec / FR_FILE).read_text(encoding="utf-8").count(RENAMED) == 1
     (diff,) = _stale_json(host, "--diff")["diffs"]
     assert diff["note"] is None
     assert [line for line in diff["diff"] if line.startswith("+text: ")][0].endswith(EDIT)

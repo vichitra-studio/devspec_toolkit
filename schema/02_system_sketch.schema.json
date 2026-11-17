@@ -126,7 +126,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this component, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this component; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -303,7 +303,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this connection, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this connection; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -460,7 +460,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this third party, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this third party; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

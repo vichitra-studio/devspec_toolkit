@@ -53,7 +53,8 @@ class Node:
     """One graph node.
 
     ``file`` is relative to the spec root (for a seed, the seed file path of its manifest entry); ``step`` is ``None``
-    for a kind with no home step and ``"seed"`` for a seed; ``milestone`` is the ``milestone`` key of a plan file.
+    for a kind with no home step and ``"seed"`` for a seed; ``milestone`` is the ``milestone`` key of a plan file;
+    ``aliases`` are the ids the node had before, in the order they were retired (the first is its first name).
     """
 
     id: str
@@ -69,6 +70,7 @@ class Node:
     links: tuple[Link, ...]
     label: str
     milestone: str | None = None
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -115,8 +117,10 @@ class Graph:
     """Nodes in build order plus the indexes every reader uses.
 
     ``by_id`` keeps the first definition of an id; ``dups`` lists every definition of an id defined more than once;
-    ``alias_index`` is empty until M5 fills it; ``shape``, ``documents`` (the parsed files the build read,
-    by path relative to the spec root) and ``decls`` (kind name to declaration) are empty for a graph built from nodes alone.
+    ``alias_index`` maps an alias to the id of the node that lists it (the first such node in build order) and
+    ``incoming`` is keyed by the CURRENT id of the target, whatever name the link was written with (``use_aliases``
+    sets both); ``shape``, ``documents`` (the parsed files the build read, by path relative to the spec root) and
+    ``decls`` (kind name to declaration) are empty for a graph built from nodes alone.
     """
 
     nodes: list[Node] = field(default_factory=list)
@@ -136,24 +140,42 @@ class Graph:
     def from_nodes(
         cls, nodes: list[Node], load_errors: list[LoadError] | None = None, shape: SpecShape | None = None
     ) -> Graph:
-        """Index *nodes* (in the order given) into a ``Graph``."""
+        """Index *nodes* (in the order given) into a ``Graph``; the alias index is filled from ``Node.aliases``."""
         graph = cls(nodes=list(nodes), load_errors=list(load_errors or []), shape=shape or SpecShape())
         defined: dict[str, list[Node]] = defaultdict(list)
         by_kind: dict[str, list[Node]] = defaultdict(list)
         outgoing: dict[str, list[Link]] = defaultdict(list)
-        incoming: dict[str, list[Link]] = defaultdict(list)
+        aliases: dict[str, str] = {}
         for node in nodes:
             defined[node.id].append(node)
             by_kind[node.kind].append(node)
-            for link in node.links:
-                outgoing[node.id].append(link)
-                incoming[link.target].append(link)
+            if node.links:
+                outgoing[node.id].extend(node.links)
+            for alias in node.aliases:
+                aliases.setdefault(alias, node.id)
             if node.children:
                 graph.children[node.id] = list(node.children)
         graph.by_id = {node_id: found[0] for node_id, found in defined.items()}
         graph.dups = {node_id: found for node_id, found in defined.items() if len(found) > 1}
-        graph.by_kind, graph.outgoing, graph.incoming = dict(by_kind), dict(outgoing), dict(incoming)
+        graph.by_kind, graph.outgoing = dict(by_kind), dict(outgoing)
+        graph.use_aliases(aliases)
         return graph
+
+    def use_aliases(self, alias_index: Mapping[str, str]) -> None:
+        """Set ``alias_index`` (alias to node id) and key ``incoming`` by the current id of each link's target again."""
+        self.alias_index = dict(alias_index)
+        incoming: dict[str, list[Link]] = defaultdict(list)
+        for node in self.nodes:
+            for link in node.links:
+                incoming[self.canonical_id(link.target)].append(link)
+        self.incoming = dict(incoming)
+
+    def canonical_id(self, name: str) -> str:
+        """The id of the node *name* names (an id, else an alias), or *name* itself when no node has it; mirrors ``find``."""
+        if name in self.by_id:
+            return name
+        current = self.alias_index.get(name)
+        return current if current in self.by_id else name
 
     def find(self, node_id: str) -> Node | None:
         """The node a caller means by *node_id*: the node with that id, else the node an alias of that name points to.
@@ -161,7 +183,7 @@ class Graph:
         Every reader that takes an id from a person or a file uses this one lookup; an id the graph itself produced
         (a link target already resolved, a parent id) may be read from ``by_id`` directly.
         """
-        return self.by_id.get(node_id) or self.by_id.get(self.alias_index.get(node_id, ""))
+        return self.by_id.get(self.canonical_id(node_id))
 
     def live_nodes(self) -> list[Node]:
         """Every node, whatever its lifecycle (``gated_nodes`` is the reader that skips ``not_applicable``)."""
@@ -170,3 +192,22 @@ class Graph:
     def gated_nodes(self) -> list[Node]:
         """Every node except those whose lifecycle is ``not_applicable``; what every other consumer reads."""
         return [node for node in self.nodes if node.lifecycle != NOT_APPLICABLE]
+
+
+def first_name_index(graph: Graph) -> dict[str, str]:
+    """``{id or alias: first name}`` for every node of *graph* that has aliases; a node with none is not listed.
+
+    The first name of a node is the first entry of its ``aliases`` (the id it had when it was first retired), else its
+    id.  ``specdev node rename`` appends to ``aliases``, so the first name never changes; hashing and ``diff`` pass this
+    mapping to ``contract_view`` so that a link id is the same text before and after a rename.  When two nodes list one
+    alias, the node that comes first in build order owns it, as in ``Graph.alias_index``.
+    """
+    names: dict[str, str] = {}
+    for node in graph.nodes:
+        if not node.aliases or graph.by_id.get(node.id) is not node:
+            continue
+        first = node.aliases[0]
+        names[node.id] = first
+        for alias in node.aliases:
+            names.setdefault(alias, first)
+    return names

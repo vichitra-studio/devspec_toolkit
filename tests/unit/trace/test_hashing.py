@@ -2,18 +2,19 @@
 from __future__ import annotations
 
 import copy
-import json
 import time
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.contract import item_at
 from specdev_tools.graph.kinds import LinkDecl
-from specdev_tools.graph.model import Graph, Link, Node
+from specdev_tools.graph.model import Graph, Link, Node, first_name_index
 from specdev_tools.trace.hashing import (
     HASH_PREFIX,
     chain_stamp,
@@ -40,13 +41,16 @@ def _base() -> Graph:
     return build_graph(EXAMPLE_SPEC, str(ROOT))
 
 
+def _edited_graph(file: str, edit: Edit) -> Graph:
+    """The worked example with *edit* applied to the parsed document *file*."""
+    document = copy.deepcopy(dict(_base().documents[file]))
+    edit(document)
+    return build_graph(EXAMPLE_SPEC, str(ROOT), overrides={file: document})
+
+
 def _edited(file: str, edit: Edit, seeds: Mapping[str, str] = SEEDS) -> Mapping[str, tuple[str, str]]:
     """The hashes of the worked example with *edit* applied to the parsed document *file*."""
-    base = _base()
-    document = copy.deepcopy(dict(base.documents[file]))
-    edit(document)
-    graph = build_graph(EXAMPLE_SPEC, str(ROOT), overrides={file: document})
-    return compute_all(graph, seeds)
+    return compute_all(_edited_graph(file, edit), seeds)
 
 
 def _original(seeds: Mapping[str, str] = SEEDS) -> Mapping[str, tuple[str, str]]:
@@ -88,7 +92,9 @@ def test_normalisation_variants_hash_equal_and_changed_word_or_case_differs() ->
 
 @pytest.mark.parametrize("field", ["status", "notes", "tags", "owner", "lifecycle"])
 def test_excluded_fields_change_neither_content_nor_chain(field: str) -> None:
-    value: Any = {"status": "done", "notes": "note", "tags": ["x"], "owner": "ops", "lifecycle": "deprecated"}[field]
+    value: Any = {
+        "status": "done", "notes": "note", "tags": ["x"], "owner": "ops", "lifecycle": "deprecated",
+    }[field]
     assert _edited(FR_FILE, lambda document: _fr(document).__setitem__(field, value)) == _original()
 
 
@@ -150,19 +156,104 @@ def test_seed_edit_moves_every_chain_below_and_no_content() -> None:
     assert {i: v[0] for i, v in after.items() if i != SEED} == {i: v[0] for i, v in before.items() if i != SEED}
 
 
+def _with_value_renamed(value: Any, old: str, new: str) -> Any:
+    """*value* with every string equal to *old* (a value or a list member, not a key) replaced by *new*."""
+    if isinstance(value, str):
+        return new if value == old else value
+    if isinstance(value, list):
+        return [_with_value_renamed(item, old, new) for item in value]
+    if isinstance(value, dict):
+        return {key: _with_value_renamed(item, old, new) for key, item in value.items()}
+    return value
+
+
+def _renamed(documents: Mapping[str, Any], old: str, new: str, *, keep: Collection[str] = ()) -> dict[str, Any]:
+    """The documents after ``node rename old new``: the id and the links in them become *new*, the files of *keep* (historical holders) are left as they are, and *old* is appended to the node's aliases."""
+    node = build_graph(EXAMPLE_SPEC, str(ROOT), overrides=documents).by_id[old]
+    result = {path: doc if path in keep else _with_value_renamed(doc, old, new) for path, doc in copy.deepcopy(dict(documents)).items()}
+    item = item_at(result[node.file], node.jq_path)
+    assert item is not None
+    item["aliases"] = [*item.get("aliases", []), old]
+    return result
+
+
+def _hashes(documents: Mapping[str, Any]) -> dict[str, tuple[str, str]]:
+    return compute_all(build_graph(EXAMPLE_SPEC, str(ROOT), overrides=documents), SEEDS)
+
+
+def _through(before: Mapping[str, tuple[str, str]], renames: Mapping[str, str]) -> dict[str, tuple[str, str]]:
+    """*before* keyed through the renames (old id to new id): what the hashes must equal after them."""
+    return {renames.get(node_id, node_id): value for node_id, value in before.items()}
+
+
+CRITERION_ID = CRITERIA[2]
+_RENAMES = {
+    "capability": (CAP, "cap-account-recovery-v2", ()),
+    "fr": (FR, "fr-password-reset-v2", ()),
+    "criterion": (CRITERION_ID, "ac-password-reset-3b", ()),
+    "criterion with historical holders left as written": (CRITERION_ID, "ac-password-reset-3b", ("14_roadmap.json",)),
+}
+
+
+@pytest.mark.parametrize(("old", "new", "keep"), list(_RENAMES.values()), ids=list(_RENAMES))
+def test_rename_changes_no_hash_before_and_after(old: str, new: str, keep: tuple[str, ...]) -> None:
+    documents = _base().documents
+    once = _renamed(documents, old, new, keep=keep)
+    assert _hashes(once) == _through(_hashes(documents), {old: new})
+    third = f"{new}-again"
+    twice = _renamed(once, new, third, keep=keep)
+    assert _hashes(twice) == _through(_hashes(documents), {old: third})
+
+
+def test_an_alias_is_outside_the_contract_of_its_node_and_a_later_alias_changes_nothing() -> None:
+    """``aliases`` is no contract field: the node's own hash stays.  Only the first alias renames the node for the hashes of its holders."""
+
+    def with_aliases(*names: str) -> Graph:
+        return _edited_graph(FR_FILE, lambda document: _fr(document).__setitem__("aliases", list(names)))
+
+    first, second = with_aliases("fr-old-name"), with_aliases("fr-old-name", "fr-older-name")
+    assert own_hash(FR, first) == own_hash(FR, _base())
+    assert compute_all(first, SEEDS)[FR][0] == _original()[FR][0]
+    assert compute_all(second, SEEDS) == compute_all(first, SEEDS)
+
+
+def test_a_renamed_criterion_leaves_its_fr_hashes_alone() -> None:
+    documents = _base().documents
+    before = _hashes(documents)
+    after = _hashes(_renamed(documents, CRITERION_ID, "ac-password-reset-3b"))
+    assert after[FR] == before[FR] and after["ac-password-reset-3b"] == before[CRITERION_ID]
+
+
 def test_alias_rename_changes_no_hash() -> None:
+    """A holder that still writes the old id and one that writes the new id hash alike: both name the target by its first name."""
     new = "cap-account-recovery-v2"
-    base = _base()
-
-    def renamed(documents: Mapping[str, Any]) -> dict[str, Any]:
-        return {path: json.loads(json.dumps(doc).replace(f'"{CAP}"', f'"{new}"')) for path, doc in documents.items()}
-
-    full = renamed(base.documents)
-    holder_keeps_old_name = {**full, FR_FILE: base.documents[FR_FILE]}
-    current = build_graph(EXAMPLE_SPEC, str(ROOT), overrides=full)
+    documents = _base().documents
+    renamed = _renamed(documents, CAP, new)
+    holder_keeps_old_name = {**renamed, FR_FILE: documents[FR_FILE]}
+    current = build_graph(EXAMPLE_SPEC, str(ROOT), overrides=renamed)
     stale = build_graph(EXAMPLE_SPEC, str(ROOT), overrides=holder_keeps_old_name)
-    stale.alias_index = {CAP: new}
+    assert stale.alias_index == {CAP: new}
     assert compute_all(stale, SEEDS) == compute_all(current, SEEDS)
+
+
+def test_the_first_name_of_a_node_is_its_first_alias() -> None:
+    plain = Graph.from_nodes([_node("a"), _node("b")])
+    assert first_name_index(plain) == {}
+    renamed = replace(_node("c"), aliases=("a", "b"))
+    assert first_name_index(Graph.from_nodes([renamed, _node("d")])) == {"c": "a", "a": "a", "b": "a"}
+
+
+def test_cycle_marker_and_evaluation_order_use_the_first_name() -> None:
+    """Renaming ``a`` to ``z`` moves it behind ``b`` in id order; its first name keeps it in front, so the cycle breaks at the same node."""
+    before = Graph.from_nodes([_node("a", "b"), _node("b", "a", "ghost")])
+    after = Graph.from_nodes([replace(_node("z", "b"), aliases=("a",)), _node("b", "z", "ghost")])
+    assert compute_all(after, {}) == _through(compute_all(before, {}), {"a": "z"})
+
+
+def test_a_missing_target_marker_is_the_same_before_and_after_a_rename() -> None:
+    before = Graph.from_nodes([_node("a", "ghost")])
+    after = Graph.from_nodes([replace(_node("z", "ghost"), aliases=("a",))])
+    assert compute_all(after, {})["z"] == compute_all(before, {})["a"]
 
 
 def test_seed_whitespace_reflow_keeps_seed_hash() -> None:

@@ -451,7 +451,7 @@
                       "$ref": "vc:core:atoms#kebabId"
                     },
                     "uniqueItems": true,
-                    "description": "Former or alternative ids of this plan item, kept so that older references still resolve. Optional."
+                    "description": "Former ids of this plan item; `specdev node rename` adds the old id here. Optional."
                   },
                   "replaces": {
                     "type": "array",

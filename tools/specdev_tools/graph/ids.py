@@ -1,7 +1,7 @@
 """Id rules of the spec graph: uniqueness (E704), slug minting and the suggested id prefix of each kind.
 
 An id is unique among every node of every file whatever its lifecycle (a deleted node is in no file, so its id is free
-again).  Minting a slug is a pure function of the text and the ids already taken; it never changes an id that exists.
+again) and an alias may not equal one (``graph.check`` reports that as E771).  Minting a slug is a pure function of the text and the ids already taken; it never changes an id that exists.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import unicodedata
 from collections.abc import Collection, Iterable
 
 from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.graph.kinds import SEED_KIND, SEED_STEP
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.ownership import step_owner
 
@@ -97,17 +98,30 @@ def mint_slug(text: str, taken: Collection[str], *, prefix: str | None = None, m
     return first_free_id((prefix or "") + slug, taken)
 
 
-def _definition(node: Node) -> str:
-    return f"{node.file} {node.jq_path or '.'}"
+def defining_file(graph: Graph, node: Node) -> str:
+    """The spec file that holds the definition of *node*: its own file, and for a seed the seed manifest.
+
+    ``Node.file`` of a seed is the seed document, while its ``jq_path`` points into the manifest.
+    """
+    if node.kind != SEED_KIND:
+        return node.file
+    manifests = graph.shape.files_by_step.get(SEED_STEP, ())
+    return manifests[0] if manifests else node.file
 
 
-def _duplicate_error(first: Node, extra: Node, hint: str) -> SpecError:
+def _definition(graph: Graph, node: Node) -> str:
+    """Where *node* is defined, for a message: file, path and kind; a seed names its document apart from its manifest entry."""
+    place = f"{defining_file(graph, node)} {node.jq_path or '.'}"
+    return f"{place} ({node.kind}, document {node.file})" if node.kind == SEED_KIND else f"{place} ({node.kind})"
+
+
+def _duplicate_error(graph: Graph, first: Node, extra: Node, hint: str) -> SpecError:
     message = (
-        f"Duplicate node id '{extra.id}': defined at {_definition(first)} ({first.kind}) and again at "
-        f"{_definition(extra)} ({extra.kind}); rename the later one, for example to '{hint}'"
+        f"Duplicate node id '{extra.id}': defined at {_definition(graph, first)} and again at "
+        f"{_definition(graph, extra)}; rename the later one, for example to '{hint}'"
     )
     return make_error(
-        "E704", message, file=extra.file, jq_path=extra.jq_path or None, owner=step_owner(extra), node_id=extra.id
+        "E704", message, file=defining_file(graph, extra), jq_path=extra.jq_path or None, owner=step_owner(extra), node_id=extra.id
     )
 
 
@@ -119,7 +133,7 @@ def check_unique_ids(graph: Graph, *, steps: Iterable[str] | None = None) -> lis
     *steps*, only extra definitions that sit in one of those steps are reported.
     """
     wanted = None if steps is None else set(steps)
-    taken = set(graph.by_id)
+    taken = set(graph.by_id) | set(graph.alias_index)
     errors: list[SpecError] = []
     for node_id, found in graph.dups.items():
         first = found[0]
@@ -127,5 +141,5 @@ def check_unique_ids(graph: Graph, *, steps: Iterable[str] | None = None) -> lis
             hint = first_free_id(node_id, taken)
             taken.add(hint)
             if wanted is None or extra.step in wanted:
-                errors.append(_duplicate_error(first, extra, hint))
+                errors.append(_duplicate_error(graph, first, extra, hint))
     return errors

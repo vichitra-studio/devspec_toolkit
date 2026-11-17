@@ -303,3 +303,15 @@ def test_every_candidate_is_accepted_by_the_resolver(example: Graph) -> None:
         assert not rejected, f"{kind}.{link_field}: {rejected}"
         checked += len(found)
     assert checked > 20
+
+
+def test_node_show_of_a_seed_names_the_manifest_pointer_and_the_document_separately() -> None:
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    report = node_view(graph, ["seed-accounts", "fr-password-reset"])
+    seed, fr = report.views
+    assert (seed.file, seed.jq_path, seed.document) == ("common/seed_manifest.json", ".seeds[0]", "docs/seed/seed_accounts.md")
+    assert fr.document is None
+    text = node_text(report).splitlines()
+    assert "  file common/seed_manifest.json  path .seeds[0]" in text and "  seed document docs/seed/seed_accounts.md" in text
+    assert text.count("  seed document docs/seed/seed_accounts.md") == 1
+    assert node_json(report)["nodes"][0]["document"] == "docs/seed/seed_accounts.md"

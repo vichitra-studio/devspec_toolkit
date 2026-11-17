@@ -11,9 +11,9 @@ from typing import Any
 import pytest
 
 from specdev_tools.graph import gitview
-from specdev_tools.graph.diff import ADDED, CHANGED, REMOVED, MINOR, NO_BUMP, diff_refs
+from specdev_tools.graph.diff import ADDED, CHANGED, MINOR, NO_BUMP, PATCH, REMOVED, RENAMED, diff_refs, diff_to_dict, render_text
 from specdev_tools.graph.gitview import GitViewError, archive_ref, load_graph_at, load_snapshot_at, spec_path_in_repo
-from unit.graph._synth import EXAMPLE_SPEC, ROOT, run_specdev, write_json, write_spec
+from unit.graph._synth import EXAMPLE_SPEC, ROOT, load_doc, run_cli, run_specdev, write_json, write_spec
 from unit.graph._synth import git as _git
 
 _FR_FILE = "04_fr_list.json"
@@ -345,6 +345,59 @@ def test_archive_ref_extracts_the_paths_at_the_ref(host: Path) -> None:
     assert "It is fast." not in text and "It works." in text
     assert "It is fast." in (spec / _FR_FILE).read_text(encoding="utf-8")
     assert not Path(archived).exists()
+
+
+# --- a rename is one renamed node, not a removal and an addition --------------------------------------------------------
+
+_CRITERION = "ac-password-reset-3"
+_FR = "fr-password-reset"
+
+
+def _rename_and_tag(host: Path, old: str, new: str, tag: str) -> None:
+    code, out = run_cli("node", "rename", old, new, "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert code == 0, out
+    _commit(host, tag)
+
+
+def _changes(host: Path, old: str, new: str) -> list[tuple[str, tuple[str, ...], str | None]]:
+    diff = diff_refs(old, new, str(host), str(host / "spec"), str(ROOT))
+    return [(change.id, change.changes, change.old_id) for change in diff.changes]
+
+
+def test_a_rename_between_two_refs_is_one_renamed_node_and_no_holder_is_changed(example_host: Path) -> None:
+    _rename_and_tag(example_host, _CRITERION, "ac-password-reset-3b", "v2")
+    assert _changes(example_host, "v1", "v2") == [("ac-password-reset-3b", (RENAMED,), _CRITERION)]
+    diff = diff_refs("v1", "v2", str(example_host), str(example_host / "spec"), str(ROOT))
+    assert diff.bump == PATCH
+    assert "ac-password-reset-3b: renamed from ac-password-reset-3" in render_text(diff)
+    nodes = [node for group in diff_to_dict(diff)["groups"] for node in group["nodes"]]
+    assert nodes == [{"id": "ac-password-reset-3b", "changes": ["renamed"], "old_id": _CRITERION}]
+
+
+def test_a_second_rename_is_found_from_the_first_name_and_from_the_middle_name(example_host: Path) -> None:
+    _rename_and_tag(example_host, _FR, "fr-password-reset-v2", "v2")
+    _rename_and_tag(example_host, "fr-password-reset-v2", "fr-password-reset-v3", "v3")
+    assert _changes(example_host, "v1", "v3") == [("fr-password-reset-v3", (RENAMED,), _FR)]
+    assert _changes(example_host, "v2", "v3") == [("fr-password-reset-v3", (RENAMED,), "fr-password-reset-v2")]
+
+
+def test_a_rename_with_an_edit_is_renamed_and_changed(example_host: Path) -> None:
+    _rename_and_tag(example_host, _CRITERION, "ac-password-reset-3b", "v2")
+    document = load_doc(example_host / "spec", _FR_FILE)
+    criterion = document["functional_requirements"][0]["acceptance_criteria"][2]
+    criterion["text"] += " Also reject a token issued for another account."
+    write_json(example_host / "spec", _FR_FILE, document)
+    _commit(example_host, "v3")
+    assert _changes(example_host, "v1", "v3")[0] == ("ac-password-reset-3b", (RENAMED, CHANGED), _CRITERION)
+    assert diff_refs("v1", "v3", str(example_host), str(example_host / "spec"), str(ROOT)).bump == MINOR
+
+
+def test_an_alias_of_an_id_that_still_exists_is_not_a_rename(example_host: Path) -> None:
+    document = load_doc(example_host / "spec", _FR_FILE)
+    document["functional_requirements"].append({"fr_id": "fr-brand-new", "statement": "The system shall exist.", "aliases": [_FR]})
+    write_json(example_host / "spec", _FR_FILE, document)
+    _commit(example_host, "v2")
+    assert _changes(example_host, "v1", "v2") == [("fr-brand-new", (ADDED,), None)]
 
 
 # --- the command ---------------------------------------------------------------------------------------------------

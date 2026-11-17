@@ -6,7 +6,8 @@ stores the hashes of the target when the holder accepted the link (``trace.hashi
 target's chain stamp has moved since.  Links held by historical nodes (``trace.history``) are never suspect.
 
 This module also holds the two pieces the ``spec-check`` checks are built from: ``LockHook``, which the ``graph``
-check passes to the resolver (E761 for a link with no entry, W720 for a new link to a deprecated node), and
+check passes to the resolver (E761 for a link with no entry, W720 for a new link to a deprecated node, E778 for a link
+that names an alias), and
 ``check_lock``, the findings of the ``trace-lock`` check (E762, E763, E882).
 """
 from __future__ import annotations
@@ -235,18 +236,35 @@ def _deprecated_target_warning(holder: Node, link: Link, target: Node) -> SpecEr
     return _node_error("W720", holder, message, step_owner(holder))
 
 
+def _stale_alias_error(holder: Node, link: Link, target: Node) -> SpecError:
+    """E778: *link* of *holder* names an alias of *target* instead of its current id; owned by the holder's step."""
+    message = (
+        f"{_link_text(holder.id, link.field, link.target)}: '{link.target}' is an old id of '{target.id}'; "
+        f"use the current id '{target.id}'"
+    )
+    return _node_error("E778", holder, message, step_owner(holder))
+
+
 class LockHook:
-    """The resolver hook of the ``graph`` check: reports a link that has no lock entry (E761) and, when the new link
-    names a deprecated node, W720.  Both are owned by the holder's step."""
+    """The resolver hook of the ``graph`` check: reports a link that has no lock entry (E761), a new link to a
+    deprecated node (W720) and a link of a live node that names an alias (E778).  All are owned by the holder's step.
+
+    A historical holder is exempt from E778: its links are frozen and resolve through the target's ``aliases``.
+    """
 
     def __init__(self, graph: Graph, lock: Lock) -> None:
         self._index = EntryIndex(graph, lock)
+        self._historical = historical_node_ids(graph)
 
     def on_link(self, link: Link, source: Node, target: Node) -> list[SpecError]:
-        """Findings for *link* of *source* once the resolver has accepted it; none when the link has an entry or the target is ``not_applicable``."""
+        """Findings for *link* of *source* once the resolver has accepted it.
+
+        E778 when a live holder wrote an alias; then none when the link has an entry or the target is ``not_applicable``.
+        """
+        stale = [_stale_alias_error(source, link, target)] if link.target != target.id and source.id not in self._historical else []
         if target.lifecycle == NOT_APPLICABLE or self._index.get(source.id, link.field, target.id) is not None:
-            return []
-        findings = [_missing_entry_error(source, link)]
+            return stale
+        findings = [*stale, _missing_entry_error(source, link)]
         if target.lifecycle == DEPRECATED:
             findings.append(_deprecated_target_warning(source, link, target))
         return findings

@@ -176,7 +176,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this capability, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this capability; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

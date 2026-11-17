@@ -6,7 +6,7 @@ applied to the file text in memory; and nothing is written until every check pas
 
 1. the payload stores no value the toolkit computes (E768);
 2. the edit adds no schema violation (the differential check of ``json patch``);
-3. the edited spec resolves no worse than it did (no new E700 to E703, no duplicate id), except that a deletion may
+3. the edited spec resolves no worse than it did (no new E700 to E703, no duplicate id, no alias that is not free), except that a deletion may
    leave the links that pointed at the deleted node broken: they are reported, not refused.
 
 The spec file is written first, then the lock (a crash between the two leaves a state the checks report).  A link the
@@ -37,6 +37,7 @@ from specdev_tools.core.json_utils import (
     patch_text,
 )
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.gitview import read_seed_texts
 from specdev_tools.graph.ids import check_unique_ids, mint_slug, suggest_prefix
 from specdev_tools.graph.kinds import SEED_KIND, KindDecl, load_kind_registry
@@ -381,8 +382,9 @@ def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: Wri
 # --- judging the candidate graph ------------------------------------------------------------------------------------
 
 def _finding_keys(graph: Graph) -> dict[tuple[str, str | None, str], SpecError]:
-    """The link-resolution and duplicate-id findings of *graph* by (code, node id, message)."""
-    return {(error.code, error.node_id, error.message): error for error in (*resolve_graph(graph), *check_unique_ids(graph))}
+    """The link-resolution, duplicate-id and alias-space findings of *graph* by (code, node id, message)."""
+    errors = (*resolve_graph(graph), *check_unique_ids(graph), *check_alias_space(graph))
+    return {(error.code, error.node_id, error.message): error for error in errors}
 
 
 def _link_keys(graph: Graph) -> set[_LinkKey]:

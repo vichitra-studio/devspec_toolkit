@@ -1,4 +1,4 @@
-"""The graph commands of the CLI: ``specdev node`` (``show``, ``candidates``, ``status``), ``trace`` and ``diff``.
+"""The graph commands of the CLI: ``specdev node`` (``show``, ``candidates``, ``status``, ``rename``), ``trace`` and ``diff``.
 
 ``cli.py`` only registers the parsers (``add_graph_parsers``) and calls the ``run_*`` handlers; every handler returns the
 process exit code.  ``node`` is a REMAINDER group like ``json``: the top-level parser hands it the raw tokens and
@@ -26,8 +26,10 @@ from specdev_tools.graph.diff import diff_refs, diff_to_dict
 from specdev_tools.graph.diff import render_text as diff_text
 from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, LifecycleChange, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, Graph
+from specdev_tools.trace.label_rename import LabelRenameResult, rename_label
+from specdev_tools.trace.rename import RenameResult, rename_node
 
-NODE_SUBCOMMANDS = ("show", "candidates", "status")
+NODE_SUBCOMMANDS = ("show", "candidates", "status", "rename")
 RECIPE_ROLES = ("16a", "16b", "16c")
 EXIT_FINDING = 1
 EXIT_USAGE = 2
@@ -61,16 +63,32 @@ def add_root_flags(parser: argparse.ArgumentParser) -> None:
 # --- parsers --------------------------------------------------------------------------------------------------------
 
 NODE_DESCRIPTION = (
-    "Read nodes of the spec graph and change a node's lifecycle.\n\n"
+    "Read nodes of the spec graph, change a node's lifecycle, rename a node.\n\n"
     "Subcommands:\n"
     "  show <id> [<id> ...]   Show a node: where it is defined, its content, its links in and out (the default:\n"
     "                         'specdev node <id>' is 'specdev node show <id>'; use 'node show <id>' for an id\n"
     "                         that is also a subcommand name)\n"
     "  candidates             List the nodes a link field may point at\n"
-    "  status <id> <value>    Set a node's lifecycle (writes the spec file)\n\n"
+    "  status <id> <value>    Set a node's lifecycle (writes the spec file)\n"
+    "  rename <old> <new>     Change a node's id: the old id becomes an alias and the links to it are rewritten\n"
+    "                         (with --label: change a glossary term's label and rewrite its uses)\n\n"
     "Flags follow the id or the subcommand, as for 'specdev json': 'specdev node <id> --json' works, "
     "'specdev node --json <id>' does not.\n"
     "Run 'specdev node <subcommand> --help' for the flags of one subcommand."
+)
+
+
+RENAME_DESCRIPTION = (
+    "Rename a node in one change. The node gets the new id and its old id is added to its 'aliases'; every link to it "
+    "that a live node writes is rewritten to the new id, and so are the trace lock entries of those links and of the "
+    "node's own links (the stored hashes do not change). Links held by historical nodes and by records keep the old "
+    "id and resolve through the alias. Refused (E770, nothing written): a seed, a record, a node whose id is a map "
+    "key, an id defined twice, the same old and new id, a new id that a node or an alias already has. An unknown id "
+    "is E706 with the nearest ids.\n\n"
+    "With --label, OLD is the id of a glossary term and NEW its new label: the term's 'term' field is changed and "
+    "every exact use of the old label (whole words, same spelling) in the text of nodes of steps 04 to 15 is "
+    "rewritten, each use listed with its node, field path and old and new text.\n\n"
+    "Exit 0 done, 1 refused. --dry-run reports without writing."
 )
 
 
@@ -111,6 +129,18 @@ def build_node_parser() -> argparse.ArgumentParser:
     status.add_argument("id", help="Node id")
     status.add_argument("value", help=f"New lifecycle: {', '.join(LIFECYCLES)}")
     add_root_flags(status)
+
+    rename = sub.add_parser(
+        "rename",
+        help="Rename a node, or with --label a glossary term's label",
+        description=RENAME_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    rename.add_argument("old", metavar="OLD", help="The node's id (or an alias of it); with --label, the id of the term")
+    rename.add_argument("new", metavar="NEW", help="The new id; with --label, the new label")
+    rename.add_argument("--label", action="store_true", help="Change the label of the glossary term OLD to NEW instead of an id")
+    rename.add_argument("--dry-run", action="store_true", dest="dry_run", help="Report what would change and write nothing")
+    add_root_flags(rename)
     return parser
 
 
@@ -277,10 +307,67 @@ def _node_status(args: argparse.Namespace, graph: Graph) -> int:
     return 0
 
 
+def _entry_text(key: tuple[str, str, str]) -> str:
+    source, field, target = key
+    return f"{source}.{field} -> {target}"
+
+
+def _rename_json(result: RenameResult) -> dict[str, Any]:
+    """The JSON form of a rename: the result's fields, each lock entry key as an object of source, field and target."""
+    document = asdict(result)
+    document["lock_entries"] = [
+        {side: dict(zip(("source", "field", "target"), getattr(entry, side))) for side in ("before", "after")}
+        for entry in result.lock_entries
+    ]
+    return document
+
+
+def _rename_lines(result: RenameResult) -> list[str]:
+    place = f"{result.old_id} -> {result.new_id} ({result.file} {result.jq_path or '.'})"
+    lines = [f"renamed {place}" if result.written else f"[dry-run] would rename {place}"]
+    lines.append(f"  old id kept in aliases: {result.old_id}")
+    if result.links:
+        lines.append(f"  links rewritten ({len(result.links)}):")
+        lines.extend(f"    {link.holder}.{link.field}" for link in result.links)
+    if result.lock_entries:
+        lines.append(f"  lock entries re-keyed ({len(result.lock_entries)}):")
+        lines.extend(f"    {_entry_text(entry.before)}  =>  {_entry_text(entry.after)}" for entry in result.lock_entries)
+    lines.append(f"  files: {', '.join(result.files)}")
+    return lines
+
+
+def _label_lines(result: LabelRenameResult) -> list[str]:
+    place = f"{result.term_id}: {result.old_label!r} -> {result.new_label!r} ({result.file} {result.jq_path or '.'})"
+    lines = [f"relabelled {place}" if result.written else f"[dry-run] would relabel {place}"]
+    if result.uses:
+        lines.append(f"  uses rewritten ({len(result.uses)}):")
+        lines.extend(f"    {use.node_id} {use.field_path}: {use.old_text!r} -> {use.new_text!r}" for use in result.uses)
+    else:
+        lines.append("  no use of the old label found")
+    lines.append(f"  files: {', '.join(result.files)}")
+    return lines
+
+
+def _node_rename(args: argparse.Namespace, graph: Graph) -> int:
+    spec_root, repo_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
+    if args.label:
+        label = rename_label(spec_root, repo_root, args.old, args.new, apply=not args.dry_run, graph=graph)
+        document, lines = asdict(label), _label_lines(label)
+    else:
+        renamed = rename_node(spec_root, repo_root, args.old, args.new, apply=not args.dry_run, graph=graph)
+        document, lines = _rename_json(renamed), _rename_lines(renamed)
+    if args.json_output:
+        print_json(document)
+    else:
+        print("\n".join(lines))
+    return 0
+
+
 _NODE_HANDLERS: dict[str, Callable[[argparse.Namespace, Graph], int]] = {
     "show": _node_show,
     "candidates": _node_candidates,
     "status": _node_status,
+    "rename": _node_rename,
 }
 
 

@@ -124,7 +124,7 @@
                         "$ref": "vc:core:graph#lifecycle"
                       },
                       "aliases": {
-                        "description": "Former or alternative ids of this acceptance criterion, kept so that older references still resolve. Optional.",
+                        "description": "Former ids of this acceptance criterion; `specdev node rename` adds the old id here. Optional.",
                         "type": "array",
                         "items": {
                           "$ref": "vc:core:atoms#kebabId"
@@ -240,7 +240,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this functional requirement, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this functional requirement; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

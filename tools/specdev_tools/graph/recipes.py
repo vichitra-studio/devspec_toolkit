@@ -358,7 +358,7 @@ def _via(hop: Hop, source: Node) -> str:
 
 def _neighbour_ids(graph: Graph, node: Node, hop: Hop) -> list[str]:
     if hop.direction == OUT:
-        return [link.target for link in graph.outgoing.get(node.id, ()) if link.field == hop.verb]
+        return [graph.canonical_id(link.target) for link in graph.outgoing.get(node.id, ()) if link.field == hop.verb]
     if hop.direction == IN:
         return [link.source for link in graph.incoming.get(node.id, ()) if link.field == hop.verb]
     if hop.direction == PARENT:
@@ -570,7 +570,7 @@ def _milestone_of(graph: Graph, start: Node) -> str | None:
     node: Node | None = start
     while node is not None:
         if node.milestone is not None:
-            return node.milestone
+            return graph.canonical_id(node.milestone)
         if node.kind == ROADMAP_MILESTONE:
             return node.id
         node = graph.by_id.get(node.parent) if node.parent else None
@@ -580,7 +580,10 @@ def _milestone_of(graph: Graph, start: Node) -> str | None:
 def _plan_files(graph: Graph, start: Node) -> set[str]:
     """The plan file(s) whose ``milestone`` is the milestone of *start*."""
     milestone = _milestone_of(graph, start)
-    return {node.file for node in graph.nodes if milestone is not None and node.milestone == milestone}
+    return {
+        node.file for node in graph.nodes
+        if milestone is not None and node.milestone is not None and graph.canonical_id(node.milestone) == milestone
+    }
 
 
 def _ambiguity_report(graph: Graph, start: Node, pack_ids: Collection[str], spec: ReportSpec) -> tuple[AmbiguityRow, ...]:
@@ -589,7 +592,8 @@ def _ambiguity_report(graph: Graph, start: Node, pack_ids: Collection[str], spec
     rows = []
     for node in graph.nodes:
         if node.kind in spec.kinds and node.file in files:
-            outside = tuple(link.target for link in node.links if link.field == ABOUT_FIELD and link.target not in inside)
+            targets = (graph.canonical_id(link.target) for link in node.links if link.field == ABOUT_FIELD)
+            outside = tuple(target for target in targets if target not in inside)
             if outside:
                 rows.append(AmbiguityRow(node.id, node.file, node.label, outside))
     return tuple(rows)

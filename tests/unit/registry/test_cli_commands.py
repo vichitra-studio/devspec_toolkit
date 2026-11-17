@@ -38,7 +38,7 @@ def test_counts_match_the_parsers():
     assert len(_top_level()) == 45
     assert len([p for p in paths if p.startswith("context ")]) == 6
     assert len([p for p in paths if p.startswith("json ")]) == 9
-    assert len([p for p in paths if p.startswith("node ")]) == 3
+    assert len([p for p in paths if p.startswith("node ")]) == 4
     assert len([p for p in paths if p.startswith("align ")]) == 7
     assert len([p for p in paths if p.startswith("lock ")]) == 2
     assert len([p for p in paths if p.startswith("step ")]) == 2
@@ -52,7 +52,7 @@ def test_spot_paths():
 
 def test_cli_commands_lists_graph_commands():
     committed = {entry["path"] for entry in json.loads((_ROOT / "tools" / "cli_commands.json").read_text())["commands"]}
-    expected = {"node", "node show", "node candidates", "node status", "trace", "diff"}
+    expected = {"node", "node show", "node candidates", "node status", "node rename", "trace", "diff"}
     assert expected <= set(_paths())
     assert expected <= committed
 

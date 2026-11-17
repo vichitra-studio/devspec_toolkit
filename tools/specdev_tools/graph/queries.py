@@ -17,8 +17,8 @@ from typing import Any
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import nearest_ids
 from specdev_tools.graph.contract import item_of
-from specdev_tools.graph.ids import check_unique_ids
-from specdev_tools.graph.kinds import LinkDecl
+from specdev_tools.graph.ids import check_unique_ids, defining_file
+from specdev_tools.graph.kinds import SEED_KIND, LinkDecl
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
@@ -60,7 +60,8 @@ class NodeView:
     """Everything ``specdev node`` shows for one definition of an id.
 
     ``content`` is the node's own item (its child nodes replaced by their ids unless ``full``), or ``None`` when the
-    document or the path is not on the graph.  ``aliases`` is empty until a node has some.
+    document or the path is not on the graph.  ``aliases`` lists the ids the node had before; ``file`` and ``jq_path``
+    say where the node is defined (for a seed, its entry in the seed manifest) and ``document`` is a seed's own file.
     """
 
     id: str
@@ -77,6 +78,7 @@ class NodeView:
     outgoing: tuple[LinkView, ...]
     incoming: tuple[IncomingCount, ...]
     aliases: tuple[str, ...]
+    document: str | None = None
 
 
 @dataclass(frozen=True)
@@ -124,6 +126,11 @@ def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
     return f"no {subject} {wanted!r}{nearest_suffix(wanted, known)}"
 
 
+def unknown_node_error(graph: Graph, node_id: str) -> QueryTargetError:
+    """The E706 finding for an id that no node has, naming the three nearest ids; ``unknown_id`` is set."""
+    return _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
+
+
 def _link_view(graph: Graph, link_field: str, target_id: str) -> LinkView:
     target = graph.find(target_id)
     if target is None:
@@ -167,7 +174,7 @@ def _view(graph: Graph, node: Node, full: bool) -> NodeView:
         role=node.role,
         lifecycle=node.lifecycle,
         scope=node.scope,
-        file=node.file,
+        file=defining_file(graph, node),
         jq_path=node.jq_path,
         label=node.label,
         content=own_content(graph, node, full),
@@ -175,6 +182,7 @@ def _view(graph: Graph, node: Node, full: bool) -> NodeView:
         outgoing=tuple(_link_view(graph, link.field, link.target) for link in node.links),
         incoming=_incoming(graph, node),
         aliases=tuple(sorted(alias for alias, current in graph.alias_index.items() if current == node.id)),
+        document=node.file if node.kind == SEED_KIND else None,
     )
 
 
@@ -225,7 +233,7 @@ def _holder_of_node(graph: Graph, node_id: str, link_field: str) -> _Holder:
     node = graph.find(node_id)
     if node is None:
         raise _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
-    linked = frozenset(link.target for link in node.links if link.field == link_field)
+    linked = frozenset(graph.canonical_id(link.target) for link in node.links if link.field == link_field)
     return _Holder(node.kind, (node.step,) if node.step is not None else (), node, linked)
 
 
@@ -323,6 +331,8 @@ def _view_text(view: NodeView) -> list[str]:
         f"  scope {_cell(view.scope)}",
         f"  file {view.file}  path {view.jq_path or '.'}",
     ]
+    if view.document is not None:
+        lines.append(f"  seed document {view.document}")
     if view.aliases:
         lines.append(f"  aliases: {', '.join(view.aliases)}")
     if view.content is not None:

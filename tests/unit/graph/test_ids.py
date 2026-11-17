@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from specdev_tools.core.errors import SpecError
+from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.ids import check_unique_ids, first_free_id, mint_slug, suggest_prefix
 from specdev_tools.graph.kinds import load_kind_registry
 from specdev_tools.validation.validate import validate_file
@@ -141,3 +142,40 @@ def test_unique_ids_step_filter_keeps_the_duplicates_of_those_steps() -> None:
 
 def test_unique_ids_of_a_unique_graph_is_empty() -> None:
     assert check_unique_ids(docs_graph({"04_fr_list.json": _fr_doc("fr-a", "fr-b")})) == []
+
+
+def test_alias_equal_to_a_live_id_or_another_alias_is_e771_owned_by_the_step_of_the_node() -> None:
+    docs = {
+        "04_fr_list.json": {"functional_requirements": [
+            {"fr_id": "fr-a", "aliases": ["fr-b", "fr-old"]}, {"fr_id": "fr-b"}, {"fr_id": "fr-c", "aliases": ["fr-old", "fr-fine"]},
+        ]},
+        "07_nfrs.json": {"nfrs": [{"nfr_id": "nfr-a", "aliases": ["fr-c"], "lifecycle": "not_applicable"}]},
+    }
+    errors = check_alias_space(docs_graph(docs))
+    assert [(e.code, e.node_id, e.owner, e.file) for e in errors] == [
+        ("E771", "fr-a", "step:04", "04_fr_list.json"),
+        ("E771", "fr-c", "step:04", "04_fr_list.json"),
+        ("E771", "nfr-a", "step:07", "07_nfrs.json"),
+    ]
+    assert "alias 'fr-b' is the id of a fr" in errors[0].message
+    assert "alias 'fr-old' is also an alias of 'fr-a'" in errors[1].message
+    assert "alias 'fr-c' is the id of a fr" in errors[2].message
+
+
+def test_an_alias_no_node_or_other_alias_has_is_free_and_check_unique_ids_keeps_its_meaning() -> None:
+    docs = {"04_fr_list.json": {"functional_requirements": [{"fr_id": "fr-a", "aliases": ["fr-old", "fr-old"]}, {"fr_id": "fr-b"}]}}
+    graph = docs_graph(docs)
+    assert check_alias_space(graph) == [] and check_unique_ids(graph) == []
+    assert first_free_id("fr-old", set(graph.by_id) | set(graph.alias_index)) == "fr-old-2"
+
+
+_MANIFEST = "common/seed_manifest.json"
+
+
+def test_a_seed_definition_names_the_manifest_pointer_and_the_seed_document_separately() -> None:
+    entry = {"seed_id": "seed-a", "description": "d"}
+    manifest = {"seeds": [{**entry, "path": "docs/seed/a.md"}, {"seed_id": "seed-b", "path": "docs/seed/b.md"}, {**entry, "path": "docs/seed/c.md"}]}
+    (error,) = check_unique_ids(docs_graph({_MANIFEST: manifest}))
+    assert error.file == _MANIFEST and error.jq_path == ".seeds[2]"
+    assert f"defined at {_MANIFEST} .seeds[0] (seed, document docs/seed/a.md)" in error.message
+    assert f"and again at {_MANIFEST} .seeds[2] (seed, document docs/seed/c.md)" in error.message

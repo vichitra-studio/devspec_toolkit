@@ -159,7 +159,7 @@
                 "$ref": "vc:core:graph#scopeReason"
               },
               "aliases": {
-                "description": "Former or alternative ids of this threat, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this threat; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -301,7 +301,7 @@
                 "$ref": "vc:core:graph#scopeReason"
               },
               "aliases": {
-                "description": "Former or alternative ids of this edge case, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this edge case; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

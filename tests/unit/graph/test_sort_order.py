@@ -363,3 +363,25 @@ def test_step_ready_blockers_are_listed_in_step_then_id_order_whatever_the_hash_
     assert list(dict.fromkeys(blocker["step"] for blocker in blockers)) == _STEP_READY_BLOCKER_STEPS
     in_08 = [(blocker["node"], blocker["field"], blocker["target"]) for blocker in blockers if blocker["step"] == "08"]
     assert len(in_08) >= 2 and in_08 == sorted(in_08)
+
+
+# --- rename.py  the holders a rename rewrites and the uses a label rename rewrites ---------------------------------------
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_rename_lists_rewritten_holders_and_label_uses_in_step_then_id_order_whatever_the_hash_seed(seed: int) -> None:
+    renamed = json.loads(run_specdev_seeded(
+        seed, "node", "rename", _CRITERION, "ac-password-reset-3b", "--dry-run", "--json", *_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)
+    ).stdout)
+    assert [f"{link['holder']}.{link['field']}" for link in renamed["links"]] == [
+        "err-password-reset-confirm-token-expired.derives_from", "fix-password-reset-expired-token.verifies",
+        "ec-token-at-expiry-second.mitigated_by", "tc-confirm-expired-token.refines",
+    ]
+    assert [entry["before"]["source"] for entry in renamed["lock_entries"]] == sorted(link["holder"] for link in renamed["links"])
+    labelled = json.loads(run_specdev_seeded(
+        seed, "node", "rename", "--label", "term-reset-token", "recovery code", "--dry-run", "--json", *_FLAGS
+    ).stdout)
+    assert [use["node_id"] for use in labelled["uses"]] == [
+        "ac-password-reset-2", "ac-password-reset-3", "fr-password-reset", "err-password-reset-confirm-token-expired",
+        "inv-reset-token-single-use", "task-implement-password-reset-confirm",
+    ]
+    assert labelled["files"] == sorted(labelled["files"])

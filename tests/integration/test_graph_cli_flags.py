@@ -312,6 +312,7 @@ _CASES: dict[str, tuple[list[str], str]] = {
     "node <id>": (["node", _CRITERION], "nodes"),
     "node candidates": (["node", "candidates", "--kind", "api", "--field", "derives_from"], "candidates"),
     "node status": (["node", "status", _CRITERION, "deprecated"], "new"),
+    "node rename": (["node", "rename", _CRITERION, "ac-password-reset-3b", "--dry-run"], "links"),
     "trace walk": (["trace", _CRITERION, "--up"], "up"),
     "trace recipe": (["trace", _PLAN_ITEM, "--recipe", "16b", "--since", "HEAD~1"], "dependency_report"),
     "diff": (["diff", "HEAD~1", "HEAD"], "groups"),
@@ -322,7 +323,8 @@ _CASES: dict[str, tuple[list[str], str]] = {
 }
 _TEXT_START = {
     "node show": _CRITERION, "node <id>": _CRITERION, "node candidates": "api",
-    "node status": f"{_CRITERION}: active -> deprecated", "trace walk": "trace of ac-password-reset-3",
+    "node status": f"{_CRITERION}: active -> deprecated", "node rename": f"[dry-run] would rename {_CRITERION} -> ac-password-reset-3b",
+    "trace walk": "trace of ac-password-reset-3",
     "trace recipe": "pack 16b for PWRESET_CONFIRM_EXPIRED_01", "diff": "diff HEAD~1 -> HEAD",
     "stale": "stale: pending replay by step", "attest": "attest --prune: no orphan",
     "step create": "[dry-run] would create", "step ready": "step 00: ready",
@@ -352,6 +354,41 @@ def test_each_command_uses_the_three_root_flags_it_is_given_not_the_current_fold
         return  # a second run finds the lifecycle already set: see the next test
     document = _json(*run_cli(*argv, *flags, "--json"))
     assert key in document
+
+
+# --- node rename: OLD NEW, --dry-run, --label ---------------------------------------------------------------------------
+
+def _spec_bytes(spec: Path) -> dict[str, bytes]:
+    return {str(path.relative_to(spec)): path.read_bytes() for path in spec.rglob("*") if path.is_file()}
+
+
+def test_node_rename_is_a_subcommand_not_an_id_whatever_follows_it(spec: Path) -> None:
+    """``node rename a b`` renames ``a``; it is not ``node show rename a b``, which asks for the ids ``rename``, ``a`` and ``b``."""
+    code, out = run_cli("node", "rename", "ac-no-such-node", "ac-new", *_flags(spec))
+    assert code == 1 and out.startswith("E706") and "'ac-no-such-node'" in out and "'rename'" not in out
+    code, out = run_cli("node", "show", "rename", "ac-no-such-node", *_flags(spec))
+    assert code == 1 and "'rename'" in out
+    code, out = run_cli("node", "rename", "--help")
+    assert code == 0 and "--dry-run" in out and "--label" in out
+
+
+def test_node_rename_dry_run_writes_nothing(spec: Path) -> None:
+    before = _spec_bytes(spec)
+    code, out = run_cli("node", "rename", _CRITERION, "ac-password-reset-3b", "--dry-run", *_flags(spec))
+    assert code == 0 and out.startswith("[dry-run] would rename") and _spec_bytes(spec) == before
+    code, out = run_cli("node", "rename", _CRITERION, "ac-password-reset-3b", *_flags(spec))
+    assert code == 0 and out.startswith(f"renamed {_CRITERION} -> ac-password-reset-3b") and _spec_bytes(spec) != before
+    assert [view["id"] for view in _json(*run_cli("node", _CRITERION, *_flags(spec), "--json"))["nodes"]] == ["ac-password-reset-3b"]
+
+
+def test_node_rename_label_renames_the_label_not_the_id(spec: Path) -> None:
+    term, label = "term-reset-token", "recovery code"
+    code, out = run_cli("node", "rename", term, label, *_flags(spec))
+    assert code == 1 and out.startswith("E770") and "is not an id" in out
+    code, out = run_cli("node", "rename", "--label", term, label, *_flags(spec))
+    assert code == 0 and out.startswith(f"relabelled {term}")
+    shown = _json(*run_cli("node", term, *_flags(spec), "--json"))["nodes"][0]
+    assert shown["id"] == term and shown["content"]["term"] == label and shown["aliases"] == []
 
 
 def test_node_status_json_says_the_lifecycle_was_already_set_on_a_second_run(host: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

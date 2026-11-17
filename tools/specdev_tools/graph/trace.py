@@ -72,7 +72,7 @@ def _neighbour_ids(graph: Graph, node: Node, direction: Direction, options: Trac
     """Ids one edge away from *node* in *direction*: link targets or sources, then the containment edge."""
     verbs = options.verbs
     if direction == "up":
-        ids = [link.target for link in graph.outgoing.get(node.id, ()) if not verbs or link.field in verbs]
+        ids = [graph.canonical_id(link.target) for link in graph.outgoing.get(node.id, ()) if not verbs or link.field in verbs]
         if options.containment and node.parent is not None:
             ids.append(node.parent)
         return ids

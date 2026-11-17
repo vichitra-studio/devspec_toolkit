@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.kinds import LinkDecl
 from specdev_tools.graph.lifecycle import LifecycleRefusedError, plan_lifecycle_change, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, NOT_APPLICABLE, Graph, Link, Node
@@ -21,6 +22,7 @@ from specdev_tools.graph.trace import trace_node
 from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.id_writes import broken_holders
 from specdev_tools.trace.lockfile import Lock, LockEntry
+from specdev_tools.trace.rename import live_holders
 from specdev_tools.trace.suspects import find_suspects, lock_links, missing_entries, orphan_entries
 
 from ._synth import EXAMPLE_SPEC, ROOT, load_doc, make_toolkit, write_json
@@ -66,6 +68,13 @@ def _with_probe_in_closed_milestone(graph: Graph) -> Graph:
     return closed
 
 
+def _holders_a_rename_rewrites(graph: Graph) -> set[str]:
+    """The holders of a rename of ``cap-missing`` (the target the probe links to, added as a node): the probe, unless it is out of play."""
+    target = replace(graph.by_id["fr-twin"], id="cap-missing", kind="capability", children=(), links=())
+    renamed = Graph.from_nodes([*graph.nodes, target], shape=graph.shape)
+    return set(live_holders(renamed, target))
+
+
 # Each consumer of the graph, as the ids of the nodes it reads or reports on; later work items add their rows.
 CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     "resolver": lambda graph: {error.node_id for error in resolve_graph(graph) if error.node_id},
@@ -82,6 +91,7 @@ CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     "historical": lambda graph: historical_node_ids(_with_probe_in_closed_milestone(graph)),
     # An id write reports the live nodes whose links point at a deleted id; the probe links to a target that is gone.
     "broken_holders": lambda graph: {link.holder for link in broken_holders(graph, ["cap-missing"])},
+    "rename": _holders_a_rename_rewrites,
 }
 
 
@@ -145,6 +155,16 @@ def test_every_consumer_honours_lifecycle(spec: Path, toolkit: Path, consumer: s
     _with_probe_lifecycle(spec, lifecycle)
     seen = CONSUMERS[consumer](_graph(spec, toolkit))
     assert (_PROBE in seen) is (lifecycle != NOT_APPLICABLE)
+
+
+@pytest.mark.parametrize("lifecycle", LIFECYCLES)
+def test_alias_space_reads_every_node_whatever_its_lifecycle(spec: Path, toolkit: Path, lifecycle: str) -> None:
+    """Aliases share the id space of the nodes, which is unique among every node present in a file: ``not_applicable`` does not free an alias."""
+    document = load_doc(spec, _FR)
+    probe = next(item for item in document["functional_requirements"] if item["fr_id"] == _PROBE)
+    probe.update(lifecycle=lifecycle, aliases=["fr-twin"])
+    write_json(spec, _FR, document)
+    assert [error.node_id for error in check_alias_space(_graph(spec, toolkit))] == [_PROBE]
 
 
 @pytest.mark.parametrize("node_id", ["amb-open", "rec-note", "seed-accounts"], ids=["ambiguity", "record", "seed"])

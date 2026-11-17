@@ -1101,7 +1101,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E770 RENAME_REFUSED
 
-**Trigger**: `specdev node rename` refused a rename. Registered in 1.2.0; the command is not built yet.
+**Trigger**: `specdev node rename` (or `node rename --label`) refused a rename and wrote nothing: the node is a seed, a record, a node whose id is a map key or an id defined twice; the old and the new id are the same; the new id is the id or an alias of a node, or not an id; the trace lock already has entries under the new id; or an edit would add a schema violation or a link finding. An unknown id is E706, not E770. Exit 1.
 
 **Resolution**: Command refusal: no owner, no node id. The message names the reason.
 
@@ -1109,7 +1109,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E771 ALIAS_COLLISION
 
-**Trigger**: An alias equals a live node id or another alias. Registered in 1.2.0; the check that raises it is not built yet.
+**Trigger**: An alias equals a live node id or an alias another node lists. Aliases share the id space of the nodes, whatever a node's lifecycle. Reported by `spec-check` (check `graph`), and an id write that would create the collision is refused (E767).
 
 **Resolution**: Owner `step:<node step>`. Give the node a different alias.
 
@@ -1117,7 +1117,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E772 REPLACES_NAMES_LIVE_NODE
 
-**Trigger**: A `replaces` link names a node that is still live. Registered in 1.2.0; the check that raises it is not built yet.
+**Trigger**: A `replaces` link names a node that is still in the spec (by its id or one of its aliases). Reported by `spec-check` (check `graph`); the git history is not read.
 
 **Resolution**: Owner `step:<node step>`. Deprecate or remove the replaced node, or drop the link.
 
@@ -1141,7 +1141,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E778 STALE_ALIAS_USE
 
-**Trigger**: A live node's link names an alias of a node instead of the node's current id. Registered in 1.2.0; the check that raises it is not built yet.
+**Trigger**: A live node's link names an alias of a node instead of the node's current id. Reported by `spec-check` (check `graph`), `validate-all` and `forward-replay-check` with the trace lock; a link of a historical node (a closed milestone) or of a record keeps the old id and is not reported. `specdev node rename` rewrites the links of live nodes itself.
 
 **Resolution**: Owner `step:<holder step>`. Rewrite the link to the current id.
 

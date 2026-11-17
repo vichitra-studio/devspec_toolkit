@@ -42,6 +42,7 @@ from specdev_tools.graph.model import (
 
 PLAN_FILE_KEY = "impl_context/ms_*_plan.json"
 SEED_PATH_FIELD = "path"
+ALIASES_FIELD = "aliases"
 UNREADABLE_MESSAGE = "unreadable or not a JSON object"
 
 
@@ -202,6 +203,7 @@ def _collect(
             links=_links_of(item, decl, node_id),
             label=node_label(item),
             milestone=ctx.milestone,
+            aliases=tuple(str_items(item.get(ALIASES_FIELD))),
         ))
         nodes.extend(nested)
     return nodes

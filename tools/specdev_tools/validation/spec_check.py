@@ -155,7 +155,7 @@ def _trace_lock_result(
     return _check_result(check_lock(graph, lock, read_seed_texts(graph, host_root)))
 
 
-_LOCK_LINK_CODES = frozenset({"E761", "W720"})
+_LOCK_LINK_CODES = frozenset({"E761", "W720", "E778"})
 
 
 def lock_link_findings(
@@ -163,7 +163,7 @@ def lock_link_findings(
 ) -> list[SpecError]:
     """The suspect-link findings of the trace lock under *lock_dir*, for the paths that do not run the whole ``spec-check``.
 
-    E760 when the lock cannot be read, E761 and W720 from one resolver run, then E762, E763 and E882 (what
+    E760 when the lock cannot be read, E761, W720 and E778 from one resolver run, then E762, E763 and E882 (what
     ``spec-check`` reports in its ``graph`` and ``trace-lock`` checks).  Nothing when *graph* is ``None`` or the graph
     has no links and no lock file exists.  *step* keeps the findings whose node belongs to that step.
     """

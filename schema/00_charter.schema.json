@@ -102,7 +102,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this scope item, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this scope item; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -182,7 +182,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this assumption, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this assumption; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -288,7 +288,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this risk, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this risk; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -410,7 +410,7 @@
                       "$ref": "vc:core:graph#lifecycle"
                     },
                     "aliases": {
-                      "description": "Former or alternative ids of this need, kept so that older references still resolve. Optional.",
+                      "description": "Former ids of this need; `specdev node rename` adds the old id here. Optional.",
                       "type": "array",
                       "items": {
                         "$ref": "vc:core:atoms#kebabId"
@@ -466,7 +466,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this stakeholder, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this stakeholder; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -578,7 +578,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this segment, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this segment; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -721,7 +721,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this metric, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this metric; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -830,7 +830,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former or alternative ids of this constraint, kept so that older references still resolve. Optional.",
+                "description": "Former ids of this constraint; `specdev node rename` adds the old id here. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
