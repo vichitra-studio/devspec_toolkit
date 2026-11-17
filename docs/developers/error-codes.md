@@ -1023,6 +1023,26 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 **Resolution**: Owner `step:<holder step>`. Not promotable (no E counterpart). Registered in 1.2.0; the check that emits it is not built yet.
 
+## Trace Lock (76x)
+
+The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the hashes of the target as the holder last accepted it. Its format is `schema/extras/trace_lock.schema.json`.
+
+### E760 TRACE_LOCK_MALFORMED
+
+**Trigger**: The trace lock cannot be read. The file is not valid JSON, is not an object of the lock format (a missing or unknown key, a `version` other than 1, a hash that is not `sha256:` and 64 lower-case hex digits, a `baseline` that is not `true`), names the same (source, field, target) triple twice, or holds git merge conflict markers (`<<<<<<<`). The marker case is checked before the JSON is parsed, and the message names the repair.
+
+**Resolution**: Owner `merge-check`. For conflict markers: install the lock merge driver with `git config merge.specdev-trace-lock.driver "<specdev> lock merge %O %A %B %P"`, then run `git checkout -m -- spec/extras/trace.lock.json` (it re-runs the driver and writes the merged file, but git still lists the path as unmerged), then `git add spec/extras/trace.lock.json`. For any other cause, restore the file from git or fix the entry the message names.
+
+**Promotable**: No (error only).
+
+### E769 LOCK_WRITE_CONFLICT
+
+**Trigger**: A command that writes the lock found another specdev write running: the exclusive lock on `spec/extras/` is held by another process. The message says "another specdev write is running".
+
+**Resolution**: Command refusal: no owner, no node id. Wait for the other command to finish and run this one again.
+
+**Promotable**: No (error only).
+
 ## Exception Classes
 
 ### SubmoduleDetectionError

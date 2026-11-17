@@ -33,6 +33,7 @@
   "vc:seed-requirements": "schema/seed_requirements.schema.json",
   "vc:step-order": "schema/step_order.schema.json",
   "vc:cli-commands": "schema/cli_commands.schema.json",
+  "vc:extras:trace-lock": "schema/extras/trace_lock.schema.json",
   "vc:infra:findings": "schema/infra/findings.schema.json",
   "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json"
 }

@@ -240,6 +240,9 @@ ERROR_CODES = {
     "E707": "RECIPE_START_KIND_INVALID",
     "E708": "DIFF_REF_UNRESOLVED",
     "E709": "DIFF_REF_PREDATES_GRAPH_MODEL",
+    # Trace lock (76x). E760 is a finding about the spec (owner merge-check); E769 is a command refusal.
+    "E760": "TRACE_LOCK_MALFORMED",
+    "E769": "LOCK_WRITE_CONFLICT",
     "W720": "LINK_TO_DEPRECATED_NODE",
 }
 

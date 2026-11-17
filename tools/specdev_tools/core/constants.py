@@ -74,6 +74,10 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
 )
 
 
+# File name of the trace lock, kept in ``<spec_dir>/extras/`` (see ``resolve_extras_path``).
+TRACE_LOCK_FILENAME = "trace.lock.json"
+
+
 # ---------------------------------------------------------------------------
 # resolve_extras_path — shared logic for locating output files in the
 # spec/extras/ directory (host-repo).
