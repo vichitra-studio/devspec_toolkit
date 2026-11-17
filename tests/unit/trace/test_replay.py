@@ -1,0 +1,225 @@
+"""The replay engine and the gap seam (WI-M5-05), on the worked example."""
+from __future__ import annotations
+
+import shutil
+from collections.abc import Callable, Iterator
+from pathlib import Path
+
+import pytest
+
+from specdev_tools.graph.model import Graph
+from specdev_tools.trace.gaps import CoverageGap, GapProvider, coverage_gaps, register_gap_provider
+from specdev_tools.trace.history import NOTE_BASELINE, OldText, contract_lines
+from specdev_tools.trace.lockfile import Lock, LockEntry
+from specdev_tools.trace.replay import (
+    NOTE_SAME_TEXT,
+    ReplayPlan,
+    ReplayStep,
+    compute_replay,
+    pending_replay,
+    plan_to_dict,
+    render_text,
+    root_diffs,
+)
+
+from ._lock_support import EXAMPLE_HOST
+from .test_suspects import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
+
+TERM = "quokka"
+UNRELATED_NODE = "cap-account-recovery"
+NEED = "need-fewer-reset-tickets"
+METRIC = "metric-recovery-time"
+
+
+@pytest.fixture
+def example(tmp_path: Path) -> Example:
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_HOST, host)
+    return Example(host)
+
+
+@pytest.fixture
+def providers() -> Iterator[Callable[[GapProvider], None]]:
+    """Register gap providers for one test; every one is unregistered at the end."""
+    removers: list[Callable[[], None]] = []
+    yield lambda provider: removers.append(register_gap_provider(provider))
+    for remove in removers:
+        remove()
+
+
+def _plan(example: Example) -> ReplayPlan:
+    graph = example.graph()
+    return compute_replay(graph, example.lock(), example.seed_texts(graph))
+
+
+def _holders(plan: ReplayPlan) -> set[str]:
+    return {node.node for step in plan.steps for node in step.nodes}
+
+
+def _step(plan: ReplayPlan, name: str) -> ReplayStep:
+    return next(step for step in plan.steps if step.step == name)
+
+
+def _add_term(item: dict[str, object]) -> None:
+    item["text"] = f"{item['text']} {TERM}"
+
+
+# --- gap seam -------------------------------------------------------------------------------------------------------
+
+def test_default_provider_empty(example: Example) -> None:
+    graph = example.graph()
+    assert coverage_gaps(graph, example.lock()) == []
+
+
+def test_coverage_gaps_adapter_returns_registered_provider_output(example: Example, providers: Callable[[GapProvider], None]) -> None:
+    first, second = CoverageGap("E740", "fr-a", "04"), CoverageGap("E742", "fix-b", "08")
+    providers(lambda graph, lock: [first])
+    providers(lambda graph, lock: [second, first])
+    assert coverage_gaps(example.graph(), example.lock()) == [first, second, first]
+
+
+def test_an_unregistered_provider_is_no_longer_asked(example: Example) -> None:
+    remove = register_gap_provider(lambda graph, lock: [CoverageGap("E740", "fr-a", "04")])
+    assert len(coverage_gaps(example.graph(), example.lock())) == 1
+    remove()
+    assert coverage_gaps(example.graph(), example.lock()) == []
+
+
+# --- compute_replay -------------------------------------------------------------------------------------------------
+
+def test_a_clean_example_has_an_empty_plan(example: Example) -> None:
+    plan = _plan(example)
+    assert plan.steps == () and (plan.node_count, plan.link_count, plan.gap_count) == (0, 0, 0)
+    assert render_text(plan) == "stale: no pending replay"
+
+
+def test_plan_holds_the_suspect_links_grouped_by_holder_step_in_step_order(example: Example) -> None:
+    example.edit_item(CRITERION, _add_term)
+    plan = _plan(example)
+    assert [step.step for step in plan.steps] == ["05", "06", "07", "08", "09", "11", "14", "15", "16a"]
+    assert {link.key for step in plan.steps for node in step.nodes for link in node.links} == CLOSURE_OF_CRITERION_EDIT
+    assert (plan.node_count, plan.link_count) == (13, 21)
+    assert all(link.holder_step == step.step for step in plan.steps for node in step.nodes for link in node.links)
+
+
+def test_wording_independent_impact(example: Example) -> None:
+    """Impact follows links: a node whose text never says the term is a suspect, a node whose text says it but has no link is not."""
+    example.edit_item(CRITERION, _add_term)
+    graph = example.graph()
+    downstream = _holders(compute_replay(graph, example.lock(), example.seed_texts(graph)))
+    assert "api-password-reset-confirm" in downstream
+    assert TERM not in " ".join(contract_lines(graph.by_id["api-password-reset-confirm"], graph, {}))
+    assert TERM in " ".join(contract_lines(graph.by_id[CRITERION], graph, {}))
+    example.attest(*downstream)
+    example.edit_item(UNRELATED_NODE, lambda item: item.update(description=f"{item['description']} {TERM}"))
+    graph = example.graph()
+    assert TERM in " ".join(contract_lines(graph.by_id[UNRELATED_NODE], graph, {}))
+    assert UNRELATED_NODE not in _holders(compute_replay(graph, example.lock(), example.seed_texts(graph)))
+
+
+def test_historical_links_not_in_replay(example: Example) -> None:
+    example.close_milestone()
+    example.edit_item(CRITERION, _add_term)
+    plan = _plan(example)
+    assert not CLOSED_HOLDERS & _holders(plan)
+    assert "16a" not in {step.step for step in plan.steps}
+    assert {link.key for step in plan.steps for node in step.nodes for link in node.links} == {
+        key for key in CLOSURE_OF_CRITERION_EDIT if key[0] not in CLOSED_HOLDERS
+    }
+
+
+def test_nodes_of_a_step_are_listed_upward_first(example: Example) -> None:
+    """``metric-recovery-time`` links ``need-fewer-reset-tickets`` of its own step, so it comes after it though its id sorts first."""
+    example.edit_seed()
+    nodes = [node.node for node in _step(_plan(example), "00").nodes]
+    assert METRIC < NEED
+    assert nodes.index(NEED) < nodes.index(METRIC)
+    assert nodes.index("asm-member-controls-email") < nodes.index("risk-reset-link-takeover")
+
+
+def test_gaps_are_a_group_of_their_own_in_the_step_that_owns_them(example: Example, providers: Callable[[GapProvider], None]) -> None:
+    example.edit_item(CRITERION, _add_term)
+    providers(lambda graph, lock: [CoverageGap("E742", "z-node", "05"), CoverageGap("E740", "b-node", "05"), CoverageGap("E740", "a-node", "03")])
+    plan = _plan(example)
+    assert [step.step for step in plan.steps][:3] == ["03", "05", "06"]
+    assert _step(plan, "03").nodes == ()
+    assert [(gap.code, gap.node) for gap in _step(plan, "05").coverage_gaps] == [("E740", "b-node"), ("E742", "z-node")]
+    assert _step(plan, "05").nodes
+    assert plan.gap_count == 3
+    assert plan_to_dict(plan)["totals"] == {"suspect_nodes": 13, "suspect_links": 21, "coverage_gaps": 3}
+
+
+def test_pending_replay_keeps_the_requested_steps_in_plan_order(example: Example) -> None:
+    example.edit_item(CRITERION, _add_term)
+    plan = _plan(example)
+    assert [step.step for step in pending_replay(plan, {"11", "06", "99"})] == ["06", "11"]
+    assert pending_replay(plan, []) == ()
+
+
+# --- root_diffs -----------------------------------------------------------------------------------------------------
+
+class _FixedResolver:
+    """Stands in for ``OldTextResolver``: the same answer for every entry."""
+
+    def __init__(self, answer: OldText) -> None:
+        self._answer = answer
+
+    def old_text(self, entry: LockEntry) -> OldText:
+        return self._answer
+
+
+def _diffs(example: Example, answer: OldText) -> list:
+    graph = example.graph()
+    seeds = example.seed_texts(graph)
+    plan = compute_replay(graph, example.lock(), seeds)
+    return root_diffs(graph, example.lock(), plan, seeds, _FixedResolver(answer))  # type: ignore[arg-type]
+
+
+def test_root_diff_is_the_unified_diff_of_the_contract_text(example: Example) -> None:
+    before = contract_lines(example.graph().by_id[CRITERION], example.graph(), {})
+    example.edit_item(CRITERION, _add_term)
+    (diff,) = _diffs(example, OldText(tuple(before)))
+    assert diff.root == CRITERION and diff.note is None
+    assert [line for line in diff.diff if line.startswith(("-", "+")) and not line.startswith(("---", "+++"))] == [
+        "-" + before[1], "+" + before[1] + f" {TERM}"
+    ]
+
+
+def test_root_diff_says_so_when_the_own_text_is_the_same(example: Example) -> None:
+    example.edit_item(CRITERION, _add_term)
+    old = tuple(contract_lines(example.graph().by_id[CRITERION], example.graph(), {}))
+    (diff,) = _diffs(example, OldText(old))
+    assert (diff.diff, diff.note) == ((), NOTE_SAME_TEXT)
+
+
+def test_root_diff_carries_the_note_when_there_is_no_old_text(example: Example) -> None:
+    example.edit_item(CRITERION, _add_term)
+    (diff,) = _diffs(example, OldText(None, NOTE_BASELINE))
+    assert (diff.root, diff.diff, diff.note) == (CRITERION, (), NOTE_BASELINE)
+
+
+def test_contract_lines_of_a_seed_are_its_sentences() -> None:
+    graph: Graph = Example(EXAMPLE_HOST).graph()
+    seed = graph.by_id["seed-accounts"]
+    assert contract_lines(seed, graph, {"seed-accounts": "One. Two! Three?"}) == ["One.", "Two!", "Three?"]
+    assert contract_lines(seed, graph, {}) == [""]
+
+
+def test_contract_lines_of_a_node_are_fields_then_links_then_criteria() -> None:
+    graph = Example(EXAMPLE_HOST).graph()
+    lines = contract_lines(graph.by_id["fr-password-reset"], graph, {})
+    link = lines.index("link derives_from: cap-account-recovery")
+    priority = next(index for index, line in enumerate(lines) if line.startswith("priority: "))
+    criterion = next(index for index, line in enumerate(lines) if line.startswith("ac-password-reset-1.text: "))
+    assert priority < link < criterion
+
+
+def test_a_lock_with_no_entry_for_the_root_gives_no_earlier_version(example: Example) -> None:
+    example.edit_item(CRITERION, _add_term)
+    graph = example.graph()
+    seeds = example.seed_texts(graph)
+    plan = compute_replay(graph, example.lock(), seeds)
+    kept = Lock(tuple(entry for entry in example.lock().entries if entry.target != CRITERION))
+    assert plan.steps
+    (diff,) = root_diffs(graph, kept, plan, seeds, _FixedResolver(OldText(("x",))))  # type: ignore[arg-type]
+    assert (diff.root, diff.diff, diff.note) == (CRITERION, (), "no earlier version found")

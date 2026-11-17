@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -249,3 +250,26 @@ def test_context_scope_lists_the_ids_of_a_kind_by_id_though_the_kind_spans_two_s
     assert {graph.by_id["amb-z-early"].step, graph.by_id["amb-a-late"].step} == {"01", "04"}
     resolved = resolve_scope("fr-password-reset", str(spec), str(ROOT))["resolved_ids"]
     assert resolved["ambiguity-item"] == ["amb-a-late", "amb-z-early"]
+
+
+# --- trace/replay.py  the steps and the nodes of `stale` ------------------------------------------------------------
+
+_STALE_STEPS = ["00", "01", "02", "02a", "04", "05", "06", "07", "08", "09", "10", "11", "12", "14", "15", "16a"]
+_STALE_STEP_00 = [
+    "asm-member-controls-email", "con-staged-delivery", "need-fewer-reset-tickets", "metric-recovery-time",
+    "metric-reset-completion-rate", "risk-reset-link-takeover", "scope-password-reset", "scope-sms-reset", "seg-registered-member",
+]
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_stale_lists_steps_in_step_key_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    """Steps follow the waterfall (``02a`` between ``02`` and ``04``, ``16a`` last), the nodes of a step go upward first, then by id."""
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    seed_doc = host / "docs" / "seed" / "seed_accounts.md"
+    seed_doc.write_text(seed_doc.read_text(encoding="utf-8") + "\nThe link is also sent to a phone.\n", encoding="utf-8")
+    result = run_specdev_seeded(seed, "stale", "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert result.returncode == 0, result.stderr
+    steps = json.loads(result.stdout)["steps"]
+    assert [step["step"] for step in steps] == _STALE_STEPS
+    assert [node["node"] for node in steps[0]["suspect_nodes"]] == _STALE_STEP_00

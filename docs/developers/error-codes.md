@@ -1085,7 +1085,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E768 STORED_COMPUTED_FIELD
 
-**Trigger**: A spec file stores a field that the toolkit computes. Registered in 1.2.0; the check that raises it is not built yet.
+**Trigger**: A spec node stores a field that the toolkit computes (for example `fr_refs` on a roadmap task, `milestone_ref` on a plan item, `content_hash` on any node). Raised by the `computed-fields` check of `spec-check`; the message names the node id, the view and the command that computes it.
 
 **Resolution**: Owner `step:<node step>`. Remove the stored field.
 

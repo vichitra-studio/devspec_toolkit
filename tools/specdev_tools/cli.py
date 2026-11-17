@@ -575,6 +575,9 @@ def build_parser() -> _SpecdevParser:
     # --- graph commands: node (REMAINDER group), trace, diff ---
     from .graph.commands import add_graph_parsers
     add_graph_parsers(sub)
+    # --- trace commands (stale, ...): each parser names its handler ---
+    from .trace.commands import add_trace_parsers
+    add_trace_parsers(sub)
     p.ctx_parser = ctx_p
     return p
 
@@ -2150,6 +2153,8 @@ def main():
     elif args.cmd == "diff":
         from .graph.commands import run_diff
         sys.exit(run_diff(args))
+    elif getattr(args, "handler", None) is not None:
+        sys.exit(args.handler(args))
 
     elif args.cmd == "guide":
         from .core.guide import format_guide_text, load_guides, lookup_guide

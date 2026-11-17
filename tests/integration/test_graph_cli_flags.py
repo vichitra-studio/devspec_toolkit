@@ -306,11 +306,13 @@ _CASES: dict[str, tuple[list[str], str]] = {
     "trace walk": (["trace", _CRITERION, "--up"], "up"),
     "trace recipe": (["trace", _PLAN_ITEM, "--recipe", "16b", "--since", "HEAD~1"], "dependency_report"),
     "diff": (["diff", "HEAD~1", "HEAD"], "groups"),
+    "stale": (["stale"], "steps"),
 }
 _TEXT_START = {
     "node show": _CRITERION, "node <id>": _CRITERION, "node candidates": "api",
     "node status": f"{_CRITERION}: active -> deprecated", "trace walk": "trace of ac-password-reset-3",
     "trace recipe": "pack 16b for PWRESET_CONFIRM_EXPIRED_01", "diff": "diff HEAD~1 -> HEAD",
+    "stale": "stale: pending replay by step",
 }
 
 
@@ -349,6 +351,39 @@ def test_the_three_root_flags_are_accepted_by_every_command_even_where_they_are_
         with_flag = run_cli(*argv, "--repo-root", str(ROOT), "--spec-root", str(spec), "--git-root", str(other))
         without = run_cli(*argv, "--repo-root", str(ROOT), "--spec-root", str(spec))
         assert with_flag == without and with_flag[0] == 0
+
+
+# --- stale: --step, --diff, --json ---------------------------------------------------------------------------------
+
+def test_stale_step_keeps_only_the_suspects_that_step_holds(host: Path) -> None:
+    """The host re-pinned a third party in commit two: step 07 holds a link to it, step 02 holds the connection."""
+    flags = _flags(host / "spec", host)
+    everything = _json(*run_cli("stale", *flags, "--json"))
+    sliced = _json(*run_cli("stale", "--step", "07", *flags, "--json"))
+    assert {"02", "07"} <= {step["step"] for step in everything["steps"]}
+    assert [step["step"] for step in sliced["steps"]] == ["07"]
+    assert {node["node"] for node in sliced["steps"][0]["suspect_nodes"]} == {"nfr-latency-reset-email"}
+    text = run_cli("stale", "--step", "07", *flags)[1]
+    assert "step 07:" in text and "step 02:" not in text
+
+
+def test_stale_diff_adds_the_old_and_new_text_of_each_root(host: Path) -> None:
+    flags = _flags(host / "spec", host)
+    plain = _json(*run_cli("stale", *flags, "--json"))
+    assert "diffs" not in plain
+    document = _json(*run_cli("stale", "--diff", *flags, "--json"))
+    diff = next(item for item in document["diffs"] if item["root"] == "tp-mailrelay")
+    assert "-pin: api-v3" in diff["diff"] and "+pin: api-v4" in diff["diff"]
+    text = run_cli("stale", "--diff", *flags)[1]
+    assert "changed above: tp-mailrelay" in text and "-pin: api-v3" in text
+    assert "changed above:" not in run_cli("stale", *flags)[1]
+
+
+def test_stale_json_prints_the_suspects_by_step_and_the_totals(host: Path) -> None:
+    document = _json(*run_cli("stale", *_flags(host / "spec", host), "--json"))
+    assert set(document) == {"steps", "totals"}
+    assert document["totals"]["suspect_links"] == sum(len(node["links"]) for step in document["steps"] for node in step["suspect_nodes"])
+    assert [step["step"] for step in document["steps"]][:3] == ["00", "01", "02"]
 
 
 # --- --json: the document, and the error envelope on the same flag --------------------------------------------------

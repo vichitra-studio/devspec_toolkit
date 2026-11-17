@@ -50,7 +50,7 @@ def _positive_int(text: str) -> int:
     return value
 
 
-def _add_root_flags(parser: argparse.ArgumentParser) -> None:
+def add_root_flags(parser: argparse.ArgumentParser) -> None:
     """The flags every graph command takes, so the three-flag default of CLAUDE.md never fails."""
     parser.add_argument("--repo-root", default=".", help="Toolkit root (schema, registry, canon); default '.', or the toolkit submodule found below it")
     parser.add_argument("--spec-root", default="./spec", help="Spec directory of the project (default ./spec)")
@@ -84,7 +84,7 @@ def build_node_parser() -> argparse.ArgumentParser:
     show = sub.add_parser("show", help="Show one or more nodes", description="Show nodes of the spec graph by id.")
     show.add_argument("ids", nargs="+", metavar="id", help="Node id (several allowed)")
     show.add_argument("--full", action="store_true", help="Include the content of child nodes (default: child ids only)")
-    _add_root_flags(show)
+    add_root_flags(show)
 
     cand = sub.add_parser(
         "candidates",
@@ -97,7 +97,7 @@ def build_node_parser() -> argparse.ArgumentParser:
     cand.add_argument("--field", required=True, help="The link field (verb), for example derives_from")
     cand.add_argument("--query", help="Keep candidates whose id or label contains this text")
     cand.add_argument("--limit", type=_positive_int, help="Show at most this many candidates")
-    _add_root_flags(cand)
+    add_root_flags(cand)
 
     status = sub.add_parser(
         "status",
@@ -110,7 +110,7 @@ def build_node_parser() -> argparse.ArgumentParser:
     )
     status.add_argument("id", help="Node id")
     status.add_argument("value", help=f"New lifecycle: {', '.join(LIFECYCLES)}")
-    _add_root_flags(status)
+    add_root_flags(status)
     return parser
 
 
@@ -145,7 +145,7 @@ def add_graph_parsers(sub: Any) -> None:
     )
     trace_p.add_argument("--expand", action="store_true", help="With --recipe: add the content of every node of the pack")
     trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: the merge base of HEAD and the first of origin/main, origin/master, main, master that shares history with HEAD; HEAD~1 when none does)")
-    _add_root_flags(trace_p)
+    add_root_flags(trace_p)
 
     diff_p = sub.add_parser(
         "diff",
@@ -157,12 +157,12 @@ def add_graph_parsers(sub: Any) -> None:
     )
     diff_p.add_argument("ref_a", metavar="refA", help="The older ref")
     diff_p.add_argument("ref_b", metavar="refB", help="The newer ref")
-    _add_root_flags(diff_p)
+    add_root_flags(diff_p)
 
 
 # --- output ---------------------------------------------------------------------------------------------------------
 
-def _print_json(document: dict[str, Any]) -> None:
+def print_json(document: dict[str, Any]) -> None:
     print(json.dumps(document, indent=2))
 
 
@@ -220,7 +220,7 @@ def _load_graph(args: argparse.Namespace) -> Graph:
     return build_graph(spec_root, os.path.abspath(args.repo_root))
 
 
-def _run_on_graph(command: str, args: argparse.Namespace, action: Callable[[Graph], int]) -> int:
+def run_on_graph(command: str, args: argparse.Namespace, action: Callable[[Graph], int]) -> int:
     """Load the graph of ``--spec-root`` and run *action* on it, under the one error path of ``_run_guarded``.
 
     When the builder skipped files, one line on stderr names them and says the answer may be incomplete.
@@ -245,7 +245,7 @@ def _run_on_graph(command: str, args: argparse.Namespace, action: Callable[[Grap
 def _node_show(args: argparse.Namespace, graph: Graph) -> int:
     report = queries.node_view(graph, args.ids, full=args.full)
     if args.json_output:
-        _print_json(queries.node_json(report))
+        print_json(queries.node_json(report))
     else:
         print(queries.node_text(report))
     return EXIT_FINDING if report.errors else 0
@@ -256,7 +256,7 @@ def _node_candidates(args: argparse.Namespace, graph: Graph) -> int:
         graph, args.field, kind=args.kind, for_id=args.for_id, query=args.query, limit=args.limit
     )
     if args.json_output:
-        _print_json(queries.candidates_json(result))
+        print_json(queries.candidates_json(result))
     else:
         print(queries.candidates_text(result))
     return 0
@@ -271,7 +271,7 @@ def _status_line(change: LifecycleChange) -> str:
 def _node_status(args: argparse.Namespace, graph: Graph) -> int:
     change = set_lifecycle(graph, os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.id, args.value)
     if args.json_output:
-        _print_json(asdict(change))
+        print_json(asdict(change))
     else:
         print(_status_line(change))
     return 0
@@ -296,7 +296,7 @@ def run_node(tokens: Sequence[str]) -> int:
     args = build_node_parser().parse_args(_node_tokens(tokens))
     args.repo_root = detect_toolkit_root(args.repo_root)
     handler = _NODE_HANDLERS[args.node_cmd]
-    return _run_on_graph("node", args, lambda graph: handler(args, graph))
+    return run_on_graph("node", args, lambda graph: handler(args, graph))
 
 
 # --- trace ----------------------------------------------------------------------------------------------------------
@@ -325,7 +325,7 @@ def _trace_pack(args: argparse.Namespace, graph: Graph) -> int:
     git = recipes.GitContext(os.path.abspath(args.git_root), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.since)
     pack = recipes.build_pack(graph, recipes.load_recipes(os.path.abspath(args.repo_root)), args.recipe, args.id, expand=args.expand, git=git)
     if args.json_output:
-        _print_json(recipes.pack_to_dict(pack))
+        print_json(recipes.pack_to_dict(pack))
     else:
         print(recipes.render_text(pack))
     return 0
@@ -336,7 +336,7 @@ def _trace_walk(args: argparse.Namespace, graph: Graph) -> int:
     options = trace.TraceOptions(args.depth, _csv(args.kinds), _csv(args.verbs), not args.no_containment)
     result = trace.trace_node(graph, args.id, directions, options)
     if args.json_output:
-        _print_json(trace.result_to_dict(result))
+        print_json(trace.result_to_dict(result))
     else:
         print(trace.render_text(result))
     return 0
@@ -348,7 +348,7 @@ def run_trace(args: argparse.Namespace) -> int:
     if problem is not None:
         return _usage_error("trace", problem)
     run = _trace_pack if args.recipe is not None else _trace_walk
-    return _run_on_graph("trace", args, lambda graph: run(args, graph))
+    return run_on_graph("trace", args, lambda graph: run(args, graph))
 
 
 # --- diff -----------------------------------------------------------------------------------------------------------
@@ -361,7 +361,7 @@ def run_diff(args: argparse.Namespace) -> int:
             args.ref_a, args.ref_b, os.path.abspath(args.git_root), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
         )
         if args.json_output:
-            _print_json(diff_to_dict(result))
+            print_json(diff_to_dict(result))
         else:
             print(diff_text(result))
         return 0

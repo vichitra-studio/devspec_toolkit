@@ -184,6 +184,9 @@
       "path": "spec-quality-lint"
     },
     {
+      "path": "stale"
+    },
+    {
       "path": "trace"
     },
     {

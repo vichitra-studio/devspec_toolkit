@@ -21,6 +21,7 @@ from ..graph.check import run_graph_check
 from ..graph.gitview import read_seed_texts
 from ..graph.model import Graph
 from ..graph.ownership import stamp_file_owner, step_for_file
+from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import Lock, LockError, lock_path, read_lock
 from ..trace.suspects import check_lock
 from .linter_utils import build_lint_graph
@@ -327,6 +328,12 @@ def _run_checks(
     check_graph = _graph_for_checks(repo_root, spec_dir, spec_root, lint_graph)
     lock, lock_error = _read_lock(spec_root or spec_dir)
     checks["graph"] = _check_result(run_graph_check(spec_root or spec_dir, repo_root, graph=check_graph, lock=lock))
+
+    # --- 10c. Stored computed fields (E768) ---
+    if check_graph is None:
+        checks["computed-fields"] = {"status": "SKIP", "reason": "no spec graph"}
+    else:
+        checks["computed-fields"] = _check_result(check_stored_computed(check_graph))
 
     # --- 11. Registry check (R001-R003) ---
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json

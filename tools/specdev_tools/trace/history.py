@@ -4,11 +4,33 @@ Work of a closed milestone is history: its links keep their lock entries and the
 part in suspect detection, replay or attest (S-003).  A node is historical when it belongs to a milestone whose anchor
 row has status ``done``: the milestone itself, everything it contains (tasks and their criteria) and the nodes of the
 plan files that name it.
+
+The second half of the module recovers the text a changed node had when a holder last accepted a link to it
+(``OldTextResolver``), for the upstream diff of ``specdev stale --diff``.
 """
 from __future__ import annotations
 
-from specdev_tools.graph.contract import item_of
+import json
+import posixpath
+import re
+import subprocess
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+from specdev_tools.core.errors import make_error
+from specdev_tools.graph.contract import contract_view, item_of
+from specdev_tools.graph.gitview import (
+    GIT_TIMEOUT_SECONDS,
+    GitViewError,
+    archive_ref,
+    load_graph_at,
+    read_seed_texts,
+    spec_path_in_repo,
+)
+from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.trace.hashing import content_hash
+from specdev_tools.trace.lockfile import LockEntry
 
 ANCHOR_ROW_KIND = "anchor-row"
 MILESTONE_KIND = "roadmap-milestone"
@@ -63,3 +85,156 @@ def historical_node_ids(graph: Graph) -> set[str]:
         historical |= _contained(graph, milestone)
     historical |= {node.id for node in graph.nodes if node.milestone in milestones}
     return historical & {node.id for node in graph.gated_nodes()}
+
+
+# --- old text of a changed node ---------------------------------------------------------------------------------------
+
+MAX_COMMITS = 50
+NOTE_NO_EARLIER = "no earlier version found"
+NOTE_BASELINE = "stamped by migration, no earlier text recorded"
+NOTE_NO_HISTORY = "history unavailable"
+_SENTENCE_END = re.compile(r"(?<=[.!?]) ")
+
+
+@dataclass(frozen=True)
+class OldText:
+    """The old text of a node as lines, or, when it cannot be recovered, ``lines`` ``None`` and a ``note`` that says why."""
+
+    lines: tuple[str, ...] | None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class _OldTree:
+    """The spec at one commit: its graph and the text of its seed files."""
+
+    graph: Graph
+    seeds: Mapping[str, str]
+
+
+def _value_text(value: object) -> str:
+    return value if isinstance(value, str) else json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+def _view_lines(view: Mapping[str, object], prefix: str = "") -> list[str]:
+    fields = view.get("fields")
+    links = view.get("links")
+    criteria = view.get("criteria")
+    lines = [f"{prefix}{name}: {_value_text(value)}" for name, value in sorted(fields.items())] if isinstance(fields, Mapping) else []
+    if isinstance(links, Mapping):
+        lines += [f"{prefix}link {name}: {', '.join(ids)}" for name, ids in sorted(links.items())]
+    if isinstance(criteria, Mapping):
+        for criterion_id, criterion in sorted(criteria.items()):
+            lines += _view_lines(criterion, f"{criterion_id}.")
+    return lines
+
+
+def contract_lines(node: Node, graph: Graph, seed_texts: Mapping[str, str], aliases: Mapping[str, str] | None = None) -> list[str]:
+    """The contract text of *node* as lines, one per contract field or link (a criterion's lines start with its id).
+
+    A seed has no contract fields: its lines are the sentences of its text in *seed_texts* (none when it has no text).
+    *aliases* (alias id to current id) is passed through to ``contract_view``; the default is ``graph.alias_index``.
+    """
+    if node.kind == SEED_KIND:
+        return _SENTENCE_END.split(seed_texts.get(node.id, ""))
+    return _view_lines(contract_view(node, graph, graph.alias_index if aliases is None else aliases))
+
+
+def _git_output(git_root: str, args: list[str]) -> str:
+    """The stdout of ``git -C <git_root> <args>``; E708 when git is missing, too slow or fails."""
+    try:
+        process = subprocess.run(["git", "-C", git_root, *args], capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT_SECONDS)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise GitViewError(make_error("E708", f"git {args[0]} could not run: {exc}")) from exc
+    if process.returncode != 0:
+        raise GitViewError(make_error("E708", f"git {args[0]} failed in {git_root}: {' '.join(process.stderr.split())}"))
+    return process.stdout
+
+
+class OldTextResolver:
+    """Finds the text a node had when a lock entry was written, from git.
+
+    The lock holds hashes only.  For an entry, the resolver walks the commits that touched the target's file (newest
+    first, at most ``MAX_COMMITS``), builds the graph at each with the current toolkit and takes the first one where the
+    target's content hash equals the entry's.  A rename or a lock rewrite changes no hash, so neither hides the old
+    text.  The content hash is computed with the current contract fields, so after a change of those fields or for a
+    tree from before the node model no commit matches.  Graphs are cached per commit.
+    """
+
+    def __init__(self, graph: Graph, *, git_root: str, spec_root: str, repo_root: str) -> None:
+        self._graph = graph
+        self._git_root = git_root
+        self._spec_root = spec_root
+        self._repo_root = repo_root
+        self._trees: dict[str, _OldTree | None] = {}
+
+    def old_text(self, entry: LockEntry) -> OldText:
+        """The old text of the target of *entry*; ``lines`` is ``None`` with a note for a baseline entry, no git history
+        and no commit within the limit that matches."""
+        if entry.baseline:
+            return OldText(None, NOTE_BASELINE)
+        target = self._graph.find(entry.target)
+        if target is None:
+            return OldText(None, NOTE_NO_EARLIER)
+        try:
+            commits = self._commits(target)
+        except GitViewError:
+            return OldText(None, NOTE_NO_HISTORY)
+        for commit in commits:
+            tree = self._tree(commit)
+            lines = self._lines_matching(tree, target, entry.content_hash) if tree is not None else None
+            if lines is not None:
+                return OldText(tuple(lines))
+        return OldText(None, NOTE_NO_HISTORY if self._is_shallow() else NOTE_NO_EARLIER)
+
+    def _commits(self, target: Node) -> list[str]:
+        """Up to ``MAX_COMMITS`` commit ids that touched the file of *target*, newest first."""
+        path = target.file if target.kind == SEED_KIND else posixpath.join(spec_path_in_repo(self._spec_root, self._git_root), target.file)
+        return _git_output(self._git_root, ["log", "--format=%H", f"--max-count={MAX_COMMITS}", "--", path]).split()
+
+    def _is_shallow(self) -> bool:
+        try:
+            return _git_output(self._git_root, ["rev-parse", "--is-shallow-repository"]).strip() == "true"
+        except GitViewError:
+            return True
+
+    def _tree(self, commit: str) -> _OldTree | None:
+        """The spec at *commit*; ``None`` when it cannot be read or has no graph nodes."""
+        if commit not in self._trees:
+            try:
+                graph = load_graph_at(commit, self._git_root, spec_path_in_repo(self._spec_root, self._git_root), self._repo_root)
+                self._trees[commit] = _OldTree(graph, self._seed_texts_at(commit, graph))
+            except GitViewError:
+                self._trees[commit] = None
+        return self._trees[commit]
+
+    def _seed_texts_at(self, commit: str, graph: Graph) -> dict[str, str]:
+        """The seed texts at *commit*: the seed files archived from the host root (the git root) and read by the one reader."""
+        paths = sorted({node.file for node in graph.nodes if node.kind == SEED_KIND})
+        if not paths:
+            return {}
+        try:
+            with archive_ref(commit, self._git_root, paths) as root:
+                return read_seed_texts(graph, root)
+        except GitViewError:
+            texts: dict[str, str] = {}
+            for path in paths:
+                try:
+                    with archive_ref(commit, self._git_root, [path]) as root:
+                        texts.update(read_seed_texts(graph, root))
+                except GitViewError:
+                    continue
+            return texts
+
+    def _lines_matching(self, tree: _OldTree, target: Node, stored_hash: str) -> list[str] | None:
+        """The lines of *target* in *tree* when its content hash there equals *stored_hash*, else ``None``.
+
+        The node is looked up by its current id and by every alias that points at it.
+        """
+        aliases = self._graph.alias_index
+        names = [target.id, *sorted(alias for alias, current in aliases.items() if current == target.id)]
+        for name in names:
+            node = tree.graph.find(name)
+            if node is not None and content_hash(node.id, tree.graph, tree.seeds) == stored_hash:
+                return contract_lines(node, tree.graph, tree.seeds, aliases)
+        return None

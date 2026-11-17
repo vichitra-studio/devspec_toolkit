@@ -391,5 +391,32 @@ class TestGraphCommands(_CliMixin, unittest.TestCase):
             self.assertEqual(detect_toolkit_root(".", cwd=tmp), ".")
 
 
+class TestTraceCommands(_CliMixin, unittest.TestCase):
+    """The trace commands (``stale``), registered by ``trace.commands.add_trace_parsers`` (WI-M5-05)."""
+
+    def test_stale_accepts_the_three_root_flags_and_its_own(self):
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        args = cli.build_parser().parse_args(["stale", "--step", "06", "--diff", "--json", *flags])
+        self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        self.assertEqual((args.step, args.diff, args.json_output), ("06", True, True))
+        defaults = cli.build_parser().parse_args(["stale"])
+        self.assertEqual((defaults.step, defaults.diff, defaults.json_output), (None, False, False))
+
+    def test_stale_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["stale", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "stale: no pending replay")
+
+    def test_stale_json_flag_shape(self):
+        code, out, err = self._run_cli(["stale", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent), "--json"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(set(json.loads(out)), {"steps", "totals"})
+
+    def test_stale_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["stale", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
 if __name__ == "__main__":
     unittest.main()
