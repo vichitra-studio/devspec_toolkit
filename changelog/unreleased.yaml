@@ -320,8 +320,7 @@ changes:
   - type: change_schema
     description: >
       Step 15: trace and links are removed. Each interface_map[] row loses
-      interface_ref and method and requires row_id (a kebab-case id, unique in the
-      file), realises (at least one API id) and path; an API may be realised by
+      interface_ref and method and requires row_id (a kebab-case id), realises (at least one API id) and path; an API may be realised by
       several rows. Rows gain lifecycle, aliases and replaces. The node kind is
       scaffold-row. project_skeleton, validators, command_ref and build_status
       stay.
@@ -542,7 +541,9 @@ changes:
       the matrix checks of prompt_14_roadmap.md and prompt_16b_impl_coder.md
       (the values they read are among those specdev matrix leaves out); and
       prompt_13a_completeness_assessment.md, which copies the four coverage
-      numbers that completeness-check does not compute on that shape.
+      numbers that completeness-check does not compute on that shape. aliases
+      are stored and not yet followed: a link whose target is an alias of a node
+      is reported as E700 until a later 1.2.0 change resolves aliases.
     migration:
       action: none
 
@@ -596,10 +597,10 @@ changes:
   - type: remove_validator
     description: >
       Removed from the step validators, and reported by the graph check of
-      spec-check instead: the per-step duplicate-id checks (E520, for example step 04
+      spec-check instead: duplicate-id checks on node ids (E520, for example step 04
       fr_id), the step 12 E590 for a depends_on (1.1.1: requires) entry that names
       no job, and E141
-      (a job or task depends_on cycle, steps 12 and 14), which is retired in favour
+      (a cycle of job or task dependencies, steps 12 and 14), which is retired in favour
       of E703. A single-file specdev validate therefore no longer reports a job or
       task cycle or an unknown job in depends_on; spec-check does (E703, E700). A
       task depends_on cycle that runs through the tasks of two milestones is

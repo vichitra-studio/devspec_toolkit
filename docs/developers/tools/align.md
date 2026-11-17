@@ -86,7 +86,7 @@ specdev align validate --repo-root ./devspec_toolkit
 
 **Checks**:
 - Conformance to all schemas.
-- Trace integrity (all IDs referenced by `trace`, `targets`, `links` and `*_ref` / `*_refs` fields exist; `derives_from` links of steps 00 to 05 and the link fields of steps 06 to 16 (for example `constrains`, `verifies`, `schedules`, `threatens`, `mitigated_by`, `realises`, `refines`) are not checked by `align validate`; `specdev spec-check` checks them, for example E700 for a target no node has).
+- Trace integrity (all IDs referenced by `trace`, `targets`, `links` and `*_ref` / `*_refs` fields exist; the link fields of the 1.2.0 shape (for example `derives_from`, `constrains`, `verifies`, `schedules`, `threatens`, `mitigated_by`, `realises`, `refines`) are not checked by `align validate`; `specdev spec-check` checks them, for example E700 for a target no node has).
 - Presence of `_migration_notes` (warns if manual review needed).
 
 ### rollback
