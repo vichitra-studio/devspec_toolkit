@@ -1125,9 +1125,9 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E773 STEP_NOT_READY
 
-**Trigger**: `specdev step ready` found pending replay in a step the named step links to. Registered in 1.2.0; the command is not built yet.
+**Trigger**: `specdev step ready NN` found that step NN may not start: a step above it has no spec file, or holds pending replay (a suspect link, or a coverage gap). The steps checked are the steps NN's nodes link to, plus (for the presence check only) the `required_spec_inputs` of NN in `tools/step_order.json`; NN's own step is never checked. Exit 1; the report lists each blocker (node, link, roots) and the step to replay first.
 
-**Resolution**: Command refusal: no owner, no node id. Finish the replay of the steps the message names.
+**Resolution**: Command refusal: no owner, no node id. Finish the replay of the steps the message names, earliest step first (`specdev stale`, then `specdev attest`).
 
 **Promotable**: No (error only).
 

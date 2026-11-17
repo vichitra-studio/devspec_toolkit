@@ -13,6 +13,8 @@ The spec file is written first, then the lock (a crash between the two leaves a 
 edit adds gets a lock entry with the hashes its target has now; a link the edit removes, and every link a deleted node
 held, loses its entry; links other nodes held into a deleted node keep theirs.  Every write holds the write lock of the
 spec folder (E769 when another specdev write runs).  A refusal is a ``WriteRefusedError`` (E767); an unknown id is E706.
+
+``write_new_file`` is the same write for a spec file that does not exist yet (``specdev step create``).
 """
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ from typing import Any
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import (
+    JQ_INDENT,
     JsonUtilsError,
     check_edit,
     delete_text,
@@ -43,7 +46,7 @@ from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import contract_lines
-from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, with_write_lock, write_lock
+from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, with_write_lock, write_lock
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
 from specdev_tools.validation.linter_utils import graph_known_ids
 
@@ -136,6 +139,7 @@ class _Edit:
     node_id: str
     jq_path: str
     minted: tuple[str, ...] = ()
+    new_file: bool = False
 
 
 # --- finding the node -----------------------------------------------------------------------------------------------
@@ -235,7 +239,7 @@ def _nested_array(decl: KindDecl, field: str) -> KindDecl | None:
     return next((child for child in decl.nested if child.array_path.lstrip(".") == field.lstrip(".")), None)
 
 
-def _with_ids(item: Any, decl: KindDecl, taken: set[str], minted: list[str]) -> Any:
+def with_ids(item: Any, decl: KindDecl, taken: set[str], minted: list[str]) -> Any:
     """*item* (an object of kind *decl*) with an id for it, and for its nested items, minted where the id is missing.
 
     Each id minted is added to *taken* and appended to *minted*.
@@ -257,7 +261,7 @@ def _with_ids(item: Any, decl: KindDecl, taken: set[str], minted: list[str]) -> 
     for child in decl.nested:
         name = child.array_path.lstrip(".")
         if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) and isinstance(result.get(name), list):
-            result[name] = [_with_ids(entry, child, taken, minted) for entry in result[name]]
+            result[name] = [with_ids(entry, child, taken, minted) for entry in result[name]]
     return result
 
 
@@ -324,7 +328,7 @@ def _plan_node_edit(graph: Graph, spec_root: str, repo_root: str, request: Write
 def _minted_for_field(graph: Graph, decl: KindDecl | None, field: str, payload: Any, minted: list[str]) -> Any:
     """The payload of an insert into *field* with ids minted (and listed in *minted*) when the field holds a nested kind."""
     child = _nested_array(decl, field) if decl is not None else None
-    return _with_ids(payload, child, set(graph_known_ids(graph)), minted) if child is not None else payload
+    return with_ids(payload, child, set(graph_known_ids(graph)), minted) if child is not None else payload
 
 
 def _step_file(graph: Graph, step: str) -> str:
@@ -365,7 +369,7 @@ def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: Wri
     if problem is not None:
         raise _refuse(problem, code="E768")
     minted: list[str] = []
-    item = _with_ids(payload, decl, set(graph_known_ids(graph)), minted)
+    item = with_ids(payload, decl, set(graph_known_ids(graph)), minted)
     content = _read_file(spec_root, rel)
     try:
         new_text = insert_text(content, path, json.dumps(item), True, create=True)
@@ -488,31 +492,72 @@ def _plan_edit(graph: Graph, spec_root: str, repo_root: str, request: WriteReque
     return _plan_node_edit(graph, spec_root, repo_root, request)
 
 
-def _write_on(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: WriteRequest, *, write: bool) -> WriteResult:
-    edit = _plan_edit(graph, spec_root, repo_root, request)
+def _apply_edit(
+    graph: Graph, spec_root: str, repo_root: str, git_root: str, edit: _Edit, *, action: str, full: bool, write: bool
+) -> WriteResult:
+    """Judge *edit* against *graph* and, when *write*, write the spec file first and then the lock."""
     candidate = build_graph(spec_root, repo_root, overrides={edit.file: edit.document})
-    if request.action != "delete":
+    if action != "delete":
         _refuse_new_findings(graph, candidate)
     lock, seed_texts = read_lock(spec_root), read_seed_texts(graph, git_root)
     new_lock, written, removed = _lock_after(graph, candidate, lock, seed_texts)
     result = WriteResult(
-        action=request.action,
+        action=action,
         node_id=edit.node_id,
         file=edit.file,
         jq_path=edit.jq_path,
         written=write,
         minted=edit.minted,
-        targets=_written_targets(graph, candidate, seed_texts, request.full),
+        targets=_written_targets(graph, candidate, seed_texts, full),
         lock_written=written,
         lock_removed=removed,
         newly_suspect=_newly_suspect(graph, candidate, lock, new_lock, seed_texts),
         broken=tuple(broken_holders(graph, set(graph.by_id) - set(candidate.by_id))),
     )
     if write:
-        json_write_atomic(os.path.join(spec_root, edit.file), edit.new_text)
+        target = os.path.join(spec_root, edit.file)
+        if edit.new_file:
+            replace_file_atomically(target, edit.new_text)
+        else:
+            json_write_atomic(target, edit.new_text)
         if new_lock != lock:
             write_lock(spec_root, new_lock)
     return result
+
+
+def _write_on(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: WriteRequest, *, write: bool) -> WriteResult:
+    edit = _plan_edit(graph, spec_root, repo_root, request)
+    return _apply_edit(graph, spec_root, repo_root, git_root, edit, action=request.action, full=request.full, write=write)
+
+
+def write_new_file(
+    graph: Graph,
+    spec_root: str,
+    repo_root: str,
+    git_root: str,
+    rel: str,
+    document: dict[str, Any],
+    node_id: str,
+    minted: Sequence[str] = (),
+    *,
+    full: bool = False,
+    write: bool = True,
+) -> WriteResult:
+    """Create the spec file *rel* (relative to *spec_root*) from *document*, with the lock entries of its links.
+
+    The caller holds the write lock of the folder (when *write*), passes the *graph* it built under that lock and has
+    checked that the file does not exist and that *document* is valid against its schema.  The candidate graph must
+    resolve no worse than *graph* (E767 otherwise, nothing written); the lock gets one entry per link of the new nodes,
+    with the hashes their targets have now.  *node_id* names the file in the result; *minted* lists the ids made.
+    The result has ``action`` ``"create"``; the spec file is written first, then the lock.
+
+    Raises:
+        WriteRefusedError: E767 when the new file would leave a link that does not resolve or a duplicate id.
+        LockError: E760 when the lock file cannot be read.
+    """
+    text = json.dumps(document, indent=JQ_INDENT, ensure_ascii=False) + "\n"
+    edit = _Edit(rel, text, document, node_id, "", tuple(minted), new_file=True)
+    return _apply_edit(graph, spec_root, repo_root, git_root, edit, action="create", full=full, write=write)
 
 
 def execute_write(

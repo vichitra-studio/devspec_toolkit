@@ -97,7 +97,7 @@ def result_to_dict(result: WriteResult) -> dict[str, Any]:
     }
 
 
-_VERBS = {"patch": ("patched", "patch"), "insert": ("inserted into", "insert into"), "delete": ("deleted", "delete")}
+_VERBS = {"patch": ("patched", "patch"), "insert": ("inserted into", "insert into"), "delete": ("deleted", "delete"), "create": ("created", "create")}
 
 
 def _plural(count: int, noun: str) -> str:

@@ -486,5 +486,36 @@ class TestLockCommand(_CliMixin, unittest.TestCase):
             self.assertEqual(ours.read_text(encoding="utf-8"), self._lock_text("2"))
 
 
+class TestStepCommand(_CliMixin, unittest.TestCase):
+    """``specdev step create`` and ``step ready``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-10, WI-M5-11)."""
+
+    def test_create_takes_the_step_from_and_dry_run_and_the_root_flags(self):
+        args = cli.build_parser().parse_args(["step", "create", "04", "--from", "d.json", "--dry-run", "--json", "--git-root", "h", "--spec-root", "s", "--repo-root", "t"])
+        self.assertEqual((args.step, args.draft, args.dry_run, args.json_output, args.git_root), ("04", "d.json", True, True, "h"))
+        self.assertFalse(cli.build_parser().parse_args(["step", "create", "04", "--from", "d.json"]).dry_run)
+
+    def test_create_needs_the_step_and_from(self):
+        for argv in (["step", "create", "--from", "d.json"], ["step", "create", "04"]):
+            code, _, err = self._run_cli(argv)
+            self.assertEqual(code, 2, err)
+
+    def test_ready_takes_the_step_and_the_root_flags(self):
+        args = cli.build_parser().parse_args(["step", "ready", "06", "--json", "--git-root", "h", "--spec-root", "s", "--repo-root", "t"])
+        self.assertEqual((args.step, args.json_output, args.git_root, args.spec_root), ("06", True, "h", "s"))
+
+    def test_ready_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["step", "ready", "00", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
+        self.assertEqual((code, out.strip(), err), (0, "step 00: ready", ""))
+
+    def test_step_without_a_subcommand_is_a_usage_error(self):
+        code, _, _ = self._run_cli(["step"])
+        self.assertEqual(code, 2)
+
+    def test_ready_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["step", "ready", "06", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
 if __name__ == "__main__":
     unittest.main()

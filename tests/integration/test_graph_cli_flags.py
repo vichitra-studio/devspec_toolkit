@@ -25,6 +25,9 @@ _PLAN_ITEM = "PWRESET_CONFIRM_EXPIRED_01"
 _SKETCH = "02_system_sketch.json"
 _NFR = "nfr-latency-reset-email"
 _CONNECTION = "conn-identity-to-mailrelay"
+_SCAFFOLD_STEP = "15"
+_SCAFFOLD_FILE = "15_scaffold.json"
+_FR_FILE = "04_fr_list.json"
 
 
 def _flags(spec: Path, git_root: Path | None = None) -> list[str]:
@@ -314,18 +317,29 @@ _CASES: dict[str, tuple[list[str], str]] = {
     "diff": (["diff", "HEAD~1", "HEAD"], "groups"),
     "stale": (["stale"], "steps"),
     "attest": (["attest", "--prune"], "pruned"),
+    "step create": (["step", "create", _SCAFFOLD_STEP, "--dry-run", "--from"], "targets"),
+    "step ready": (["step", "ready", "00"], "blockers"),
 }
 _TEXT_START = {
     "node show": _CRITERION, "node <id>": _CRITERION, "node candidates": "api",
     "node status": f"{_CRITERION}: active -> deprecated", "trace walk": "trace of ac-password-reset-3",
     "trace recipe": "pack 16b for PWRESET_CONFIRM_EXPIRED_01", "diff": "diff HEAD~1 -> HEAD",
     "stale": "stale: pending replay by step", "attest": "attest --prune: no orphan",
+    "step create": "[dry-run] would create", "step ready": "step 00: ready",
 }
+
+
+def _detach_scaffold(host: Path, drafts: Path, name: str = _SCAFFOLD_FILE) -> Path:
+    """Move the step file *name* (default step 15) out of the host's spec folder, so ``step create`` can write it; the moved file is the draft."""
+    drafts.mkdir(exist_ok=True)
+    return Path(shutil.move(host / "spec" / name, drafts / name))
 
 
 @pytest.mark.parametrize("name", list(_CASES))
 def test_each_command_uses_the_three_root_flags_it_is_given_not_the_current_folder(name: str, host: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     argv, key = _CASES[name]
+    if name == "step create":
+        argv = [*argv, str(_detach_scaffold(host, tmp_path / "drafts"))]
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
     monkeypatch.chdir(elsewhere)
@@ -669,3 +683,43 @@ def test_json_id_raw_takes_the_value_as_a_string(id_host: Path) -> None:
     assert bare[0] == 1 and bare[1].startswith("E767") and "not valid JSON" in bare[1]
     assert run_cli("json", "patch", "--id", _FR_REQUEST, ".statement", text, "--raw", *flags)[0] == 0
     assert _statement(id_host, _FR_REQUEST) == text
+
+
+# --- step create: --from, --dry-run; step ready: --json (WI-M5-10, WI-M5-11) ------------------------------------------------
+
+def test_step_create_from_reads_the_draft_file(host: Path, tmp_path: Path) -> None:
+    flags = _flags(host / "spec", host)
+    whole = _detach_scaffold(host, tmp_path / "drafts", _FR_FILE)
+    document = json.loads(whole.read_text(encoding="utf-8"))
+    first = document["functional_requirements"][0]
+    extra = {**first, "fr_id": "fr-password-reset-audit", "acceptance_criteria": [{"scope": "in", "text": "Every reset is logged."}, {"scope": "in", "text": "A log line names no password."}]}
+    document["functional_requirements"].append(extra)
+    larger = tmp_path / "drafts" / "larger.json"
+    larger.write_text(json.dumps(document), encoding="utf-8")
+    full = _json(*run_cli("step", "create", "04", "--from", str(whole), "--dry-run", *flags, "--json"))
+    larger_run = _json(*run_cli("step", "create", "04", "--from", str(larger), "--dry-run", *flags, "--json"))
+    assert len(full["targets"]) == 2 and len(larger_run["targets"]) == 3
+    code, out = run_cli("step", "create", "04", "--from", str(tmp_path / "no-such-draft.json"), *flags)
+    assert code == 1 and out.startswith("E767") and "cannot read the draft" in out
+
+
+def test_step_create_dry_run_writes_nothing(host: Path, tmp_path: Path) -> None:
+    flags = _flags(host / "spec", host)
+    draft = _detach_scaffold(host, tmp_path / "drafts")
+    lock_before = _lock_text(host)
+    argv = ["step", "create", _SCAFFOLD_STEP, "--from", str(draft), *flags]
+    assert run_cli(*argv, "--dry-run")[0] == 0
+    assert not (host / "spec" / _SCAFFOLD_FILE).exists() and _lock_text(host) == lock_before
+    assert run_cli(*argv)[0] == 0 and (host / "spec" / _SCAFFOLD_FILE).exists()
+
+
+def test_step_ready_json_prints_the_blockers_as_the_envelope(full_host: Path) -> None:
+    flags = _flags(full_host / "spec", full_host)
+    status, out = run_cli("step", "ready", "05", *flags, "--json")
+    document = json.loads(out)
+    assert status == 1 and document["command"] == "step ready" and document["status"] == "FAIL" and document["error_count"] == 1
+    assert document["errors"][0]["code"] == "E773" and document["step"] == "05" and document["ready"] is False
+    assert document["replay_first"] == "02" and document["upstream"] == ["00", "02", "04"]
+    assert [(b["step"], b["reason"], b["node"], b["field"], b["target"]) for b in document["blockers"]] == [("02", "suspect", _CONNECTION, "connects_to", "tp-mailrelay")]
+    status, out = run_cli("step", "ready", "04", *flags, "--json")
+    assert status == 0 and json.loads(out)["status"] == "PASS" and json.loads(out)["blockers"] == []

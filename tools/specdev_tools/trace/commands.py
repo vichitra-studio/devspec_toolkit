@@ -1,4 +1,4 @@
-"""The trace commands of the CLI: ``specdev stale`` (the replay), ``attest`` and ``lock``, and the commands later work items add here.
+"""The trace commands of the CLI: ``specdev stale`` (the replay), ``attest``, ``lock`` and ``step``, and the commands later work items add here.
 
 ``cli.py`` registers every command of this module with one call, ``add_trace_parsers``, and runs the handler a parser
 names with ``set_defaults(handler=...)``.  To add a command: write its ``run_<name>(args) -> int`` handler here (follow
@@ -8,21 +8,25 @@ is argparse's alone), add its parser in ``add_trace_parsers`` and end that with 
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import sys
 from contextlib import nullcontext
 from typing import Any
 
 from specdev_tools.core.errors import FindingError, make_error
+from specdev_tools.core.step_order import load_step_order
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.graph.commands import add_root_flags, print_json, run_on_graph, usage_error
 from specdev_tools.graph.gitview import read_seed_texts, spec_path_in_repo
 from specdev_tools.graph.kinds import SEED_STEP
 from specdev_tools.graph.model import Graph
-from specdev_tools.trace import attest, replay
+from specdev_tools.trace import attest, replay, step_ready
 from specdev_tools.trace.history import OldTextResolver
+from specdev_tools.trace.id_write_commands import render_text as render_write, result_to_dict as write_to_dict
 from specdev_tools.trace.lockfile import Lock, read_lock, with_write_lock, write_lock
 from specdev_tools.trace.merge_driver import install_driver, merge_files
+from specdev_tools.trace.step_create import StepCreateRequest, create_step
 
 STALE_DESCRIPTION = (
     "Show what is still to be re-read after an upstream change: the suspect links (links whose target changed after "
@@ -62,9 +66,23 @@ LOCK_DESCRIPTION = (
     "                                per clone, so run it once in each fresh clone."
 )
 
+STEP_DESCRIPTION = (
+    "Create the artifact of a step and ask whether a step may start.\n\n"
+    "Subcommands:\n"
+    "  create NN --from DRAFT   Write spec/<NN file> from the draft artifact (the whole JSON document; ids of\n"
+    "                           sub-items may be left out and are minted). The draft is checked against the step's\n"
+    "                           schema, every link must resolve, and the lock gets an entry for every link. Prints each\n"
+    "                           link target with its contract text. Refused (E767, exit 1) when the step already has a\n"
+    "                           file (edit it with `specdev json patch|insert|delete --id`) or is 13a or 16. Writes\n"
+    "                           nothing with --dry-run.\n"
+    "  ready NN                 Exit 0 when step NN may start; exit 1 (E773) when a step above it is missing or has\n"
+    "                           pending replay (a suspect link or a coverage gap), listing each blocker and the step to\n"
+    "                           replay first. An unknown step is E706, exit 1."
+)
+
 
 def add_trace_parsers(sub: Any) -> None:
-    """Register the trace commands (``stale``, ``lock``) on the top-level sub-parsers action *sub*."""
+    """Register the trace commands (``stale``, ``attest``, ``lock``, ``step``) on the top-level sub-parsers action *sub*."""
     stale = sub.add_parser("stale", help="List the pending replay by step: suspect links and coverage gaps", description=STALE_DESCRIPTION)
     stale.add_argument("--step", metavar="NN", help="Only the replay of this step: the suspect links its nodes hold (what changed above them)")
     stale.add_argument("--diff", action="store_true", help="Add, per root, the diff of its contract text against the text the link was accepted with (reads git history)")
@@ -98,6 +116,19 @@ def add_trace_parsers(sub: Any) -> None:
     install.add_argument("--driver-command", required=True, help="Command git runs, before the four file arguments, for example '<venv>/bin/specdev lock merge'; quote what a shell needs quoted")
     add_root_flags(install)
     install.set_defaults(handler=run_lock_install_driver)
+
+    step = sub.add_parser("step", help="Create the artifact of a step; check that a step may start", description=STEP_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
+    step_sub = step.add_subparsers(dest="step_cmd", required=True)
+    create = step_sub.add_parser("create", help="Write the artifact of a step from a draft", description="Write the artifact of step NN from the draft file given with --from.")
+    create.add_argument("step", metavar="NN", help="The step to create, for example 04 or 02a")
+    create.add_argument("--from", required=True, dest="draft", metavar="DRAFT", help="JSON file holding the whole artifact; ids of sub-items may be left out")
+    create.add_argument("--dry-run", action="store_true", dest="dry_run", help="Print the same report and write nothing")
+    add_root_flags(create)
+    create.set_defaults(handler=run_step_create)
+    ready = step_sub.add_parser("ready", help="Check that nothing above a step is still to be replayed", description="Exit 0 when step NN may start, 1 (E773) when a step above it is missing or has pending replay.")
+    ready.add_argument("step", metavar="NN", help="The step to check, for example 06")
+    add_root_flags(ready)
+    ready.set_defaults(handler=run_step_ready)
 
 
 def _require_known_step(graph: Graph, step: str) -> None:
@@ -201,6 +232,54 @@ def _attest(args: argparse.Namespace, graph: Graph) -> int:
 def run_attest(args: argparse.Namespace) -> int:
     """Run ``specdev attest`` on the parsed *args*; returns the exit code."""
     return run_on_graph("attest", args, lambda graph: _attest(args, graph))
+
+
+def _step_create(args: argparse.Namespace, graph: Graph) -> int:
+    _require_known_step(graph, args.step)
+    result = create_step(
+        graph,
+        os.path.abspath(args.spec_root),
+        os.path.abspath(args.repo_root),
+        os.path.abspath(args.git_root),
+        StepCreateRequest(args.step, args.draft),
+        dry_run=args.dry_run,
+    )
+    if args.json_output:
+        print_json(write_to_dict(result))
+    else:
+        print(render_write(result))
+    return 0
+
+
+def run_step_create(args: argparse.Namespace) -> int:
+    """Run ``specdev step create`` on the parsed *args*; returns the exit code (0 written, 1 refused)."""
+    return run_on_graph("step create", args, lambda graph: _step_create(args, graph))
+
+
+def _step_present(graph: Graph, spec_root: str, step: str) -> bool:
+    """True when a spec file of *step* exists: a file the registry assigns to it, or ``<step>_*.json`` in the spec folder."""
+    return bool(graph.shape.files_by_step.get(step)) or bool(glob.glob(os.path.join(glob.escape(spec_root), f"{step}_*.json")))
+
+
+def _step_ready(args: argparse.Namespace, graph: Graph) -> int:
+    _require_known_step(graph, args.step)
+    spec_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.git_root)
+    plan = replay.compute_replay(graph, read_lock(spec_root), read_seed_texts(graph, git_root))
+    required = load_step_order(os.path.abspath(args.repo_root)).get("step_metadata", {}).get(args.step, {}).get("required_spec_inputs", [])
+    readiness = step_ready.check_ready(graph, plan, args.step, required, lambda step: _step_present(graph, spec_root, step))
+    errors = [] if readiness.ready else [step_ready.not_ready_error(readiness)]
+    if args.json_output:
+        print(format_errors_json(errors, context={"command": "step ready", **step_ready.to_dict(readiness)}))
+    else:
+        print(step_ready.render_text(readiness))
+        for error in errors:
+            print(error.render(), file=sys.stderr)
+    return 0 if readiness.ready else 1
+
+
+def run_step_ready(args: argparse.Namespace) -> int:
+    """Run ``specdev step ready`` on the parsed *args*; returns the exit code (0 ready, 1 not ready: E773)."""
+    return run_on_graph("step ready", args, lambda graph: _step_ready(args, graph))
 
 
 def _report_finding(error: FindingError, command: str, json_output: bool) -> int:

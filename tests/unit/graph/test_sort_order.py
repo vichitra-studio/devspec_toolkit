@@ -323,3 +323,43 @@ def test_write_report_lists_targets_and_newly_suspect_steps_in_step_then_id_orde
     assert [item["step"] for item in report["newly_suspect"]] == _WRITE_STEPS
     pairs = [(link["holder"], link["field"]) for link in report["broken"]]
     assert len(pairs) >= 2 and pairs == sorted(pairs)
+
+
+# --- trace/step_create.py, trace/step_ready.py  the targets of a created step and the blockers of `step ready` ------------------------
+
+_STEP_READY_BLOCKER_STEPS = ["06", "08", "13a"]
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_step_create_lists_targets_in_step_then_id_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    """The draft lists its requirements in reverse order; the targets come out by holder id, then field and target."""
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    draft = tmp_path / "04_fr_list.json"
+    document = json.loads((host / "spec" / "04_fr_list.json").read_text(encoding="utf-8"))
+    document["functional_requirements"].reverse()
+    draft.write_text(json.dumps(document), encoding="utf-8")
+    (host / "spec" / "04_fr_list.json").unlink()
+    flags = ["--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host)]
+    result = run_specdev_seeded(seed, "step", "create", "04", "--from", str(draft), "--dry-run", "--json", *flags)
+    assert result.returncode == 0, result.stderr
+    triples = [(item["holder"], item["field"], item["target"]) for item in json.loads(result.stdout)["targets"]]
+    assert len(triples) >= 2 and triples == sorted(triples)
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_step_ready_blockers_are_listed_in_step_then_id_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    """Step 14 links into 06 and 08, which hold suspects after a criterion edit, and lists input 13a, which has no file."""
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    criteria = host / "spec" / "04_fr_list.json"
+    document = json.loads(criteria.read_text(encoding="utf-8"))
+    document["functional_requirements"][0]["acceptance_criteria"][2]["text"] += " Also reject a token issued for another account."
+    criteria.write_text(json.dumps(document), encoding="utf-8")
+    flags = ["--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host)]
+    result = run_specdev_seeded(seed, "step", "ready", "14", "--json", *flags)
+    assert result.returncode == 1, result.stderr
+    blockers = json.loads(result.stdout)["blockers"]
+    assert list(dict.fromkeys(blocker["step"] for blocker in blockers)) == _STEP_READY_BLOCKER_STEPS
+    in_08 = [(blocker["node"], blocker["field"], blocker["target"]) for blocker in blockers if blocker["step"] == "08"]
+    assert len(in_08) >= 2 and in_08 == sorted(in_08)
