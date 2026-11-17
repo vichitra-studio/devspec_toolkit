@@ -79,7 +79,8 @@
     },
     "verifiers": {
       "members": [
-        "fix-password-reset-expired-token"
+        "fix-password-reset-expired-token",
+        "ver-password-reset-expired-token"
       ],
       "containers": []
     },

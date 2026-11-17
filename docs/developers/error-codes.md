@@ -1133,9 +1133,9 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E774 RECORD_INVALID
 
-**Trigger**: A verification or evidence record does not have the record format. Registered in 1.2.0; the check that raises it is not built yet.
+**Trigger**: A file under `spec/extras/verification/` is not a valid record. Reported by `spec-check` (check `records`) for a file that is not a JSON object, violates the schema its `$schema` names (a second record in the file, an id with the wrong prefix, no `output_guard`, an unknown `stage`, a malformed `output_hash`), holds no record of the kind its name prefix declares (`ver-` for a verification record, `evd-` for an evidence record), or has a file name that is not its record id. A `verifies` or `about` id that no node has is E700 from the `graph` check, not E774.
 
-**Resolution**: Owner `merge-check`. Fix the record the message names.
+**Resolution**: Owner `merge-check`. Fix the record the message names. Records are written by the toolkit, not by hand.
 
 **Promotable**: No (error only).
 

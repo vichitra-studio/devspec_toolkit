@@ -21,7 +21,7 @@ from specdev_tools.graph.commands import add_root_flags, print_json, run_on_grap
 from specdev_tools.graph.gitview import read_seed_texts, spec_path_in_repo
 from specdev_tools.graph.kinds import SEED_STEP
 from specdev_tools.graph.model import Graph
-from specdev_tools.trace import attest, replay, step_ready
+from specdev_tools.trace import attest, coverage, replay, step_ready
 from specdev_tools.trace.history import OldTextResolver
 from specdev_tools.trace.id_write_commands import render_text as render_write, result_to_dict as write_to_dict
 from specdev_tools.trace.lockfile import Lock, read_lock, with_write_lock, write_lock
@@ -81,8 +81,24 @@ STEP_DESCRIPTION = (
 )
 
 
+COVERAGE_DESCRIPTION = (
+    "Show how the obligations of the graph are linked, read from the reverse index. Information only: exit 0 whatever "
+    "it finds (no rule requires an FR to have an API or a capability to have an FR; the role-rule findings are the "
+    "gate of spec-check).\n\n"
+    "Default view: the FRs with an API, the FRs with a fixture (a fixture that verifies one of the FR's criteria) and "
+    "the capabilities with an FR, each as linked/total/ratio with the ids that are not linked; the criteria that have "
+    "a current refinement (a step-14 task criterion that refines it, whose lock entry still holds the criterion's "
+    "present content hash); the exempt nodes (lifecycle not_applicable, scope later or out), which are left out of every "
+    "count; and the role findings of the coverage-gap seam, grouped by owning step.\n\n"
+    "--by fr prints the matrix instead: per in-scope FR, the nodes that link the FR or one of its criteria directly, "
+    "grouped by kind, each with 'current' (the lock entry's content hash equals the target's now), 'suspect' and "
+    "'historical'; and per criterion 'refined': current, stale (refinements exist, none current) or none. Direct "
+    "links only, nothing through an API."
+)
+
+
 def add_trace_parsers(sub: Any) -> None:
-    """Register the trace commands (``stale``, ``attest``, ``lock``, ``step``) on the top-level sub-parsers action *sub*."""
+    """Register the trace commands (``stale``, ``attest``, ``lock``, ``step``, ``coverage``) on the top-level sub-parsers action *sub*."""
     stale = sub.add_parser("stale", help="List the pending replay by step: suspect links and coverage gaps", description=STALE_DESCRIPTION)
     stale.add_argument("--step", metavar="NN", help="Only the replay of this step: the suspect links its nodes hold (what changed above them)")
     stale.add_argument("--diff", action="store_true", help="Add, per root, the diff of its contract text against the text the link was accepted with (reads git history)")
@@ -129,6 +145,14 @@ def add_trace_parsers(sub: Any) -> None:
     ready.add_argument("step", metavar="NN", help="The step to check, for example 06")
     add_root_flags(ready)
     ready.set_defaults(handler=run_step_ready)
+
+    coverage_p = sub.add_parser(
+        "coverage", help="Show link counts and the FR matrix over the reverse index (information only)", description=COVERAGE_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    coverage_p.add_argument("--by", choices=["fr"], help="Print the matrix of the FRs: their criteria and the nodes that link them directly")
+    add_root_flags(coverage_p)
+    coverage_p.set_defaults(handler=run_coverage)
 
 
 def _require_known_step(graph: Graph, step: str) -> None:
@@ -280,6 +304,33 @@ def _step_ready(args: argparse.Namespace, graph: Graph) -> int:
 def run_step_ready(args: argparse.Namespace) -> int:
     """Run ``specdev step ready`` on the parsed *args*; returns the exit code (0 ready, 1 not ready: E773)."""
     return run_on_graph("step ready", args, lambda graph: _step_ready(args, graph))
+
+
+def _coverage_matrix(args: argparse.Namespace, graph: Graph, lock: Lock, seed_texts: dict[str, str]) -> None:
+    matrix, exempt = coverage.build_fr_matrix(graph, lock, seed_texts), tuple(coverage.exempt_nodes(graph))
+    if args.json_output:
+        print_json(coverage.matrix_to_dict(matrix, exempt))
+    else:
+        print(coverage.render_matrix(matrix, exempt))
+
+
+def _coverage(args: argparse.Namespace, graph: Graph) -> int:
+    lock = read_lock(os.path.abspath(args.spec_root))
+    seed_texts = read_seed_texts(graph, os.path.abspath(args.git_root))
+    if args.by == "fr":
+        _coverage_matrix(args, graph, lock, seed_texts)
+        return 0
+    report = coverage.build_report(graph, lock, seed_texts)
+    if args.json_output:
+        print_json(coverage.report_to_dict(report))
+    else:
+        print(coverage.render_report(report))
+    return 0
+
+
+def run_coverage(args: argparse.Namespace) -> int:
+    """Run ``specdev coverage`` on the parsed *args*; returns the exit code (0: it only informs)."""
+    return run_on_graph("coverage", args, lambda graph: _coverage(args, graph))
 
 
 def _report_finding(error: FindingError, command: str, json_output: bool) -> int:

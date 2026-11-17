@@ -50,8 +50,8 @@ _KIND_ROLE_TABLE_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "graph" / "kind_r
 _UNLISTED_KINDS = frozenset({"extension"})
 """Registered kinds the table leaves out: step 13 extension kinds are declared when they become first-class."""
 
-_UNREGISTERED_KINDS = frozenset({"seed", "evidence-record", "execution-record", "review-record", "verification-record"})
-"""Table kinds with no registry entry: the seed is an external kind, the records arrive with a later milestone."""
+_UNREGISTERED_KINDS = frozenset({"seed", "execution-record", "review-record"})
+"""Table kinds with no registry entry: the seed is an external kind, the execution and review records arrive with a later milestone."""
 
 
 def _run_generator() -> tuple[dict[str, Any], dict[str, Any]]:

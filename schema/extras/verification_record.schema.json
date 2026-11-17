@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:extras:verification-record",
+  "title": "Verification Record",
+  "description": "A verification record binds the commands that prove a fixture, a CI job or a rule to the output they must print. One record per file, spec/extras/verification/ver-<id>.json, written by the toolkit and never by hand. The file holds a records array of exactly one record, and the file name without .json is the record id.",
+  "type": "object",
+  "required": ["records"],
+  "additionalProperties": false,
+  "properties": {
+    "records": {
+      "description": "The one verification record of this file.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "x-node": {
+        "kind": "verification-record",
+        "role": "record",
+        "contract": ["verifies", "stage", "commands", "output_guard"],
+        "id": "verification_id",
+        "files": ["extras/verification/ver-*.json"]
+      },
+      "items": {
+        "description": "A verification record: what it verifies, at which stage, the commands to run and the guard the output must match.",
+        "type": "object",
+        "required": ["verification_id", "verifies", "commands", "output_guard"],
+        "additionalProperties": false,
+        "properties": {
+          "verification_id": {
+            "description": "Id of this record: ver- followed by a kebab-case name. Equals the file name without .json.",
+            "type": "string",
+            "pattern": "^ver-[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "verifies": {
+            "description": "Ids of the fixtures, CI jobs or rules these commands prove.",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "vc:core:atoms#kebabId"},
+            "x-link": {
+              "kinds": ["fixture", "job", "rule"],
+              "required": true
+            }
+          },
+          "stage": {
+            "description": "Stage at which the commands run: dev, ci, staging or prod. Default dev. Evidence from a later stage on the same code tree also satisfies an earlier stage, never the reverse.",
+            "$ref": "vc:core:collections#stageName",
+            "default": "dev"
+          },
+          "commands": {
+            "description": "The commands to run, each a shell command line. At least one.",
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "output_guard": {
+            "description": "A regular expression the output of the commands must match. It is the only protection against a command that exits 0 having run nothing, so it is required; use the test's own name or a line only a real run prints.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

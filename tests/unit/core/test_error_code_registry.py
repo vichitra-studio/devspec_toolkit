@@ -29,10 +29,9 @@ EXPECTED_PROMOTABLE_PAIRS = {
 # Registered codes with no string literal outside errors.py that are not the E side
 # of a PROMOTABLE_PAIRS row: kept for compatibility or reserved, not emitted.
 # A code that a work item registers before the code that writes it exists stays here until that work item writes it
-# as a literal (the trace-lock codes below are written by WI-M5-15).
+# as a literal.
 REGISTERED_WITHOUT_EMITTER = {
     "E422", "E561", "E604", "E620", "W150", "W591",
-    "E774",
     # W595 is emitted, but only inside longer message strings (context freshness in cli.py, context/seed_indexer.py),
     # which the literal pattern above does not match; file-level forward replay, which wrote it as a literal, is gone.
     "W595",

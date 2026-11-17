@@ -2026,6 +2026,68 @@
       ],
       "step": "16"
     },
+    "extras/verification/evd-*.json": {
+      "arrays": [
+        {
+          "array_path": ".records",
+          "contract": [
+            "type",
+            "about",
+            "stage",
+            "tested_tree",
+            "exit_code",
+            "guard_matched",
+            "output_hash",
+            "installed_versions"
+          ],
+          "id_field": "evidence_id",
+          "kind": "evidence-record",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        }
+      ],
+      "step": "extras"
+    },
+    "extras/verification/ver-*.json": {
+      "arrays": [
+        {
+          "array_path": ".records",
+          "contract": [
+            "verifies",
+            "stage",
+            "commands",
+            "output_guard"
+          ],
+          "id_field": "verification_id",
+          "kind": "verification-record",
+          "links": [
+            {
+              "built": false,
+              "field": "verifies",
+              "kinds": [
+                "fixture",
+                "job",
+                "rule"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        }
+      ],
+      "step": "extras"
+    },
     "impl_context/ms_*_plan.json": {
       "arrays": [
         {

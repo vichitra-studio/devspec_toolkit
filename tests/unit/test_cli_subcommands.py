@@ -445,6 +445,33 @@ class TestTraceCommands(_CliMixin, unittest.TestCase):
         self.assertTrue(err.startswith("E520"), err)
 
 
+class TestCoverageCommand(_CliMixin, unittest.TestCase):
+    """``specdev coverage``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-14)."""
+
+    def test_coverage_accepts_the_three_root_flags_and_its_own(self):
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        args = cli.build_parser().parse_args(["coverage", "--by", "fr", "--json", *flags])
+        self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        self.assertEqual((args.by, args.json_output), ("fr", True))
+        defaults = cli.build_parser().parse_args(["coverage"])
+        self.assertEqual((defaults.by, defaults.json_output), (None, False))
+
+    def test_coverage_by_takes_only_fr(self):
+        code, _, err = self._run_cli(["coverage", "--by", "capability"])
+        self.assertEqual(code, 2)
+        self.assertIn("invalid choice", err)
+
+    def test_coverage_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["coverage", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent), "--json"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["command"], "coverage")
+
+    def test_coverage_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["coverage", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
 class TestLockCommand(_CliMixin, unittest.TestCase):
     """``specdev lock merge`` and ``lock install-driver``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-07)."""
 

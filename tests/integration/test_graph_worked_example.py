@@ -51,6 +51,10 @@ def test_pack_16b_matches_doc_12_22(expected: dict[str, Any], pack_json: dict[st
         "members": {"fr-password-reset", "cap-account-recovery", "scope-password-reset"},
         "containers": set(),
     }
+    assert found["verifiers"] == {
+        "members": {"fix-password-reset-expired-token", "ver-password-reset-expired-token"},
+        "containers": set(),
+    }
     pins = {row["id"]: row["pin"] for row in pack_json["sections"]["third parties"]}
     assert pins == expected["pins"] == {"tp-argon2": "0.41.1", "tp-mailrelay": "api-v3"}
     assert all(row["pin"] in row["label"] for row in pack_json["sections"]["third parties"])
@@ -99,7 +103,7 @@ def test_pack_16b_leaves_out_what_the_doc_leaves_out(pack_json: dict[str, Any]) 
     everything = {row["id"] for rows in pack_json["sections"].values() for row in rows}
     assert everything.isdisjoint({"identity-service", "seed-accounts", "seg-registered-member", "need-fewer-reset-tickets"})
     assert everything.isdisjoint({"fix-password-reset-reused-token", "term-reset-email-delivery-time-p95"})
-    assert not any(name.startswith("ver-") for name in everything)
+    assert {name for name in everything if name.startswith(("ver-", "evd-"))} == {"ver-password-reset-expired-token"}
 
 
 # --- the worked example under the commands and the mutations of the test plan (section 7, items 3 and 6) ------------

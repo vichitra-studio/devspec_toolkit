@@ -65,7 +65,7 @@ def _registered_steps(doc: dict) -> set[str]:
     for _bn, entry in doc.get("registry", {}).items():
         if not entry.get("_special", False):
             step = entry.get("step")
-            if step:
+            if step and step != "extras":  # record hosts (extras/verification/*) belong to no pipeline step
                 registered.add(step)
     return registered
 

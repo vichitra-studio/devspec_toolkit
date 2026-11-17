@@ -76,6 +76,9 @@
       "path": "context structure"
     },
     {
+      "path": "coverage"
+    },
+    {
       "path": "dag-lint"
     },
     {

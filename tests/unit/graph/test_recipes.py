@@ -40,6 +40,9 @@ START_16A = "task-implement-password-reset-confirm"
 START_16C = "ms-account-recovery"
 STARTS = {"16a": START_16A, "16b": START_16B, "16c": START_16C}
 PLAN_FILE = "impl_context/ms_account_recovery_plan.json"
+VERIFICATION_RECORD = "ver-password-reset-expired-token"
+EVIDENCE_FILE = "extras/verification/evd-attest-expired-token.json"
+EVIDENCE_RECORD = "evd-attest-expired-token"
 SKETCH_FILE = "02_system_sketch.json"
 WRONG_VALUES = [None, 5, True, [], {}, ["x"]]
 
@@ -89,7 +92,32 @@ def test_pack_16a_adds_needs_and_assumptions(example: Graph, table: RecipeTable)
     assert sections["core criteria"] == {"tc-confirm-expired-token", "tc-confirm-reused-token", "ms-account-recovery"}
     assert sections["obligations"] == {"ac-password-reset-3", "fr-password-reset", "inv-reset-token-single-use"}
     assert {"identity-service", "contract-tests", "ci"} <= sections["delivery"]
-    assert sections["verifiers"] == {"fix-password-reset-expired-token", "fix-password-reset-reused-token"}
+    assert sections["verifiers"] == {"fix-password-reset-expired-token", "fix-password-reset-reused-token", VERIFICATION_RECORD}
+
+
+def _attestation_about(node_id: str) -> dict[str, Any]:
+    return {
+        "$schema": "vc:extras:evidence-record",
+        "records": [{"evidence_id": EVIDENCE_RECORD, "type": "attestation", "about": [node_id], "tested_tree": "9a41c7e2"}],
+    }
+
+
+def test_verifier_section_places_the_verification_and_evidence_kinds(example: Graph, table: RecipeTable) -> None:
+    placed = {
+        role: {kind for section in table.sections if section.name == "verifiers" and role in section.roles for kind in section.emitted_kinds}
+        for role in ("16a", "16b", "16c")
+    }
+    assert placed == {
+        "16a": {"fixture", "job", "verification-record"},
+        "16b": {"fixture", "job", "verification-record"},
+        "16c": {"fixture", "job", "verification-record", "evidence-record"},
+    }
+    graph = _with_docs(example, {EVIDENCE_FILE: lambda document: document.update(_attestation_about("fix-password-reset-expired-token"))})
+    assert graph.by_id[EVIDENCE_RECORD].kind == "evidence-record"
+    verifiers = {role: _sections(build_pack(graph, table, role, STARTS[role]))["verifiers"] for role in STARTS}
+    assert VERIFICATION_RECORD in verifiers["16a"] and VERIFICATION_RECORD in verifiers["16b"]
+    assert EVIDENCE_RECORD not in verifiers["16a"] | verifiers["16b"]
+    assert {VERIFICATION_RECORD, EVIDENCE_RECORD} <= verifiers["16c"]
 
 
 def test_pack_16b_has_neither_needs_nor_segments(example: Graph, table: RecipeTable) -> None:
@@ -109,7 +137,7 @@ def test_pack_16c_milestone_scope(example: Graph, table: RecipeTable) -> None:
         "milestone-account-recovery",
     }
     assert {"identity-service", "contract-tests"} <= sections["delivery"]
-    assert sections["verifiers"] == {"fix-password-reset-expired-token", "fix-password-reset-reused-token"}
+    assert sections["verifiers"] == {"fix-password-reset-expired-token", "fix-password-reset-reused-token", VERIFICATION_RECORD}
     assert "assumptions" not in sections and "needs" not in sections
 
 

@@ -320,6 +320,7 @@ _CASES: dict[str, tuple[list[str], str]] = {
     "attest": (["attest", "--prune"], "pruned"),
     "step create": (["step", "create", _SCAFFOLD_STEP, "--dry-run", "--from"], "targets"),
     "step ready": (["step", "ready", "00"], "blockers"),
+    "coverage": (["coverage"], "counts"),
 }
 _TEXT_START = {
     "node show": _CRITERION, "node <id>": _CRITERION, "node candidates": "api",
@@ -328,6 +329,7 @@ _TEXT_START = {
     "trace recipe": "pack 16b for PWRESET_CONFIRM_EXPIRED_01", "diff": "diff HEAD~1 -> HEAD",
     "stale": "stale: pending replay by step", "attest": "attest --prune: no orphan",
     "step create": "[dry-run] would create", "step ready": "step 00: ready",
+    "coverage": "Link counts",
 }
 
 
@@ -442,6 +444,33 @@ def test_stale_json_prints_the_suspects_by_step_and_the_totals(host: Path) -> No
     assert set(document) == {"steps", "totals"}
     assert document["totals"]["suspect_links"] == sum(len(node["links"]) for step in document["steps"] for node in step["suspect_nodes"])
     assert [step["step"] for step in document["steps"]][:3] == ["00", "01", "02"]
+
+
+# --- coverage: --by, --json --------------------------------------------------------------------------------------------
+
+def test_coverage_by_fr_prints_the_matrix_of_the_frs(host: Path) -> None:
+    flags = _flags(host / "spec", host)
+    text = run_cli("coverage", "--by", "fr", *flags)[1]
+    assert text.startswith("fr-password-reset  ") and f"  {_CRITERION}  refined: current" in text
+    assert "Link counts" not in text
+    document = _json(*run_cli("coverage", "--by", "fr", *flags, "--json"))
+    assert set(document) == {"command", "by", "by_fr", "exempt"} and document["by"] == "fr"
+    assert [row["id"] for row in document["by_fr"]] == ["fr-password-reset", "fr-password-reset-request"]
+    criterion = next(item for item in document["by_fr"][0]["criteria"] if item["id"] == _CRITERION)
+    assert criterion["refined"] == "current"
+    fixtures = next(group for group in criterion["groups"] if group["kind"] == "fixture")
+    # the host re-pins a third party in its second commit: the fixture's chain stamp moved, its own content did not
+    assert fixtures["links"] == [{"node": "fix-password-reset-expired-token", "field": "verifies", "current": True, "suspect": True, "historical": False}]
+
+
+def test_coverage_json_prints_the_counts_as_json(host: Path) -> None:
+    flags = _flags(host / "spec", host)
+    document = _json(*run_cli("coverage", *flags, "--json"))
+    assert set(document) == {"command", "counts", "criteria_refined", "exempt", "role_findings"}
+    assert set(document["counts"]) == {"fr_api_coverage", "fr_fixture_coverage", "capability_fr_coverage"}
+    assert document["counts"]["capability_fr_coverage"] == {"linked": 1, "total": 1, "ratio": 1.0, "unlinked": []}
+    assert document["role_findings"] == {"counts": {}, "by_step": []}
+    assert not run_cli("coverage", *flags)[1].lstrip().startswith("{")
 
 
 # --- attest: the node, --field, --target, --step, --yes, --dry-run, --prune, --json -------------------------------------

@@ -123,12 +123,23 @@
       "kinds": ["third-party"]
     },
     {
-      "name": "verifiers", "roles": ["16a", "16b", "16c"], "start_set": ["core criteria", "obligations", "APIs and errors"],
+      "name": "verifiers", "roles": ["16a", "16b"], "start_set": ["core criteria", "obligations", "APIs and errors"],
       "hops": [
         {"verb": "verified_by", "direction": "out", "kinds": ["fixture", "job"]},
-        {"verb": "verifies", "direction": "in", "kinds": ["fixture", "job"]}
+        {"verb": "verifies", "direction": "in", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["verification-record"]}
       ],
-      "kinds": ["fixture", "job"]
+      "kinds": ["fixture", "job", "verification-record"]
+    },
+    {
+      "name": "verifiers", "roles": ["16c"], "start_set": ["core criteria", "obligations", "APIs and errors"],
+      "hops": [
+        {"verb": "verified_by", "direction": "out", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["verification-record"]},
+        {"verb": "about", "direction": "in", "kinds": ["evidence-record"]}
+      ],
+      "kinds": ["fixture", "job", "verification-record", "evidence-record"]
     },
     {
       "name": "universal", "roles": ["16a", "16b", "16c"],

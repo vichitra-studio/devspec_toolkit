@@ -254,7 +254,7 @@ def test_delete_runs_schema_validation_and_removes_held_entries_only(host: Path)
     result = _json(host, "delete", "--id", FIXTURE)
     assert {(e["holder"], e["field"], e["target"]) for e in result["lock"]["removed"]} == held
     assert _lock_keys(host) == keys_before - held and inbound <= _lock_keys(host)
-    assert {(b["holder"], b["field"]) for b in result["broken"]} == {(key[0], key[1]) for key in inbound}
+    assert {(b["holder"], b["field"]) for b in result["broken"]} == {(key[0], key[1]) for key in inbound} | {("ver-password-reset-expired-token", "verifies")}
     assert FIXTURE not in {item["fixture_id"] for item in _doc(host, "08_fixtures.json")["fixtures"]}
 
 

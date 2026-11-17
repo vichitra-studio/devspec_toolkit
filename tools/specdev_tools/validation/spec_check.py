@@ -23,6 +23,7 @@ from ..graph.model import Graph
 from ..graph.ownership import stamp_file_owner, step_for_file
 from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import Lock, LockError, lock_path, read_lock
+from ..trace.records import check_records, record_files
 from ..trace.suspects import check_lock
 from .linter_utils import build_lint_graph
 
@@ -153,6 +154,15 @@ def _trace_lock_result(
     if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
         return {"status": "SKIP", "reason": "no links and no trace lock"}
     return _check_result(check_lock(graph, lock, read_seed_texts(graph, host_root)))
+
+
+def _records_result(graph: Graph | None, repo_root: str, records_dir: str) -> dict[str, Any]:
+    """The ``records`` check: E774 for the record files under ``extras/verification/``; SKIP with no graph or no record file."""
+    if graph is None:
+        return {"status": "SKIP", "reason": "no spec graph"}
+    if not record_files(records_dir):
+        return {"status": "SKIP", "reason": "no record files"}
+    return _check_result(check_records(records_dir, repo_root, graph))
 
 
 _LOCK_LINK_CODES = frozenset({"E761", "W720", "E778"})
@@ -360,6 +370,9 @@ def _run_checks(
         checks["computed-fields"] = {"status": "SKIP", "reason": "no spec graph"}
     else:
         checks["computed-fields"] = _check_result(check_stored_computed(check_graph))
+
+    # --- 10d. Verification and evidence records (E774) ---
+    checks["records"] = _records_result(check_graph, repo_root, spec_root or spec_dir)
 
     # --- 11. Registry check (R001-R003) ---
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json

@@ -385,3 +385,34 @@ def test_rename_lists_rewritten_holders_and_label_uses_in_step_then_id_order_wha
         "inv-reset-token-single-use", "task-implement-password-reset-confirm",
     ]
     assert labelled["files"] == sorted(labelled["files"])
+
+
+# --- trace/coverage.py  the FR rows, the criteria, the groups and the links of `coverage --by fr` ----------------------------
+
+_EXTRA_FIXTURES = ("fix-zzz-late", "fix-mmm-middle", "fix-aaa-early")
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_coverage_rows_and_groups_are_listed_in_step_then_id_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    """The FRs, their criteria and the fixtures that verify a criterion are written in reverse id order; the listing is by step, then id."""
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    fr_file, fixture_file = host / "spec" / "04_fr_list.json", host / "spec" / "08_fixtures.json"
+    frs = json.loads(fr_file.read_text(encoding="utf-8"))
+    frs["functional_requirements"].reverse()
+    for fr in frs["functional_requirements"]:
+        fr["acceptance_criteria"].reverse()
+    fr_file.write_text(json.dumps(frs, indent=2) + "\n", encoding="utf-8")
+    fixtures = json.loads(fixture_file.read_text(encoding="utf-8"))
+    fixtures["fixtures"] = [{"fixture_id": name, "verifies": [_CRITERION]} for name in _EXTRA_FIXTURES] + fixtures["fixtures"]
+    fixture_file.write_text(json.dumps(fixtures, indent=2) + "\n", encoding="utf-8")
+    result = run_specdev_seeded(seed, "coverage", "--by", "fr", "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert result.returncode == 0, result.stderr
+    rows = json.loads(result.stdout)["by_fr"]
+    assert [row["id"] for row in rows] == ["fr-password-reset", "fr-password-reset-request"]
+    assert [criterion["id"] for criterion in rows[0]["criteria"]] == ["ac-password-reset-1", "ac-password-reset-2", "ac-password-reset-3"]
+    assert [group["kind"] for group in rows[0]["groups"]] == ["capability", "api", "invariant", "nfr", "design-milestone"]
+    criterion = rows[0]["criteria"][2]
+    assert [group["kind"] for group in criterion["groups"]] == ["api-error", "fixture", "edge-case", "task-criterion"]
+    fixture_group = next(group for group in criterion["groups"] if group["kind"] == "fixture")
+    assert [link["node"] for link in fixture_group["links"]] == ["fix-aaa-early", "fix-mmm-middle", "fix-password-reset-expired-token", "fix-zzz-late"]
