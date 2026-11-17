@@ -121,7 +121,7 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
     ]
 
 
-def _graph_for_checks(repo_root: str, spec_dir: str, spec_root: str | None, lint_graph: Graph | None) -> Graph | None:
+def graph_for_checks(repo_root: str, spec_dir: str, spec_root: str | None, lint_graph: Graph | None) -> Graph | None:
     """The graph of *spec_root* for the ``graph`` and ``trace-lock`` checks: the lint graph when that is the same folder as *spec_dir*, else a new build.
 
     ``None`` when the registry is unavailable (the ``graph`` check then reports that one E520).
@@ -153,6 +153,32 @@ def _trace_lock_result(
     if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
         return {"status": "SKIP", "reason": "no links and no trace lock"}
     return _check_result(check_lock(graph, lock, read_seed_texts(graph, host_root)))
+
+
+_LOCK_LINK_CODES = frozenset({"E761", "W720"})
+
+
+def lock_link_findings(
+    graph: Graph | None, lock_dir: str, repo_root: str, host_root: str, *, step: str | None = None
+) -> list[SpecError]:
+    """The suspect-link findings of the trace lock under *lock_dir*, for the paths that do not run the whole ``spec-check``.
+
+    E760 when the lock cannot be read, E761 and W720 from one resolver run, then E762, E763 and E882 (what
+    ``spec-check`` reports in its ``graph`` and ``trace-lock`` checks).  Nothing when *graph* is ``None`` or the graph
+    has no links and no lock file exists.  *step* keeps the findings whose node belongs to that step.
+    """
+    if graph is None:
+        return []
+    lock, lock_error = _read_lock(lock_dir)
+    if lock is None:
+        return [] if lock_error is None else [lock_error]
+    if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
+        return []
+    link_errs = [e for e in run_graph_check(lock_dir, repo_root, graph=graph, lock=lock) if e.code in _LOCK_LINK_CODES]
+    findings = [*link_errs, *check_lock(graph, lock, read_seed_texts(graph, host_root))]
+    if step is None:
+        return findings
+    return [e for e in findings if (node := graph.by_id.get(e.node_id or "")) is not None and node.step == step]
 
 
 def _run_checks(
@@ -325,7 +351,7 @@ def _run_checks(
         }
 
     # --- 10b. Spec graph: unique ids (E704) and links (E700-E703) ---
-    check_graph = _graph_for_checks(repo_root, spec_dir, spec_root, lint_graph)
+    check_graph = graph_for_checks(repo_root, spec_dir, spec_root, lint_graph)
     lock, lock_error = _read_lock(spec_root or spec_dir)
     checks["graph"] = _check_result(run_graph_check(spec_root or spec_dir, repo_root, graph=check_graph, lock=lock))
 
@@ -384,7 +410,7 @@ def _run_checks(
             "reason": "03_glossary.json not present",
         }
 
-    # --- 14. Forward replay (opt-in) ---
+    # --- 14. Id regression against the base ref (opt-in; file-level forward replay is retired) ---
     if include_forward_replay:
         from .forward_replay_check import check_forward_replay
         from .validate import _resolve_replay_base_ref, _detect_git_root
@@ -402,7 +428,7 @@ def _run_checks(
     else:
         checks["forward-replay-check"] = {
             "status": "SKIP",
-            "reason": "use --include-forward-replay to enable",
+            "reason": "use --include-forward-replay to check id regressions (E555) against the base ref",
         }
 
     # --- 15. Trace lock: suspect links, orphan entries, baseline markers ---

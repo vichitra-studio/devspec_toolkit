@@ -13,18 +13,16 @@ from __future__ import annotations
 import json
 import posixpath
 import re
-import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from specdev_tools.core.errors import make_error
 from specdev_tools.graph.contract import contract_view, item_of
 from specdev_tools.graph.gitview import (
-    GIT_TIMEOUT_SECONDS,
     GitViewError,
-    archive_ref,
+    commits_touching,
+    is_shallow_repository,
     load_graph_at,
-    read_seed_texts,
+    read_seed_texts_at,
     spec_path_in_repo,
 )
 from specdev_tools.graph.kinds import SEED_KIND
@@ -140,17 +138,6 @@ def contract_lines(node: Node, graph: Graph, seed_texts: Mapping[str, str], alia
     return _view_lines(contract_view(node, graph, graph.alias_index if aliases is None else aliases))
 
 
-def _git_output(git_root: str, args: list[str]) -> str:
-    """The stdout of ``git -C <git_root> <args>``; E708 when git is missing, too slow or fails."""
-    try:
-        process = subprocess.run(["git", "-C", git_root, *args], capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT_SECONDS)
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        raise GitViewError(make_error("E708", f"git {args[0]} could not run: {exc}")) from exc
-    if process.returncode != 0:
-        raise GitViewError(make_error("E708", f"git {args[0]} failed in {git_root}: {' '.join(process.stderr.split())}"))
-    return process.stdout
-
-
 class OldTextResolver:
     """Finds the text a node had when a lock entry was written, from git.
 
@@ -190,11 +177,11 @@ class OldTextResolver:
     def _commits(self, target: Node) -> list[str]:
         """Up to ``MAX_COMMITS`` commit ids that touched the file of *target*, newest first."""
         path = target.file if target.kind == SEED_KIND else posixpath.join(spec_path_in_repo(self._spec_root, self._git_root), target.file)
-        return _git_output(self._git_root, ["log", "--format=%H", f"--max-count={MAX_COMMITS}", "--", path]).split()
+        return commits_touching(self._git_root, path, MAX_COMMITS)
 
     def _is_shallow(self) -> bool:
         try:
-            return _git_output(self._git_root, ["rev-parse", "--is-shallow-repository"]).strip() == "true"
+            return is_shallow_repository(self._git_root)
         except GitViewError:
             return True
 
@@ -203,28 +190,10 @@ class OldTextResolver:
         if commit not in self._trees:
             try:
                 graph = load_graph_at(commit, self._git_root, spec_path_in_repo(self._spec_root, self._git_root), self._repo_root)
-                self._trees[commit] = _OldTree(graph, self._seed_texts_at(commit, graph))
+                self._trees[commit] = _OldTree(graph, read_seed_texts_at(commit, self._git_root, graph))
             except GitViewError:
                 self._trees[commit] = None
         return self._trees[commit]
-
-    def _seed_texts_at(self, commit: str, graph: Graph) -> dict[str, str]:
-        """The seed texts at *commit*: the seed files archived from the host root (the git root) and read by the one reader."""
-        paths = sorted({node.file for node in graph.nodes if node.kind == SEED_KIND})
-        if not paths:
-            return {}
-        try:
-            with archive_ref(commit, self._git_root, paths) as root:
-                return read_seed_texts(graph, root)
-        except GitViewError:
-            texts: dict[str, str] = {}
-            for path in paths:
-                try:
-                    with archive_ref(commit, self._git_root, [path]) as root:
-                        texts.update(read_seed_texts(graph, root))
-                except GitViewError:
-                    continue
-            return texts
 
     def _lines_matching(self, tree: _OldTree, target: Node, stored_hash: str) -> list[str] | None:
         """The lines of *target* in *tree* when its content hash there equals *stored_hash*, else ``None``.

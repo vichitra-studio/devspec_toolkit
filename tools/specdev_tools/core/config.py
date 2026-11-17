@@ -39,8 +39,6 @@ class SpecdevConfig:
         ``SPECDEV_REPLAY_BASE_REF`` — explicit git base ref override.
     replay_diff_error_mode : str
         ``SPECDEV_REPLAY_DIFF_ERROR_MODE`` — ``"error"`` or ``"ignore"``.
-    staleness_threshold : int
-        ``SPECDEV_STALENESS_THRESHOLD`` — minimum new upstream tokens for W595 (default 3).
     """
 
     __slots__ = (
@@ -49,7 +47,6 @@ class SpecdevConfig:
         "matrix_strict",
         "replay_base_ref",
         "replay_diff_error_mode",
-        "staleness_threshold",
     )
 
     def __init__(self) -> None:
@@ -63,13 +60,6 @@ class SpecdevConfig:
         self.replay_diff_error_mode: str = os.environ.get(
             "SPECDEV_REPLAY_DIFF_ERROR_MODE", ""
         ).strip().lower()
-
-        try:
-            self.staleness_threshold: int = int(
-                os.environ.get("SPECDEV_STALENESS_THRESHOLD", "3")
-            )
-        except (ValueError, TypeError):
-            self.staleness_threshold = 3
 
     def __repr__(self) -> str:
         attrs = ", ".join(f"{attr}={getattr(self, attr)!r}" for attr in self.__slots__)

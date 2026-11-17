@@ -465,3 +465,24 @@ def test_run_node_prints_the_help_of_node_for_a_help_flag_not_the_help_of_node_s
     assert raised.value.code == 0
     assert out.startswith("usage: specdev node [-h]") and "candidates" in out and "status" in out
     assert "Show nodes of the spec graph by id." not in out
+
+
+# --- lock install-driver: --driver-command and the root flags --------------------------------------------------------
+
+def test_lock_install_driver_writes_the_command_and_the_line_for_the_spec_root_it_is_given(host: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    flags = _flags(host / "spec", host)
+    document = _json(*run_cli("lock", "install-driver", "--driver-command", "/venv/bin/specdev lock merge", *flags, "--json"))
+    assert document["attribute_line"] == "spec/extras/trace.lock.json merge=specdev-trace-lock"
+    assert git(host, "config", "--local", "merge.specdev-trace-lock.driver") == "/venv/bin/specdev lock merge %O %A %B %P"
+    assert document["attribute_line"] in (host / ".git" / "info" / "attributes").read_text(encoding="utf-8").splitlines()
+    code, text = run_cli("lock", "install-driver", "--driver-command", "/venv/bin/specdev lock merge", *flags)
+    assert code == 0 and text.startswith("lock merge driver installed: spec/extras/trace.lock.json merge=specdev-trace-lock")
+
+
+def test_lock_install_driver_refuses_a_spec_folder_outside_the_git_root(host: Path, tmp_path: Path) -> None:
+    outside = copy_example(tmp_path / "outside" / "spec")
+    code, out = run_cli("lock", "install-driver", "--driver-command", "x", *_flags(outside, host))
+    assert code == 1 and out.startswith("E708")

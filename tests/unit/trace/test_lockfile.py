@@ -85,7 +85,7 @@ def test_lock_loads_without_tripping_artifact_loader(tmp_path: Path) -> None:
     spec.mkdir()
     shutil.copy(EXAMPLE_SPEC / "00_charter.json", spec)
     before = validate_dir(str(ROOT), str(spec))
-    write_lock(str(spec), Lock((_entry("a", "t"),)))
+    write_lock(str(spec), Lock(()))  # no entry: an entry with no link would be reported (E762) by the lock check
     verification = spec / "extras" / "verification"
     verification.mkdir(parents=True)
     (verification / "ver-one.json").write_text("{}", encoding="utf-8")

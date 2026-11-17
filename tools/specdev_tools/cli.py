@@ -287,7 +287,7 @@ def build_parser() -> _SpecdevParser:
     sc.add_argument("--repo-root", default=".")
     sc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     sc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Include forward-replay check")
+    sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Also check id regressions (E555) against the base ref; file-level forward replay is retired, see `specdev stale`")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
@@ -364,8 +364,9 @@ def build_parser() -> _SpecdevParser:
     frc.add_argument("--repo-root", default=".")
     frc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     frc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    frc.add_argument("--base-ref", help="Diff base ref (default: auto-resolved in validate-all)")
-    frc.add_argument("--diff-error-mode", choices=["error", "ignore"], default="error")
+    frc.add_argument("--base-ref", help="Diff base ref for the id-regression check (E555); default: auto-resolved in validate-all")
+    frc.add_argument("--diff-error-mode", choices=["error", "ignore"], default="error", help="What a failed diff of the base ref does (error: E550; ignore: skip the id-regression check)")
+    frc.add_argument("--step", metavar="NN", help="Only this step: the suspect links its nodes hold and the id regressions of its file")
     frc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     gov = sub.add_parser("governance-check")
@@ -1217,18 +1218,24 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "forward-replay-check":
-        from .validation.forward_replay_check import check_forward_replay
+        from .validation.forward_replay_check import check_forward_replay_alias
         from .validation.validate import _resolve_replay_base_ref
+        print(
+            "specdev: forward-replay-check is deprecated; use `specdev stale` for the pending replay "
+            "(it now reports suspect links of the trace lock and id regressions only)",
+            file=sys.stderr,
+        )
         repo_root = os.path.abspath(args.repo_root)
         git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
         spec_root = os.path.abspath(args.spec_root) if getattr(args, 'spec_root', None) else None
         base_ref = args.base_ref or _resolve_replay_base_ref(Path(git_root or repo_root))
-        errs = check_forward_replay(
+        errs = check_forward_replay_alias(
             repo_root,
             base_ref=base_ref,
             diff_error_mode=args.diff_error_mode,
             git_root=git_root,
             spec_root=spec_root,
+            step=args.step,
         )
         if getattr(args, "json_output", False):
             _json_exit(errs, "forward-replay-check")

@@ -33,6 +33,7 @@ from .forward_replay_check import check_forward_replay
 from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from .linter_utils import build_lint_graph
+from .spec_check import graph_for_checks, lock_link_findings
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.constants import DEFAULT_BRANCH_CANDIDATES
@@ -270,6 +271,14 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
         failures.extend(e for e in tc_errors if not e.code.startswith("W"))
 
     root = Path(os.path.abspath(repo_root))
+    failures.extend(
+        lock_link_findings(
+            graph_for_checks(repo_root, spec_dir, spec_root, lint_graph),
+            spec_root or spec_dir,
+            repo_root,
+            git_root or os.path.dirname(os.path.abspath(spec_dir)),
+        )
+    )
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
         step_order = _load_step_order(root / "tools" / "step_order.json")
         dep_errors = lint_dependency_order(repo_root)

@@ -142,6 +142,15 @@
       "path": "json structure"
     },
     {
+      "path": "lock"
+    },
+    {
+      "path": "lock install-driver"
+    },
+    {
+      "path": "lock merge"
+    },
+    {
       "path": "matrix"
     },
     {

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import tarfile
 from pathlib import Path
@@ -10,9 +11,9 @@ from typing import Any
 import pytest
 
 from specdev_tools.graph import gitview
-from specdev_tools.graph.diff import ADDED, CHANGED, MINOR, NO_BUMP, diff_refs
-from specdev_tools.graph.gitview import GitViewError, archive_ref, load_graph_at, spec_path_in_repo
-from unit.graph._synth import ROOT, run_specdev, write_json, write_spec
+from specdev_tools.graph.diff import ADDED, CHANGED, REMOVED, MINOR, NO_BUMP, diff_refs
+from specdev_tools.graph.gitview import GitViewError, archive_ref, load_graph_at, load_snapshot_at, spec_path_in_repo
+from unit.graph._synth import EXAMPLE_SPEC, ROOT, run_specdev, write_json, write_spec
 from unit.graph._synth import git as _git
 
 _FR_FILE = "04_fr_list.json"
@@ -84,14 +85,14 @@ def test_load_graph_at_builds_the_graph_of_the_tag(host: Path) -> None:
 def test_diff_seed_whitespace_only_is_unchanged(host: Path) -> None:
     spec = host / "spec"
     write_json(spec, _SEED_MANIFEST, _seed_manifest())
-    (spec / _SEED_FILE).parent.mkdir(parents=True)
-    (spec / _SEED_FILE).write_text("Users sign in.\nThey can reset a password.\n", encoding="utf-8")
+    (host / _SEED_FILE).parent.mkdir(parents=True)
+    (host / _SEED_FILE).write_text("Users sign in.\nThey can reset a password.\n", encoding="utf-8")
     write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a.")})
     _commit(host, "v1")
-    (spec / _SEED_FILE).write_text("Users   sign in.\n\n\nThey can reset a   password.", encoding="utf-8")
+    (host / _SEED_FILE).write_text("Users   sign in.\n\n\nThey can reset a   password.", encoding="utf-8")
     _commit(host, "v2")
     assert diff_refs("v1", "v2", str(host), str(spec), str(ROOT)).changes == ()
-    (spec / _SEED_FILE).write_text("Users sign in. They can reset a password by email.", encoding="utf-8")
+    (host / _SEED_FILE).write_text("Users sign in. They can reset a password by email.", encoding="utf-8")
     _commit(host, "v3")
     changes = diff_refs("v2", "v3", str(host), str(spec), str(ROOT)).changes
     assert [(change.id, change.changes) for change in changes] == [("seed-notes", (CHANGED,))]
@@ -102,11 +103,60 @@ def test_diff_seed_file_absent_at_a_tag_counts_as_removed(host: Path) -> None:
     write_json(spec, _SEED_MANIFEST, _seed_manifest())
     write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a.")})
     _commit(host, "v1")
-    (spec / _SEED_FILE).parent.mkdir(parents=True)
-    (spec / _SEED_FILE).write_text("Now it exists.", encoding="utf-8")
+    (host / _SEED_FILE).parent.mkdir(parents=True)
+    (host / _SEED_FILE).write_text("Now it exists.", encoding="utf-8")
     _commit(host, "v2")
     changes = diff_refs("v1", "v2", str(host), str(spec), str(ROOT)).changes
     assert [(change.id, change.changes) for change in changes] == [("seed-notes", (ADDED,))]
+
+
+_EXAMPLE_SEED = "docs/seed/seed_accounts.md"
+_EXAMPLE_SEED_ID = "seed-accounts"
+
+
+@pytest.fixture
+def example_host(host: Path) -> Path:
+    """The worked example on the standard layout (``docs/seed/`` beside ``spec/``), committed as tag ``v1``."""
+    shutil.copytree(EXAMPLE_SPEC.parent, host, dirs_exist_ok=True)
+    _commit(host, "v1")
+    return host
+
+
+def _seed_changes(host: Path, old: str, new: str) -> list[tuple[str, tuple[str, ...]]]:
+    changes = diff_refs(old, new, str(host), str(host / "spec"), str(ROOT)).changes
+    return [(change.id, change.changes) for change in changes]
+
+
+def test_diff_standard_layout_seed_edit_is_changed(example_host: Path) -> None:
+    with (example_host / _EXAMPLE_SEED).open("a", encoding="utf-8") as seed:
+        seed.write("A link also expires after a day.\n")
+    _commit(example_host, "v2")
+    assert _seed_changes(example_host, "v1", "v2") == [(_EXAMPLE_SEED_ID, (CHANGED,))]
+
+
+def test_diff_standard_layout_seed_whitespace_only_is_unchanged(example_host: Path) -> None:
+    seed = example_host / _EXAMPLE_SEED
+    seed.write_text("\n\n".join(seed.read_text(encoding="utf-8").split("\n")) + "\n\n", encoding="utf-8")
+    _commit(example_host, "v2")
+    assert _seed_changes(example_host, "v1", "v2") == []
+
+
+def test_diff_reads_seed_from_archive_root_at_each_ref(example_host: Path) -> None:
+    (example_host / _EXAMPLE_SEED).write_text("Only the second text.", encoding="utf-8")
+    _commit(example_host, "v2")
+    texts = {ref: load_snapshot_at(ref, str(example_host), "spec", str(ROOT)).seeds[_EXAMPLE_SEED_ID] for ref in ("v1", "v2")}
+    assert texts["v2"] == "Only the second text."
+    assert texts["v1"] != texts["v2"]
+    assert texts["v1"] == " ".join(_git(example_host, "show", f"v1:{_EXAMPLE_SEED}").split())
+
+
+def test_snapshot_omits_a_seed_file_missing_at_the_ref(example_host: Path) -> None:
+    (example_host / _EXAMPLE_SEED).unlink()
+    _commit(example_host, "v2")
+    snapshot = load_snapshot_at("v2", str(example_host), "spec", str(ROOT))
+    assert _EXAMPLE_SEED_ID in snapshot.graph.by_id
+    assert _EXAMPLE_SEED_ID not in snapshot.seeds
+    assert _seed_changes(example_host, "v1", "v2") == [(_EXAMPLE_SEED_ID, (REMOVED,))]
 
 
 def test_diff_spec_dir_absent_at_tag_e708(host: Path) -> None:
@@ -202,8 +252,8 @@ def test_ref_predates_model_e709_when_the_stamp_is_absent(host: Path) -> None:
 def test_ref_with_only_seeds_is_e709(host: Path) -> None:
     spec = host / "spec"
     write_spec(spec, {_SEED_MANIFEST: _seed_manifest()})
-    (spec / _SEED_FILE).parent.mkdir(parents=True)
-    (spec / _SEED_FILE).write_text("notes\n", encoding="utf-8")
+    (host / _SEED_FILE).parent.mkdir(parents=True)
+    (host / _SEED_FILE).write_text("notes\n", encoding="utf-8")
     _commit(host, "seeds-only")
     with pytest.raises(GitViewError) as raised:
         load_graph_at("seeds-only", str(host), "spec", str(ROOT))
@@ -213,8 +263,8 @@ def test_ref_with_only_seeds_is_e709(host: Path) -> None:
 def test_ref_with_a_node_beside_its_seeds_is_not_refused(host: Path) -> None:
     spec = host / "spec"
     write_spec(spec, {_SEED_MANIFEST: _seed_manifest(), _FR_FILE: _fr_doc("The system shall do a.")})
-    (spec / _SEED_FILE).parent.mkdir(parents=True)
-    (spec / _SEED_FILE).write_text("notes\n", encoding="utf-8")
+    (host / _SEED_FILE).parent.mkdir(parents=True)
+    (host / _SEED_FILE).write_text("notes\n", encoding="utf-8")
     _commit(host, "seeds-and-fr")
     assert "fr-a" in load_graph_at("seeds-and-fr", str(host), "spec", str(ROOT)).by_id
 

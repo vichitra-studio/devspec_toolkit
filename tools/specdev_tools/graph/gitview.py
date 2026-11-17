@@ -1,7 +1,8 @@
 """The spec graph as it stood at a git ref.
 
 The ref is resolved and its spec folder is archived into a temporary directory (``git archive``, a read-only git
-command), then the graph is built there with the current toolkit registry.  Git is run with an argument list and a
+command), then the graph is built there with the current toolkit registry.  The seed files the manifest names are
+archived from the repository root, and ``read_seed_texts`` reads them under the archive root.  Git is run with an argument list and a
 timeout; a missing git, a folder that is not a repository, an unknown ref and a spec folder absent at the ref are all
 E708.
 """
@@ -134,6 +135,32 @@ def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.Tempo
     return directory
 
 
+def _git_stdout(git_root: str, args: Sequence[str]) -> str:
+    """The stdout of ``git -C <git_root> <args>``; E708 when git is missing, too slow or fails."""
+    process = _run_git(git_root, args)
+    if process.returncode != 0:
+        raise _fail("E708", f"git {args[0]} failed in {git_root}: {_reason(process)}")
+    return process.stdout.decode("utf-8", errors="replace")
+
+
+def commits_touching(git_root: str, path: str, max_count: int) -> list[str]:
+    """Up to *max_count* ids of the commits that touched *path* (relative to *git_root*), newest first.
+
+    Raises:
+        GitViewError: E708 when git is missing, too slow, or *git_root* is not a repository.
+    """
+    return _git_stdout(git_root, ["log", "--format=%H", f"--max-count={max_count}", "--", path]).split()
+
+
+def is_shallow_repository(git_root: str) -> bool:
+    """Whether the repository at *git_root* is a shallow clone.
+
+    Raises:
+        GitViewError: E708 when git is missing, too slow, or *git_root* is not a repository.
+    """
+    return _git_stdout(git_root, ["rev-parse", "--is-shallow-repository"]).strip() == "true"
+
+
 def read_seed_texts(graph: Graph, host_root: str) -> dict[str, str]:
     """Whitespace-collapsed content of the file of each seed of *graph*, found under the directory *host_root*.
 
@@ -151,6 +178,37 @@ def read_seed_texts(graph: Graph, host_root: str) -> dict[str, str]:
         except OSError:
             continue
     return texts
+
+
+def read_seed_texts_at(ref: str, git_root: str, graph: Graph) -> dict[str, str]:
+    """Whitespace-collapsed seed texts as they are at *ref*: the seed files of *graph* archived from the repository root.
+
+    A seed path is relative to the repository root (``schema/seed_manifest.schema.json``), so the files are archived
+    from *git_root* and read under the archive root.  A seed file absent at *ref* has no entry.
+
+    Raises:
+        GitViewError: E708 when *ref* does not resolve or git fails.
+    """
+    paths = sorted({node.file for node in graph.nodes if node.kind == SEED_KIND})
+    commit = resolve_ref(ref, git_root)
+    try:
+        return _read_archived_seeds(commit, git_root, graph, paths)
+    except GitViewError:
+        texts: dict[str, str] = {}
+        for path in paths:
+            try:
+                texts.update(_read_archived_seeds(commit, git_root, graph, [path]))
+            except GitViewError:
+                continue
+        return texts
+
+
+def _read_archived_seeds(commit: str, git_root: str, graph: Graph, paths: Sequence[str]) -> dict[str, str]:
+    """Archive *paths* at *commit* and read the seeds of *graph* under the archive root; ``{}`` for no paths."""
+    if not paths:
+        return {}
+    with archive_ref(commit, git_root, paths) as root:
+        return read_seed_texts(graph, root)
 
 
 def _predates_message(ref: str, spec_dir: str) -> str:
@@ -173,7 +231,7 @@ def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) ->
         graph = build_graph(spec_dir, repo_root)
         if all(node.kind == SEED_KIND for node in graph.nodes):
             raise _fail("E709", _predates_message(ref, spec_dir))
-        return Snapshot(graph, read_seed_texts(graph, spec_dir))
+        return Snapshot(graph, read_seed_texts_at(ref, git_root, graph))
 
 
 def load_graph_at(ref: str, git_root: str, spec_path: str, repo_root: str) -> Graph:

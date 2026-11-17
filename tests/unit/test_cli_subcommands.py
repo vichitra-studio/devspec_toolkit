@@ -10,6 +10,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -18,6 +19,7 @@ from unittest.mock import patch
 
 from specdev_tools import cli
 from specdev_tools.core.toolkit_root import detect_toolkit_root
+from specdev_tools.trace.lockfile import Lock, LockEntry, serialise_lock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -416,6 +418,47 @@ class TestTraceCommands(_CliMixin, unittest.TestCase):
         code, _, err = self._run_cli(["stale", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
         self.assertEqual(code, 1)
         self.assertTrue(err.startswith("E520"), err)
+
+
+class TestLockCommand(_CliMixin, unittest.TestCase):
+    """``specdev lock merge`` and ``lock install-driver``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-07)."""
+
+    def _lock_text(self, *digits: str) -> str:
+        entries = [LockEntry(f"fr-{d}", "api_refs", f"api-{d}", f"sha256:{d * 64}", f"sha256:{d * 64}") for d in digits]
+        return serialise_lock(Lock(tuple(entries)))
+
+    def test_merge_takes_the_four_positionals(self):
+        args = cli.build_parser().parse_args(["lock", "merge", "o", "a", "b", "spec/extras/trace.lock.json"])
+        self.assertEqual((args.base, args.ours, args.theirs, args.pathname), ("o", "a", "b", "spec/extras/trace.lock.json"))
+
+    def test_install_driver_takes_the_root_flags_and_a_required_driver_command(self):
+        args = cli.build_parser().parse_args(["lock", "install-driver", "--driver-command", "x lock merge", "--git-root", "h", "--spec-root", "s", "--repo-root", "t", "--json"])
+        self.assertEqual((args.driver_command, args.git_root, args.spec_root, args.json_output), ("x lock merge", "h", "s", True))
+        code, _, err = self._run_cli(["lock", "install-driver"])
+        self.assertEqual(code, 2, err)
+
+    def test_lock_without_a_subcommand_is_a_usage_error(self):
+        code, _, _ = self._run_cli(["lock"])
+        self.assertEqual(code, 2)
+
+    def test_merge_dispatches_and_writes_the_result_over_ours(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = {name: Path(tmp) / name for name in ("base", "ours", "theirs")}
+            for name, text in (("base", self._lock_text("1")), ("ours", self._lock_text("1", "2")), ("theirs", self._lock_text("1", "3"))):
+                files[name].write_text(text, encoding="utf-8")
+            code, out, err = self._run_cli(["lock", "merge", str(files["base"]), str(files["ours"]), str(files["theirs"]), "p"])
+            self.assertEqual((code, out, err), (0, "", ""))
+            self.assertEqual(files["ours"].read_text(encoding="utf-8"), self._lock_text("1", "2", "3"))
+
+    def test_merge_of_a_malformed_version_exits_1_with_e760_and_leaves_ours(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ours, theirs = (Path(tmp) / name for name in ("base", "ours", "theirs"))
+            for path, text in ((base, self._lock_text("1")), (ours, self._lock_text("2")), (theirs, "<<<<<<< x\n")):
+                path.write_text(text, encoding="utf-8")
+            code, out, err = self._run_cli(["lock", "merge", str(base), str(ours), str(theirs), "p"])
+            self.assertEqual(code, 1)
+            self.assertTrue(err.startswith("E760"), err)
+            self.assertEqual(ours.read_text(encoding="utf-8"), self._lock_text("2"))
 
 
 if __name__ == "__main__":
