@@ -419,6 +419,31 @@ class TestTraceCommands(_CliMixin, unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertTrue(err.startswith("E520"), err)
 
+    def test_attest_accepts_the_three_root_flags_and_its_own(self):
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        args = cli.build_parser().parse_args(["attest", "a-node", "--field", "f", "--target", "t", "--yes", "--dry-run", "--json", *flags])
+        self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        self.assertEqual((args.node_id, args.field, args.target, args.yes, args.dry_run, args.json_output), ("a-node", "f", "t", True, True, True))
+        self.assertEqual((args.step, args.prune), (None, False))
+        by_step = cli.build_parser().parse_args(["attest", "--step", "06"])
+        self.assertEqual((by_step.node_id, by_step.step, by_step.yes, by_step.dry_run), (None, "06", False, False))
+        self.assertTrue(cli.build_parser().parse_args(["attest", "--prune"]).prune)
+
+    def test_attest_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["attest", _EXAMPLE_ID, *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "attest: nothing to attest")
+
+    def test_attest_needs_a_node_a_step_or_prune(self):
+        code, _, err = self._run_cli(["attest", *_ROOT_FLAGS])
+        self.assertEqual(code, 2)
+        self.assertIn("one of the arguments", err)
+
+    def test_attest_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["attest", "--prune", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
 
 class TestLockCommand(_CliMixin, unittest.TestCase):
     """``specdev lock merge`` and ``lock install-driver``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-07)."""

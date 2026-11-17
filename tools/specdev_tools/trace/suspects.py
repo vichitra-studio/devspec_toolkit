@@ -93,7 +93,7 @@ def _canonical(graph: Graph, target: str) -> str:
     return node.id if node is not None else target
 
 
-class _EntryIndex:
+class EntryIndex:
     """The entries of a lock by (holder, field, id of the node the target names): an alias and its node share one."""
 
     def __init__(self, graph: Graph, lock: Lock) -> None:
@@ -107,7 +107,7 @@ class _EntryIndex:
 
 def missing_entries(graph: Graph, lock: Lock) -> list[LockedLink]:
     """The links of *graph* that have no entry in *lock*."""
-    index = _EntryIndex(graph, lock)
+    index = EntryIndex(graph, lock)
     return [item for item in lock_links(graph) if index.get(item.holder.id, item.link.field, item.target.id) is None]
 
 
@@ -188,7 +188,7 @@ def find_suspects(graph: Graph, lock: Lock, seed_texts: Mapping[str, str]) -> li
     reported.  The result follows ``lock_links`` order.
     """
     hashes = compute_all(graph, seed_texts)
-    index = _EntryIndex(graph, lock)
+    index = EntryIndex(graph, lock)
     historical = historical_node_ids(graph)
     changed: set[str] | None = None
     suspects: list[SuspectLink] = []
@@ -240,7 +240,7 @@ class LockHook:
     names a deprecated node, W720.  Both are owned by the holder's step."""
 
     def __init__(self, graph: Graph, lock: Lock) -> None:
-        self._index = _EntryIndex(graph, lock)
+        self._index = EntryIndex(graph, lock)
 
     def on_link(self, link: Link, source: Node, target: Node) -> list[SpecError]:
         """Findings for *link* of *source* once the resolver has accepted it; none when the link has an entry or the target is ``not_applicable``."""

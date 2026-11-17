@@ -193,7 +193,7 @@ def _step_text(step: ReplayStep) -> list[str]:
     return lines
 
 
-def _diff_text(diff: RootDiff) -> list[str]:
+def diff_lines(diff: RootDiff) -> list[str]:
     body = [f"  {line}" for line in diff.diff] if diff.diff else [f"  ({diff.note})"]
     return [f"changed above: {diff.root}", *body]
 
@@ -206,7 +206,7 @@ def render_text(plan: ReplayPlan, diffs: Sequence[RootDiff] | None = None) -> st
     for step in plan.steps:
         lines.extend(_step_text(step))
     for diff in diffs or ():
-        lines.extend(_diff_text(diff))
+        lines.extend(diff_lines(diff))
     lines.append(f"total: {_plural(plan.link_count, 'suspect link')} in {_plural(plan.node_count, 'node')}, {_plural(plan.gap_count, 'coverage gap')}")
     return "\n".join(lines)
 

@@ -97,7 +97,17 @@ def test_stale_step_slice_only_upstream_into_nn(host: Example) -> None:
     assert [(link["target"], link["roots"]) for link in sliced["steps"][0]["suspect_nodes"][0]["links"]] == [(API, [API])]
     assert sliced["totals"] == {"suspect_nodes": 1, "suspect_links": 1, "coverage_gaps": 0}
     assert _stale_json(host, "--step", "05")["steps"] == []
-    assert _stale_json(host, "--step", "99")["steps"] == []
+    assert _stale_json(host, "--step", "10")["steps"] == []
+
+
+@pytest.mark.parametrize("step", ["99", "6", "seed"])
+def test_stale_step_that_is_not_a_step_of_the_pipeline_is_e706_as_text_and_json(host: Example, step: str) -> None:
+    code, text = _stale(host, "--step", step)
+    assert code == 1 and text.startswith("E706") and f"no step {step!r}" in text and "known steps: 00, 01, 02, 02a" in text
+    code, out = _stale(host, "--step", step, "--json")
+    assert code == 1
+    (error,) = json.loads(out)["errors"]
+    assert error["code"] == "E706" and f"no step {step!r}" in error["message"]
 
 
 def test_stale_json_schema_stable(host: Example) -> None:

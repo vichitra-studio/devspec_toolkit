@@ -273,3 +273,30 @@ def test_stale_lists_steps_in_step_key_order_whatever_the_hash_seed(seed: int, t
     steps = json.loads(result.stdout)["steps"]
     assert [step["step"] for step in steps] == _STALE_STEPS
     assert [node["node"] for node in steps[0]["suspect_nodes"]] == _STALE_STEP_00
+
+
+# --- trace/attest.py  the nodes `attest` blocks on and the entries `--prune` lists -----------------------------------------
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_attest_names_the_blocking_links_in_field_then_target_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    seed_doc = host / "docs" / "seed" / "seed_accounts.md"
+    seed_doc.write_text(seed_doc.read_text(encoding="utf-8") + "\nThe link is also sent to a phone.\n", encoding="utf-8")
+    result = run_specdev_seeded(seed, "attest", "nfr-latency-reset-email", "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert result.returncode == 1, result.stderr
+    (blocked,) = json.loads(result.stdout)["blocked"]
+    pairs = [(item["field"], item["target"]) for item in blocked["blockers"]]
+    assert len(pairs) >= 2 and pairs == sorted(pairs)
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_attest_step_lists_its_nodes_in_replay_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
+    host = tmp_path / "host"
+    shutil.copytree(EXAMPLE_SPEC.parent, host)
+    seed_doc = host / "docs" / "seed" / "seed_accounts.md"
+    seed_doc.write_text(seed_doc.read_text(encoding="utf-8") + "\nThe link is also sent to a phone.\n", encoding="utf-8")
+    result = run_specdev_seeded(seed, "attest", "--step", "00", "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert result.returncode == 0, result.stderr
+    holders = list(dict.fromkeys(link["holder"] for link in json.loads(result.stdout)["attested"]))
+    assert holders == _STALE_STEP_00

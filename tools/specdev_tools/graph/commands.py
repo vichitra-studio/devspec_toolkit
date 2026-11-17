@@ -183,7 +183,7 @@ def _report_finding(error: SpecError, command: str, json_output: bool) -> int:
     return EXIT_FINDING
 
 
-def _usage_error(command: str, message: str) -> int:
+def usage_error(command: str, message: str) -> int:
     print(f"specdev {command}: error: {message}", file=sys.stderr)
     return EXIT_USAGE
 
@@ -346,7 +346,7 @@ def run_trace(args: argparse.Namespace) -> int:
     """Run ``specdev trace`` on the parsed *args*; returns the exit code."""
     problem = _recipe_flags_problem(args)
     if problem is not None:
-        return _usage_error("trace", problem)
+        return usage_error("trace", problem)
     run = _trace_pack if args.recipe is not None else _trace_walk
     return run_on_graph("trace", args, lambda graph: run(args, graph))
 

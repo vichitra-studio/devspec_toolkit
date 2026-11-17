@@ -1061,15 +1061,15 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E764 ATTEST_REFUSED_TARGET_SUSPECT
 
-**Trigger**: `specdev attest` refused a node because one of its own targets is itself a suspect node. Registered in 1.2.0; the command that raises it is not built yet.
+**Trigger**: `specdev attest` refused a node because one of its own targets is itself a suspect node: a node that holds a suspect link. The message names the node and the links that block it. With `--step`, the nodes that can be attested are, and the rest are named in one E764; the exit code is 1.
 
-**Resolution**: Command refusal: no owner, no node id. Attest the blocking node first.
+**Resolution**: Command refusal: no owner, no node id. Attest the blocking node first (`specdev attest <blocking id>`), then this one; `specdev attest --step NN` does this upward-first for a whole step.
 
 **Promotable**: No (error only).
 
 ### E765 ATTEST_REFUSED_HISTORICAL
 
-**Trigger**: `specdev attest` refused a link held by a historical node. Registered in 1.2.0; the command that raises it is not built yet.
+**Trigger**: `specdev attest` refused a node of a closed milestone (a historical node). Its lock entries stay as they were.
 
 **Resolution**: Command refusal: no owner, no node id. Links of a closed milestone are not re-attested.
 

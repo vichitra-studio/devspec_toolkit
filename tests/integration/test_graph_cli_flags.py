@@ -8,17 +8,23 @@ handler and the mutation each test kills.
 from __future__ import annotations
 
 import json
+import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from specdev_tools.graph.commands import run_node
+from specdev_tools.trace.lockfile import Lock, lock_path, read_lock, write_lock
+from unit.trace._lock_support import EXAMPLE_HOST
 from unit.graph._synth import ROOT, copy_build_spec, copy_example, git, make_toolkit, run_cli, write_json
 
 _CRITERION = "ac-password-reset-3"
 _PLAN_ITEM = "PWRESET_CONFIRM_EXPIRED_01"
 _SKETCH = "02_system_sketch.json"
+_NFR = "nfr-latency-reset-email"
+_CONNECTION = "conn-identity-to-mailrelay"
 
 
 def _flags(spec: Path, git_root: Path | None = None) -> list[str]:
@@ -307,12 +313,13 @@ _CASES: dict[str, tuple[list[str], str]] = {
     "trace recipe": (["trace", _PLAN_ITEM, "--recipe", "16b", "--since", "HEAD~1"], "dependency_report"),
     "diff": (["diff", "HEAD~1", "HEAD"], "groups"),
     "stale": (["stale"], "steps"),
+    "attest": (["attest", "--prune"], "pruned"),
 }
 _TEXT_START = {
     "node show": _CRITERION, "node <id>": _CRITERION, "node candidates": "api",
     "node status": f"{_CRITERION}: active -> deprecated", "trace walk": "trace of ac-password-reset-3",
     "trace recipe": "pack 16b for PWRESET_CONFIRM_EXPIRED_01", "diff": "diff HEAD~1 -> HEAD",
-    "stale": "stale: pending replay by step",
+    "stale": "stale: pending replay by step", "attest": "attest --prune: no orphan",
 }
 
 
@@ -384,6 +391,98 @@ def test_stale_json_prints_the_suspects_by_step_and_the_totals(host: Path) -> No
     assert set(document) == {"steps", "totals"}
     assert document["totals"]["suspect_links"] == sum(len(node["links"]) for step in document["steps"] for node in step["suspect_nodes"])
     assert [step["step"] for step in document["steps"]][:3] == ["00", "01", "02"]
+
+
+# --- attest: the node, --field, --target, --step, --yes, --dry-run, --prune, --json -------------------------------------
+
+@pytest.fixture
+def full_host(tmp_path: Path) -> Path:
+    """The worked example with its seed documents, in a repository whose second commit re-pins a third party."""
+    repo = tmp_path / "full"
+    shutil.copytree(EXAMPLE_HOST, repo)
+    git(repo, "init", "-q", "-b", "main")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "one")
+    sketch = json.loads((repo / "spec" / _SKETCH).read_text(encoding="utf-8"))
+    sketch["third_parties"][1]["pin"] = "api-v4"
+    (repo / "spec" / _SKETCH).write_text(json.dumps(sketch, indent=2) + "\n", encoding="utf-8")
+    return repo
+
+
+def _attest_json(host: Path, *args: str, code: int = 0) -> dict[str, Any]:
+    status, out = run_cli("attest", *args, *_flags(host / "spec", host), "--json")
+    assert status == code, out
+    return json.loads(out)
+
+
+def _attested(document: dict[str, Any]) -> list[tuple[str, str, str]]:
+    return [(link["holder"], link["field"], link["target"]) for link in document["attested"]]
+
+
+def _lock_text(host: Path) -> str:
+    return Path(lock_path(str(host / "spec"))).read_text(encoding="utf-8")
+
+
+def test_attest_node_id_picks_the_node_whose_links_are_attested(full_host: Path) -> None:
+    assert _attested(_attest_json(full_host, _NFR)) == [(_NFR, "relies_on", "tp-mailrelay")]
+    assert _attested(_attest_json(full_host, _CONNECTION)) == [(_CONNECTION, "connects_to", "tp-mailrelay")]
+
+
+def test_attest_field_keeps_only_the_links_of_that_field(full_host: Path) -> None:
+    assert _attested(_attest_json(full_host, _NFR, "--field", "relies_on")) == [(_NFR, "relies_on", "tp-mailrelay")]
+    assert _attest_json(full_host, _NFR, "--field", "derives_from")["attested"] == []
+
+
+def test_attest_target_keeps_only_the_links_to_that_target(full_host: Path) -> None:
+    assert _attested(_attest_json(full_host, _NFR, "--target", "tp-mailrelay")) == [(_NFR, "relies_on", "tp-mailrelay")]
+    assert _attest_json(full_host, _NFR, "--target", "fr-password-reset")["attested"] == []
+
+
+def test_attest_step_attests_the_suspect_nodes_of_that_step_only(full_host: Path) -> None:
+    assert _attested(_attest_json(full_host, "--step", "07")) == [(_NFR, "relies_on", "tp-mailrelay")]
+    assert _attested(_attest_json(full_host, "--step", "02")) == [(_CONNECTION, "connects_to", "tp-mailrelay")]
+    assert _attest_json(full_host, "--step", "05")["attested"] == []
+
+
+def test_attest_writes_only_with_yes(full_host: Path) -> None:
+    before = _lock_text(full_host)
+    document = _attest_json(full_host, _NFR)
+    assert document["written"] is False and _lock_text(full_host) == before
+    document = _attest_json(full_host, _NFR, "--yes")
+    assert document["written"] is True and _lock_text(full_host) != before
+    assert _nodes_in_step(full_host, "07") == []
+
+
+def test_attest_dry_run_writes_nothing_even_with_yes(full_host: Path) -> None:
+    before = _lock_text(full_host)
+    document = _attest_json(full_host, _NFR, "--yes", "--dry-run")
+    assert document["written"] is False and _attested(document) == [(_NFR, "relies_on", "tp-mailrelay")]
+    assert _lock_text(full_host) == before
+
+
+def test_attest_prune_removes_the_orphan_entry_and_dry_run_only_lists_it(full_host: Path) -> None:
+    lock = read_lock(str(full_host / "spec"))
+    orphan = replace(lock.entries[0], source=_NFR, field="relies_on", target="tp-gone")
+    write_lock(str(full_host / "spec"), Lock((*lock.entries, orphan)))
+    listed = json.loads(run_cli("attest", "--prune", "--dry-run", *_flags(full_host / "spec", full_host), "--json")[1])
+    assert listed == {"written": False, "pruned": [{"source": _NFR, "field": "relies_on", "target": "tp-gone"}]}
+    assert orphan in read_lock(str(full_host / "spec")).entries
+    done = json.loads(run_cli("attest", "--prune", *_flags(full_host / "spec", full_host), "--json")[1])
+    assert done["written"] is True and orphan not in read_lock(str(full_host / "spec")).entries
+
+
+def test_attest_json_prints_the_document_and_text_prints_the_summary(full_host: Path) -> None:
+    document = _attest_json(full_host, _NFR)
+    assert set(document) == {"written", "attested", "blocked", "diffs"}
+    assert set(document["attested"][0]) == {"holder", "field", "target", "reason", "cause", "old", "new"}
+    text = run_cli("attest", _NFR, *_flags(full_host / "spec", full_host))[1]
+    assert text.splitlines()[0] == "attest: would write 1 link on 1 node (run again with --yes to write)"
+    assert "-pin: api-v3" in text and "+pin: api-v4" in text
+
+
+def _nodes_in_step(host: Path, step: str) -> list[str]:
+    document = json.loads(run_cli("stale", "--step", step, *_flags(host / "spec", host), "--json")[1])
+    return [node["node"] for entry in document["steps"] for node in entry["suspect_nodes"]]
 
 
 # --- --json: the document, and the error envelope on the same flag --------------------------------------------------
