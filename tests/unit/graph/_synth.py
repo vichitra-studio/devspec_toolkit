@@ -81,6 +81,26 @@ def run_specdev(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run([sys.executable, "-m", "specdev_tools.cli", *args], capture_output=True, text=True, env=env)
 
 
+HASH_SEEDS = (0, 1, 2, 3)  # a listing built from a set comes out in a different order under some of these
+
+
+def _seeded_env(seed: int) -> dict[str, str]:
+    tests = str(ROOT / "tests")
+    path = os.pathsep.join([str(ROOT / "tools"), tests, os.environ.get("PYTHONPATH", "")])
+    return {**os.environ, "PYTHONPATH": path, "PYTHONHASHSEED": str(seed)}
+
+
+def run_specdev_seeded(seed: int, *args: str) -> subprocess.CompletedProcess[str]:
+    """``run_specdev`` with ``PYTHONHASHSEED=seed``: set order, and so any unsorted listing built from a set, depends on it."""
+    return subprocess.run([sys.executable, "-m", "specdev_tools.cli", *args], capture_output=True, text=True, env=_seeded_env(seed))
+
+
+def run_python_seeded(seed: int, code: str) -> str:
+    """Run the Python *code* in a subprocess with ``PYTHONHASHSEED=seed`` (``tools/`` and ``tests/`` importable); its stdout."""
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=_seeded_env(seed), check=True)
+    return done.stdout
+
+
 def copy_example(dest: Path) -> Path:
     """Copy the worked example spec folder to *dest* and return it."""
     shutil.copytree(EXAMPLE_SPEC, dest)

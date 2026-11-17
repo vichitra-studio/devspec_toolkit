@@ -202,7 +202,7 @@
                 "minItems": 1
               },
               "depends_on": {
-                "description": "Ids of the functional requirements this one depends on, in the same list. Optional; a self-reference parses (cycle checking is not done here).",
+                "description": "Ids of the functional requirements this one depends on, in the same list. Optional. A self-reference passes the schema and single-file `validate`; `spec-check` reports it as a link cycle (E703).",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

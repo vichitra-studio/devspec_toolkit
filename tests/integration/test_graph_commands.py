@@ -84,7 +84,8 @@ def test_trace_up_lists_ancestors_and_never_the_entry_again(spec: Path) -> None:
     assert "fr-password-reset" in reached and _CRITERION not in reached
 
 
-def test_trace_kinds_filter_and_depth(spec: Path) -> None:
+def test_trace_kinds_filter_shows_only_the_kind_named(spec: Path) -> None:
+    """The kinds only; ``--depth`` is pinned in ``test_graph_cli_flags.py`` (``test_trace_depth_limits_how_far_the_walk_goes``)."""
     result = run_specdev("trace", _CRITERION, "--up", "--kinds", "fr", "--depth", "1", *_flags(spec), "--json")
     assert list(json.loads(result.stdout)["up"]["groups"]) == ["fr"]
 

@@ -144,7 +144,7 @@ def add_graph_parsers(sub: Any) -> None:
         help=f"Print the context pack of this role: {', '.join(RECIPE_ROLES)} (16a: task, 16b: plan item, 16c: roadmap milestone)",
     )
     trace_p.add_argument("--expand", action="store_true", help="With --recipe: add the content of every node of the pack")
-    trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: the commit where HEAD left the default branch, or HEAD~1 when no default branch shares history with HEAD)")
+    trace_p.add_argument("--since", metavar="REF", help="With --recipe: git ref the 16b dependency report compares against (default: the merge base of HEAD and the first of origin/main, origin/master, main, master that shares history with HEAD; HEAD~1 when none does)")
     _add_root_flags(trace_p)
 
     diff_p = sub.add_parser(

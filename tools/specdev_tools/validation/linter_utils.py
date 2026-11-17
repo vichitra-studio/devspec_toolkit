@@ -111,13 +111,15 @@ def graph_covered_files(graph: Graph | None) -> frozenset[str]:
 
 
 def graph_known_ids(graph: Graph | None) -> set[str]:
-    """Every id a reference may name: the graph's nodes (first definition of each) and the root ``id`` of each document read.
+    """Every id a reference may name: the graph's nodes (first definition of each), their aliases and the root ``id`` of each document read.
 
+    An id a person or a file wrote is looked up as an id, then as an alias (``Graph.find``), so an alias is known too.
     An artifact's own ``id`` is no node; a 1.1.1 ``trace`` entry may still name it.
     """
     if graph is None:
         return set()
     known = set(graph.by_id)
+    known.update(graph.alias_index)
     known.update(root_id for document in graph.documents.values() if isinstance(root_id := document.get("id"), str))
     return known
 

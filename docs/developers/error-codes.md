@@ -987,7 +987,7 @@ Errors E700-E704 and W720 are findings about the spec: each is given an `owner` 
 
 ### E706 GRAPH_COMMAND_TARGET_UNKNOWN
 
-**Trigger**: A read command was given an id, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace` or a `--recipe` role that is not `16a`, `16b` or `16c`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints `specdev <command>: could not read <files>; the answer may be incomplete` on stderr first, where `<files>` are the unreadable files joined by ", ".
+**Trigger**: A read command was given an id, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace` or a `--recipe` role that is not `16a`, `16b` or `16c`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints a line on stderr first, for example `specdev trace: could not read <files>; the answer may be incomplete`, where `<files>` are the unreadable files joined by ", ".
 
 **Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
 

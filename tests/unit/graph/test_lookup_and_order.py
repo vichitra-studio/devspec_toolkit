@@ -12,6 +12,7 @@ from specdev_tools.graph.lifecycle import plan_lifecycle_change
 from specdev_tools.graph.model import UNRANKED, Graph, Node, SpecShape
 from specdev_tools.graph.recipes import build_pack, load_recipes
 from specdev_tools.graph.trace import trace_node
+from specdev_tools.validation.linter_utils import graph_known_ids
 
 from ._synth import EXAMPLE_SPEC, ROOT
 
@@ -32,6 +33,17 @@ def test_find_looks_up_an_id_then_an_alias(aliased: Graph) -> None:
     assert aliased.find(_FR) is aliased.by_id[_FR]
     assert aliased.find("fr-old-name") is aliased.by_id[_FR]
     assert aliased.find("no-such-node") is None
+
+
+def test_graph_known_ids_holds_the_ids_and_the_aliases(aliased: Graph) -> None:
+    """The lints that read an id a person wrote know what ``Graph.find`` finds: a node id or an alias."""
+    known = graph_known_ids(aliased)
+    assert {_FR, "fr-old-name", "plan-old-name", _PLAN_ITEM} <= known
+    assert all(aliased.find(name) is not None for name in _ALIASES)
+    unaliased = graph_known_ids(build_graph(str(EXAMPLE_SPEC), str(ROOT)))
+    assert _FR in unaliased and not unaliased & set(_ALIASES)
+    assert "fr-never-existed" not in known
+    assert graph_known_ids(None) == set()
 
 
 def test_an_id_wins_over_an_alias_of_the_same_name(aliased: Graph) -> None:

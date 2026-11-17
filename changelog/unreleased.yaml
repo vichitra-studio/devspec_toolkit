@@ -596,8 +596,9 @@ changes:
   - type: remove_validator
     description: >
       Removed from the step validators, and reported by the graph check of
-      spec-check instead: the per-step duplicate-id checks (E520, for example step 15
-      row_id), the step 12 E590 for a depends_on entry that names no job, and E141
+      spec-check instead: the per-step duplicate-id checks (E520, for example step 04
+      fr_id), the step 12 E590 for a depends_on (1.1.1: requires) entry that names
+      no job, and E141
       (a job or task depends_on cycle, steps 12 and 14), which is retired in favour
       of E703. A single-file specdev validate therefore no longer reports a job or
       task cycle or an unknown job in depends_on; spec-check does (E703, E700). A

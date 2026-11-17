@@ -254,6 +254,22 @@ def test_ambiguity_report_is_empty_without_open_items(example: Graph, table: Rec
     assert build_pack(example, table, "16b", START_16B).ambiguities == ()
 
 
+def test_ambiguity_report_leaves_out_an_item_about_the_pack_and_lists_an_item_about_the_outside(example: Graph, table: RecipeTable) -> None:
+    """The filter is seen: an item exists in the plan file in both runs, and only the one about a node outside the pack is reported."""
+    def only_inside(document: dict[str, Any]) -> None:
+        document["plan"]["ambiguities"] = [_ambiguity("amb-in-pack", "ac-password-reset-3")]
+
+    def inside_and_outside(document: dict[str, Any]) -> None:
+        document["plan"]["ambiguities"] = [_ambiguity("amb-in-pack", "ac-password-reset-3"), _ambiguity("amb-open", "fr-password-reset-request")]
+
+    closed = _with_docs(example, {PLAN_FILE: only_inside})
+    assert "amb-in-pack" in closed.by_id
+    assert build_pack(closed, table, "16b", START_16B).ambiguities == ()
+    mixed = _with_docs(example, {PLAN_FILE: inside_and_outside})
+    report = build_pack(mixed, table, "16b", START_16B).ambiguities
+    assert report is not None and [(row.id, row.about) for row in report] == [("amb-open", ("fr-password-reset-request",))]
+
+
 # --- the dependency report ------------------------------------------------------------------------------------------
 
 def _older_sketch(document: dict[str, Any]) -> None:

@@ -52,7 +52,7 @@
                   "properties": {
                     "task_id": {
                       "$ref": "vc:core:atoms#kebabId",
-                      "description": "Unique kebab-case identifier for this task within the parent milestone. Use the pattern 'task-{verb}-{noun}' to make the ID self-describing. Examples: 'task-implement-auth-endpoint', 'task-add-session-schema', 'task-write-login-unit-tests', 'task-deploy-auth-service', 'task-configure-rate-limiting'. The verb names the work type (implement, add, write, migrate, configure, deploy, integrate). Avoid sequential IDs like 'task-1' or 'task-a' — they convey no meaning and break traceability when tasks are reordered."
+                      "description": "Unique kebab-case identifier for this task. It should be unique across the whole spec, not only within the parent milestone: the same `task_id` in two milestones is reported as E704. Use the pattern 'task-{verb}-{noun}' to make the ID self-describing. Examples: 'task-implement-auth-endpoint', 'task-add-session-schema', 'task-write-login-unit-tests', 'task-deploy-auth-service', 'task-configure-rate-limiting'. The verb names the work type (implement, add, write, migrate, configure, deploy, integrate). Avoid sequential IDs like 'task-1' or 'task-a' — they convey no meaning and break traceability when tasks are reordered."
                     },
                     "description": {
                       "type": "string",
