@@ -86,7 +86,7 @@ HASH_SEEDS = (0, 1, 2, 3)  # a listing built from a set comes out in a different
 
 def _seeded_env(seed: int) -> dict[str, str]:
     tests = str(ROOT / "tests")
-    path = os.pathsep.join([str(ROOT / "tools"), tests, os.environ.get("PYTHONPATH", "")])
+    path = os.pathsep.join(part for part in (str(ROOT / "tools"), tests, os.environ.get("PYTHONPATH", "")) if part)
     return {**os.environ, "PYTHONPATH": path, "PYTHONHASHSEED": str(seed)}
 
 

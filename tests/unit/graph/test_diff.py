@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -22,6 +23,7 @@ from specdev_tools.graph.diff import (
     NodeChange,
     diff_snapshots,
     diff_to_dict,
+    group_changes,
     render_text,
     suggest_bump,
 )
@@ -309,3 +311,67 @@ def test_build_graph_keeps_its_documents_and_declarations() -> None:
     graph = docs_graph(_docs(_fr("fr-a", "Do a.")))
     assert graph.documents[_FR_FILE]["functional_requirements"][0]["fr_id"] == "fr-a"
     assert graph.decls["fr"].kind == "fr" and graph.decls["criterion"].kind == "criterion"
+
+
+# --- M4 round 6 (R6-5 to R6-8, R6-12): pins that were only half there ----------------------------------------------
+
+def _roadmap(*tasks: tuple[str, str, list[str]]) -> dict[str, Any]:
+    """A roadmap with one milestone; each task is ``(task id, criterion text, ids its criterion removes)``."""
+    built = [
+        {"task_id": task_id, "description": "Do it.", "acceptance_criteria": [{**_criterion(f"tc-{task_id}", text), "removes": removes}]}
+        for task_id, text, removes in tasks
+    ]
+    return {_TASK_FILE: {"milestones": [{"milestone_id": "ms-a", "tasks": built}]}}
+
+
+def test_groups_are_sorted_by_role_first_then_kind() -> None:
+    """Sorted by kind alone the order would be assumption, capability, term; the role puts both ``context`` kinds first."""
+    new = {
+        "00_charter.json": {"assumptions": [{"assumption_id": "asm-a"}]},
+        "01_capabilities.json": {"capabilities": [{"capability_id": "cap-a", "description": "x"}]},
+        "03_glossary.json": {"terms": [{"term_id": "t-a"}]},
+    }
+    diff = _diff({}, new)
+    assert list(group_changes(diff)) == [("context", "assumption"), ("context", "term"), ("obligation-system", "capability")]
+
+
+def test_a_node_without_a_role_is_grouped_first_under_no_role() -> None:
+    diff = GraphDiff(
+        (NodeChange("z-id", "aaa", "context", (ADDED,)), NodeChange("a-id", "zzz", None, (ADDED,))), (), PATCH,
+    )
+    assert list(group_changes(diff)) == [("(no role)", "zzz"), ("context", "aaa")]
+    assert render_text(diff).splitlines()[1:3] == ["(no role) / zzz", "  a-id: added"]
+
+
+def test_new_removes_links_are_sorted_by_source_then_target() -> None:
+    """The targets alone would put ``ac-a`` (of ``tc-task-b``) first."""
+    diff = _diff(_roadmap(("task-a", "Done.", []), ("task-b", "Done.", [])),
+                 _roadmap(("task-a", "Done.", ["ac-z"]), ("task-b", "Done.", ["ac-a"])))
+    assert diff.new_removes == (("tc-task-a", "ac-z"), ("tc-task-b", "ac-a"))
+
+
+def test_a_removes_link_that_disappears_is_not_a_new_removal() -> None:
+    diff = _diff(_roadmap(("task-a", "Done.", ["ac-old"])), _roadmap(("task-a", "Done.", [])))
+    assert diff.new_removes == ()
+    assert diff.bump != MAJOR
+    assert "new removes links" not in render_text(diff)
+
+
+def test_a_kind_change_between_two_obligation_kinds_follows_neither_rule_of_a_change_of_role() -> None:
+    """Both kinds are ``obligation-system``: the node neither stops nor starts being one, so a bare kind change is a patch."""
+    both = NodeChange("x", "nfr", "obligation-system", (KIND,), old_kind="fr", old_role="obligation-system")
+    assert suggest_bump((both,), ()) == PATCH
+    assert suggest_bump((replace(both, changes=(KIND, CHANGED)),), ()) == MINOR
+
+
+def test_a_changed_criterion_text_of_a_task_changes_the_contract_view_of_the_task() -> None:
+    old, new = _snapshot(_roadmap(("task-a", "Done.", []))), _snapshot(_roadmap(("task-a", "Done, and logged.", [])))
+    old_view = contract_view(old.graph.by_id["task-a"], old.graph)
+    new_view = contract_view(new.graph.by_id["task-a"], new.graph)
+    assert old_view["criteria"]["tc-task-a"]["fields"] == {"text": "Done."}
+    assert old_view != new_view
+    assert _changes_by_id(diff_snapshots(old, new)) == {"task-a": (CHANGED,), "tc-task-a": (CHANGED,)}
+
+
+def test_normalise_text_maps_the_low_and_reversed_single_quotes() -> None:
+    assert normalise_text("‚a‛") == "'a'"

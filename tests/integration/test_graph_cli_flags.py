@@ -13,7 +13,8 @@ from typing import Any
 
 import pytest
 
-from unit.graph._synth import EXAMPLE_SPEC, ROOT, copy_build_spec, copy_example, git, make_toolkit, run_cli, write_json
+from specdev_tools.graph.commands import run_node
+from unit.graph._synth import ROOT, copy_build_spec, copy_example, git, make_toolkit, run_cli, write_json
 
 _CRITERION = "ac-password-reset-3"
 _PLAN_ITEM = "PWRESET_CONFIRM_EXPIRED_01"
@@ -324,12 +325,21 @@ def test_each_command_uses_the_three_root_flags_it_is_given_not_the_current_fold
     assert code == 0, text
     assert text.startswith(_TEXT_START[name]) or _TEXT_START[name] in text.splitlines()[0]
     assert not text.lstrip().startswith("{")
-    if name == "node status":  # the second run finds the lifecycle already set: the json form says so
-        document = _json(*run_cli(*argv, *flags, "--json"))
-        assert document["new"] == document["old"] == "deprecated"
-        return
+    if name == "node status":
+        return  # a second run finds the lifecycle already set: see the next test
     document = _json(*run_cli(*argv, *flags, "--json"))
     assert key in document
+
+
+def test_node_status_json_says_the_lifecycle_was_already_set_on_a_second_run(host: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    argv = ["node", "status", _CRITERION, "deprecated"]
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    flags = _flags(host / "spec", host)
+    assert run_cli(*argv, *flags)[0] == 0
+    document = _json(*run_cli(*argv, *flags, "--json"))
+    assert document["new"] == document["old"] == "deprecated"
 
 
 def test_the_three_root_flags_are_accepted_by_every_command_even_where_they_are_not_read(spec: Path) -> None:
@@ -339,7 +349,6 @@ def test_the_three_root_flags_are_accepted_by_every_command_even_where_they_are_
         with_flag = run_cli(*argv, "--repo-root", str(ROOT), "--spec-root", str(spec), "--git-root", str(other))
         without = run_cli(*argv, "--repo-root", str(ROOT), "--spec-root", str(spec))
         assert with_flag == without and with_flag[0] == 0
-    assert EXAMPLE_SPEC.is_dir()
 
 
 # --- --json: the document, and the error envelope on the same flag --------------------------------------------------
@@ -382,3 +391,42 @@ def test_status_validates_the_write_against_the_toolkit_named_by_repo_root(tmp_p
     before = (spec / "04_fr_list.json").read_bytes()
     code, out = run_cli("node", "status", "fr-login", "deprecated", "--repo-root", str(toolkit), "--spec-root", str(spec))
     assert code == 1 and out.startswith("E705") and (spec / "04_fr_list.json").read_bytes() == before
+
+
+# --- the default --repo-root of ``node``: the toolkit as a submodule below the current folder ----------------------------
+
+@pytest.fixture
+def submodule_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A host folder with ``devspec_toolkit/`` (the toolkit, linked) and ``spec/`` (the example); the current folder."""
+    host_dir = tmp_path / "submodule-host"
+    host_dir.mkdir()
+    (host_dir / "devspec_toolkit").symlink_to(ROOT, target_is_directory=True)
+    copy_example(host_dir / "spec")
+    monkeypatch.chdir(host_dir)
+    return host_dir
+
+
+@pytest.mark.parametrize(
+    ("argv", "start"),
+    [
+        (["node", _CRITERION], _CRITERION),
+        (["node", "candidates", "--kind", "api", "--field", "derives_from"], "2 candidates for api.derives_from"),
+        (["node", "status", _CRITERION, "deprecated"], f"{_CRITERION}: active -> deprecated"),
+    ],
+    ids=["show", "candidates", "status"],
+)
+def test_node_finds_the_toolkit_below_the_current_folder_when_repo_root_is_not_given(submodule_host: Path, argv: list[str], start: str) -> None:
+    code, text = run_cli(*argv, "--spec-root", str(submodule_host / "spec"))
+    assert code == 0, text
+    assert text.startswith(start)
+
+
+@pytest.mark.parametrize("flag", ["-h", "--help"])
+def test_run_node_prints_the_help_of_node_for_a_help_flag_not_the_help_of_node_show(flag: str, capsys: pytest.CaptureFixture[str]) -> None:
+    """``cli.main`` answers ``node -h`` with its own usage line, so the tokens are handed to ``run_node`` directly."""
+    with pytest.raises(SystemExit) as raised:
+        run_node([flag])
+    out = capsys.readouterr().out
+    assert raised.value.code == 0
+    assert out.startswith("usage: specdev node [-h]") and "candidates" in out and "status" in out
+    assert "Show nodes of the spec graph by id." not in out

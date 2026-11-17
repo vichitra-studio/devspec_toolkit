@@ -128,6 +128,13 @@ def test_owner_for_finds_code_in_any_row_list():
     assert owner_for("E999", node, ctx) is None
 
 
+@pytest.mark.parametrize("rule", ["holder_step", "node_step", "consumer_step", "binding_step"])
+def test_every_step_rule_gives_the_step_of_the_node(rule):
+    ctx = OwnerContext(rows=(OwnershipRow("a", rule, ("E901",), ""),))
+    assert owner_for("E901", _node(step="05"), ctx) == "step:05"
+    assert owner_for("E901", None, ctx) is None
+
+
 def test_a_step_rule_with_no_node_has_no_answer():
     """M6a asks for emitters that own no node: a rule that needs the node answers ``None``, a rule that does not still answers."""
     ctx = OwnerContext(

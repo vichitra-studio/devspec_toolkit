@@ -267,6 +267,16 @@ def test_absent_upstream_message_names_the_step() -> None:
     assert "no node has that id" in error.message and "no file of step" not in error.message
 
 
+def test_a_field_over_two_steps_names_absent_steps_only_when_none_of_them_has_a_file() -> None:
+    """The field accepts kinds of ``s1`` and ``s2``; ``s1`` has a file, ``s2`` has none: the target may still be in ``s1``."""
+    decl = _decl("to", ["B", "C"])
+    nodes = [_node("a", "A", "s3", [(decl, "ghost")]), _node("b", "B", "s1"), _node("c", "C", "s2")]
+    (error,) = resolve_graph(_graph(nodes, files={"s1": ("s1.json",), "s3": ("s3.json",)}))
+    assert error.message.endswith("no node has that id")
+    (error,) = resolve_graph(_graph(nodes, files={"s3": ("s3.json",)}))
+    assert error.message.endswith("no file of step s1, s2 exists in the spec, so the target cannot be found")
+
+
 def test_a_target_in_a_file_that_could_not_be_read_says_so() -> None:
     """The file was skipped, so "no node has that id" would be false; the finding names the file and its step."""
     api = {"05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-x"]}]}}

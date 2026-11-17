@@ -55,6 +55,11 @@ def test_mint_slug_cuts_on_a_word_boundary() -> None:
     assert mint_slug("abcdefghij" * 3, set(), max_len=12) == "abcdefghijab"
 
 
+def test_mint_slug_keeps_a_slug_of_exactly_max_len_whole() -> None:
+    assert mint_slug("ab cd", set(), max_len=5) == "ab-cd"
+    assert mint_slug("ab cd", set(), max_len=4) == "ab"
+
+
 def test_mint_slug_keeps_ascii_letters_of_accented_text() -> None:
     assert mint_slug("Réinitialiser le mot de passe", set()) == "reinitialiser-le-mot-de-passe"
 
