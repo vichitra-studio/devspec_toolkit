@@ -18,13 +18,14 @@ from typing import Any
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
-from specdev_tools.graph.gitview import read_seed_texts, spec_path_in_repo
+from specdev_tools.graph.gitview import read_seed_texts_noting, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.queries import require_known_step
 from specdev_tools.trace import attest, coverage, replay, step_ready
 from specdev_tools.trace.history import OldTextResolver
-from specdev_tools.trace.lockfile import Lock, locked_graph, read_lock, refuse_unreadable, write_lock
-from specdev_tools.trace.merge_driver import install_driver, merge_files
+from specdev_tools.trace.lockfile import Lock, read_lock, write_lock
+from specdev_tools.trace.writing import locked_graph, refuse_unreadable, seed_texts_for_write
+from specdev_tools.trace.merge_driver import git_top_level, install_driver, merge_files
 from specdev_tools.trace.step_create import StepCreateRequest, create_step
 from specdev_tools.trace.write_report import render_text as render_write, result_to_dict as write_to_dict
 
@@ -32,7 +33,8 @@ STALE_DESCRIPTION = (
     "Show what is still to be re-read after an upstream change: the suspect links (links whose target changed after "
     "the holder accepted them), grouped by owning step in waterfall order, nodes upward first, with the cause and the "
     "nodes the change started from (roots), and the coverage gaps. Links of closed milestones are not listed. "
-    "Informational: exit 0 whatever it finds (the gate is spec-check).\n\n"
+    "Informational: exit 0 when it lists links or gaps (the gate is spec-check); a spec file that cannot be read is a "
+    "warning on stderr, a lock file that cannot be read is an error (E760, exit 1).\n\n"
     "--diff adds, per root, the unified diff of its contract text against the text it had when the link was accepted "
     "(one diff per accepted version, with the holders named, when holders accepted different ones; a line says so when "
     "the change above was already accepted by the links that point at it). "
@@ -89,9 +91,10 @@ STEP_DESCRIPTION = (
 
 
 COVERAGE_DESCRIPTION = (
-    "Show how the obligations of the graph are linked, read from the reverse index. Information only: exit 0 whatever "
-    "it finds (no rule requires an FR to have an API or a capability to have an FR; the role-rule findings are the "
-    "gate of spec-check).\n\n"
+    "Show how the obligations of the graph are linked, read from the reverse index. Information only: exit 0 when it "
+    "shows the counts and gaps (no rule requires an FR to have an API or a capability to have an FR; the role-rule "
+    "findings are the gate of spec-check); a spec file that cannot be read is a warning on stderr, a lock file that "
+    "cannot be read is an error (E760, exit 1).\n\n"
     "Default view: the FRs with an API, the FRs with a fixture (a fixture that verifies one of the FR's criteria) and "
     "the capabilities with an FR, each as linked/total/ratio with the ids that are not linked; the criteria that have "
     "a current refinement (a step-14 task criterion that refines it, whose lock entry still holds the criterion's "
@@ -178,16 +181,26 @@ class _View:
         return OldTextResolver(self.graph, git_root=self.git_root, spec_root=self.spec_root, repo_root=self.repo_root)
 
 
-def _view(args: argparse.Namespace, graph: Graph) -> _View:
+def _view(args: argparse.Namespace, graph: Graph, *, for_write: bool = False) -> _View:
+    """The view of the parsed *args*.
+
+    A command that writes hashes into the lock (*for_write*) refuses with E520 when a seed document is not found
+    (``seed_texts_for_write``).  A read command goes on, a missing seed making its links suspect, and says once on
+    stderr which seeds were not found and where they were searched, so a wrong host root is seen at the first read.
+    """
     spec_root, git_root = os.path.abspath(args.spec_root), resolve_git_root(args)
-    return _View(graph, spec_root, git_root, os.path.abspath(args.repo_root), read_lock(spec_root), read_seed_texts(graph, git_root))
+    if for_write:
+        seed_texts = seed_texts_for_write(graph, git_root)
+    else:
+        seed_texts = read_seed_texts_noting(graph, git_root)
+    return _View(graph, spec_root, git_root, os.path.abspath(args.repo_root), read_lock(spec_root), seed_texts)
 
 
 @contextmanager
-def _locked_view(args: argparse.Namespace, what: str) -> Iterator[_View]:
+def _locked_view(args: argparse.Namespace, what: str, *, for_write: bool = True) -> Iterator[_View]:
     """The view of a command *what* that writes: the write lock is held and the graph is built under it (``locked_graph``)."""
     with locked_graph(os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), what) as graph:
-        yield _view(args, graph)
+        yield _view(args, graph, for_write=for_write)
 
 
 def _stale(args: argparse.Namespace, graph: Graph) -> int:
@@ -223,7 +236,7 @@ def _attest_flags_problem(args: argparse.Namespace) -> str | None:
 
 def _attest_prune(args: argparse.Namespace, graph: Graph) -> int:
     write = not args.dry_run
-    with _locked_view(args, "attest --prune") if write else nullcontext(_view(args, graph)) as view:
+    with _locked_view(args, "attest --prune", for_write=False) if write else nullcontext(_view(args, graph)) as view:
         if not write:
             refuse_unreadable(view.graph, "attest --prune --dry-run")
         lock, dropped = attest.prune_orphans(view.graph, view.lock)
@@ -238,7 +251,7 @@ def _attest_prune(args: argparse.Namespace, graph: Graph) -> int:
 
 def _attest_links(args: argparse.Namespace, graph: Graph) -> int:
     write = args.yes and not args.dry_run
-    with _locked_view(args, "attest --yes") if write else nullcontext(_view(args, graph)) as view:
+    with _locked_view(args, "attest --yes") if write else nullcontext(_view(args, graph, for_write=args.yes)) as view:
         if args.dry_run and args.yes:
             refuse_unreadable(view.graph, "attest --yes --dry-run")
         if args.step is not None:
@@ -335,7 +348,7 @@ def _coverage(args: argparse.Namespace, graph: Graph) -> int:
 
 
 def run_coverage(args: argparse.Namespace) -> int:
-    """Run ``specdev coverage`` on the parsed *args*; returns the exit code (0: it only informs)."""
+    """Run ``specdev coverage`` on the parsed *args*; returns the exit code (0 when it shows the counts; 1 for a lock that cannot be read, E760)."""
     return run_on_graph("coverage", args, lambda graph: _coverage(args, graph))
 
 
@@ -360,7 +373,8 @@ def run_lock_merge(args: argparse.Namespace) -> int:
 def run_lock_install_driver(args: argparse.Namespace) -> int:
     """Run ``specdev lock install-driver`` on the parsed *args*; returns the exit code."""
     try:
-        git_root = resolve_git_root(args)
+        # a git operation: the line is relative to the top of the working tree, wherever the host root derived from --spec-root is
+        git_root = git_top_level(resolve_git_root(args))
         result = install_driver(git_root, spec_path_in_repo(os.path.abspath(args.spec_root), git_root), args.driver_command)
     except FindingError as exc:
         return _report_finding(exc, "lock install-driver", args.json_output)

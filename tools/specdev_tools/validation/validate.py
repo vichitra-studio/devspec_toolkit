@@ -41,6 +41,7 @@ from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import SchemaRegistry, get_shared_registry
 from ..graph.build import build_file_graph
+from ..graph.gitview import host_root_of
 from ..graph.ids import check_unique_ids
 from ..graph.kinds import KindRegistryError
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
@@ -276,7 +277,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
             graph_for_checks(repo_root, spec_dir, spec_root, lint_graph),
             spec_root or spec_dir,
             repo_root,
-            git_root or os.path.dirname(os.path.abspath(spec_dir)),
+            host_root_of(spec_root or spec_dir, git_root),
         )
     )
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():

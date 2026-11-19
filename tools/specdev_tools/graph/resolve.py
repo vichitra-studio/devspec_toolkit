@@ -14,7 +14,7 @@ from typing import Protocol
 
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.graph.kinds import RECORD_ROLE, LinkDecl
-from specdev_tools.graph.model import UNRANKED, Graph, Link, Node, SpecShape
+from specdev_tools.graph.model import UNRANKED, Graph, Link, Node, SpecShape, article
 from specdev_tools.graph.ownership import step_owner
 
 HISTORY_FIELDS = frozenset({"replaces", "removes"})
@@ -101,7 +101,7 @@ def _wrong_kind_error(holder: Node, link: Link, target: Node) -> SpecError:
     accepted = ", ".join(link.decl.kinds)
     return _error(
         "E701", holder,
-        f"{holder.id}, field {link.field}, target '{target.id}' is a {target.kind}; the field accepts: {accepted}",
+        f"{holder.id}, field {link.field}, target '{target.id}' is {article(target.kind)} {target.kind}; the field accepts: {accepted}",
     )
 
 
@@ -133,7 +133,7 @@ def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -
         return _error("E702", holder, f"{where}: the target is in a later step; a link points to an earlier step")
     return _error(
         "E702", holder,
-        f"{where}: the target is in the same step and a {target.kind} is not declared as a same-step target of the field",
+        f"{where}: the target is in the same step and {article(target.kind)} {target.kind} is not declared as a same-step target of the field",
     )
 
 

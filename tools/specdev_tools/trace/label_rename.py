@@ -21,10 +21,10 @@ from typing import Any
 
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.kinds import RECORD_ROLE
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node, article
 from specdev_tools.graph.queries import unknown_node_error
 from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.trace.lockfile import writing_graph
+from specdev_tools.trace.writing import writing_graph
 from specdev_tools.trace.rename import FileEdit, FileEditor, jq_key, refuse, write_edits
 
 TERM_KIND = "term"
@@ -74,7 +74,7 @@ def _term_to_relabel(graph: Graph, term_id: str, new_label: str) -> tuple[Node, 
     if node.id in graph.dups:
         raise refuse(f"node id {node.id!r} is defined more than once (E704); fix the duplicate first")
     if node.kind != TERM_KIND:
-        raise refuse(f"{node.id!r} is a {node.kind}, not a glossary term; only a term has a label to rename")
+        raise refuse(f"{node.id!r} is {article(node.kind)} {node.kind}, not a glossary term; only a term has a label to rename")
     held = (item_of(graph, node) or {}).get(LABEL_KEY)
     if not isinstance(held, str) or not held.strip():
         raise refuse(f"{node.id!r} has no {LABEL_KEY!r} text to rename")

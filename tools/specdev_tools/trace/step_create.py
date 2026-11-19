@@ -16,16 +16,15 @@ from typing import Any
 from specdev_tools.core.errors import make_error
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.registry import get_shared_registry
-from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations
+from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations, violation_text
 from specdev_tools.graph.kinds import FileDecl, load_kind_registry
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import WriteRefusedError, WriteResult, with_ids, write_new_file
-from specdev_tools.trace.lockfile import writing_graph
+from specdev_tools.trace.writing import writing_graph
 from specdev_tools.validation.linter_utils import graph_known_ids
 
 ANCHOR_STEP = "16"
 MAX_SHOWN_VIOLATIONS = 10
-MAX_VIOLATION_CHARS = 300
 
 
 @dataclass(frozen=True)
@@ -97,7 +96,7 @@ def check_draft(repo_root: str, decl: FileDecl, document: dict[str, Any]) -> Non
         raise _refuse(f"cannot validate the draft: {error}") from None
     if violations:
         shown = sorted(violations, key=lambda item: (item.path, item.message))[:MAX_SHOWN_VIOLATIONS]
-        lines = "\n".join(f"  {_jq_path(item.path)}: {item.message[:MAX_VIOLATION_CHARS]}" for item in shown)
+        lines = "\n".join(f"  {_jq_path(item.path)}: {violation_text(item)}" for item in shown)
         more = len(violations) - len(shown)
         tail = f"\n  ... and {more} more" if more > 0 else ""
         raise _refuse(f"the draft is not valid against its schema; nothing was written:\n{lines}{tail}")

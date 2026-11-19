@@ -149,6 +149,17 @@ class SchemaViolation(NamedTuple):
     message: str
 
 
+_SHORT_MESSAGES = {"maxItems": "has more items than the schema allows", "minItems": "has fewer items than the schema requires"}
+_MAX_MESSAGE = 200
+
+
+def violation_text(item: SchemaViolation) -> str:
+    """What is wrong at the violation: its message, but not the whole value the message quotes (a long one is cut)."""
+    if item.keyword in _SHORT_MESSAGES:
+        return _SHORT_MESSAGES[item.keyword]
+    return item.message if len(item.message) <= _MAX_MESSAGE else item.message[:_MAX_MESSAGE] + " ..."
+
+
 def validate_data_against_schema(
     repo_root: str,
     data: dict,

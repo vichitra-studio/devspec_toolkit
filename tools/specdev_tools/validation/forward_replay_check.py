@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from ..core.errors import SpecError, make_error
+from ..graph.gitview import host_root_of
 from ._legacy_shim import removed_paths
 from .linter_utils import build_lint_graph
 from .spec_check import lock_link_findings
@@ -117,7 +118,7 @@ def check_forward_replay_alias(
         errors = [e for e in errors if e.code not in _PER_FILE_CODES or _step_of_path(e.file or e.path) == step]
     spec_dir = os.path.abspath(spec_root) if spec_root else os.path.join(os.path.abspath(repo_root), "spec")
     graph = build_lint_graph(spec_dir, os.path.abspath(repo_root))
-    host_root = os.path.abspath(git_root) if git_root else os.path.abspath(repo_root)
+    host_root = host_root_of(spec_dir, git_root)
     return [*errors, *lock_link_findings(graph, spec_dir, os.path.abspath(repo_root), host_root, step=step)]
 
 

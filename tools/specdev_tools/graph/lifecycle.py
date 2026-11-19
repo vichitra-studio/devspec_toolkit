@@ -14,8 +14,7 @@ from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import json_delete, json_patch
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
-from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node
-from specdev_tools.graph.queries import article
+from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node, article
 from specdev_tools.trace.lockfile import with_write_lock
 
 LIFECYCLE_KEY = "lifecycle"

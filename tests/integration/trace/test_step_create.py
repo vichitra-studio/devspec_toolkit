@@ -116,6 +116,17 @@ def test_step_create_refuses_existing_artifact(host: Host) -> None:
     assert host.snapshot() == before
 
 
+def test_step_create_cuts_a_long_schema_message_like_the_other_writers(host: Host) -> None:
+    """H1-6: the violation text is ``violation_text`` (200 characters and `` ...``), not a cut of its own."""
+    before = host.snapshot()
+    draft = _with_draft(host, "long.json", lambda doc: doc["functional_requirements"][0].update(priority="x" * 600))
+    document = host.create_json(FR_STEP, draft=draft, code=1)
+    message = document["errors"][0]["message"]
+    line = next(line for line in message.splitlines() if "priority" in line)
+    assert line.endswith(" ...") and "x" * 150 in line and "x" * 250 not in line
+    assert host.snapshot() == before
+
+
 @pytest.mark.parametrize(
     ("name", "change", "needle"),
     [

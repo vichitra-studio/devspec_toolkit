@@ -315,3 +315,16 @@ def test_node_show_of_a_seed_names_the_manifest_pointer_and_the_document_separat
     assert "  file common/seed_manifest.json  path .seeds[0]" in text and "  seed document docs/seed/seed_accounts.md" in text
     assert text.count("  seed document docs/seed/seed_accounts.md") == 1
     assert node_json(report)["nodes"][0]["document"] == "docs/seed/seed_accounts.md"
+
+
+def test_a_message_that_names_a_kind_after_an_article_says_an_before_a_vowel() -> None:
+    """H1-8: the recipe start check, run on every kind of the worked example that starts with a vowel ("is a api" before the fix)."""
+    from unit.graph._synth import run_cli
+
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    vowel_nodes = {node.kind: node.id for node in graph.nodes if node.kind[:1] in "aeiou"}
+    assert {"api", "assumption", "invariant"} <= set(vowel_nodes)
+    for kind, node_id in sorted(vowel_nodes.items()):
+        code, out = run_cli("trace", node_id, "--recipe", "16b", "--repo-root", str(ROOT), "--spec-root", str(EXAMPLE_SPEC))
+        assert code == 1 and "E707" in out, (kind, out)
+        assert f"is an {kind}" in out and f"is a {kind}" not in out, (kind, out)

@@ -57,6 +57,7 @@ def host(tmp_path: Path) -> Path:
     repo.mkdir()
     git(repo, "init", "-q", "-b", "main")
     spec = copy_example(repo / "spec")
+    shutil.copytree(EXAMPLE_HOST / "docs", repo / "docs")  # the seed documents: without them every seed link is suspect and a hash write is E520
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "one")
     sketch = json.loads((spec / _SKETCH).read_text(encoding="utf-8"))
@@ -454,7 +455,7 @@ def test_stale_json_prints_the_suspects_by_step_and_the_totals(host: Path) -> No
     document = _json(*run_cli("stale", *_flags(host / "spec", host), "--json"))
     assert set(document) == {"steps", "totals"}
     assert document["totals"]["suspect_links"] == sum(len(node["links"]) for step in document["steps"] for node in step["suspect_nodes"])
-    assert [step["step"] for step in document["steps"]][:3] == ["00", "01", "02"]
+    assert [step["step"] for step in document["steps"]] == ["02", "02a", "07"]  # the re-pin of tp-mailrelay and what is built on it; the seed documents are in the host
 
 
 # --- coverage: --by, --json --------------------------------------------------------------------------------------------
@@ -470,8 +471,8 @@ def test_coverage_by_fr_prints_the_matrix_of_the_frs(host: Path) -> None:
     criterion = next(item for item in document["by_fr"][0]["criteria"] if item["id"] == _CRITERION)
     assert criterion["refined"] == "current"
     fixtures = next(group for group in criterion["groups"] if group["kind"] == "fixture")
-    # the host re-pins a third party in its second commit: the fixture's chain stamp moved, its own content did not
-    assert fixtures["links"] == [{"node": "fix-password-reset-expired-token", "field": "verifies", "current": True, "suspect": True, "historical": False}]
+    # the host re-pins a third party in its second commit: that does not reach the fixture (before the seed documents were in the host, every seed link was suspect and so was this one)
+    assert fixtures["links"] == [{"node": "fix-password-reset-expired-token", "field": "verifies", "current": True, "suspect": False, "historical": False}]
 
 
 def test_coverage_json_prints_the_counts_as_json(host: Path) -> None:

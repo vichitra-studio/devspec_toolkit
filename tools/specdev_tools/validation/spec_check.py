@@ -18,7 +18,7 @@ from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.check import run_graph_check
-from ..graph.gitview import host_root_of, read_seed_texts
+from ..graph.gitview import host_root_of, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import stamp_file_owner, step_for_file
 from ..trace.computed_fields import check_stored_computed
@@ -153,7 +153,7 @@ def _trace_lock_result(
         return {"status": "SKIP", "reason": "no spec graph"}
     if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
         return {"status": "SKIP", "reason": "no links and no trace lock"}
-    return _check_result(check_lock(graph, lock, read_seed_texts(graph, host_root)))
+    return _check_result(check_lock(graph, lock, read_seed_texts_noting(graph, host_root)))
 
 
 def _records_result(graph: Graph | None, repo_root: str, records_dir: str) -> dict[str, Any]:
@@ -185,7 +185,7 @@ def lock_link_findings(
     if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
         return []
     link_errs = [e for e in run_graph_check(lock_dir, repo_root, graph=graph, lock=lock) if e.code in _LOCK_LINK_CODES]
-    findings = [*link_errs, *check_lock(graph, lock, read_seed_texts(graph, host_root))]
+    findings = [*link_errs, *check_lock(graph, lock, read_seed_texts_noting(graph, host_root))]
     if step is None:
         return findings
     return [e for e in findings if (node := graph.by_id.get(e.node_id or "")) is not None and node.step == step]

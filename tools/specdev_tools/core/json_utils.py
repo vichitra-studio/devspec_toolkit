@@ -37,6 +37,7 @@ from specdev_tools.core.schema_validate import (
     SchemaValidationError,
     SchemaViolation,
     schema_violations,
+    violation_text,
 )
 
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
@@ -445,17 +446,6 @@ def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> List[Sc
             f"Unexpected error during schema validation: {type(exc).__name__}: {exc}; "
             "refusing to proceed."
         ) from exc
-
-
-_SHORT_MESSAGES = {"maxItems": "has more items than the schema allows", "minItems": "has fewer items than the schema requires"}
-_MAX_MESSAGE = 200
-
-
-def violation_text(item: SchemaViolation) -> str:
-    """What is wrong at the violation: its message, but not the whole value the message quotes (a long one is cut)."""
-    if item.keyword in _SHORT_MESSAGES:
-        return _SHORT_MESSAGES[item.keyword]
-    return item.message if len(item.message) <= _MAX_MESSAGE else item.message[:_MAX_MESSAGE] + " ..."
 
 
 def _ws1_differential_check(

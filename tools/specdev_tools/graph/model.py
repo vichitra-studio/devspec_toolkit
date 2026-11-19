@@ -25,6 +25,11 @@ def collapse_whitespace(text: str) -> str:
     return _WHITESPACE.sub(" ", text).strip()
 
 
+def article(noun: str) -> str:
+    """``a`` or ``an`` for *noun* (``a link``, ``an alias``): the one place a message puts a kind or a noun variable after an article."""
+    return "an" if noun[:1].lower() in "aeiou" else "a"
+
+
 def node_label(item: Mapping[str, Any]) -> str:
     """Short text that names a node: the first non-empty ``LABEL_FIELDS`` string, whitespace-collapsed, cut at 120 characters.
 

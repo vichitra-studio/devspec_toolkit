@@ -5,7 +5,7 @@ from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.kinds import KindRegistryError
-from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.model import Graph, Node, article
 from specdev_tools.graph.ownership import step_owner
 from specdev_tools.graph.resolve import NULL_HOOKS, resolve_graph
 from specdev_tools.trace.lockfile import Lock
@@ -30,7 +30,7 @@ def check_alias_space(graph: Graph) -> list[SpecError]:
         for alias in dict.fromkeys(node.aliases):
             other = listed.setdefault(alias, node)
             if alias in graph.by_id:
-                problem = f"is the id of a {graph.by_id[alias].kind}"
+                problem = f"is the id of {article(graph.by_id[alias].kind)} {graph.by_id[alias].kind}"
             elif other.id != node.id:
                 problem = f"is also an alias of '{other.id}'"
             else:

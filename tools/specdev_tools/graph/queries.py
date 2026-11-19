@@ -147,11 +147,6 @@ def plural(count: int, noun: str, many: str | None = None) -> str:
     return f"{count} {noun}" if count == 1 else f"{count} {many or noun + 's'}"
 
 
-def article(noun: str) -> str:
-    """``a`` or ``an`` for *noun* (``a link``, ``an alias``)."""
-    return "an" if noun[:1].lower() in "aeiou" else "a"
-
-
 def _link_view(graph: Graph, link_field: str, target_id: str) -> LinkView:
     target = graph.find(target_id)
     if target is None:

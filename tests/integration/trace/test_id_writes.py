@@ -322,7 +322,33 @@ def test_insert_creates_the_first_item_of_an_array_field_the_schema_declares(hos
 def test_insert_into_a_field_the_schema_does_not_have_is_refused_naming_the_field(host: Path) -> None:
     before = _snapshot(host)
     status, out = _run(host, "insert", "--id", FR_REQUEST, ".nope", '"x"')
-    assert status == 1 and out.startswith("E767") and "nope" in out and "jq" not in out
+    assert status == 1 and out.startswith("E767") and "jq" not in out
+    assert f"{FR_REQUEST!r} has no nope and its schema does not declare .nope as an array" in out
+    assert _snapshot(host) == before
+
+
+def test_insert_into_a_free_form_object_field_that_is_absent_is_refused_before_jq_makes_an_array(host: Path) -> None:
+    """H1-5(a): the schema of ``.security.token_permissions`` is a free-form object; only the declared-array check keeps jq from creating an array there."""
+    before = _snapshot(host)
+    status, out = _run(host, "insert", "--id", "job-contract-tests", ".security.token_permissions", '"x"')
+    assert status == 1 and out.startswith("E767")
+    assert "'job-contract-tests' has no security.token_permissions and its schema does not declare .security.token_permissions as an array" in out
+    assert _snapshot(host) == before
+
+
+@pytest.mark.parametrize(
+    ("node", "field", "what"),
+    [(FR_REQUEST, ".statement", "a string"), ("job-contract-tests", ".environment_ref", "an object")],
+    ids=["string", "object"],
+)
+def test_insert_into_a_present_field_that_is_not_an_array_names_what_it_is(host: Path, node: str, field: str, what: str) -> None:
+    """H1-3: decided from the file and the schema before jq runs, so no jq error text is shown or matched."""
+    before = _snapshot(host)
+    status, out = _run(host, "insert", "--id", node, field, '"x"')
+    assert status == 1 and out.startswith("E767"), out
+    assert f"{field} of {node!r} is {what}, not an array" in out
+    assert f"specdev json patch --id {node} {field}" in out
+    assert "jq" not in out and "Cannot insert" not in out
     assert _snapshot(host) == before
 
 

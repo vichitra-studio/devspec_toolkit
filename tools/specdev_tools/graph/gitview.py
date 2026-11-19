@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import os
 import subprocess
+import sys
 import tarfile
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -20,9 +21,8 @@ from pathlib import Path
 from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
-from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import SEED_KIND
-from specdev_tools.graph.model import Graph, collapse_whitespace
+from specdev_tools.graph.model import Graph, Node, collapse_whitespace
 
 GIT_TIMEOUT_SECONDS = 30
 PREVIOUS_COMMIT = "HEAD~1"
@@ -191,6 +191,29 @@ def read_seed_texts(graph: Graph, host_root: str) -> dict[str, str]:
     return texts
 
 
+def missing_seeds(graph: Graph, texts: Mapping[str, str]) -> tuple[Node, ...]:
+    """The seed nodes of *graph* that have no entry in *texts* (what ``read_seed_texts`` returned): their document was not found."""
+    return tuple(node for node in graph.nodes if node.kind == SEED_KIND and node.id not in texts)
+
+
+def read_seed_texts_noting(graph: Graph, host_root: str) -> dict[str, str]:
+    """``read_seed_texts`` for a command that reads: it also says once on stderr which seed documents were not found.
+
+    A seed that was not found makes its links suspect, which is what a wrong host root looks like; the line names the
+    folder searched and ``--git-root``, so the cause is seen at the first read.
+    """
+    texts = read_seed_texts(graph, host_root)
+    absent = missing_seeds(graph, texts)
+    if absent:
+        names = ", ".join(f"{node.file} ({node.id})" for node in absent)
+        print(
+            f"note: seed documents not found under {host_root}: {names}; their links count as suspect; "
+            "if the repository root is another folder pass --git-root",
+            file=sys.stderr,
+        )
+    return texts
+
+
 def read_seed_texts_at(ref: str, git_root: str, graph: Graph) -> dict[str, str]:
     """Whitespace-collapsed seed texts as they are at *ref*: the seed files of *graph* archived from the repository root.
 
@@ -237,6 +260,8 @@ def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) ->
             it is.
         KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
     """
+    from specdev_tools.graph.build import build_graph  # not at the top: the git merge driver imports this module and builds no graph
+
     with archive_ref(ref, git_root, [spec_path]) as archived:
         spec_dir = os.path.join(archived, spec_path)
         graph = build_graph(spec_dir, repo_root)

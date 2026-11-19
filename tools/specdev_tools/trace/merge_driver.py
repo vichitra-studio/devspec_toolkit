@@ -110,6 +110,11 @@ def _git(git_root: str, args: Sequence[str]) -> str:
     return process.stdout.decode("utf-8", errors="replace").strip()
 
 
+def git_top_level(folder: str) -> str:
+    """The top folder of the working tree that holds *folder* (``git rev-parse --show-toplevel``); E520 outside a repository."""
+    return _git(folder, ["rev-parse", "--show-toplevel"])
+
+
 def attribute_line(spec_rel_path: str) -> str:
     """The attributes line that routes the lock of the spec folder *spec_rel_path* (relative to the git root) to the driver."""
     parts = [] if spec_rel_path in ("", ".") else [spec_rel_path.strip("/")]

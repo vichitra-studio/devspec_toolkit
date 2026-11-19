@@ -31,8 +31,8 @@ from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.kinds import RECORD_ROLE, SEED_KIND, KindDecl
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
-from specdev_tools.graph.queries import article, unknown_node_error
+from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node, article
+from specdev_tools.graph.queries import unknown_node_error
 from specdev_tools.graph.resolve import HISTORY_FIELDS, resolve_graph
 from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import (
@@ -42,8 +42,8 @@ from specdev_tools.trace.lockfile import (
     read_lock,
     replace_file_atomically,
     write_lock,
-    writing_graph,
 )
+from specdev_tools.trace.writing import writing_graph
 
 ALIASES_KEY = "aliases"
 _PLAIN_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -187,7 +187,7 @@ def _check_new_id(graph: Graph, node: Node, new_id: str) -> None:
     if new_id == node.id:
         raise refuse(f"{node.id!r} already has the id {new_id!r}; the old and the new id are the same")
     if new_id in graph.by_id:
-        raise refuse(f"{new_id!r} is already the id of a {graph.by_id[new_id].kind}; choose an id no node has")
+        raise refuse(f"{new_id!r} is already the id of {article(graph.by_id[new_id].kind)} {graph.by_id[new_id].kind}; choose an id no node has")
     if new_id in graph.alias_index:
         raise refuse(f"{new_id!r} is an alias of '{graph.alias_index[new_id]}'; choose an id no node or alias has")
 

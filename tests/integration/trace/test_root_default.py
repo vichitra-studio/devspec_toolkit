@@ -86,3 +86,20 @@ def test_attest_yes_from_another_folder_leaves_spec_check_clean(host: Example, t
     monkeypatch.chdir(host.host)
     errors, _context = run_spec_check_json(str(ROOT), str(host.spec), git_root=str(host.host))
     assert [e.message for e in errors if e.code == "E763"] == []
+
+
+@pytest.mark.parametrize("command", ["forward-replay-check", "validate-all"])
+def test_replay_and_validate_all_derive_the_host_root_from_the_spec_folder(
+    command: str, host: Example, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """H1-1: without ``--git-root`` both read the seed texts under the folder that holds the spec folder, not the toolkit root or the current folder (64 false E763 before the fix)."""
+    other = tmp_path / "elsewhere"
+    other.mkdir()
+    monkeypatch.chdir(other)
+    positional = [str(host.spec)] if command == "validate-all" else []
+    flags = ["--repo-root", str(ROOT), "--spec-root", str(host.spec)]
+    given = run_cli(command, *positional, *flags, "--git-root", str(host.host))
+    derived = run_cli(command, *positional, *flags)
+    assert "E763" not in given[1]
+    assert "E763" not in derived[1]
+    assert derived == given

@@ -5,6 +5,8 @@ them.  Each writer, dry run included, ends with E520 naming the file, exit 1, an
 """
 from __future__ import annotations
 
+import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -39,11 +41,14 @@ WRITERS = {
 @pytest.mark.parametrize("argv", WRITERS.values(), ids=WRITERS.keys())
 def test_a_write_refuses_while_a_spec_file_cannot_be_read(tmp_path: Path, argv: list[str]) -> None:
     host = git_copy_of_example(tmp_path / "host")
+    shutil.rmtree(host / "spec" / "extras")  # a host with no lock yet: a refused write must not leave an empty folder behind (H1-4)
     broken = host / "spec" / "04_fr_list.json"
     broken.write_text("<<<<<<< ours\n" + broken.read_text(encoding="utf-8") + "=======\n>>>>>>> theirs\n", encoding="utf-8")
     git(host, "add", "-A")
     git(host, "commit", "-q", "-m", "conflict markers")
+    before = sorted(os.listdir(host / "spec"))
     code, out = run_on_example(host, *argv)
     assert code == 1, out
     assert "E520" in out and "04_fr_list.json cannot be read" in out and "refused" in out, out
-    assert git(host, "status", "--porcelain") == ""
+    assert git(host, "status", "--porcelain", "--ignored") == ""
+    assert sorted(os.listdir(host / "spec")) == before and "extras" not in before

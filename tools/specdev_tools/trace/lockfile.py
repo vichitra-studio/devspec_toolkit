@@ -25,8 +25,6 @@ from typing import Any
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME, resolve_extras_path
 from specdev_tools.core.errors import FindingError, make_error
-from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.model import Graph
 
 LOCK_SCHEMA_URI = "vc:extras:trace-lock"
 LOCK_VERSION = 1
@@ -248,69 +246,21 @@ def write_lock(spec_dir: str, lock: Lock) -> None:
 def with_write_lock(spec_dir: str) -> Iterator[None]:
     """Hold the exclusive write lock of *spec_dir* for the ``with`` block.
 
-    The lock is ``flock`` on a descriptor opened on ``<spec_dir>/extras`` itself, so no file exists to be ignored or
-    committed; it is released when the block ends or the process dies.  Creates the folder when it is missing.
-    Raises ``LockError`` (E769) at once, without waiting, when another process holds it.
+    The lock is ``flock`` on a descriptor opened on *spec_dir* itself, so no file exists to be ignored or committed and
+    no folder is made to hold it (a refused write leaves the host as it was); it is released when the block ends or
+    the process dies.  Raises ``LockError`` (E769) at once, without waiting, when another process holds it.
     """
-    extras_dir = os.path.dirname(lock_path(spec_dir))
-    os.makedirs(extras_dir, exist_ok=True)
-    descriptor = os.open(extras_dir, os.O_RDONLY)
+    spec_dir = os.path.abspath(spec_dir)
+    descriptor = os.open(spec_dir, os.O_RDONLY)
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise LockError(make_error(
                 "E769",
-                f"another specdev write is running (the lock on {extras_dir} is held); "
+                f"another specdev write is running (the lock on {spec_dir} is held); "
                 "wait for it to finish, then run the command again",
             )) from None
         yield
     finally:
         os.close(descriptor)
-
-
-def refuse_unreadable(graph: Graph, what: str) -> None:
-    """Raise a ``FindingError`` (E520) naming the spec files that could not be read, for a write *what* that plans from *graph*.
-
-    A file that cannot be read gives no nodes, so the links it holds are not in the graph: a rename could not rewrite
-    them, a delete could not list them, and ``attest --prune`` would take their lock entries for orphans.  Nothing is
-    written until the file is repaired.  ``locked_graph`` applies it to every write; a dry run calls it on the graph it
-    was given.
-    """
-    if graph.load_errors:
-        files = ", ".join(error.file for error in graph.load_errors)
-        raise FindingError(make_error(
-            "E520",
-            f"{what} refused: {files} cannot be read, so the links it holds are not in the graph and the lock "
-            "cannot be checked against them; repair the file, then run the command again",
-        ))
-
-
-@contextmanager
-def locked_graph(spec_root: str, repo_root: str, what: str) -> Iterator[Graph]:
-    """Hold the write lock of *spec_root* and yield the graph built under it (the files as they are when written).
-
-    A write plans from the graph built after the lock is taken, so a file changed by another process between the
-    caller's own read and the lock is not planned from stale text.  Raises ``LockError`` (E769) when another write
-    holds the lock, and E520 (``refuse_unreadable``, *what* names the command) when a spec file cannot be read.
-    """
-    with with_write_lock(spec_root):
-        graph = build_graph(spec_root, repo_root)
-        refuse_unreadable(graph, what)
-        yield graph
-
-
-@contextmanager
-def writing_graph(graph: Graph | None, spec_root: str, repo_root: str, what: str, *, write: bool) -> Iterator[Graph]:
-    """The one write skeleton: yield the graph a write *what* plans from.
-
-    For a write (*write* true) the graph is built under the write lock (``locked_graph``).  For a dry run it is the
-    caller's *graph* (built here when ``None``), refused when a spec file cannot be read, and no lock is taken.
-    """
-    if write:
-        with locked_graph(spec_root, repo_root, what) as built:
-            yield built
-        return
-    known = graph if graph is not None else build_graph(spec_root, repo_root)
-    refuse_unreadable(known, what)
-    yield known

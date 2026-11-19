@@ -39,7 +39,7 @@ from specdev_tools.core.json_utils import (
 )
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import check_alias_space
-from specdev_tools.graph.gitview import read_seed_texts
+from specdev_tools.graph.contract import value_at
 from specdev_tools.graph.ids import check_unique_ids, mint_slug, suggest_prefix
 from specdev_tools.graph.kinds import SEED_KIND, KindDecl, load_kind_registry
 from specdev_tools.graph.model import Graph, Link, Node, node_label
@@ -48,7 +48,8 @@ from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import contract_lines
-from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, write_lock, writing_graph
+from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, write_lock
+from specdev_tools.trace.writing import seed_texts_for_write, writing_graph
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
 from specdev_tools.validation.linter_utils import graph_known_ids
 
@@ -307,6 +308,36 @@ def _declared_array(spec_root: str, node: Node, field: str, repo_root: str) -> b
     return isinstance(found, dict) and "error" not in found and found.get("type") == "array"
 
 
+_JSON_KINDS = ((bool, "a boolean"), (str, "a string"), (int, "a number"), (float, "a number"), (dict, "an object"))
+
+
+def _insert_target(spec_root: str, node: Node, field: str, content: str, repo_root: str) -> bool:
+    """Whether an ``insert`` into *field* of *node* creates the array (its schema declares an array and the field is absent).
+
+    Decided from the file and the schema before jq runs: a field that holds an array takes the item; an absent field
+    takes it when the schema declares an array there; anything else is refused with a sentence that says what the field
+    is, so no jq error text is matched.
+    """
+    current = value_at(json.loads(content), node.jq_path + field)
+    if isinstance(current, list):
+        return False
+    name = field.lstrip(".")
+    if current is None:
+        if _declared_array(spec_root, node, field, repo_root):
+            return True
+        raise _refuse(
+            f"{node.id!r} has no {name} and its schema does not declare {field} as an array, "
+            "so there is nothing to insert into; set the field with `specdev json patch --id`",
+            node_id=node.id,
+        )
+    what = next(label for kind, label in _JSON_KINDS if isinstance(current, kind))
+    raise _refuse(
+        f"{field} of {node.id!r} is {what}, not an array, so nothing can be inserted into it; "
+        f"set it with `specdev json patch --id {node.id} {field} <value>`",
+        node_id=node.id,
+    )
+
+
 def _plan_field_write(graph: Graph, spec_root: str, node: Node, content: str, repo_root: str, request: WriteRequest) -> _Edit:
     """The edit of ``patch`` or ``insert`` into a field of *node*."""
     decl = graph.decls.get(node.kind)
@@ -321,15 +352,9 @@ def _plan_field_write(graph: Graph, spec_root: str, node: Node, content: str, re
             new_text = patch_text(content, path, request.value or "", not request.raw)
         else:
             item = _minted_for_field(graph, decl, field, payload, minted)
-            create = _declared_array(spec_root, node, field, repo_root)
+            create = _insert_target(spec_root, node, field, content, repo_root)
             new_text = insert_text(content, path, request.value or "" if request.raw else json.dumps(item), not request.raw, create=create)
     except JsonUtilsError as error:
-        if request.action == "insert" and "Cannot insert into null" in str(error):
-            raise _refuse(
-                f"{node.id!r} has no {field.lstrip('.')} and its schema does not declare {field} as an array, "
-                "so there is nothing to insert into; set the field with `specdev json patch --id`",
-                node_id=node.id,
-            ) from None
         raise _refuse(str(error), node_id=node.id) from None
     return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, minted)
 
@@ -520,7 +545,7 @@ def _apply_edit(
     candidate = build_graph(spec_root, repo_root, overrides={edit.file: edit.document})
     if action != "delete":
         _refuse_new_findings(graph, candidate)
-    lock, seed_texts = read_lock(spec_root), read_seed_texts(graph, git_root)
+    lock, seed_texts = read_lock(spec_root), seed_texts_for_write(graph, git_root)
     new_lock, written, removed = _lock_after(graph, candidate, lock, seed_texts)
     result = WriteResult(
         action=action,

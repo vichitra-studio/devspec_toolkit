@@ -14,19 +14,19 @@ from specdev_tools.core.constants import TRACE_LOCK_FILENAME
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.loaders import iter_spec_artifacts
 from specdev_tools.core.schema_validate import validate_data_against_schema
-from specdev_tools.trace import lockfile
+from specdev_tools.trace import writing
 from specdev_tools.trace.lockfile import (
     Lock,
     LockEntry,
     LockError,
     lock_path,
-    locked_graph,
     parse_lock,
     read_lock,
     serialise_lock,
     with_write_lock,
     write_lock,
 )
+from specdev_tools.trace.writing import locked_graph
 from specdev_tools.validation.validate import validate_dir
 
 ROOT = Path(__file__).parents[3]
@@ -240,7 +240,7 @@ def test_locked_graph_builds_the_graph_while_the_lock_is_held(tmp_path: Path, mo
 
     spec = copy_example(tmp_path / "spec")
     seen: list[str] = []
-    real = lockfile.build_graph
+    real = writing.build_graph
 
     def spy(spec_root: str, repo_root: str) -> object:
         try:
@@ -250,9 +250,21 @@ def test_locked_graph_builds_the_graph_while_the_lock_is_held(tmp_path: Path, mo
             seen.append(exc.error.code)
         return real(spec_root, repo_root)
 
-    monkeypatch.setattr(lockfile, "build_graph", spy)
+    monkeypatch.setattr(writing, "build_graph", spy)
     with locked_graph(str(spec), str(ROOT), "test"):
         pass
     assert seen == ["E769"]
     with with_write_lock(str(spec)):
         pass
+
+
+def test_the_lock_file_and_the_merge_driver_load_no_graph_builder() -> None:
+    """H1-7: the git merge driver reads only the lock file; the write skeleton that builds the graph lives in ``trace.writing``."""
+    code = (
+        "import sys\n"
+        "import specdev_tools.trace.merge_driver, specdev_tools.trace.lockfile\n"
+        "print('specdev_tools.graph.build' in sys.modules, 'specdev_tools.trace.writing' in sys.modules)\n"
+    )
+    env = {**os.environ, "PYTHONPATH": str(TOOLS_DIR)}
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, check=True)
+    assert done.stdout.split() == ["False", "False"]

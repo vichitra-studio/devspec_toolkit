@@ -12,9 +12,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.core.json_utils import violation_text
 from specdev_tools.core.loaders import read_json_object
-from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations
+from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations, violation_text
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 

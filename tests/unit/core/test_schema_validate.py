@@ -485,3 +485,15 @@ class TestHappyPath:
 
         assert "$schema" in doc, "$schema key was removed from the input dict"
         assert doc["$schema"] == original_uri, "$schema value was modified"
+
+
+def test_violation_text_cuts_a_long_message_at_200_characters_and_shortens_the_array_size_ones() -> None:
+    """H1-5(b): a message that quotes a whole value is cut; ``maxItems`` and ``minItems`` say their own sentence."""
+    from specdev_tools.core.schema_validate import SchemaViolation, violation_text
+
+    long = SchemaViolation(("a",), "enum", "x" * 500)
+    assert violation_text(long) == "x" * 200 + " ..."
+    exact = SchemaViolation(("a",), "enum", "y" * 200)
+    assert violation_text(exact) == "y" * 200
+    assert violation_text(SchemaViolation(("a",), "maxItems", "[" + "1, " * 300 + "1] is too long")) == "has more items than the schema allows"
+    assert violation_text(SchemaViolation(("a",), "minItems", "[] should be non-empty")) == "has fewer items than the schema requires"

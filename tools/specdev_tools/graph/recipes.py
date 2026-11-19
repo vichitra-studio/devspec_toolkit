@@ -37,7 +37,7 @@ from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.diff import diff_snapshots
 from specdev_tools.graph.gitview import GitViewError, Snapshot, default_base_ref, load_snapshot_at, spec_path_in_repo
 from specdev_tools.graph.kinds import RECORD_ROLE, SEED_KIND
-from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node, collapse_whitespace
+from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node, article, collapse_whitespace
 from specdev_tools.graph.queries import own_content
 
 START = "start"
@@ -561,7 +561,7 @@ def _start_node(graph: Graph, table: RecipeTable, role: str, start_id: str) -> N
     if node is None:
         raise RecipeError(make_error("E706", f"no node has the id {start_id!r}"), unknown_id=True)
     if node.kind != expected:
-        raise RecipeError(make_error("E707", f"recipe {role} starts from a {expected}, but {start_id!r} is a {node.kind}"))
+        raise RecipeError(make_error("E707", f"recipe {role} starts from {article(expected)} {expected}, but {start_id!r} is {article(node.kind)} {node.kind}"))
     return node
 
 

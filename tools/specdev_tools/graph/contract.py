@@ -44,10 +44,10 @@ def _normalise_value(value: Any) -> Any:
     return value
 
 
-def item_at(document: Mapping[str, Any], jq_path: str) -> Mapping[str, Any] | None:
-    """The object at the jq-style *jq_path* (``.milestones[0].tasks[2]``, ``.environments["prod"]``) of *document*.
+def value_at(document: Mapping[str, Any], jq_path: str) -> Any:
+    """The value at the jq-style *jq_path* (``.milestones[0].tasks[2]``, ``.environments["prod"]``) of *document*.
 
-    Returns ``None`` when the path does not lead to an object; never raises.
+    Returns ``None`` when the path leads nowhere (a JSON ``null`` gives ``None`` too); never raises.
     """
     current: Any = document
     position = 0
@@ -66,6 +66,12 @@ def item_at(document: Mapping[str, Any], jq_path: str) -> Mapping[str, Any] | No
         except (KeyError, IndexError, TypeError):
             return None
         position = step.end()
+    return current
+
+
+def item_at(document: Mapping[str, Any], jq_path: str) -> Mapping[str, Any] | None:
+    """The object at *jq_path* of *document* (as ``value_at`` reads it), or ``None`` when the path does not lead to an object; never raises."""
+    current = value_at(document, jq_path)
     return current if isinstance(current, dict) else None
 
 
