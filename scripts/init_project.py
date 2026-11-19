@@ -28,11 +28,11 @@ repos:
   - repo: local
     hooks:
       - id: spec-check
-        name: Validate all spec files
-        entry: {venv_name}/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root .
+        name: Step gate for touched steps and seed paths
+        entry: {venv_name}/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root . --paths
         language: system
-        pass_filenames: false
-        files: spec/.*\\.json$
+        pass_filenames: true
+        require_serial: true
         types: [file]
 """
 

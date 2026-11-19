@@ -4,10 +4,22 @@ import os
 import sys
 from unittest import mock
 
+import pytest
+import yaml
+
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
+import init_project
 from init_project import _build_pre_commit_config, _render_ci_workflow, copy_seeds_from_manifest
+
+SPEC_CHECK_ENTRY_TAIL = "spec-check spec --repo-root ./{root} --spec-root ./spec --git-root . --paths"
+
+
+def _spec_check_hook(content: str) -> dict:
+    """Return the `spec-check` hook mapping of a rendered pre-commit config."""
+    hooks = yaml.safe_load(content)["repos"][0]["hooks"]
+    return next(h for h in hooks if h["id"] == "spec-check")
 
 
 class TestBuildPreCommitConfig:
@@ -73,6 +85,58 @@ class TestBuildPreCommitConfig:
         assert "customenv/bin/python" in content
         # no leakage of the default venv name when a custom one is requested
         assert "devspec_env/bin/python" not in content
+
+    def test_spec_check_hook_ends_with_paths_takes_filenames_and_has_no_files_filter(self):
+        hook = _spec_check_hook(_build_pre_commit_config("devspec_toolkit"))
+        assert hook["entry"].endswith(" --paths")
+        assert hook["pass_filenames"] is True
+        assert hook["require_serial"] is True
+        assert "files" not in hook
+
+    @pytest.mark.parametrize("root", ["devspec_toolkit", "custom/path", "my_toolkit"])
+    def test_custom_toolkit_root_is_substituted_in_the_spec_check_entry(self, root):
+        hook = _spec_check_hook(_build_pre_commit_config(root))
+        assert hook["entry"] == (
+            "devspec_env/bin/python -m specdev_tools.cli "
+            + SPEC_CHECK_ENTRY_TAIL.format(root=root)
+        )
+
+    def test_fallback_hook_also_ends_with_paths(self):
+        with mock.patch("init_project.os.path.exists", return_value=False):
+            hook = _spec_check_hook(_build_pre_commit_config("my_toolkit", "venv2"))
+        assert hook["entry"] == "venv2/bin/python -m specdev_tools.cli " + SPEC_CHECK_ENTRY_TAIL.format(root="my_toolkit")
+        assert hook["pass_filenames"] is True
+        assert "files" not in hook
+
+    def test_seed_lint_hook_keeps_its_files_filter(self):
+        hooks = yaml.safe_load(_build_pre_commit_config("devspec_toolkit"))["repos"][0]["hooks"]
+        seed_lint = next(h for h in hooks if h["id"] == "seed-lint")
+        assert seed_lint["files"] == r"spec/.*\.json$"
+        assert seed_lint["pass_filenames"] is False
+
+
+class TestInitIntoHost:
+    """Run `init_project.main` into a temporary host with every subprocess stubbed."""
+
+    TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    def _init(self, host, monkeypatch) -> None:
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(host), "--toolkit-root", self.TOOLKIT_ROOT])
+        with mock.patch("init_project.run_cmd"), mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"):
+            init_project.main()
+
+    def test_new_host_gets_the_step_gate_hook(self, tmp_path, monkeypatch):
+        self._init(tmp_path, monkeypatch)
+        hook = _spec_check_hook((tmp_path / ".pre-commit-config.yaml").read_text())
+        assert hook["entry"].endswith(" --git-root . --paths")
+        assert hook["pass_filenames"] is True
+        assert "files" not in hook
+
+    def test_existing_pre_commit_config_is_left_untouched(self, tmp_path, monkeypatch):
+        old = "repos:\n  - repo: local\n    hooks:\n      - id: spec-check\n        files: spec/.*\\.json$\n"
+        (tmp_path / ".pre-commit-config.yaml").write_text(old)
+        self._init(tmp_path, monkeypatch)
+        assert (tmp_path / ".pre-commit-config.yaml").read_text() == old
 
 
 class TestManifestDerivedSeedBootstrap:

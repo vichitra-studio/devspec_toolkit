@@ -23,11 +23,11 @@ repos:
         files: (devspec_toolkit/tools/step_order\.json|devspec_toolkit/prompts/prompt_.*\.md)$
         types: [file]
       - id: spec-check
-        name: Validate all spec files
-        entry: devspec_env/bin/python -m specdev_tools.cli spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+        name: Step gate for touched steps and seed paths
+        entry: devspec_env/bin/python -m specdev_tools.cli spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --paths
         language: system
-        pass_filenames: false
-        files: spec/.*\.json$
+        pass_filenames: true
+        require_serial: true
         types: [file]
       - id: seed-lint
         name: Seed reference lint
