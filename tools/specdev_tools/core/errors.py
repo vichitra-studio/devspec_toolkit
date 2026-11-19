@@ -235,6 +235,13 @@ ERROR_CODES = {
     # promoted, like W613): the filtering itself is correct behavior, this
     # just discloses that it happened.
     "W617": "UPSTREAM_BACKLOG_STATUS_FILTERED",
+    # Open items (63x). W630 and W633 are warn-only and non-promotable: like W555 they are excluded from
+    # PROMOTABLE_PAIRS (E630 and E633 do not exist), so SPECDEV_WARNINGS_AS_ERRORS and SPECDEV_PROMOTE_CODES
+    # cannot turn an open-item warning into a step blocker.  E631 (merge) and E632 (close) are errors of their gate.
+    "W630": "OPEN_ITEM",
+    "E631": "OPEN_ITEM_AT_MERGE",
+    "E632": "OPEN_ITEM_IN_PLAN",
+    "W633": "OPEN_ITEM_LEGACY_TRIAGE",
     # Spec graph (7xx). E700-E704 are findings about the spec and carry an owner
     # and a node id; E705-E709 are command usage errors and carry neither.
     "E700": "LINK_TARGET_NOT_FOUND",
@@ -279,6 +286,7 @@ ERROR_CODES = {
 # inline W604 note below). W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
 # E-counterpart at all -- it is an informational nudge, not a hard failure.
 # W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
+# W630 (OPEN_ITEM) and W633 (OPEN_ITEM_LEGACY_TRIAGE) likewise have none (no E630 or E633 exists).
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the

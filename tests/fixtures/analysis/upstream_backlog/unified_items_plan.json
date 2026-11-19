@@ -1,0 +1,39 @@
+{
+  "id": "ms-unified",
+  "plan": {
+    "ambiguities": [
+      {
+        "id": "amb-about-seed",
+        "description": "The seed does not say how long a reset link lives.",
+        "about": ["seed-accounts"],
+        "proposed_assumption": "One hour until answered."
+      },
+      {
+        "id": "amb-about-criterion",
+        "description": "The third criterion does not name the error shown.",
+        "about": ["ac-password-reset-3"],
+        "decision": "Show the generic expired-link message."
+      },
+      {
+        "id": "amb-two-steps",
+        "description": "The requirement and the contract disagree on the lock-out.",
+        "about": ["fr-password-reset", "api-password-reset-confirm"]
+      }
+    ]
+  },
+  "execution": {
+    "emergent_ambiguities": [
+      {
+        "id": "amb-silent-criterion",
+        "description": "The confirm endpoint has no criterion for a replayed token.",
+        "about": ["api-password-reset-confirm"],
+        "missing_kind": "criterion"
+      },
+      {
+        "id": "amb-unresolved",
+        "description": "Names a node that does not exist.",
+        "about": ["fr-does-not-exist"]
+      }
+    ]
+  }
+}

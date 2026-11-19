@@ -453,16 +453,16 @@ def build_parser() -> _SpecdevParser:
 
     ub = sub.add_parser(
         "upstream-backlog",
-        help="Aggregate both plan.ambiguities[] (16a) and execution.emergent_ambiguities[] (16b/16c) across impl_context plans by implicated upstream step (read-only)",
+        help="List every open ambiguity item of all artifacts (steps 00-15, anchor, milestone plans) grouped by the step its about nodes belong to (read-only)",
     )
     ub.add_argument("spec_dir")
     ub.add_argument("--repo-root", default=".")
     ub.add_argument("--spec-root", default=None,
-                    help="(reserved; no effect in MVP — accepted for submodule CLI symmetry)")
+                    help="(accepted and ignored: the positional spec_dir is the spec folder)")
     ub.add_argument("--severity", choices=["low", "medium", "high", "critical"], default="low",
-                    help="Minimum severity (default: low)")
+                    help="Minimum severity of legacy-shape items (default: low); items with an about field always pass")
     ub.add_argument("--status", choices=["open", "resolved", "all"], default="open",
-                    help="Status filter (default: open = status != resolved)")
+                    help="Status filter for legacy-shape items (default: open = status != resolved); items with an about field always pass")
     ub.add_argument("--json", action="store_true", dest="json_output",
                     help="Emit JSON instead of plain text")
 
@@ -1932,7 +1932,6 @@ def main():
         stdout_payload, stderr_lines, exit_code = run_upstream_backlog(
             spec_dir=spec_dir_abs,
             repo_root=args.repo_root,
-            spec_root=args.spec_root,
             severity=args.severity,
             status=args.status,
             json_output=args.json_output,

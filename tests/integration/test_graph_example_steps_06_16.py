@@ -326,9 +326,9 @@ def test_milestone_state_reads_the_plan_file(tmp_path: Path) -> None:
 
 
 def test_upstream_backlog_is_empty() -> None:
-    stdout, stderr_lines, exit_code = run_upstream_backlog(str(_SPEC))
+    stdout, stderr_lines, exit_code = run_upstream_backlog(str(_SPEC), repo_root=str(_ROOT))
     assert exit_code == 0
-    assert stdout == "Totals: 0 open / 0 resolved across 0 milestones / 0 records."
+    assert stdout == "Totals: 0 items / 0 with answer / 0 needing answer."
     assert stderr_lines == []
 
 

@@ -1,250 +1,79 @@
-"""Coerce-records unit tests — E520 emission for schema-bypass records."""
+"""Loader unit tests: ``load_items`` reads every artifact and reports E520 for items it cannot report."""
 from __future__ import annotations
 
-from specdev_tools.analysis.upstream_backlog import _coerce_records
+import json
+from pathlib import Path
+
+import pytest
+
+from specdev_tools.analysis.upstream_backlog import item_problem, load_items
+from specdev_tools.core.ambiguity_items import AmbiguityItem, AmbiguityReadError, shape_of
 
 
-def test_missing_id_emits_e520_and_skips():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"severity": "low", "impact": []},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert len(errors) == 1
-    assert errors[0].startswith("E520 ")
-    assert "missing_id" in errors[0]
+def _write(root: Path, rel: str, doc: object) -> None:
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc), encoding="utf-8")
 
 
-def test_invalid_severity_emits_e520_and_skips():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "severity": "LOW", "impact": []},
-            {"id": "amb-2", "severity": "unknown", "impact": []},
-            {"id": "amb-3", "impact": []},  # severity missing
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert len(errors) == 3
-    assert all(e.startswith("E520 ") for e in errors)
-    assert all("invalid_severity" in e for e in errors)
+def _item(raw: dict, step: str = "16b") -> AmbiguityItem:
+    return AmbiguityItem("p.json", step, ".x", raw, shape_of(raw))
 
 
-def test_non_dict_ambiguity_emits_e520_and_skips():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": ["not-a-dict", 42]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert len(errors) == 2
-    assert all("non_dict_ambiguity" in e for e in errors)
-
-
-def test_null_execution_yields_empty_no_error():
-    plan = {"id": "ms-x", "execution": None}
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
+def test_anchor_items_are_read(tmp_path):
+    _write(tmp_path, "16_impl_context.json", {"plan": {"ambiguities": [{"id": "amb-anchor", "about": ["fr-a"]}]}})
+    items, errors = load_items(str(tmp_path))
+    assert [(i.id, i.step) for i in items] == [("amb-anchor", "16")]
     assert errors == []
 
 
-def test_null_ambiguities_yields_empty_no_error():
-    plan = {"id": "ms-x", "execution": {"emergent_ambiguities": None}}
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert errors == []
+def test_step_files_plans_and_both_plan_arrays_are_read(tmp_path):
+    _write(tmp_path, "04_fr_list.json", {"ambiguities": [{"id": "amb-04", "about": ["fr-a"]}]})
+    _write(tmp_path, "impl_context/ms_a_plan.json", {
+        "plan": {"ambiguities": [{"id": "amb-16a", "about": ["fr-a"]}]},
+        "execution": {"emergent_ambiguities": [{"id": "amb-16b", "about": ["fr-a"]}]},
+    })
+    items, _ = load_items(str(tmp_path))
+    assert [(i.id, i.step) for i in items] == [("amb-04", "04"), ("amb-16a", "16a"), ("amb-16b", "16b")]
 
 
-def test_non_list_ambiguities_yields_empty_no_error():
-    plan = {"id": "ms-x", "execution": {"emergent_ambiguities": {"a": 1}}}
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert errors == []
+def test_item_without_id_is_reported_and_skipped(tmp_path):
+    _write(tmp_path, "impl_context/ms_a_plan.json", {"execution": {"emergent_ambiguities": [
+        {"severity": "low", "impact": []}, {"id": "amb-ok", "about": ["fr-a"]},
+    ]}})
+    items, errors = load_items(str(tmp_path))
+    assert [i.id for i in items] == ["amb-ok"]
+    assert len(errors) == 1 and errors[0].startswith("E520 ") and "missing_id" in errors[0]
 
 
-def test_happy_path_coerces_null_status_to_tracking():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "severity": "low", "status": None, "impact": []},
-            {"id": "amb-2", "severity": "low", "impact": []},  # missing status
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert len(records) == 2
-    for r in records:
-        assert r["status"] == "tracking"
-        assert r["status_unset"] is True
+@pytest.mark.parametrize("raw", [
+    {"id": "a", "severity": "LOW"},
+    {"id": "a", "severity": "unknown"},
+    {"id": "a"},
+    {"id": "a", "severity": "blocking"},
+])
+def test_invalid_legacy_severity_on_the_execution_scale_is_a_problem(raw):
+    assert "invalid_severity" in (item_problem(_item(raw)) or "")
 
 
-def test_explicit_tracking_status_preserves_unset_false():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "severity": "low", "status": "tracking",
-             "impact": []},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert records[0]["status"] == "tracking"
-    assert records[0]["status_unset"] is False
+@pytest.mark.parametrize("severity, step, ok", [
+    ("blocking", "16a", True), ("high", "16a", False), ("high", "16b", True), ("non_blocking", "16b", False),
+])
+def test_legacy_severity_scale_depends_on_the_array(severity, step, ok):
+    assert (item_problem(_item({"id": "a", "severity": severity}, step)) is None) is ok
 
 
-def test_non_string_description_coerced_to_empty():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "severity": "low", "description": None,
-             "impact": []},
-        ]},
-    }
-    records, _ = _coerce_records(plan, "p.json")
-    assert records[0]["description"] == ""
+def test_unified_item_has_no_severity_to_check():
+    assert item_problem(_item({"id": "a", "about": ["fr-a"]})) is None
 
 
-# ---------------------------------------------------------------------------
-# DEVSPEC-123: plan.ambiguities[] (16a) must be scanned alongside
-# execution.emergent_ambiguities[] (16b/16c) — previously it was never read.
-# ---------------------------------------------------------------------------
-
-def test_plan_ambiguities_are_extracted_and_tagged_with_origin():
-    plan = {
-        "id": "ms-x",
-        "plan": {"ambiguities": [
-            {"id": "amb-1", "severity": "blocking", "impact": []},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert len(records) == 1
-    assert records[0]["origin"] == "plan"
-    assert records[0]["severity"] == "blocking"
+@pytest.mark.parametrize("doc", [{"id": "ms-x", "execution": None}, {"id": "ms-x", "execution": {"emergent_ambiguities": None}}])
+def test_null_execution_or_array_yields_nothing(tmp_path, doc):
+    _write(tmp_path, "impl_context/ms_a_plan.json", doc)
+    assert load_items(str(tmp_path)) == ([], [])
 
 
-def test_execution_records_are_tagged_with_origin():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "severity": "low", "impact": []},
-        ]},
-    }
-    records, _ = _coerce_records(plan, "p.json")
-    assert records[0]["origin"] == "execution"
-
-
-def test_both_arrays_combine_in_one_pass():
-    plan = {
-        "id": "ms-x",
-        "plan": {"ambiguities": [
-            {"id": "amb-plan", "severity": "non_blocking", "impact": []},
-        ]},
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-exec", "severity": "low", "impact": []},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    ids = {r["ambiguity_id"]: r["origin"] for r in records}
-    assert ids == {"amb-plan": "plan", "amb-exec": "execution"}
-
-
-def test_plan_ambiguity_invalid_severity_for_its_scale_emits_e520():
-    # "low" is valid for execution but not for the plan's blocking/non_blocking scale.
-    plan = {
-        "id": "ms-x",
-        "plan": {"ambiguities": [
-            {"id": "amb-1", "severity": "low", "impact": []},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert len(errors) == 1
-    assert "invalid_severity" in errors[0]
-    assert "origin=plan" in errors[0]
-
-
-def test_duplicate_id_across_origins_yields_two_independent_records():
-    # The same ambiguity id can legitimately appear in both plan.ambiguities[]
-    # (16a) and execution.emergent_ambiguities[] (16b/16c) -- e.g. a 16a
-    # ambiguity re-surfaced during execution under the same id. Origin, not
-    # id, differentiates the two records; neither should be dropped/merged.
-    plan = {
-        "id": "ms-x",
-        "plan": {"ambiguities": [
-            {"id": "amb-shared", "severity": "blocking", "impact": []},
-        ]},
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-shared", "severity": "high", "impact": []},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert len(records) == 2
-    origins = {r["origin"] for r in records}
-    assert origins == {"plan", "execution"}
-    assert all(r["ambiguity_id"] == "amb-shared" for r in records)
-
-
-def test_null_plan_section_yields_empty_no_error():
-    plan = {"id": "ms-x", "plan": None}
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert errors == []
-
-
-def test_null_plan_ambiguities_yields_empty_no_error():
-    plan = {"id": "ms-x", "plan": {"ambiguities": None}}
-    records, errors = _coerce_records(plan, "p.json")
-    assert records == []
-    assert errors == []
-
-
-def test_new_shape_item_without_severity_or_status_is_not_e520():
-    plan = {
-        "id": "ms-x",
-        "plan": {"ambiguities": [
-            {"id": "amb-1", "description": "Unstated timeout.", "about": ["fr-login"]},
-        ]},
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-2", "description": "No criterion.", "about": ["fr-login", "fr-logout"],
-             "missing_kind": "criterion"},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert [(r["ambiguity_id"], r["origin"], r["severity"], r["status"]) for r in records] == [
-        ("amb-1", "plan", None, "open"),
-        ("amb-2", "execution", None, "open"),
-    ]
-    assert records[1]["about"] == ["fr-login", "fr-logout"]
-
-
-def test_new_shape_item_with_wrong_typed_values_does_not_raise():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "description": ["not", "a", "string"], "about": "fr-login"},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert (records[0]["description"], records[0]["about"]) == ("", [])
-
-
-def test_legacy_shape_item_still_coerced():
-    plan = {
-        "id": "ms-x",
-        "execution": {"emergent_ambiguities": [
-            {"id": "amb-1", "severity": "high", "status": "blocked",
-             "description": "Legacy.", "impact": ["spec/09_impl_plan.json"]},
-        ]},
-    }
-    records, errors = _coerce_records(plan, "p.json")
-    assert errors == []
-    assert [(r["severity"], r["status"], r["bucket"]) for r in records] == [("high", "blocked", "step_09")]
+def test_non_object_entry_raises_the_read_error(tmp_path):
+    _write(tmp_path, "impl_context/ms_a_plan.json", {"execution": {"emergent_ambiguities": ["not-a-dict"]}})
+    with pytest.raises(AmbiguityReadError):
+        load_items(str(tmp_path))

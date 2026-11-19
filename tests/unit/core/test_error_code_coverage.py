@@ -65,6 +65,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W615", "E615",
             # DEVSPEC-123: upstream-backlog discloses records hidden by --status filtering
             "W617",
+            # Open items (63x)
+            "W630", "E631", "E632", "W633",
             # Spec graph (7xx)
             "E700", "E701", "E702", "E703", "E704", "E705", "E706", "E707", "E708", "E709",
             "E760", "E761", "E762", "E763", "E764", "E765", "E767", "E768", "E769", "E770", "E771", "E772", "E773",

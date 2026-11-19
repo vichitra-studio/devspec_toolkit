@@ -812,16 +812,18 @@ def test_reviewer_counts_trace_when_the_artifact_carries_it():
     assert review.reverse_trace["unjustified"] == ["fr-z"]
 
 
-def test_upstream_backlog_accepts_pd3_item_without_w613(tmp_path):
+def test_upstream_backlog_lists_pd3_items_and_places_unresolved_about_in_unplaced(tmp_path):
     plan = {"plan": {"ambiguities": [{"id": "amb-1", "description": "Timeout unstated.", "about": ["fr-a"]}]},
             "execution": {"emergent_ambiguities": [{"id": "amb-2", "description": "Retry unstated.", "about": ["fr-a"]}]}}
     plans = tmp_path / "spec" / "impl_context"
     plans.mkdir(parents=True)
     (plans / "ms_a_plan.json").write_text(json.dumps(plan), encoding="utf-8")
-    stdout, stderr_lines, exit_code = run_upstream_backlog(str(tmp_path / "spec"))
+    stdout, stderr_lines, exit_code = run_upstream_backlog(str(tmp_path / "spec"), repo_root=str(TOOLKIT_ROOT))
     assert exit_code == 0
     assert "amb-1" in stdout and "amb-2" in stdout
-    assert not any(line.startswith(("W613", "E520")) for line in stderr_lines)
+    assert [line.split()[2] for line in stderr_lines if line.startswith("W613")] == [
+        "impl_context/ms_a_plan.json:amb-1", "impl_context/ms_a_plan.json:amb-2"]
+    assert not any(line.startswith("E520") for line in stderr_lines)
 
 
 def test_seed_lint_w140_w551_on_new_shape_fixtures(tmp_path):

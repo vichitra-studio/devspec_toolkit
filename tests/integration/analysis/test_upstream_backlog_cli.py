@@ -18,6 +18,12 @@ import pytest
 
 TOOLKIT_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_DIR = TOOLKIT_ROOT / "tests" / "fixtures" / "analysis" / "upstream_backlog"
+GRAPH_EXAMPLE_SPEC = TOOLKIT_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+IMPACT_PIPELINE = (
+    '[.records[]?.impact[]?'
+    ' | if type == "string" and test(":") then split(":") | {file: .[0], id: .[1]}'
+    ' elif type == "object" then {file, id} else empty end]'
+)
 
 
 def _run_cli(spec_dir: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -33,248 +39,202 @@ def _run_cli(spec_dir: Path, *extra: str) -> subprocess.CompletedProcess:
     )
 
 
-@pytest.fixture
-def clean_spec(tmp_path: Path) -> Path:
-    spec_dir = tmp_path / "spec"
+def _stage(spec_dir: Path, *names: str) -> Path:
+    """Copy fixtures into ``spec_dir/impl_context`` as milestone plan files (``ms_<name>_plan.json``)."""
     impl = spec_dir / "impl_context"
-    impl.mkdir(parents=True)
-    for name in ("plan_with_six_ambiguities.json", "plan_with_no_execution.json"):
-        shutil.copy(FIXTURE_DIR / name, impl / name)
+    impl.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        shutil.copy(FIXTURE_DIR / name, impl / f"ms_{name.removesuffix('.json')}_plan.json")
     return spec_dir
 
 
 @pytest.fixture
-def broken_spec(clean_spec: Path) -> Path:
-    shutil.copy(FIXTURE_DIR / "plan_malformed.json",
-                clean_spec / "impl_context" / "plan_malformed.json")
-    return clean_spec
+def clean_spec(tmp_path: Path) -> Path:
+    return _stage(tmp_path / "spec", "plan_with_six_ambiguities.json", "plan_with_no_execution.json")
 
 
-def test_clean_run_exits_zero_and_groups_buckets(clean_spec: Path):
-    r = _run_cli(clean_spec)
-    assert r.returncode == 0, r.stderr
-    assert "Step 09" in r.stdout
-    assert "Plan-level" in r.stdout
-    assert "Unclassified" in r.stdout
-
-
-def test_clean_run_emits_w613_for_open_unclassified(clean_spec: Path):
-    r = _run_cli(clean_spec)
-    assert r.returncode == 0
-    # Under --status open (default), the 2 open unclassified fire W613
-    w613_lines = [ln for ln in r.stderr.splitlines()
-                  if ln.startswith("W613 UPSTREAM_BACKLOG_UNCLASSIFIED")]
-    assert len(w613_lines) == 2
-
-
-def test_status_all_includes_resolved_unclassified(clean_spec: Path):
-    r = _run_cli(clean_spec, "--status", "all")
-    assert r.returncode == 0
-    w613_lines = [ln for ln in r.stderr.splitlines()
-                  if ln.startswith("W613 UPSTREAM_BACKLOG_UNCLASSIFIED")]
-    assert len(w613_lines) == 3
-
-
-def test_json_output_is_valid_with_schema_version(clean_spec: Path):
-    r = _run_cli(clean_spec, "--json")
-    assert r.returncode == 0
-    payload = json.loads(r.stdout)
-    assert payload["schema_version"] == "1"
-    assert "records" in payload
-    assert "warnings" in payload
-
-
-def test_malformed_plan_triggers_exit_two(broken_spec: Path):
-    r = _run_cli(broken_spec)
-    assert r.returncode == 2
-    assert "E520" in r.stderr
-
-
-def test_unicode_decode_error_triggers_exit_two(tmp_path: Path):
-    """_iter_plans' UnicodeDecodeError branch (an impl_context/*.json file
-    containing bytes that are not valid UTF-8) must exit 2 and surface a
-    stderr line naming the offending path via 'unicode_decode_error='."""
+@pytest.fixture
+def unified_spec(tmp_path: Path) -> Path:
     spec_dir = tmp_path / "spec"
-    impl = spec_dir / "impl_context"
-    impl.mkdir(parents=True)
-    bad_file = impl / "plan_invalid_utf8.json"
-    bad_file.write_bytes(b'{"id": "ms-bad", "execution": \xff\xfe}')
-    r = _run_cli(spec_dir)
-    assert r.returncode == 2
-    assert "unicode_decode_error=" in r.stderr
+    shutil.copytree(GRAPH_EXAMPLE_SPEC, spec_dir)
+    return _stage(spec_dir, "unified_items_plan.json")
 
 
-def test_severity_high_filters_out_lower(clean_spec: Path):
-    r = _run_cli(clean_spec, "--severity", "high")
-    assert r.returncode == 0
-    # Only amb-new-responsive-375 is high —
-    # lands in Unclassified. Plan-level (all low) must be gone; Step 09
-    # (low-severity wcag-pairing-ratchet) must also be gone.
-    assert "Plan-level" not in r.stdout
-    assert "Step 09" not in r.stdout
-    assert "Unclassified" in r.stdout
-    assert "amb-new-responsive-375" in r.stdout
-
-
-def test_record_level_e520_triggers_exit_two(tmp_path: Path):
-    """Plan decision #12: any E520 emission sets exit_code=2, including
-    record-level schema bypass (not just malformed JSON)."""
-    spec_dir = tmp_path / "spec"
-    impl = spec_dir / "impl_context"
-    impl.mkdir(parents=True)
-    shutil.copy(FIXTURE_DIR / "plan_with_record_level_e520.json",
-                impl / "plan_with_record_level_e520.json")
-    r = _run_cli(spec_dir)
-    assert r.returncode == 2
-    assert "E520" in r.stderr
-    assert "missing_id" in r.stderr
-    # The sibling well-formed record survives and renders.
-    assert "amb-good" in r.stdout
-
-
-def test_null_execution_plan_is_skipped_silently(tmp_path: Path):
-    spec_dir = tmp_path / "spec"
-    impl = spec_dir / "impl_context"
-    impl.mkdir(parents=True)
-    shutil.copy(FIXTURE_DIR / "plan_with_null_execution.json",
-                impl / "plan_with_null_execution.json")
-    r = _run_cli(spec_dir)
-    assert r.returncode == 0, r.stderr
-    assert "E520" not in r.stderr
-    assert "0 records" in r.stdout
+@pytest.fixture
+def legacy_spec(tmp_path: Path) -> Path:
+    return _stage(tmp_path / "spec", "legacy_impact_two_steps_plan.json")
 
 
 @pytest.fixture
 def dual_origin_spec(tmp_path: Path) -> Path:
-    spec_dir = tmp_path / "spec"
-    impl = spec_dir / "impl_context"
+    return _stage(tmp_path / "spec", "plan_with_dual_origin_ambiguities.json")
+
+
+def _records(r: subprocess.CompletedProcess) -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    for rec in json.loads(r.stdout)["records"]:
+        out.setdefault(rec["item_id"], []).append(rec)
+    return out
+
+
+def test_clean_run_exits_zero_and_groups_legacy_items_by_step(clean_spec: Path):
+    r = _run_cli(clean_spec)
+    assert r.returncode == 0, r.stderr
+    assert "09 - 1 item(s)" in r.stdout
+    assert "unplaced - " in r.stdout
+
+
+def test_clean_run_emits_w613_for_open_unplaced_items(clean_spec: Path):
+    r = _run_cli(clean_spec)
+    assert r.returncode == 0
+    w613 = [ln for ln in r.stderr.splitlines() if ln.startswith("W613 UPSTREAM_BACKLOG_UNCLASSIFIED")]
+    assert len(w613) == 4
+
+
+def test_status_all_includes_resolved_unplaced_item(clean_spec: Path):
+    r = _run_cli(clean_spec, "--status", "all")
+    assert r.returncode == 0
+    w613 = [ln for ln in r.stderr.splitlines() if ln.startswith("W613 UPSTREAM_BACKLOG_UNCLASSIFIED")]
+    assert len(w613) == 5
+
+
+def test_json_output_is_valid_with_schema_version_2(clean_spec: Path):
+    r = _run_cli(clean_spec, "--json")
+    assert r.returncode == 0
+    payload = json.loads(r.stdout)
+    assert payload["schema_version"] == "2"
+    assert {"summary", "records", "warnings"} <= set(payload)
+
+
+def test_malformed_plan_triggers_exit_two(clean_spec: Path):
+    _stage(clean_spec.parent / "spec", "plan_malformed.json")
+    r = _run_cli(clean_spec)
+    assert r.returncode == 2
+    assert "E520" in r.stderr and "ms_plan_malformed_plan.json" in r.stderr
+
+
+def test_unreadable_utf8_plan_triggers_exit_two(tmp_path: Path):
+    impl = tmp_path / "spec" / "impl_context"
     impl.mkdir(parents=True)
-    shutil.copy(FIXTURE_DIR / "plan_with_dual_origin_ambiguities.json",
-                impl / "plan_with_dual_origin_ambiguities.json")
-    return spec_dir
+    (impl / "ms_bad_plan.json").write_bytes(b'{"id": "ms-bad", "execution": \xff\xfe}')
+    r = _run_cli(tmp_path / "spec")
+    assert r.returncode == 2
+    assert "E520" in r.stderr and "ms_bad_plan.json" in r.stderr
+
+
+def test_severity_high_filters_out_lower_legacy_items(clean_spec: Path):
+    r = _run_cli(clean_spec, "--severity", "high")
+    assert r.returncode == 0
+    assert "amb-new-responsive-375" in r.stdout
+    assert "amb-new-wcag-pairing-ratchet" not in r.stdout
+    assert "09 - " not in r.stdout
+
+
+def test_record_level_e520_triggers_exit_two_and_siblings_still_render(tmp_path: Path):
+    r = _run_cli(_stage(tmp_path / "spec", "plan_with_record_level_e520.json"))
+    assert r.returncode == 2
+    assert "E520" in r.stderr and "missing_id" in r.stderr
+    assert "amb-good" in r.stdout
+
+
+def test_null_execution_plan_is_skipped_silently(tmp_path: Path):
+    r = _run_cli(_stage(tmp_path / "spec", "plan_with_null_execution.json"))
+    assert r.returncode == 0, r.stderr
+    assert "E520" not in r.stderr
+    assert "0 items" in r.stdout
 
 
 def test_plan_ambiguities_16a_are_scanned(dual_origin_spec: Path):
-    """DEVSPEC-123 regression: plan.ambiguities[] (16a) must be as visible
-    to upstream-backlog as execution.emergent_ambiguities[] (16b/16c) —
-    previously it was never read at all."""
+    """DEVSPEC-123 regression: plan.ambiguities[] (16a) is as visible as execution.emergent_ambiguities[]."""
     r = _run_cli(dual_origin_spec, "--status", "all", "--json")
     assert r.returncode == 0, r.stderr
-    payload = json.loads(r.stdout)
-    ids = {rec["ambiguity_id"] for rec in payload["records"]}
-    assert "amb-16a-open-blocking" in ids
-    assert "amb-16a-resolved-non-blocking" in ids
-    assert "amb-16b-open-high" in ids
-    assert "amb-16c-resolved-critical" in ids
-    assert payload["summary"]["total_records"] == 4
-
-    origins = {rec["ambiguity_id"]: rec["origin"] for rec in payload["records"]}
-    assert origins["amb-16a-open-blocking"] == "plan"
-    assert origins["amb-16a-resolved-non-blocking"] == "plan"
-    assert origins["amb-16b-open-high"] == "execution"
-    assert origins["amb-16c-resolved-critical"] == "execution"
+    found = _records(r)
+    assert set(found) == {"amb-16a-open-blocking", "amb-16a-resolved-non-blocking", "amb-16b-open-high", "amb-16c-resolved-critical"}
+    assert found["amb-16a-open-blocking"][0]["step"] == "16a"
+    assert found["amb-16b-open-high"][0]["step"] == "16b"
 
 
-def test_plan_ambiguities_blocking_severity_ranks_as_critical(dual_origin_spec: Path):
-    """--severity critical must keep the 16a 'blocking' record (mapped to the
-    critical rank) and drop the 16a 'non_blocking' one (mapped to low)."""
+def test_plan_blocking_severity_ranks_as_critical(dual_origin_spec: Path):
     r = _run_cli(dual_origin_spec, "--status", "all", "--severity", "critical", "--json")
-    assert r.returncode == 0, r.stderr
-    payload = json.loads(r.stdout)
-    ids = {rec["ambiguity_id"] for rec in payload["records"]}
+    ids = set(_records(r))
     assert "amb-16a-open-blocking" in ids
     assert "amb-16a-resolved-non-blocking" not in ids
 
 
 def test_default_status_open_hides_resolved_and_emits_w617(dual_origin_spec: Path):
-    """DEVSPEC-123: the two resolved records (one per origin) must trigger
-    the W617 hidden-count notice under the default --status open."""
     r = _run_cli(dual_origin_spec)
     assert r.returncode == 0, r.stderr
-    w617_lines = [ln for ln in r.stderr.splitlines()
-                  if ln.startswith("W617 UPSTREAM_BACKLOG_STATUS_FILTERED")]
-    assert len(w617_lines) == 1
-    assert "2 record(s)" in w617_lines[0]
+    w617 = [ln for ln in r.stderr.splitlines() if ln.startswith("W617 UPSTREAM_BACKLOG_STATUS_FILTERED")]
+    assert len(w617) == 1 and "2 record(s)" in w617[0]
     assert "amb-16a-resolved-non-blocking" not in r.stdout
-    assert "amb-16c-resolved-critical" not in r.stdout
 
 
 def test_status_all_suppresses_w617(dual_origin_spec: Path):
     r = _run_cli(dual_origin_spec, "--status", "all")
-    assert r.returncode == 0, r.stderr
     assert "W617" not in r.stderr
 
 
+def test_unified_items_alone_never_trigger_w617(unified_spec: Path):
+    assert "W617" not in _run_cli(unified_spec).stderr
+
+
 def test_json_summary_carries_hidden_by_status_count(dual_origin_spec: Path):
-    r = _run_cli(dual_origin_spec, "--json")
-    assert r.returncode == 0, r.stderr
-    payload = json.loads(r.stdout)
-    assert payload["summary"]["hidden_by_status_count"] == 2
-
-    r_all = _run_cli(dual_origin_spec, "--status", "all", "--json")
-    payload_all = json.loads(r_all.stdout)
-    assert payload_all["summary"]["hidden_by_status_count"] == 0
+    assert json.loads(_run_cli(dual_origin_spec, "--json").stdout)["summary"]["hidden_by_status_count"] == 2
+    assert json.loads(_run_cli(dual_origin_spec, "--status", "all", "--json").stdout)["summary"]["hidden_by_status_count"] == 0
 
 
-def test_misfiled_anchor_is_skipped_not_misread_as_plan_ambiguities(tmp_path: Path):
-    """DEVSPEC-123 follow-up: a Trinity Anchor (artifact_role="anchor")
-    misfiled inside impl_context/ (the W609 condition) also has a
-    `plan.ambiguities[]` array, but its legacy shape uses the
-    severity scale (low/medium/high/critical), not the milestone plan's 16a
-    binary blocking/non_blocking scale. Before the artifact_role guard, this
-    fixture's "high" severity would have failed origin="plan" validation
-    (which only accepts blocking/non_blocking) and spuriously emitted E520 for
-    a perfectly schema-valid anchor. It must instead be skipped entirely."""
-    spec_dir = tmp_path / "spec"
-    impl = spec_dir / "impl_context"
+@pytest.mark.parametrize("fixture", ["anchor_misfiled_in_impl_context.json", "anchor_misfiled_whitespace_role.json"])
+def test_anchor_misfiled_in_impl_context_is_not_read_as_a_plan(tmp_path: Path, fixture: str):
+    """A Trinity Anchor misfiled under impl_context/ (W609) is not a milestone plan file, so it is never read."""
+    impl = tmp_path / "spec" / "impl_context"
     impl.mkdir(parents=True)
-    shutil.copy(FIXTURE_DIR / "anchor_misfiled_in_impl_context.json",
-                impl / "anchor_misfiled_in_impl_context.json")
-    r = _run_cli(spec_dir, "--status", "all", "--json")
+    shutil.copy(FIXTURE_DIR / fixture, impl / fixture)
+    r = _run_cli(tmp_path / "spec", "--status", "all", "--json")
     assert r.returncode == 0, r.stderr
-    assert "E520" not in r.stderr
-    payload = json.loads(r.stdout)
-    assert payload["summary"]["total_records"] == 0
-    assert payload["records"] == []
+    assert json.loads(r.stdout)["records"] == []
 
 
-def test_misfiled_anchor_with_whitespace_padded_role_is_still_skipped(tmp_path: Path):
-    """validate.py's W609 ANCHOR_MISFILED check tolerates a whitespace-padded
-    artifact_role via `.strip() == "anchor"` (defensive against trailing
-    whitespace in an otherwise schema-invalid file). upstream-backlog's guard
-    must match that same tolerance -- otherwise a file validate.py correctly
-    flags as a misfiled anchor would fall through here and be misread as a
-    milestone plan, spuriously emitting E520 for its legacy-shape
-    severities."""
-    spec_dir = tmp_path / "spec"
-    impl = spec_dir / "impl_context"
-    impl.mkdir(parents=True)
-    shutil.copy(FIXTURE_DIR / "anchor_misfiled_whitespace_role.json",
-                impl / "anchor_misfiled_whitespace_role.json")
-    r = _run_cli(spec_dir, "--status", "all", "--json")
+def test_unified_items_are_grouped_by_the_step_of_their_about_nodes(unified_spec: Path):
+    r = _run_cli(unified_spec, "--json")
     assert r.returncode == 0, r.stderr
-    assert "E520" not in r.stderr
-    payload = json.loads(r.stdout)
-    assert payload["summary"]["total_records"] == 0
-    assert payload["records"] == []
+    found = _records(r)
+    assert [x["group"] for x in found["amb-about-seed"]] == ["seed"]
+    assert [x["group"] for x in found["amb-about-criterion"]] == ["04"]
+    assert [x["group"] for x in found["amb-two-steps"]] == ["04", "05"]
+    assert found["amb-two-steps"][1]["also_in"] == ["04"]
+    assert [x["group"] for x in found["amb-silent-criterion"]] == ["04"]
+    assert [x["group"] for x in found["amb-unresolved"]] == ["unplaced"]
+    summary = json.loads(r.stdout)["summary"]
+    assert (summary["items"], summary["with_answer"], summary["needing_answer"], summary["unplaced_count"]) == (5, 1, 4, 1)
 
 
-def test_new_shape_item_listed_and_legacy_fixture_unchanged(clean_spec: Path):
-    """1.2.0 open items (about, no severity/status/impact) are listed and raise no E520 or W613;
-    the legacy-shape fixtures in the same run still report exactly as before."""
-    baseline = _run_cli(clean_spec, "--json")
-    shutil.copy(FIXTURE_DIR / "plan_with_new_shape_items.json",
-                clean_spec / "impl_context" / "plan_with_new_shape_items.json")
-    r = _run_cli(clean_spec, "--json")
+def test_unified_plain_output_orders_groups_seed_first_unplaced_last(unified_spec: Path):
+    r = _run_cli(unified_spec)
     assert r.returncode == 0, r.stderr
-    assert "E520" not in r.stderr
-    payload = json.loads(r.stdout)
-    new_records = [rec for rec in payload["records"] if rec["milestone_id"] == "ms-new-shape"]
-    assert {(rec["ambiguity_id"], rec["origin"], rec["severity"], rec["status"], tuple(rec["about"]))
-            for rec in new_records} == {
-        ("amb-session-timeout", "plan", None, "open", ("fr-user-login",)),
-        ("amb-missing-criterion", "execution", None, "open", ("fr-user-login", "fr-user-logout")),
-    }
-    legacy = [rec for rec in payload["records"] if rec["milestone_id"] != "ms-new-shape"]
-    assert legacy == json.loads(baseline.stdout)["records"]
-    assert len([ln for ln in r.stderr.splitlines() if ln.startswith("W613")]) == 2
+    out = r.stdout
+    assert out.index("seed - ") < out.index("04 - ") < out.index("05 - ") < out.index("unplaced - ")
+    assert "answer known" in out and "needs operator answer" in out
+    assert "(also in 04)" in out
+    assert out.splitlines()[-1] == "Totals: 5 items / 1 with answer / 4 needing answer."
+    assert [ln for ln in r.stderr.splitlines() if ln.startswith("W613")] == [
+        "W613 UPSTREAM_BACKLOG_UNCLASSIFIED impl_context/ms_unified_items_plan_plan.json:amb-unresolved"
+    ]
+
+
+def test_legacy_item_widened_across_steps_lands_in_the_earliest_flagged_legacy(legacy_spec: Path):
+    r = _run_cli(legacy_spec, "--json")
+    assert r.returncode == 0, r.stderr
+    rec = _records(r)["amb-legacy-widened"][0]
+    assert (rec["group"], rec["shape"]) == ("04", "legacy")
+    assert _records(r)["amb-legacy-no-step"][0]["group"] == "unplaced"
+    assert "legacy" in _run_cli(legacy_spec).stdout
+
+
+@pytest.mark.parametrize("fixture", ["legacy_spec", "unified_spec"])
+def test_context_skill_jq_pipeline_yields_pointers(request: pytest.FixtureRequest, fixture: str):
+    """specdev-context SKILL.md pipes ``.records[]?.impact[]?`` of the JSON into resolve-pointers."""
+    spec_dir: Path = request.getfixturevalue(fixture)
+    r = _run_cli(spec_dir, "--json")
+    jq = subprocess.run(["jq", IMPACT_PIPELINE], input=r.stdout, capture_output=True, text=True, check=True)
+    pointers = json.loads(jq.stdout)
+    assert pointers and all(p["file"].startswith("spec/") and p["id"] for p in pointers)
