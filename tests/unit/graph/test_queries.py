@@ -8,11 +8,13 @@ from typing import Any
 
 import pytest
 
+from specdev_tools.core.errors import make_error
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.contract import item_at
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph
 from specdev_tools.graph.resolve import HISTORY_FIELDS, resolve_graph
 from specdev_tools.graph.queries import (
+    NodeReport,
     QueryTargetError,
     candidates,
     candidates_json,
@@ -328,3 +330,9 @@ def test_a_message_that_names_a_kind_after_an_article_says_an_before_a_vowel() -
         code, out = run_cli("trace", node_id, "--recipe", "16b", "--repo-root", str(ROOT), "--spec-root", str(EXAMPLE_SPEC))
         assert code == 1 and "E707" in out, (kind, out)
         assert f"is an {kind}" in out and f"is a {kind}" not in out, (kind, out)
+
+
+def test_error_json_omits_target() -> None:
+    error = make_error("E700", "m", node_id="api-y", target="derives_from->fr-x")
+    (document,) = node_json(NodeReport(views=(), errors=(error,)))["errors"]
+    assert document == {"code": "E700", "message": "m", "node_id": "api-y"}

@@ -12,6 +12,7 @@ import pytest
 
 from specdev_tools.core.errors import ERROR_CODES, SpecError, make_error
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.check import check_replaces
 from specdev_tools.graph.kinds import LinkDecl
 from specdev_tools.graph.model import Graph, Link, Node, SpecShape
 from specdev_tools.graph.ownership import OwnerContext, load_ownership_table, owner_for
@@ -65,6 +66,37 @@ class _RecordingHooks:
     def on_link(self, link: Link, source: Node, target: Node) -> list[SpecError]:
         self.calls.append((link, source, target))
         return [make_error("W720", f"marker for {source.id} -> {target.id}", owner=f"step:{source.step}", node_id=source.id)]
+
+
+# --- the target of a link finding ----------------------------------------------------------------------------------
+
+def test_link_findings_carry_field_arrow_target() -> None:
+    graph = _graph([
+        _node("a", "A", "s2", [(_decl("to", ["A", "B"]), "ghost-1"), (_decl("also", ["A", "B"]), "ghost-2"),
+                               (_decl("kind", ["B"]), "c"), (_decl("later", ["B"]), "d")]),
+        _node("c", "C", "s1"), _node("d", "B", "s3"),
+    ])
+    errors = resolve_graph(graph)
+    assert [(error.code, error.target) for error in errors] == [
+        ("E700", "to->ghost-1"), ("E700", "also->ghost-2"), ("E701", "kind->c"), ("E702", "later->d"),
+    ]
+    (cycle,) = resolve_graph(_graph([_node("x", "A", "s1", [(_decl("to", ["A"], ["A"]), "x")])]))
+    assert (cycle.code, cycle.target) == ("E703", None)
+
+
+def test_e772_carries_the_replaces_link_as_target() -> None:
+    graph = _graph([_node("a", "A", "s2", [(_decl("replaces", ["A"]), "b")]), _node("b", "A", "s1")])
+    (error,) = check_replaces(graph)
+    assert (error.code, error.target) == ("E772", "replaces->b")
+
+
+def test_e700_target_does_not_change_when_the_message_does() -> None:
+    nodes = [_node("a", "A", "s2", [(_decl("to", ["B"]), "ghost")]), _node("b", "B", "s1")]
+    present = resolve_graph(_graph(nodes))
+    absent = resolve_graph(_graph(nodes, files={"s2": ("s2.json",)}))
+    (with_file,), (without_file,) = present, absent
+    assert with_file.message != without_file.message
+    assert with_file.target == without_file.target == "to->ghost"
 
 
 # --- Figure 4, one graph per branch --------------------------------------------------------------------------------

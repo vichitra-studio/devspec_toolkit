@@ -12,7 +12,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import SpecError, link_target, make_error
 from specdev_tools.graph.kinds import RECORD_ROLE, LinkDecl
 from specdev_tools.graph.model import UNRANKED, Graph, Link, Node, SpecShape, article
 from specdev_tools.graph.ownership import step_owner
@@ -49,9 +49,11 @@ class _SameStepEdges:
         self.successors.setdefault(source.id, []).append((target.id, field_name))
 
 
-def _error(code: str, holder: Node, message: str) -> SpecError:
+def _error(code: str, holder: Node, message: str, *, link: Link | None = None) -> SpecError:
+    """A finding about *holder*; with *link*, also about that link (``target`` is ``<field>-><target as written>``)."""
     return make_error(
-        code, message, file=holder.file, jq_path=holder.jq_path or None, owner=step_owner(holder), node_id=holder.id
+        code, message, file=holder.file, jq_path=holder.jq_path or None, owner=step_owner(holder), node_id=holder.id,
+        target=link_target(link.field, link.target) if link else None,
     )
 
 
@@ -87,14 +89,16 @@ def _missing_target_error(holder: Node, link: Link, graph: Graph) -> SpecError:
         return _error(
             "E700", holder,
             f"{where}: the file {path} of step {step} could not be read, so the target cannot be checked",
+            link=link,
         )
     absent = _absent_steps(link, shape)
     if absent:
         return _error(
             "E700", holder,
             f"{where}: no file of step {', '.join(absent)} exists in the spec, so the target cannot be found",
+            link=link,
         )
-    return _error("E700", holder, f"{where}: no node has that id")
+    return _error("E700", holder, f"{where}: no node has that id", link=link)
 
 
 def _wrong_kind_error(holder: Node, link: Link, target: Node) -> SpecError:
@@ -102,6 +106,7 @@ def _wrong_kind_error(holder: Node, link: Link, target: Node) -> SpecError:
     return _error(
         "E701", holder,
         f"{holder.id}, field {link.field}, target '{target.id}' is {article(target.kind)} {target.kind}; the field accepts: {accepted}",
+        link=link,
     )
 
 
@@ -130,10 +135,11 @@ def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -
         return None
     where = f"{holder.id} (step {holder.step}), field {link.field}, target '{target.id}' (step {target.step})"
     if shape.rank_of(target.step) > shape.rank_of(holder.step):
-        return _error("E702", holder, f"{where}: the target is in a later step; a link points to an earlier step")
+        return _error("E702", holder, f"{where}: the target is in a later step; a link points to an earlier step", link=link)
     return _error(
         "E702", holder,
         f"{where}: the target is in the same step and {article(target.kind)} {target.kind} is not declared as a same-step target of the field",
+        link=link,
     )
 
 

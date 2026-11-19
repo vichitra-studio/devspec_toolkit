@@ -371,7 +371,8 @@ def node_text(report: NodeReport) -> str:
 
 
 def _error_json(error: SpecError) -> dict[str, Any]:
-    return {name: value for name, value in asdict(error).items() if value is not None}
+    """The JSON form of a finding: its set fields, without ``target`` (the identity of a link finding, never printed)."""
+    return {name: value for name, value in asdict(error).items() if value is not None and name != "target"}
 
 
 def node_json(report: NodeReport) -> dict[str, Any]:

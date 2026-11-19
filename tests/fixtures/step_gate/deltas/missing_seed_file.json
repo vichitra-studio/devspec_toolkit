@@ -1,0 +1,19 @@
+{
+  "description": "The seed manifest lists a seed whose file does not exist: E520 from the seed lint, owned by the merge check.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/common/seed_manifest.json",
+      "path": [
+        "seeds"
+      ],
+      "value": {
+        "seed_id": "seed-ghost",
+        "path": "docs/seed/ghost.md",
+        "description": "Listed but not on disk.",
+        "required": false,
+        "source_type": "doc"
+      }
+    }
+  ]
+}

@@ -99,6 +99,58 @@
       "owner": "release-gate",
       "codes": [],
       "authority": "DOC L824-840 row 15; DS L402; DS L420"
+    },
+    {
+      "class": "glossary-canon-drift",
+      "owner": "fixed_step:03",
+      "codes": [
+        "E607"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "toolkit-version-mismatch",
+      "owner": "merge-check",
+      "codes": [
+        "E608"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "registry-drift",
+      "owner": "merge-check",
+      "codes": [
+        "E620",
+        "E621",
+        "E622"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "hardcoded-seed-reference",
+      "owner": "merge-check",
+      "codes": [
+        "W554"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "replay-diff-unavailable",
+      "owner": "merge-check",
+      "codes": [
+        "E550"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "id-regression-on-replay",
+      "owner": "merge-check",
+      "codes": [
+        "E555",
+        "W598",
+        "W550"
+      ],
+      "authority": "M6a PD"
     }
   ]
 }

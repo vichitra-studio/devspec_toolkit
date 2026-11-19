@@ -1,0 +1,62 @@
+{
+  "description": "A step-01 capability that no step-02 component derives from: E590, owned by step 02 (DEVSPEC-201).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/canon/manifest.json",
+      "path": [
+        "entries"
+      ],
+      "value": {
+        "id": "cn:project:capability:account-export",
+        "kind": "capability",
+        "preferred_label": "account export",
+        "definition": "A registered member downloads the data held about their account.",
+        "version": "1.0.0",
+        "status": "active",
+        "owners": [
+          "product"
+        ],
+        "aliases": [],
+        "lifecycle": {
+          "introduced_at": "2026-11-15T00:00:00Z"
+        }
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/01_capabilities.json",
+      "path": [
+        "capabilities"
+      ],
+      "value": {
+        "capability_id": "cap-account-export",
+        "verb": "export",
+        "scope": "in",
+        "owner": "product",
+        "description": "A registered member can download the data held about their account.",
+        "derives_from": [
+          "scope-password-reset",
+          "seg-registered-member"
+        ],
+        "capability_ref": {
+          "id": "cn:project:capability:account-export",
+          "kind": "capability",
+          "version": "1.0.0"
+        }
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/01_capabilities.json",
+      "path": [
+        "canonical_refs_used"
+      ],
+      "value": {
+        "id": "cn:project:capability:account-export",
+        "kind": "capability",
+        "version": "^1.0.0"
+      }
+    }
+  ]
+}

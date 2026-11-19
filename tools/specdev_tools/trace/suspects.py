@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import SpecError, link_target, make_error
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Link, Node
 from specdev_tools.graph.ownership import step_owner
@@ -218,11 +218,14 @@ def find_suspects(graph: Graph, lock: Lock, seed_texts: Mapping[str, str]) -> li
     return suspects
 
 
-def _node_error(code: str, node: Node | None, message: str, owner: str | None) -> SpecError:
-    """A finding about *node* (when the graph has it) with *owner*."""
+def _node_error(code: str, node: Node | None, message: str, owner: str | None, *, link: tuple[str, str]) -> SpecError:
+    """A finding about the link *link* (``(field, target)``) of *node* (when the graph has it) with *owner*."""
+    target = link_target(*link)
     if node is None:
-        return make_error(code, message, owner=owner)
-    return make_error(code, message, file=node.file, jq_path=node.jq_path or None, owner=owner, node_id=node.id)
+        return make_error(code, message, owner=owner, target=target)
+    return make_error(
+        code, message, file=node.file, jq_path=node.jq_path or None, owner=owner, node_id=node.id, target=target
+    )
 
 
 def _link_text(holder: str, field: str, target: str) -> str:
@@ -240,7 +243,7 @@ def _missing_entry_error(holder: Node, link: Link) -> SpecError:
         f"{_link_text(holder.id, link.field, link.target)}: the trace lock has no entry for this link; "
         f"once the target is checked, {_accept_with(holder.id)}"
     )
-    return _node_error("E761", holder, message, step_owner(holder))
+    return _node_error("E761", holder, message, step_owner(holder), link=(link.field, link.target))
 
 
 def _deprecated_target_warning(holder: Node, link: Link, target: Node) -> SpecError:
@@ -249,7 +252,7 @@ def _deprecated_target_warning(holder: Node, link: Link, target: Node) -> SpecEr
         f"{_link_text(holder.id, link.field, link.target)}: '{target.id}' is deprecated; "
         "point the link at the node that replaces it"
     )
-    return _node_error("W720", holder, message, step_owner(holder))
+    return _node_error("W720", holder, message, step_owner(holder), link=(link.field, link.target))
 
 
 def _stale_alias_error(holder: Node, link: Link, target: Node) -> SpecError:
@@ -258,7 +261,7 @@ def _stale_alias_error(holder: Node, link: Link, target: Node) -> SpecError:
         f"{_link_text(holder.id, link.field, link.target)}: '{link.target}' is an old id of '{target.id}'; "
         f"use the current id '{target.id}'"
     )
-    return _node_error("E778", holder, message, step_owner(holder))
+    return _node_error("E778", holder, message, step_owner(holder), link=(link.field, link.target))
 
 
 class LockHook:
@@ -291,7 +294,7 @@ def _orphan_error(graph: Graph, entry: LockEntry) -> SpecError:
         f"trace lock entry ({_link_text(entry.source, entry.field, entry.target)}) has no link any more; "
         "remove it with `specdev attest --prune`"
     )
-    return _node_error("E762", graph.by_id.get(entry.source), message, MERGE_CHECK_OWNER)
+    return _node_error("E762", graph.by_id.get(entry.source), message, MERGE_CHECK_OWNER, link=(entry.field, entry.target))
 
 
 def check_lock_orphans(graph: Graph, lock: Lock) -> list[SpecError]:
@@ -305,7 +308,7 @@ def _suspect_error(graph: Graph, suspect: SuspectLink) -> SpecError:
         f"{_link_text(suspect.holder, suspect.field, suspect.target)}: suspect link, {_CAUSE_TEXT[suspect.cause]}{roots}. "
         f"Review the change, then edit {suspect.holder} or accept it: {_accept_with(suspect.holder)}"
     )
-    return _node_error("E763", graph.by_id.get(suspect.holder), message, MERGE_CHECK_OWNER)
+    return _node_error("E763", graph.by_id.get(suspect.holder), message, MERGE_CHECK_OWNER, link=(suspect.field, suspect.target))
 
 
 def _baseline_errors(graph: Graph, lock: Lock) -> list[SpecError]:
@@ -323,7 +326,7 @@ def _baseline_errors(graph: Graph, lock: Lock) -> list[SpecError]:
             f"trace lock entry ({_link_text(entry.source, entry.field, entry.target)}) still carries the migration "
             f"baseline marker; check the link, then clear it: {_accept_with(entry.source)}"
         )
-        errors.append(_node_error("E882", holder, message, step_owner(holder)))
+        errors.append(_node_error("E882", holder, message, step_owner(holder), link=(entry.field, entry.target)))
     return errors
 
 

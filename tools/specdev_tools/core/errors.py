@@ -17,11 +17,18 @@ class SpecError:
     value: Optional[str] = None
     owner: Optional[str] = None
     node_id: Optional[str] = None
+    target: Optional[str] = None
+    """The link a finding is about, as ``<field>-><target id>``; part of the identity of a link finding, never printed."""
 
     def render(self) -> str:
         if self.path:
             return f"{self.code} {self.path} {self.message}"
         return f"{self.code} {self.message}"
+
+
+def link_target(field: str, target: str) -> str:
+    """The ``SpecError.target`` of a finding about the link *field* of a node to *target*: ``<field>-><target>``."""
+    return f"{field}->{target}"
 
 
 class FindingError(Exception):
@@ -345,13 +352,14 @@ def make_error(
     value: Optional[str] = None,
     owner: Optional[str] = None,
     node_id: Optional[str] = None,
+    target: Optional[str] = None,
 ) -> SpecError:
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
     return SpecError(
         code=code, message=message, path=path,
         subcode=subcode, file=file, jq_path=jq_path, value=value,
-        owner=owner, node_id=node_id,
+        owner=owner, node_id=node_id, target=target,
     )
 
 

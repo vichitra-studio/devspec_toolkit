@@ -1,11 +1,11 @@
 """The ``graph`` check of ``spec-check``: build the graph of a spec folder, then check its ids, its aliases and its links."""
 from __future__ import annotations
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import SpecError, link_target, make_error
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.kinds import KindRegistryError
-from specdev_tools.graph.model import Graph, Node, article
+from specdev_tools.graph.model import Graph, Link, Node, article
 from specdev_tools.graph.ownership import step_owner
 from specdev_tools.graph.resolve import NULL_HOOKS, resolve_graph
 from specdev_tools.trace.lockfile import Lock
@@ -14,8 +14,12 @@ from specdev_tools.trace.suspects import LockHook
 REPLACES_FIELD = "replaces"
 
 
-def _node_finding(code: str, node: Node, message: str) -> SpecError:
-    return make_error(code, message, file=node.file, jq_path=node.jq_path or None, owner=step_owner(node), node_id=node.id)
+def _node_finding(code: str, node: Node, message: str, *, link: Link | None = None) -> SpecError:
+    """A finding about *node*; with *link*, also about that link (``target`` is ``<field>-><target as written>``)."""
+    return make_error(
+        code, message, file=node.file, jq_path=node.jq_path or None, owner=step_owner(node), node_id=node.id,
+        target=link_target(link.field, link.target) if link else None,
+    )
 
 
 def check_alias_space(graph: Graph) -> list[SpecError]:
@@ -50,7 +54,7 @@ def check_replaces(graph: Graph) -> list[SpecError]:
             target = graph.find(link.target) if link.field == REPLACES_FIELD else None
             if target is not None:
                 message = f"{holder.id}, field {link.field}, target '{link.target}': '{target.id}' is still in the spec; delete it or drop the link"
-                errors.append(_node_finding("E772", holder, message))
+                errors.append(_node_finding("E772", holder, message, link=link))
     return errors
 
 
