@@ -89,7 +89,8 @@ def test_stored_suspects_impact_fr_refs_rejected(spec: Path, graph: Graph, kind:
     assert (finding.code, finding.node_id, finding.owner) == ("E768", node_id, f"step:{step}")
     assert f"'{name}'" in finding.message and finding.message.startswith(node_id)
     if name == "content_hash":  # review round 1: say it is computed and not stored; `specdev attest` does not write it
-        assert "not stored in a spec file" in finding.message and "attest" not in finding.message
+        assert "kept in the trace lock, not in a spec file" in finding.message and "attest" not in finding.message
+        assert "compute it with" not in finding.message  # no command computes it: one sentence, no `with the toolkit`
     else:
         assert "specdev" in finding.message
     assert finding.jq_path is not None and finding.jq_path.endswith(f".{name}")

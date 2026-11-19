@@ -548,8 +548,8 @@ changes:
   - type: add_module
     description: >
       New commands for reading the spec as a graph (graph/commands.py); each takes
-      --repo-root, --spec-root (default ./spec), --git-root (default .) and --json.
-      specdev node <id> [<id> ...] [--full] (also specdev node show <id>, which
+      --repo-root, --spec-root (default ./spec), --git-root (default: the folder that holds --spec-root) and --json. specdev node
+      <id> [<id> ...] [--full] (also specdev node show <id>, which
       reads an id that is itself a subcommand name) shows a node: file and jq
       path, content, links out and the number of links in. specdev node candidates
       (--kind KIND | --for ID) --field FIELD [--query TEXT] [--limit N] lists the
@@ -697,10 +697,11 @@ changes:
       [--field F] [--target T], attest --step NN and attest --prune write the current
       hashes into the lock for the suspect links of a node, of a step (upward first)
       or remove the entries of links that no longer exist; without --yes the first two
-      print what they would write and write nothing, --dry-run never writes, and
-      --prune writes at once. Refused with exit 1: E520 (--yes, --dry-run or --prune
-      while a spec file cannot be read, so the links it holds are not in the graph;
-      nothing is written), E764 (a node the holder links to is itself suspect: attest
+      print what they would write and write nothing, --dry-run never writes, with or without --yes, and --prune writes at once; --target
+      takes an id or an alias. Refused with exit 1: E520 (--yes or --prune, each
+      with or without --dry-run, while a spec file cannot be read, so the links it
+      holds are not in the graph; nothing is written; a preview, with no --yes,
+      still prints, with a warning on stderr that the answer may be incomplete), E764 (a node the holder links to is itself suspect: attest
       that one first), E765 (a node of a closed milestone), E706 (an unknown id or
       step), E704 (an id defined twice). specdev coverage [--by fr] prints how many
       FRs have an API or a fixture and how many capabilities have an FR, the criteria
@@ -715,12 +716,15 @@ changes:
     description: >
       specdev lock merge BASE OURS THEIRS PATH is a git merge driver for the lock:
       it merges the three versions entry by entry and writes the result over OURS
-      (E760 for an input that is not a valid lock, E520 for a file that cannot be
-      read). specdev lock install-driver --driver-command CMD adds
+      (E760 for an input that is not a valid lock, E520 for a file that cannot be read);
+      when both sides changed one entry in different ways it keeps the entry the
+      common ancestor had, or, when it had none, the entry with the smaller chain
+      stamp (string order), and the link is suspect again when its target changed
+      after the kept entry. specdev lock install-driver --driver-command CMD adds
       <spec>/extras/trace.lock.json merge=specdev-trace-lock to the file git
       rev-parse --git-path info/attributes names and sets
-      merge.specdev-trace-lock.driver to CMD %O %A %B %P in the clone at --git-root;
-      running it again changes nothing. Until a later 1.2.0 change no setup script
+      merge.specdev-trace-lock.driver to CMD %O %A %B %P in the clone at the git root (--git-root, or the folder that holds
+      --spec-root); running it again changes nothing. Until a later 1.2.0 change no setup script
       installs the driver into a host: run lock install-driver once in each clone,
       otherwise git merges the lock as text, and a conflict leaves conflict markers
       in it, which specdev reports as E760 with the repair.
@@ -732,17 +736,18 @@ changes:
       specdev json patch|insert|delete --id <node-id> and specdev json insert --step
       NN write by node id: the field path is relative to the node, ids the new item
       leaves out are minted, the lock entries of the links the edit adds are written
-      and those of the links it removes are dropped, and the command lists the links
-      the edit leaves suspect (newly suspect: ...) and, for a delete, the links that
+      and those of the links it removes are dropped, and the command lists the links the edit leaves suspect (newly suspect: ...; would
+      become suspect: ... with --dry-run) and, for a delete, the links that
       now point at a node that is gone (now broken). With --dry-run the report says
       lock entry to write and lock entry to remove, and nothing is written. Refused
-      with exit 1: E767 (a seed, the node's own id, an edit that adds a schema
-      violation or leaves a link that does not resolve or an alias collision, a path
+      with exit 1: E767 (a seed, the node's own id, an edit that adds a schema violation or leaves a
+      link that does not resolve or an alias collision, an insert --id into a field
+      the node does not have and its schema does not declare as an array, a path
       that is not a node collection of the step, the path of a collection that is a
       map keyed by id), E768 (the payload stores a computed field), E706 (an unknown
-      id or step), E769 (another specdev write is running), E520 (a spec file cannot
-      be read, so the links it holds are not in the graph; also for a dry run). These
-      forms take --repo-root, --spec-root, --git-root and --json (CLAUDE.md says the
+      id or step), E769 (another specdev write is running), E520 (a spec file cannot be read, so the links it holds are not in the graph; also
+      for a dry run). json insert --id creates the first item of an array field that
+      the node lacks and its schema declares. These forms take --repo-root, --spec-root, --git-root and --json (CLAUDE.md says the
       json subcommands take --repo-root only: that holds for the path forms); json
       delete, json keys and json structure now accept --repo-root too.
     migration:
@@ -753,12 +758,12 @@ changes:
       specdev step create NN --from DRAFT [--dry-run] writes the file of step NN from
       a draft that holds the whole artifact (ids of sub-items may be left out), checks
       it against the step's schema, requires every link to resolve and writes the lock
-      entries of its links; E767 when the step already has its file, for steps 13a and
-      16, for a draft that cannot be read, for a draft whose $schema is not the step's
+      entries of its links; E767 when the step already has its file, for steps 13a and 16 to 16c, for a draft that cannot be read, for a draft whose $schema is not the step's
       and for a link that does not resolve; E520 when a spec file cannot be read.
       specdev step ready NN prints step NN: ready and exits 0 when the steps NN links
-      to have a spec file and no pending replay, and otherwise reports E773 with the
-      blockers and exits 1; the file of NN itself is not required. Until a later 1.2.0
+      to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, naming the step to write
+      first (a step with no file) or to replay first; E520, exit 1, when a spec file
+      cannot be read; the file of NN itself is not required. Until a later 1.2.0
       change retires step 13a, tools/step_order.json still lists it as an input of 14
       and 16a, so step ready 14 reports E773 on a spec with no 13a file.
     migration:

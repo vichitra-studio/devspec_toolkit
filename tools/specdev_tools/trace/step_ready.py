@@ -65,6 +65,12 @@ class Readiness:
         return self.blockers[0].step if self.blockers else None
 
 
+def first_clause(readiness: Readiness) -> str:
+    """What to do first, worded by the kind of the first blocker: ``write step NN first`` for a missing file, else ``replay step NN first``."""
+    verb = "write" if readiness.blockers and readiness.blockers[0].reason == REASON_MISSING else "replay"
+    return f"{verb} step {readiness.replay_first} first"
+
+
 def link_steps(graph: Graph, step: str) -> tuple[str, ...]:
     """The steps, in waterfall order, of the targets of the lock links the nodes of *step* hold; not *step* itself and not the seeds."""
     found: set[str] = set()
@@ -139,7 +145,7 @@ def render_text(readiness: Readiness) -> str:
         return f"step {readiness.step}: ready"
     lines = [f"step {readiness.step}: not ready, {plural(len(readiness.blockers), 'blocker')}"]
     lines.extend(_blocker_line(blocker) for blocker in readiness.blockers)
-    lines.append(f"replay step {readiness.replay_first} first")
+    lines.append(first_clause(readiness))
     return "\n".join(lines)
 
 
@@ -166,5 +172,5 @@ def not_ready_error(readiness: Readiness) -> SpecError:
     for blocker in readiness.blockers:
         per_step[blocker.step] = per_step.get(blocker.step, 0) + 1
     steps = "; ".join(f"step {name} ({plural(count, 'blocker')})" for name, count in per_step.items())
-    return make_error("E773", f"step {readiness.step} is not ready: {steps}; replay step {readiness.replay_first} first")
+    return make_error("E773", f"step {readiness.step} is not ready: {steps}; {first_clause(readiness)}")
 

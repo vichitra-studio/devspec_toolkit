@@ -14,9 +14,8 @@ from typing import Any
 
 import pytest
 
-from specdev_tools.trace.lockfile import Lock, LockEntry, lock_path, read_lock
+from specdev_tools.trace.lockfile import Lock, LockEntry, lock_path, read_lock, write_lock
 from specdev_tools.validation.spec_check import run_spec_check_json
-from specdev_tools.trace.lockfile import write_lock
 
 from unit.graph._synth import ROOT
 from unit.trace._lock_support import git_copy_of_example, run_on_example
@@ -113,3 +112,15 @@ def test_node_rename_refusal_names_a_prune_that_lets_the_rename_through(host: Pa
     assert run_on_example(host, *command)[0] == 0
     code, out = run_on_example(host, "node", "rename", "fr-password-reset", "fr-password-recovery")
     assert code == 0, out
+
+
+def test_a_dry_run_of_an_id_write_says_would_become_suspect_and_names_no_command(host: Path) -> None:
+    """M5 R2 G1-6: nothing is written, so ``specdev stale`` shows nothing: the dry run does not send the reader there."""
+    edit = ["json", "patch", "--id", CRITERION, ".text", '"A reset link stops working after one use."']
+    code, dry = run_on_example(host, *edit, "--dry-run")
+    assert code == 0 and "would become suspect: " in dry and "newly suspect" not in dry and "specdev stale" not in dry, dry
+    assert "specdev stale" not in dry.split("would become suspect: ")[1]
+    code, done = run_on_example(host, *edit)
+    assert code == 0 and "newly suspect: " in done and "see `specdev stale`" in done and "would become" not in done, done
+    count = re.search(r"newly suspect: (\d+ links) ", done)
+    assert count is not None and f"would become suspect: {count.group(1)} " in dry

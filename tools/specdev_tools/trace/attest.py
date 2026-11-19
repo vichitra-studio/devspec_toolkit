@@ -104,7 +104,7 @@ class _State:
             self.locked.setdefault(item.holder.id, []).append(item)
 
     def pending(self, holder: str, field: str | None = None, target: str | None = None) -> list[AttestedLink]:
-        """The links of *holder* to attest, narrowed to *field* and *target* when given."""
+        """The links of *holder* to attest, narrowed to *field* and to the node *target* (an id) when given."""
         links: list[AttestedLink] = []
         for item in self.locked.get(holder, ()):
             if not _matches(item, field, target):
@@ -132,8 +132,9 @@ class _State:
         return [node.node for kept in replay.pending_replay(self.replay_plan, [step]) for node in kept.nodes]
 
 
-def _matches(item: LockedLink, field: str | None, target: str | None) -> bool:
-    return (field is None or item.link.field == field) and (target is None or target in (item.link.target, item.target.id))
+def _matches(item: LockedLink, field: str | None, target_id: str | None) -> bool:
+    """Whether *item* is a link of *field* (when given) to the node *target_id* (when given: an id, resolved by the caller)."""
+    return (field is None or item.link.field == field) and (target_id is None or item.target.id == target_id)
 
 
 def _holder_node(graph: Graph, node_id: str) -> Node:
@@ -167,9 +168,11 @@ def plan_node_attest(
     """
     node = _holder_node(graph, node_id)
     state = _State(graph, lock, seed_texts)
-    if (field or target) and not any(_matches(item, field, target) for item in state.locked.get(node.id, ())):
-        raise AttestRefusedError(make_error("E706", f"{node.id!r} holds no link with field {field or 'any'} and target {target or 'any'}"))
-    links = state.pending(node.id, field, target)
+    target_id = graph.canonical_id(target) if target else None
+    if (field or target) and not any(_matches(item, field, target_id) for item in state.locked.get(node.id, ())):
+        given = [*([f"field {field}"] if field else []), *([f"target {target}"] if target else [])]
+        raise AttestRefusedError(make_error("E706", f"{node.id!r} holds no link with {' and '.join(given)}"))
+    links = state.pending(node.id, field, target_id)
     blockers = state.blockers(node.id) if links else ()
     if blockers:
         return AttestPlan((), (BlockedNode(node.id, blockers),))

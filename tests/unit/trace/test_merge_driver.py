@@ -187,3 +187,19 @@ def test_install_driver_outside_a_repository_is_e520(tmp_path: Path) -> None:
 @pytest.mark.parametrize(("spec", "expected"), [("spec", "spec/extras"), (".", "extras"), ("a/b/", "a/b/extras")])
 def test_attribute_line_names_the_lock_path_from_the_git_root(spec: str, expected: str) -> None:
     assert attribute_line(spec) == f"{expected}/{TRACE_LOCK_FILENAME} merge={DRIVER_NAME}"
+
+
+def test_a_git_failure_reaches_the_caller_as_the_e520_of_the_driver(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_git`` re-wraps the ``GitViewError`` of ``run_git`` (a missing git, a timeout) so the driver reports E520, as the module promises."""
+    from specdev_tools.core.errors import make_error
+    from specdev_tools.graph.gitview import GitViewError
+    from specdev_tools.trace import merge_driver
+
+    def failing(git_root: str, args: object) -> object:
+        raise GitViewError(make_error("E708", "git did not answer within 30 seconds"))
+
+    monkeypatch.setattr(merge_driver, "run_git", failing)
+    with pytest.raises(LockMergeError) as caught:
+        merge_driver._git(str(tmp_path), ["rev-parse", "--git-dir"])
+    assert not isinstance(caught.value, GitViewError)
+    assert caught.value.error.code == "E520" and "git did not answer within 30 seconds" in caught.value.error.message

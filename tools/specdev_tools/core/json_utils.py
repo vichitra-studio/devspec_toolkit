@@ -447,6 +447,17 @@ def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> List[Sc
         ) from exc
 
 
+_SHORT_MESSAGES = {"maxItems": "has more items than the schema allows", "minItems": "has fewer items than the schema requires"}
+_MAX_MESSAGE = 200
+
+
+def violation_text(item: SchemaViolation) -> str:
+    """What is wrong at the violation: its message, but not the whole value the message quotes (a long one is cut)."""
+    if item.keyword in _SHORT_MESSAGES:
+        return _SHORT_MESSAGES[item.keyword]
+    return item.message if len(item.message) <= _MAX_MESSAGE else item.message[:_MAX_MESSAGE] + " ..."
+
+
 def _ws1_differential_check(
     file_path: str,
     content: str,
@@ -508,7 +519,7 @@ def _ws1_differential_check(
     added = _added_violations(errors_before, errors_after)
     if added:
         lines = [
-            f"  path {_path_tuple_to_jq(violation.path)}: {violation.message}"
+            f"  path {_path_tuple_to_jq(violation.path)}: {violation_text(violation)}"
             for violation in added
         ]
         raise JsonUtilsError(

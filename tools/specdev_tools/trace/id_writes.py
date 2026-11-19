@@ -33,6 +33,7 @@ from specdev_tools.core.json_utils import (
     check_edit,
     delete_text,
     insert_text,
+    json_schema_discovery,
     json_write_atomic,
     patch_text,
 )
@@ -47,7 +48,7 @@ from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import contract_lines
-from specdev_tools.trace.lockfile import Lock, LockEntry, locked_graph, read_lock, refuse_unreadable, replace_file_atomically, write_lock
+from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, write_lock, writing_graph
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
 from specdev_tools.validation.linter_utils import graph_known_ids
 
@@ -201,7 +202,8 @@ def _computed_names(kind: str | None) -> dict[str, str]:
     names: dict[str, str] = {}
     for view in COMPUTED_VIEWS:
         if view.scope is None or kind in view.scope:
-            names.update(dict.fromkeys(view.names, f"it is computed ({view.view}); compute it with {view.source}"))
+            how = view.remedy or f"compute it with {view.source}"
+            names.update(dict.fromkeys(view.names, f"it is computed ({view.view}); {how}"))
     return names
 
 
@@ -296,7 +298,16 @@ def _plan_delete(node: Node, content: str, repo_root: str) -> _Edit:
     return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path)
 
 
-def _plan_field_write(graph: Graph, node: Node, content: str, repo_root: str, request: WriteRequest) -> _Edit:
+def _declared_array(spec_root: str, node: Node, field: str, repo_root: str) -> bool:
+    """Whether the schema of the file of *node* declares *field* of the node as an array."""
+    try:
+        found = json.loads(json_schema_discovery(os.path.join(spec_root, node.file), node.jq_path + field, repo_root) or "{}")
+    except (JsonUtilsError, ValueError):
+        return False
+    return isinstance(found, dict) and "error" not in found and found.get("type") == "array"
+
+
+def _plan_field_write(graph: Graph, spec_root: str, node: Node, content: str, repo_root: str, request: WriteRequest) -> _Edit:
     """The edit of ``patch`` or ``insert`` into a field of *node*."""
     decl = graph.decls.get(node.kind)
     field = _field_path(request.path, decl, node)
@@ -310,8 +321,15 @@ def _plan_field_write(graph: Graph, node: Node, content: str, repo_root: str, re
             new_text = patch_text(content, path, request.value or "", not request.raw)
         else:
             item = _minted_for_field(graph, decl, field, payload, minted)
-            new_text = insert_text(content, path, request.value or "" if request.raw else json.dumps(item), not request.raw)
+            create = _declared_array(spec_root, node, field, repo_root)
+            new_text = insert_text(content, path, request.value or "" if request.raw else json.dumps(item), not request.raw, create=create)
     except JsonUtilsError as error:
+        if request.action == "insert" and "Cannot insert into null" in str(error):
+            raise _refuse(
+                f"{node.id!r} has no {field.lstrip('.')} and its schema does not declare {field} as an array, "
+                "so there is nothing to insert into; set the field with `specdev json patch --id`",
+                node_id=node.id,
+            ) from None
         raise _refuse(str(error), node_id=node.id) from None
     return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, minted)
 
@@ -322,7 +340,7 @@ def _plan_node_edit(graph: Graph, spec_root: str, repo_root: str, request: Write
     content = _read_file(spec_root, node.file)
     if request.action == "delete":
         return _plan_delete(node, content, repo_root)
-    return _plan_field_write(graph, node, content, repo_root, request)
+    return _plan_field_write(graph, spec_root, node, content, repo_root, request)
 
 
 def _minted_for_field(graph: Graph, decl: KindDecl | None, field: str, payload: Any, minted: list[str]) -> Any:
@@ -347,7 +365,11 @@ def _collection_decl(repo_root: str, step: str, path: str) -> KindDecl:
     for kind in declared:
         if kind.array_path.removesuffix("{}").lstrip(".") == path.lstrip("."):  # a map-keyed collection is declared as `.name{}`
             return kind
-    names = ", ".join(sorted(f"{kind.array_path} ({kind.kind})" for kind in declared)) or "none"
+    names = ", ".join(sorted(
+        f"{kind.array_path.removesuffix('{}')} ({kind.kind}, map: not added by this command)" if kind.map_keyed
+        else f"{kind.array_path} ({kind.kind})"
+        for kind in declared
+    )) or "none"
     raise _refuse(f"step {step} has no node collection {path}; its collections: {names}")
 
 
@@ -573,8 +595,5 @@ def execute_write(
             (E760) when the lock file cannot be read.
     """
     what = f"json {request.action} --{'step' if request.step else 'id'}"
-    if dry_run:
-        refuse_unreadable(graph, what)
-        return _write_on(graph, spec_root, repo_root, git_root, request, write=False)
-    with locked_graph(spec_root, repo_root, what) as built:
-        return _write_on(built, spec_root, repo_root, git_root, request, write=True)
+    with writing_graph(graph, spec_root, repo_root, what, write=not dry_run) as planned:
+        return _write_on(planned, spec_root, repo_root, git_root, request, write=not dry_run)

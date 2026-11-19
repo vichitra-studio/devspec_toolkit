@@ -71,7 +71,10 @@ def render_text(result: WriteResult) -> str:
     if result.newly_suspect:
         total = sum(count for _step, count in result.newly_suspect)
         per_step = ", ".join(f"step {step}: {count}" for step, count in result.newly_suspect)
-        lines.append(f"newly suspect: {plural(total, 'link')} ({per_step}); see `specdev stale`")
+        if result.written:
+            lines.append(f"newly suspect: {plural(total, 'link')} ({per_step}); see `specdev stale`")
+        else:
+            lines.append(f"would become suspect: {plural(total, 'link')} ({per_step})")
     if result.broken:
         lines.append(f"now broken ({plural(len(result.broken), 'link')} point at the deleted node):")
         lines.extend(f"  {link.holder}.{link.field} -> {link.target}" for link in result.broken)

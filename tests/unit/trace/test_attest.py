@@ -142,6 +142,23 @@ def test_attest_field_and_target_narrow_the_links(example: Example) -> None:
     assert code == 1 and out.startswith("E706") and NFR in out
 
 
+def test_attest_target_takes_an_alias_after_a_rename_and_the_e706_names_the_flags_given(example: Example) -> None:
+    """``--target`` is an id or an alias: the link now spells the new id, the old id is an alias of the same node."""
+    code, out = run_cli(
+        "node", "rename", "fr-password-reset", "fr-password-reset-flow",
+        "--repo-root", str(ROOT), "--spec-root", str(example.spec), "--git-root", str(example.host),
+    )
+    assert code == 0, out
+    example.drop_entries(lambda entry: entry.source == NFR)
+    by_alias = _attest_json(example, NFR, "--target", "fr-password-reset")["attested"]
+    assert [(link["field"], link["target"]) for link in by_alias] == [("constrains", "fr-password-reset-flow")]
+    assert _attest_json(example, NFR, "--target", "fr-password-reset-flow")["attested"] == by_alias
+    code, out = _attest(example, NFR, "--target", "fr-no-such-node")
+    assert code == 1 and out.startswith("E706") and "holds no link with target fr-no-such-node" in out and "any" not in out
+    code, out = _attest(example, NFR, "--field", "nope", "--target", "fr-password-reset")
+    assert code == 1 and "holds no link with field nope and target fr-password-reset" in out
+
+
 def test_attest_with_nothing_to_do_says_so_and_writes_nothing(example: Example) -> None:
     before = _lock_text(example)
     code, out = _attest(example, API, "--yes")
@@ -288,7 +305,7 @@ def _break_fr_file(example: Example) -> None:
     path.write_text("<<<<<<< ours\n" + path.read_text(encoding="utf-8") + "=======\n>>>>>>> theirs\n", encoding="utf-8")
 
 
-@pytest.mark.parametrize("argv", [["--prune"], ["--prune", "--dry-run"], [API, "--yes"], [API, "--dry-run"], ["--step", "05", "--yes"]])
+@pytest.mark.parametrize("argv", [["--prune"], ["--prune", "--dry-run"], [API, "--yes"], [API, "--yes", "--dry-run"], ["--step", "05", "--yes"]])
 def test_attest_that_writes_refuses_while_a_spec_file_cannot_be_read(example: Example, argv: list[str]) -> None:
     """B2: the entries of the links in the unreadable file look like orphans; ``--prune`` deleted them and the state could not be rebuilt."""
     example.edit_criterion()
@@ -299,15 +316,21 @@ def test_attest_that_writes_refuses_while_a_spec_file_cannot_be_read(example: Ex
     assert _lock_text(example) == before
 
 
-def test_attest_preview_of_a_node_still_works_with_an_unreadable_file(example: Example) -> None:
-    """The preview only prints, as ``stale`` does; every mode that plans a write (dry run included) is in ``test_unreadable_writers``."""
+@pytest.mark.parametrize("argv", [[API], [API, "--dry-run"], ["--step", "05"], ["--step", "05", "--dry-run"]])
+def test_attest_preview_prints_with_an_unreadable_file_bare_or_with_dry_run(example: Example, argv: list[str]) -> None:
+    """A preview writes nothing, so it prints (with the warning of ``run_on_graph``) in both spellings, as ``stale`` does."""
+    example.edit_criterion()
     _break_fr_file(example)
-    code, out = _attest(example, API)
-    assert code != 2 and "E520" not in out
+    before = _lock_text(example)
+    code, out = _attest(example, *argv)
+    assert code == 0 and "E520" not in out, out
+    assert out.splitlines()[0].startswith("specdev attest: could not read 04_fr_list.json"), out
+    assert "attest: " in out.split("\n", 1)[1]
+    assert _lock_text(example) == before
 
 
-def test_attest_builds_the_graph_under_the_write_lock_only_when_it_writes(example: Example, monkeypatch: pytest.MonkeyPatch) -> None:
-    """B10: a plan that is written is made from the graph read after the lock is taken."""
+def test_attest_previews_do_not_take_the_write_lock_and_writes_do(example: Example, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A preview and a dry run plan from the graph already built; ``--yes`` and ``--prune`` take the lock (its order: ``test_lockfile``)."""
     from specdev_tools.trace import commands
 
     calls: list[str] = []

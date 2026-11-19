@@ -17,16 +17,16 @@ from typing import Any
 
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.json_output import format_errors_json
-from specdev_tools.graph.commands import add_root_flags, print_json, run_on_graph, usage_error
+from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
 from specdev_tools.graph.gitview import read_seed_texts, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.queries import require_known_step
 from specdev_tools.trace import attest, coverage, replay, step_ready
 from specdev_tools.trace.history import OldTextResolver
-from specdev_tools.trace.id_write_commands import render_text as render_write, result_to_dict as write_to_dict
 from specdev_tools.trace.lockfile import Lock, locked_graph, read_lock, refuse_unreadable, write_lock
 from specdev_tools.trace.merge_driver import install_driver, merge_files
 from specdev_tools.trace.step_create import StepCreateRequest, create_step
+from specdev_tools.trace.write_report import render_text as render_write, result_to_dict as write_to_dict
 
 STALE_DESCRIPTION = (
     "Show what is still to be re-read after an upstream change: the suspect links (links whose target changed after "
@@ -55,7 +55,9 @@ ATTEST_DESCRIPTION = (
     "A node can be attested only when none of the nodes it links to is itself a suspect node: attest those first. "
     "Otherwise the node is refused (E764), exit 1; with --step the nodes that can be attested are, and the rest are "
     "listed. A node of a closed milestone is refused (E765). An unknown id is E706, a duplicate id E704, exit 1. While a spec "
-    "file cannot be read, --yes, --dry-run and --prune are refused (E520), exit 1, and nothing is written."
+    "file cannot be read, --yes (with or without --dry-run) and --prune (with or without --dry-run) are refused (E520), "
+    "exit 1, and nothing is written; a preview (no --yes), bare or with --dry-run, still prints, with a warning on stderr "
+    "that the answer may be incomplete."
 )
 
 LOCK_DESCRIPTION = (
@@ -63,7 +65,9 @@ LOCK_DESCRIPTION = (
     "Subcommands:\n"
     "  merge BASE OURS THEIRS PATH   The git merge driver: merge the three versions entry by entry and write the result\n"
     "                                to OURS; exit 0 merged, 1 left as a conflict (a version is not a valid lock). When\n"
-    "                                both sides changed one entry the older chain stamp wins, so the link stays suspect.\n"
+    "                                both sides changed one entry in different ways the entry the common ancestor had\n"
+    "                                is kept, or, when it had none, the entry with the smaller chain stamp (string order);\n"
+    "                                the link is suspect again when its target changed after the kept entry.\n"
     "  install-driver                Set the driver up in this clone: one line in .git/info/attributes and two\n"
     "                                'git config merge.specdev-trace-lock.*' keys; safe to run again. Git config is\n"
     "                                per clone, so run it once in each fresh clone."
@@ -76,11 +80,11 @@ STEP_DESCRIPTION = (
     "                           sub-items may be left out and are minted). The draft is checked against the step's\n"
     "                           schema, every link must resolve, and the lock gets an entry for every link. Prints each\n"
     "                           link target with its contract text. Refused (E767, exit 1) when the step already has a\n"
-    "                           file (edit it with `specdev json patch|insert|delete --id`) or is 13a or 16. Writes\n"
+    "                           file (edit it with `specdev json patch|insert|delete --id`) or is 13a or 16 to 16c. Writes\n"
     "                           nothing with --dry-run.\n"
     "  ready NN                 Exit 0 when step NN may start; exit 1 (E773) when a step above it is missing or has\n"
     "                           pending replay (a suspect link or a coverage gap), listing each blocker and the step to\n"
-    "                           replay first. An unknown step is E706, exit 1."
+    "                           write or replay first. An unknown step is E706, exit 1."
 )
 
 
@@ -175,7 +179,7 @@ class _View:
 
 
 def _view(args: argparse.Namespace, graph: Graph) -> _View:
-    spec_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.git_root)
+    spec_root, git_root = os.path.abspath(args.spec_root), resolve_git_root(args)
     return _View(graph, spec_root, git_root, os.path.abspath(args.repo_root), read_lock(spec_root), read_seed_texts(graph, git_root))
 
 
@@ -220,7 +224,8 @@ def _attest_flags_problem(args: argparse.Namespace) -> str | None:
 def _attest_prune(args: argparse.Namespace, graph: Graph) -> int:
     write = not args.dry_run
     with _locked_view(args, "attest --prune") if write else nullcontext(_view(args, graph)) as view:
-        refuse_unreadable(view.graph, "attest --prune")
+        if not write:
+            refuse_unreadable(view.graph, "attest --prune --dry-run")
         lock, dropped = attest.prune_orphans(view.graph, view.lock)
         if write and dropped:
             write_lock(view.spec_root, lock)
@@ -234,8 +239,8 @@ def _attest_prune(args: argparse.Namespace, graph: Graph) -> int:
 def _attest_links(args: argparse.Namespace, graph: Graph) -> int:
     write = args.yes and not args.dry_run
     with _locked_view(args, "attest --yes") if write else nullcontext(_view(args, graph)) as view:
-        if args.dry_run:
-            refuse_unreadable(view.graph, "attest --dry-run")
+        if args.dry_run and args.yes:
+            refuse_unreadable(view.graph, "attest --yes --dry-run")
         if args.step is not None:
             plan = attest.plan_step_attest(view.graph, view.lock, view.seed_texts, args.step)
         else:
@@ -274,7 +279,7 @@ def _step_create(args: argparse.Namespace, graph: Graph) -> int:
         graph,
         os.path.abspath(args.spec_root),
         os.path.abspath(args.repo_root),
-        os.path.abspath(args.git_root),
+        resolve_git_root(args),
         StepCreateRequest(args.step, args.draft),
         dry_run=args.dry_run,
     )
@@ -292,6 +297,7 @@ def run_step_create(args: argparse.Namespace) -> int:
 
 def _step_ready(args: argparse.Namespace, graph: Graph) -> int:
     require_known_step(graph, args.step)
+    refuse_unreadable(graph, "step ready")
     view = _view(args, graph)
     plan = replay.compute_replay(graph, view.lock, view.seed_texts)
     required = step_ready.required_spec_inputs(view.repo_root, args.step)
@@ -354,7 +360,7 @@ def run_lock_merge(args: argparse.Namespace) -> int:
 def run_lock_install_driver(args: argparse.Namespace) -> int:
     """Run ``specdev lock install-driver`` on the parsed *args*; returns the exit code."""
     try:
-        git_root = os.path.abspath(args.git_root)
+        git_root = resolve_git_root(args)
         result = install_driver(git_root, spec_path_in_repo(os.path.abspath(args.spec_root), git_root), args.driver_command)
     except FindingError as exc:
         return _report_finding(exc, "lock install-driver", args.json_output)

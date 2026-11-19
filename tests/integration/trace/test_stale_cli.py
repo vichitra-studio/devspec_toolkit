@@ -257,6 +257,7 @@ def test_diff_after_one_holder_of_the_root_was_attested_still_shows_the_change(h
     (diff,) = _diffs_of(host, CRITERION)
     assert diff["note"] is None and any(line.startswith("-text: Given a reset token") for line in diff["diff"])
     assert any(line.startswith("+text:") and line.endswith("#1") for line in diff["diff"])
+    assert "no root left" not in out  # links that have a root are not counted in the line about links that have none
     preview = run_cli("attest", ERR_HOLDER, "--repo-root", str(ROOT), "--spec-root", str(host.spec), "--git-root", str(host.host))[1]
     assert UNCHANGED_NOTE not in preview and "+text:" in preview
 
@@ -300,3 +301,16 @@ def test_upstream_links_with_no_root_left_say_the_change_was_already_accepted(ho
     note = "changed upstream with no root left: the change above was already accepted by the links that point at it"
     assert code == 0 and out.count(note) == 1 and "changed above" not in out, out
     assert note not in _stale(host)[1]
+
+
+def test_the_holders_of_a_closed_milestone_are_not_a_version_of_the_root_to_diff_against(host: Example) -> None:
+    """A closed milestone's links are outside replay: the version they stored is not offered as an accepted version."""
+    host.close_milestone()
+    _commit(host, "milestone closed")
+    _set_criterion_text(host, " #1")
+    for step in ("05", "06", "07", "08", "09", "11", "14", "15", "16a"):
+        run_cli("attest", "--step", step, "--yes", "--repo-root", str(ROOT), "--spec-root", str(host.spec), "--git-root", str(host.host))
+    _set_criterion_text(host, " #2")
+    (diff,) = _diffs_of(host, CRITERION)
+    assert diff["accepted_by"] == [] and any(line.startswith("-text:") and line.endswith("#1") for line in diff["diff"])
+    assert [line for line in diff["diff"] if line.startswith("-text:")] and all(line.endswith("#1") for line in diff["diff"] if line.startswith("-text:"))

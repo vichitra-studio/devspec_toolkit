@@ -16,12 +16,12 @@ import os
 from collections.abc import Sequence
 
 from specdev_tools.core.toolkit_root import detect_toolkit_root
-from specdev_tools.graph.commands import add_root_flags, print_json, run_on_graph
+from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import ACTIONS, WriteRequest, execute_write
 from specdev_tools.trace.write_report import render_text, result_to_dict
 
-__all__ = ["ID_FLAGS", "build_id_write_parser", "is_id_write", "render_text", "result_to_dict", "run_id_write"]
+__all__ = ["ID_FLAGS", "build_id_write_parser", "is_id_write", "run_id_write"]
 
 ID_FLAGS = ("--id", "--step")
 ID_WRITE_DESCRIPTION = (
@@ -96,7 +96,7 @@ def _write(args: argparse.Namespace, graph: Graph) -> int:
         graph,
         os.path.abspath(args.spec_root),
         os.path.abspath(args.repo_root),
-        os.path.abspath(args.git_root),
+        resolve_git_root(args),
         _request_of(args),
         dry_run=args.dry_run,
     )

@@ -26,7 +26,8 @@ class ComputedView:
     """One computed view: its DOC wording, the ``names`` that may not be stored, where, and how to compute it.
 
     ``scope`` is the node kinds the names are rejected on; ``None`` means every node.  ``reason`` is non-empty exactly
-    when ``names`` is empty: why no name is enforced.
+    when ``names`` is empty: why no name is enforced.  ``remedy`` is the whole sentence that says what to do with a stored
+    name when there is no command that computes it (then ``source`` is empty).
     """
 
     view: str
@@ -34,6 +35,7 @@ class ComputedView:
     scope: tuple[str, ...] | None
     source: str
     reason: str = ""
+    remedy: str = ""
 
 
 COMPUTED_VIEWS: tuple[ComputedView, ...] = (
@@ -70,12 +72,15 @@ COMPUTED_VIEWS: tuple[ComputedView, ...] = (
         "content hash and chain stamp",
         ("content_hash", "chain_stamp"),
         None,
-        "the toolkit, from the node's text (the value is computed; it is not stored in a spec file)",
+        "",
+        remedy="remove it; the content hash and the chain stamp are computed from the node's text and are kept in the trace lock, not in a spec file",
     ),
 )
 
 
 def _message(node: Node, name: str, view: ComputedView) -> str:
+    if view.remedy:
+        return f"{node.id} ({node.kind}) stores '{name}', which is computed ({view.view}). {view.remedy[0].upper()}{view.remedy[1:]}"
     return (
         f"{node.id} ({node.kind}) stores '{name}', which is computed ({view.view}); "
         f"remove it and compute it with {view.source}"

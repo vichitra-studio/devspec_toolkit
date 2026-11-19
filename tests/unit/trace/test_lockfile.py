@@ -14,11 +14,13 @@ from specdev_tools.core.constants import TRACE_LOCK_FILENAME
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.loaders import iter_spec_artifacts
 from specdev_tools.core.schema_validate import validate_data_against_schema
+from specdev_tools.trace import lockfile
 from specdev_tools.trace.lockfile import (
     Lock,
     LockEntry,
     LockError,
     lock_path,
+    locked_graph,
     parse_lock,
     read_lock,
     serialise_lock,
@@ -229,4 +231,28 @@ def test_advisory_lock_blocks_second_writer(tmp_path: Path) -> None:
         holder.stdin.close()
         holder.wait(timeout=30)
     with with_write_lock(str(tmp_path)):
+        pass
+
+
+def test_locked_graph_builds_the_graph_while_the_lock_is_held(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A write plans from the graph read AFTER the lock is taken: at the moment of the build a second writer is E769, and after the block it is free."""
+    from unit.graph._synth import copy_example
+
+    spec = copy_example(tmp_path / "spec")
+    seen: list[str] = []
+    real = lockfile.build_graph
+
+    def spy(spec_root: str, repo_root: str) -> object:
+        try:
+            with with_write_lock(spec_root):
+                seen.append("free")
+        except LockError as exc:
+            seen.append(exc.error.code)
+        return real(spec_root, repo_root)
+
+    monkeypatch.setattr(lockfile, "build_graph", spy)
+    with locked_graph(str(spec), str(ROOT), "test"):
+        pass
+    assert seen == ["E769"]
+    with with_write_lock(str(spec)):
         pass

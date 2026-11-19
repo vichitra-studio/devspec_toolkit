@@ -25,6 +25,8 @@ from typing import Any
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME, resolve_extras_path
 from specdev_tools.core.errors import FindingError, make_error
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.model import Graph
 
 LOCK_SCHEMA_URI = "vc:extras:trace-lock"
 LOCK_VERSION = 1
@@ -267,7 +269,7 @@ def with_write_lock(spec_dir: str) -> Iterator[None]:
         os.close(descriptor)
 
 
-def refuse_unreadable(graph: Any, what: str) -> None:
+def refuse_unreadable(graph: Graph, what: str) -> None:
     """Raise a ``FindingError`` (E520) naming the spec files that could not be read, for a write *what* that plans from *graph*.
 
     A file that cannot be read gives no nodes, so the links it holds are not in the graph: a rename could not rewrite
@@ -285,19 +287,30 @@ def refuse_unreadable(graph: Any, what: str) -> None:
 
 
 @contextmanager
-def locked_graph(spec_root: str, repo_root: str, what: str | None = None) -> Iterator[Any]:
+def locked_graph(spec_root: str, repo_root: str, what: str) -> Iterator[Graph]:
     """Hold the write lock of *spec_root* and yield the graph built under it (the files as they are when written).
 
-    The one place of the write skeleton: a write plans from the graph built after the lock is taken, so a file changed
-    by another process between the caller's own read and the lock is not planned from stale text.  Raises
-    ``LockError`` (E769) when another write holds the lock, and E520 (``refuse_unreadable``, *what* names the command)
-    when a spec file cannot be read.  *what* is ``None`` for a write that does not plan from the links of other files
-    (``node status`` sets one field of one node), which is not refused for an unreadable file.
+    A write plans from the graph built after the lock is taken, so a file changed by another process between the
+    caller's own read and the lock is not planned from stale text.  Raises ``LockError`` (E769) when another write
+    holds the lock, and E520 (``refuse_unreadable``, *what* names the command) when a spec file cannot be read.
     """
-    from specdev_tools.graph.build import build_graph  # local: the graph package does not import the trace package
-
     with with_write_lock(spec_root):
         graph = build_graph(spec_root, repo_root)
-        if what is not None:
-            refuse_unreadable(graph, what)
+        refuse_unreadable(graph, what)
         yield graph
+
+
+@contextmanager
+def writing_graph(graph: Graph | None, spec_root: str, repo_root: str, what: str, *, write: bool) -> Iterator[Graph]:
+    """The one write skeleton: yield the graph a write *what* plans from.
+
+    For a write (*write* true) the graph is built under the write lock (``locked_graph``).  For a dry run it is the
+    caller's *graph* (built here when ``None``), refused when a spec file cannot be read, and no lock is taken.
+    """
+    if write:
+        with locked_graph(spec_root, repo_root, what) as built:
+            yield built
+        return
+    known = graph if graph is not None else build_graph(spec_root, repo_root)
+    refuse_unreadable(known, what)
+    yield known

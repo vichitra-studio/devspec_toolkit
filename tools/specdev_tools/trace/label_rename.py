@@ -19,13 +19,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from typing import Any
 
-from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.queries import unknown_node_error
 from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.trace.lockfile import locked_graph, refuse_unreadable
+from specdev_tools.trace.lockfile import writing_graph
 from specdev_tools.trace.rename import FileEdit, FileEditor, jq_key, refuse, write_edits
 
 TERM_KIND = "term"
@@ -186,11 +185,8 @@ def rename_label(
             unchanged, or an edit that adds a schema violation.
         LockError: E769 when another specdev write is running.
     """
-    if not apply:
-        known = graph if graph is not None else build_graph(spec_dir, repo_root)
-        refuse_unreadable(known, "node rename --label")
-        return _plan(known, spec_dir, repo_root, term_id, new_label)[0]
-    with locked_graph(spec_dir, repo_root, "node rename --label") as built:
-        result, edits = _plan(built, spec_dir, repo_root, term_id, new_label)
-        write_edits(spec_dir, edits)
-    return replace(result, written=True)
+    with writing_graph(graph, spec_dir, repo_root, "node rename --label", write=apply) as planned:
+        result, edits = _plan(planned, spec_dir, repo_root, term_id, new_label)
+        if apply:
+            write_edits(spec_dir, edits)
+    return replace(result, written=True) if apply else result

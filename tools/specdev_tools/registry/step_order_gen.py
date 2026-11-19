@@ -43,12 +43,11 @@ Pair = tuple[str, str]  # (holder step, target step): the holder requires the ta
 
 _NOTES = {
     "status_write_exemptions": (
-        "policy.status_write_exemptions maps a step to field paths whose change alone does not "
-        "count as a change of that step in forward replay. No code reads it since file-level forward replay "
-        "was retired; the key stays until the legacy shim goes. Entries 09 and 14 (milestones[].status) name a field "
+        "policy.status_write_exemptions maps a step to field paths whose change alone did not "
+        "count as a change of that step in forward replay. No code reads the key (only the generator checks its shape); "
+        "it stays until the legacy shim goes. Entries 09 and 14 (milestones[].status) name a field "
         "no 1.2.0 schema has and do nothing on a 1.2.0 spec; they serve 1.1.1-shaped specs. "
-        "Entry 16 (plan.milestone_index[].status) is the status of the step 16 anchor row, which "
-        "1.2.0 keeps, and is live."
+        "Entry 16 (plan.milestone_index[].status) names a field 1.2.0 keeps: the status of the step 16 anchor row."
     ),
     "downstream_consumers": (
         "Records which steps actively consume each step's output. Read by 'specdev prompt-context', the context loaders, "

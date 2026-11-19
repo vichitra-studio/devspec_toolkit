@@ -18,7 +18,7 @@ from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.check import run_graph_check
-from ..graph.gitview import read_seed_texts
+from ..graph.gitview import host_root_of, read_seed_texts
 from ..graph.model import Graph
 from ..graph.ownership import stamp_file_owner, step_for_file
 from ..trace.computed_fields import check_stored_computed
@@ -318,7 +318,7 @@ def _run_checks(
     # --- 8. Seed lint ---
     # project_root must be computed before the gate so the manifest-existence
     # check can use it.  It is also passed to lint_seeds when the gate is True.
-    project_root = os.path.dirname(spec_dir) if git_root is None else git_root
+    project_root = host_root_of(spec_dir, git_root)
     seed_applicable = os.path.exists(
         os.path.join(project_root, "spec", "common", "seed_manifest.json")
     )

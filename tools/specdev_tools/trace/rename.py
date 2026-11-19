@@ -32,18 +32,17 @@ from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.kinds import RECORD_ROLE, SEED_KIND, KindDecl
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
-from specdev_tools.graph.queries import unknown_node_error
+from specdev_tools.graph.queries import article, unknown_node_error
 from specdev_tools.graph.resolve import HISTORY_FIELDS, resolve_graph
 from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import (
     Lock,
     LockEntry,
     LockError,
-    locked_graph,
     read_lock,
-    refuse_unreadable,
     replace_file_atomically,
     write_lock,
+    writing_graph,
 )
 
 ALIASES_KEY = "aliases"
@@ -176,14 +175,10 @@ def _node_to_rename(graph: Graph, old_id: str) -> Node:
     if node.kind == SEED_KIND:
         raise refuse(f"{node.id!r} is a seed; a seed id is the key of its manifest entry and is changed in the seed manifest")
     if node.role == RECORD_ROLE:
-        raise refuse(f"{node.id!r} is {_article(node.kind)} {node.kind}, which is a record written by the toolkit, and a record is not renamed")
+        raise refuse(f"{node.id!r} is {article(node.kind)} {node.kind}, which is a record written by the toolkit, and a record is not renamed")
     if decl is None or decl.map_keyed or decl.id_field is None:
-        raise refuse(f"{node.id!r} is {_article(node.kind)} {node.kind}, whose id is the key of a map; it is not renamed by id")
+        raise refuse(f"{node.id!r} is {article(node.kind)} {node.kind}, whose id is the key of a map; it is not renamed by id")
     return node
-
-
-def _article(noun: str) -> str:
-    return "an" if noun[:1].lower() in "aeiou" else "a"
 
 
 def _check_new_id(graph: Graph, node: Node, new_id: str) -> None:
@@ -357,11 +352,8 @@ def rename_node(
             new id, a new id that a node or an alias already has, or an edit that adds a schema violation or a finding.
         LockError: E769 when another specdev write is running, E760 when the lock cannot be read.
     """
-    if not apply:
-        known = graph if graph is not None else build_graph(spec_dir, repo_root)
-        refuse_unreadable(known, "node rename")
-        return _result(_plan_rename(known, spec_dir, repo_root, old_id, new_id), written=False)
-    with locked_graph(spec_dir, repo_root, "node rename") as built:
-        plan = _plan_rename(built, spec_dir, repo_root, old_id, new_id)
-        write_edits(spec_dir, plan.edits, plan.lock, plan.old_lock)
-    return _result(plan, written=True)
+    with writing_graph(graph, spec_dir, repo_root, "node rename", write=apply) as planned:
+        plan = _plan_rename(planned, spec_dir, repo_root, old_id, new_id)
+        if apply:
+            write_edits(spec_dir, plan.edits, plan.lock, plan.old_lock)
+    return _result(plan, written=apply)

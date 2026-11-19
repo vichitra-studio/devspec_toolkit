@@ -72,7 +72,22 @@ def test_not_ready_when_upstream_artifact_absent(host: Example) -> None:
     document = _ready_json(host, "07", code=1)
     assert [(b["step"], b["reason"]) for b in document["blockers"]] == [("05", "missing")]
     assert document["replay_first"] == "05"
-    assert "  step 05: no spec file yet" in _ready(host, "07")[1]
+    code, out = _ready(host, "07")
+    assert "  step 05: no spec file yet" in out
+    assert "\nwrite step 05 first\n" in out and "; write step 05 first" in out and "replay step" not in out
+
+
+def test_ready_refuses_while_an_upstream_spec_file_cannot_be_read(host: Example) -> None:
+    """The unreadable file gives no nodes, so nothing points at a suspect node and the file name exists: the gate must not say ready."""
+    path = host.spec / "04_fr_list.json"
+    path.write_text("<<<<<<< ours\n" + path.read_text(encoding="utf-8") + "=======\n>>>>>>> theirs\n", encoding="utf-8")
+    code, out = _ready(host, "05")
+    assert code == 1 and "E520" in out and "04_fr_list.json cannot be read" in out and "step ready refused" in out, out
+    assert "step 05: ready" not in out
+    status, text = run_cli("step", "ready", "05", *_flags(host), "--json")
+    assert status == 1 and '"ready": true' not in text and '"E520"' in text
+    # the reading commands keep printing, with their warning
+    assert run_cli("stale", *_flags(host))[0] == 0
 
 
 def test_link_target_step_not_in_required_spec_inputs_still_blocks(host: Example, tmp_path: Path) -> None:

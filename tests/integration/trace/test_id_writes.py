@@ -285,7 +285,8 @@ def test_refuses_payload_with_hash_or_pin_fields(host: Path) -> None:
         assert status == 1 and out.startswith("E768"), (case, out)
     assert _snapshot(host) == before
     status, out = _run(host, "patch", "--id", FR, ".content_hash", '"sha256:aa"')
-    assert f"the write to {FR} stores 'content_hash'" in out and "not stored in a spec file" in out and "attest" not in out, out
+    assert f"the write to {FR} stores 'content_hash'" in out and "kept in the trace lock, not in a spec file" in out and "attest" not in out, out
+    assert "compute it with" not in out, out
 
 
 def test_wrong_kind_target_refused_with_candidates_hint(host: Path) -> None:
@@ -307,6 +308,22 @@ def test_plan_item_link_write_by_id(host: Path) -> None:
     assert realises == ["tc-confirm-expired-token", "tc-confirm-reused-token"]
     assert (PLAN_ITEM, "realises", "tc-confirm-reused-token") in _lock_keys(host)
     assert result["targets"][0]["target"] == "tc-confirm-reused-token" and "HTTP 410" in result["targets"][0]["text"]
+
+
+def test_insert_creates_the_first_item_of_an_array_field_the_schema_declares(host: Path) -> None:
+    assert "assumes" not in _item(host, FR_FILE, "functional_requirements", "fr_id", FR_REQUEST)
+    result = _json(host, "insert", "--id", FR_REQUEST, ".assumes", '"asm-member-controls-email"')
+    assert result["written"] is True
+    assert _item(host, FR_FILE, "functional_requirements", "fr_id", FR_REQUEST)["assumes"] == ["asm-member-controls-email"]
+    assert (FR_REQUEST, "assumes", "asm-member-controls-email") in _lock_keys(host)
+    assert graph_check(host / "spec")["status"] == "PASS"
+
+
+def test_insert_into_a_field_the_schema_does_not_have_is_refused_naming_the_field(host: Path) -> None:
+    before = _snapshot(host)
+    status, out = _run(host, "insert", "--id", FR_REQUEST, ".nope", '"x"')
+    assert status == 1 and out.startswith("E767") and "nope" in out and "jq" not in out
+    assert _snapshot(host) == before
 
 
 def test_classic_jq_path_forms_unchanged(host: Path, tmp_path: Path) -> None:
@@ -418,7 +435,9 @@ def test_delete_that_adds_a_violation_is_still_refused_beside_an_old_one(host: P
     _write_doc(host, FR_FILE, document)
     before = _snapshot(host)
     status, out = _run(host, "delete", "--id", FR)  # leaves one FR: the list's minItems is a violation the delete adds
-    assert status == 1 and out.startswith("E767") and "minItems" in out or "non-empty" in out or "too short" in out, out
+    assert status == 1 and out.startswith("E767") and ("fewer items than the schema requires" in out or "non-empty" in out or "too short" in out), out
+    assert "acceptance_criteria" not in out and "bogus" not in out  # the old violation's path is not reported
+    assert len(out) < 400, out  # the whole array is not quoted
     assert _snapshot(host) == before
 
 
@@ -453,3 +472,10 @@ def test_insert_into_a_map_keyed_collection_is_refused_with_a_message_that_says_
     assert "E767" in out and ".environments is a map keyed by id" in out and "does not add to a map" in out, out
     assert "no node collection" not in out and "specdev json patch --id" not in out
     assert (host / "spec" / "02a_delivery_baseline.json").read_text(encoding="utf-8") == before
+
+
+def test_the_collections_listed_for_a_step_are_spelt_as_the_command_takes_them(host: Path) -> None:
+    status, out = _run(host, "insert", "--step", "02a", ".nope", "{}")
+    assert status == 1 and out.startswith("E767"), out
+    listed = out.split("its collections:")[1]
+    assert ".environments (environment, map: not added by this command)" in listed and ".environments{}" not in listed

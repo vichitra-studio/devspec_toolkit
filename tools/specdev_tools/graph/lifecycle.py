@@ -12,9 +12,11 @@ from pathlib import Path
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import json_delete, json_patch
+from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
 from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node
-from specdev_tools.trace.lockfile import locked_graph
+from specdev_tools.graph.queries import article
+from specdev_tools.trace.lockfile import with_write_lock
 
 LIFECYCLE_KEY = "lifecycle"
 NOT_APPLICABLE_GUIDANCE = (
@@ -41,10 +43,6 @@ def _refuse(message: str, *, unknown_id: bool = False) -> LifecycleRefusedError:
     return LifecycleRefusedError(make_error("E705", message), unknown_id=unknown_id)
 
 
-def _article(word: str) -> str:
-    return "an" if word[:1].lower() in "aeiou" else "a"
-
-
 def _node_to_change(graph: Graph, node_id: str) -> Node:
     """The node *node_id* names (an id or an alias), or E705 when it cannot take a lifecycle; an unknown id is marked as such."""
     node = graph.find(node_id)
@@ -55,7 +53,7 @@ def _node_to_change(graph: Graph, node_id: str) -> Node:
     if node.kind == SEED_KIND:
         raise _refuse(f"{node.id!r} is a seed, and a seed has no lifecycle")
     if not has_lifecycle(node.kind, node.role):
-        raise _refuse(f"{node.id!r} is {_article(node.kind)} {node.kind}, which is a record, and a record has no lifecycle")
+        raise _refuse(f"{node.id!r} is {article(node.kind)} {node.kind}, which is a record, and a record has no lifecycle")
     return node
 
 
@@ -96,7 +94,8 @@ def set_lifecycle(graph: Graph, spec_root: str, repo_root: str, node_id: str, va
     change = plan_lifecycle_change(graph, node_id, value)
     if change.old == change.new:
         return change
-    with locked_graph(spec_root, repo_root) as built:
+    with with_write_lock(spec_root):
+        built = build_graph(spec_root, repo_root)
         change = plan_lifecycle_change(built, node_id, value)
         if change.old != change.new:
             apply_lifecycle_change(spec_root, repo_root, change)

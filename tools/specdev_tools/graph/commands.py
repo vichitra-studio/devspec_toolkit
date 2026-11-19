@@ -24,6 +24,7 @@ from specdev_tools.graph import queries, recipes, trace
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.diff import diff_refs, diff_to_dict
 from specdev_tools.graph.diff import render_text as diff_text
+from specdev_tools.graph.gitview import host_root_of
 from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, LifecycleChange, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, Graph
 from specdev_tools.trace.label_rename import LabelRenameResult, rename_label
@@ -56,8 +57,17 @@ def add_root_flags(parser: argparse.ArgumentParser) -> None:
     """The flags every graph command takes, so the three-flag default of CLAUDE.md never fails."""
     parser.add_argument("--repo-root", default=".", help="Toolkit root (schema, registry, canon); default '.', or the toolkit submodule found below it")
     parser.add_argument("--spec-root", default="./spec", help="Spec directory of the project (default ./spec)")
-    parser.add_argument("--git-root", default=".", help="Host repository root, used by the commands that read git history (default '.')")
+    parser.add_argument(
+        "--git-root",
+        default=None,
+        help="Host repository root: where seed documents and git history are read (default: the folder that holds --spec-root)",
+    )
     parser.add_argument("--json", action="store_true", dest="json_output", help="Print JSON instead of text")
+
+
+def resolve_git_root(args: argparse.Namespace) -> str:
+    """The host root of the parsed *args*: ``--git-root`` when given, else the folder that holds ``--spec-root`` (the one rule, ``host_root_of``)."""
+    return host_root_of(args.spec_root, args.git_root)
 
 
 # --- parsers --------------------------------------------------------------------------------------------------------
@@ -412,7 +422,7 @@ def _recipe_flags_problem(args: argparse.Namespace) -> str | None:
 
 
 def _trace_pack(args: argparse.Namespace, graph: Graph) -> int:
-    git = recipes.GitContext(os.path.abspath(args.git_root), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.since)
+    git = recipes.GitContext(resolve_git_root(args), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.since)
     pack = recipes.build_pack(graph, recipes.load_recipes(os.path.abspath(args.repo_root)), args.recipe, args.id, expand=args.expand, git=git)
     if args.json_output:
         print_json(recipes.pack_to_dict(pack))
@@ -448,7 +458,7 @@ def run_diff(args: argparse.Namespace) -> int:
 
     def action() -> int:
         result = diff_refs(
-            args.ref_a, args.ref_b, os.path.abspath(args.git_root), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
+            args.ref_a, args.ref_b, resolve_git_root(args), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
         )
         if args.json_output:
             print_json(diff_to_dict(result))

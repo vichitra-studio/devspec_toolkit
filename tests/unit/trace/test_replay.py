@@ -214,3 +214,30 @@ def test_a_lock_with_no_entry_for_the_root_gives_no_earlier_version(example: Exa
     assert plan.steps
     (diff,) = root_diffs(graph, kept, plan, seeds, _FixedResolver(OldText(("x",))))  # type: ignore[arg-type]
     assert (diff.root, diff.diff, diff.note) == (CRITERION, (), "no earlier version found")
+
+
+class _RecordingResolver:
+    """Remembers the entries it was asked about and answers with no text."""
+
+    def __init__(self) -> None:
+        self.asked: list[LockEntry] = []
+
+    def old_text(self, entry: LockEntry) -> OldText:
+        self.asked.append(entry)
+        return OldText(None, NOTE_BASELINE)
+
+
+def test_the_diff_is_recovered_from_an_entry_that_is_not_a_baseline_marker(example: Example) -> None:
+    """Entries of one stored hash: a baseline entry has no recoverable text, so the first entry that is not one is asked, whatever the lock order."""
+    example.edit_item(CRITERION, _add_term)
+    entries = list(example.lock().entries)
+    first = next(index for index, entry in enumerate(entries) if entry.target == CRITERION)
+    entries[first] = LockEntry(*entries[first].key, entries[first].content_hash, entries[first].chain_stamp, baseline=True)
+    graph = example.graph()
+    seeds = example.seed_texts(graph)
+    lock = Lock(tuple(entries))
+    plan = compute_replay(graph, lock, seeds)
+    resolver = _RecordingResolver()
+    root_diffs(graph, lock, plan, seeds, resolver)  # type: ignore[arg-type]
+    assert [entry.baseline for entry in resolver.asked] == [False] and resolver.asked[0].target == CRITERION
+    assert resolver.asked[0].key != entries[first].key

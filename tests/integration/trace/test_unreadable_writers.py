@@ -30,7 +30,7 @@ WRITERS = {
     "rename-label": ["node", "rename", "--label", TERM, "Reset code"],
     "rename-label-dry-run": ["node", "rename", "--label", TERM, "Reset code", "--dry-run"],
     "attest-yes": ["attest", API, "--yes"],
-    "attest-dry-run": ["attest", API, "--dry-run"],
+    "attest-dry-run": ["attest", API, "--yes", "--dry-run"],
     "attest-prune": ["attest", "--prune"],
     "attest-prune-dry-run": ["attest", "--prune", "--dry-run"],
 }

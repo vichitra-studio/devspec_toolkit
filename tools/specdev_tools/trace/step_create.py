@@ -20,7 +20,7 @@ from specdev_tools.core.schema_validate import SchemaValidationError, schema_vio
 from specdev_tools.graph.kinds import FileDecl, load_kind_registry
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import WriteRefusedError, WriteResult, with_ids, write_new_file
-from specdev_tools.trace.lockfile import locked_graph, refuse_unreadable
+from specdev_tools.trace.lockfile import writing_graph
 from specdev_tools.validation.linter_utils import graph_known_ids
 
 ANCHOR_STEP = "16"
@@ -129,8 +129,5 @@ def create_step(graph: Graph, spec_root: str, repo_root: str, git_root: str, req
             resolve; nothing is written).
         LockError: E769 when another specdev write holds the lock; E760 when the lock file cannot be read.
     """
-    if dry_run:
-        refuse_unreadable(graph, "step create")
-        return _create_on(graph, spec_root, repo_root, git_root, request, write=False)
-    with locked_graph(spec_root, repo_root, "step create") as built:
-        return _create_on(built, spec_root, repo_root, git_root, request, write=True)
+    with writing_graph(graph, spec_root, repo_root, "step create", write=not dry_run) as planned:
+        return _create_on(planned, spec_root, repo_root, git_root, request, write=not dry_run)
