@@ -28,6 +28,8 @@ Shape = Literal["unified", "legacy"]
 STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_[^/]*\.json$")
 PLAN_DIR = "impl_context"
 PLAN_FILE_GLOB = "ms_*_plan.json"
+PLAN_FILE_RE = re.compile(fnmatch.translate(PLAN_FILE_GLOB))
+"""The plan file pattern as a regex, derived from ``PLAN_FILE_GLOB`` (match a bare file name with ``.match``)."""
 ANCHOR_STEP = "16"
 SILENT_MARKER = "silent"
 _RESOLVED = "resolved"
@@ -50,6 +52,9 @@ LOCATIONS: tuple[AmbiguityLocation, ...] = (
     AmbiguityLocation("16a", ".plan.ambiguities", True),
     AmbiguityLocation("16b", ".execution.emergent_ambiguities", True),
 )
+
+PLAN_ITEM_STEPS: frozenset[str] = frozenset(loc.step for loc in LOCATIONS if loc.in_plan_file)
+"""The steps whose items live in a milestone plan file (``16a`` and ``16b``; the anchor's ``16`` is a step file)."""
 
 
 class AmbiguityReadError(ValueError):
@@ -90,6 +95,24 @@ class AmbiguityItem:
         value = self.raw.get("id")
         return value if isinstance(value, str) else ""
 
+    @property
+    def description(self) -> str:
+        """The item description, ``""`` when it has none."""
+        value = self.raw.get("description")
+        return value if isinstance(value, str) else ""
+
+    @property
+    def decision(self) -> str | None:
+        """The recorded answer as authored, ``None`` when it is absent or blank (the item still needs an answer)."""
+        value = self.raw.get("decision")
+        return value if isinstance(value, str) and value.strip() else None
+
+    @property
+    def about_ids(self) -> tuple[str, ...]:
+        """The ``about`` ids that are strings, in order (``()`` for a legacy item); ``about_targets`` adds the silent-spec reading."""
+        about = self.raw.get("about")
+        return tuple(a for a in about if isinstance(a, str)) if isinstance(about, list) else ()
+
 
 def shape_of(raw: dict[str, Any]) -> Shape:
     """``unified`` when *raw* has ``about`` and no ``severity``, else ``legacy``."""
@@ -111,8 +134,7 @@ def about_targets(item: AmbiguityItem) -> tuple[str | SilentTarget, ...]:
     With a ``missing_kind`` the ``about`` ids name the parent that should hold the missing node, so the result is the
     single ``("silent", missing_kind, about[0])`` target.  A legacy item has no ``about`` and gives ``()``.
     """
-    raw_about = item.raw.get("about")
-    about = tuple(a for a in raw_about if isinstance(a, str)) if isinstance(raw_about, list) else ()
+    about = item.about_ids
     missing_kind = item.raw.get("missing_kind")
     if isinstance(missing_kind, str) and missing_kind and about:
         return (SilentTarget(SILENT_MARKER, missing_kind, about[0]),)
@@ -126,11 +148,13 @@ def _step_of_file(name: str) -> str | None:
 
 
 def _load(path: str) -> dict[str, Any]:
-    """Load one artifact; raises ``AmbiguityReadError`` when it is not readable JSON."""
+    """Load one artifact; raises ``AmbiguityReadError`` when it is not readable JSON or not readable at all."""
     try:
         return load_json_artifact(path)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise AmbiguityReadError(path, f"not readable JSON ({exc})") from exc
+    except OSError as exc:
+        raise AmbiguityReadError(path, exc.strerror or str(exc)) from exc
 
 
 def _array_at(doc: dict[str, Any], array_path: str) -> Any:
@@ -170,7 +194,7 @@ def _plan_files(spec_dir: str) -> list[str]:
     plan_dir = os.path.join(spec_dir, PLAN_DIR)
     if not os.path.isdir(plan_dir):
         return []
-    return [os.path.join(plan_dir, n) for n in sorted(os.listdir(plan_dir)) if fnmatch.fnmatch(n, PLAN_FILE_GLOB)]
+    return [os.path.join(plan_dir, n) for n in sorted(os.listdir(plan_dir)) if PLAN_FILE_RE.match(n)]
 
 
 def iter_ambiguity_items(spec_dir: str) -> Iterator[AmbiguityItem]:
@@ -191,3 +215,24 @@ def iter_ambiguity_items(spec_dir: str) -> Iterator[AmbiguityItem]:
         doc = _load(path)
         for location in plan_locations:
             yield from _items_in(path, doc, location)
+
+
+class ItemsRead(NamedTuple):
+    """What ``read_ambiguity_items`` found: the items read, and the read error that ended the list (``None`` when it was complete)."""
+
+    items: tuple[AmbiguityItem, ...]
+    error: AmbiguityReadError | None
+
+
+def read_ambiguity_items(spec_dir: str) -> ItemsRead:
+    """Every ambiguity item of *spec_dir* up to the first file the reader cannot read, and that read error.
+
+    The items are those of ``iter_ambiguity_items``; a run that reads them once passes this result to each consumer
+    instead of reading the folder again.
+    """
+    items: list[AmbiguityItem] = []
+    try:
+        items.extend(iter_ambiguity_items(spec_dir))
+    except AmbiguityReadError as error:
+        return ItemsRead(tuple(items), error)
+    return ItemsRead(tuple(items), None)

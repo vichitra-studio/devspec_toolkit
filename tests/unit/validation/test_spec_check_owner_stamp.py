@@ -10,8 +10,14 @@ import pytest
 
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.graph.ownership import OwnerContext, OwnershipRow
-from specdev_tools.validation import spec_check
-from specdev_tools.validation.spec_check import CheckContext, CheckSpec, _with_default_owner, run_registered_checks
+from specdev_tools.validation import check_registry
+from specdev_tools.validation.check_registry import (
+    CheckContext,
+    CheckSpec,
+    _with_default_owner,
+    register_check,
+    run_registered_checks,
+)
 
 from ..trace._lock_support import EXAMPLE_HOST
 
@@ -67,9 +73,9 @@ def test_the_run_follows_the_table_it_is_given_as_data(
     shutil.copytree(EXAMPLE_HOST, host)
     finding = make_error("E607", "drift")
     registry: list[CheckSpec] = []
-    monkeypatch.setattr(spec_check, "CHECK_REGISTRY", registry)
-    spec_check.register_check("table-probe", lambda _ctx: {"status": "FAIL", "errors": [finding]}, default_owner=DEFAULT)
-    ctx = CheckContext(str(ROOT), str(host / "spec"))
+    monkeypatch.setattr(check_registry, "CHECK_REGISTRY", registry)
+    register_check("table-probe", lambda _ctx: {"status": "FAIL", "errors": [finding]}, default_owner=DEFAULT)
+    ctx = CheckContext(repo_root=str(ROOT), spec_dir=str(host / "spec"))
     ctx.owner_context = _context(rule, "E607")
     checks: OrderedDict[str, dict[str, Any]] = run_registered_checks(ctx)
     assert [error.owner for error in checks["table-probe"]["errors"]] == [owner]

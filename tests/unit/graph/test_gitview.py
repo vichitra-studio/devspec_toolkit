@@ -5,7 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from specdev_tools.graph.gitview import GitViewError, commits_touching, is_shallow_repository, read_seed_texts, read_seed_texts_at
+from specdev_tools.graph.gitview import (
+    GitViewError,
+    commits_touching,
+    git_top_level,
+    is_shallow_repository,
+    path_exists_at,
+    read_seed_texts,
+    read_seed_texts_at,
+    relative_inside,
+    spec_path_in_repo,
+)
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node
 
@@ -83,3 +93,48 @@ def test_read_seed_texts_at_unknown_ref_is_e708(repo: Path) -> None:
     with pytest.raises(GitViewError) as raised:
         read_seed_texts_at("no-such-ref", str(repo), graph)
     assert raised.value.error.code == "E708"
+
+
+def test_git_top_level_of_a_nested_folder_is_the_repository_top(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    nested = tmp_path / "a" / "b"
+    nested.mkdir(parents=True)
+    assert git_top_level(str(nested)) == str(tmp_path.resolve())
+
+
+def test_git_top_level_is_none_outside_a_repository_and_for_a_missing_folder(tmp_path: Path) -> None:
+    assert git_top_level(str(tmp_path)) is None
+    assert git_top_level(str(tmp_path / "missing")) is None
+
+
+def test_relative_inside_answers_the_path_below_the_root_or_none(tmp_path: Path) -> None:
+    (tmp_path / "root" / "sub").mkdir(parents=True)
+    root = str(tmp_path / "root")
+    assert relative_inside(root, str(tmp_path / "root" / "sub")) == "sub"
+    assert relative_inside(root, root) == "."
+    assert relative_inside(root, str(tmp_path / "other")) is None
+    assert relative_inside(root, str(tmp_path / "root" / ".." / "root-sibling")) is None
+
+
+def test_relative_inside_follows_symlinks(tmp_path: Path) -> None:
+    (tmp_path / "root" / "real").mkdir(parents=True)
+    (tmp_path / "link").symlink_to(tmp_path / "root" / "real")
+    assert relative_inside(str(tmp_path / "root"), str(tmp_path / "link")) == "real"
+
+
+def test_spec_path_in_repo_raises_where_relative_inside_is_none(tmp_path: Path) -> None:
+    (tmp_path / "host").mkdir()
+    with pytest.raises(GitViewError, match="not inside the git root"):
+        spec_path_in_repo(str(tmp_path / "elsewhere"), str(tmp_path / "host"))
+
+
+def test_path_exists_at_is_false_only_when_git_says_the_path_is_absent(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("a", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "a")
+    assert path_exists_at("HEAD", str(tmp_path), "docs/a.md") is True
+    assert path_exists_at("HEAD", str(tmp_path), "docs/b.md") is False
+    with pytest.raises(GitViewError):
+        path_exists_at("no-such-ref", str(tmp_path), "docs/a.md")

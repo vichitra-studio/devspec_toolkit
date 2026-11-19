@@ -18,19 +18,14 @@ from integration._step_gate_support import apply_delta, attest, commit_all, run_
 from specdev_tools.core.ambiguity_items import iter_ambiguity_items
 from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.core.git_base import BaselineResult, active_baseline_provider, register_baseline_provider
+from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.build import build_graph
-from specdev_tools.validation.spec_check import (
-    CHECK_REGISTRY,
-    CheckContext,
-    _check_result,
-    _run_checks,
-    register_check,
-    run_spec_check_json,
-    run_step_gate,
-)
+from specdev_tools.validation.check_registry import CHECK_REGISTRY, CheckContext, _check_result, register_check
+from specdev_tools.validation.spec_check import _run_checks, run_spec_check_json
 from specdev_tools.validation.spec_check import run_spec_check as run_plain_spec_check
 from specdev_tools.validation.step_gate import waiting_map
+from specdev_tools.validation.step_gate_run import run_step_gate
+from specdev_tools.validation.touched_steps import SEED_EDIT_NOTE
 from unit.graph._synth import ROOT, git
 from unit.trace._lock_support import git_copy_of_example
 
@@ -44,14 +39,6 @@ def _fresh_config() -> Iterator[None]:
     reset_config()
     yield
     reset_config()
-
-
-@pytest.fixture
-def registry() -> Iterator[None]:
-    """The check registry as it was, put back when the test ends."""
-    saved = list(CHECK_REGISTRY)
-    yield
-    CHECK_REGISTRY[:] = saved
 
 
 def _flags(host: Path) -> list[str]:
@@ -70,7 +57,7 @@ def _register_finding(name: str, error: SpecError) -> None:
 
 # --- the registry -----------------------------------------------------------------------------------------------
 
-def test_register_check_runs_once_and_keeps_order(tmp_path: Path, registry: None) -> None:
+def test_register_check_runs_once_and_keeps_order(tmp_path: Path, registered_checks: None) -> None:
     calls: list[str] = []
 
     def probe(ctx: CheckContext) -> dict[str, Any]:
@@ -84,18 +71,24 @@ def test_register_check_runs_once_and_keeps_order(tmp_path: Path, registry: None
     assert list(context["checks"])[-2:] == ["open-items", "probe-check"]
 
 
-def test_register_check_refuses_a_name_that_is_registered(registry: None) -> None:
+def test_register_check_refuses_a_name_that_is_registered(registered_checks: None) -> None:
     with pytest.raises(ValueError, match="already registered"):
         register_check(CHECK_REGISTRY[0].name, lambda ctx: _check_result([]))
 
 
 def test_every_check_of_the_registry_has_a_default_owner() -> None:
-    steps = {"03", "08"}
+    """Every default owner is the merge check or a step of ``tools/step_order.json``; no count, so a new check does not break it."""
+    known = {f"step:{step}" for step in load_step_order(str(ROOT))["steps"]}
     owners = {spec.name: spec.default_owner for spec in CHECK_REGISTRY}
-    assert len(owners) == len(CHECK_REGISTRY) == 20
-    assert all(owner == "merge-check" or owner.removeprefix("step:") in steps for owner in owners.values()), owners
-    assert owners["fixtures-lint"] == "step:08"
-    assert owners["glossary-drift-check"] == "step:03"
+    assert owners and all(owner == "merge-check" or owner in known for owner in owners.values()), owners
+
+
+def test_fixtures_lint_is_owned_by_step_08() -> None:
+    assert {spec.name: spec.default_owner for spec in CHECK_REGISTRY}["fixtures-lint"] == "step:08"
+
+
+def test_glossary_drift_check_is_owned_by_step_03() -> None:
+    assert {spec.name: spec.default_owner for spec in CHECK_REGISTRY}["glossary-drift-check"] == "step:03"
 
 
 def test_toolkit_side_lint_finding_carries_merge_check(tmp_path: Path) -> None:
@@ -150,7 +143,7 @@ def test_new_error_of_an_earlier_step_blocks_a_later_step_and_a_committed_one_is
     assert code == 0 and "UPSTREAM DEBT (1)" in out and "04: 1" in out, out
 
 
-def test_promoted_code_blocks_in_own_step(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registry: None) -> None:
+def test_promoted_code_blocks_in_own_step(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registered_checks: None) -> None:
     _register_finding("own-warning", make_error(PROMOTABLE_WARNING, "unexercised", owner="step:04"))
     monkeypatch.setenv("SPECDEV_PROMOTE_CODES", PROMOTABLE_WARNING)
     host = step_gate_host(tmp_path / "host")
@@ -158,7 +151,7 @@ def test_promoted_code_blocks_in_own_step(tmp_path: Path, monkeypatch: pytest.Mo
     assert code == 1 and "E615  [04 own]" in out, out
 
 
-def test_unpromoted_code_is_an_own_warning(tmp_path: Path, capsys: pytest.CaptureFixture[str], registry: None) -> None:
+def test_unpromoted_code_is_an_own_warning(tmp_path: Path, capsys: pytest.CaptureFixture[str], registered_checks: None) -> None:
     _register_finding("own-warning", make_error(PROMOTABLE_WARNING, "unexercised", owner="step:04"))
     host = step_gate_host(tmp_path / "host")
     code, payload = _gate_json(host, capsys, "--step", "04")
@@ -230,7 +223,7 @@ def test_several_steps_give_one_block_each_and_the_union_in_json(tmp_path: Path,
     assert len(gate["pending"]["05"]) == 1
 
 
-def test_waiting_item_explains_an_error_of_its_step(tmp_path: Path, registry: None, capsys: pytest.CaptureFixture[str]) -> None:
+def test_waiting_item_explains_an_error_of_its_step(tmp_path: Path, registered_checks: None, capsys: pytest.CaptureFixture[str]) -> None:
     host = step_gate_host(tmp_path / "host", ["open_items"])
     spec = str(host / "spec")
     items = list(iter_ambiguity_items(spec))
@@ -270,20 +263,6 @@ def test_gate_direct_call_without_pre_commit_reads_working_tree(tmp_path: Path) 
     assert broken == {"fr-broken-link", "api-broken-link"}
 
 
-def test_step_gate_restores_the_baseline_provider_it_found(tmp_path: Path) -> None:
-    def sentinel(spec_dir: Path, git_root: str) -> BaselineResult:
-        return BaselineResult("unavailable")
-
-    previous = active_baseline_provider()
-    register_baseline_provider(sentinel)
-    try:
-        host = step_gate_host(tmp_path / "host")
-        run_spec_check(host, "--step", "04")
-        assert active_baseline_provider() is sentinel
-    finally:
-        register_baseline_provider(previous)
-
-
 def test_base_ref_names_the_branch_the_baseline_is_measured_against(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     host = step_gate_host(tmp_path / "host")
     git(host, "branch", "trunk")
@@ -300,7 +279,7 @@ def test_base_ref_names_the_branch_the_baseline_is_measured_against(tmp_path: Pa
 # --- --paths ----------------------------------------------------------------------------------------------------
 
 def test_paths_with_no_mapped_path_exits_0_without_running_a_check(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registry: None
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registered_checks: None
 ) -> None:
     def forbidden(ctx: CheckContext) -> dict[str, Any]:
         raise AssertionError("no check may run when no path maps to a step")
@@ -325,4 +304,4 @@ def test_a_seed_edit_prints_the_dependants_note(tmp_path: Path, monkeypatch: pyt
     host = step_gate_host(tmp_path / "host")
     monkeypatch.chdir(host)
     code, out = run_spec_check(host, "--paths", "docs/seed/seed_accounts.md")
-    assert code == 0 and "seed edit: dependants become suspect; run `specdev stale`" in out
+    assert code == 0 and SEED_EDIT_NOTE in out

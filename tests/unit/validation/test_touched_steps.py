@@ -14,7 +14,13 @@ from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.graph.model import Graph
-from specdev_tools.validation.touched_steps import TouchedSteps, outside_root_note, steps_for_paths
+from specdev_tools.validation.touched_steps import (
+    PLAN_FILE_STEPS,
+    SEED_EDIT_NOTE,
+    TouchedSteps,
+    outside_root_note,
+    steps_for_paths,
+)
 
 from ..trace._lock_support import EXAMPLE_HOST
 
@@ -222,3 +228,12 @@ def test_spec_folder_outside_the_git_root_is_refused(host: Path, manifest: dict[
     other.mkdir()
     with pytest.raises(GitViewError):
         _touched(host, ["spec/04_fr_list.json"], manifest, git_root=str(other))
+
+
+def test_the_seed_edit_note_is_true_for_a_whitespace_only_edit() -> None:
+    """A whitespace-only edit makes nothing suspect, so the note sends the reader to ``stale`` instead of saying it does."""
+    assert SEED_EDIT_NOTE == "seed document edited: run specdev stale to see what became suspect"
+
+
+def test_plan_file_steps_are_the_three_trinity_steps() -> None:
+    assert PLAN_FILE_STEPS == ("16a", "16b", "16c")

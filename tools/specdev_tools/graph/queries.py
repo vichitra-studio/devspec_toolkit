@@ -136,8 +136,12 @@ def require_known_step(graph: Graph, step: str) -> None:
 
     The seed step is not a step a command takes, so it is unknown here.
     """
-    ranks = graph.shape.step_ranks
-    known = sorted((name for name in ranks if name != SEED_STEP), key=ranks.__getitem__)
+    require_known_step_in(graph.shape.step_ranks, step)
+
+
+def require_known_step_in(order: Mapping[str, int], step: str) -> None:
+    """``require_known_step`` for a step order (step to place in the waterfall) with no graph: E706 unless *step* is in *order*."""
+    known = sorted((name for name in order if name != SEED_STEP), key=order.__getitem__)
     if step not in known:
         raise _unknown(f"no step {step!r}; known steps: {', '.join(known)}")
 

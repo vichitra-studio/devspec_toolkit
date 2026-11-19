@@ -12,8 +12,11 @@ from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import PROMOTABLE_PAIRS, FindingError, SpecError
 from specdev_tools.trace.lockfile import LockError, with_write_lock
 from specdev_tools.validation.open_items import check_open_items, default_frozen, delete_resolved_items
-from specdev_tools.validation.spec_check import _check_result
+from specdev_tools.validation.check_registry import _check_result
 from specdev_tools.validation.validate import validate_file
+
+from .._ambiguity_support import plan_doc, unified_item
+from ..graph._synth import write_json
 
 ROOT = Path(__file__).resolve().parents[3]
 EXAMPLE_SPEC = ROOT / "tests" / "fixtures" / "graph_example" / "spec"
@@ -24,21 +27,8 @@ PLAN_A = "impl_context/ms_alpha_plan.json"
 PLAN_B = "impl_context/ms_beta_plan.json"
 
 
-def _unified(item_id: str, **extra: object) -> dict:
-    return {"id": item_id, "description": "what is unclear", "about": ["fr-login"], **extra}
-
-
 def _legacy(item_id: str, status: str) -> dict:
     return {"id": item_id, "description": "old question", "severity": "low", "status": status, "impact": ["x"]}
-
-
-def _write(path: Path, doc: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc), encoding="utf-8")
-
-
-def _plan_doc(plan_items: list[dict] = (), emergent: list[dict] = ()) -> dict:
-    return {"plan": {"ambiguities": list(plan_items)}, "execution": {"emergent_ambiguities": list(emergent)}}
 
 
 def _is_frozen_only(*names: str):
@@ -54,9 +44,9 @@ def _codes(errors: list[SpecError]) -> list[str]:
 def spec(tmp_path: Path) -> Path:
     """A spec folder with one unified item in step 05, one in plan alpha's ``plan.ambiguities``, one in plan beta."""
     folder = tmp_path / "spec"
-    _write(folder / STEP_FILE, {"ambiguities": [_unified("amb-reset-seed", decision="use the seed value")]})
-    _write(folder / PLAN_A, _plan_doc(emergent=[_unified("amb-emergent")]))
-    _write(folder / PLAN_B, _plan_doc(plan_items=[_unified("amb-beta")]))
+    write_json(folder, STEP_FILE, {"ambiguities": [unified_item("amb-reset-seed", decision="use the seed value")]})
+    write_json(folder, PLAN_A, plan_doc(emergent=[unified_item("amb-emergent")]))
+    write_json(folder, PLAN_B, plan_doc(plan_items=[unified_item("amb-beta")]))
     return folder
 
 
@@ -85,7 +75,7 @@ def test_step_gate_item_is_w630_owned_by_its_step(spec: Path) -> None:
     [({"decision": "use the seed value"}, "known: apply in the batch pass"), ({}, "needed from the operator")],
 )
 def test_w630_says_whether_the_answer_is_known(tmp_path: Path, extra: dict, answer: str) -> None:
-    _write(tmp_path / STEP_FILE, {"ambiguities": [_unified("amb-x", **extra)]})
+    write_json(tmp_path, STEP_FILE, {"ambiguities": [unified_item("amb-x", **extra)]})
 
     (error,) = check_open_items(tmp_path, gate="step")
 
@@ -93,7 +83,7 @@ def test_w630_says_whether_the_answer_is_known(tmp_path: Path, extra: dict, answ
 
 
 def test_w630_names_the_missing_kind_and_its_parent(tmp_path: Path) -> None:
-    _write(tmp_path / STEP_FILE, {"ambiguities": [_unified("amb-x", missing_kind="acceptance-criterion", about=["fr-a"])]})
+    write_json(tmp_path, STEP_FILE, {"ambiguities": [unified_item("amb-x", missing_kind="acceptance-criterion", about=["fr-a"])]})
 
     (error,) = check_open_items(tmp_path, gate="step")
 
@@ -108,7 +98,7 @@ def test_merge_gate_item_is_e631_owned_by_merge_check(spec: Path) -> None:
 
 
 def test_deleting_the_item_removes_e631(spec: Path) -> None:
-    _write(spec / STEP_FILE, {"ambiguities": []})
+    write_json(spec, STEP_FILE, {"ambiguities": []})
     (spec / PLAN_A).unlink()
     (spec / PLAN_B).unlink()
 
@@ -189,7 +179,7 @@ def test_legacy_fixture_gives_one_summary_w630_and_five_e631(tmp_path: Path) -> 
 
 
 def test_anchor_items_are_live_open_items(tmp_path: Path) -> None:
-    _write(tmp_path / ANCHOR_FILE, {"plan": {"ambiguities": [_unified("amb-anchor")]}})
+    write_json(tmp_path, ANCHOR_FILE, {"plan": {"ambiguities": [unified_item("amb-anchor")]}})
 
     step = check_open_items(tmp_path, gate="step", frozen=lambda _path: True)
     merge = check_open_items(tmp_path, gate="merge", frozen=lambda _path: True)
@@ -199,7 +189,7 @@ def test_anchor_items_are_live_open_items(tmp_path: Path) -> None:
 
 
 def test_an_unreadable_file_ends_the_list_with_e520(tmp_path: Path) -> None:
-    _write(tmp_path / "04_fr_list.json", {"ambiguities": [_unified("amb-first")]})
+    write_json(tmp_path, "04_fr_list.json", {"ambiguities": [unified_item("amb-first")]})
     (tmp_path / STEP_FILE).write_text("{not json", encoding="utf-8")
 
     errors = check_open_items(tmp_path, gate="merge")
@@ -217,12 +207,12 @@ def _example_with_items(spec_dir: Path) -> None:
     """Resolved legacy items in the anchor and in both arrays of the example plan, plus items that must stay."""
     anchor = json.loads((spec_dir / ANCHOR_FILE).read_text(encoding="utf-8"))
     anchor["plan"]["ambiguities"] = _legacy_items()
-    _write(spec_dir / ANCHOR_FILE, anchor)
+    write_json(spec_dir, ANCHOR_FILE, anchor)
     plan_file = spec_dir / "impl_context" / "ms_account_recovery_plan.json"
     plan = json.loads(plan_file.read_text(encoding="utf-8"))
-    plan["plan"]["ambiguities"] = [_legacy("amb-plan-done", "resolved"), _unified("amb-plan-open")]
-    plan["execution"] = {"emergent_ambiguities": [_unified("amb-keep"), _legacy("amb-emergent-done", "resolved")]}
-    _write(plan_file, plan)
+    plan["plan"]["ambiguities"] = [_legacy("amb-plan-done", "resolved"), unified_item("amb-plan-open")]
+    plan["execution"] = {"emergent_ambiguities": [unified_item("amb-keep"), _legacy("amb-emergent-done", "resolved")]}
+    write_json(plan_file.parent, plan_file.name, plan)
 
 
 def _all_ids(spec_dir: Path, relative: str, *keys: str) -> list[str]:
@@ -294,3 +284,24 @@ def test_delete_resolved_items_on_a_read_only_folder_ends_in_e520(example_copy: 
     assert refused.value.error.code == "E520"
     assert refused.value.error.message.startswith(f"cannot write {ANCHOR_FILE}: ")
     assert len(_all_ids(example_copy, ANCHOR_FILE, "plan", "ambiguities")) == 3
+
+
+def test_an_item_with_no_id_is_named_so_without_a_double_space(tmp_path: Path) -> None:
+    write_json(tmp_path, STEP_FILE, {"ambiguities": [{"description": "no id", "about": ["fr-login"]}]})
+    (error,) = check_open_items(tmp_path, gate="step")
+    assert error.message.startswith("open item (no id) in ") and "  " not in error.message and error.node_id is None
+
+
+def test_an_unreadable_file_ends_the_list_with_one_e520_owned_by_its_step(tmp_path: Path) -> None:
+    write_json(tmp_path, STEP_FILE, {"ambiguities": [unified_item("amb-x")]})
+    (tmp_path / "04_fr_list.json").mkdir()
+    errors = check_open_items(tmp_path, gate="step")
+    unreadable = [e for e in errors if e.code == "E520"]
+    assert [(e.file, e.owner) for e in unreadable] == [("04_fr_list.json", "step:04")]
+    assert "cannot read" in unreadable[0].message and errors[-1] is unreadable[0]
+
+
+def test_an_unreadable_plan_file_is_owned_by_a_plan_step(tmp_path: Path) -> None:
+    (tmp_path / "impl_context" / "ms_a_plan.json").mkdir(parents=True)
+    (error,) = check_open_items(tmp_path, gate="merge")
+    assert error.code == "E520" and error.owner in {"step:16a", "step:16b", "step:16c"}

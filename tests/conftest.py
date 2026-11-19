@@ -67,3 +67,15 @@ def canon_root(repo_root):
 def fixtures_root(repo_root):
     """Return the test fixtures directory path."""
     return repo_root / "tests" / "fixtures"
+
+
+@pytest.fixture
+def registered_checks():
+    """Lets a test register ``spec-check`` checks: each check it registered is removed again when the test ends."""
+    from specdev_tools.validation.check_registry import CHECK_REGISTRY, unregister_check
+
+    before = {spec.name for spec in CHECK_REGISTRY}
+    yield
+    for spec in list(CHECK_REGISTRY):
+        if spec.name not in before:
+            unregister_check(spec.name)

@@ -188,7 +188,7 @@ def test_paths_gate_nested_layout_with_git_root(
 ) -> None:
     spec, flags, prefix = _nested_with_git_root(tmp_path, monkeypatch)
     code, found, err = _run_gate(capsys, spec, flags, "--paths", f"{prefix}/{STEP_04_FILE}", SEED_FILE)
-    assert code == 1 and SEED_NOTE not in err and "seed edit:" in err, err
+    assert code == 1 and SEED_NOTE not in err and "seed document edited: run specdev stale" in err, err
     _assert_decided(found, {**STEP_04, "steps": ["00", "02", "04"]})
 
 

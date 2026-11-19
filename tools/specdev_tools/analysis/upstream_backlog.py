@@ -13,7 +13,9 @@ Read-only reporter.  Four layers with one-way deps:
   Filter     -> ``filter_records``: records + severity/status thresholds -> records (legacy items only)
   Render     -> ``render_plain`` / ``render_json``: records -> str
 
-``run()`` returns ``(stdout_payload, stderr_lines, exit_code)`` with no side effects, so CLI dispatch owns all I/O.
+``run()`` returns a ``BacklogReport`` (``stdout``, ``stderr_lines``, ``exit_code``) with no side effects, so CLI dispatch
+owns all I/O.  The exit code is 2 when ``load_items`` returned a problem (or a file, array or folder could not be read),
+else 0; it is never read back from the text of a line.
 W613 stderr lines are formatted manually (not via ``SpecError.render()``) because the spec requires the format
 ``W613 UPSTREAM_BACKLOG_UNCLASSIFIED <target>`` while ``render()`` places the path between code and message.
 """
@@ -23,8 +25,9 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass, field
-from typing import Any, NamedTuple
+from dataclasses import dataclass
+from collections.abc import Sequence
+from typing import Any, Literal, NamedTuple
 
 from ..core.ambiguity_items import (
     AmbiguityItem,
@@ -50,6 +53,12 @@ PLAN_SEVERITY_RANK = {
 
 PLAN_STEP = "16a"
 UNPLACED = "unplaced"
+MATCHED_RULE_PLACED = 1
+MATCHED_RULE_UNPLACED = 4
+SEVERITY_FIELD = "severity"
+STATUS_FIELD = "status"
+IMPACT_FIELD = "impact"
+StatusFilter = Literal["open", "resolved", "all"]
 JSON_SCHEMA_VERSION = "2"
 SPEC_PREFIX = "spec/"
 ANSWER_KNOWN = "answer known"
@@ -90,32 +99,47 @@ class Record:
 
     @property
     def description(self) -> str:
-        value = self.item.raw.get("description")
-        return value if isinstance(value, str) else ""
+        return self.item.description
 
     @property
     def decision(self) -> str:
-        value = self.item.raw.get("decision")
-        return value if isinstance(value, str) else ""
+        return self.item.decision or ""
 
     @property
     def about(self) -> list[str]:
-        raw = self.item.raw.get("about")
-        return [a for a in raw if isinstance(a, str)] if isinstance(raw, list) else []
+        return list(self.item.about_ids)
 
     @property
     def severity(self) -> str | None:
-        value = self.item.raw.get("severity")
-        return value if isinstance(value, str) else None
+        return legacy_fields(self.item).severity
 
     @property
     def status(self) -> str | None:
-        return self.item.raw.get("status") if self.legacy else None
+        return legacy_fields(self.item).status if self.legacy else None
 
     @property
     def impact_raw(self) -> list[Any]:
-        value = self.item.raw.get("impact")
-        return value if isinstance(value, list) else []
+        return legacy_fields(self.item).impact
+
+
+class LegacyFields(NamedTuple):
+    """The fields only a 1.1.1 item carries (``severity``, ``status``, ``impact``); each is ``None`` / empty when absent or mistyped."""
+
+    severity: str | None
+    status: str | None
+    impact: list[Any]
+
+
+def legacy_fields(item: AmbiguityItem) -> LegacyFields:
+    """The one place the legacy-only fields of an item are read from its raw object."""
+    severity = item.raw.get(SEVERITY_FIELD)
+    status = item.raw.get(STATUS_FIELD)
+    impact = item.raw.get(IMPACT_FIELD)
+    return LegacyFields(
+        severity if isinstance(severity, str) else None,
+        status if isinstance(status, str) else None,
+        impact if isinstance(impact, list) else [],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -126,14 +150,29 @@ def _valid_severities(step: str) -> frozenset[str]:
     return frozenset(PLAN_SEVERITY_RANK) if step == PLAN_STEP else frozenset(SEVERITY_ORDER)
 
 
+class ItemProblem(NamedTuple):
+    """An item that cannot be reported: where it is and why (``reason`` is the text after ``E520 UNRESOLVED_INPUT``)."""
+
+    path: str
+    step: str
+    item_id: str
+    reason: str
+
+    def line(self) -> str:
+        """The stderr line of this problem."""
+        return _e520_line(f"{self.reason} in {self.path} (step={self.step}, item={self.item_id or '?'})")
+
+
 def item_problem(item: AmbiguityItem) -> str | None:
     """The E520 reason for an item that cannot be reported (no id; a legacy severity outside its scale), else ``None``."""
     if not item.id:
         return "missing_id"
     if item.shape == "legacy":
-        severity = item.raw.get("severity")
-        if not isinstance(severity, str) or severity not in _valid_severities(item.step):
-            return f"invalid_severity={severity!r}"
+        severity = legacy_fields(item).severity
+        if severity is None and SEVERITY_FIELD not in item.raw:
+            return "item has neither about nor a valid severity"
+        if severity not in _valid_severities(item.step):
+            return f"invalid_severity={item.raw.get(SEVERITY_FIELD)!r}"
     return None
 
 
@@ -141,21 +180,21 @@ def _e520_line(detail: str) -> str:
     return f"E520 {ERROR_CODES['E520']} {detail}"
 
 
-def load_items(spec_dir: str) -> tuple[list[AmbiguityItem], list[str]]:
-    """Every readable item of *spec_dir* and one E520 line per item that cannot be reported.
+def load_items(spec_dir: str) -> tuple[list[AmbiguityItem], list[ItemProblem]]:
+    """Every readable item of *spec_dir* and one problem per item that cannot be reported.
 
     Raises:
         AmbiguityReadError: a file is not readable JSON or an array is malformed (the caller reports it, exit 2).
     """
     items: list[AmbiguityItem] = []
-    errors: list[str] = []
+    problems: list[ItemProblem] = []
     for item in iter_ambiguity_items(spec_dir):
-        problem = item_problem(item)
-        if problem is None:
+        reason = item_problem(item)
+        if reason is None:
             items.append(item)
         else:
-            errors.append(_e520_line(f"{problem} in {item.artifact_path} (step={item.step}, item={item.id or '?'})"))
-    return items, errors
+            problems.append(ItemProblem(item.artifact_path, item.step, item.id, reason))
+    return items, problems
 
 
 # ---------------------------------------------------------------------------
@@ -199,13 +238,10 @@ def place(item: AmbiguityItem, graph: Graph) -> Placement:
     """
     targets = about_targets(item)
     steps = {step for target in targets for step in _target_steps(target, graph)}
-    about = item.raw.get("about")
-    ids = [a for a in about if isinstance(a, str)] if isinstance(about, list) else []
     if steps:
-        return Placement(_ordered(steps, graph), _ordered(steps, graph), _pointers(graph, ids))
+        return Placement(_ordered(steps, graph), _ordered(steps, graph), _pointers(graph, list(item.about_ids)))
     if item.shape == "legacy" and not targets:
-        impact = item.raw.get("impact")
-        step = _earliest_impact_step(impact if isinstance(impact, list) else [], graph)
+        step = _earliest_impact_step(legacy_fields(item).impact, graph)
         if step is not None:
             return Placement((step,), (), ())
     return Placement((UNPLACED,), (), ())
@@ -240,7 +276,7 @@ def severity_rank(record: Record) -> int:
     return SEVERITY_ORDER[severity]
 
 
-def filter_records(records: list[Record], severity_min: str, status_filter: str) -> list[Record]:
+def filter_records(records: list[Record], severity_min: str, status_filter: StatusFilter) -> list[Record]:
     """Apply ``--severity`` and ``--status`` to the legacy records; a unified record has neither and always passes."""
     min_rank = SEVERITY_ORDER[severity_min]
     out: list[Record] = []
@@ -274,15 +310,15 @@ class Summary:
     needing_answer: int
     unplaced: int = 0
     hidden_by_status: int = 0
-    warnings: list[dict[str, str]] = field(default_factory=list)
+    warnings: tuple[dict[str, str], ...] = ()
 
 
-def summarise(records: list[Record], *, hidden_by_status: int = 0, warnings: list[dict[str, str]] | None = None) -> Summary:
+def summarise(records: list[Record], *, hidden_by_status: int = 0, warnings: Sequence[dict[str, str]] = ()) -> Summary:
     """Count the distinct items of *records* (an item is its artifact plus its id) by answer state."""
     distinct = {(r.item.artifact_path, r.item.location, r.item_id): r for r in records}
     with_answer = sum(1 for r in distinct.values() if r.decision)
     unplaced = sum(1 for r in distinct.values() if UNPLACED in r.placement.groups)
-    return Summary(len(distinct), with_answer, len(distinct) - with_answer, unplaced, hidden_by_status, warnings or [])
+    return Summary(len(distinct), with_answer, len(distinct) - with_answer, unplaced, hidden_by_status, tuple(warnings))
 
 
 def _answer_state(record: Record) -> str:
@@ -341,7 +377,7 @@ def _json_record(record: Record) -> dict[str, Any]:
     }
     if record.legacy:
         out.update(severity=record.severity, status=record.status, bucket=_legacy_bucket(record),
-                   matched_rule=1 if record.group != UNPLACED else 4)
+                   matched_rule=MATCHED_RULE_UNPLACED if record.group == UNPLACED else MATCHED_RULE_PLACED)
     return out
 
 
@@ -362,7 +398,7 @@ def render_json(records: list[Record], summary: Summary) -> str:
             "hidden_by_status_count": summary.hidden_by_status,
         },
         "records": [_json_record(r) for r in records],
-        "warnings": summary.warnings,
+        "warnings": list(summary.warnings),
     }
     return json.dumps(payload, indent=2, sort_keys=False)
 
@@ -392,30 +428,43 @@ def _hidden_by_status(records: list[Record], shown: list[Record], severity: str)
     return len(hidden - shown_keys)
 
 
+class BacklogReport(NamedTuple):
+    """What ``run`` gives the CLI: the text for stdout, the lines for stderr in order, the exit code."""
+
+    stdout: str
+    stderr_lines: list[str]
+    exit_code: int
+
+
+EXIT_PROBLEM = 2
+
+
 def run(
     spec_dir: str,
     *,
     repo_root: str = ".",
     severity: str = "low",
-    status: str = "open",
+    status: StatusFilter = "open",
     json_output: bool = False,
-) -> tuple[str, list[str], int]:
-    """Return ``(stdout_payload, stderr_lines, exit_code)``.
+) -> BacklogReport:
+    """The backlog of *spec_dir* as a ``BacklogReport``.
 
     ``repo_root`` is the toolkit root (kind registry and step order for the graph).  Exit 2 when a file or array
-    cannot be read, an item has no id or a legacy item has an invalid severity (E520), the spec folder does not exist
-    (E520), or the toolkit has no registry.
+    cannot be read (a file that is not readable JSON, a permission error, a folder named like a step file), an item
+    has no id or a legacy item has an invalid severity (E520, one line per item; the run goes on), the spec folder
+    does not exist (E520), or the toolkit has no registry.
     """
     if not os.path.isdir(spec_dir):
-        return "", [_e520_line(f"missing_spec_dir {spec_dir}")], 2
+        return BacklogReport("", [_e520_line(f"missing_spec_dir {spec_dir}")], EXIT_PROBLEM)
     try:
-        items, stderr_lines = load_items(spec_dir)
+        items, problems = load_items(spec_dir)
     except AmbiguityReadError as exc:
-        return "", [_e520_line(f"{exc.path}: {exc.reason}")], 2
+        return BacklogReport("", [_e520_line(f"{exc.path}: {exc.reason}")], EXIT_PROBLEM)
+    stderr_lines = [problem.line() for problem in problems]
     try:
         graph = build_graph(spec_dir, repo_root)
     except FindingError as exc:
-        return "", [exc.error.render()], 2
+        return BacklogReport("", [exc.error.render()], EXIT_PROBLEM)
 
     records = _records_of(items, graph, spec_dir)
     shown = filter_records(records, severity, status)
@@ -435,4 +484,4 @@ def run(
 
     summary = summarise(shown, hidden_by_status=hidden, warnings=warnings)
     stdout = render_json(shown, summary) if json_output else render_plain(shown, summary, graph)
-    return stdout, stderr_lines, 2 if any(line.startswith("E520") for line in stderr_lines) else 0
+    return BacklogReport(stdout, stderr_lines, EXIT_PROBLEM if problems else 0)

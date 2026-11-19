@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +28,8 @@ from integration._step_gate_support import (
 )
 from specdev_tools.core.errors import make_error
 from specdev_tools.validation.open_items import check_open_items
-from specdev_tools.validation.spec_check import CHECK_REGISTRY, _check_result, register_check
+from specdev_tools.validation.touched_steps import SEED_EDIT_NOTE
+from specdev_tools.validation.check_registry import _check_result, register_check
 from unit.graph._synth import git
 from unit.trace._lock_support import ROOT, run_on_example
 
@@ -41,14 +41,6 @@ WAITING = {
     "api-below-items": ["amb-reset-seed"],
     "err-below-items-token-expired": ["amb-reset-criterion", "amb-reset-seed"],
 }
-
-
-@pytest.fixture
-def registry() -> Iterator[None]:
-    """The check registry as it was, put back when the test ends."""
-    saved = list(CHECK_REGISTRY)
-    yield
-    CHECK_REGISTRY[:] = saved
 
 
 def _flags(host: Path) -> list[str]:
@@ -135,7 +127,7 @@ def test_clarify_round_trip(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
 # --- DOC 13.9: pending and new upstream ---------------------------------------------------------------------------
 
 def test_doc_13_9_rows_3_4_pending_with_stub_and_new_upstream_blocks(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], registry: None
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], registered_checks: None
 ) -> None:
     # Row 3: no-dangling error of a requirement that no later step uses yet; the owned error is a stub until M6b.
     stub = make_error("E520", "stub: nothing uses fr-account-export yet", owner="step:08", node_id="fr-account-export")
@@ -278,7 +270,7 @@ def test_staged_step_and_seed_edit_run_the_mapped_steps(tmp_path: Path) -> None:
     done = run_hook(host, [SEED_FILE, SPEC_STEP_FILE])
     assert _headers(done.stdout) == ["00", "02", "04"]
     assert done.returncode == 1 and "E700  [04 own]" in done.stdout
-    assert "dependants become suspect" in done.stderr
+    assert SEED_EDIT_NOTE in done.stderr
 
 
 def test_schema_error_in_the_staged_step_file_exits_1(tmp_path: Path) -> None:
@@ -307,7 +299,7 @@ def test_doc_13_8_row_2_seed_stage_runs_the_mapped_steps_and_prints_the_suspect_
     done = run_hook(host, [SEED_FILE])
     assert done.returncode == 0, done.stdout
     assert _headers(done.stdout) == ["00", "02"]
-    assert "seed edit: dependants become suspect; run `specdev stale`" in done.stderr
+    assert SEED_EDIT_NOTE in done.stderr
 
 
 def test_manifest_edit_with_a_missing_seed_file_is_gate_owned_and_the_hook_exits_0(
@@ -330,3 +322,56 @@ def test_w630_does_not_block_with_warnings_as_errors_or_a_promote_request(tmp_pa
     done = run_hook(host, ["spec/05_interface_contracts.json"], env=env)
     assert done.returncode == 0, done.stdout
     assert "W630  [05 own]" in done.stdout and "RESULT: CLEAR" in done.stdout
+
+
+# --- new since the baseline is a count per key (F1-1) -----------------------------------------------------------
+
+def _edit_spec_file(host: Path, relative: str, edit: Any) -> None:
+    """Apply *edit* to the parsed JSON of ``host/<relative>`` and write it back."""
+    path = host / relative
+    document = json.loads(path.read_text(encoding="utf-8"))
+    edit(document)
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def _commit_on_branch(host: Path, message: str) -> None:
+    from integration._step_gate_support import attest
+
+    attest(host)
+    commit_all(host, message)
+
+
+def test_a_second_schema_error_of_one_file_is_new_upstream_while_the_old_one_is_debt(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    host = step_gate_host(tmp_path / "host")
+    _edit_spec_file(host, SPEC_STEP_FILE, lambda doc: doc["functional_requirements"][0].update(scope="bogus"))
+    commit_all(host, "one schema error on the default branch")
+    start_branch(host)
+    _edit_spec_file(host, SPEC_STEP_FILE, lambda doc: doc["functional_requirements"][1].update(scope="bogus"))
+    _commit_on_branch(host, "a second schema error")
+    code, gate = _gate(capsys, host, "--step", "05")
+    assert code == 1 and gate["result"] == "blocked"
+    # the default branch's tree has two E520 (the bad scope and the "unevaluated properties" one that follows from it): both are debt
+    assert [f["message"].split(":", 1)[1].split(" is not")[0] for f in gate["blocking"]] == ["functional_requirements/1/scope: 'bogus'"]
+    assert len(gate["upstream_debt"]) == 2 and {f["owner"] for f in gate["upstream_debt"]} == {"step:04"}
+    code, out, _err = run_split(capsys, "spec-check", str(host / "spec"), *_flags(host), "--step", "05")
+    assert code == 1 and "BLOCKING (1)" in out and "UPSTREAM DEBT (2)" in out and "[04 new upstream]" in out
+
+
+def test_an_insert_before_an_old_error_leaves_it_upstream_debt(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    host = step_gate_host(tmp_path / "host", ["broken_link_in_step_04"], commit=True)
+    start_branch(host)
+
+    def insert_first(doc: dict[str, Any]) -> None:
+        added = json.loads(json.dumps(doc["functional_requirements"][0]))
+        added["fr_id"] = "fr-inserted-first"
+        for number, criterion in enumerate(added["acceptance_criteria"], 1):
+            criterion["criterion_id"] = f"ac-inserted-first-{number}"
+        doc["functional_requirements"].insert(0, added)
+    _edit_spec_file(host, SPEC_STEP_FILE, insert_first)
+    _commit_on_branch(host, "insert a requirement before the broken one")
+    code, gate = _gate(capsys, host, "--step", "05")
+    assert [(f["code"], f.get("node_id")) for f in gate["upstream_debt"]] == [("E700", "fr-broken-link")]
+    assert [f["code"] for f in gate["blocking"] if f["code"] == "E700"] == []
+    assert code == 0, gate["blocking"]

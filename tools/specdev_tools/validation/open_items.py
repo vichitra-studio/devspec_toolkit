@@ -27,23 +27,25 @@ from typing import Literal
 
 from specdev_tools.core.ambiguity_items import (
     AmbiguityItem,
+    PLAN_ITEM_STEPS,
     AmbiguityReadError,
+    ItemsRead,
     SilentTarget,
     about_targets,
     is_open,
     iter_ambiguity_items,
+    read_ambiguity_items,
 )
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import delete_text, json_write_atomic
-from specdev_tools.graph.ownership import STEP_PREFIX
+from specdev_tools.graph.ownership import STEP_PREFIX, step_for_file
+from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 from specdev_tools.trace.writing import writing_graph
 
 Gate = Literal["step", "merge", "close"]
 FrozenProvider = Callable[[Path], bool]
 
-MERGE_OWNER = "merge-check"
 CLOSE_OWNER = "close-gate"
-_PLAN_STEPS = frozenset({"16a", "16b"})
 _ANSWER_KNOWN = "known: apply in the batch pass"
 _ANSWER_NEEDED = "needed from the operator"
 
@@ -63,29 +65,30 @@ def check_open_items(
     gate: Gate,
     plan_path: str | os.PathLike[str] | None = None,
     frozen: FrozenProvider = default_frozen,
+    read: ItemsRead | None = None,
 ) -> list[SpecError]:
     """The findings of the open items of *spec_dir* at *gate* (``step``, ``merge`` or ``close``).
 
-    *plan_path* is the milestone plan the ``close`` gate is about and is required there; the other gates ignore it.
+    *plan_path* is for ``gate="close"`` only: the milestone plan that gate is about (required there; the ``step`` and
+    ``merge`` gates ignore it).
     *frozen* tells whether a milestone plan file is frozen (an open item in a frozen plan is a legacy item: not live at
     the step gate, W633 at the merge gate); anchor and step-file items are never legacy.  A file the reader cannot read
-    ends the list with one E520 (``cannot read <file>: <reason>``).
+    ends the list with one E520 (``cannot read <file>: <reason>``).  *read* is the result of
+    ``core.ambiguity_items.read_ambiguity_items`` for *spec_dir* when the caller has read the items already.
 
     Raises:
-        ValueError: *gate* is not one of the three, or the ``close`` gate has no *plan_path*.
+        ValueError: the ``close`` gate has no *plan_path*.
     """
     root = os.fspath(spec_dir)
-    items, unreadable = _open_items(root)
+    items, unreadable = _open_items(root, read)
     if gate == "close":
         if plan_path is None:
             raise ValueError("the close gate needs the plan_path of the milestone plan")
         findings = _close_findings(items, root, os.fspath(plan_path))
     elif gate == "merge":
         findings = _merge_findings(items, root, frozen)
-    elif gate == "step":
-        findings = _step_findings(items, root, frozen)
     else:
-        raise ValueError(f"unknown open-item gate {gate!r}; expected step, merge or close")
+        findings = _step_findings(items, root, frozen)
     return findings + unreadable
 
 
@@ -118,22 +121,25 @@ def _relative(root: str, path: str) -> str:
 
 
 def _unreadable(root: str, error: AmbiguityReadError) -> SpecError:
-    return make_error("E520", f"cannot read {error.path}: {error.reason}", file=_relative(root, error.path))
+    """The E520 of a file the reader cannot read; its owner is the step of that file (``step_for_file`` by name)."""
+    step = step_for_file(error.path, None)
+    return make_error(
+        "E520",
+        f"cannot read {error.path}: {error.reason}",
+        file=_relative(root, error.path),
+        owner=STEP_PREFIX + step if step else None,
+    )
 
 
-def _open_items(root: str) -> tuple[list[AmbiguityItem], list[SpecError]]:
+def _open_items(root: str, read: ItemsRead | None) -> tuple[list[AmbiguityItem], list[SpecError]]:
     """The open items of *root* read before the first unreadable file, and the E520 for that file (or nothing)."""
-    items: list[AmbiguityItem] = []
-    try:
-        items.extend(item for item in iter_ambiguity_items(root) if is_open(item))
-    except AmbiguityReadError as error:
-        return items, [_unreadable(root, error)]
-    return items, []
+    items, error = read if read is not None else read_ambiguity_items(root)
+    return [item for item in items if is_open(item)], [] if error is None else [_unreadable(root, error)]
 
 
 def _frozen_paths(items: Iterable[AmbiguityItem], frozen: FrozenProvider) -> set[str]:
     """The milestone plan files among the files of *items* that *frozen* says are frozen."""
-    plan_files = {item.artifact_path for item in items if item.step in _PLAN_STEPS}
+    plan_files = {item.artifact_path for item in items if item.step in PLAN_ITEM_STEPS}
     return {path for path in plan_files if frozen(Path(path))}
 
 
@@ -148,15 +154,14 @@ def _about_text(item: AmbiguityItem) -> str:
 
 
 def _answer_text(item: AmbiguityItem) -> str:
-    decision = item.raw.get("decision")
-    return _ANSWER_KNOWN if isinstance(decision, str) and decision.strip() else _ANSWER_NEEDED
+    return _ANSWER_KNOWN if item.decision else _ANSWER_NEEDED
 
 
 def _item_error(code: str, item: AmbiguityItem, root: str, owner: str, what: str) -> SpecError:
     artifact = _relative(root, item.artifact_path)
     return make_error(
         code,
-        f"open item {item.id} in {artifact}: about {_about_text(item)}; {what}",
+        f"open item {item.id or '(no id)'} in {artifact}: about {_about_text(item)}; {what}",
         file=artifact,
         node_id=item.id or None,
         owner=owner,
@@ -190,9 +195,9 @@ def _legacy_summary(path: str, step: str, count: int, root: str) -> SpecError:
 def _merge_findings(items: list[AmbiguityItem], root: str, frozen: FrozenProvider) -> list[SpecError]:
     frozen_files = _frozen_paths(items, frozen)
     return [
-        _item_error("W633", item, root, MERGE_OWNER, "in a frozen plan: listed for triage, does not fail the merge")
+        _item_error("W633", item, root, MERGE_CHECK_OWNER, "in a frozen plan: listed for triage, does not fail the merge")
         if item.artifact_path in frozen_files
-        else _item_error("E631", item, root, MERGE_OWNER, f"apply the answer ({_answer_text(item)}), then delete the item")
+        else _item_error("E631", item, root, MERGE_CHECK_OWNER, f"apply the answer ({_answer_text(item)}), then delete the item")
         for item in items
     ]
 
@@ -202,7 +207,7 @@ def _close_findings(items: list[AmbiguityItem], root: str, plan_path: str) -> li
     return [
         _item_error("E632", item, root, CLOSE_OWNER, "answer it and delete the item before the milestone closes")
         for item in items
-        if item.step in _PLAN_STEPS and Path(item.artifact_path).resolve() == plan
+        if item.step in PLAN_ITEM_STEPS and Path(item.artifact_path).resolve() == plan
     ]
 
 

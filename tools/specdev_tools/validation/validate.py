@@ -33,7 +33,8 @@ from .forward_replay_check import check_forward_replay
 from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from .linter_utils import build_lint_graph
-from .spec_check import graph_for_checks, lock_link_findings
+from .check_registry import graph_for_checks
+from .spec_check import lock_link_findings
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.constants import DEFAULT_BRANCH_CANDIDATES

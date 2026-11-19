@@ -24,24 +24,22 @@ from __future__ import annotations
 import functools
 import os
 import posixpath
-import re
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from specdev_tools.core.ambiguity_items import STEP_FILE_RE
+from specdev_tools.core.ambiguity_items import PLAN_DIR, PLAN_FILE_RE, STEP_FILE_RE
 from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
-from specdev_tools.graph.gitview import host_root_of, run_git, spec_path_in_repo
+from specdev_tools.graph.gitview import git_top_level, host_root_of, relative_inside, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 
 DERIVES_FROM = "derives_from"
 FIRST_STEP = "00"
-PLAN_STEPS = ("16a", "16b", "16c")
-PLAN_DIR = "impl_context"
+PLAN_FILE_STEPS = ("16a", "16b", "16c")
+"""The steps a milestone plan file gates (plan, code and review); not the steps whose items live in it."""
 SEED_MANIFEST_FILE = "common/seed_manifest.json"
-SEED_EDIT_NOTE = "seed edit: dependants become suspect; run `specdev stale`"
-_PLAN_FILE_RE = re.compile(r"^ms_.+_plan\.json$")
+SEED_EDIT_NOTE = "seed document edited: run specdev stale to see what became suspect"
 _PARENT = ".."
 
 
@@ -102,7 +100,7 @@ def steps_for_paths(
     seed_edited = False
     base = _path_base(spec_dir, git_root, host_root)
     for path in paths:
-        relative = _relative_to(host_root, os.path.join(base, path))
+        relative = relative_inside(host_root, os.path.join(base, path))
         if relative is None:
             outside.append(path)
         elif relative in seed_ids:
@@ -123,17 +121,8 @@ def _path_base(spec_dir: str, git_root: str | None, host_root: str) -> str:
     """
     if git_root is not None:
         return host_root
-    answer = run_git(spec_dir, ["rev-parse", "--show-toplevel"])
-    top = answer.stdout.decode("utf-8", errors="replace").strip()
-    return os.path.realpath(top) if answer.returncode == 0 and top else host_root
-
-
-def _relative_to(host_root: str, path: str) -> str | None:
-    """The absolute *path* relative to *host_root*, ``/``-separated; ``None`` when it lies outside."""
-    relative = os.path.relpath(os.path.realpath(path), host_root)
-    if relative == _PARENT or relative.startswith(_PARENT + os.sep):
-        return None
-    return relative.replace(os.sep, "/")
+    top = git_top_level(spec_dir)
+    return os.path.realpath(top) if top else host_root
 
 
 def _relative_to_spec(relative: str, spec_prefix: str) -> str | None:
@@ -156,8 +145,8 @@ def _spec_file_steps(relative: str, manifest: Mapping[str, Any]) -> set[str]:
     if relative == SEED_MANIFEST_FILE:
         return {FIRST_STEP, *as_dict(manifest.get("step_requirements"))}
     directory, name = posixpath.split(relative)
-    if directory == PLAN_DIR and _PLAN_FILE_RE.match(name):
-        return set(PLAN_STEPS)
+    if directory == PLAN_DIR and PLAN_FILE_RE.match(name):
+        return set(PLAN_FILE_STEPS)
     match = None if directory else STEP_FILE_RE.match(name)
     return {match.group(1)} if match else set()
 
@@ -185,10 +174,16 @@ def _with_artifact(steps: Collection[str], spec_dir: str, step_order: Sequence[s
     return tuple(step for step in step_order if step in steps and step in present)
 
 
+def steps_without_artifact(steps: Iterable[str], spec_dir: str) -> tuple[str, ...]:
+    """The steps among *steps* that have no artifact in *spec_dir* (see ``_present_steps``), in the order given."""
+    present = _present_steps(spec_dir)
+    return tuple(step for step in steps if step not in present)
+
+
 def _present_steps(spec_dir: str) -> set[str]:
     """Steps with a file in *spec_dir*: a root ``NN_*.json``, or (for 16a to 16c) a milestone plan."""
     present = {match.group(1) for name in os.listdir(spec_dir) if (match := STEP_FILE_RE.match(name))}
     plans = os.path.join(spec_dir, PLAN_DIR)
-    if os.path.isdir(plans) and any(_PLAN_FILE_RE.match(name) for name in os.listdir(plans)):
-        present.update(PLAN_STEPS)
+    if os.path.isdir(plans) and any(PLAN_FILE_RE.match(name) for name in os.listdir(plans)):
+        present.update(PLAN_FILE_STEPS)
     return present

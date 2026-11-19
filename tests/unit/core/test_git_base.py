@@ -8,11 +8,8 @@ import pytest
 from specdev_tools.core import git_base
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.git_base import (
-    BaselineResult,
-    active_baseline_provider,
     materialise_baseline,
     merge_base_provider,
-    register_baseline_provider,
     resolve_baseline,
     resolve_target_branch,
 )
@@ -45,13 +42,6 @@ def repo(tmp_path: Path) -> Path:
     root.mkdir()
     git(root, "init", "-q", "-b", "main")
     return root
-
-
-@pytest.fixture(autouse=True)
-def _restore_provider():
-    saved = active_baseline_provider()
-    yield
-    register_baseline_provider(saved)
 
 
 def _base_files(repo: Path, spec: str = SPEC) -> str:
@@ -123,12 +113,45 @@ def test_head_on_default_branch_gives_mode_head(repo: Path) -> None:
     assert (resolution.commit, resolution.mode, resolution.note) == (head, "head", None)
 
 
-def test_head_on_another_branch_adds_a_note(repo: Path) -> None:
+def test_head_on_another_branch_says_only_uncommitted_changes_count(repo: Path) -> None:
     head = _base_files(repo)
     git(repo, "checkout", "-q", "-b", "feature")
     resolution = resolve_baseline(str(repo))
     assert (resolution.commit, resolution.mode) == (head, "head")
-    assert resolution.note
+    assert resolution.note == "the baseline is HEAD itself: only uncommitted changes count as new"
+
+
+def test_head_on_a_slashed_default_branch_adds_no_note(repo: Path, tmp_path: Path) -> None:
+    """``release/1.0`` against ``origin/release/1.0``: the full branch name is compared, not the last path part."""
+    _base_files(repo)
+    git(repo, "checkout", "-q", "-b", "release/1.0")
+    remote = tmp_path / "remote.git"
+    git(tmp_path, "init", "-q", "--bare", str(remote))
+    git(repo, "remote", "add", "origin", str(remote))
+    git(repo, "push", "-q", "origin", "release/1.0:release/1.0")
+    git(repo, "fetch", "-q", "origin")
+
+    assert resolve_baseline(str(repo), "origin/release/1.0").note is None
+    assert resolve_baseline(str(repo), "release/1.0").note is None
+
+
+def test_a_target_that_only_ends_like_the_branch_still_gets_the_note(repo: Path) -> None:
+    """Branch ``main`` against the local branch ``feature/main``: ``feature`` is no remote, so the names differ."""
+    _base_files(repo)
+    git(repo, "branch", "feature/main")
+    assert resolve_baseline(str(repo), "feature/main").note == "the baseline is HEAD itself: only uncommitted changes count as new"
+
+
+def test_every_unavailable_baseline_carries_its_reason(repo: Path, tmp_path: Path) -> None:
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert resolve_baseline(str(plain)).note == "not a git repository"
+    assert resolve_baseline(str(repo)).note == "no commit yet"
+    _base_files(repo)
+    assert resolve_baseline(str(repo), "nope").note == "nope does not name a commit"
+    assert resolve_baseline(str(repo), "--evil").note == "--evil does not name a commit"
+    git(repo, "branch", "-q", "-m", "odd")
+    assert resolve_baseline(str(repo)).note == "no base ref found (origin/main, origin/master, main, master); pass --base-ref"
 
 
 def test_no_git_repository_gives_unavailable(tmp_path: Path) -> None:
@@ -153,6 +176,14 @@ def test_shallow_clone_without_merge_base_gives_unavailable(repo: Path, tmp_path
     git(clone, "branch", "-q", "-D", "main")
     git(clone, "update-ref", "-d", "refs/remotes/origin/main")
     assert resolve_baseline(str(clone)).mode == "unavailable"
+
+
+def test_unrelated_history_says_no_common_history(repo: Path) -> None:
+    _base_files(repo)
+    git(repo, "checkout", "-q", "--orphan", "other")
+    _commit(repo, "unrelated", z="1")
+    resolution = resolve_baseline(str(repo), "main")
+    assert (resolution.mode, resolution.note) == ("unavailable", "no common history with main (a shallow clone?)")
 
 
 def _tree_files(root: Path) -> dict[str, str]:
@@ -209,6 +240,17 @@ def test_seed_added_on_the_branch_is_left_out_of_the_baseline(repo: Path) -> Non
         assert not (tree.root / "docs/seeds/added.md").exists()
 
 
+def test_a_git_failure_other_than_an_absent_seed_propagates(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    commit = _base_files(repo)
+
+    def failing(*_args: object) -> bool:
+        raise GitViewError(SpecError(code="E708", message="git broke"))
+
+    monkeypatch.setattr(git_base, "path_exists_at", failing)
+    with pytest.raises(GitViewError, match="git broke"):
+        materialise_baseline(str(repo), commit, repo / SPEC, ["docs/seeds/absent.md"])
+
+
 def test_spec_folder_absent_at_base_gives_unavailable(repo: Path) -> None:
     _commit(repo, "no spec yet", readme="x")
     git(repo, "checkout", "-q", "-b", "feature")
@@ -222,6 +264,50 @@ def test_spec_folder_absent_at_base_gives_unavailable(repo: Path) -> None:
     assert seen == []
     with pytest.raises(GitViewError):
         materialise_baseline(str(repo), git(repo, "rev-parse", "HEAD~1"), repo / SPEC, [])
+
+
+@pytest.mark.parametrize("failure", [ValueError("boom"), AttributeError("'list' object has no attribute 'get'"), KeyError("x")])
+def test_checks_that_raise_on_the_baseline_tree_make_it_unavailable_with_the_reason(repo: Path, failure: Exception) -> None:
+    _base_files(repo)
+    git(repo, "checkout", "-q", "-b", "feature")
+    _commit(repo, "edit", **{SEED.replace("/", "__"): "charter v2"})
+    seen: list[Path] = []
+
+    def checks(root: Path, _spec: Path) -> list[SpecError]:
+        seen.append(root)
+        raise failure
+
+    result = merge_base_provider(checks, lambda _: [SEED])(repo / SPEC, str(repo))
+
+    assert result.mode == "unavailable" and result.errors == ()
+    assert result.resolution is not None and result.resolution.note is not None
+    assert result.resolution.note.startswith(f"the checks could not run on the baseline tree: {type(failure).__name__}: ")
+    assert not seen[0].exists()
+
+
+def test_a_long_failure_text_is_cut_in_the_reason(repo: Path) -> None:
+    _base_files(repo)
+    git(repo, "checkout", "-q", "-b", "feature")
+    _commit(repo, "edit", a="1")
+
+    def checks(_root: Path, _spec: Path) -> list[SpecError]:
+        raise ValueError("x " * 500)
+
+    result = merge_base_provider(checks, lambda _: [])(repo / SPEC, str(repo))
+    assert result.resolution is not None and result.resolution.note is not None
+    assert len(result.resolution.note) < 300 and result.resolution.note.endswith("...")
+
+
+def test_a_keyboard_interrupt_is_not_swallowed(repo: Path) -> None:
+    _base_files(repo)
+    git(repo, "checkout", "-q", "-b", "feature")
+    _commit(repo, "edit", a="1")
+
+    def checks(_root: Path, _spec: Path) -> list[SpecError]:
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        merge_base_provider(checks, lambda _: [])(repo / SPEC, str(repo))
 
 
 def test_provider_runs_the_checks_on_the_baseline_tree_and_deletes_it(repo: Path) -> None:
@@ -254,11 +340,3 @@ def test_provider_measures_against_the_branch_it_was_given(repo: Path) -> None:
 
     assert result.resolution is not None
     assert (result.resolution.ref, result.resolution.commit, result.resolution.mode) == ("trunk", base, "merge-base")
-
-
-def test_registered_provider_replaces_the_default(tmp_path: Path) -> None:
-    assert active_baseline_provider()(tmp_path, str(tmp_path)).mode == "unavailable"
-    stub = BaselineResult("ok", (SpecError(code="E1", message="m"),))
-    register_baseline_provider(lambda _spec, _root: stub)
-
-    assert git_base.active_baseline_provider()(tmp_path, str(tmp_path)) is stub

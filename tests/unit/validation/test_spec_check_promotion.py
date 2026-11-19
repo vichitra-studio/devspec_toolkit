@@ -22,7 +22,7 @@ import pytest
 
 from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import SpecError
-from specdev_tools.validation.spec_check import _check_result
+from specdev_tools.validation.check_registry import _check_result
 
 # W615 is in PROMOTABLE_PAIRS (-> E615). Used as a representative promotable
 # W-code emitted by one of checks #2-#14 (step-11 invariant/threat drift).

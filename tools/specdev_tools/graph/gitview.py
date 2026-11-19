@@ -112,16 +112,50 @@ def host_root_of(spec_root: str, git_root: str | None = None) -> str:
     return os.path.abspath(git_root) if git_root else os.path.dirname(os.path.abspath(spec_root))
 
 
+def relative_inside(root: str, path: str) -> str | None:
+    """*path* relative to *root* (both resolved through symlinks), ``/``-separated; ``None`` when it lies outside *root*."""
+    relative = os.path.relpath(os.path.realpath(path), os.path.realpath(root))
+    if relative == os.pardir or relative.startswith(os.pardir + os.sep):
+        return None
+    return Path(relative).as_posix()
+
+
 def spec_path_in_repo(spec_root: str, git_root: str) -> str:
     """The path of *spec_root* relative to *git_root*, ``/``-separated.
 
     Raises:
         GitViewError: E708 when *spec_root* is not inside *git_root*.
     """
-    relative = os.path.relpath(os.path.realpath(spec_root), os.path.realpath(git_root))
-    if relative == os.pardir or relative.startswith(os.pardir + os.sep):
+    relative = relative_inside(git_root, spec_root)
+    if relative is None:
         raise _fail("E708", f"the spec folder {spec_root} is not inside the git root {git_root}, so it cannot be found in the repository")
-    return Path(relative).as_posix()
+    return relative
+
+
+def git_top_level(folder: str) -> str | None:
+    """The top folder of the git working tree that holds *folder* (``git rev-parse --show-toplevel``); ``None`` outside a repository.
+
+    The one home of this lookup: ``touched_steps`` and the lock merge driver call it.
+
+    Raises:
+        GitViewError: E708 when git is missing or does not answer in time.
+    """
+    process = run_git(folder, ["rev-parse", "--show-toplevel"])
+    top = process.stdout.decode("utf-8", errors="replace").strip()
+    return top if process.returncode == 0 and top else None
+
+
+def path_exists_at(ref: str, git_root: str, path: str) -> bool:
+    """Whether *path* (relative to *git_root*) exists at *ref*; ``False`` only when git answers that it does not.
+
+    Raises:
+        GitViewError: E708 when the ref does not resolve or git fails.
+    """
+    commit = resolve_ref(ref, git_root)
+    process = run_git(git_root, ["ls-tree", "--name-only", commit, "--", path])
+    if process.returncode != 0:
+        raise _fail("E708", f"{path} cannot be looked up at ref '{ref}': {git_reason(process)}")
+    return bool(process.stdout.strip())
 
 
 def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.TemporaryDirectory[str]:

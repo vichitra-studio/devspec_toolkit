@@ -138,7 +138,7 @@ Run when the task is to apply edits driven by a source of findings.
 | Edit intent | Caller supplies findings |
 | Spec-check errors | `specdev spec-check $SPEC_DIR --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json` |
 
-Each finding has minimally `{id, severity, description, impact[]}`. The `impact[]` is a list of pointer-shaped `(file, id)` targets. If the source produced zero actionable findings (empty `records[]` for backlog, empty `findings[]` for spec-check, no items supplied for edit intent), stop and report "no findings" — do not proceed to Step 2.
+Each finding has minimally `{id, severity, description, impact[]}`; a backlog record names its item `item_id`, and has `severity` only when the item is of the 1.1.1 shape. The `impact[]` is a list of pointer-shaped `(file, id)` targets. If the source produced zero actionable findings (empty `records[]` for backlog, empty `findings[]` for spec-check, no items supplied for edit intent), stop and report "no findings" — do not proceed to Step 2.
 
 ### Step 2 — Validate pointers
 
@@ -205,7 +205,7 @@ Verify routing:
 specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT
 ```
 
-Entries landing in `Unclassified` mean `impact[]` lacks a step-routable path.
+Entries under `unplaced` (W613) have an `about` id that names no node, or are 1.1.1 items whose `impact[]` names no step.
 
 ## Permission allow-list
 

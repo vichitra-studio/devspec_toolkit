@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse, os, json, re, sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NoReturn
 # Lazy imports handled inside main/command blocks to improve CLI responsiveness
 
 from .core.config import get_config, reset_config
@@ -108,6 +109,17 @@ def _discover_project_canon_dir(
     return None
 
 
+def _refuse_spec_check(error: SpecError, json_output: bool) -> NoReturn:
+    """Print a refusal of ``spec-check`` (one finding: E520, E706, E708) and exit 1."""
+    from .core.json_output import format_errors_json
+
+    if json_output:
+        print(format_errors_json([error], context={"command": "spec-check"}))
+    else:
+        print(error.render(), file=sys.stderr)
+    sys.exit(1)
+
+
 def _spec_check_step_gate(
     args: argparse.Namespace,
     repo_root: str,
@@ -115,48 +127,30 @@ def _spec_check_step_gate(
     git_root: str | None,
     spec_root: str | None,
     project_canon_dir: str | None,
-) -> None:
+) -> NoReturn:
     """``spec-check --step`` and ``spec-check --paths``: print the step gate report and exit 0 (clear) or 1 (blocked).
 
-    ``--paths`` maps the touched files to steps first and exits 0 without running a check when none maps.  The exit code
-    comes from the gate alone: ``_json_exit`` is not used, because it fails on any finding under
-    ``SPECDEV_WARNINGS_AS_ERRORS`` and on pending or upstream debt.  A refusal (E706 for an unknown step, E708) is printed
-    as one finding and exits 1.
+    ``validation.step_gate_run.gate_run`` decides what is gated and in which order the notes come; this prints them, then
+    the report, and exits.  The exit code comes from the gate alone: ``_json_exit`` is not used, because it fails on any
+    finding under ``SPECDEV_WARNINGS_AS_ERRORS`` and on pending or upstream debt.  A refusal (E520 for a missing spec
+    folder, E706 for an unknown step, E708) is printed as one finding and exits 1.
     """
     from .core.errors import FindingError
-    from .core.git_base import BaselineResult
     from .core.json_output import format_errors_json
-    from .validation.spec_check import StepGateRun, run_step_gate, touched_steps_of
-    from .validation.step_gate_report import (
-        DETAIL_SUMMARY, gate_exit_code, render_step_gate, reported_errors, step_gate_json,
-    )
-    from .validation.touched_steps import SEED_EDIT_NOTE, outside_root_note
+    from .validation.step_gate import gate_exit_code, reported_errors
+    from .validation.step_gate_report import DETAIL_SUMMARY, render_step_gate, step_gate_json
+    from .validation.step_gate_run import gate_run
 
-    json_output = getattr(args, "json_output", False)
     try:
-        steps = args.steps
-        if steps is None:
-            touched = touched_steps_of(repo_root, spec_dir, args.paths, git_root, spec_root)
-            for note in (outside_root_note(touched), SEED_EDIT_NOTE if touched.seed_edited else None):
-                if note:
-                    print(note, file=sys.stderr)
-            steps = list(touched.steps)
-            if args.paths and not steps:
-                print("no step gated: no listed path maps to a step", file=sys.stderr)
-        run = (
-            run_step_gate(repo_root, spec_dir, steps, git_root, spec_root, project_canon_dir, base_ref=args.base_ref)
-            if steps
-            else StepGateRun((), BaselineResult("unavailable"))
+        run = gate_run(
+            repo_root, spec_dir, steps=args.steps, paths=args.paths, git_root=git_root, spec_root=spec_root,
+            project_canon_dir=project_canon_dir, base_ref=args.base_ref,
         )
     except FindingError as exc:
-        if json_output:
-            print(format_errors_json([exc.error], context={"command": "spec-check"}))
-        else:
-            print(exc.error.render(), file=sys.stderr)
-        sys.exit(1)
+        _refuse_spec_check(exc.error, args.json_output)
     for note in run.notes:
         print(note, file=sys.stderr)
-    if json_output:
+    if args.json_output:
         context = {"command": "spec-check", "step_gate": step_gate_json(run.results, run.baseline)}
         print(format_errors_json(reported_errors(run.results), context=context))
     elif run.results:
@@ -2302,24 +2296,30 @@ def main():
     elif args.cmd == "spec-check":
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
-        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
-        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        git_root = os.path.abspath(args.git_root) if args.git_root else None
+        spec_root = os.path.abspath(args.spec_root) if args.spec_root else None
         project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        gating = args.steps is not None or args.paths is not None
-        if gating and args.include_forward_replay:
-            p.error("spec-check: --include-forward-replay cannot be combined with --step or --paths (id regressions are suspects there)")
-        if not gating and (args.base_ref is not None or args.detail is not None):
-            p.error("spec-check: --base-ref and --detail apply only with --step or --paths")
-        if gating:
+        from .core.errors import FindingError
+        from .validation.step_gate_run import gate_usage_error
+        usage = gate_usage_error(
+            steps=args.steps, paths=args.paths, include_forward_replay=args.include_forward_replay,
+            base_ref=args.base_ref, detail=args.detail,
+        )
+        if usage:
+            p.error(usage)
+        if args.steps is not None or args.paths is not None:
             _spec_check_step_gate(args, repo_root, spec_dir, git_root, spec_root, project_canon_dir)
-        elif getattr(args, "json_output", False):
-            from .validation.spec_check import run_spec_check_json
-            errs, ctx = run_spec_check_json(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
-            _json_exit(errs, "spec-check", extra_context=ctx)
-        else:
-            from .validation.spec_check import run_spec_check
-            errs = run_spec_check(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
-            _print_and_exit_if_errors(errs)
+        try:
+            if args.json_output:
+                from .validation.spec_check import run_spec_check_json
+                errs, ctx = run_spec_check_json(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+                _json_exit(errs, "spec-check", extra_context=ctx)
+            else:
+                from .validation.spec_check import run_spec_check
+                errs = run_spec_check(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+                _print_and_exit_if_errors(errs)
+        except FindingError as exc:
+            _refuse_spec_check(exc.error, args.json_output)
 
     else:
         p.print_help()

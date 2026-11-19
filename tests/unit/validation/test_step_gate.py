@@ -9,14 +9,18 @@ from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import FindingError, SpecError, link_target
 from specdev_tools.core.git_base import BaselineResult
 from specdev_tools.core.step_order import load_step_order
-from specdev_tools.validation.spec_check import _check_result
+from specdev_tools.validation.check_registry import _check_result
 from specdev_tools.validation.step_gate import (
     StepGateResult,
     WaitingOn,
     classify_for_step,
     classify_for_steps,
     declared_owner,
+    gate_exit_code,
     identity_key,
+    reported_errors,
+    union_errors,
+    union_waiting,
 )
 
 ROOT = Path(__file__).parents[3]
@@ -206,9 +210,51 @@ def test_the_same_finding_twice_is_one_finding() -> None:
     assert gate([error, error], "05").blocking.own == (error,)
 
 
-def test_the_key_is_the_eight_fields_and_no_message() -> None:
-    error = SpecError("E700", "text", "p", "sub", "spec/a.json", ".x[0]", "v", "step:04", "fr-a", "derives_from->ac-a")
-    assert identity_key(error, declared_owner) == ("E700", "step:04", "fr-a", "derives_from->ac-a", "spec/a.json", ".x[0]", "sub", "p")
+def test_the_key_is_the_eight_fields_no_message_and_no_array_index() -> None:
+    error = SpecError("E700", "text", "p", "sub", "spec/a.json", ".x[0].y[12]", "v", "step:04", "fr-a", "derives_from->ac-a")
+    key = identity_key(error, declared_owner)
+    assert key == ("E700", "step:04", "fr-a", "derives_from->ac-a", "spec/a.json", ".x[].y[]", "sub", "p")
+    assert key.location == ".x[].y[]" and key.node_id == "fr-a"
+
+
+def test_an_insert_before_a_finding_does_not_change_its_key() -> None:
+    before = err("E700", "step:04", "fr-a", jq_path=".functional_requirements[2]")
+    after = err("E700", "step:04", "fr-a", jq_path=".functional_requirements[3]")
+    assert identity_key(before, declared_owner) == identity_key(after, declared_owner)
+
+
+def test_two_findings_with_one_key_and_two_messages_are_two_findings_the_same_message_twice_is_one() -> None:
+    first, second = err("E520", "step:05", message="/0/scope"), err("E520", "step:05", message="/1/scope")
+    result = gate([first, second, first], "05")
+    assert result.blocking.own == (first, second)
+
+
+def test_two_w630_of_one_id_in_two_files_are_both_listed() -> None:
+    first = err("W630", "step:05", "amb-x", message="open item amb-x in 05_a.json")
+    second = err("W630", "step:05", "amb-x", message="open item amb-x in 08_b.json")
+    assert gate([first, second], "05").own_warnings == (first, second)
+
+
+# --- exit code and the union over steps -------------------------------------------------------------------------
+
+def test_exit_code_is_1_when_any_step_blocks_and_0_otherwise() -> None:
+    errors = [err("E500", "step:08", "fx-a")]
+    clear, blocked = classify_for_steps(errors, ["05", "08"], declared_owner, ORDER, OK_BASELINE)
+    assert (gate_exit_code([clear]), gate_exit_code([clear, blocked]), gate_exit_code([])) == (0, 1, 0)
+
+
+def test_union_and_reported_errors_list_a_finding_of_two_steps_once() -> None:
+    error, warning = err("E500", "step:04", "fr-a"), err("W500", "step:04", "fr-b")
+    results = classify_for_steps([error, warning], ["05", "06"], declared_owner, ORDER, OK_BASELINE)
+    assert reported_errors(results) == [error, warning]
+    assert union_errors(result.blocking.errors for result in results) == [error]
+
+
+def test_union_waiting_lists_a_waiting_finding_of_two_steps_once() -> None:
+    error = err("E500", "step:05", "api-a")
+    on = waiting_on("api-a")
+    results = (gate([error], "05", waiting=on), gate([error], "05", waiting=on))
+    assert [entry.error for entry in union_waiting(results)] == [error]
 
 
 # --- steps ------------------------------------------------------------------------------------------------------

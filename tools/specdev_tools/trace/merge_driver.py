@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME
 from specdev_tools.core.errors import FindingError, make_error
+from specdev_tools.graph import gitview
 from specdev_tools.graph.gitview import GitViewError, git_reason, run_git
 from specdev_tools.trace.lockfile import Lock, LockEntry, parse_lock, replace_file_atomically, serialise_lock
 
@@ -111,8 +112,14 @@ def _git(git_root: str, args: Sequence[str]) -> str:
 
 
 def git_top_level(folder: str) -> str:
-    """The top folder of the working tree that holds *folder* (``git rev-parse --show-toplevel``); E520 outside a repository."""
-    return _git(folder, ["rev-parse", "--show-toplevel"])
+    """The top folder of the working tree that holds *folder*; E520 outside a repository (the lookup is ``gitview.git_top_level``)."""
+    try:
+        top = gitview.git_top_level(folder)
+    except GitViewError as error:
+        raise LockMergeError(make_error("E520", error.error.message)) from None
+    if top is None:
+        raise LockMergeError(make_error("E520", f"{folder} is not inside a git working tree"))
+    return top
 
 
 def attribute_line(spec_rel_path: str) -> str:

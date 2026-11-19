@@ -4,9 +4,9 @@ Wraps validate-all as the core, then adds checks that validate-all doesn't run
 (seed-lint, fixtures-lint, completeness-check, canon-schema-alignment).
 Reports per-check breakdown with PASS/WARN/FAIL/SKIP status.
 
-The checks are a registry (``CHECK_REGISTRY``, filled by ``register_check``) that one loop runs once per run.
-``run_step_gate`` runs the same checks once on the working tree and once on the merge-base tree and sorts the findings
-by the step that owns them (``validation.step_gate``).
+This module holds the check bodies, their registrations and the plain run with its summary.  The registry they are
+registered in is ``validation.check_registry``; the step gate, which runs the same checks once on the working tree and
+once on the merge-base tree, is ``validation.step_gate_run``.
 """
 
 from __future__ import annotations
@@ -14,86 +14,31 @@ from __future__ import annotations
 import os
 import sys
 from collections import OrderedDict
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field, replace
-from functools import cached_property
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any
 
-from ..core.ambiguity_items import AmbiguityReadError, iter_ambiguity_items
 from ..core.config import reset_config
 from ..core.errors import SpecError
-from ..core.git_base import (
-    BaselineChecks,
-    BaselineResult,
-    SeedPaths,
-    active_baseline_provider,
-    merge_base_provider,
-    register_baseline_provider,
-)
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
-from ..core.scope_helpers import str_items
-from ..core.step_order import load_step_order
-from ..graph.build import build_graph
 from ..graph.check import run_graph_check
-from ..graph.gitview import host_root_of, read_seed_texts, read_seed_texts_noting
-from ..graph.kinds import SEED_KIND
+from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
-from ..graph.ownership import (
-    STEP_PREFIX,
-    OwnerContext,
-    load_ownership_table,
-    owner_for,
-    stamp_file_owner,
-    step_for_file,
-)
+from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
 from ..trace.computed_fields import check_stored_computed
-from ..trace.lockfile import MERGE_CHECK_OWNER, Lock, LockError, lock_path, read_lock
+from ..trace.lockfile import Lock, lock_path
 from ..trace.records import check_records, record_files
 from ..trace.suspects import check_lock
-from .linter_utils import build_lint_graph
+from .check_registry import (
+    CheckContext,
+    _check_result,
+    _read_lock,
+    _skip,
+    register_check,
+    run_registered_checks,
+)
 from .open_items import check_open_items
-from .step_gate import StepGateResult, WaitingOn, classify_for_steps, declared_owner, require_known_order_step
-from .touched_steps import SEED_MANIFEST_FILE, TouchedSteps, steps_for_paths
-
-
-def _classify(errors: list[SpecError]) -> dict[str, Any]:
-    """Return status/counts for a list of errors."""
-    e_count = sum(1 for e in errors if not e.code.startswith("W"))
-    w_count = sum(1 for e in errors if e.code.startswith("W"))
-    if e_count:
-        status = "FAIL"
-    elif w_count:
-        status = "WARN"
-    else:
-        status = "PASS"
-    return {"status": status, "error_count": e_count, "warning_count": w_count}
-
-
-def _check_result(errors: list[SpecError]) -> dict[str, Any]:
-    """Build a per-check result dict with W->E promotion applied first.
-
-    Promotion (``SPECDEV_WARNINGS_AS_ERRORS`` / ``SPECDEV_PROMOTE_CODES``) must be
-    applied *before* both the status classification and the stored error list, so
-    that:
-      - ``_classify`` reports FAIL (not WARN) when a check's only errors are
-        promotable W-codes under an active promotion contract, and
-      - the ``errors`` list — surfaced in the stderr breakdown, the JSON
-        per-check ``findings``, and the aggregate returned by ``_collect_errors``
-        — carries the promoted E-codes, so downstream consumers parsing the code
-        field do not mis-classify promoted errors as warnings.
-
-    ``_apply_we_promotion`` is a no-op (dedup only) when no promotion env is set,
-    and is idempotent on already-promoted codes (e.g. schema-validation errors
-    promoted inside ``validate_file``). Control-flow gates that branch on raw
-    codes (the ``canon_ok`` bootstrap gate) are intentionally left to read the
-    unpromoted lists; only result *storage* flows through this helper.
-    """
-    from .validate import _apply_we_promotion
-
-    promoted = _apply_we_promotion(errors)
-    return {**_classify(promoted), "errors": promoted}
 
 
 def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
@@ -150,24 +95,6 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
             ),
         )
     ]
-
-
-def graph_for_checks(repo_root: str, spec_dir: str, spec_root: str | None, lint_graph: Graph | None) -> Graph | None:
-    """The graph of *spec_root* for the ``graph`` and ``trace-lock`` checks: the lint graph when that is the same folder as *spec_dir*, else a new build.
-
-    ``None`` when the registry is unavailable (the ``graph`` check then reports that one E520).
-    """
-    if os.path.abspath(spec_root or spec_dir) == os.path.abspath(spec_dir):
-        return lint_graph
-    return build_lint_graph(spec_root or spec_dir, repo_root)
-
-
-def _read_lock(lock_dir: str) -> tuple[Lock | None, SpecError | None]:
-    """The trace lock under *lock_dir* (empty when the file is absent), or the E760 finding when it cannot be read."""
-    try:
-        return read_lock(lock_dir), None
-    except LockError as exc:
-        return None, exc.error
 
 
 def _trace_lock_result(
@@ -229,138 +156,6 @@ def lock_link_findings(
     return [e for e in findings if (node := graph.by_id.get(e.node_id or "")) is not None and node.step == step]
 
 
-
-@dataclass
-class CheckContext:
-    """The arguments of one ``spec-check`` run, the results so far (``checks``) and the values several checks share.
-
-    A shared value is computed on first use, so a check does not depend on where the registry puts the check that
-    needs the same value.  ``quiet`` is set for the run on the baseline tree of the step gate: it says nothing on stderr.
-    """
-
-    repo_root: str
-    spec_dir: str
-    include_forward_replay: bool = False
-    git_root: str | None = None
-    spec_root: str | None = None
-    project_canon_dir: str | None = None
-    quiet: bool = False
-    checks: OrderedDict[str, dict[str, Any]] = field(default_factory=OrderedDict)
-
-    @property
-    def effective_spec_root(self) -> str:
-        """``--spec-root`` when given, else the spec folder."""
-        return self.spec_root or self.spec_dir
-
-    @cached_property
-    def root(self) -> Path:
-        """The toolkit root, absolute."""
-        return Path(os.path.abspath(self.repo_root))
-
-    @cached_property
-    def project_root(self) -> str:
-        """The host repository root (``host_root_of``)."""
-        return host_root_of(self.spec_dir, self.git_root)
-
-    @cached_property
-    def owner_context(self) -> OwnerContext:
-        """The ownership table of the toolkit, read once per run; raises ``OwnershipTableError`` when it cannot be read."""
-        return OwnerContext(rows=load_ownership_table(self.repo_root))
-
-    @cached_property
-    def lint_graph(self) -> Graph | None:
-        """The graph the linters share; ``None`` when the registry is unavailable."""
-        return build_lint_graph(self.spec_dir, self.repo_root)
-
-    @cached_property
-    def check_graph(self) -> Graph | None:
-        """The graph of the spec root for the ``graph``, ``computed-fields``, ``records`` and ``trace-lock`` checks."""
-        return graph_for_checks(self.repo_root, self.spec_dir, self.spec_root, self.lint_graph)
-
-    @cached_property
-    def lock_state(self) -> tuple[Lock | None, SpecError | None]:
-        """The trace lock of the spec root, or the E760 finding when it cannot be read."""
-        return _read_lock(self.effective_spec_root)
-
-    @cached_property
-    def canon_errors(self) -> list[SpecError]:
-        """The findings of the canonical preflight, without repeats."""
-        from ..canonical.lint import lint_canon_dirs
-
-        return list(
-            dict.fromkeys(
-                lint_canon_dirs(
-                    self.repo_root,
-                    project_canon_dir=self.project_canon_dir,
-                    require_manifest_schema_registration=True,
-                )
-            )
-        )
-
-    @cached_property
-    def canon_ok(self) -> bool:
-        """Whether the canonical preflight has no error; the canon-dependent checks are skipped when it has.
-
-        Read from the unpromoted findings on purpose: promotion must not change which checks run.
-        """
-        return not any(not e.code.startswith("W") for e in self.canon_errors)
-
-    @cached_property
-    def closure_errors(self) -> list[SpecError]:
-        """The findings of the traceability closure; ``completeness-check`` is the subset with its codes."""
-        from .traceability_closure import check_traceability_closure
-
-        return check_traceability_closure(self.spec_dir, self.repo_root)
-
-
-CheckFn = Callable[[CheckContext], dict[str, Any]]
-"""``ctx -> result``: ``_check_result(errors)`` or ``{"status": "SKIP", "reason": ...}``."""
-
-
-class CheckSpec(NamedTuple):
-    """One registered check: its name in the report, the function that runs it and the owner of a finding that has none."""
-
-    name: str
-    fn: CheckFn
-    default_owner: str
-
-
-CHECK_REGISTRY: list[CheckSpec] = []
-"""The checks ``spec-check`` runs, in order; ``register_check`` appends to it."""
-
-
-def register_check(name: str, fn: CheckFn, *, default_owner: str = MERGE_CHECK_OWNER) -> None:
-    """Append the check *name* to the checks every ``spec-check`` run executes, once, after the ones registered before.
-
-    *default_owner* (``merge-check`` or ``step:<id>``) is stamped on the findings of *fn* that carry no owner of their
-    own.  Other milestones register their checks from their own module instead of editing the run loop.
-
-    Raises:
-        ValueError: a check of that name is already registered.
-    """
-    if any(spec.name == name for spec in CHECK_REGISTRY):
-        raise ValueError(f"check {name!r} is already registered")
-    CHECK_REGISTRY.append(CheckSpec(name, fn, default_owner))
-
-
-def _skip(reason: str) -> dict[str, Any]:
-    return {"status": "SKIP", "reason": reason}
-
-
-def _with_default_owner(result: dict[str, Any], owner: str, context: OwnerContext) -> dict[str, Any]:
-    """*result* with an owner on each of its findings that has none.
-
-    The owner of a finding is the one it carries; else the row of the ownership table for its code (*context*, asked
-    without a node: a ``fixed_step:<id>`` or a gate rule answers); else *owner*, the default of the check.
-    """
-    errors = result.get("errors")
-    if not errors:
-        return result
-    stamped = [
-        err if err.owner is not None else replace(err, owner=owner_for(err.code, None, context) or owner)
-        for err in errors
-    ]
-    return {**result, "errors": stamped}
 
 
 def _owned_by_file(errors: Sequence[SpecError], spec_dir: str) -> list[SpecError]:
@@ -555,7 +350,7 @@ def _check_trace_lock(ctx: CheckContext) -> dict[str, Any]:
 
 
 def _check_open_items(ctx: CheckContext) -> dict[str, Any]:
-    return _check_result(check_open_items(ctx.spec_dir, gate="step"))
+    return _check_result(check_open_items(ctx.spec_dir, gate="step", read=ctx.ambiguity_read))
 
 
 register_check("schema-validation", _check_schema_validation)
@@ -590,16 +385,6 @@ def _warn_ignored_promotions() -> None:
     _warn_ignored_promote_codes()
 
 
-def run_registered_checks(ctx: CheckContext) -> OrderedDict[str, dict[str, Any]]:
-    """Run each check of ``CHECK_REGISTRY`` once, in order, store its result in ``ctx.checks`` by name and return them.
-
-    A finding that has no owner gets the check's default owner.
-    """
-    for spec in CHECK_REGISTRY:
-        ctx.checks[spec.name] = _with_default_owner(spec.fn(ctx), spec.default_owner, ctx.owner_context)
-    return ctx.checks
-
-
 def _run_checks(
     repo_root: str,
     spec_dir: str,
@@ -617,7 +402,13 @@ def _run_checks(
     - ``{"status": "PASS"|"WARN"|"FAIL", "error_count": int, "warning_count": int, "errors": list}``
     """
     ctx = CheckContext(
-        repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir, quiet
+        repo_root=repo_root,
+        spec_dir=spec_dir,
+        include_forward_replay=include_forward_replay,
+        git_root=git_root,
+        spec_root=spec_root,
+        project_canon_dir=project_canon_dir,
+        quiet=quiet,
     )
     if not quiet:
         _warn_ignored_promotions()
@@ -707,148 +498,3 @@ def _print_summary(checks: OrderedDict[str, dict[str, Any]]) -> None:
     for line in lines:
         print(line, file=sys.stderr)
     print(file=sys.stderr)
-
-
-@dataclass(frozen=True)
-class StepGateRun:
-    """The outcome of ``run_step_gate``: one result per gated step, the baseline "new" was measured against, and the stderr notes.
-
-    ``notes`` are lines the caller prints on stderr (files the graph could not read, a baseline that is HEAD itself).
-    """
-
-    results: tuple[StepGateResult, ...]
-    baseline: BaselineResult
-    notes: tuple[str, ...] = ()
-
-
-def _unchanged(name: str) -> str:
-    return name
-
-
-def _gate_errors(checks: Mapping[str, dict[str, Any]]) -> list[SpecError]:
-    """The findings of every check, all of them (the step gate sorts them itself); ``completeness-check`` repeats ``traceability-closure``."""
-    return [e for name, info in checks.items() if name != _COMPLETENESS_CHECK for e in info.get("errors", ())]
-
-
-def _step_names(repo_root: str) -> list[str]:
-    """The steps of ``tools/step_order.json`` in waterfall order."""
-    return str_items(load_step_order(repo_root).get("steps"))
-
-
-def _step_ranks(repo_root: str) -> dict[str, int]:
-    """Each step of ``tools/step_order.json`` mapped to its place in the waterfall."""
-    return {step: index for index, step in enumerate(_step_names(repo_root))}
-
-
-def touched_steps_of(
-    repo_root: str,
-    spec_dir: str,
-    paths: Sequence[str],
-    git_root: str | None = None,
-    spec_root: str | None = None,
-) -> TouchedSteps:
-    """The steps the touched *paths* (``--paths``) put under the gate; see ``validation.touched_steps``.
-
-    Reads the seed manifest of *spec_dir* (none is an empty manifest) and builds the graph of the spec root only when a
-    listed seed document is among the paths.
-
-    Raises:
-        FindingError: E708 when the spec folder is outside the host root.
-    """
-    manifest = read_json_object(os.path.join(spec_dir, SEED_MANIFEST_FILE)) or {}
-    return steps_for_paths(
-        paths, spec_dir, manifest, lambda: build_graph(spec_root or spec_dir, repo_root),
-        step_order=_step_names(repo_root), git_root=git_root,
-    )
-
-
-def _baseline_checks(repo_root: str) -> BaselineChecks:
-    """The check runner of the baseline provider: all checks on a materialised tree, quiet, with that tree as git root and spec root."""
-
-    def compute(baseline_root: Path, baseline_spec_dir: Path) -> list[SpecError]:
-        spec = str(baseline_spec_dir)
-        canon = os.path.join(spec, "canon")
-        checks = _run_checks(
-            repo_root, spec, git_root=str(baseline_root), spec_root=spec,
-            project_canon_dir=canon if os.path.isdir(canon) else None, quiet=True,
-        )
-        return _gate_errors(checks)
-
-    return compute
-
-
-def _seed_paths_of(graph: Graph | None) -> SeedPaths:
-    """The seed documents of *graph* (paths relative to the host root), as the baseline provider asks for them."""
-    paths = sorted({node.file for node in graph.nodes if node.kind == SEED_KIND}) if graph is not None else []
-    return lambda _spec_dir: paths
-
-
-def _measure_baseline(ctx: CheckContext, base_ref: str | None) -> BaselineResult:
-    """The errors of the spec tree at the merge-base commit, from the merge-base provider registered here for the run.
-
-    This is the one place that registers the default provider (``merge_base_provider`` with the check runner); the
-    previously registered provider is put back afterwards.
-    """
-    previous = active_baseline_provider()
-    register_baseline_provider(
-        merge_base_provider(_baseline_checks(ctx.repo_root), _seed_paths_of(ctx.check_graph), base_ref)
-    )
-    try:
-        return active_baseline_provider()(Path(ctx.spec_dir), host_root_of(ctx.effective_spec_root, ctx.git_root))
-    finally:
-        register_baseline_provider(previous)
-
-
-def _waiting_on(ctx: CheckContext) -> WaitingOn | None:
-    """The open items that explain errors of their steps; ``None`` with no graph or an unreadable artifact (``open-items`` reports that)."""
-    if ctx.check_graph is None:
-        return None
-    try:
-        items = list(iter_ambiguity_items(ctx.spec_dir))
-    except AmbiguityReadError:
-        return None
-    return WaitingOn.from_items(ctx.check_graph, items)
-
-
-def _gate_notes(ctx: CheckContext, baseline: BaselineResult) -> tuple[str, ...]:
-    notes: list[str] = []
-    unreadable = [error.file for error in ctx.check_graph.load_errors] if ctx.check_graph is not None else []
-    if unreadable:
-        notes.append(f"specdev spec-check: could not read {', '.join(unreadable)}; the answer may be incomplete")
-    if baseline.resolution is not None and baseline.resolution.note:
-        notes.append(f"note: {baseline.resolution.note}")
-    return tuple(notes)
-
-
-def run_step_gate(
-    repo_root: str,
-    spec_dir: str,
-    steps: Sequence[str],
-    git_root: str | None = None,
-    spec_root: str | None = None,
-    project_canon_dir: str | None = None,
-    base_ref: str | None = None,
-) -> StepGateRun:
-    """Run every check once and the baseline once, and sort the findings into the buckets of each of *steps*.
-
-    The step gate is the check for finishing a step: a finding of the step blocks it, a new finding of an earlier step
-    blocks it, everything else is listed (see ``validation.step_gate``).  *base_ref* is the ``--base-ref`` flag.  Nothing
-    is printed except what the checks print themselves; the caller prints the notes and the report.
-
-    Raises:
-        FindingError: E706 when a step is not a step of ``tools/step_order.json`` (before any check runs).
-    """
-    reset_config()
-    order = _step_ranks(repo_root)
-    for step in steps:
-        require_known_order_step(order, step)
-    ctx = CheckContext(repo_root, spec_dir, False, git_root, spec_root, project_canon_dir)
-    _warn_ignored_promotions()
-    errors = _gate_errors(run_registered_checks(ctx))
-    baseline = _measure_baseline(ctx, base_ref)
-    graph = ctx.check_graph
-    results = classify_for_steps(
-        errors, steps, declared_owner, order, baseline, _waiting_on(ctx),
-        canonical_id=graph.canonical_id if graph is not None else _unchanged,
-    )
-    return StepGateRun(results, baseline, _gate_notes(ctx, baseline))

@@ -11,26 +11,25 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from specdev_tools.core.errors import SpecError
-from specdev_tools.core.git_base import BaselineResult
+from specdev_tools.core.git_base import BaselineResult, BaseResolution
 from specdev_tools.core.json_output import error_to_dict
 from specdev_tools.graph.ownership import STEP_PREFIX
 from specdev_tools.validation.step_gate import (
-    IdentityKey,
+    EXIT_CLEAR,
     StepGateResult,
     WaitingError,
-    declared_owner,
-    dedupe_by_identity,
-    identity_key,
+    gate_exit_code,
+    union_errors,
+    union_waiting,
 )
 
-DETAIL_SUMMARY = "summary"
-DETAIL_ALL = "all"
+Detail = Literal["summary", "all"]
+DETAIL_SUMMARY: Detail = "summary"
+DETAIL_ALL: Detail = "all"
 DETAIL_CHOICES = (DETAIL_SUMMARY, DETAIL_ALL)
-EXIT_CLEAR = 0
-EXIT_BLOCKED = 1
 
 _SUSPECT_CODES = frozenset({"E762", "E763"})
 _SUSPECT_HINT = "(incl. suspects: specdev stale)"
@@ -39,27 +38,10 @@ _TITLE_WIDTH = 19
 _LABEL_WIDTH = 20
 _NO_OWNER = "unowned"
 _NO_BASELINE = "unavailable"
+_UNAVAILABLE = BaseResolution(None, None, "unavailable")
 
 
 # --- shared helpers ---------------------------------------------------------------------------------------------
-
-def gate_exit_code(results: Iterable[StepGateResult]) -> int:
-    """``EXIT_CLEAR`` when no listed step has a blocking finding, else ``EXIT_BLOCKED``."""
-    return EXIT_CLEAR if all(result.clear for result in results) else EXIT_BLOCKED
-
-
-def reported_errors(results: Sequence[StepGateResult]) -> list[SpecError]:
-    """The findings that matter for the steps (blocking, then warnings of the step and new upstream warnings), once each.
-
-    This is the ``errors`` list of the JSON payload, so its ``status`` agrees with the exit code.
-    """
-    found: list[SpecError] = []
-    for result in results:
-        found.extend(result.blocking.errors)
-        found.extend(result.own_warnings)
-        found.extend(result.new_upstream_warnings)
-    return dedupe_by_identity(found, declared_owner)
-
 
 def _who(error: SpecError) -> str:
     """The owner of *error* without the ``step:`` prefix (``05``, ``merge-check``, ``unowned``)."""
@@ -77,16 +59,15 @@ def _flatten(pending: Mapping[str, tuple[SpecError, ...]]) -> list[SpecError]:
 
 # --- text -------------------------------------------------------------------------------------------------------
 
-def render_step_gate(results: Sequence[StepGateResult], baseline: BaselineResult, detail: str = DETAIL_SUMMARY) -> str:
+def render_step_gate(results: Sequence[StepGateResult], baseline: BaselineResult, detail: Detail = DETAIL_SUMMARY) -> str:
     """The text report: one block per step in *results*, each ending in its ``RESULT`` line."""
     base = _base_text(baseline)
     return "\n".join(line for result in results for line in _block(result, base, detail == DETAIL_ALL))
 
 
 def _base_text(baseline: BaselineResult) -> str:
-    if baseline.mode != "ok" or baseline.resolution is None:
-        return f"base: {_NO_BASELINE}"
-    return baseline.resolution.describe()
+    resolution = baseline.resolution if baseline.mode == "ok" else None
+    return (resolution or _UNAVAILABLE).describe()
 
 
 def _block(result: StepGateResult, base: str, full: bool) -> list[str]:
@@ -183,13 +164,13 @@ def step_gate_json(results: Sequence[StepGateResult], baseline: BaselineResult) 
     return {
         "steps": [result.step for result in results],
         "baseline": _baseline_json(baseline),
-        "blocking": _dicts(_union(result.blocking.errors for result in results)),
-        "waiting": [_waiting_json(entry) for entry in _union_waiting(results)],
-        "own_warnings": _dicts(_union(result.own_warnings for result in results)),
-        "new_upstream_warnings": _dicts(_union(result.new_upstream_warnings for result in results)),
-        "upstream_debt": _dicts(_union(result.upstream_debt for result in results)),
+        "blocking": _dicts(union_errors(result.blocking.errors for result in results)),
+        "waiting": [_waiting_json(entry) for entry in union_waiting(results)],
+        "own_warnings": _dicts(union_errors(result.own_warnings for result in results)),
+        "new_upstream_warnings": _dicts(union_errors(result.new_upstream_warnings for result in results)),
+        "upstream_debt": _dicts(union_errors(result.upstream_debt for result in results)),
         "pending": _pending_json(results),
-        "gate_owned": _dicts(_union(result.gate_owned for result in results)),
+        "gate_owned": _dicts(union_errors(result.gate_owned for result in results)),
         "result": "clear" if gate_exit_code(results) == EXIT_CLEAR else "blocked",
     }
 
@@ -205,18 +186,6 @@ def _dicts(errors: Iterable[SpecError]) -> list[dict[str, Any]]:
     return [error_to_dict(error) for error in errors]
 
 
-def _union(groups: Iterable[Iterable[SpecError]]) -> list[SpecError]:
-    return dedupe_by_identity((error for group in groups for error in group), declared_owner)
-
-
-def _union_waiting(results: Sequence[StepGateResult]) -> list[WaitingError]:
-    unique: dict[IdentityKey, WaitingError] = {}
-    for result in results:
-        for entry in result.waiting:
-            unique.setdefault(identity_key(entry.error, declared_owner), entry)
-    return list(unique.values())
-
-
 def _waiting_json(entry: WaitingError) -> dict[str, Any]:
     return {
         "error": error_to_dict(entry.error),
@@ -226,4 +195,4 @@ def _waiting_json(entry: WaitingError) -> dict[str, Any]:
 
 def _pending_json(results: Sequence[StepGateResult]) -> dict[str, list[dict[str, Any]]]:
     owners = sorted({owner for result in results for owner in result.pending})
-    return {owner: _dicts(_union(result.pending.get(owner, ()) for result in results)) for owner in owners}
+    return {owner: _dicts(union_errors(result.pending.get(owner, ()) for result in results)) for owner in owners}

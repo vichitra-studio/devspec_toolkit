@@ -854,20 +854,34 @@ changes:
 
   - type: add_module
     description: >
-      specdev spec-check gates one step: --step N (repeat it for several steps) blocks
-      on the errors that step N owns and on errors of earlier steps that are new since
-      the base; --paths FILE... (last; zero or more files) gates the steps of the
-      files you list; --base-ref REF names the base branch (default:
-      SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main, origin/master, main, master);
-      --detail {summary,all} lists upstream debt, pending and gate-owned findings in
-      full. The report goes to stdout and notes to stderr, and the exit code is 1 only
-      when the result is BLOCKED, with --json too. A new error is told from an old one
-      by the tuple (code, owner, node id, link target, file, jq path, subcode, path),
-      never by its message. --step with --paths, --include-forward-replay with either,
-      and --base-ref or --detail without a gate are usage errors (exit 2). A relative
-      path after --paths is taken from the repository top: --git-root, else the top of
-      the git working tree that holds the spec folder, else the folder that holds the
-      spec folder. See docs/developers/reference.md, section "Step gate".
+      specdev spec-check gates one step: --step N (repeat it for several steps; a
+      step given twice is gated once) blocks on the errors that step N owns and on
+      errors of earlier steps that are new since the base; --paths FILE... (every
+      word up to the next option; zero or more files; write spec_dir before it)
+      gates the steps of the files you list; --base-ref REF names the base branch
+      (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main, origin/master,
+      main, master); --detail {summary,all} lists upstream debt, pending and
+      gate-owned findings in full. The report goes to stdout and notes to stderr,
+      and the exit code is 1 only when the result is BLOCKED, with --json too. A
+      new error is told from an old one by the tuple (code, owner, node id, link
+      target, file, jq path with the array indexes removed, subcode, path), never
+      by its message, and by count: for each tuple, a finding is new only when the
+      working tree has more findings with it than the base had. A reworded
+      message, or an item inserted before an old error, is not new. One limit: an
+      error fixed and another of the same tuple added on the same branch reads as
+      no change at the step gate; plain spec-check still lists both, and the merge
+      check, which no command runs yet, reports every error. With several steps
+      each bucket of the --json report is the union over the steps. When no base
+      can be used the report says base: unavailable, every upstream error counts
+      as new, and stderr gives the reason. A spec folder that does not exist, and
+      a toolkit with no readable tools/error_ownership.json, give one E520 and
+      exit 1. A spec file that cannot be read gives one E520 from the open-items
+      check and the run goes on. --step with --paths, an empty --base-ref,
+      --include-forward-replay with either, and --base-ref or --detail without a
+      gate are usage errors (exit 2). A relative path after --paths is taken from
+      the repository top: --git-root, else the top of the git working tree that
+      holds the spec folder, else the folder that holds the spec folder. See
+      docs/developers/reference.md, section "Step gate".
     migration:
       action: none
 
@@ -896,17 +910,25 @@ changes:
 
   - type: change_config
     description: >
-      specdev upstream-backlog lists every open item of the spec grouped by the step
-      of the nodes the item is about, not by the text of impact[]: a seed item under
-      seed, a silent-spec item under the step of its missing kind, an item about nodes
-      of several steps in each group (counted once), and an item that no group can
-      hold under unplaced with W613. The JSON has schema_version "2"; each record has
-      group, also_in, artifact, step, item_id, about, about_steps, decision, shape,
-      description and impact, and a record of the 1.1.1 shape also has severity,
-      status, bucket and matched_rule. --severity and --status filter items of the
-      1.1.1 shape only. An artifact that cannot be read, or a spec folder that does
-      not exist, stops the run with E520 and exit 2. --spec-root is still accepted
-      and ignored.
+      specdev upstream-backlog lists every open item of the spec grouped by the
+      step of the nodes the item is about, not by the text of impact[]: a seed
+      item under seed, a silent-spec item under the step of its missing kind, an
+      item about nodes of several steps in each group (counted once), and an item
+      that no group can hold under unplaced with W613. The JSON has schema_version
+      "2"; each record has group, also_in, artifact, step, item_id, about,
+      about_steps, decision, shape, description and impact, and a record of the
+      1.1.1 shape also has severity, status, bucket and matched_rule. ambiguity_id
+      is now item_id; milestone_id, origin and matched_impact_entry are removed.
+      In summary, items, with_answer, needing_answer and unplaced_count replace
+      total_records, open_count, resolved_count, milestones_scanned and
+      unclassified_count (hidden_by_status_count stays). The group unclassified is
+      now unplaced. --severity and --status filter items of the 1.1.1 shape only.
+      An artifact that cannot be read (bad JSON, no permission, a folder named
+      like a step file), or a spec folder that does not exist, stops the run with
+      E520 and exit 2. An item that cannot be reported (no id, neither about nor a
+      valid severity, a severity outside its scale) prints one E520 line on
+      stderr; the run goes on and the exit code is 2. A decision of spaces only
+      counts as no answer. --spec-root is still accepted and ignored.
     migration:
       action: none
 

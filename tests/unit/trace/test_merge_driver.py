@@ -14,6 +14,7 @@ from specdev_tools.trace.merge_driver import (
     DRIVER_NAME,
     LockMergeError,
     attribute_line,
+    git_top_level,
     install_driver,
     merge_entry,
     merge_files,
@@ -138,6 +139,17 @@ def test_an_unreadable_version_is_e520(tmp_path: Path) -> None:
     with pytest.raises(LockMergeError) as caught:
         merge_files(str(tmp_path / "missing"), ours, ours, "p")
     assert isinstance(caught.value, FindingError) and caught.value.error.code == "E520"
+
+
+def test_git_top_level_is_the_repository_top_and_e520_outside_a_repository(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "a").mkdir(parents=True)
+    _init_repo(repo)
+    assert git_top_level(str(repo / "a")) == str(repo.resolve())
+    (tmp_path / "plain").mkdir()
+    with pytest.raises(LockMergeError) as caught:
+        git_top_level(str(tmp_path / "plain"))
+    assert caught.value.error.code == "E520" and "not inside a git working tree" in caught.value.error.message
 
 
 def _init_repo(path: Path) -> None:
