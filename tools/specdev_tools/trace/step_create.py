@@ -17,11 +17,10 @@ from specdev_tools.core.errors import make_error
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.registry import get_shared_registry
 from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations
-from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import FileDecl, load_kind_registry
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import WriteRefusedError, WriteResult, with_ids, write_new_file
-from specdev_tools.trace.lockfile import with_write_lock
+from specdev_tools.trace.lockfile import locked_graph, refuse_unreadable
 from specdev_tools.validation.linter_utils import graph_known_ids
 
 ANCHOR_STEP = "16"
@@ -131,6 +130,7 @@ def create_step(graph: Graph, spec_root: str, repo_root: str, git_root: str, req
         LockError: E769 when another specdev write holds the lock; E760 when the lock file cannot be read.
     """
     if dry_run:
+        refuse_unreadable(graph, "step create")
         return _create_on(graph, spec_root, repo_root, git_root, request, write=False)
-    with with_write_lock(spec_root):
-        return _create_on(build_graph(spec_root, repo_root), spec_root, repo_root, git_root, request, write=True)
+    with locked_graph(spec_root, repo_root, "step create") as built:
+        return _create_on(built, spec_root, repo_root, git_root, request, write=True)

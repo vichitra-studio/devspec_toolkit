@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -22,12 +22,12 @@ from specdev_tools.trace.coverage import (
     exemption,
     link_counts,
 )
-from specdev_tools.trace.gaps import CoverageGap, GapProvider, register_gap_provider
+from specdev_tools.trace.gaps import CoverageGap
 from specdev_tools.trace.lockfile import Lock
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 
 from ..graph._synth import ROOT, docs_graph, run_cli
-from ._lock_support import EXAMPLE_HOST
+from ._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
 from .test_suspects import Example
 
 FR, FR_REQUEST = "fr-password-reset", "fr-password-reset-request"
@@ -43,15 +43,6 @@ def example(tmp_path: Path) -> Example:
     host = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, host)
     return Example(host)
-
-
-@pytest.fixture
-def providers() -> Iterator[Callable[[GapProvider], None]]:
-    """Register gap providers for one test; every one is unregistered at the end."""
-    removers: list[Callable[[], None]] = []
-    yield lambda provider: removers.append(register_gap_provider(provider))
-    for remove in removers:
-        remove()
 
 
 def _matrix(example: Example) -> dict[str, FrRow]:
@@ -219,11 +210,11 @@ def test_scope_later_out_and_not_applicable_excluded_and_listed() -> None:
 
 # --- role findings --------------------------------------------------------------------------------------------------
 
-def test_role_findings_section_empty_without_provider_and_grouped_with_stub(example: Example, providers: Callable[[GapProvider], None]) -> None:
+def test_role_findings_section_empty_without_provider_and_grouped_with_stub(example: Example, gap_providers: Any) -> None:
     graph = example.graph()
     empty = build_report(graph, example.lock(), example.seed_texts(graph))
     assert empty.gaps_by_step == () and empty.gap_counts == ()
-    providers(lambda _graph, _lock: [CoverageGap("E743", "fix-b", "08"), CoverageGap("E740", "fr-z", "04"), CoverageGap("E740", "fr-a", "04")])
+    gap_providers(lambda _graph, _lock: [CoverageGap("E743", "fix-b", "08"), CoverageGap("E740", "fr-z", "04"), CoverageGap("E740", "fr-a", "04")])
     report = build_report(graph, example.lock(), example.seed_texts(graph))
     assert report.gaps_by_step == (("04", (("E740", "fr-a"), ("E740", "fr-z"))), ("08", (("E743", "fix-b"),)))
     assert report.gap_counts == (("E740", 2), ("E743", 1))

@@ -14,6 +14,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import stat
 import tempfile
 from collections.abc import Iterator
@@ -97,11 +98,19 @@ def lock_path(spec_dir: str) -> str:
 
 
 def _conflict_message(path: str) -> str:
+    """The text after ``trace lock <path>:`` for a lock with conflict markers: the three commands that remove them.
+
+    ``install-driver`` goes first because git only runs the driver for a file the attributes route to it, and a clone
+    that never had the driver installed has no such line; ``git checkout -m`` then merges again with it.
+    """
+    spec_dir = shlex.quote(os.path.dirname(os.path.dirname(path)))
+    quoted = shlex.quote(path)
     return (
-        f"{path} holds git merge conflict markers ({CONFLICT_MARKER}). Repair: install the merge driver with "
-        f'`git config merge.specdev-trace-lock.driver "specdev lock merge %O %A %B %P"`, then run '
-        f"`git checkout -m -- {path}` (it re-runs the driver and writes the merged file, but git still lists the path "
-        f"as unmerged), then `git add {path}`"
+        f"holds git merge conflict markers ({CONFLICT_MARKER}). Repair, from the repository root, with three commands in "
+        f"this order: `specdev lock install-driver --driver-command \"<path to specdev> lock merge\" --spec-root {spec_dir}` "
+        f"(routes the lock to the merge driver and sets the driver; safe to run again), `git checkout -m -- {quoted}` "
+        f"(merges again with the driver and writes the merged file, but git still lists the path as unmerged), "
+        f"`git add {quoted}`"
     )
 
 
@@ -171,7 +180,8 @@ def parse_lock(text: str, path: str) -> Lock:
 def read_lock(spec_dir: str) -> Lock:
     """The lock of *spec_dir*; an empty lock when the file does not exist.
 
-    Raises ``LockError`` (E760) as ``parse_lock`` does, and when the file is not UTF-8.
+    Raises ``LockError`` (E760) as ``parse_lock`` does, and when the file is not UTF-8 or cannot be read (a folder in
+    its place, no permission).
     """
     path = lock_path(spec_dir)
     try:
@@ -181,6 +191,8 @@ def read_lock(spec_dir: str) -> Lock:
         return Lock()
     except UnicodeDecodeError as error:
         raise _malformed(path, f"not valid UTF-8 ({error})") from None
+    except OSError as error:
+        raise _malformed(path, f"cannot be read ({error.strerror or error})") from None
     return parse_lock(text, path)
 
 
@@ -253,3 +265,39 @@ def with_write_lock(spec_dir: str) -> Iterator[None]:
         yield
     finally:
         os.close(descriptor)
+
+
+def refuse_unreadable(graph: Any, what: str) -> None:
+    """Raise a ``FindingError`` (E520) naming the spec files that could not be read, for a write *what* that plans from *graph*.
+
+    A file that cannot be read gives no nodes, so the links it holds are not in the graph: a rename could not rewrite
+    them, a delete could not list them, and ``attest --prune`` would take their lock entries for orphans.  Nothing is
+    written until the file is repaired.  ``locked_graph`` applies it to every write; a dry run calls it on the graph it
+    was given.
+    """
+    if graph.load_errors:
+        files = ", ".join(error.file for error in graph.load_errors)
+        raise FindingError(make_error(
+            "E520",
+            f"{what} refused: {files} cannot be read, so the links it holds are not in the graph and the lock "
+            "cannot be checked against them; repair the file, then run the command again",
+        ))
+
+
+@contextmanager
+def locked_graph(spec_root: str, repo_root: str, what: str | None = None) -> Iterator[Any]:
+    """Hold the write lock of *spec_root* and yield the graph built under it (the files as they are when written).
+
+    The one place of the write skeleton: a write plans from the graph built after the lock is taken, so a file changed
+    by another process between the caller's own read and the lock is not planned from stale text.  Raises
+    ``LockError`` (E769) when another write holds the lock, and E520 (``refuse_unreadable``, *what* names the command)
+    when a spec file cannot be read.  *what* is ``None`` for a write that does not plan from the links of other files
+    (``node status`` sets one field of one node), which is not refused for an unreadable file.
+    """
+    from specdev_tools.graph.build import build_graph  # local: the graph package does not import the trace package
+
+    with with_write_lock(spec_root):
+        graph = build_graph(spec_root, repo_root)
+        if what is not None:
+            refuse_unreadable(graph, what)
+        yield graph

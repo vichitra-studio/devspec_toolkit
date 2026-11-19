@@ -13,7 +13,7 @@ from pathlib import Path
 
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.loaders import read_json_object
-from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations
+from specdev_tools.core.schema_validate import SchemaValidationError, SchemaViolation, schema_violations
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 
@@ -36,6 +36,17 @@ def _finding(rel: str, message: str, node_id: str | None = None) -> SpecError:
     return make_error("E774", f"{rel}: {message}", file=rel, owner=MERGE_CHECK_OWNER, node_id=node_id)
 
 
+_SHORT_MESSAGES = {"maxItems": "has more items than the schema allows", "minItems": "has fewer items than the schema requires"}
+_MAX_MESSAGE = 200
+
+
+def _violation_text(item: SchemaViolation) -> str:
+    """What is wrong at the violation: its message, but not the whole value the message quotes (a long one is cut)."""
+    if item.keyword in _SHORT_MESSAGES:
+        return _SHORT_MESSAGES[item.keyword]
+    return item.message if len(item.message) <= _MAX_MESSAGE else item.message[:_MAX_MESSAGE] + " ..."
+
+
 def _schema_findings(rel: str, document: dict, repo_root: str) -> list[SpecError]:
     """One finding for each violation of the schema the file names in ``$schema``, or one for a schema that cannot be applied."""
     try:
@@ -43,7 +54,7 @@ def _schema_findings(rel: str, document: dict, repo_root: str) -> list[SpecError
     except SchemaValidationError as exc:
         return [_finding(rel, f"the schema of the record cannot be applied: {exc}")]
     ordered = sorted(violations, key=lambda item: (tuple(str(part) for part in item.path), item.message))
-    return [_finding(rel, f"{'/'.join(str(part) for part in item.path) or 'file'}: {item.message}") for item in ordered]
+    return [_finding(rel, f"{'/'.join(str(part) for part in item.path) or 'file'}: {_violation_text(item)}") for item in ordered]
 
 
 def _node_findings(rel: str, nodes: list[Node]) -> list[SpecError]:

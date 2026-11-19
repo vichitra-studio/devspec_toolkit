@@ -277,6 +277,22 @@ def test_an_entry_naming_an_alias_is_not_an_orphan(example: Example) -> None:
     assert LockHook(graph, lock).on_link(*_first_link_to(graph, "need-fewer-reset-tickets")) == []
 
 
+def test_two_entries_for_one_link_after_a_rename_merge_leave_the_old_spelling_as_an_orphan(example: Example) -> None:
+    """C-08: one branch renamed the target (the entry is re-keyed), the other attested under the old id: the old spelling is the orphan."""
+    graph = example.graph()
+    graph.alias_index["need-old-name"] = "need-fewer-reset-tickets"
+    current = next(entry for entry in example.lock().entries if entry.target == "need-fewer-reset-tickets")
+    old_spelling = replace(current, target="need-old-name", content_hash="sha256:" + "a" * 64, chain_stamp="sha256:" + "b" * 64)
+    lock = Lock((*example.lock().entries, old_spelling))
+    assert orphan_entries(graph, lock) == [old_spelling]
+    assert [error.code for error in check_lock_orphans(graph, lock)] == ["E762"]
+    # both entries under an old spelling, none under the id: one stays, so the link keeps an entry
+    second_old = replace(old_spelling, target="need-older-name")
+    graph.alias_index["need-older-name"] = "need-fewer-reset-tickets"
+    only_old = Lock((*(entry for entry in example.lock().entries if entry is not current and entry != current), old_spelling, second_old))
+    assert orphan_entries(graph, only_old) == [second_old] and missing_entries(graph, only_old) == []
+
+
 def _first_link_to(graph: Graph, target: str) -> tuple[Any, Any, Any]:
     item = next(item for item in lock_links(graph) if item.link.target == target)
     return item.link, item.holder, item.target

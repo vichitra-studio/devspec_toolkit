@@ -125,8 +125,11 @@ def test_conflict_markers_reported_with_repair_text(tmp_path: Path) -> None:
     assert error.owner == "merge-check"
     assert "git checkout -m -- " in error.message
     assert "git add " in error.message
-    assert "git config merge.specdev-trace-lock.driver" in error.message
-    assert error.message.index("git checkout -m") < error.message.index("git add ")
+    assert "specdev lock install-driver --driver-command" in error.message
+    assert error.message.index("install-driver") < error.message.index("git checkout -m") < error.message.index("git add ")
+    assert "holds git merge conflict markers" in error.message
+    # the path is in the "trace lock <path>:" prefix and in the two git commands that need it, not in a lead sentence as well
+    assert error.message.count(lock_path(str(tmp_path))) == 3
 
 
 def test_lock_error_is_a_finding_error(tmp_path: Path) -> None:
@@ -172,6 +175,14 @@ def test_non_utf8_file_is_e760(tmp_path: Path) -> None:
     path.write_bytes(b"\xff\xfe\x00")
     with pytest.raises(LockError, match="UTF-8"):
         read_lock(str(tmp_path))
+
+
+def test_lock_path_that_is_a_folder_is_e760_not_a_traceback(tmp_path: Path) -> None:
+    os.makedirs(lock_path(str(tmp_path)))
+    with pytest.raises(LockError, match="cannot be read") as caught:
+        read_lock(str(tmp_path))
+    assert caught.value.error.code == "E760"
+    assert caught.value.error.file == lock_path(str(tmp_path))
 
 
 def test_write_lock_creates_missing_extras_dir(tmp_path: Path) -> None:

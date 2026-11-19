@@ -19,7 +19,7 @@ from typing import Any
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.queries import nearest_suffix
+from specdev_tools.graph.queries import plural, unknown_node_error
 from specdev_tools.trace import replay
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import historical_node_ids
@@ -35,7 +35,7 @@ _LinkKey = tuple[str, str, str]
 
 
 class AttestRefusedError(FindingError):
-    """``attest`` refuses the request: ``error`` is E706 (unknown id or link), E704 (duplicate id) or E765 (historical node)."""
+    """``attest`` refuses the request: ``error`` is E706 (unknown link), E704 (duplicate id), E765 (historical node) or E520 (a spec file cannot be read)."""
 
 
 @dataclass(frozen=True)
@@ -140,9 +140,7 @@ def _holder_node(graph: Graph, node_id: str) -> Node:
     """The node *node_id* names (an id or an alias) when attest may act on it; otherwise raises ``AttestRefusedError``."""
     node = graph.find(node_id)
     if node is None:
-        raise AttestRefusedError(
-            make_error("E706", f"no node with the id {node_id!r}{nearest_suffix(node_id, graph.by_id)}"), unknown_id=True
-        )
+        raise unknown_node_error(graph, node_id)
     if node.id in graph.dups:
         duplicate = next(error for error in check_unique_ids(graph) if error.node_id == node.id)
         raise AttestRefusedError(duplicate)
@@ -237,25 +235,23 @@ def _preview(text: str | None) -> str:
     return "-" if text is None else text[:HASH_PREVIEW_LENGTH]
 
 
-def _plural(count: int, noun: str) -> str:
-    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
-
-
 def _link_text(link: AttestedLink) -> str:
     cause = f", {link.suspect.cause}" if link.suspect is not None else ""
     before = _preview(link.old.chain_stamp if link.old is not None else None)
     return f"    {link.new.field} -> {link.new.target} ({link.reason}{cause}): {before} -> {_preview(link.new.chain_stamp)}"
 
 
-def render_text(plan: AttestPlan, *, written: bool, diffs: Sequence[RootDiff] | None = None) -> str:
+def render_text(plan: AttestPlan, *, written: bool, diffs: Sequence[RootDiff] | None = None, dry_run: bool = False) -> str:
     """The links of *plan* as text, grouped by node, with the diffs of what changed above them when *diffs* is given.
 
-    The first line says whether the entries were written or only would be.
+    The first line says whether the entries were written or only would be; for a preview it says how to write, which
+    is not ``--yes`` again when the command ran with ``--dry-run`` (*dry_run*): that flag writes nothing with or without it.
     """
     if not plan.links:
         return "attest: nothing to attest"
-    count = f"{_plural(len(plan.links), 'link')} on {_plural(plan.node_count, 'node')}"
-    lines = [f"attest: wrote {count}" if written else f"attest: would write {count} (run again with --yes to write)"]
+    count = f"{plural(len(plan.links), 'link')} on {plural(plan.node_count, 'node')}"
+    how = "--dry-run: nothing is written" if dry_run else "run again with --yes to write"
+    lines = [f"attest: wrote {count}" if written else f"attest: would write {count} ({how})"]
     holder = None
     for link in plan.links:
         if link.new.source != holder:
@@ -264,6 +260,9 @@ def render_text(plan: AttestPlan, *, written: bool, diffs: Sequence[RootDiff] | 
         lines.append(_link_text(link))
     for diff in diffs or ():
         lines.extend(replay.diff_lines(diff))
+    note = replay.unrooted_note(suspect_view(plan)) if diffs is not None else None
+    if note:
+        lines.append(note)
     return "\n".join(lines)
 
 
@@ -300,7 +299,9 @@ def plan_to_dict(plan: AttestPlan, *, written: bool, diffs: Sequence[RootDiff] |
         "blocked": [_blocked_dict(blocked) for blocked in plan.blocked],
     }
     if diffs is not None:
-        document["diffs"] = [{"root": diff.root, "note": diff.note, "diff": list(diff.diff)} for diff in diffs]
+        document["diffs"] = [
+            {"root": diff.root, "note": diff.note, "diff": list(diff.diff), "accepted_by": list(diff.accepted_by)} for diff in diffs
+        ]
     return document
 
 
@@ -309,7 +310,7 @@ def prune_text(dropped: Sequence[LockEntry], *, written: bool) -> str:
     if not dropped:
         return "attest --prune: no orphan entries"
     head = "removed" if written else "would remove"
-    lines = [f"attest --prune: {head} {_plural(len(dropped), 'orphan entry')}"]
+    lines = [f"attest --prune: {head} {plural(len(dropped), 'orphan entry', 'orphan entries')}"]
     lines.extend(f"  {entry.source}: {entry.field} -> {entry.target}" for entry in dropped)
     return "\n".join(lines)
 

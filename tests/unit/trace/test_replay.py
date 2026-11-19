@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import shutil
-from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from specdev_tools.graph.model import Graph
-from specdev_tools.trace.gaps import CoverageGap, GapProvider, coverage_gaps, register_gap_provider
+from specdev_tools.trace.gaps import CoverageGap, coverage_gaps, register_gap_provider
 from specdev_tools.trace.history import NOTE_BASELINE, OldText, contract_lines
 from specdev_tools.trace.lockfile import Lock, LockEntry
 from specdev_tools.trace.replay import (
@@ -22,7 +22,7 @@ from specdev_tools.trace.replay import (
     root_diffs,
 )
 
-from ._lock_support import EXAMPLE_HOST
+from ._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
 from .test_suspects import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
 
 TERM = "quokka"
@@ -36,15 +36,6 @@ def example(tmp_path: Path) -> Example:
     host = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, host)
     return Example(host)
-
-
-@pytest.fixture
-def providers() -> Iterator[Callable[[GapProvider], None]]:
-    """Register gap providers for one test; every one is unregistered at the end."""
-    removers: list[Callable[[], None]] = []
-    yield lambda provider: removers.append(register_gap_provider(provider))
-    for remove in removers:
-        remove()
 
 
 def _plan(example: Example) -> ReplayPlan:
@@ -71,10 +62,10 @@ def test_default_provider_empty(example: Example) -> None:
     assert coverage_gaps(graph, example.lock()) == []
 
 
-def test_coverage_gaps_adapter_returns_registered_provider_output(example: Example, providers: Callable[[GapProvider], None]) -> None:
+def test_coverage_gaps_adapter_returns_registered_provider_output(example: Example, gap_providers: Any) -> None:
     first, second = CoverageGap("E740", "fr-a", "04"), CoverageGap("E742", "fix-b", "08")
-    providers(lambda graph, lock: [first])
-    providers(lambda graph, lock: [second, first])
+    gap_providers(lambda graph, lock: [first])
+    gap_providers(lambda graph, lock: [second, first])
     assert coverage_gaps(example.graph(), example.lock()) == [first, second, first]
 
 
@@ -137,9 +128,9 @@ def test_nodes_of_a_step_are_listed_upward_first(example: Example) -> None:
     assert nodes.index("asm-member-controls-email") < nodes.index("risk-reset-link-takeover")
 
 
-def test_gaps_are_a_group_of_their_own_in_the_step_that_owns_them(example: Example, providers: Callable[[GapProvider], None]) -> None:
+def test_gaps_are_a_group_of_their_own_in_the_step_that_owns_them(example: Example, gap_providers: Any) -> None:
     example.edit_item(CRITERION, _add_term)
-    providers(lambda graph, lock: [CoverageGap("E742", "z-node", "05"), CoverageGap("E740", "b-node", "05"), CoverageGap("E740", "a-node", "03")])
+    gap_providers(lambda graph, lock: [CoverageGap("E742", "z-node", "05"), CoverageGap("E740", "b-node", "05"), CoverageGap("E740", "a-node", "03")])
     plan = _plan(example)
     assert [step.step for step in plan.steps][:3] == ["03", "05", "06"]
     assert _step(plan, "03").nodes == ()

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -10,9 +11,9 @@ from pathlib import Path
 import pytest
 
 from specdev_tools.trace.lockfile import CONFLICT_MARKER, Lock, LockEntry, LockError, read_lock, serialise_lock, write_lock
-from specdev_tools.trace.merge_driver import DRIVER_NAME, install_driver
+from specdev_tools.trace.merge_driver import install_driver
 
-from unit.graph._synth import GIT_IDENTITY, git
+from unit.graph._synth import GIT_IDENTITY, ROOT, git
 
 LOCK_REL = "spec/extras/trace.lock.json"
 DRIVER_COMMAND = f"{shlex.quote(sys.executable)} -m specdev_tools.cli lock merge"
@@ -39,19 +40,30 @@ def _try_merge(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", "-C", str(repo), *GIT_IDENTITY, *args], capture_output=True, text=True, env=GIT_ENV, check=False)
 
 
-@pytest.fixture
-def diverged(tmp_path: Path) -> Path:
-    """A repository on `main` and a branch `theirs`, both changed from one base: adjacent entries re-attested, one added each."""
-    repo = tmp_path / "host"
+def _diverge(repo: Path, *, install: bool) -> Path:
+    """*repo* on `main` and a branch `theirs`, both changed from one base: adjacent entries re-attested, one added each."""
     repo.mkdir()
     git(repo, "init", "-q", "-b", "main")
-    install_driver(str(repo), "spec", DRIVER_COMMAND)
+    if install:
+        install_driver(str(repo), "spec", DRIVER_COMMAND)
     _commit(repo, Lock((FIRST, SECOND)), "base")
     git(repo, "checkout", "-q", "-b", "theirs")
     _commit(repo, Lock((FIRST_ATTESTED, SECOND, ADDED_BY_THEM)), "theirs attests the first link and adds one")
     git(repo, "checkout", "-q", "main")
     _commit(repo, Lock((FIRST, SECOND_ATTESTED, ADDED_BY_US)), "ours attests the second link and adds one")
     return repo
+
+
+@pytest.fixture
+def diverged(tmp_path: Path) -> Path:
+    """The diverged repository with the merge driver installed."""
+    return _diverge(tmp_path / "host", install=True)
+
+
+@pytest.fixture
+def diverged_never_installed(tmp_path: Path) -> Path:
+    """The diverged repository of a clone that never installed the driver: no attribute line, no driver in git config."""
+    return _diverge(tmp_path / "host", install=False)
 
 
 def test_git_merge_with_installed_driver_leaves_no_markers(diverged: Path) -> None:
@@ -63,21 +75,37 @@ def test_git_merge_with_installed_driver_leaves_no_markers(diverged: Path) -> No
     assert read_lock(str(diverged / "spec")) == EXPECTED
 
 
-def test_without_driver_markers_loader_e760_and_repair_succeeds(diverged: Path) -> None:
-    git(diverged, "config", "--remove-section", f"merge.{DRIVER_NAME}")
-    done = _try_merge(diverged, "merge", "--no-edit", "theirs")
-    assert done.returncode != 0
-    assert CONFLICT_MARKER in (diverged / LOCK_REL).read_text(encoding="utf-8")
-    with pytest.raises(LockError) as caught:
-        read_lock(str(diverged / "spec"))
-    assert caught.value.error.code == "E760"
-    repair = caught.value.error.message
-    assert f"git config merge.{DRIVER_NAME}.driver" in repair and "git checkout -m" in repair and "git add" in repair
+def _printed_commands(message: str) -> list[str]:
+    """The commands of the repair a message prints (the backticked parts), with ``specdev`` and the driver path filled in."""
+    specdev = f"{shlex.quote(sys.executable)} -m specdev_tools.cli"
+    commands = re.findall(r"`([^`]+)`", message)
+    return [
+        command.replace("<path to specdev>", specdev).replace("specdev ", f"{specdev} ", 1) + (f" --repo-root {ROOT}" if command.startswith("specdev ") else "")
+        for command in commands
+    ]
 
-    git(diverged, "config", f"merge.{DRIVER_NAME}.driver", f"{DRIVER_COMMAND} %O %A %B %P")
-    git(diverged, "checkout", "-m", "--", LOCK_REL)
-    git(diverged, "add", LOCK_REL)
-    assert (diverged / LOCK_REL).read_text(encoding="utf-8") == serialise_lock(EXPECTED)
-    assert git(diverged, "diff", "--name-only", "--diff-filter=U") == ""
-    git(diverged, "commit", "-q", "--no-edit")
-    assert read_lock(str(diverged / "spec")) == EXPECTED
+
+def test_without_driver_markers_loader_e760_and_repair_succeeds(diverged_never_installed: Path) -> None:
+    """A clone that never installed the driver: the printed repair, run as printed, removes the markers and the unmerged state."""
+    repo = diverged_never_installed
+    assert not (repo / ".git" / "info" / "attributes").exists()
+    done = _try_merge(repo, "merge", "--no-edit", "theirs")
+    assert done.returncode != 0
+    assert CONFLICT_MARKER in (repo / LOCK_REL).read_text(encoding="utf-8")
+    with pytest.raises(LockError) as caught:
+        read_lock(str(repo / "spec"))
+    assert caught.value.error.code == "E760"
+    message = caught.value.error.message
+    assert message.count("lock install-driver") == 1 and "git checkout -m" in message and "git add" in message
+    assert message.index("install-driver") < message.index("git checkout -m") < message.index("git add")
+
+    commands = _printed_commands(message)
+    assert len(commands) == 3
+    for command in commands:
+        ran = subprocess.run(command, shell=True, cwd=repo, capture_output=True, text=True, env=GIT_ENV, check=False)
+        assert ran.returncode == 0, f"{command}\n{ran.stdout}{ran.stderr}"
+    assert CONFLICT_MARKER not in (repo / LOCK_REL).read_text(encoding="utf-8")
+    assert (repo / LOCK_REL).read_text(encoding="utf-8") == serialise_lock(EXPECTED)
+    assert git(repo, "diff", "--name-only", "--diff-filter=U") == ""
+    git(repo, "commit", "-q", "--no-edit")
+    assert read_lock(str(repo / "spec")) == EXPECTED

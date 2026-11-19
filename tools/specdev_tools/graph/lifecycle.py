@@ -14,6 +14,7 @@ from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import json_delete, json_patch
 from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
 from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node
+from specdev_tools.trace.lockfile import locked_graph
 
 LIFECYCLE_KEY = "lifecycle"
 NOT_APPLICABLE_GUIDANCE = (
@@ -88,9 +89,15 @@ def apply_lifecycle_change(spec_root: str, repo_root: str, change: LifecycleChan
 def set_lifecycle(graph: Graph, spec_root: str, repo_root: str, node_id: str, value: str) -> LifecycleChange:
     """Plan and apply the change of *node_id* to *value*; returns the change.  Raises what the two steps raise.
 
-    A node that already has *value* is not written: the file stays as it is and the change has ``old == new``.
+    A node that already has *value* is not written: the file stays as it is and the change has ``old == new``.  A write
+    takes the write lock of the spec folder and plans again from the graph built under it, as every other write does;
+    ``LockError`` (E769) when another specdev write holds it.
     """
     change = plan_lifecycle_change(graph, node_id, value)
-    if change.old != change.new:
-        apply_lifecycle_change(spec_root, repo_root, change)
+    if change.old == change.new:
+        return change
+    with locked_graph(spec_root, repo_root) as built:
+        change = plan_lifecycle_change(built, node_id, value)
+        if change.old != change.new:
+            apply_lifecycle_change(spec_root, repo_root, change)
     return change

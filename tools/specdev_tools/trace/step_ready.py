@@ -9,13 +9,17 @@ never checked: its suspects and gaps are NN's own replay work.
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+import os
+import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
 
 from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.kinds import SEED_STEP
 from specdev_tools.graph.model import Graph
+from specdev_tools.graph.queries import plural
 from specdev_tools.trace import replay
 from specdev_tools.trace.suspects import lock_links
 
@@ -82,21 +86,36 @@ def _replay_blockers(item: replay.ReplayStep) -> list[Blocker]:
     return [*suspects, *gaps]
 
 
+_SPEC_FILE_STEP = re.compile(r"^(\d{2}[a-z]?)_.*\.json$")
+
+
+def required_spec_inputs(repo_root: str, step: str) -> list[str]:
+    """The ``required_spec_inputs`` of *step* in ``tools/step_order.json`` under *repo_root* (none when it has no entry)."""
+    return load_step_order(repo_root).get("step_metadata", {}).get(step, {}).get("required_spec_inputs", [])
+
+
+def present_steps(graph: Graph, spec_root: str) -> frozenset[str]:
+    """The steps that have a spec file: a file the registry assigns to a step, or ``<step>_*.json`` in *spec_root*."""
+    found = {step for step, files in graph.shape.files_by_step.items() if files}
+    found.update(match.group(1) for name in os.listdir(spec_root) if (match := _SPEC_FILE_STEP.match(name)))
+    return frozenset(found)
+
+
 def check_ready(
     graph: Graph,
     plan: replay.ReplayPlan,
     step: str,
     required_inputs: Collection[str],
-    present: Callable[[str], bool],
+    present: Collection[str],
 ) -> Readiness:
-    """Whether *step* is ready, given the replay *plan* of the spec, the step's ``required_spec_inputs`` and ``present(step)``.
+    """Whether *step* is ready, given the replay *plan* of the spec, the step's ``required_spec_inputs`` and the steps that
+    have a spec file (*present*, see ``present_steps``).
 
-    ``present`` says whether a spec file of a step exists.  The blockers are sorted by the waterfall order of their
-    step, then node, field, target and code.
+    The blockers are sorted by the waterfall order of their step, then node, field, target and code.
     """
     linked = link_steps(graph, step)
     upstream = tuple(sorted({*linked, *required_inputs}, key=graph.shape.step_key))
-    blockers = [Blocker(name, REASON_MISSING) for name in upstream if not present(name)]
+    blockers = [Blocker(name, REASON_MISSING) for name in upstream if name not in present]
     for item in replay.pending_replay(plan, linked):
         blockers.extend(_replay_blockers(item))
     blockers.sort(key=lambda b: (graph.shape.step_key(b.step), b.node or "", b.field or "", b.target or "", b.code or ""))
@@ -104,10 +123,6 @@ def check_ready(
 
 
 # --- output ---------------------------------------------------------------------------------------------------------
-
-def _plural(count: int, noun: str) -> str:
-    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
-
 
 def _blocker_line(blocker: Blocker) -> str:
     if blocker.reason == REASON_MISSING:
@@ -122,7 +137,7 @@ def render_text(readiness: Readiness) -> str:
     """The verdict as text: ``ready``, or the blockers one per line and the step to replay first."""
     if readiness.ready:
         return f"step {readiness.step}: ready"
-    lines = [f"step {readiness.step}: not ready, {_plural(len(readiness.blockers), 'blocker')}"]
+    lines = [f"step {readiness.step}: not ready, {plural(len(readiness.blockers), 'blocker')}"]
     lines.extend(_blocker_line(blocker) for blocker in readiness.blockers)
     lines.append(f"replay step {readiness.replay_first} first")
     return "\n".join(lines)
@@ -150,6 +165,6 @@ def not_ready_error(readiness: Readiness) -> SpecError:
     per_step: dict[str, int] = {}
     for blocker in readiness.blockers:
         per_step[blocker.step] = per_step.get(blocker.step, 0) + 1
-    steps = "; ".join(f"step {name} ({_plural(count, 'blocker')})" for name, count in per_step.items())
+    steps = "; ".join(f"step {name} ({plural(count, 'blocker')})" for name, count in per_step.items())
     return make_error("E773", f"step {readiness.step} is not ready: {steps}; replay step {readiness.replay_first} first")
 

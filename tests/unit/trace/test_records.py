@@ -191,6 +191,7 @@ def test_record_file_with_two_records_is_refused_by_the_schema(tmp_path: Path) -
     errors = _findings(spec)
     assert [error.code for error in errors] == ["E774"]
     assert errors[0].file == VER_REL and "records" in errors[0].message
+    assert "verification_id" not in errors[0].message and len(errors[0].message) < 200  # not the whole value
 
 
 def test_evidence_record_is_not_read_as_a_verification_record(tmp_path: Path) -> None:

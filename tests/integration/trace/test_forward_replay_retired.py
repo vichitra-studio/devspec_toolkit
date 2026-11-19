@@ -150,3 +150,36 @@ def test_forward_replay_check_alias_step_limits_suspects_to_holder_step(host: Ex
 def test_alias_deprecation_line_goes_to_stderr_only(host: Example, capsys: pytest.CaptureFixture[str]) -> None:
     _code, document, err = _alias(host, capsys=capsys)
     assert DEPRECATION in err and "errors" in document
+
+
+def _rename_criterion_and_commit(example: Example) -> None:
+    """Rename ``ac-password-reset-1`` in the FR list and commit: step 04's file drops an id (E555, W598)."""
+    fr_path = example.spec / FR_FILE
+    fr_path.write_text(fr_path.read_text(encoding="utf-8").replace('"ac-password-reset-1"', '"ac-renamed-1"'), encoding="utf-8")
+    _commit(example, "rename")
+
+
+def _per_file_findings(document: dict[str, Any]) -> set[tuple[str, str | None]]:
+    return {(error["code"], error.get("file")) for error in document["errors"] if error["code"] in {"E555", "W598", "W550"}}
+
+
+def test_forward_replay_check_step_filters_the_id_regressions_by_their_file(host: Example, capsys: pytest.CaptureFixture[str]) -> None:
+    """The id-regression findings name their file, so ``--step 04`` keeps them and ``--step 06`` drops them (they were dropped for every step)."""
+    _rename_criterion_and_commit(host)
+    everything = _per_file_findings(_alias(host, capsys=capsys)[1])
+    assert {"E555", "W598"} <= {code for code, _file in everything}
+    assert {file for _code, file in everything} == {f"spec/{FR_FILE}"}
+    assert _per_file_findings(_alias(host, "--step", "04", capsys=capsys)[1]) == everything
+    assert _per_file_findings(_alias(host, "--step", "06", capsys=capsys)[1]) == set()
+
+
+def test_forward_replay_check_reads_the_base_through_a_symlinked_spec_root(host: Example, tmp_path: Path) -> None:
+    """A spec root spelled through a symlink is the same folder: no W550 ``unable_to_read_base`` for every spec file."""
+    from specdev_tools.validation.forward_replay_check import check_forward_replay
+
+    _rename_criterion_and_commit(host)
+    link = tmp_path / "link"
+    link.symlink_to(host.host, target_is_directory=True)
+    findings = check_forward_replay(str(ROOT), base_ref=BASE_BRANCH, git_root=str(host.host), spec_root=str(link / "spec"))
+    assert "W550" not in {error.code for error in findings}
+    assert "E555" in {error.code for error in findings}

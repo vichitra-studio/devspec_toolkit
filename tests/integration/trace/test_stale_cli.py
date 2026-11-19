@@ -224,3 +224,79 @@ def test_rename_and_merge_driver_commits_do_not_hide_old_text(host: Example) -> 
     (diff,) = _stale_json(host, "--diff")["diffs"]
     assert diff["note"] is None
     assert [line for line in diff["diff"] if line.startswith("+text: ")][0].endswith(EDIT)
+
+
+# --- which accepted version a diff is against (review M5 R1, F1-3) --------------------------------------------------------
+
+ERR_HOLDER = "err-password-reset-confirm-token-expired"
+UNCHANGED_NOTE = "its own contract text is unchanged"
+
+
+def _attest(example: Example, *args: str) -> None:
+    code, out = run_cli("attest", *args, "--yes", "--repo-root", str(ROOT), "--spec-root", str(example.spec), "--git-root", str(example.host))
+    assert code == 0, out
+
+
+def _set_criterion_text(example: Example, suffix: str) -> None:
+    example.edit_item(CRITERION, lambda item: item.update(text=item["text"].split(" #")[0] + suffix))
+    _commit(example, f"criterion{suffix}")
+
+
+def _diffs_of(example: Example, root: str) -> list[dict[str, Any]]:
+    return [diff for diff in _stale_json(example, "--diff")["diffs"] if diff["root"] == root]
+
+
+def test_diff_after_one_holder_of_the_root_was_attested_still_shows_the_change(host: Example) -> None:
+    """A1-02: the holders attested first had accepted the change; the first entry in lock order must not decide the old text."""
+    _set_criterion_text(host, " #1")
+    for holder in (API, "fix-password-reset-expired-token", "ec-token-at-expiry-second"):
+        _attest(host, holder)
+    assert ERR_HOLDER in {node["node"] for step in _stale_json(host)["steps"] for node in step["suspect_nodes"]}
+    code, out = _stale(host, "--diff")
+    assert code == 0 and UNCHANGED_NOTE not in out, out
+    (diff,) = _diffs_of(host, CRITERION)
+    assert diff["note"] is None and any(line.startswith("-text: Given a reset token") for line in diff["diff"])
+    assert any(line.startswith("+text:") and line.endswith("#1") for line in diff["diff"])
+    preview = run_cli("attest", ERR_HOLDER, "--repo-root", str(ROOT), "--spec-root", str(host.spec), "--git-root", str(host.host))[1]
+    assert UNCHANGED_NOTE not in preview and "+text:" in preview
+
+
+def test_diff_of_two_edits_with_an_attest_between_shows_each_accepted_version(host: Example) -> None:
+    """C-04: ``err-`` accepted the first edit, the others the original; each diff is against the version its holders accepted."""
+    _set_criterion_text(host, " #1")
+    _attest(host, ERR_HOLDER)
+    _set_criterion_text(host, " #2")
+    diffs = _diffs_of(host, CRITERION)
+    assert len(diffs) == 2
+    by_holders = {tuple(diff["accepted_by"]): diff["diff"] for diff in diffs}
+    assert (ERR_HOLDER,) in by_holders
+    after_err = by_holders.pop((ERR_HOLDER,))
+    assert any(line.startswith("-text:") and line.endswith("#1") for line in after_err)
+    assert any(line.startswith("+text:") and line.endswith("#2") for line in after_err)
+    (others,) = by_holders.values()
+    assert any(line.startswith("-text: Given a reset token") for line in others)
+    text = _stale(host, "--diff")[1]
+    assert f"changed above: {CRITERION} (as accepted by {ERR_HOLDER})" in text
+
+
+def test_diff_after_the_text_was_restored_is_against_what_the_holder_accepted(host: Example) -> None:
+    """C-04: ``err-`` accepted the first edit and the text went back to the original: still suspect, and the diff says what changed."""
+    _set_criterion_text(host, " #1")
+    _attest(host, ERR_HOLDER)
+    host.edit_item(CRITERION, lambda item: item.update(text=item["text"].split(" #")[0]))
+    _commit(host, "restored")
+    (diff,) = _diffs_of(host, CRITERION)
+    assert diff["note"] is None and diff["accepted_by"] == []
+    assert any(line.startswith("-text:") and line.endswith("#1") for line in diff["diff"])
+    assert not any(UNCHANGED_NOTE in line for line in diff["diff"])
+
+
+def test_upstream_links_with_no_root_left_say_the_change_was_already_accepted(host: Example) -> None:
+    """B8: every holder that pointed at the changed node accepted it; the links below show no root, and one line says why."""
+    _set_criterion_text(host, " #1")
+    for step in ("05", "06", "07", "08", "09", "11", "14"):
+        _attest(host, "--step", step)
+    code, out = _stale(host, "--diff")
+    note = "changed upstream with no root left: the change above was already accepted by the links that point at it"
+    assert code == 0 and out.count(note) == 1 and "changed above" not in out, out
+    assert note not in _stale(host)[1]

@@ -3,16 +3,15 @@ from __future__ import annotations
 
 import json
 import shutil
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from specdev_tools.trace.gaps import CoverageGap, register_gap_provider
+from specdev_tools.trace.gaps import CoverageGap
 
 from unit.graph._synth import ROOT, run_cli
-from unit.trace._lock_support import EXAMPLE_HOST
+from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
 from unit.trace.test_suspects import Example
 
 API = "api-password-reset-confirm"
@@ -94,18 +93,9 @@ def test_link_target_step_not_in_required_spec_inputs_still_blocks(host: Example
     assert document["upstream"] == ["00", "02", "04", "05"] and _blocker_steps(document) == ["05"]
 
 
-@pytest.fixture
-def unregister() -> Iterator[list[Any]]:
-    """Gap providers a test registers; they are removed when the test ends."""
-    removers: list[Any] = []
-    yield removers
-    for remove in removers:
-        remove()
-
-
-def test_ready_blocked_by_coverage_gap_in_upstream_step(host: Example, unregister: list[Any]) -> None:
+def test_ready_blocked_by_coverage_gap_in_upstream_step(host: Example, gap_providers: Any) -> None:
     assert _ready(host, "06")[0] == 0
-    unregister.append(register_gap_provider(lambda graph, lock: [CoverageGap("E740", "cap-account-recovery", "05")]))
+    gap_providers(lambda graph, lock: [CoverageGap("E740", "cap-account-recovery", "05")])
     document = _ready_json(host, "06", code=1)
     assert [(b["step"], b["reason"], b["code"], b["node"]) for b in document["blockers"]] == [("05", "gap", "E740", "cap-account-recovery")]
     assert "  step 05: coverage gap E740: cap-account-recovery" in _ready(host, "06")[1]

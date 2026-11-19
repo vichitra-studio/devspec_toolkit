@@ -15,20 +15,18 @@ run once in each clone; without it git falls back to a text merge and the loader
 from __future__ import annotations
 
 import os
-import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME
 from specdev_tools.core.errors import FindingError, make_error
+from specdev_tools.graph.gitview import GitViewError, git_reason, run_git
 from specdev_tools.trace.lockfile import Lock, LockEntry, parse_lock, replace_file_atomically, serialise_lock
 
 DRIVER_NAME = "specdev-trace-lock"
 DRIVER_DESCRIPTION = "specdev trace lock merge"
 DRIVER_ARGUMENTS = "%O %A %B %P"
 ATTRIBUTES_GIT_PATH = "info/attributes"
-GIT_TIMEOUT_SECONDS = 30
-_MAX_REASON_CHARS = 240
 
 
 class LockMergeError(FindingError):
@@ -104,17 +102,12 @@ def merge_files(base_path: str, ours_path: str, theirs_path: str, pathname: str)
 def _git(git_root: str, args: Sequence[str]) -> str:
     """Stdout of ``git -C <git_root> <args>``, stripped; E520 when git is missing, slow or fails."""
     try:
-        process = subprocess.run(
-            ["git", "-C", git_root, *args], capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT_SECONDS
-        )
-    except FileNotFoundError:
-        raise LockMergeError(make_error("E520", "git is not installed or not on PATH")) from None
-    except subprocess.TimeoutExpired:
-        raise LockMergeError(make_error("E520", f"git {args[0]} did not finish within {GIT_TIMEOUT_SECONDS} seconds")) from None
+        process = run_git(git_root, args)
+    except GitViewError as error:
+        raise LockMergeError(make_error("E520", error.error.message)) from None
     if process.returncode != 0:
-        reason = " ".join(process.stderr.split())[:_MAX_REASON_CHARS]
-        raise LockMergeError(make_error("E520", f"git {' '.join(args)} failed in {git_root}: {reason}"))
-    return process.stdout.strip()
+        raise LockMergeError(make_error("E520", f"git {' '.join(args)} failed in {git_root}: {git_reason(process)}"))
+    return process.stdout.decode("utf-8", errors="replace").strip()
 
 
 def attribute_line(spec_rel_path: str) -> str:

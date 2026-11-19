@@ -65,15 +65,7 @@ def check_forward_replay(
         effective_git_root, set(known_changed), base_ref, effective_spec_root, repo_root=root,
     )
 
-    for err in semantic_errors:
-        if err["type"] == "skip":
-            errors.append(make_error("W550", f"SEMANTIC_COVERAGE_SKIP unable_to_read_base base_ref={err['base_ref']} path={err['path']}"))
-        elif err["type"] == "regression":
-            dropped_str = ",".join(err["dropped_ids"])
-            errors.append(make_error("E555", f"SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}"))
-            # W598: warn individually for each removed ID to surface renames early
-            for removed_id in err["dropped_ids"]:
-                errors.append(make_error("W598", f"ID_STABILITY_REMOVAL path={err['path']} removed_id={removed_id}"))
+    errors.extend(_semantic_findings(semantic_errors))
 
     tc_errors = check_traceability_closure(str(effective_spec_root), str(root))
     for tc_err in tc_errors:
@@ -83,6 +75,25 @@ def check_forward_replay(
             errors.append(tc_err)
 
     return errors
+
+
+def _semantic_findings(semantic_errors: list[dict]) -> list[SpecError]:
+    """E555, W598 and W550 for the results of ``_check_semantic_coverage``; each names its file (``file=``) so ``--step`` can filter it."""
+    findings: list[SpecError] = []
+    for err in semantic_errors:
+        path = err["path"]
+        if err["type"] == "skip":
+            findings.append(make_error(
+                "W550", f"SEMANTIC_COVERAGE_SKIP unable_to_read_base base_ref={err['base_ref']} path={path}", file=path
+            ))
+        elif err["type"] == "regression":
+            dropped_str = ",".join(err["dropped_ids"])
+            findings.append(make_error("E555", f"SEMANTIC_COVERAGE_REGRESSION path={path} dropped_ids={dropped_str}", file=path))
+            # W598: warn individually for each removed ID to surface renames early
+            findings.extend(
+                make_error("W598", f"ID_STABILITY_REMOVAL path={path} removed_id={removed_id}", file=path) for removed_id in err["dropped_ids"]
+            )
+    return findings
 
 
 def check_forward_replay_alias(
@@ -103,7 +114,7 @@ def check_forward_replay_alias(
         repo_root, base_ref=base_ref, diff_error_mode=diff_error_mode, git_root=git_root, spec_root=spec_root
     )
     if step is not None:
-        errors = [e for e in errors if e.code not in _PER_FILE_CODES or _step_of_path(e.path) == step]
+        errors = [e for e in errors if e.code not in _PER_FILE_CODES or _step_of_path(e.file or e.path) == step]
     spec_dir = os.path.abspath(spec_root) if spec_root else os.path.join(os.path.abspath(repo_root), "spec")
     graph = build_lint_graph(spec_dir, os.path.abspath(repo_root))
     host_root = os.path.abspath(git_root) if git_root else os.path.abspath(repo_root)
@@ -228,7 +239,8 @@ def _check_semantic_coverage(
         removed = removed_paths(step, repo_root)  # read once per step, not once per changed file
         for new_path in spec_dir.glob(f"{step}_*.json"):
             try:
-                rel_path = new_path.relative_to(git_root).as_posix()
+                # realpath on both sides: a spec root spelled through a symlink (macOS /tmp) is still inside the repository
+                rel_path = (Path(os.path.realpath(spec_dir)) / new_path.name).relative_to(os.path.realpath(git_root)).as_posix()
             except ValueError:
                 errors.append({
                     "type": "skip",

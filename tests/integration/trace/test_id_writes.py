@@ -284,6 +284,8 @@ def test_refuses_payload_with_hash_or_pin_fields(host: Path) -> None:
         status, out = _run(host, *case)
         assert status == 1 and out.startswith("E768"), (case, out)
     assert _snapshot(host) == before
+    status, out = _run(host, "patch", "--id", FR, ".content_hash", '"sha256:aa"')
+    assert f"the write to {FR} stores 'content_hash'" in out and "not stored in a spec file" in out and "attest" not in out, out
 
 
 def test_wrong_kind_target_refused_with_candidates_hint(host: Path) -> None:
@@ -385,3 +387,69 @@ def test_the_help_of_the_id_forms_is_the_help_of_the_id_parser() -> None:
     assert code == 0 and "FIELD_PATH" in out and "--id NODE_ID" in out and "--dry-run" in out
     classic_code, classic = run_cli("json", "patch", "--help")
     assert classic_code == 0 and "FIELD_PATH" not in classic
+
+
+# --- review round 1 (A2-1, B6): a violation a later sibling already had moves down one index on a delete -----------------
+
+def test_delete_is_not_refused_for_a_violation_a_later_sibling_already_had(host: Path) -> None:
+    document = _doc(host, "08_fixtures.json")
+    document["fixtures"][1]["zzz"] = 1
+    _write_doc(host, "08_fixtures.json", document)
+    result = _json(host, "delete", "--id", FIXTURE)
+    assert result["written"] is True
+    left = _doc(host, "08_fixtures.json")["fixtures"]
+    assert [item["fixture_id"] for item in left] == ["fix-password-reset-reused-token"] and left[0]["zzz"] == 1
+
+
+def test_delete_of_a_criterion_is_not_refused_for_a_bad_scope_on_a_later_criterion(host: Path) -> None:
+    document = _doc(host, FR_FILE)
+    document["functional_requirements"][0]["acceptance_criteria"][1]["scope"] = "bogus"
+    _write_doc(host, FR_FILE, document)
+    result = _json(host, "delete", "--id", "ac-password-reset-1")
+    assert result["written"] is True
+    left = _doc(host, FR_FILE)["functional_requirements"][0]["acceptance_criteria"]
+    assert [item["criterion_id"] for item in left] == ["ac-password-reset-2", "ac-password-reset-3"]
+    assert left[0]["scope"] == "bogus"
+
+
+def test_delete_that_adds_a_violation_is_still_refused_beside_an_old_one(host: Path) -> None:
+    document = _doc(host, FR_FILE)
+    document["functional_requirements"][1]["acceptance_criteria"][0]["scope"] = "bogus"
+    _write_doc(host, FR_FILE, document)
+    before = _snapshot(host)
+    status, out = _run(host, "delete", "--id", FR)  # leaves one FR: the list's minItems is a violation the delete adds
+    assert status == 1 and out.startswith("E767") and "minItems" in out or "non-empty" in out or "too short" in out, out
+    assert _snapshot(host) == before
+
+
+def test_insert_into_the_seed_step_is_e706_like_step_ready(host: Path) -> None:
+    before = _snapshot(host)
+    status, out = _run(host, "insert", "--step", "seed", ".seeds", '{"seed_id": "seed-x"}')
+    assert status == 1 and out.startswith("E706") and "no step 'seed'" in out and "seed," not in out, out
+    status, out = _run(host, "insert", "--step", "99", ".x", "{}")
+    assert status == 1 and out.startswith("E706") and "known steps" in out
+    assert _snapshot(host) == before
+
+
+def test_dry_run_says_to_write_and_to_remove_and_a_write_says_written_and_removed(host: Path) -> None:
+    status, dry = _run(host, "delete", "--id", FIXTURE, "--dry-run")
+    assert status == 0 and "lock entry to remove: " in dry and "lock entry removed" not in dry, dry
+    status, done = _run(host, "delete", "--id", FIXTURE)
+    assert status == 0 and "lock entry removed: " in done and "lock entry to remove" not in done, done
+
+
+def test_a_refusal_names_the_specific_violation_before_the_unevaluated_properties_cascade(host: Path) -> None:
+    status, out = _run(host, "insert", "--step", "04", ".functional_requirements", '{"fr_id": "fr-new-one"}')
+    lines = out.splitlines()
+    assert status == 1 and lines[0].startswith("E767"), out
+    assert "required property" in lines[1] and "Unevaluated properties" in lines[-1], out
+
+
+def test_insert_into_a_map_keyed_collection_is_refused_with_a_message_that_says_so(host: Path) -> None:
+    """F3-4: ``.environments`` (the path without ``{}``) reaches the map-keyed refusal instead of "no node collection"."""
+    before = (host / "spec" / "02a_delivery_baseline.json").read_text(encoding="utf-8")
+    status, out = _run(host, "insert", "--step", "02a", ".environments", '{"scope": "in"}')
+    assert status == 1, out
+    assert "E767" in out and ".environments is a map keyed by id" in out and "does not add to a map" in out, out
+    assert "no node collection" not in out and "specdev json patch --id" not in out
+    assert (host / "spec" / "02a_delivery_baseline.json").read_text(encoding="utf-8") == before

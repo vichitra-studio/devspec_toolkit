@@ -3,8 +3,8 @@
 A replay holds two kinds of item: the suspect links (``trace.suspects``; links held by historical nodes are outside
 replay) and the coverage gaps the registered providers report (``trace.gaps``).  Within a step the nodes that hold
 suspect links are listed upward first, a node after the nodes of its own step it links to, which is the order in which
-``attest`` can succeed.  ``--diff`` adds, per root of a change, the text the changed node had when the lock entry was
-written (``trace.history``).
+``attest`` can succeed.  ``--diff`` adds, per root of a change, the text the changed node had when a holder accepted it (``trace.history``),
+one diff per version when holders accepted different ones.
 """
 from __future__ import annotations
 
@@ -14,10 +14,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from specdev_tools.graph.model import Graph
+from specdev_tools.graph.queries import plural
 from specdev_tools.trace.gaps import CoverageGap, coverage_gaps
-from specdev_tools.trace.history import NOTE_NO_EARLIER, OldTextResolver, contract_lines
+from specdev_tools.trace.history import NOTE_NO_EARLIER, OldTextResolver, contract_lines, historical_node_ids
 from specdev_tools.trace.lockfile import Lock, LockEntry
-from specdev_tools.trace.suspects import SuspectLink, find_suspects
+from specdev_tools.trace.hashing import compute_all
+from specdev_tools.trace.suspects import CAUSE_UPSTREAM, SuspectLink, find_suspects
 
 NOTE_SAME_TEXT = "its own contract text is unchanged; something above it or folded into it changed"
 NO_STEP_LABEL = "(no step)"
@@ -69,11 +71,16 @@ class ReplayPlan:
 
 @dataclass(frozen=True)
 class RootDiff:
-    """The change of one root: the unified diff of its contract text, or the ``note`` that says why there is none."""
+    """The change of one root: the unified diff of its contract text, or the ``note`` that says why there is none.
+
+    A root whose holders accepted different versions has one ``RootDiff`` per accepted version; ``accepted_by`` then
+    names the holders of that version (it is empty when all of them accepted the same one).
+    """
 
     root: str
     note: str | None
     diff: tuple[str, ...] = ()
+    accepted_by: tuple[str, ...] = ()
 
 
 def _upward_first(graph: Graph, holders: Collection[str]) -> list[str]:
@@ -137,36 +144,63 @@ def _roots(plan: ReplayPlan) -> list[str]:
     return list(found)
 
 
-def _entries_by_root(graph: Graph, lock: Lock, roots: Collection[str]) -> dict[str, LockEntry]:
-    """For each of *roots* the first lock entry (in lock order) whose target is that node, aliases resolved."""
-    found: dict[str, LockEntry] = {}
+def _stale_groups(graph: Graph, lock: Lock, root: str, current: str, historical: Collection[str]) -> dict[str, list[LockEntry]]:
+    """The entries that target *root* (aliases resolved) with a stored content hash other than *current*, by stored hash.
+
+    These are the versions of the root some holder accepted and has not seen change; an entry already attested has the
+    current hash and is left out, and so is an entry of a historical holder (its link is outside replay).  Groups and
+    their entries are in lock order.
+    """
+    groups: dict[str, list[LockEntry]] = {}
     for entry in lock.entries:
         target = graph.find(entry.target)
-        if target is not None and target.id in roots:
-            found.setdefault(target.id, entry)
-    return found
+        if target is not None and target.id == root and entry.content_hash != current and entry.source not in historical:
+            groups.setdefault(entry.content_hash, []).append(entry)
+    return groups
 
 
 def root_diffs(
     graph: Graph, lock: Lock, plan: ReplayPlan, seed_texts: Mapping[str, str], resolver: OldTextResolver
 ) -> list[RootDiff]:
-    """One ``RootDiff`` per root named in *plan*, in order of first appearance.
+    """The ``RootDiff`` of each root named in *plan*, in order of first appearance of the root.
 
-    The old text of a root is what *resolver* recovers for the lock entry that targets it; the new text is the root as
-    it is in *graph*.  A root with no old text carries the resolver's note.
+    The old text of a root is what *resolver* recovers for a lock entry that targets it and has not yet accepted its
+    current content (``_stale_groups``); the new text is the root as it is in *graph*.  Holders that accepted
+    different versions are grouped by the stored content hash: one ``RootDiff`` per version, in lock order, with the
+    holders named.  A root with no old text carries the resolver's note.
     """
-    roots = _roots(plan)
-    entries = _entries_by_root(graph, lock, roots)
+    hashes = compute_all(graph, seed_texts)
+    historical = historical_node_ids(graph)
     diffs: list[RootDiff] = []
-    for root in roots:
-        node, entry = graph.by_id[root], entries.get(root)
-        old = resolver.old_text(entry) if entry is not None else None
-        if old is None or old.lines is None:
-            diffs.append(RootDiff(root, old.note if old is not None else NOTE_NO_EARLIER))
-            continue
-        lines = tuple(difflib.unified_diff(old.lines, contract_lines(node, graph, seed_texts), "old", "new", lineterm="", n=1))
-        diffs.append(RootDiff(root, None if lines else NOTE_SAME_TEXT, lines))
+    for root in _roots(plan):
+        node = graph.by_id[root]
+        groups = _stale_groups(graph, lock, root, hashes[root][0], historical)
+        if not groups:
+            diffs.append(RootDiff(root, NOTE_NO_EARLIER))
+        for entries in groups.values():
+            entry = next((candidate for candidate in entries if not candidate.baseline), entries[0])
+            accepted_by = tuple(sorted({candidate.source for candidate in entries})) if len(groups) > 1 else ()
+            old = resolver.old_text(entry)
+            if old.lines is None:
+                diffs.append(RootDiff(root, old.note, accepted_by=accepted_by))
+                continue
+            lines = tuple(difflib.unified_diff(old.lines, contract_lines(node, graph, seed_texts), "old", "new", lineterm="", n=1))
+            diffs.append(RootDiff(root, None if lines else NOTE_SAME_TEXT, lines, accepted_by))
     return diffs
+
+
+def unrooted_note(plan: ReplayPlan) -> str | None:
+    """The one line for suspect links that changed upstream and name no root, or ``None`` when every link has one.
+
+    A link has no root when every entry that pointed at the changed node was attested already, so no stored version of
+    the root is left to compare with.
+    """
+    count = sum(
+        1 for step in plan.steps for node in step.nodes for link in node.links if link.cause == CAUSE_UPSTREAM and not link.roots
+    )
+    if not count:
+        return None
+    return f"({plural(count, 'link')} changed upstream with no root left: the change above was already accepted by the links that point at it)"
 
 
 # --- output ---------------------------------------------------------------------------------------------------------
@@ -175,17 +209,13 @@ def _step_label(step: str | None) -> str:
     return NO_STEP_LABEL if step is None else step
 
 
-def _plural(count: int, noun: str) -> str:
-    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
-
-
 def _suspect_text(link: SuspectLink) -> str:
     roots = f", roots: {', '.join(link.roots)}" if link.roots else ""
     return f"    {link.field} -> {link.target} ({link.cause}{roots})"
 
 
 def _step_text(step: ReplayStep) -> list[str]:
-    lines = [f"step {_step_label(step.step)}: {_plural(len(step.nodes), 'suspect node')}, {_plural(step.link_count, 'suspect link')}, {_plural(len(step.coverage_gaps), 'coverage gap')}"]
+    lines = [f"step {_step_label(step.step)}: {plural(len(step.nodes), 'suspect node')}, {plural(step.link_count, 'suspect link')}, {plural(len(step.coverage_gaps), 'coverage gap')}"]
     for node in step.nodes:
         lines.append(f"  {node.node}")
         lines.extend(_suspect_text(link) for link in node.links)
@@ -195,7 +225,8 @@ def _step_text(step: ReplayStep) -> list[str]:
 
 def diff_lines(diff: RootDiff) -> list[str]:
     body = [f"  {line}" for line in diff.diff] if diff.diff else [f"  ({diff.note})"]
-    return [f"changed above: {diff.root}", *body]
+    holders = f" (as accepted by {', '.join(diff.accepted_by)})" if diff.accepted_by else ""
+    return [f"changed above: {diff.root}{holders}", *body]
 
 
 def render_text(plan: ReplayPlan, diffs: Sequence[RootDiff] | None = None) -> str:
@@ -207,7 +238,10 @@ def render_text(plan: ReplayPlan, diffs: Sequence[RootDiff] | None = None) -> st
         lines.extend(_step_text(step))
     for diff in diffs or ():
         lines.extend(diff_lines(diff))
-    lines.append(f"total: {_plural(plan.link_count, 'suspect link')} in {_plural(plan.node_count, 'node')}, {_plural(plan.gap_count, 'coverage gap')}")
+    note = unrooted_note(plan) if diffs is not None else None
+    if note:
+        lines.append(note)
+    lines.append(f"total: {plural(plan.link_count, 'suspect link')} in {plural(plan.node_count, 'node')}, {plural(plan.gap_count, 'coverage gap')}")
     return "\n".join(lines)
 
 
@@ -230,5 +264,7 @@ def plan_to_dict(plan: ReplayPlan, diffs: Sequence[RootDiff] | None = None) -> d
         "totals": {"suspect_nodes": plan.node_count, "suspect_links": plan.link_count, "coverage_gaps": plan.gap_count},
     }
     if diffs is not None:
-        document["diffs"] = [{"root": diff.root, "note": diff.note, "diff": list(diff.diff)} for diff in diffs]
+        document["diffs"] = [
+            {"root": diff.root, "note": diff.note, "diff": list(diff.diff), "accepted_by": list(diff.accepted_by)} for diff in diffs
+        ]
     return document

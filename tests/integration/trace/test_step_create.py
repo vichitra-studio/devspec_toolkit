@@ -154,6 +154,7 @@ def test_step_create_dry_run_prints_the_same_and_writes_nothing(host: Host) -> N
     assert host.snapshot() == before
     dry_text = host.create(FR_STEP, "--dry-run")
     assert dry_text.splitlines()[0] == f"[dry-run] would create fr-list-password-reset ({STEP_FILES[FR_STEP]} .)"
+    assert "lock entry to write: " in dry_text and "lock entry written" not in dry_text
     real = host.create_json(FR_STEP)
     assert dry["written"] is False and real["written"] is True
     assert {**dry, "written": True} == real

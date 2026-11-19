@@ -39,9 +39,10 @@ from specdev_tools.trace.lockfile import (
     Lock,
     LockEntry,
     LockError,
+    locked_graph,
     read_lock,
+    refuse_unreadable,
     replace_file_atomically,
-    with_write_lock,
     write_lock,
 )
 
@@ -175,10 +176,14 @@ def _node_to_rename(graph: Graph, old_id: str) -> Node:
     if node.kind == SEED_KIND:
         raise refuse(f"{node.id!r} is a seed; a seed id is the key of its manifest entry and is changed in the seed manifest")
     if node.role == RECORD_ROLE:
-        raise refuse(f"{node.id!r} is a {node.kind}, which is a record written by the toolkit, and a record is not renamed")
+        raise refuse(f"{node.id!r} is {_article(node.kind)} {node.kind}, which is a record written by the toolkit, and a record is not renamed")
     if decl is None or decl.map_keyed or decl.id_field is None:
-        raise refuse(f"{node.id!r} is a {node.kind}, whose id is the key of a map; it is not renamed by id")
+        raise refuse(f"{node.id!r} is {_article(node.kind)} {node.kind}, whose id is the key of a map; it is not renamed by id")
     return node
+
+
+def _article(noun: str) -> str:
+    return "an" if noun[:1].lower() in "aeiou" else "a"
 
 
 def _check_new_id(graph: Graph, node: Node, new_id: str) -> None:
@@ -354,8 +359,9 @@ def rename_node(
     """
     if not apply:
         known = graph if graph is not None else build_graph(spec_dir, repo_root)
+        refuse_unreadable(known, "node rename")
         return _result(_plan_rename(known, spec_dir, repo_root, old_id, new_id), written=False)
-    with with_write_lock(spec_dir):
-        plan = _plan_rename(build_graph(spec_dir, repo_root), spec_dir, repo_root, old_id, new_id)
+    with locked_graph(spec_dir, repo_root, "node rename") as built:
+        plan = _plan_rename(built, spec_dir, repo_root, old_id, new_id)
         write_edits(spec_dir, plan.edits, plan.lock, plan.old_lock)
     return _result(plan, written=True)

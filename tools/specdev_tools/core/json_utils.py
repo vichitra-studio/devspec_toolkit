@@ -503,6 +503,7 @@ def _ws1_differential_check(
 
     # Step 4: Compute errors_before to distinguish pre-existing from newly introduced.
     errors_before = _call_validate_or_raise(eff_root, original, file_path)
+    errors_before = _reindexed_after_removal(errors_before, _removed_array_item(original, new))
 
     added = _added_violations(errors_before, errors_after)
     if added:
@@ -515,10 +516,50 @@ def _ws1_differential_check(
         )
 
 
+def _removed_array_item(original: Any, new: Any, path: tuple = ()) -> Optional[Tuple[tuple, int]]:
+    """``(path of the array, index)`` when *new* is *original* with one array item removed, else ``None``."""
+    if isinstance(original, list) and isinstance(new, list):
+        if len(original) == len(new) + 1:
+            index = next((i for i, item in enumerate(new) if original[i] != item), len(new))
+            return (path, index) if original[:index] + original[index + 1:] == new else None
+        if len(original) == len(new):
+            for i, (old_item, new_item) in enumerate(zip(original, new)):
+                found = _removed_array_item(old_item, new_item, path + (i,))
+                if found:
+                    return found
+    elif isinstance(original, dict) and isinstance(new, dict):
+        for key in original.keys() & new.keys():
+            found = _removed_array_item(original[key], new[key], path + (key,))
+            if found:
+                return found
+    return None
+
+
+def _reindexed_after_removal(
+    before: List[SchemaViolation], removed: Optional[Tuple[tuple, int]]
+) -> List[SchemaViolation]:
+    """*before* as its paths read once array item ``removed`` is gone: the removed item's violations drop out and the
+    later items' violations move down one index, so a violation of a later sibling is not counted as added."""
+    if removed is None:
+        return before
+    array_path, index = removed
+    depth = len(array_path)
+    result: List[SchemaViolation] = []
+    for violation in before:
+        path = violation.path
+        if path[:depth] == array_path and len(path) > depth and isinstance(path[depth], int):
+            if path[depth] == index:
+                continue
+            if path[depth] > index:
+                violation = violation._replace(path=path[:depth] + (path[depth] - 1,) + path[depth + 1:])
+        result.append(violation)
+    return result
+
+
 def _added_violations(
     before: List[SchemaViolation], after: List[SchemaViolation]
 ) -> List[SchemaViolation]:
-    """The violations of *after* that an edit added, sorted by path then message.
+    """The violations of *after* that an edit added, sorted by path then message (``unevaluatedProperties`` last).
 
     A violation is identified by ``(path, keyword)``, not by its message: the message of ``minItems`` or ``anyOf``
     quotes the instance and so changes with any edit inside it.  For each identity the violations beyond the count
@@ -533,7 +574,8 @@ def _added_violations(
             already[key] -= 1
         else:
             added.append(violation)
-    return sorted(added, key=lambda v: (v.path, v.message))
+    # An ``unevaluatedProperties`` violation only repeats that a deeper one exists: the specific ones come first.
+    return sorted(added, key=lambda v: (v.keyword == "unevaluatedProperties", v.path, v.message))
 
 
 def check_edit(file_path: str, content: str, new_content: str, repo_root: Optional[str]) -> None:
@@ -709,7 +751,8 @@ def json_delete(
 
     ``validate`` defaults to False: the classic ``json delete`` and ``node status <id> active`` validate nothing.  When
     True, the edit is checked against the document's own ``$schema`` as ``json patch`` is: only a violation the
-    deletion adds refuses it.
+    deletion adds refuses it.  When the deletion removes an array item, the violations of the later items are compared
+    at their new index, so a violation a later sibling already had is not counted as added.
     """
     _check_file(file_path)
 

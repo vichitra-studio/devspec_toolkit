@@ -48,13 +48,15 @@ def _fail(code: str, message: str) -> GitViewError:
     return GitViewError(make_error(code, message))
 
 
-def _reason(process: subprocess.CompletedProcess[bytes]) -> str:
+def git_reason(process: subprocess.CompletedProcess[bytes]) -> str:
     text = " ".join(process.stderr.decode("utf-8", errors="replace").split())
     return text if len(text) <= _MAX_REASON_CHARS else text[:_MAX_REASON_CHARS].rstrip() + "..."
 
 
-def _run_git(git_root: str, args: Sequence[str]) -> subprocess.CompletedProcess[bytes]:
-    """Run ``git -C <git_root> <args>``; E708 when git is missing or does not answer in time."""
+def run_git(git_root: str, args: Sequence[str]) -> subprocess.CompletedProcess[bytes]:
+    """Run ``git -C <git_root> <args>`` (bytes out); E708 when git is missing or does not answer in time.
+
+    The one place that starts git for the toolkit: ``trace.merge_driver`` uses it too and re-wraps the error."""
     try:
         return subprocess.run(["git", "-C", git_root, *args], capture_output=True, check=False, timeout=GIT_TIMEOUT_SECONDS)
     except FileNotFoundError:
@@ -78,10 +80,10 @@ def resolve_ref(ref: str, git_root: str) -> str:
     if ref.startswith("-"):
         raise _fail("E708", f"'{ref}' is not a git ref")
     require_git_root_folder(git_root)
-    process = _run_git(git_root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
+    process = run_git(git_root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
     if process.returncode == 0:
         return process.stdout.decode("utf-8").strip()
-    if "not a git repository" in _reason(process).lower():
+    if "not a git repository" in git_reason(process).lower():
         raise _fail("E708", f"{git_root} is not a git repository")
     raise _fail("E708", f"ref '{ref}' does not name a commit in {git_root}")
 
@@ -95,7 +97,7 @@ def default_base_ref(git_root: str) -> str:
         GitViewError: E708 when git is missing or does not answer in time.
     """
     for candidate in DEFAULT_BRANCH_CANDIDATES:
-        process = _run_git(git_root, ["merge-base", "HEAD", candidate])
+        process = run_git(git_root, ["merge-base", "HEAD", candidate])
         if process.returncode == 0:
             return process.stdout.decode("utf-8").strip()
     return PREVIOUS_COMMIT
@@ -122,9 +124,9 @@ def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.Tempo
         GitViewError: E708 when the ref does not resolve, a path is absent at the ref, or git fails.
     """
     commit = resolve_ref(ref, git_root)
-    process = _run_git(git_root, ["archive", "--format=tar", commit, "--", *paths])
+    process = run_git(git_root, ["archive", "--format=tar", commit, "--", *paths])
     if process.returncode != 0:
-        raise _fail("E708", f"{', '.join(paths)} cannot be read at ref '{ref}': {_reason(process)}")
+        raise _fail("E708", f"{', '.join(paths)} cannot be read at ref '{ref}': {git_reason(process)}")
     directory = tempfile.TemporaryDirectory(prefix="specdev-gitview-")
     try:
         with tarfile.open(fileobj=io.BytesIO(process.stdout)) as archive:
@@ -137,9 +139,9 @@ def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.Tempo
 
 def _git_stdout(git_root: str, args: Sequence[str]) -> str:
     """The stdout of ``git -C <git_root> <args>``; E708 when git is missing, too slow or fails."""
-    process = _run_git(git_root, args)
+    process = run_git(git_root, args)
     if process.returncode != 0:
-        raise _fail("E708", f"git {args[0]} failed in {git_root}: {_reason(process)}")
+        raise _fail("E708", f"git {args[0]} failed in {git_root}: {git_reason(process)}")
     return process.stdout.decode("utf-8", errors="replace")
 
 

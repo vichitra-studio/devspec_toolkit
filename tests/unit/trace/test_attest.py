@@ -70,7 +70,9 @@ def test_attest_shows_old_and_new_text_then_writes_only_with_yes(example: Exampl
     assert "derives_from -> fr-password-reset (suspect, content_changed)" in out
     assert f"changed above: {CRITERION}" in out and "+text:" in out and "Also reject a token" in out
     assert _lock_text(example) == before
-    assert _attest(example, API, "--yes", "--dry-run")[0] == 0 and _lock_text(example) == before
+    code, out = _attest(example, API, "--yes", "--dry-run")
+    assert code == 0 and _lock_text(example) == before
+    assert out.splitlines()[0] == "attest: would write 1 link on 1 node (--dry-run: nothing is written)"  # not "run again with --yes"
     code, out = _attest(example, API, "--yes")
     assert code == 0 and out.splitlines()[0] == "attest: wrote 1 link on 1 node"
     assert _lock_text(example) != before and API not in _suspect_holders(example)
@@ -276,3 +278,51 @@ def test_attest_unknown_step_is_e706_as_text_and_json(example: Example) -> None:
     document = _attest_json(example, "--step", "99", code=1)
     assert document["errors"][0]["code"] == "E706"
     assert serialise_lock(example.lock()) == _lock_text(example)
+
+
+# --- an unreadable spec file, and the graph built under the write lock (review M5 R1, F1-5) -------------------------------
+
+def _break_fr_file(example: Example) -> None:
+    """Conflict markers in the FR list: the file cannot be read, so the nodes of step 04 are not in the graph."""
+    path = example.spec / "04_fr_list.json"
+    path.write_text("<<<<<<< ours\n" + path.read_text(encoding="utf-8") + "=======\n>>>>>>> theirs\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("argv", [["--prune"], ["--prune", "--dry-run"], [API, "--yes"], [API, "--dry-run"], ["--step", "05", "--yes"]])
+def test_attest_that_writes_refuses_while_a_spec_file_cannot_be_read(example: Example, argv: list[str]) -> None:
+    """B2: the entries of the links in the unreadable file look like orphans; ``--prune`` deleted them and the state could not be rebuilt."""
+    example.edit_criterion()
+    _break_fr_file(example)
+    before = _lock_text(example)
+    code, out = _attest(example, *argv)
+    assert code == 1 and "E520" in out and "04_fr_list.json cannot be read" in out, out
+    assert _lock_text(example) == before
+
+
+def test_attest_preview_of_a_node_still_works_with_an_unreadable_file(example: Example) -> None:
+    """The preview only prints, as ``stale`` does; every mode that plans a write (dry run included) is in ``test_unreadable_writers``."""
+    _break_fr_file(example)
+    code, out = _attest(example, API)
+    assert code != 2 and "E520" not in out
+
+
+def test_attest_builds_the_graph_under_the_write_lock_only_when_it_writes(example: Example, monkeypatch: pytest.MonkeyPatch) -> None:
+    """B10: a plan that is written is made from the graph read after the lock is taken."""
+    from specdev_tools.trace import commands
+
+    calls: list[str] = []
+    real = commands.locked_graph
+
+    def spy(spec_root: str, repo_root: str, what: str) -> Any:
+        calls.append(spec_root)
+        return real(spec_root, repo_root, what)
+
+    monkeypatch.setattr(commands, "locked_graph", spy)
+    example.edit_criterion()
+    _attest(example, API)
+    _attest(example, "--prune", "--dry-run")
+    _attest(example, API, "--yes", "--dry-run")
+    assert calls == []
+    _attest(example, API, "--yes")
+    _attest(example, "--prune")
+    assert len(calls) == 2

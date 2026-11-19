@@ -42,12 +42,12 @@ from specdev_tools.graph.gitview import read_seed_texts
 from specdev_tools.graph.ids import check_unique_ids, mint_slug, suggest_prefix
 from specdev_tools.graph.kinds import SEED_KIND, KindDecl, load_kind_registry
 from specdev_tools.graph.model import Graph, Link, Node, node_label
-from specdev_tools.graph.queries import nearest_suffix
+from specdev_tools.graph.queries import require_known_step, unknown_node_error
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import contract_lines
-from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, with_write_lock, write_lock
+from specdev_tools.trace.lockfile import Lock, LockEntry, locked_graph, read_lock, refuse_unreadable, replace_file_atomically, write_lock
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
 from specdev_tools.validation.linter_utils import graph_known_ids
 
@@ -145,16 +145,11 @@ class _Edit:
 
 # --- finding the node -----------------------------------------------------------------------------------------------
 
-def _unknown_id(graph: Graph, node_id: str) -> FindingError:
-    message = f"no node with the id {node_id!r}{nearest_suffix(node_id, graph.by_id)}"
-    return FindingError(make_error("E706", message), unknown_id=True)
-
-
 def _node_to_write(graph: Graph, node_id: str) -> Node:
     """The node *node_id* names (an id or an alias); E706 when none does, E767 for a duplicated id or a seed."""
     node = graph.find(node_id)
     if node is None:
-        raise _unknown_id(graph, node_id)
+        raise unknown_node_error(graph, node_id)
     if node.id in graph.dups:
         raise _refuse(f"node id {node.id!r} is defined more than once (E704); fix the duplicate first", node_id=node.id)
     if node.kind == SEED_KIND:
@@ -210,13 +205,17 @@ def _computed_names(kind: str | None) -> dict[str, str]:
     return names
 
 
-def _payload_problem(kind: str | None, field: str | None, payload: Any) -> str | None:
-    """The first reason the payload (or the field it is written to) stores something the toolkit computes or no longer stores."""
+def _payload_problem(kind: str | None, field: str | None, payload: Any, node_id: str | None = None) -> str | None:
+    """The first reason the payload (or the field it is written to) stores something the toolkit computes or no longer stores.
+
+    *node_id* is the node the write goes to (none for a new node); the message names it as the check's message does.
+    """
     names = _computed_names(kind)
     written = [*([field.split("[")[0].lstrip(".")] if field else []), *_keys_of(payload)]
     for name in written:
         if name in names:
-            return f"the write stores '{name}': {names[name]}"
+            where = f" to {node_id}" if node_id else ""
+            return f"the write{where} stores '{name}': {names[name]}"
     for pin in _pin_objects(payload):
         for name in _PIN_FIELDS:
             if name in pin:
@@ -302,7 +301,7 @@ def _plan_field_write(graph: Graph, node: Node, content: str, repo_root: str, re
     decl = graph.decls.get(node.kind)
     field = _field_path(request.path, decl, node)
     payload = _parse_payload(request.value, request.raw)
-    problem = _payload_problem(node.kind, field, payload)
+    problem = _payload_problem(node.kind, field, payload, node.id)
     if problem is not None:
         raise _refuse(problem, code="E768", node_id=node.id)
     path, minted = node.jq_path + field, []
@@ -334,9 +333,7 @@ def _minted_for_field(graph: Graph, decl: KindDecl | None, field: str, payload: 
 
 def _step_file(graph: Graph, step: str) -> str:
     """The one spec file of *step*; E706 for a step that does not exist, E767 when it has no file or several."""
-    if step not in graph.shape.step_ranks:
-        known = ", ".join(sorted(graph.shape.step_ranks, key=graph.shape.step_ranks.__getitem__))
-        raise FindingError(make_error("E706", f"no step {step!r}; known steps: {known}"))
+    require_known_step(graph, step)
     files = graph.shape.files_by_step.get(step, ())
     if len(files) != 1:
         what = "has no file in this spec" if not files else f"has several files ({', '.join(files)}); write by --id into one of them"
@@ -348,7 +345,7 @@ def _collection_decl(repo_root: str, step: str, path: str) -> KindDecl:
     """The kind whose collection is *path* in a file of *step*; E767 naming the collections there are when none is."""
     declared = [kind for file in load_kind_registry(repo_root).files if file.step == step for kind in file.kinds]
     for kind in declared:
-        if kind.array_path.lstrip(".") == path.lstrip("."):
+        if kind.array_path.removesuffix("{}").lstrip(".") == path.lstrip("."):  # a map-keyed collection is declared as `.name{}`
             return kind
     names = ", ".join(sorted(f"{kind.array_path} ({kind.kind})" for kind in declared)) or "none"
     raise _refuse(f"step {step} has no node collection {path}; its collections: {names}")
@@ -362,7 +359,7 @@ def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: Wri
         raise _refuse(f"the collection path {path!r} must be a plain jq path such as .functional_requirements")
     decl = _collection_decl(repo_root, step, path)
     if decl.map_keyed:
-        raise _refuse(f"{path} is a map keyed by id; add the entry with `specdev json patch --id` on its parent")
+        raise _refuse(f"{path} is a map keyed by id, and `specdev json insert --step` does not add to a map")
     payload = _parse_payload(request.value, request.raw)
     if not isinstance(payload, dict):
         raise _refuse(f"the new {decl.kind} must be a JSON object")
@@ -575,7 +572,9 @@ def execute_write(
         FindingError: E706 for an unknown id or step; ``LockError`` (E769) when another write holds the lock, or
             (E760) when the lock file cannot be read.
     """
+    what = f"json {request.action} --{'step' if request.step else 'id'}"
     if dry_run:
+        refuse_unreadable(graph, what)
         return _write_on(graph, spec_root, repo_root, git_root, request, write=False)
-    with with_write_lock(spec_root):
-        return _write_on(build_graph(spec_root, repo_root), spec_root, repo_root, git_root, request, write=True)
+    with locked_graph(spec_root, repo_root, what) as built:
+        return _write_on(built, spec_root, repo_root, git_root, request, write=True)

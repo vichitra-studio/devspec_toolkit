@@ -1,19 +1,34 @@
 """Helpers that build a trace lock from a graph, for tests; ``python -m`` runs ``regenerate_example_lock``."""
 from __future__ import annotations
 
+import shutil
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+
+import pytest
 
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.gitview import read_seed_texts
 from specdev_tools.graph.model import Graph
+from specdev_tools.trace import gaps
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.lockfile import Lock, LockEntry, write_lock
 from specdev_tools.trace.suspects import lock_links
 
 ROOT = Path(__file__).parents[3]
 EXAMPLE_HOST = ROOT / "tests" / "fixtures" / "graph_example"
+
+
+@pytest.fixture
+def gap_providers() -> Iterator[object]:
+    """``register_gap_provider`` for one test; the list of registered providers (module state) is restored when it ends.
+
+    The one fixture of the tests that register a coverage-gap provider: import it into the test module.
+    """
+    saved = list(gaps._providers)
+    yield gaps.register_gap_provider
+    gaps._providers[:] = saved
 
 
 def lock_for(graph: Graph, host_root: Path | str, *, only_holders: Iterable[str] | None = None) -> Lock:
@@ -28,6 +43,28 @@ def lock_for(graph: Graph, host_root: Path | str, *, only_holders: Iterable[str]
         for item in lock_links(graph)
         if wanted is None or item.holder.id in wanted
     ))
+
+
+def git_copy_of_example(destination: Path) -> Path:
+    """Copy the worked example to *destination* (a new folder), make it a git repository with one commit, and return it.
+
+    The folder holds ``spec`` and ``docs`` as in a host repository; commands run on it take ``--spec-root ./spec``
+    and ``--git-root .`` from inside it (see ``run_on_example``).
+    """
+    from unit.graph._synth import git  # local: _synth imports the CLI, which this module need not load
+
+    shutil.copytree(EXAMPLE_HOST, destination)
+    git(destination, "init", "-q", "-b", "main")
+    git(destination, "add", "-A")
+    git(destination, "commit", "-q", "-m", "worked example")
+    return destination
+
+
+def run_on_example(host: Path, *argv: str) -> tuple[int, str]:
+    """Run ``specdev <argv>`` on the copy *host* with the three root flags of a submodule deployment: ``(exit code, output)``."""
+    from unit.graph._synth import run_cli  # local, as above
+
+    return run_cli(*argv, "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
 
 
 def regenerate_example_lock() -> None:

@@ -690,22 +690,24 @@ changes:
     description: >
       specdev stale [--step NN] [--diff] lists the suspect links by owning step in
       waterfall order, nodes upward first, with the cause and the nodes the change
-      started from (roots); --diff adds the diff of each root's contract text
-      against the text the link was accepted with, recovered from git. It exits 0
-      whatever it finds, and an unknown step is E706. specdev attest <node-id>
-      [--field F] [--target T], attest --step NN and attest --prune write the
-      current hashes into the lock for the suspect links of a node, of a step
-      (upward first) or remove the entries of links that no longer exist; without
-      --yes the first two print what they would write and write nothing, --dry-run
-      never writes, and --prune writes at once. Refused with exit 1: E764 (a node
-      the holder links to is itself suspect: attest that one first), E765 (a node of
-      a closed milestone), E706 (an unknown id or step), E704 (an id defined twice).
-      specdev coverage [--by fr] prints how many FRs have an API or a fixture and
-      how many capabilities have an FR, the criteria that have a current refinement
-      and the exempt nodes (not_applicable, scope later or out); it exits 0 whatever
-      it finds, because no rule requires those links. The role-rule findings of
-      coverage and the coverage gaps of stale stay empty until a later 1.2.0 change
-      registers the rules.
+      started from (roots); --diff adds the diff of each root's contract text against
+      the text the holders accepted, recovered from git (one diff for each accepted
+      version when the holders below one root accepted different ones). It exits 0
+      when it lists links, and an unknown step is E706. specdev attest <node-id>
+      [--field F] [--target T], attest --step NN and attest --prune write the current
+      hashes into the lock for the suspect links of a node, of a step (upward first)
+      or remove the entries of links that no longer exist; without --yes the first two
+      print what they would write and write nothing, --dry-run never writes, and
+      --prune writes at once. Refused with exit 1: E520 (--yes, --dry-run or --prune
+      while a spec file cannot be read, so the links it holds are not in the graph;
+      nothing is written), E764 (a node the holder links to is itself suspect: attest
+      that one first), E765 (a node of a closed milestone), E706 (an unknown id or
+      step), E704 (an id defined twice). specdev coverage [--by fr] prints how many
+      FRs have an API or a fixture and how many capabilities have an FR, the criteria
+      that have a current refinement and the exempt nodes (not_applicable, scope later
+      or out); it prints information only and exits 0, because no rule requires those
+      links. The role-rule findings of coverage and the coverage gaps of stale stay
+      empty until a later 1.2.0 change registers the rules.
     migration:
       action: none
 
@@ -732,30 +734,33 @@ changes:
       leaves out are minted, the lock entries of the links the edit adds are written
       and those of the links it removes are dropped, and the command lists the links
       the edit leaves suspect (newly suspect: ...) and, for a delete, the links that
-      now point at a node that is gone (now broken). Refused with exit 1: E767 (a
-      seed, the node's own id, an edit that adds a schema violation or leaves a link
-      that does not resolve or an alias collision, a path that is not a node
-      collection of the step), E768 (the payload stores a computed field), E706 (an
-      unknown id or step), E769 (another specdev write is running). These forms take
-      --repo-root, --spec-root, --git-root and --json (CLAUDE.md says the json
-      subcommands take --repo-root only: that holds for the path forms); json
+      now point at a node that is gone (now broken). With --dry-run the report says
+      lock entry to write and lock entry to remove, and nothing is written. Refused
+      with exit 1: E767 (a seed, the node's own id, an edit that adds a schema
+      violation or leaves a link that does not resolve or an alias collision, a path
+      that is not a node collection of the step, the path of a collection that is a
+      map keyed by id), E768 (the payload stores a computed field), E706 (an unknown
+      id or step), E769 (another specdev write is running), E520 (a spec file cannot
+      be read, so the links it holds are not in the graph; also for a dry run). These
+      forms take --repo-root, --spec-root, --git-root and --json (CLAUDE.md says the
+      json subcommands take --repo-root only: that holds for the path forms); json
       delete, json keys and json structure now accept --repo-root too.
     migration:
       action: none
 
   - type: add_module
     description: >
-      specdev step create NN --from DRAFT [--dry-run] writes the file of step NN
-      from a draft that holds the whole artifact (ids of sub-items may be left out),
-      checks it against the step's schema, requires every link to resolve and writes
-      the lock entries of its links; E767 when the step already has its file, for
-      steps 13a and 16, for a draft that cannot be read and for a draft whose
-      $schema is not the step's. specdev step ready NN prints step NN: ready and
-      exits 0 when the steps NN links to have a spec file and no pending replay, and
-      otherwise reports E773 with the blockers and exits 1; the file of NN itself is
-      not required. Until a later 1.2.0 change retires step 13a,
-      tools/step_order.json still lists it as an input of 14 and 16a, so step ready
-      14 reports E773 on a spec with no 13a file.
+      specdev step create NN --from DRAFT [--dry-run] writes the file of step NN from
+      a draft that holds the whole artifact (ids of sub-items may be left out), checks
+      it against the step's schema, requires every link to resolve and writes the lock
+      entries of its links; E767 when the step already has its file, for steps 13a and
+      16, for a draft that cannot be read, for a draft whose $schema is not the step's
+      and for a link that does not resolve; E520 when a spec file cannot be read.
+      specdev step ready NN prints step NN: ready and exits 0 when the steps NN links
+      to have a spec file and no pending replay, and otherwise reports E773 with the
+      blockers and exits 1; the file of NN itself is not required. Until a later 1.2.0
+      change retires step 13a, tools/step_order.json still lists it as an input of 14
+      and 16a, so step ready 14 reports E773 on a spec with no 13a file.
     migration:
       action: none
 
@@ -769,11 +774,17 @@ changes:
       Links held by closed milestones and by records keep the old id and resolve
       through the alias. specdev node rename --label TERM_ID "NEW LABEL" changes a
       glossary term's label and rewrites every use of the old label in the text of
-      nodes of steps 04 to 15; the nodes whose text changes, and the nodes that link
-      to them, become suspect. specdev diff prints <new id>: renamed from <old id>
-      for a rename and suggests the bump patch. Refused: E770 (a seed, a record, an
-      id that a node or an alias has, the same id, a label of something that is not
-      a glossary term), E706 (an unknown id).
+      nodes of steps 04 to 15, except in nodes of a closed milestone, which it lists
+      as not rewritten; the nodes whose text changes, and the nodes that link to them,
+      become suspect. specdev diff prints <new id>: renamed from <old id> for a rename
+      and suggests the bump patch. Before it writes, it checks the schema of the files
+      it edits and the findings of the graph; it does not run the step validators, so
+      a new id that breaks the id convention of a step is written and spec-check
+      reports it (E530). A plan item can be renamed. Refused: E770 (a seed, a record,
+      an environment, an id that a node or an alias has, the same id, a rename that
+      adds a schema violation or a finding, a label of something that is not a
+      glossary term), E706 (an unknown id), E520 (a spec file cannot be read, so the
+      links it holds are not in the graph; also for a dry run).
     migration:
       action: none
 
@@ -803,25 +814,25 @@ changes:
     description: >
       File-level forward replay is retired; the trace lock replaces it. validate-all
       no longer reports a changed step whose later steps did not change, and E550 is
-      no longer reported for one; it stays for a diff against the base ref that
-      cannot be computed. W595 is no longer reported by forward replay (specdev
-      context freshness and the seed indexer still report it, and it is still
-      promotable to E595). specdev forward-replay-check stays as a deprecated alias
-      with one line on stderr: it takes --step NN, runs the id-regression check
-      (E555, W598, W550; --base-ref and --diff-error-mode apply to it) and reports
-      the trace-lock findings of spec-check. spec-check --include-forward-replay
-      only switches the id-regression check (E555) on. The environment variable
-      SPECDEV_STALENESS_THRESHOLD and the staleness_threshold setting are removed
-      and a host that sets the variable gets no effect.
-      policy.status_write_exemptions in step_order.json is read by nothing; the key
-      stays until a later 1.2.0 change. In validate-all,
-      require_full_forward_replay_on_change now gates only the id-regression check.
-      Until a later 1.2.0 change, validate-all has no file-level replay gate: a
-      host's CI sees suspect links (E763) and links with no entry (E761) only. The
-      skills and agents under .claude/ still call forward-replay-check and still say
-      that W595 fires after a change; both stay valid until a later 1.2.0 change
-      rewrites them, but a suspect link (E763) can only be cleared with attest or an
-      edit.
+      no longer reported for one; it stays for a diff against the base ref that cannot
+      be computed. W595 is no longer reported by forward replay (specdev context
+      freshness and the seed indexer still report it, and it is still promotable to
+      E595). specdev forward-replay-check stays as a deprecated alias with one line on
+      stderr: it takes --step NN (it limits the trace-lock findings to the links held
+      by nodes of that step), runs the id-regression check (E555, W598, W550;
+      --base-ref and --diff-error-mode apply to it) and reports the trace-lock
+      findings of spec-check. spec-check --include-forward-replay only switches the
+      id-regression check (E555) on. The environment variable
+      SPECDEV_STALENESS_THRESHOLD and the staleness_threshold setting are removed and
+      a host that sets the variable gets no effect. policy.status_write_exemptions in
+      step_order.json is read by nothing; the key stays until a later 1.2.0 change. In
+      validate-all, require_full_forward_replay_on_change now gates only the
+      id-regression check. Until a later 1.2.0 change, validate-all has no file-level
+      replay gate: a host's CI sees suspect links (E763) and links with no entry
+      (E761) only. The skills and agents under .claude/ still call
+      forward-replay-check and still say that W595 fires after a change; both stay
+      valid until a later 1.2.0 change rewrites them, but a suspect link (E763) can
+      only be cleared with attest or an edit.
     migration:
       action: none
 

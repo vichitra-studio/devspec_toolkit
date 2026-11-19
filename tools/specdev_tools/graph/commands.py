@@ -344,6 +344,9 @@ def _label_lines(result: LabelRenameResult) -> list[str]:
         lines.extend(f"    {use.node_id} {use.field_path}: {use.old_text!r} -> {use.new_text!r}" for use in result.uses)
     else:
         lines.append("  no use of the old label found")
+    if result.skipped:
+        lines.append(f"  not rewritten (closed milestone) ({len(result.skipped)}):")
+        lines.extend(f"    {use.node_id} {use.field_path}" for use in result.skipped)
     lines.append(f"  files: {', '.join(result.files)}")
     return lines
 

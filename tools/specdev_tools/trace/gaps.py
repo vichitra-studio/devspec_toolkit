@@ -4,6 +4,10 @@ A coverage gap is a finding of the role rules of the graph checks (an in-play no
 unused or missing), grouped by the step that owns the node.  The toolkit computes none of them here: the checks that
 decide what a gap is register a *provider* (``register_gap_provider``), and ``coverage_gaps`` concatenates what the
 registered providers report.  With no provider registered there are no gaps.
+
+The registered providers are module state (``_providers``): they live as long as the process.  M6b registers its
+provider here.  A test that registers one uses the ``gap_providers`` fixture of ``tests/unit/trace/_lock_support.py``,
+which puts the list back when the test ends.
 """
 from __future__ import annotations
 

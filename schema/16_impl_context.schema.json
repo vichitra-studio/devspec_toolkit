@@ -448,7 +448,7 @@
                   "aliases": {
                     "type": "array",
                     "items": {
-                      "$ref": "vc:core:atoms#kebabId"
+                      "$ref": "vc:core:atoms#screamingSnakeId"
                     },
                     "uniqueItems": true,
                     "description": "Former ids of this plan item; `specdev node rename` adds the old id here. Optional."

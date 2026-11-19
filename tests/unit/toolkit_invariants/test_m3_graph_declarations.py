@@ -210,7 +210,9 @@ def test_every_non_record_kind_carries_lifecycle_aliases_and_replaces(decls, rea
         props = reader.properties(item, uri)
         required = reader.get(item, uri, "required")[0] or []
         assert props["lifecycle"][0]["$ref"] == f"{_GRAPH}#lifecycle", node.kind
-        assert props["aliases"][0]["items"]["$ref"] == "vc:core:atoms#kebabId", node.kind
+        # A former id has the form of the kind's ids: plan-item ids are upper-case, every other kind's are kebab-case.
+        alias_form = "screamingSnakeId" if node.kind == "plan-item" else "kebabId"
+        assert props["aliases"][0]["items"]["$ref"] == f"vc:core:atoms#{alias_form}", node.kind
         assert "x-link" not in props["aliases"][0], node.kind
         assert props["replaces"][0]["items"]["$ref"] == f"{_GRAPH}#nodeId", node.kind
         assert not {"lifecycle", "aliases", "replaces"} & set(required), node.kind

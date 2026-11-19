@@ -78,7 +78,7 @@
                 "$ref": "vc:core:graph#lifecycle"
               },
               "aliases": {
-                "description": "Former ids of this environment; `specdev node rename` adds the old id here. Optional.",
+                "description": "Former names of this environment. An environment is a map-keyed node: `specdev node rename` does not rename it, so these names are written by hand. Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

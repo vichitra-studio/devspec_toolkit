@@ -70,7 +70,7 @@ COMPUTED_VIEWS: tuple[ComputedView, ...] = (
         "content hash and chain stamp",
         ("content_hash", "chain_stamp"),
         None,
-        "the trace lock (`specdev attest` writes it)",
+        "the toolkit, from the node's text (the value is computed; it is not stored in a spec file)",
     ),
 )
 

@@ -4,19 +4,24 @@
 ``run_id_write``; the jq-path forms of the same subcommands are not touched.  The parser here is the id forms' own (the
 classic ``patch`` parser has a required positional file, so ``--id`` cannot be a flag of it).  Unlike the classic forms,
 the id forms need the spec folder, so they keep ``--spec-root`` and ``--git-root``.
+
+This module is a command module of its own, not a row of the generic dispatch of ``graph/commands``: ``json`` is parsed
+by ``cli.py`` with its own token handling (since 1.1.1), and moving the id forms under the generic dispatch would change
+that routing, which no plan asks for.  The report text lives in ``trace.write_report``.
 """
 from __future__ import annotations
 
 import argparse
 import os
 from collections.abc import Sequence
-from typing import Any
 
 from specdev_tools.core.toolkit_root import detect_toolkit_root
 from specdev_tools.graph.commands import add_root_flags, print_json, run_on_graph
 from specdev_tools.graph.model import Graph
-from specdev_tools.trace.id_writes import ACTIONS, WriteRequest, WriteResult, execute_write
-from specdev_tools.trace.lockfile import LockEntry
+from specdev_tools.trace.id_writes import ACTIONS, WriteRequest, execute_write
+from specdev_tools.trace.write_report import render_text, result_to_dict
+
+__all__ = ["ID_FLAGS", "build_id_write_parser", "is_id_write", "render_text", "result_to_dict", "run_id_write"]
 
 ID_FLAGS = ("--id", "--step")
 ID_WRITE_DESCRIPTION = (
@@ -70,74 +75,6 @@ def build_id_write_parser() -> argparse.ArgumentParser:
     delete = sub.add_parser("delete", parents=[common], help="Delete a node, by id")
     delete.add_argument("--id", dest="node_id", required=True, metavar="NODE_ID", help="The node to delete (an id or an alias)")
     return parser
-
-
-# --- output ---------------------------------------------------------------------------------------------------------
-
-def _entry_dict(entry: LockEntry) -> dict[str, str]:
-    return {"holder": entry.source, "field": entry.field, "target": entry.target}
-
-
-def result_to_dict(result: WriteResult) -> dict[str, Any]:
-    """The result as a JSON-able dict (``json --json``): the write, ``targets``, ``lock``, ``newly_suspect`` and ``broken``."""
-    return {
-        "action": result.action,
-        "id": result.node_id,
-        "file": result.file,
-        "jq_path": result.jq_path,
-        "written": result.written,
-        "minted": list(result.minted),
-        "targets": [
-            {"holder": item.holder, "field": item.field, "target": item.target, "kind": item.kind, "step": item.step, "text": item.text}
-            for item in result.targets
-        ],
-        "lock": {"written": [_entry_dict(e) for e in result.lock_written], "removed": [_entry_dict(e) for e in result.lock_removed]},
-        "newly_suspect": [{"step": step, "count": count} for step, count in result.newly_suspect],
-        "broken": [{"holder": link.holder, "field": link.field, "target": link.target} for link in result.broken],
-    }
-
-
-_VERBS = {"patch": ("patched", "patch"), "insert": ("inserted into", "insert into"), "delete": ("deleted", "delete"), "create": ("created", "create")}
-
-
-def _plural(count: int, noun: str) -> str:
-    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
-
-
-def _target_lines(result: WriteResult) -> list[str]:
-    if not result.targets:
-        return []
-    lines = ["targets:"]
-    for item in result.targets:
-        step = f", step {item.step}" if item.step else ""
-        lines.append(f"  {item.holder}.{item.field} -> {item.target} ({item.kind}{step}): {item.text}")
-    return lines
-
-
-def _lock_lines(result: WriteResult) -> list[str]:
-    lines: list[str] = []
-    for label, entries in (("lock entry written", result.lock_written), ("lock entry removed", result.lock_removed)):
-        lines.extend(f"{label}: {e.source}.{e.field} -> {e.target}" for e in entries)
-    return lines
-
-
-def render_text(result: WriteResult) -> str:
-    """The text report: the change, the targets, the lock entries, the newly suspect links and, for a delete, the broken links."""
-    past, plain = _VERBS[result.action]
-    where = f"{result.node_id} ({result.file} {result.jq_path or '.'})"
-    lines = [f"{past} {where}" if result.written else f"[dry-run] would {plain} {where}"]
-    if result.minted:
-        lines.append(f"ids minted: {', '.join(result.minted)}")
-    lines.extend(_target_lines(result))
-    lines.extend(_lock_lines(result))
-    if result.newly_suspect:
-        total = sum(count for _step, count in result.newly_suspect)
-        per_step = ", ".join(f"step {step}: {count}" for step, count in result.newly_suspect)
-        lines.append(f"newly suspect: {_plural(total, 'link')} ({per_step}); see `specdev stale`")
-    if result.broken:
-        lines.append(f"now broken ({_plural(len(result.broken), 'link')} point at the deleted node):")
-        lines.extend(f"  {link.holder}.{link.field} -> {link.target}" for link in result.broken)
-    return "\n".join(lines)
 
 
 # --- running --------------------------------------------------------------------------------------------------------

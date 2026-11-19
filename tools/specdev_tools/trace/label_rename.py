@@ -4,7 +4,8 @@ The label of a term is its ``term`` field.  A use is a string of a node of steps
 and not ``not_applicable``) that holds the old label as whole words, spelled exactly (the case counts); the id fields,
 the link fields, ``aliases`` and the fields that hold an id or a reference are not read.  Each use is rewritten and
 listed with the node, the field path and the old and new text.  Nothing is added to ``aliases`` (it holds old ids only)
-and no old label is matched afterwards.
+and no old label is matched afterwards.  Closed work is frozen: the uses in the nodes of a closed milestone are not
+rewritten and are listed as skipped.
 
 The change is planned in memory, every file is checked against its schema, and the spec files are then written under
 the write lock of the spec folder, as for the id rename (``trace.rename``).  The trace lock is not touched: the new
@@ -23,7 +24,8 @@ from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.queries import unknown_node_error
-from specdev_tools.trace.lockfile import with_write_lock
+from specdev_tools.trace.history import historical_node_ids
+from specdev_tools.trace.lockfile import locked_graph, refuse_unreadable
 from specdev_tools.trace.rename import FileEdit, FileEditor, jq_key, refuse, write_edits
 
 TERM_KIND = "term"
@@ -43,6 +45,14 @@ class LabelUse:
 
 
 @dataclass(frozen=True)
+class LabelSkip:
+    """A use of the old label that was not rewritten because its node belongs to a closed milestone (frozen work)."""
+
+    node_id: str
+    field_path: str
+
+
+@dataclass(frozen=True)
 class LabelRenameResult:
     """What a label rename did (or, for a dry run, would do); ``uses`` are in step order, then node id and field path."""
 
@@ -54,6 +64,7 @@ class LabelRenameResult:
     written: bool
     uses: tuple[LabelUse, ...]
     files: tuple[str, ...]
+    skipped: tuple[LabelSkip, ...] = ()
 
 
 def _term_to_relabel(graph: Graph, term_id: str, new_label: str) -> tuple[Node, str]:
@@ -117,15 +128,25 @@ def _own_leaves(graph: Graph, node: Node) -> Iterator[tuple[str, str]]:
     yield from _leaves(item, "", frozenset(skipped))
 
 
-def _uses(graph: Graph, old_label: str, new_label: str) -> list[LabelUse]:
-    """Every string of a user that holds *old_label* as whole words, with the text it will have."""
+def _uses(graph: Graph, old_label: str, new_label: str) -> tuple[list[LabelUse], list[LabelSkip]]:
+    """Every string of a user that holds *old_label* as whole words, with the text it will have.
+
+    Closed work is frozen: a string of a node of a closed milestone (``trace.history.historical_node_ids``) is not
+    rewritten and comes back in the second list.
+    """
     pattern = re.compile(rf"(?<!\w){re.escape(old_label)}(?!\w)")
+    frozen = historical_node_ids(graph)
     found: list[LabelUse] = []
+    skipped: list[LabelSkip] = []
     for node in sorted(_users(graph), key=graph.shape.order_key):
         for path, text in _own_leaves(graph, node):
-            if pattern.search(text):
+            if not pattern.search(text):
+                continue
+            if node.id in frozen:
+                skipped.append(LabelSkip(node.id, path))
+            else:
                 found.append(LabelUse(node.id, path, text, pattern.sub(lambda _match: new_label, text)))
-    return found
+    return found, skipped
 
 
 def _edits(graph: Graph, spec_root: str, repo_root: str, term: Node, new_label: str, uses: list[LabelUse]) -> tuple[FileEdit, ...]:
@@ -140,10 +161,11 @@ def _edits(graph: Graph, spec_root: str, repo_root: str, term: Node, new_label: 
 def _plan(graph: Graph, spec_root: str, repo_root: str, term_id: str, new_label: str) -> tuple[LabelRenameResult, tuple[FileEdit, ...]]:
     """The result of the rename of *term_id* as a dry run, and the file edits that carry it out."""
     term, old_label = _term_to_relabel(graph, term_id, new_label)
-    uses = _uses(graph, old_label, new_label)
+    uses, skipped = _uses(graph, old_label, new_label)
     edits = _edits(graph, spec_root, repo_root, term, new_label, uses)
     return LabelRenameResult(
-        term.id, old_label, new_label, term.file, term.jq_path, False, tuple(uses), tuple(edit.rel for edit in edits)
+        term.id, old_label, new_label, term.file, term.jq_path, False, tuple(uses), tuple(edit.rel for edit in edits),
+        tuple(skipped),
     ), edits
 
 
@@ -166,8 +188,9 @@ def rename_label(
     """
     if not apply:
         known = graph if graph is not None else build_graph(spec_dir, repo_root)
+        refuse_unreadable(known, "node rename --label")
         return _plan(known, spec_dir, repo_root, term_id, new_label)[0]
-    with with_write_lock(spec_dir):
-        result, edits = _plan(build_graph(spec_dir, repo_root), spec_dir, repo_root, term_id, new_label)
+    with locked_graph(spec_dir, repo_root, "node rename --label") as built:
+        result, edits = _plan(built, spec_dir, repo_root, term_id, new_label)
         write_edits(spec_dir, edits)
     return replace(result, written=True)

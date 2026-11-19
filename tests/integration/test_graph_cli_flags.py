@@ -162,6 +162,17 @@ def test_status_id_and_value_choose_the_node_and_the_lifecycle(spec: Path) -> No
     assert by_id["fr-password-reset-request"]["lifecycle"] == "deprecated" and "lifecycle" not in by_id["fr-password-reset"]
 
 
+def test_node_status_is_e769_while_another_write_holds_the_lock_and_writes_nothing(spec: Path) -> None:
+    from specdev_tools.trace.lockfile import with_write_lock
+
+    before = (spec / "04_fr_list.json").read_bytes()
+    with with_write_lock(str(spec)):
+        code, out = run_cli("node", "status", _CRITERION, "deprecated", *_flags(spec))
+    assert code == 1 and out.startswith("E769") and "another specdev write is running" in out, out
+    assert (spec / "04_fr_list.json").read_bytes() == before
+    assert run_cli("node", "status", _CRITERION, "deprecated", *_flags(spec))[0] == 0
+
+
 # --- trace: the walk --------------------------------------------------------------------------------------------------
 
 def _trace(spec: Path, *args: str) -> dict[str, Any]:
@@ -736,7 +747,7 @@ def test_json_id_dry_run_writes_nothing(id_host: Path) -> None:
     before = {path: path.read_bytes() for path in (id_host / "spec").rglob("*") if path.is_file()}
     argv = ["json", "insert", "--id", "api-password-reset-confirm", ".derives_from", json.dumps(_FR_REQUEST), *flags]
     code, out = run_cli(*argv, "--dry-run")
-    assert code == 0 and out.startswith("[dry-run] would insert into api-password-reset-confirm") and "lock entry written" in out
+    assert code == 0 and out.startswith("[dry-run] would insert into api-password-reset-confirm") and "lock entry to write" in out and "lock entry written" not in out
     assert {path: path.read_bytes() for path in (id_host / "spec").rglob("*") if path.is_file()} == before
     assert json.loads(run_cli(*argv, "--dry-run", "--json")[1])["written"] is False
     assert run_cli(*argv)[0] == 0 and (id_host / "spec" / _API_FILE).read_bytes() != before[id_host / "spec" / _API_FILE]

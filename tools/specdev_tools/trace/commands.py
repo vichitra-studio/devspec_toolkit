@@ -8,23 +8,23 @@ is argparse's alone), add its parser in ``add_trace_parsers`` and end that with 
 from __future__ import annotations
 
 import argparse
-import glob
 import os
 import sys
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
 from typing import Any
 
-from specdev_tools.core.errors import FindingError, make_error
-from specdev_tools.core.step_order import load_step_order
+from specdev_tools.core.errors import FindingError
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.graph.commands import add_root_flags, print_json, run_on_graph, usage_error
 from specdev_tools.graph.gitview import read_seed_texts, spec_path_in_repo
-from specdev_tools.graph.kinds import SEED_STEP
 from specdev_tools.graph.model import Graph
+from specdev_tools.graph.queries import require_known_step
 from specdev_tools.trace import attest, coverage, replay, step_ready
 from specdev_tools.trace.history import OldTextResolver
 from specdev_tools.trace.id_write_commands import render_text as render_write, result_to_dict as write_to_dict
-from specdev_tools.trace.lockfile import Lock, read_lock, with_write_lock, write_lock
+from specdev_tools.trace.lockfile import Lock, locked_graph, read_lock, refuse_unreadable, write_lock
 from specdev_tools.trace.merge_driver import install_driver, merge_files
 from specdev_tools.trace.step_create import StepCreateRequest, create_step
 
@@ -33,7 +33,9 @@ STALE_DESCRIPTION = (
     "the holder accepted them), grouped by owning step in waterfall order, nodes upward first, with the cause and the "
     "nodes the change started from (roots), and the coverage gaps. Links of closed milestones are not listed. "
     "Informational: exit 0 whatever it finds (the gate is spec-check).\n\n"
-    "--diff adds, per root, the unified diff of its contract text against the text it had when the link was accepted. "
+    "--diff adds, per root, the unified diff of its contract text against the text it had when the link was accepted "
+    "(one diff per accepted version, with the holders named, when holders accepted different ones; a line says so when "
+    "the change above was already accepted by the links that point at it). "
     "That text is recovered from git: the commits that touched the root's file are walked newest first (at most 50) "
     "and the first whose content hash equals the one in the lock is used. The hash is recomputed with the current "
     "contract fields, so after a change of those fields, or for a history from before the node model, no commit matches "
@@ -52,7 +54,8 @@ ATTEST_DESCRIPTION = (
     "0; --yes writes; --dry-run never writes, with or without --yes. --prune writes at once, without --yes.\n\n"
     "A node can be attested only when none of the nodes it links to is itself a suspect node: attest those first. "
     "Otherwise the node is refused (E764), exit 1; with --step the nodes that can be attested are, and the rest are "
-    "listed. A node of a closed milestone is refused (E765). An unknown id is E706, a duplicate id E704, exit 1."
+    "listed. A node of a closed milestone is refused (E765). An unknown id is E706, a duplicate id E704, exit 1. While a spec "
+    "file cannot be read, --yes, --dry-run and --prune are refused (E520), exit 1, and nothing is written."
 )
 
 LOCK_DESCRIPTION = (
@@ -155,26 +158,42 @@ def add_trace_parsers(sub: Any) -> None:
     coverage_p.set_defaults(handler=run_coverage)
 
 
-def _require_known_step(graph: Graph, step: str) -> None:
-    """Raise E706 unless *step* is a step of ``tools/step_order.json``; the message names the known steps."""
-    known = sorted((name for name in graph.shape.step_ranks if name != SEED_STEP), key=graph.shape.step_ranks.__getitem__)
-    if step not in known:
-        raise FindingError(make_error("E706", f"no step {step!r}; known steps: {', '.join(known)}"))
+@dataclass(frozen=True)
+class _View:
+    """What a trace command reads, once: the graph, the folders, the lock and the seed texts of the graph."""
+
+    graph: Graph
+    spec_root: str
+    git_root: str
+    repo_root: str
+    lock: Lock
+    seed_texts: dict[str, str]
+
+    def resolver(self) -> OldTextResolver:
+        """The resolver of old texts for ``--diff`` and the attest preview."""
+        return OldTextResolver(self.graph, git_root=self.git_root, spec_root=self.spec_root, repo_root=self.repo_root)
+
+
+def _view(args: argparse.Namespace, graph: Graph) -> _View:
+    spec_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.git_root)
+    return _View(graph, spec_root, git_root, os.path.abspath(args.repo_root), read_lock(spec_root), read_seed_texts(graph, git_root))
+
+
+@contextmanager
+def _locked_view(args: argparse.Namespace, what: str) -> Iterator[_View]:
+    """The view of a command *what* that writes: the write lock is held and the graph is built under it (``locked_graph``)."""
+    with locked_graph(os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), what) as graph:
+        yield _view(args, graph)
 
 
 def _stale(args: argparse.Namespace, graph: Graph) -> int:
-    spec_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.git_root)
     if args.step is not None:
-        _require_known_step(graph, args.step)
-    lock = read_lock(spec_root)
-    seed_texts = read_seed_texts(graph, git_root)
-    plan = replay.compute_replay(graph, lock, seed_texts)
+        require_known_step(graph, args.step)
+    view = _view(args, graph)
+    plan = replay.compute_replay(graph, view.lock, view.seed_texts)
     if args.step is not None:
         plan = replay.ReplayPlan(replay.pending_replay(plan, [args.step]))
-    diffs = None
-    if args.diff:
-        resolver = OldTextResolver(graph, git_root=git_root, spec_root=spec_root, repo_root=os.path.abspath(args.repo_root))
-        diffs = replay.root_diffs(graph, lock, plan, seed_texts, resolver)
+    diffs = replay.root_diffs(graph, view.lock, plan, view.seed_texts, view.resolver()) if args.diff else None
     if args.json_output:
         print_json(replay.plan_to_dict(plan, diffs))
     else:
@@ -198,12 +217,13 @@ def _attest_flags_problem(args: argparse.Namespace) -> str | None:
     return None
 
 
-def _attest_prune(args: argparse.Namespace, graph: Graph, spec_root: str) -> int:
+def _attest_prune(args: argparse.Namespace, graph: Graph) -> int:
     write = not args.dry_run
-    with with_write_lock(spec_root) if write else nullcontext():
-        lock, dropped = attest.prune_orphans(graph, read_lock(spec_root))
+    with _locked_view(args, "attest --prune") if write else nullcontext(_view(args, graph)) as view:
+        refuse_unreadable(view.graph, "attest --prune")
+        lock, dropped = attest.prune_orphans(view.graph, view.lock)
         if write and dropped:
-            write_lock(spec_root, lock)
+            write_lock(view.spec_root, lock)
     if args.json_output:
         print_json(attest.prune_to_dict(dropped, written=write and bool(dropped)))
     else:
@@ -211,31 +231,22 @@ def _attest_prune(args: argparse.Namespace, graph: Graph, spec_root: str) -> int
     return 0
 
 
-def _attest_preview_diffs(args: argparse.Namespace, graph: Graph, spec_root: str, git_root: str, plan: attest.AttestPlan) -> list[replay.RootDiff]:
-    """What changed above the suspect links of *plan*, read from git history."""
-    resolver = OldTextResolver(graph, git_root=git_root, spec_root=spec_root, repo_root=os.path.abspath(args.repo_root))
-    return replay.root_diffs(graph, read_lock(spec_root), attest.suspect_view(plan), read_seed_texts(graph, git_root), resolver)
-
-
-def _attest_links(args: argparse.Namespace, graph: Graph, spec_root: str, git_root: str) -> int:
-    seed_texts = read_seed_texts(graph, git_root)
+def _attest_links(args: argparse.Namespace, graph: Graph) -> int:
     write = args.yes and not args.dry_run
-
-    def plan_for(lock: Lock) -> attest.AttestPlan:
+    with _locked_view(args, "attest --yes") if write else nullcontext(_view(args, graph)) as view:
+        if args.dry_run:
+            refuse_unreadable(view.graph, "attest --dry-run")
         if args.step is not None:
-            return attest.plan_step_attest(graph, lock, seed_texts, args.step)
-        return attest.plan_node_attest(graph, lock, seed_texts, args.node_id, field=args.field, target=args.target)
-
-    with with_write_lock(spec_root) if write else nullcontext():
-        lock = read_lock(spec_root)
-        plan = plan_for(lock)
+            plan = attest.plan_step_attest(view.graph, view.lock, view.seed_texts, args.step)
+        else:
+            plan = attest.plan_node_attest(view.graph, view.lock, view.seed_texts, args.node_id, field=args.field, target=args.target)
         if write and plan.links:
-            write_lock(spec_root, attest.apply_attest(lock, plan))
-    diffs = None if write else _attest_preview_diffs(args, graph, spec_root, git_root, plan)
+            write_lock(view.spec_root, attest.apply_attest(view.lock, plan))
+    diffs = None if write else replay.root_diffs(view.graph, view.lock, attest.suspect_view(plan), view.seed_texts, view.resolver())
     if args.json_output:
         print_json(attest.plan_to_dict(plan, written=write and bool(plan.links), diffs=diffs))
     elif plan.links or not plan.blocked:
-        print(attest.render_text(plan, written=write, diffs=diffs))
+        print(attest.render_text(plan, written=write, diffs=diffs, dry_run=args.dry_run))
     if plan.blocked and not args.json_output:
         print(attest.blocked_error(plan).render(), file=sys.stderr)
     return 1 if plan.blocked else 0
@@ -245,12 +256,11 @@ def _attest(args: argparse.Namespace, graph: Graph) -> int:
     problem = _attest_flags_problem(args)
     if problem is not None:
         return usage_error("attest", problem)
-    spec_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.git_root)
     if args.prune:
-        return _attest_prune(args, graph, spec_root)
+        return _attest_prune(args, graph)
     if args.step is not None:
-        _require_known_step(graph, args.step)
-    return _attest_links(args, graph, spec_root, git_root)
+        require_known_step(graph, args.step)
+    return _attest_links(args, graph)
 
 
 def run_attest(args: argparse.Namespace) -> int:
@@ -259,7 +269,7 @@ def run_attest(args: argparse.Namespace) -> int:
 
 
 def _step_create(args: argparse.Namespace, graph: Graph) -> int:
-    _require_known_step(graph, args.step)
+    require_known_step(graph, args.step)
     result = create_step(
         graph,
         os.path.abspath(args.spec_root),
@@ -280,17 +290,12 @@ def run_step_create(args: argparse.Namespace) -> int:
     return run_on_graph("step create", args, lambda graph: _step_create(args, graph))
 
 
-def _step_present(graph: Graph, spec_root: str, step: str) -> bool:
-    """True when a spec file of *step* exists: a file the registry assigns to it, or ``<step>_*.json`` in the spec folder."""
-    return bool(graph.shape.files_by_step.get(step)) or bool(glob.glob(os.path.join(glob.escape(spec_root), f"{step}_*.json")))
-
-
 def _step_ready(args: argparse.Namespace, graph: Graph) -> int:
-    _require_known_step(graph, args.step)
-    spec_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.git_root)
-    plan = replay.compute_replay(graph, read_lock(spec_root), read_seed_texts(graph, git_root))
-    required = load_step_order(os.path.abspath(args.repo_root)).get("step_metadata", {}).get(args.step, {}).get("required_spec_inputs", [])
-    readiness = step_ready.check_ready(graph, plan, args.step, required, lambda step: _step_present(graph, spec_root, step))
+    require_known_step(graph, args.step)
+    view = _view(args, graph)
+    plan = replay.compute_replay(graph, view.lock, view.seed_texts)
+    required = step_ready.required_spec_inputs(view.repo_root, args.step)
+    readiness = step_ready.check_ready(graph, plan, args.step, required, step_ready.present_steps(graph, view.spec_root))
     errors = [] if readiness.ready else [step_ready.not_ready_error(readiness)]
     if args.json_output:
         print(format_errors_json(errors, context={"command": "step ready", **step_ready.to_dict(readiness)}))
@@ -306,21 +311,16 @@ def run_step_ready(args: argparse.Namespace) -> int:
     return run_on_graph("step ready", args, lambda graph: _step_ready(args, graph))
 
 
-def _coverage_matrix(args: argparse.Namespace, graph: Graph, lock: Lock, seed_texts: dict[str, str]) -> None:
-    matrix, exempt = coverage.build_fr_matrix(graph, lock, seed_texts), tuple(coverage.exempt_nodes(graph))
-    if args.json_output:
-        print_json(coverage.matrix_to_dict(matrix, exempt))
-    else:
-        print(coverage.render_matrix(matrix, exempt))
-
-
 def _coverage(args: argparse.Namespace, graph: Graph) -> int:
-    lock = read_lock(os.path.abspath(args.spec_root))
-    seed_texts = read_seed_texts(graph, os.path.abspath(args.git_root))
+    view = _view(args, graph)
     if args.by == "fr":
-        _coverage_matrix(args, graph, lock, seed_texts)
+        matrix, exempt = coverage.build_fr_matrix(graph, view.lock, view.seed_texts), tuple(coverage.exempt_nodes(graph))
+        if args.json_output:
+            print_json(coverage.matrix_to_dict(matrix, exempt))
+        else:
+            print(coverage.render_matrix(matrix, exempt))
         return 0
-    report = coverage.build_report(graph, lock, seed_texts)
+    report = coverage.build_report(graph, view.lock, view.seed_texts)
     if args.json_output:
         print_json(coverage.report_to_dict(report))
     else:

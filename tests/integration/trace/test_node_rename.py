@@ -400,3 +400,55 @@ def test_label_rename_refusals_are_e770_and_write_nothing(host: Example, args: t
     assert code == 1 and out.startswith("E770") and message in out and _snapshot(host) == before
     code, out = _rename(host, "--label", "term-nobody", NEW_LABEL)
     assert code == 1 and out.startswith("E706")
+
+
+# --- review round 1 (C-03, C-07): a node of every kind can be renamed to an id valid for that kind -----------------------
+
+#: Kinds the design refuses to rename: the seed (id is its manifest key), records (written by the toolkit), map-keyed nodes.
+_REFUSED_KINDS = {"seed", "evidence-record", "verification-record", "ambiguity-item", "anchor-row", "environment"}
+
+
+def _kinds_of_the_example() -> list[str]:
+    from specdev_tools.graph.build import build_graph
+
+    graph = build_graph(str(EXAMPLE_HOST / "spec"), str(ROOT))
+    return sorted({node.kind for node in graph.by_id.values()})
+
+
+def _new_id_for(node_id: str) -> str:
+    """An id in the same spelling as *node_id* that no node has: lower-case kebab gets a suffix, upper-case a suffix too."""
+    if re.fullmatch(r"[A-Z0-9_]+", node_id):
+        return f"{node_id}_RENAMED"
+    return f"{node_id}-renamed"
+
+
+@pytest.mark.parametrize("kind", _kinds_of_the_example())
+def test_one_node_of_every_kind_renames_to_an_id_valid_for_its_kind(host: Example, kind: str) -> None:
+    from specdev_tools.graph.build import build_graph
+
+    graph = build_graph(str(host.spec), str(ROOT))
+    old = next(node.id for node in graph.by_id.values() if node.kind == kind)
+    status, out = _rename(host, old, _new_id_for(old), "--dry-run")
+    if kind in _REFUSED_KINDS:
+        assert status == 1 and out.startswith("E770"), (kind, out)
+    else:
+        assert status == 0, (kind, old, out)
+
+
+def test_label_rename_does_not_rewrite_a_closed_milestone_and_lists_what_it_skipped(host: Example) -> None:
+    host.close_milestone()
+    path = host.spec / "14_roadmap.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    criterion = document["milestones"][0]["tasks"][0]["acceptance_criteria"][0]
+    assert criterion["criterion_id"] == "tc-confirm-expired-token"
+    criterion["text"] = f"A {OLD_LABEL} issued 31 minutes earlier is refused."
+    path.write_text(json.dumps(document, indent=4) + "\n", encoding="utf-8")
+    code, out = _rename(host, "--label", TERM, NEW_LABEL, "--dry-run")
+    assert code == 0 and "not rewritten (closed milestone) (2):" in out and "    tc-confirm-expired-token .text" in out and "    task-implement-password-reset-confirm .description" in out, out
+    result = json.loads(_rename_json(host, "--label", TERM, NEW_LABEL, "--dry-run"))
+    assert {(item["node_id"], item["field_path"]) for item in result["skipped"]} == {
+        ("tc-confirm-expired-token", ".text"), ("task-implement-password-reset-confirm", ".description")
+    }
+    assert not {"tc-confirm-expired-token", "task-implement-password-reset-confirm"} & {use["node_id"] for use in result["uses"]}
+    assert _rename(host, "--label", TERM, NEW_LABEL)[0] == 0
+    assert json.loads(path.read_text(encoding="utf-8"))["milestones"][0]["tasks"][0]["acceptance_criteria"][0]["text"] == criterion["text"]

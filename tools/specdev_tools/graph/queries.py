@@ -18,7 +18,7 @@ from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import nearest_ids
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import check_unique_ids, defining_file
-from specdev_tools.graph.kinds import SEED_KIND, LinkDecl
+from specdev_tools.graph.kinds import SEED_KIND, SEED_STEP, LinkDecl
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
@@ -129,6 +129,22 @@ def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
 def unknown_node_error(graph: Graph, node_id: str) -> QueryTargetError:
     """The E706 finding for an id that no node has, naming the three nearest ids; ``unknown_id`` is set."""
     return _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
+
+
+def require_known_step(graph: Graph, step: str) -> None:
+    """Raise the E706 finding unless *step* is a step of ``tools/step_order.json``; the message names the known steps.
+
+    The seed step is not a step a command takes, so it is unknown here.
+    """
+    ranks = graph.shape.step_ranks
+    known = sorted((name for name in ranks if name != SEED_STEP), key=ranks.__getitem__)
+    if step not in known:
+        raise _unknown(f"no step {step!r}; known steps: {', '.join(known)}")
+
+
+def plural(count: int, noun: str, many: str | None = None) -> str:
+    """``1 link`` or ``3 links``; *many* is the plural when it is not the noun plus ``s`` (``entry``, ``entries``)."""
+    return f"{count} {noun}" if count == 1 else f"{count} {many or noun + 's'}"
 
 
 def _link_view(graph: Graph, link_field: str, target_id: str) -> LinkView:

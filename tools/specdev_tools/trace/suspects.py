@@ -134,13 +134,24 @@ def orphan_entries(graph: Graph, lock: Lock) -> list[LockEntry]:
 
     An entry whose target resolves through an alias is not an orphan, and neither is one whose holder still declares the
     link while the target node is gone (that is a resolver error of the holder's step).  An entry with a
-    ``not_applicable`` holder or target is kept and ignored.
+    ``not_applicable`` holder or target is kept and ignored.  When two entries are for one link (a rename on one branch
+    and an attest on the other, merged), the one stored under the old spelling of the target, not the id the link names
+    now, is the orphan.
     """
     declared = _declared_keys(graph)
-    return [
-        entry for entry in lock.entries
-        if not _is_out_of_play(graph, entry) and (entry.source, entry.field, _canonical(graph, entry.target)) not in declared
-    ]
+    by_link: dict[_LinkKey, list[LockEntry]] = {}
+    for entry in lock.entries:
+        by_link.setdefault((entry.source, entry.field, _canonical(graph, entry.target)), []).append(entry)
+
+    def is_orphan(entry: LockEntry) -> bool:
+        key = (entry.source, entry.field, _canonical(graph, entry.target))
+        if _is_out_of_play(graph, entry):
+            return False
+        # one entry per link stays: the one stored under the id the link names, else the first
+        kept = next((other for other in by_link[key] if other.target == key[2]), by_link[key][0])
+        return key not in declared or entry is not kept
+
+    return [entry for entry in lock.entries if is_orphan(entry)]
 
 
 def _upstream(graph: Graph, node: Node) -> Iterator[str]:
@@ -218,11 +229,16 @@ def _link_text(holder: str, field: str, target: str) -> str:
     return f"{holder}, field {field}, target '{target}'"
 
 
+def _accept_with(holder: str) -> str:
+    """The sentence that names both attest commands: the bare one only shows, the one with ``--yes`` writes."""
+    return f"`specdev attest {holder}` shows what would be written, `specdev attest {holder} --yes` writes it"
+
+
 def _missing_entry_error(holder: Node, link: Link) -> SpecError:
     """E761: the lock has no entry for *link* of *holder*; owned by the holder's step."""
     message = (
         f"{_link_text(holder.id, link.field, link.target)}: the trace lock has no entry for this link; "
-        f"accept it with `specdev attest {holder.id}` once the target is checked"
+        f"once the target is checked, {_accept_with(holder.id)}"
     )
     return _node_error("E761", holder, message, step_owner(holder))
 
@@ -287,7 +303,7 @@ def _suspect_error(graph: Graph, suspect: SuspectLink) -> SpecError:
     roots = f"; changed above: {', '.join(suspect.roots)}" if suspect.roots else ""
     message = (
         f"{_link_text(suspect.holder, suspect.field, suspect.target)}: suspect link, {_CAUSE_TEXT[suspect.cause]}{roots}. "
-        f"Review the change, then edit {suspect.holder} or run `specdev attest {suspect.holder}`"
+        f"Review the change, then edit {suspect.holder} or accept it: {_accept_with(suspect.holder)}"
     )
     return _node_error("E763", graph.by_id.get(suspect.holder), message, MERGE_CHECK_OWNER)
 
@@ -305,7 +321,7 @@ def _baseline_errors(graph: Graph, lock: Lock) -> list[SpecError]:
             continue
         message = (
             f"trace lock entry ({_link_text(entry.source, entry.field, entry.target)}) still carries the migration "
-            f"baseline marker; check the link, then run `specdev attest {entry.source}` to clear it"
+            f"baseline marker; check the link, then clear it: {_accept_with(entry.source)}"
         )
         errors.append(_node_error("E882", holder, message, step_owner(holder)))
     return errors
