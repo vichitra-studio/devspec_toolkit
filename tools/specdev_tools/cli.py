@@ -108,6 +108,60 @@ def _discover_project_canon_dir(
     return None
 
 
+def _spec_check_step_gate(
+    args: argparse.Namespace,
+    repo_root: str,
+    spec_dir: str,
+    git_root: str | None,
+    spec_root: str | None,
+    project_canon_dir: str | None,
+) -> None:
+    """``spec-check --step`` and ``spec-check --paths``: print the step gate report and exit 0 (clear) or 1 (blocked).
+
+    ``--paths`` maps the touched files to steps first and exits 0 without running a check when none maps.  The exit code
+    comes from the gate alone: ``_json_exit`` is not used, because it fails on any finding under
+    ``SPECDEV_WARNINGS_AS_ERRORS`` and on pending or upstream debt.  A refusal (E706 for an unknown step, E708) is printed
+    as one finding and exits 1.
+    """
+    from .core.errors import FindingError
+    from .core.git_base import BaselineResult
+    from .core.json_output import format_errors_json
+    from .validation.spec_check import StepGateRun, run_step_gate, touched_steps_of
+    from .validation.step_gate_report import (
+        DETAIL_SUMMARY, gate_exit_code, render_step_gate, reported_errors, step_gate_json,
+    )
+    from .validation.touched_steps import SEED_EDIT_NOTE, outside_root_note
+
+    json_output = getattr(args, "json_output", False)
+    try:
+        steps = args.steps
+        if steps is None:
+            touched = touched_steps_of(repo_root, spec_dir, args.paths, git_root, spec_root)
+            for note in (outside_root_note(touched), SEED_EDIT_NOTE if touched.seed_edited else None):
+                if note:
+                    print(note, file=sys.stderr)
+            steps = list(touched.steps)
+        run = (
+            run_step_gate(repo_root, spec_dir, steps, git_root, spec_root, project_canon_dir, base_ref=args.base_ref)
+            if steps
+            else StepGateRun((), BaselineResult("unavailable"))
+        )
+    except FindingError as exc:
+        if json_output:
+            print(format_errors_json([exc.error], context={"command": "spec-check"}))
+        else:
+            print(exc.error.render(), file=sys.stderr)
+        sys.exit(1)
+    for note in run.notes:
+        print(note, file=sys.stderr)
+    if json_output:
+        context = {"command": "spec-check", "step_gate": step_gate_json(run.results, run.baseline)}
+        print(format_errors_json(reported_errors(run.results), context=context))
+    elif run.results:
+        print(render_step_gate(run.results, run.baseline, args.detail or DETAIL_SUMMARY))
+    sys.exit(gate_exit_code(run.results))
+
+
 def _derive_step_names(repo_root: str) -> dict[str, str]:
     """Derive step ID -> display name mapping from schema_registry.json.
 
@@ -289,6 +343,11 @@ def build_parser() -> _SpecdevParser:
     sc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Also check id regressions (E555) against the base ref; file-level forward replay is retired, see `specdev stale`")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+    sc_scope = sc.add_mutually_exclusive_group()
+    sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
+    sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); must come last")
+    sc.add_argument("--base-ref", default=None, help="With --step or --paths: the branch whose merge-base counts as 'before' (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master)")
+    sc.add_argument("--detail", choices=("summary", "all"), default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
 
     rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
     rc.add_argument("--spec-root", required=True, help="Project spec directory (used for R003 drift check against live spec files)")
@@ -2244,7 +2303,14 @@ def main():
         git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
         spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
         project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        if getattr(args, "json_output", False):
+        gating = args.steps is not None or args.paths is not None
+        if gating and args.include_forward_replay:
+            p.error("spec-check: --include-forward-replay cannot be combined with --step or --paths (id regressions are suspects there)")
+        if not gating and (args.base_ref is not None or args.detail is not None):
+            p.error("spec-check: --base-ref and --detail apply only with --step or --paths")
+        if gating:
+            _spec_check_step_gate(args, repo_root, spec_dir, git_root, spec_root, project_canon_dir)
+        elif getattr(args, "json_output", False):
             from .validation.spec_check import run_spec_check_json
             errs, ctx = run_spec_check_json(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
             _json_exit(errs, "spec-check", extra_context=ctx)

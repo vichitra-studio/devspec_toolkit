@@ -156,6 +156,13 @@ def test_two_broken_links_of_one_node_the_new_one_blocks() -> None:
     assert result.upstream_debt == (old,) and result.blocking.new_upstream == (new,)
 
 
+def test_two_findings_located_only_by_path_the_new_one_blocks() -> None:
+    old = SpecError("E500", "old text", "04_fr_list.json", owner="step:04")
+    new = SpecError("E500", "new text", "03_glossary.json", owner="step:04")
+    result = gate([old, new], "05", baseline_of(old))
+    assert result.upstream_debt == (old,) and result.blocking.new_upstream == (new,)
+
+
 # --- later steps ------------------------------------------------------------------------------------------------
 
 def test_later_step_error_is_pending_grouped_by_owner() -> None:
@@ -199,9 +206,9 @@ def test_the_same_finding_twice_is_one_finding() -> None:
     assert gate([error, error], "05").blocking.own == (error,)
 
 
-def test_the_key_is_the_seven_fields_and_no_message() -> None:
+def test_the_key_is_the_eight_fields_and_no_message() -> None:
     error = SpecError("E700", "text", "p", "sub", "spec/a.json", ".x[0]", "v", "step:04", "fr-a", "derives_from->ac-a")
-    assert identity_key(error, declared_owner) == ("E700", "step:04", "fr-a", "derives_from->ac-a", "spec/a.json", ".x[0]", "sub")
+    assert identity_key(error, declared_owner) == ("E700", "step:04", "fr-a", "derives_from->ac-a", "spec/a.json", ".x[0]", "sub", "p")
 
 
 # --- steps ------------------------------------------------------------------------------------------------------

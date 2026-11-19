@@ -184,7 +184,7 @@ def test_promoted_code_keeps_owner_and_node_id(monkeypatch):
 def test_legacy_per_file_error_gets_step_owner(spec_dir):
     findings = _schema_findings(spec_dir)
     assert findings["04_fr_list.json"]["owner"] == "step:04"
-    assert "owner" not in findings["notastep.json"]
+    assert findings["notastep.json"]["owner"] == "merge-check"  # no step: the check's default owner
 
 
 @pytest.mark.parametrize(

@@ -38,7 +38,7 @@ RouteOf = Callable[[SpecError], Optional[tuple[str, str]]]
 CanonicalId = Callable[[str], str]
 """``name -> current id`` (``Graph.canonical_id``): maps an id an error carries from before a rename."""
 
-IdentityKey = tuple[str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]
+IdentityKey = tuple[str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]
 """``(code, owner, node_id, target, file, jq_path, subcode)``: what makes two findings the same finding.  Never the message."""
 
 _TARGET_SEPARATOR = "->"
@@ -64,9 +64,12 @@ def identity_key(error: SpecError, owner_of: OwnerOf, canonical_id: CanonicalId 
     """The identity key of *error*: its owner by *owner_of*, its node id and the target of its link by *canonical_id*.
 
     A field an error lacks is ``None`` in the tuple.  The message is never part of the key (messages embed counts).
+    ``path`` is part of it: the older checks name their artifact there and nowhere else, so without it two findings of
+    one code in two files would be one finding, and a new one would hide behind an old one.
     """
     node_id = canonical_id(error.node_id) if error.node_id is not None else None
-    return (error.code, owner_of(error), node_id, _canonical_target(error.target, canonical_id), error.file, error.jq_path, error.subcode)
+    target = _canonical_target(error.target, canonical_id)
+    return (error.code, owner_of(error), node_id, target, error.file, error.jq_path, error.subcode, error.path)
 
 
 def _canonical_target(target: str | None, canonical_id: CanonicalId) -> str | None:

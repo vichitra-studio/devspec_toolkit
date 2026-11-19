@@ -245,6 +245,17 @@ def test_provider_runs_the_checks_on_the_baseline_tree_and_deletes_it(repo: Path
     assert not seen[0][0].exists()
 
 
+def test_provider_measures_against_the_branch_it_was_given(repo: Path) -> None:
+    base = _base_files(repo)
+    git(repo, "branch", "trunk")
+    _commit(repo, "second", **{SEED.replace("/", "__"): "charter v2"})
+
+    result = merge_base_provider(lambda *_: [], lambda _: [SEED], "trunk")(repo / SPEC, str(repo))
+
+    assert result.resolution is not None
+    assert (result.resolution.ref, result.resolution.commit, result.resolution.mode) == ("trunk", base, "merge-base")
+
+
 def test_registered_provider_replaces_the_default(tmp_path: Path) -> None:
     assert active_baseline_provider()(tmp_path, str(tmp_path)).mode == "unavailable"
     stub = BaselineResult("ok", (SpecError(code="E1", message="m"),))

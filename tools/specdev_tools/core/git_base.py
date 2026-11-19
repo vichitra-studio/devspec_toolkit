@@ -188,16 +188,19 @@ def materialise_baseline(git_root: str, commit: str, spec_dir: str | Path, seed_
     return BaselineTree(directory, spec_path)
 
 
-def merge_base_provider(compute_errors: BaselineChecks, seed_paths: SeedPaths) -> BaselineProvider:
+def merge_base_provider(
+    compute_errors: BaselineChecks, seed_paths: SeedPaths, base_ref: str | None = None
+) -> BaselineProvider:
     """The default provider: the errors of the checks on the spec tree at the merge-base commit.
 
     ``unavailable`` when the baseline cannot be resolved or materialised (no git, no merge-base, a spec folder absent
     at the commit) or when the checks cannot read the baseline tree.  ``seed_paths`` names the seed documents of the
-    current tree; ``compute_errors`` runs the checks on the materialised tree.
+    current tree; ``compute_errors`` runs the checks on the materialised tree; *base_ref* (``--base-ref``) names the
+    branch to compare with, as ``resolve_target_branch`` reads it.
     """
 
     def provider(spec_dir: Path, git_root: str) -> BaselineResult:
-        resolution = resolve_baseline(git_root)
+        resolution = resolve_baseline(git_root, base_ref)
         if resolution.commit is None:
             return BaselineResult("unavailable", resolution=resolution)
         try:
