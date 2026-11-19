@@ -177,8 +177,8 @@ def test_paths_gate_from_the_host_root(tmp_path: Path, monkeypatch: pytest.Monke
 def test_paths_gate_from_the_folder_above_without_git_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    spec, flags, prefix = _folder_above(tmp_path, monkeypatch)
-    code, found, err = _run_gate(capsys, spec, flags, "--paths", f"{prefix}/{STEP_04_FILE}")
+    spec, flags, _prefix = _folder_above(tmp_path, monkeypatch)
+    code, found, err = _run_gate(capsys, spec, flags, "--paths", f"spec/{STEP_04_FILE}")
     assert code == 1 and SEED_NOTE not in err, err
     _assert_decided(found, STEP_04)
 
@@ -192,13 +192,15 @@ def test_paths_gate_nested_layout_with_git_root(
     _assert_decided(found, {**STEP_04, "steps": ["00", "02", "04"]})
 
 
-def test_paths_gate_nested_layout_without_git_root_reports_unmapped_step_file_paths(
+def test_paths_gate_nested_layout_without_git_root_counts_the_paths_that_leave_the_host_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    spec, flags, prefix = _nested_without_git_root(tmp_path, monkeypatch)
-    code, out, err = run_split(capsys, "spec-check", spec, "--repo-root", str(ROOT), *flags, "--paths", SEED_FILE)
+    """The host root is ``sub`` here: the seed document at the top of the repository lies outside it."""
+    spec, flags, _prefix = _nested_without_git_root(tmp_path, monkeypatch)
+    seed = str(Path.cwd() / SEED_FILE)
+    code, out, err = run_split(capsys, "spec-check", spec, "--repo-root", str(ROOT), *flags, "--paths", seed)
     assert (code, out) == (0, ""), out
-    assert "1 path lies outside the host root and map to no step" in err and "--git-root" in err, err
-    code, found, err = _run_gate(capsys, spec, flags, "--paths", f"{prefix}/{STEP_04_FILE}", SEED_FILE)
-    assert code == 1 and "1 path lies outside the host root" in err, err
+    assert "1 path lies outside the host root and maps to no step" in err and "--git-root" in err, err
+    code, found, err = _run_gate(capsys, spec, flags, "--paths", f"sub/spec/{STEP_04_FILE}", seed, SEED_FILE)
+    assert code == 1 and "2 paths lie outside the host root" in err, err
     _assert_decided(found, STEP_04)

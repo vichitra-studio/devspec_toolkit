@@ -791,6 +791,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
 
             checks = _run_checks(repo_root=repo_root, spec_dir=spec_dir)
             rc = checks.get("registry-check", {})
@@ -805,6 +806,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Write registry to toolkit-side tools/ directory
             _write(repo_root, "tools/entry_key_registry.json", _make_registry(
@@ -833,6 +835,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             # extraction_paths has no entries → registered basename becomes phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Registry references a basename not in extraction_paths → E621
@@ -870,6 +873,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             # No registry → registry-check will be SKIP
 
             captured = io.StringIO()
@@ -899,6 +903,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Write a clean registry so registry-check runs (not SKIP) and passes
             _write(spec_dir, "entry_key_registry.json", _make_registry(
@@ -940,6 +945,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             # extraction_paths has no entries → registered basename becomes phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Registry references a basename not in extraction_paths → E621

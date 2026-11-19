@@ -40,11 +40,12 @@ GIT_IDENTITY = ("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
 
 
 def make_toolkit(dest: Path) -> Path:
-    """Copy the mini toolkit to *dest*, add the real core schemas and step order, write its generated registry."""
+    """Copy the mini toolkit to *dest*, add the real core schemas, step order and ownership table, write its generated registry."""
     shutil.copytree(MINI_TOOLKIT, dest)
     for name in _CORE_SCHEMAS:
         shutil.copy(ROOT / "schema" / "core" / f"{name}.schema.json", dest / "schema" / "core")
     shutil.copy(ROOT / "tools" / "step_order.json", dest / "tools")
+    shutil.copy(ROOT / "tools" / "error_ownership.json", dest / "tools")
     shutil.copy(ROOT / "schema" / "step_order.schema.json", dest / "schema")
     clear_shared_caches()
     registry, _extraction = generate_registry(str(dest))

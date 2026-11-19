@@ -32,7 +32,7 @@ from typing import Any
 from specdev_tools.core.ambiguity_items import STEP_FILE_RE
 from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
-from specdev_tools.graph.gitview import host_root_of, spec_path_in_repo
+from specdev_tools.graph.gitview import host_root_of, run_git, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 
 DERIVES_FROM = "derives_from"
@@ -63,9 +63,9 @@ def outside_root_note(touched: TouchedSteps) -> str | None:
     count = len(touched.outside_root)
     if not count:
         return None
-    noun = "path lies" if count == 1 else "paths lie"
+    verbs = "path lies outside the host root and maps" if count == 1 else "paths lie outside the host root and map"
     return (
-        f"{count} {noun} outside the host root and map to no step; "
+        f"{count} {verbs} to no step; "
         "pass --git-root <repository root> when the spec folder is nested"
     )
 
@@ -82,7 +82,8 @@ def steps_for_paths(
     """The steps of *step_order* whose gate the touched *paths* put under check.
 
     Args:
-        paths: touched files, relative to the current folder (the repository top for a pre-commit hook) or absolute.
+        paths: touched files, absolute or relative to the repository top, as a pre-commit hook passes them (see
+            ``_path_base``), never to the current folder.
         spec_dir: the spec folder.
         manifest: the parsed ``seed_manifest.json`` (an empty mapping when the host has none).
         graph: builds the graph of the spec; called at most once, and only when a listed seed document is touched.
@@ -99,8 +100,9 @@ def steps_for_paths(
     found: set[str] = set()
     outside: list[str] = []
     seed_edited = False
+    base = _path_base(spec_dir, git_root, host_root)
     for path in paths:
-        relative = _relative_to(host_root, path)
+        relative = _relative_to(host_root, os.path.join(base, path))
         if relative is None:
             outside.append(path)
         elif relative in seed_ids:
@@ -112,8 +114,22 @@ def steps_for_paths(
     return TouchedSteps(steps, tuple(outside), seed_edited)
 
 
+def _path_base(spec_dir: str, git_root: str | None, host_root: str) -> str:
+    """The folder a relative path is taken from: the repository top, never the current folder.
+
+    That is *host_root* when ``--git-root`` names it; else the top of the git working tree that holds *spec_dir*
+    (what pre-commit passes its paths relative to, so a nested spec folder with no ``--git-root`` still has its step
+    files placed and its top-level seeds reported as outside the host root); else, outside a repository, *host_root*.
+    """
+    if git_root is not None:
+        return host_root
+    answer = run_git(spec_dir, ["rev-parse", "--show-toplevel"])
+    top = answer.stdout.decode("utf-8", errors="replace").strip()
+    return os.path.realpath(top) if answer.returncode == 0 and top else host_root
+
+
 def _relative_to(host_root: str, path: str) -> str | None:
-    """*path* relative to *host_root*, ``/``-separated; ``None`` when it lies outside."""
+    """The absolute *path* relative to *host_root*, ``/``-separated; ``None`` when it lies outside."""
     relative = os.path.relpath(os.path.realpath(path), host_root)
     if relative == _PARENT or relative.startswith(_PARENT + os.sep):
         return None

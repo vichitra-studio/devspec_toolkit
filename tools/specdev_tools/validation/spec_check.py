@@ -40,7 +40,14 @@ from ..graph.check import run_graph_check
 from ..graph.gitview import host_root_of, read_seed_texts, read_seed_texts_noting
 from ..graph.kinds import SEED_KIND
 from ..graph.model import Graph
-from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
+from ..graph.ownership import (
+    STEP_PREFIX,
+    OwnerContext,
+    load_ownership_table,
+    owner_for,
+    stamp_file_owner,
+    step_for_file,
+)
 from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import MERGE_CHECK_OWNER, Lock, LockError, lock_path, read_lock
 from ..trace.records import check_records, record_files
@@ -256,6 +263,11 @@ class CheckContext:
         return host_root_of(self.spec_dir, self.git_root)
 
     @cached_property
+    def owner_context(self) -> OwnerContext:
+        """The ownership table of the toolkit, read once per run; raises ``OwnershipTableError`` when it cannot be read."""
+        return OwnerContext(rows=load_ownership_table(self.repo_root))
+
+    @cached_property
     def lint_graph(self) -> Graph | None:
         """The graph the linters share; ``None`` when the registry is unavailable."""
         return build_lint_graph(self.spec_dir, self.repo_root)
@@ -335,12 +347,20 @@ def _skip(reason: str) -> dict[str, Any]:
     return {"status": "SKIP", "reason": reason}
 
 
-def _with_default_owner(result: dict[str, Any], owner: str) -> dict[str, Any]:
-    """*result* with *owner* stamped on each of its findings that has none."""
+def _with_default_owner(result: dict[str, Any], owner: str, context: OwnerContext) -> dict[str, Any]:
+    """*result* with an owner on each of its findings that has none.
+
+    The owner of a finding is the one it carries; else the row of the ownership table for its code (*context*, asked
+    without a node: a ``fixed_step:<id>`` or a gate rule answers); else *owner*, the default of the check.
+    """
     errors = result.get("errors")
     if not errors:
         return result
-    return {**result, "errors": [err if err.owner is not None else replace(err, owner=owner) for err in errors]}
+    stamped = [
+        err if err.owner is not None else replace(err, owner=owner_for(err.code, None, context) or owner)
+        for err in errors
+    ]
+    return {**result, "errors": stamped}
 
 
 def _owned_by_file(errors: Sequence[SpecError], spec_dir: str) -> list[SpecError]:
@@ -576,7 +596,7 @@ def run_registered_checks(ctx: CheckContext) -> OrderedDict[str, dict[str, Any]]
     A finding that has no owner gets the check's default owner.
     """
     for spec in CHECK_REGISTRY:
-        ctx.checks[spec.name] = _with_default_owner(spec.fn(ctx), spec.default_owner)
+        ctx.checks[spec.name] = _with_default_owner(spec.fn(ctx), spec.default_owner, ctx.owner_context)
     return ctx.checks
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -29,10 +30,12 @@ def _no_graph() -> Graph:
 
 @pytest.fixture
 def host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A copy of the example host (spec folder directly under the root); the current folder is its root, as for a hook."""
+    """A copy of the example host (spec folder directly under the root); the current folder is another folder, so no case depends on it."""
     copy = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, copy)
-    monkeypatch.chdir(copy)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
     return copy
 
 
@@ -141,8 +144,20 @@ def test_graph_is_loaded_once_for_several_seeds(host: Path, manifest: dict[str, 
     assert len(loads) == 1
 
 
-def test_absolute_paths_map_like_relative_ones(host: Path, manifest: dict[str, Any]) -> None:
-    assert _touched(host, [str(host / "spec" / "04_fr_list.json")], manifest).steps == ("04",)
+def test_absolute_and_git_root_relative_paths_map_the_same_from_another_cwd(host: Path, manifest: dict[str, Any]) -> None:
+    relative = _touched(host, ["spec/04_fr_list.json"], manifest, git_root=str(host))
+    absolute = _touched(host, [str(host / "spec" / "04_fr_list.json")], manifest, git_root=str(host))
+    derived = _touched(host, ["spec/04_fr_list.json"], manifest)
+    assert relative == absolute == derived
+    assert relative.steps == ("04",)
+
+
+def test_a_relative_path_is_taken_from_the_host_root_not_the_current_folder(
+    host: Path, manifest: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(host / "docs")
+    assert _touched(host, ["spec/04_fr_list.json"], manifest).steps == ("04",)
+    assert _touched(host, ["../spec/04_fr_list.json"], manifest).outside_root == ("../spec/04_fr_list.json",)
 
 
 def _nest(host: Path) -> None:
@@ -151,11 +166,32 @@ def _nest(host: Path) -> None:
     shutil.move(str(host / "spec"), str(host / "sub" / "spec"))
 
 
-def test_nested_layout_maps_spec_files_from_the_repository_top(host: Path, manifest: dict[str, Any]) -> None:
+def test_nested_layout_with_the_git_root_maps_spec_files_from_the_repository_top(host: Path, manifest: dict[str, Any]) -> None:
     _nest(host)
-    touched = _touched(host, ["sub/spec/04_fr_list.json"], manifest, spec="sub/spec")
+    touched = _touched(host, ["sub/spec/04_fr_list.json"], manifest, spec="sub/spec", git_root=str(host))
     assert touched.steps == ("04",)
     assert touched.outside_root == ()
+
+
+def test_nested_layout_without_the_git_root_and_outside_a_repository_takes_paths_from_the_host_root(
+    host: Path, manifest: dict[str, Any]
+) -> None:
+    """With no repository the host root ``sub`` is all there is: ``sub/spec/...`` is ``sub/sub/spec/...`` from it."""
+    _nest(host)
+    assert _touched(host, ["sub/spec/04_fr_list.json"], manifest, spec="sub/spec").steps == ()
+    assert _touched(host, ["spec/04_fr_list.json"], manifest, spec="sub/spec").steps == ("04",)
+    assert _touched(host, [str(host / "sub" / "spec" / "04_fr_list.json")], manifest, spec="sub/spec").steps == ("04",)
+
+
+def test_nested_layout_without_the_git_root_in_a_repository_takes_paths_from_the_repository_top(
+    host: Path, manifest: dict[str, Any]
+) -> None:
+    """What a pre-commit hook passes: the step file is placed, the seed at the top is reported, nothing is silent."""
+    _nest(host)
+    subprocess.run(["git", "init", "-q", str(host)], check=True)
+    touched = _touched(host, ["sub/spec/04_fr_list.json", SEED_PATH, "spec/04_fr_list.json"], manifest, spec="sub/spec")
+    assert touched.steps == ("04",)
+    assert touched.outside_root == (SEED_PATH, "spec/04_fr_list.json")
 
 
 def test_nested_layout_with_the_git_root_finds_the_seeds_at_the_top(host: Path, manifest: dict[str, Any]) -> None:
@@ -168,9 +204,11 @@ def test_nested_layout_with_the_git_root_finds_the_seeds_at_the_top(host: Path, 
 
 def test_paths_outside_the_host_root_are_counted_as_unmapped(host: Path, manifest: dict[str, Any]) -> None:
     _nest(host)
-    touched = _touched(host, [SEED_PATH, "README.md", "sub/spec/04_fr_list.json"], manifest, spec="sub/spec")
+    seed = str(host / SEED_PATH)
+    spec_file = str(host / "sub" / "spec" / "04_fr_list.json")
+    touched = _touched(host, [seed, "../README.md", spec_file], manifest, spec="sub/spec")
     assert touched.steps == ("04",)
-    assert touched.outside_root == (SEED_PATH, "README.md")
+    assert touched.outside_root == (seed, "../README.md")
     note = outside_root_note(touched)
     assert note is not None and note.startswith("2 paths lie outside the host root") and "--git-root" in note
 
