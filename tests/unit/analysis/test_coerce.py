@@ -39,7 +39,7 @@ def test_item_without_id_is_reported_and_skipped(tmp_path):
     items, errors = load_items(str(tmp_path))
     assert [i.id for i in items] == ["amb-ok"]
     assert [(p.reason, p.item_id, p.step) for p in errors] == [("missing_id", "", "16b")]
-    assert errors[0].line().startswith("E520 ") and "item=?" in errors[0].line()
+    assert errors[0].line().startswith("E520 ") and "item=(no id)" in errors[0].line()
 
 
 @pytest.mark.parametrize("raw", [

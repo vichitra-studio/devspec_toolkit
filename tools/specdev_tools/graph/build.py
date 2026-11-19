@@ -55,8 +55,12 @@ class _FileContext:
     milestone: str | None
 
 
-def _step_ranks(repo_root: str) -> dict[str, int]:
-    """Sort rank of each step: seeds first, then ``tools/step_order.json`` order; any other step sorts last."""
+def step_order_ranks(repo_root: str) -> dict[str, int]:
+    """Each step of ``tools/step_order.json`` mapped to its place in the waterfall (the keys are in waterfall order).
+
+    Raises:
+        KindRegistryError: E520 when the file is missing or is not a JSON object.
+    """
     path = os.path.join(repo_root, "tools", "step_order.json")
     try:
         order = load_step_order(repo_root)
@@ -64,14 +68,21 @@ def _step_ranks(repo_root: str) -> dict[str, int]:
         raise KindRegistryError(make_error("E520", f"step order {path} is unreadable: {exc}", path)) from exc
     if not isinstance(order, dict):
         raise KindRegistryError(make_error("E520", f"step order {path} is unreadable: not a JSON object", path))
-    ranks = {step: index for index, step in enumerate(str_items(order.get("steps")))}
-    ranks[SEED_STEP] = -1
-    return ranks
+    return {step: index for index, step in enumerate(str_items(order.get("steps")))}
+
+
+def _step_ranks(repo_root: str) -> dict[str, int]:
+    """Sort rank of each step: seeds first, then ``tools/step_order.json`` order; any other step sorts last."""
+    return {**step_order_ranks(repo_root), SEED_STEP: -1}
 
 
 def _files_on_disk(spec_root: Path, pattern: str) -> list[str]:
-    """Spec-root-relative paths of the files that match registry file key *pattern*."""
-    return [path.relative_to(spec_root).as_posix() for path in spec_root.glob(pattern) if path.is_file()]
+    """Spec-root-relative paths of the files that match registry file key *pattern*.
+
+    A folder with the name of a step file is listed too: it cannot be read, so the build reports it in ``load_errors``
+    like a file that cannot be opened.
+    """
+    return [path.relative_to(spec_root).as_posix() for path in spec_root.glob(pattern) if path.is_file() or path.is_dir()]
 
 
 def _file_matches(rel: str, pattern: str) -> bool:

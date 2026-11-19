@@ -571,7 +571,7 @@ class SpecCheckGitRootForwardingTests(unittest.TestCase):
     a tempdir for spec artifacts and host-repo files.  This lets canonical-lint
     pass cleanly so hallucination-lint actually runs.
 
-    If git_root=git_root is ever removed from spec_check._run_checks, the
+    If git_root=git_root is ever removed from spec_check.run_checks, the
     positive test will regress to a false-positive E530.
     """
 

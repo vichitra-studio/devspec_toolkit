@@ -5,6 +5,7 @@ command to pin what a refusal prints and the exit code it gives.
 """
 from __future__ import annotations
 
+import inspect
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -124,7 +125,7 @@ def test_the_gate_measures_the_baseline_with_the_provider_it_is_given(tmp_path: 
         seen.append((spec_dir, git_root))
         return _unavailable(spec_dir, git_root)
 
-    run = run_step_gate(str(ROOT), spec, ["05"], git_root=str(host), spec_root=spec, provider=provider)
+    run = run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec, provider=provider)
     assert seen == [(Path(spec), str(host))]
     assert (run.baseline.mode, run.notes) == ("unavailable", (f"note: {REASON}",))
 
@@ -132,8 +133,8 @@ def test_the_gate_measures_the_baseline_with_the_provider_it_is_given(tmp_path: 
 def test_a_provider_given_to_one_run_does_not_outlive_it(tmp_path: Path) -> None:
     host = step_gate_host(tmp_path / "host")
     spec = str(host / "spec")
-    run_step_gate(str(ROOT), spec, ["05"], git_root=str(host), spec_root=spec, provider=_unavailable)
-    run = run_step_gate(str(ROOT), spec, ["05"], git_root=str(host), spec_root=spec)
+    run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec, provider=_unavailable)
+    run = run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec)
     assert run.baseline.mode == "ok"
 
 
@@ -150,7 +151,7 @@ def test_the_open_items_are_read_once_for_the_check_and_the_waiting_map(tmp_path
         return real(spec_dir)
 
     monkeypatch.setattr(ambiguity_items, "iter_ambiguity_items", counting)
-    run_step_gate(str(ROOT), spec, ["05"], git_root=str(host), spec_root=spec, provider=_unavailable)
+    run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec, provider=_unavailable)
     assert reads == [spec]
 
 
@@ -231,3 +232,45 @@ def test_an_unreadable_ownership_table_is_one_e520_line_and_exit_1(
     assert str(table) in refusal and "E520" in refusal
     if not json_output:
         assert len(_stderr_lines(err)) == 1
+
+
+# --- the toolkit's step order, the signature, the baseline's canon (M6a review round 2) -----------------------------
+
+@pytest.mark.parametrize("scope", [["--step", "05"], ["--paths", "spec/04_fr_list.json"]], ids=["step", "paths"])
+def test_a_toolkit_without_a_step_order_is_one_e520_line_and_no_traceback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], scope: list[str]
+) -> None:
+    toolkit = tmp_path / "toolkit"
+    toolkit.mkdir()
+    host = step_gate_host(tmp_path / "host")
+
+    code, out, err = run_split(capsys, "spec-check", str(host / "spec"), "--repo-root", str(toolkit), "--git-root", str(host), *scope)
+
+    lines = _stderr_lines(err)
+    assert code == 1 and out == "" and "Traceback" not in err
+    assert len(lines) == 1 and lines[0].startswith("E520 ") and str(toolkit / "tools" / "step_order.json") in lines[0]
+
+
+def test_the_parameters_after_the_spec_folder_are_keyword_only() -> None:
+    for function in (run_step_gate, gate_run):
+        kinds = [p.kind for p in list(inspect.signature(function).parameters.values())[2:]]
+        assert set(kinds) == {inspect.Parameter.KEYWORD_ONLY}, function.__name__
+
+
+def test_the_baseline_run_reads_the_project_canon_when_the_current_run_does(tmp_path: Path) -> None:
+    """Without ``project_canon_dir`` neither run reads the project canon: committed defects are old, whoever calls the gate."""
+    host = step_gate_host(tmp_path / "host", ["broken_link_in_step_04"], commit=True)
+    spec = str(host / "spec")
+
+    bare = run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec)
+    with_canon = run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec, project_canon_dir=f"{spec}/canon")
+
+    for run in (bare, with_canon):
+        assert run.baseline.mode == "ok"
+        assert run.results[0].blocking.errors == () and run.results[0].blocking.new_upstream == ()
+
+
+def test_the_help_of_paths_says_it_takes_every_word_up_to_the_next_option(capsys: pytest.CaptureFixture[str]) -> None:
+    _code, out, _err = run_split(capsys, "spec-check", "--help")
+    text = " ".join(out.split())
+    assert "takes every word after it up to the next option" in text and "must come last" not in text

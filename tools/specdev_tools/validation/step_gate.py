@@ -85,7 +85,7 @@ def identity_key(error: SpecError, owner_of: OwnerOf, canonical_id: CanonicalId 
     """The identity key of *error*: its owner by *owner_of*, its node id and the target of its link by *canonical_id*.
 
     A field an error lacks is ``None`` in the key.  The message is never part of it, and ``location`` has no array
-    indexes.  Several findings can share one key (every schema error of one file does); ``new_since_baseline`` counts them.
+    indexes.  Several findings can share one key (the schema errors at one place of one file do); ``new_since_baseline`` counts them.
     """
     node_id = canonical_id(error.node_id) if error.node_id is not None else None
     target = _canonical_target(error.target, canonical_id)
@@ -132,7 +132,10 @@ def new_since_baseline(
     second schema error in a file that already had one is new.  An exact duplicate gets the answer of its first copy.
 
     The one known limit: a finding fixed and another of the same key added on the branch is a count that did not grow,
-    so the added one stays old; the merge check is where that is caught.
+    so the added one stays old; the merge check is where that is caught.  A schema finding has its file and the place of
+    the violation in its key (index removed), so this needs the fixed and the added one to be at the same place in
+    the same file: fixing ``.frs[1].scope`` and adding ``.frs[0].scope`` is one such case, while fixing a ``priority`` and
+    adding a ``scope`` is not.
     """
     baseline_messages: dict[IdentityKey, set[str]] = {}
     for error in baseline:
@@ -319,6 +322,10 @@ def classify_for_step(
     (``Graph.shape.step_ranks``; a step it lacks sorts last).  An upstream error is debt unless ``new_since_baseline``
     says it is new (keys mapped through *canonical_id*, so a node renamed on the branch keeps its old finding old);
     with an ``unavailable`` baseline every upstream error is new.  *waiting* is ``None`` where waiting is off.
+
+    The order of *errors* decides which finding is named new when two of one key are left over (the rule of
+    ``new_since_baseline``): the caller fixes it, and ``run_step_gate`` gives the registry order, then the order of each
+    check's own findings.
 
     Raises ``FindingError`` (E706) when *step* is not in *order*.
     """

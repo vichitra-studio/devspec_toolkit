@@ -341,7 +341,7 @@ def build_parser() -> _SpecdevParser:
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
     sc_scope = sc.add_mutually_exclusive_group()
     sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
-    sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); must come last")
+    sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
     sc.add_argument("--base-ref", default=None, help="With --step or --paths: the branch whose merge-base counts as 'before' (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master)")
     sc.add_argument("--detail", choices=("summary", "all"), default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
 

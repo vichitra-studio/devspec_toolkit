@@ -9,7 +9,7 @@ from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import FindingError, SpecError, link_target
 from specdev_tools.core.git_base import BaselineResult
 from specdev_tools.core.step_order import load_step_order
-from specdev_tools.validation.check_registry import _check_result
+from specdev_tools.validation.check_registry import check_result
 from specdev_tools.validation.step_gate import (
     StepGateResult,
     WaitingOn,
@@ -99,7 +99,7 @@ def test_promoted_code_owned_by_n_blocks(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("SPECDEV_WARNINGS_AS_ERRORS", "1")
     reset_config()
     try:
-        promoted = _check_result([err("W615", "step:05", "inv-a")])["errors"]
+        promoted = check_result([err("W615", "step:05", "inv-a")])["errors"]
         result = gate(promoted, "05")
     finally:
         monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS")

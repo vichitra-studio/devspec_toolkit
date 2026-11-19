@@ -18,15 +18,13 @@ from ..core.config import reset_config
 from ..core.errors import FindingError, SpecError, make_error
 from ..core.git_base import BaselineChecks, BaselineProvider, BaselineResult, SeedPaths, merge_base_provider
 from ..core.loaders import read_json_object
-from ..core.scope_helpers import str_items
-from ..core.step_order import load_step_order
-from ..graph.build import build_graph
+from ..graph.build import build_graph, step_order_ranks
 from ..graph.gitview import host_root_of
 from ..graph.kinds import SEED_KIND
 from ..graph.model import Graph
 from ..graph.queries import require_known_step_in
 from .check_registry import CheckContext, run_registered_checks
-from .spec_check import _COMPLETENESS_CHECK, _run_checks, _warn_ignored_promotions
+from .spec_check import check_findings, run_checks, warn_ignored_promotions
 from .step_gate import StepGateResult, WaitingOn, classify_for_steps, declared_owner, same_id
 from .touched_steps import (
     SEED_EDIT_NOTE,
@@ -76,16 +74,6 @@ def gate_usage_error(
     return None
 
 
-def _gate_errors(checks: Mapping[str, dict[str, Any]]) -> list[SpecError]:
-    """The findings of every check, all of them (the step gate sorts them itself); ``completeness-check`` repeats ``traceability-closure``."""
-    return [e for name, info in checks.items() if name != _COMPLETENESS_CHECK for e in info.get("errors", ())]
-
-
-def _step_ranks(repo_root: str) -> dict[str, int]:
-    """Each step of ``tools/step_order.json`` mapped to its place in the waterfall (the keys are in waterfall order)."""
-    return {step: index for index, step in enumerate(str_items(load_step_order(repo_root).get("steps")))}
-
-
 def touched_steps_of(
     repo_root: str,
     spec_dir: str,
@@ -105,21 +93,25 @@ def touched_steps_of(
     manifest = read_json_object(os.path.join(spec_dir, SEED_MANIFEST_FILE)) or {}
     return steps_for_paths(
         paths, spec_dir, manifest, lambda: build_graph(spec_root or spec_dir, repo_root),
-        step_order=list(ranks if ranks is not None else _step_ranks(repo_root)), git_root=git_root,
+        step_order=list(ranks if ranks is not None else step_order_ranks(repo_root)), git_root=git_root,
     )
 
 
-def _baseline_checks(repo_root: str) -> BaselineChecks:
-    """The check runner of the baseline provider: all checks on a materialised tree, quiet, with that tree as git root and spec root."""
+def _baseline_checks(repo_root: str, *, with_project_canon: bool) -> BaselineChecks:
+    """The check runner of the baseline provider: all checks on a materialised tree, quiet, with that tree as git root and spec root.
+
+    The baseline run takes the project canon of its own tree (``<spec>/canon``) exactly when the current run has one
+    (*with_project_canon*), so both runs read the same kind of canon.
+    """
 
     def compute(baseline_root: Path, baseline_spec_dir: Path) -> list[SpecError]:
         spec = str(baseline_spec_dir)
         canon = os.path.join(spec, "canon")
-        checks = _run_checks(
+        checks = run_checks(
             repo_root, spec, git_root=str(baseline_root), spec_root=spec,
-            project_canon_dir=canon if os.path.isdir(canon) else None, quiet=True,
+            project_canon_dir=canon if with_project_canon and os.path.isdir(canon) else None, quiet=True,
         )
-        return _gate_errors(checks)
+        return check_findings(checks)
 
     return compute
 
@@ -152,6 +144,7 @@ def _gate_notes(ctx: CheckContext, baseline: BaselineResult) -> tuple[str, ...]:
 def run_step_gate(
     repo_root: str,
     spec_dir: str,
+    *,
     steps: Sequence[str],
     git_root: str | None = None,
     spec_root: str | None = None,
@@ -173,15 +166,15 @@ def run_step_gate(
             ownership table of the toolkit cannot be read.
     """
     reset_config()
-    order = ranks if ranks is not None else _step_ranks(repo_root)
+    order = ranks if ranks is not None else step_order_ranks(repo_root)
     for step in steps:
         require_known_step_in(order, step)
     ctx = CheckContext(
         repo_root=repo_root, spec_dir=spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir
     )
-    _warn_ignored_promotions()
-    errors = _gate_errors(run_registered_checks(ctx))
-    measure = provider or merge_base_provider(_baseline_checks(repo_root), _seed_paths_of(ctx.check_graph), base_ref)
+    warn_ignored_promotions()
+    errors = check_findings(run_registered_checks(ctx))
+    measure = provider or merge_base_provider(_baseline_checks(repo_root, with_project_canon=project_canon_dir is not None), _seed_paths_of(ctx.check_graph), base_ref)
     baseline = measure(Path(ctx.spec_dir), host_root_of(ctx.effective_spec_root, ctx.git_root))
     graph = ctx.check_graph
     results = classify_for_steps(
@@ -215,7 +208,7 @@ def gate_run(
     """
     if not os.path.isdir(spec_dir):
         raise FindingError(make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir}"))
-    ranks = _step_ranks(repo_root)
+    ranks = step_order_ranks(repo_root)
     notes: list[str] = []
     if steps is None:
         touched = touched_steps_of(repo_root, spec_dir, paths or (), git_root, spec_root, ranks)
@@ -230,5 +223,8 @@ def gate_run(
         notes.extend(f"step {step} has no artifact in {spec_dir}" for step in steps_without_artifact(gated, spec_dir))
     if not gated:
         return StepGateRun((), BaselineResult("unavailable"), tuple(notes))
-    run = run_step_gate(repo_root, spec_dir, gated, git_root, spec_root, project_canon_dir, base_ref, provider, ranks)
+    run = run_step_gate(
+        repo_root, spec_dir, steps=gated, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir,
+        base_ref=base_ref, provider=provider, ranks=ranks,
+    )
     return replace(run, notes=(*notes, *run.notes))

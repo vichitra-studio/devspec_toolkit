@@ -29,7 +29,7 @@ from integration._step_gate_support import (
 from specdev_tools.core.errors import make_error
 from specdev_tools.validation.open_items import check_open_items
 from specdev_tools.validation.touched_steps import SEED_EDIT_NOTE
-from specdev_tools.validation.check_registry import _check_result, register_check
+from specdev_tools.validation.check_registry import check_result, register_check
 from unit.graph._synth import git
 from unit.trace._lock_support import ROOT, run_on_example
 
@@ -131,7 +131,7 @@ def test_doc_13_9_rows_3_4_pending_with_stub_and_new_upstream_blocks(
 ) -> None:
     # Row 3: no-dangling error of a requirement that no later step uses yet; the owned error is a stub until M6b.
     stub = make_error("E520", "stub: nothing uses fr-account-export yet", owner="step:08", node_id="fr-account-export")
-    register_check("stub-no-dangling", lambda ctx: _check_result([stub]))
+    register_check("stub-no-dangling", lambda ctx: check_result([stub]))
     host = step_gate_host(tmp_path / "host", ["fr_nothing_uses"])
     code, gate = _gate(capsys, host, "--step", "04")
     assert code == 0 and gate["blocking"] == []

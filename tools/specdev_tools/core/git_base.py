@@ -9,6 +9,7 @@ Git is run only through ``graph.gitview.run_git``.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from collections.abc import Callable, Sequence
@@ -221,6 +222,37 @@ def materialise_baseline(git_root: str, commit: str, spec_dir: str | Path, seed_
     return BaselineTree(directory, spec_path)
 
 
+def host_paths_in(errors: Sequence[SpecError], replacements: Sequence[tuple[str, str]]) -> tuple[SpecError, ...]:
+    """*errors* with every *replacements* ``(old, new)`` applied, in the order given, to their ``message``, ``path`` and ``file``.
+
+    A finding with no ``old`` in any of the three fields is returned as the same object.  List the longer ``old`` first
+    (the spec folder before the root that holds it).
+    """
+    out: list[SpecError] = []
+    for error in errors:
+        changes: dict[str, str] = {}
+        for name in ("message", "path", "file"):
+            text = getattr(error, name)
+            if not text:
+                continue
+            for old, new in replacements:
+                text = text.replace(old, new)
+            if text != getattr(error, name):
+                changes[name] = text
+        out.append(replace(error, **changes) if changes else error)
+    return tuple(out)
+
+
+def _tree_replacements(tree: BaselineTree, spec_dir: Path, git_root: str) -> list[tuple[str, str]]:
+    """What turns a path inside the baseline tree into the same path of the current tree: the spec folder as the caller names it, then the host root.
+
+    Each ``old`` comes as given and as its real path (a temporary folder may sit behind a symbolic link), the longer first: the
+    real path of ``/tmp/x`` is ``/private/tmp/x``, which contains the other.
+    """
+    pairs = [(tree.spec_dir, str(spec_dir)), (tree.root, git_root)]
+    return [(form, new) for old, new in pairs for form in sorted({str(old), os.path.realpath(old)}, key=len, reverse=True)]
+
+
 def merge_base_provider(
     compute_errors: BaselineChecks, seed_paths: SeedPaths, base_ref: str | None = None
 ) -> BaselineProvider:
@@ -239,7 +271,7 @@ def merge_base_provider(
             return BaselineResult("unavailable", resolution=resolution)
         try:
             with materialise_baseline(git_root, resolution.commit, spec_dir, seed_paths(spec_dir)) as tree:
-                errors = tuple(compute_errors(tree.root, tree.spec_dir))
+                errors = host_paths_in(compute_errors(tree.root, tree.spec_dir), _tree_replacements(tree, spec_dir, git_root))
         except Exception as error:  # noqa: BLE001 - the baseline tree is old data: whatever breaks on it makes it unavailable
             text = " ".join(str(error).split())
             text = text if len(text) <= _REASON_CHARS else text[:_REASON_CHARS].rstrip() + "..."
@@ -259,6 +291,7 @@ __all__ = [
     "BaselineResult",
     "BaselineTree",
     "SeedPaths",
+    "host_paths_in",
     "materialise_baseline",
     "merge_base_provider",
     "resolve_baseline",

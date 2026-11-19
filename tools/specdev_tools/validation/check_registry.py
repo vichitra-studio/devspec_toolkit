@@ -38,7 +38,7 @@ def _classify(errors: list[SpecError]) -> dict[str, Any]:
     return {"status": status, "error_count": e_count, "warning_count": w_count}
 
 
-def _check_result(errors: list[SpecError]) -> dict[str, Any]:
+def check_result(errors: list[SpecError]) -> dict[str, Any]:
     """Build a per-check result dict with W->E promotion applied first.
 
     Promotion (``SPECDEV_WARNINGS_AS_ERRORS`` / ``SPECDEV_PROMOTE_CODES``) must be
@@ -73,7 +73,7 @@ def graph_for_checks(repo_root: str, spec_dir: str, spec_root: str | None, lint_
     return build_lint_graph(spec_root or spec_dir, repo_root)
 
 
-def _read_lock(lock_dir: str) -> tuple[Lock | None, SpecError | None]:
+def lock_or_error(lock_dir: str) -> tuple[Lock | None, SpecError | None]:
     """The trace lock under *lock_dir* (empty when the file is absent), or the E760 finding when it cannot be read."""
     try:
         return read_lock(lock_dir), None
@@ -142,7 +142,7 @@ class CheckContext:
     @cached_property
     def lock_state(self) -> tuple[Lock | None, SpecError | None]:
         """The trace lock of the spec root, or the E760 finding when it cannot be read."""
-        return _read_lock(self.effective_spec_root)
+        return lock_or_error(self.effective_spec_root)
 
     @cached_property
     def canon_errors(self) -> list[SpecError]:
@@ -176,7 +176,7 @@ class CheckContext:
 
 
 CheckFn = Callable[[CheckContext], dict[str, Any]]
-"""``ctx -> result``: ``_check_result(errors)`` or ``{"status": "SKIP", "reason": ...}``."""
+"""``ctx -> result``: ``check_result(errors)`` or ``{"status": "SKIP", "reason": ...}``."""
 
 
 class CheckSpec(NamedTuple):
@@ -208,7 +208,9 @@ def register_check(name: str, fn: CheckFn, *, default_owner: str = MERGE_CHECK_O
     """Append the check *name* to the checks every ``spec-check`` run executes, once, after the ones registered before.
 
     *default_owner* (``merge-check`` or ``step:<id>``) is stamped on the findings of *fn* that carry no owner of their
-    own.  Other milestones register their checks from their own module instead of editing the run loop.
+    own.  A milestone registers its check from its own module, by a ``register_check`` call in the registration block of
+    ``validation/spec_check.py`` (the one place the block lives); a module that registers its check anywhere else is
+    imported only if something imports it, and ``spec-check`` then does not run it.
 
     Raises:
         ValueError: a check of that name is already registered.
@@ -218,7 +220,7 @@ def register_check(name: str, fn: CheckFn, *, default_owner: str = MERGE_CHECK_O
     CHECK_REGISTRY.append(CheckSpec(name, fn, default_owner))
 
 
-def _skip(reason: str) -> dict[str, Any]:
+def skip(reason: str) -> dict[str, Any]:
     return {"status": "SKIP", "reason": reason}
 
 
@@ -244,8 +246,11 @@ def run_registered_checks(ctx: CheckContext) -> OrderedDict[str, dict[str, Any]]
     A finding that has no owner gets the check's default owner.
 
     Raises:
+        RuntimeError: ``CHECK_REGISTRY`` is empty (a programming error: a gate built on no check would say CLEAR).
         FindingError: E520 when the ownership table of the toolkit cannot be read.
     """
+    if not CHECK_REGISTRY:
+        raise RuntimeError("no check is registered: import specdev_tools.validation.spec_check, whose registration block registers the checks")
     checks: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for spec in CHECK_REGISTRY:
         checks[spec.name] = _with_default_owner(spec.fn(ctx), spec.default_owner, ctx.owner_context)

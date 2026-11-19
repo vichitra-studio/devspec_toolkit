@@ -19,6 +19,7 @@ from typing import Any, Callable
 # Kept as the patch-target anchor for test_validate_file_runtime_error_is_not_misclassified_as_ref_resolution (patches validate.Draft202012Validator.iter_errors); do not remove.
 from jsonschema import Draft202012Validator
 from ..core.schema_validate import (
+    jq_path_of,
     validate_data_against_schema,
     SchemaBootstrapError,
     SchemaNotFoundError,
@@ -165,7 +166,7 @@ def validate_file(
                 prompt_path = f"prompts/prompt_{step}*.md"
                 error_msg += f"\n  See: {prompt_path} for guidance on requirements"
 
-            enhanced_errors.append(make_error("E520", error_msg))
+            enhanced_errors.append(make_error("E520", error_msg, jq_path=jq_path_of(path_tuple)))
 
         deep_errors = _run_deep_validation(step, data, repo_root, path, git_root=git_root, spec_root=spec_root)
         if deep_errors:

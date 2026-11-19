@@ -60,7 +60,7 @@ def test_an_item_with_neither_about_nor_severity_says_so_and_the_run_goes_on(spe
 def test_an_item_without_an_id_exits_2(spec: Path) -> None:
     _with_items(spec, {"description": "x", "about": ["fr-does-not-exist"]})
     report = _run(spec)
-    assert report.exit_code == 2 and "missing_id" in report.stderr_lines[0] and "item=?" in report.stderr_lines[0]
+    assert report.exit_code == 2 and "missing_id" in report.stderr_lines[0] and "item=(no id)" in report.stderr_lines[0]
 
 
 def test_an_unreadable_file_exits_2_with_one_line(spec: Path) -> None:

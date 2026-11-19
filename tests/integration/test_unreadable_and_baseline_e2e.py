@@ -87,6 +87,35 @@ def test_step_gate_goes_on_with_an_unreadable_step_file(
 
 
 @pytest.mark.parametrize("how", HOWS)
+def test_step_gate_says_on_stderr_which_step_file_it_could_not_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], how: str
+) -> None:
+    """A file without permission and a folder named like the file get the same note."""
+    host = step_gate_host(tmp_path / "h")
+    path = _unreadable_step_file(host, how)
+    try:
+        _code, _out, err = _spec_check(capsys, host, "--step", "05")
+    finally:
+        _restore(path, how)
+    assert _lines_with(err, "could not read") == ["specdev spec-check: could not read 04_fr_list.json; the answer may be incomplete"]
+
+
+def test_waiting_is_off_when_an_artifact_of_open_items_cannot_be_read(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Items read before the unreadable file would explain the errors below them; the run must not trust a list that stops half way."""
+    host = step_gate_host(tmp_path / "h", ["open_items", "broken_links_below_open_items"])
+    code, out, _err = _spec_check(capsys, host, "--step", "05", "--json")
+    assert code == 0 and len(json.loads(out)["step_gate"]["waiting"]) == 2
+
+    (host / NFR_FILE).unlink()
+    (host / NFR_FILE).mkdir()
+    code, out, _err = _spec_check(capsys, host, "--step", "05", "--json")
+
+    gate = json.loads(out)["step_gate"]
+    assert code == 1 and gate["waiting"] == []
+    assert [f["code"] for f in gate["blocking"] if f["code"] == "E700"] == ["E700", "E700"]
+
+
+@pytest.mark.parametrize("how", HOWS)
 def test_upstream_backlog_prints_one_e520_and_exits_2_for_an_unreadable_file(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], how: str
 ) -> None:

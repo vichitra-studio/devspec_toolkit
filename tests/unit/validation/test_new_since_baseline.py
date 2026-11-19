@@ -10,7 +10,7 @@ OWNER = "step:04"
 
 
 def schema_error(message: str) -> SpecError:
-    """A schema finding as ``_check_schema_validation`` makes it: owner and message only, so every one of a file has one key."""
+    """A finding with an owner and a message and no place: the worst case of the count rule, where every such finding has one key."""
     return SpecError("E520", message, owner=OWNER)
 
 

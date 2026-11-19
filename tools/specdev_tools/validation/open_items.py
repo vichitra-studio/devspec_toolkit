@@ -176,17 +176,18 @@ def _step_findings(items: list[AmbiguityItem], root: str, frozen: FrozenProvider
         for item in live
         if item.shape == "unified"
     ]
-    legacy = Counter((item.artifact_path, item.step) for item in live if item.shape == "legacy")
-    findings.extend(_legacy_summary(path, step, count, root) for (path, step), count in legacy.items())
+    legacy = Counter((item.artifact_path, item.step, item.location) for item in live if item.shape == "legacy")
+    findings.extend(_legacy_summary(path, step, location, count, root) for (path, step, location), count in legacy.items())
     return findings
 
 
-def _legacy_summary(path: str, step: str, count: int, root: str) -> SpecError:
+def _legacy_summary(path: str, step: str, location: str, count: int, root: str) -> SpecError:
+    """The one W630 of the legacy items of one array; it names the array, so the two arrays of a plan give two different findings."""
     artifact = _relative(root, path)
     noun = "legacy open item" if count == 1 else "legacy open items"
     return make_error(
         "W630",
-        f"{count} {noun} in {artifact}; see `upstream-backlog`",
+        f"{count} {noun} in {artifact} ({location.removeprefix('.')}); see `upstream-backlog`",
         file=artifact,
         owner=STEP_PREFIX + step,
     )

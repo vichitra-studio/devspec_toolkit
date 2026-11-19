@@ -12,7 +12,7 @@ from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import PROMOTABLE_PAIRS, FindingError, SpecError
 from specdev_tools.trace.lockfile import LockError, with_write_lock
 from specdev_tools.validation.open_items import check_open_items, default_frozen, delete_resolved_items
-from specdev_tools.validation.check_registry import _check_result
+from specdev_tools.validation.check_registry import check_result
 from specdev_tools.validation.validate import validate_file
 
 from .._ambiguity_support import plan_doc, unified_item
@@ -157,7 +157,7 @@ def test_w630_is_not_promotable_under_warnings_as_errors(
     monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
     reset_config()
 
-    result = _check_result(check_open_items(spec, gate="step"))
+    result = check_result(check_open_items(spec, gate="step"))
 
     assert result["status"] == "WARN"
     assert result["error_count"] == 0
@@ -292,13 +292,21 @@ def test_an_item_with_no_id_is_named_so_without_a_double_space(tmp_path: Path) -
     assert error.message.startswith("open item (no id) in ") and "  " not in error.message and error.node_id is None
 
 
-def test_an_unreadable_file_ends_the_list_with_one_e520_owned_by_its_step(tmp_path: Path) -> None:
+def _unreadable_04_folder(tmp_path: Path) -> list[SpecError]:
     write_json(tmp_path, STEP_FILE, {"ambiguities": [unified_item("amb-x")]})
     (tmp_path / "04_fr_list.json").mkdir()
-    errors = check_open_items(tmp_path, gate="step")
-    unreadable = [e for e in errors if e.code == "E520"]
+    return check_open_items(tmp_path, gate="step")
+
+
+def test_an_unreadable_file_is_one_e520_owned_by_its_step_that_says_it_cannot_read(tmp_path: Path) -> None:
+    unreadable = [e for e in _unreadable_04_folder(tmp_path) if e.code == "E520"]
     assert [(e.file, e.owner) for e in unreadable] == [("04_fr_list.json", "step:04")]
-    assert "cannot read" in unreadable[0].message and errors[-1] is unreadable[0]
+    assert "cannot read" in unreadable[0].message
+
+
+def test_the_e520_of_an_unreadable_file_ends_the_list(tmp_path: Path) -> None:
+    errors = _unreadable_04_folder(tmp_path)
+    assert [e.code for e in errors][-1] == "E520" and [e.code for e in errors].count("E520") == 1
 
 
 def test_an_unreadable_plan_file_is_owned_by_a_plan_step(tmp_path: Path) -> None:

@@ -14,7 +14,8 @@ from __future__ import annotations
 import os
 import sys
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -32,9 +33,9 @@ from ..trace.records import check_records, record_files
 from ..trace.suspects import check_lock
 from .check_registry import (
     CheckContext,
-    _check_result,
-    _read_lock,
-    _skip,
+    check_result,
+    lock_or_error,
+    skip,
     register_check,
     run_registered_checks,
 )
@@ -112,13 +113,13 @@ def _trace_lock_result(
     stderr which seed documents were not found.
     """
     if lock_error is not None:
-        return _check_result([lock_error])
+        return check_result([lock_error])
     if graph is None or lock is None:
         return {"status": "SKIP", "reason": "no spec graph"}
     if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
         return {"status": "SKIP", "reason": "no links and no trace lock"}
     read_seeds = read_seed_texts if quiet else read_seed_texts_noting
-    return _check_result(check_lock(graph, lock, read_seeds(graph, host_root)))
+    return check_result(check_lock(graph, lock, read_seeds(graph, host_root)))
 
 
 def _records_result(graph: Graph | None, repo_root: str, records_dir: str) -> dict[str, Any]:
@@ -127,7 +128,7 @@ def _records_result(graph: Graph | None, repo_root: str, records_dir: str) -> di
         return {"status": "SKIP", "reason": "no spec graph"}
     if not record_files(records_dir):
         return {"status": "SKIP", "reason": "no record files"}
-    return _check_result(check_records(records_dir, repo_root, graph))
+    return check_result(check_records(records_dir, repo_root, graph))
 
 
 _LOCK_LINK_CODES = frozenset({"E761", "W720", "E778"})
@@ -144,7 +145,7 @@ def lock_link_findings(
     """
     if graph is None:
         return []
-    lock, lock_error = _read_lock(lock_dir)
+    lock, lock_error = lock_or_error(lock_dir)
     if lock is None:
         return [] if lock_error is None else [lock_error]
     if not any(node.links for node in graph.nodes) and not os.path.isfile(lock_path(lock_dir)):
@@ -186,32 +187,32 @@ def _check_schema_validation(ctx: CheckContext) -> dict[str, Any]:
                 spec_root=ctx.spec_root,
                 include_id_slice=False,
             )
-            schema_errs.extend(
-                stamp_file_owner(file_errs, step_for_file(file_path, read_json_object(file_path)))
-            )
-    return _check_result(schema_errs)
+            where = os.path.relpath(file_path, ctx.spec_dir)
+            owned = stamp_file_owner(file_errs, step_for_file(file_path, read_json_object(file_path)))
+            schema_errs.extend(err if err.file is not None else replace(err, file=where) for err in owned)
+    return check_result(schema_errs)
 
 
 def _check_toolkit_version_result(ctx: CheckContext) -> dict[str, Any]:
-    return _check_result(_check_toolkit_version(ctx.repo_root, ctx.spec_dir))
+    return check_result(_check_toolkit_version(ctx.repo_root, ctx.spec_dir))
 
 
 def _check_spec_quality_lint(ctx: CheckContext) -> dict[str, Any]:
     from .spec_quality_lint import lint_spec_quality
 
-    return _check_result(lint_spec_quality(ctx.spec_dir, graph=ctx.lint_graph))
+    return check_result(lint_spec_quality(ctx.spec_dir, graph=ctx.lint_graph))
 
 
 def _check_canonical_lint(ctx: CheckContext) -> dict[str, Any]:
-    return _check_result(ctx.canon_errors)
+    return check_result(ctx.canon_errors)
 
 
 def _check_canonical_integrity(ctx: CheckContext) -> dict[str, Any]:
     if not ctx.canon_ok:
-        return _skip("canonical preflight failed")
+        return skip("canonical preflight failed")
     from ..canonical.integrity import validate_canonical_integrity
 
-    return _check_result(
+    return check_result(
         validate_canonical_integrity(
             ctx.repo_root, ctx.spec_dir,
             require_manifest_schema_registration=True,
@@ -222,7 +223,7 @@ def _check_canonical_integrity(ctx: CheckContext) -> dict[str, Any]:
 
 def _check_hallucination_lint(ctx: CheckContext) -> dict[str, Any]:
     if not ctx.canon_ok:
-        return _skip("canonical preflight failed")
+        return skip("canonical preflight failed")
     from .hallucination_lint import lint_hallucinations
 
     hall_errs = lint_hallucinations(
@@ -234,11 +235,11 @@ def _check_hallucination_lint(ctx: CheckContext) -> dict[str, Any]:
         git_root=ctx.git_root,
         graph=ctx.lint_graph,
     )
-    return _check_result(_owned_by_file(hall_errs, ctx.spec_dir))
+    return check_result(_owned_by_file(hall_errs, ctx.spec_dir))
 
 
 def _check_traceability_closure(ctx: CheckContext) -> dict[str, Any]:
-    return _check_result(ctx.closure_errors)
+    return check_result(ctx.closure_errors)
 
 
 _COMPLETENESS_CHECK = "completeness-check"
@@ -249,43 +250,43 @@ _COMPLETENESS_CODES = frozenset({
 
 
 def _check_completeness(ctx: CheckContext) -> dict[str, Any]:
-    return _check_result([e for e in ctx.closure_errors if isinstance(e, SpecError) and e.code in _COMPLETENESS_CODES])
+    return check_result([e for e in ctx.closure_errors if isinstance(e, SpecError) and e.code in _COMPLETENESS_CODES])
 
 
 def _check_seed_lint(ctx: CheckContext) -> dict[str, Any]:
     if not os.path.exists(os.path.join(ctx.project_root, "spec", "common", "seed_manifest.json")):
-        return _skip("seed_manifest.json not present")
+        return skip("seed_manifest.json not present")
     from .seed_lint import lint_seeds
 
     # For submodule deployments, seed docs are in the host repo (git_root), not in the toolkit root.
-    return _check_result(lint_seeds(ctx.repo_root, ctx.spec_dir, project_root=ctx.project_root))
+    return check_result(lint_seeds(ctx.repo_root, ctx.spec_dir, project_root=ctx.project_root))
 
 
 def _check_fixtures_lint(ctx: CheckContext) -> dict[str, Any]:
     if not os.path.isfile(os.path.join(ctx.spec_dir, "08_fixtures.json")):
-        return _skip("step 08 not present")
+        return skip("step 08 not present")
     from .fixtures_lint import lint_fixtures
 
-    return _check_result(lint_fixtures(ctx.spec_dir))
+    return check_result(lint_fixtures(ctx.spec_dir))
 
 
 def _check_dependency_order_lint(ctx: CheckContext) -> dict[str, Any]:
     if not (ctx.root / "tools" / "step_order.json").exists():
-        return _skip("step_order.json not found")
+        return skip("step_order.json not found")
     from .dependency_order_lint import lint_dependency_order
 
-    return _check_result(lint_dependency_order(ctx.repo_root))
+    return check_result(lint_dependency_order(ctx.repo_root))
 
 
 def _check_graph(ctx: CheckContext) -> dict[str, Any]:
     lock, _lock_error = ctx.lock_state
-    return _check_result(run_graph_check(ctx.effective_spec_root, ctx.repo_root, graph=ctx.check_graph, lock=lock))
+    return check_result(run_graph_check(ctx.effective_spec_root, ctx.repo_root, graph=ctx.check_graph, lock=lock))
 
 
 def _check_computed_fields(ctx: CheckContext) -> dict[str, Any]:
     if ctx.check_graph is None:
-        return _skip("no spec graph")
-    return _check_result(check_stored_computed(ctx.check_graph))
+        return skip("no spec graph")
+    return check_result(check_stored_computed(ctx.check_graph))
 
 
 def _check_records(ctx: CheckContext) -> dict[str, Any]:
@@ -295,10 +296,10 @@ def _check_records(ctx: CheckContext) -> dict[str, Any]:
 def _check_registry(ctx: CheckContext) -> dict[str, Any]:
     # The registry lives toolkit-side at <repo_root>/tools/entry_key_registry.json
     if not os.path.isfile(os.path.join(ctx.repo_root, "tools", "entry_key_registry.json")):
-        return _skip("entry_key_registry.json not present")
+        return skip("entry_key_registry.json not present")
     from .registry_check import run_registry_check
 
-    return _check_result(
+    return check_result(
         run_registry_check(spec_root=ctx.effective_spec_root, repo_root=ctx.repo_root, git_root=ctx.git_root)
     )
 
@@ -306,18 +307,18 @@ def _check_registry(ctx: CheckContext) -> dict[str, Any]:
 def _check_hardcoded_seed(ctx: CheckContext) -> dict[str, Any]:
     # Always runs when a prompts/ directory exists under repo_root.
     if not os.path.isdir(os.path.join(ctx.repo_root, "prompts")):
-        return _skip("prompts/ directory not present")
+        return skip("prompts/ directory not present")
     from .seed_lint import check_hardcoded_seed_reference
 
-    return _check_result(check_hardcoded_seed_reference(ctx.repo_root, git_root=ctx.git_root))
+    return check_result(check_hardcoded_seed_reference(ctx.repo_root, git_root=ctx.git_root))
 
 
 def _check_glossary_drift(ctx: CheckContext) -> dict[str, Any]:
     if not os.path.isfile(os.path.join(ctx.spec_dir, "03_glossary.json")):
-        return _skip("03_glossary.json not present")
+        return skip("03_glossary.json not present")
     from .glossary_drift_lint import lint_glossary_drift
 
-    return _check_result(
+    return check_result(
         lint_glossary_drift(ctx.spec_dir, repo_root=ctx.repo_root, project_canon_dir=ctx.project_canon_dir)
     )
 
@@ -325,12 +326,12 @@ def _check_glossary_drift(ctx: CheckContext) -> dict[str, Any]:
 def _check_forward_replay(ctx: CheckContext) -> dict[str, Any]:
     """Id regression against the base ref (opt-in; file-level forward replay is retired)."""
     if not ctx.include_forward_replay:
-        return _skip("use --include-forward-replay to check id regressions (E555) against the base ref")
+        return skip("use --include-forward-replay to check id regressions (E555) against the base ref")
     from .forward_replay_check import check_forward_replay
     from .validate import _detect_git_root, _resolve_replay_base_ref
 
     effective_git_root = ctx.git_root or str(_detect_git_root(ctx.root))
-    return _check_result(
+    return check_result(
         check_forward_replay(
             ctx.repo_root,
             base_ref=_resolve_replay_base_ref(Path(effective_git_root)),
@@ -350,7 +351,7 @@ def _check_trace_lock(ctx: CheckContext) -> dict[str, Any]:
 
 
 def _check_open_items(ctx: CheckContext) -> dict[str, Any]:
-    return _check_result(check_open_items(ctx.spec_dir, gate="step", read=ctx.ambiguity_read))
+    return check_result(check_open_items(ctx.spec_dir, gate="step", read=ctx.ambiguity_read))
 
 
 register_check("schema-validation", _check_schema_validation)
@@ -375,7 +376,7 @@ register_check("trace-lock", _check_trace_lock)
 register_check("open-items", _check_open_items)
 
 
-def _warn_ignored_promotions() -> None:
+def warn_ignored_promotions() -> None:
     """Surface (once per run) any SPECDEV_PROMOTE_CODES entries that will be silently ignored because they are not promotable.
 
     spec-check loops ``validate_file`` directly (never ``validate_dir``), so it needs its own call.
@@ -385,7 +386,7 @@ def _warn_ignored_promotions() -> None:
     _warn_ignored_promote_codes()
 
 
-def _run_checks(
+def run_checks(
     repo_root: str,
     spec_dir: str,
     include_forward_replay: bool = False,
@@ -411,25 +412,28 @@ def _run_checks(
         quiet=quiet,
     )
     if not quiet:
-        _warn_ignored_promotions()
+        warn_ignored_promotions()
     return run_registered_checks(ctx)
+
+
+def check_findings(checks: Mapping[str, dict[str, Any]]) -> list[SpecError]:
+    """Every finding of *checks*, in check order, except those of ``completeness-check``.
+
+    The completeness findings are a subset of the ``traceability-closure`` ones, so counting both would count them
+    twice.  This is the one place that rule is coded; ``_collect_errors`` and the step gate both read it.
+    """
+    return [e for name, info in checks.items() if name != _COMPLETENESS_CHECK for e in info.get("errors", ())]
 
 
 def _collect_errors(checks: OrderedDict[str, dict[str, Any]]) -> list[SpecError]:
     """Collect and deduplicate all errors across checks."""
     combined: list[SpecError] = []
     seen: set[tuple[str, str]] = set()
-    # Completeness errors are a subset of traceability-closure errors;
-    # skip them to avoid double-counting in the combined list.
-    skip_checks = {_COMPLETENESS_CHECK}
-    for name, info in checks.items():
-        if name in skip_checks:
-            continue
-        for e in info.get("errors", []):
-            key = (e.code, e.message)
-            if key not in seen:
-                seen.add(key)
-                combined.append(e)
+    for e in check_findings(checks):
+        key = (e.code, e.message)
+        if key not in seen:
+            seen.add(key)
+            combined.append(e)
     return combined
 
 
@@ -446,7 +450,7 @@ def run_spec_check(
     Prints a per-check summary to stderr before returning.
     """
     reset_config()
-    checks = _run_checks(repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+    checks = run_checks(repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
     _print_summary(checks)
     return _collect_errors(checks)
 
@@ -461,7 +465,7 @@ def run_spec_check_json(
 ) -> tuple[list[SpecError], dict[str, Any]]:
     """Run all checks and return (errors, json_context) for ``_json_exit``."""
     reset_config()
-    checks = _run_checks(repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+    checks = run_checks(repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
     checks_summary: dict[str, Any] = {}
     for name, info in checks.items():
         if info.get("status") == "SKIP":

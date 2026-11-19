@@ -8,6 +8,7 @@ import pytest
 from specdev_tools.core import git_base
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.git_base import (
+    host_paths_in,
     materialise_baseline,
     merge_base_provider,
     resolve_baseline,
@@ -340,3 +341,61 @@ def test_provider_measures_against_the_branch_it_was_given(repo: Path) -> None:
 
     assert result.resolution is not None
     assert (result.resolution.ref, result.resolution.commit, result.resolution.mode) == ("trunk", base, "merge-base")
+
+
+def test_a_branch_named_like_the_end_of_the_target_still_gets_the_note(repo: Path, tmp_path: Path) -> None:
+    """Branch ``1.0`` against ``origin/release/1.0`` is not the default branch: only a whole name behind one remote name is."""
+    _base_files(repo)
+    remote = tmp_path / "remote.git"
+    git(tmp_path, "init", "-q", "--bare", str(remote))
+    git(repo, "remote", "add", "origin", str(remote))
+    git(repo, "push", "-q", "origin", "main:release/1.0")
+    git(repo, "fetch", "-q", "origin")
+    git(repo, "checkout", "-q", "-b", "1.0")
+
+    assert resolve_baseline(str(repo), "origin/release/1.0").note == "the baseline is HEAD itself: only uncommitted changes count as new"
+
+
+def test_a_slashed_branch_against_the_plain_name_gets_the_note(repo: Path) -> None:
+    """Branch ``feature/main`` against ``main``: the names differ, whatever they end in."""
+    _base_files(repo)
+    git(repo, "checkout", "-q", "-b", "feature/main")
+    assert resolve_baseline(str(repo), "main").note == "the baseline is HEAD itself: only uncommitted changes count as new"
+
+
+def test_host_paths_in_replaces_the_root_in_message_path_and_file_and_keeps_the_rest_as_it_is() -> None:
+    root = "/tmp/baseline-x"
+    touched = SpecError("E520", f"{root}/spec/04.json:a/1/b: bad", path=f"{root}/spec/04.json", file=f"{root}/spec/04.json", owner="step:04")
+    untouched = SpecError("E700", "no node", owner="step:04", node_id="fr-a")
+
+    out = host_paths_in([touched, untouched], [(root, "/host")])
+
+    assert out[0] == SpecError("E520", "/host/spec/04.json:a/1/b: bad", path="/host/spec/04.json", file="/host/spec/04.json", owner="step:04")
+    assert out[1] is untouched
+
+
+def test_host_paths_in_applies_the_first_pair_first() -> None:
+    error = SpecError("E520", "/tmp/b/spec/04.json: bad")
+    assert host_paths_in([error], [("/tmp/b/spec", "spec"), ("/tmp/b", "/host")])[0].message == "spec/04.json: bad"
+
+
+def test_the_baseline_errors_come_back_with_the_names_of_the_current_tree(repo: Path) -> None:
+    """The checks run in a temporary folder: a finding of it names the spec folder and the root as the current tree does."""
+    _base_files(repo)
+    git(repo, "checkout", "-q", "-b", "feature")
+    _commit(repo, "edit", a="1")
+
+    def checks(root: Path, spec: Path) -> list[SpecError]:
+        real = Path(spec).resolve()
+        return [
+            SpecError("E520", f"{spec}/01_x.json:a/0: bad"),
+            SpecError("E520", f"{real}/01_x.json:a/1: bad", file=str(real / "01_x.json")),
+            SpecError("E761", f"seed {root}/{SEED} not found", path=f"{root}/{SEED}"),
+        ]
+
+    result = merge_base_provider(checks, lambda _: [SEED])(repo / SPEC, str(repo))
+
+    assert [e.message for e in result.errors] == [
+        f"{repo / SPEC}/01_x.json:a/0: bad", f"{repo / SPEC}/01_x.json:a/1: bad", f"seed {repo}/{SEED} not found",
+    ]
+    assert result.errors[1].file == f"{repo / SPEC}/01_x.json" and result.errors[2].path == f"{repo}/{SEED}"

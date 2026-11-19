@@ -42,7 +42,7 @@ W614 warnings do not cause a non-zero exit unless promoted via
 
 Integration
 -----------
-Folded into ``spec-check`` via ``_run_checks`` in ``validation/spec_check.py``.
+Folded into ``spec-check`` via ``run_checks`` in ``validation/spec_check.py``.
 """
 
 from __future__ import annotations

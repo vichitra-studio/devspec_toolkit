@@ -783,7 +783,7 @@ class TestJsonEnvelopeShape:
 class TestSpecCheckWiring:
     def test_registry_check_skip_when_no_registry(self) -> None:
         """spec-check reports registry-check as SKIP when entry_key_registry.json is absent."""
-        from specdev_tools.validation.spec_check import _run_checks
+        from specdev_tools.validation.spec_check import run_checks
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Minimal spec_dir — no registry file
@@ -793,13 +793,13 @@ class TestSpecCheckWiring:
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
             _write(repo_root, "tools/error_ownership.json", {"rows": []})
 
-            checks = _run_checks(repo_root=repo_root, spec_dir=spec_dir)
+            checks = run_checks(repo_root=repo_root, spec_dir=spec_dir)
             rc = checks.get("registry-check", {})
             assert rc.get("status") == "SKIP", f"Expected SKIP, got: {rc}"
 
     def test_registry_check_in_checks_output_when_registry_present(self) -> None:
         """spec-check includes registry-check with PASS when registry is clean."""
-        from specdev_tools.validation.spec_check import _run_checks
+        from specdev_tools.validation.spec_check import run_checks
 
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_dir = tmpdir
@@ -814,7 +814,7 @@ class TestSpecCheckWiring:
                 steps_without_entry_arrays={}
             ))
 
-            checks = _run_checks(repo_root=repo_root, spec_dir=spec_dir)
+            checks = run_checks(repo_root=repo_root, spec_dir=spec_dir)
             rc = checks.get("registry-check", {})
             assert rc.get("status") in ("PASS", "WARN"), f"Expected PASS/WARN, got: {rc}"
 

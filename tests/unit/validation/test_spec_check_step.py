@@ -6,7 +6,11 @@ The scenarios are the worked example (a git copy, see ``tests/integration/_step_
 """
 from __future__ import annotations
 
+import ast
 import json
+import os
+import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -20,8 +24,9 @@ from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.build import build_graph
-from specdev_tools.validation.check_registry import CHECK_REGISTRY, CheckContext, _check_result, register_check
-from specdev_tools.validation.spec_check import _run_checks, run_spec_check_json
+from specdev_tools.validation import check_registry
+from specdev_tools.validation.check_registry import CHECK_REGISTRY, CheckContext, check_result, register_check, run_registered_checks
+from specdev_tools.validation.spec_check import run_checks, run_spec_check_json
 from specdev_tools.validation.spec_check import run_spec_check as run_plain_spec_check
 from specdev_tools.validation.step_gate import waiting_map
 from specdev_tools.validation.step_gate_run import run_step_gate
@@ -52,7 +57,7 @@ def _gate_json(host: Path, capsys: pytest.CaptureFixture[str], *flags: str) -> t
 
 
 def _register_finding(name: str, error: SpecError) -> None:
-    register_check(name, lambda ctx: _check_result([error]))
+    register_check(name, lambda ctx: check_result([error]))
 
 
 # --- the registry -----------------------------------------------------------------------------------------------
@@ -62,7 +67,7 @@ def test_register_check_runs_once_and_keeps_order(tmp_path: Path, registered_che
 
     def probe(ctx: CheckContext) -> dict[str, Any]:
         calls.append(ctx.spec_dir)
-        return _check_result([])
+        return check_result([])
 
     register_check("probe-check", probe)
     host = step_gate_host(tmp_path / "host")
@@ -73,7 +78,46 @@ def test_register_check_runs_once_and_keeps_order(tmp_path: Path, registered_che
 
 def test_register_check_refuses_a_name_that_is_registered(registered_checks: None) -> None:
     with pytest.raises(ValueError, match="already registered"):
-        register_check(CHECK_REGISTRY[0].name, lambda ctx: _check_result([]))
+        register_check(CHECK_REGISTRY[0].name, lambda ctx: check_result([]))
+
+
+def test_an_empty_registry_is_refused_not_clear(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A gate built on no check would say CLEAR: running the registry with nothing registered is a programming error."""
+    monkeypatch.setattr(check_registry, "CHECK_REGISTRY", [])
+    with pytest.raises(RuntimeError, match=r"no check is registered.*spec_check"):
+        run_registered_checks(CheckContext(repo_root=str(ROOT), spec_dir=str(tmp_path)))
+
+
+def _registered_names_of_the_block() -> list[str]:
+    """The names ``validation/spec_check.py`` registers: the first argument of each module-level ``register_check`` call, read from the source."""
+    from specdev_tools.validation import spec_check
+
+    tree = ast.parse(Path(spec_check.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node.value for node in tree.body
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and getattr(node.value.func, "id", "") == "register_check"
+    ]
+    return [arg.value if isinstance(arg, ast.Constant) else getattr(spec_check, arg.id) for arg in (call.args[0] for call in calls)]
+
+
+def test_a_fresh_cli_process_runs_every_check_of_the_registration_block(tmp_path: Path) -> None:
+    """The one place a check is registered is the block of ``spec_check.py``: a new interpreter that imports the CLI and runs ``spec-check`` has all of them."""
+    host = step_gate_host(tmp_path / "host")
+    spec = str(host / "spec")
+    program = "import sys, specdev_tools.cli as cli\nsys.argv = ['specdev', *sys.argv[1:]]\ncli.main()"
+    done = subprocess.run(
+        [sys.executable, "-c", program, "spec-check", spec, "--repo-root", str(ROOT), "--spec-root", spec, "--git-root", str(host), "--json"],
+        cwd=str(host), capture_output=True, text=True, check=False,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "tools"), "PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    block = _registered_names_of_the_block()
+    assert len(block) >= 20 and list(json.loads(done.stdout)["checks"]) == block, done.stderr[-500:]
+
+
+def test_spec_check_runs_every_check_of_the_registration_block(tmp_path: Path) -> None:
+    host = step_gate_host(tmp_path / "host")
+    _errors, context = run_spec_check_json(str(ROOT), str(host / "spec"), git_root=str(host), spec_root=str(host / "spec"))
+    assert list(context["checks"]) == _registered_names_of_the_block()
 
 
 def test_every_check_of_the_registry_has_a_default_owner() -> None:
@@ -109,9 +153,9 @@ def test_baseline_run_prints_no_seed_note(tmp_path: Path, capsys: pytest.Capture
     host = git_copy_of_example(tmp_path / "host")
     (host / "docs" / "seed" / "seed_accounts.md").unlink()
     spec = str(host / "spec")
-    _run_checks(str(ROOT), spec, git_root=str(host), spec_root=spec)
+    run_checks(str(ROOT), spec, git_root=str(host), spec_root=spec)
     assert "seed documents not found" in capsys.readouterr().err
-    _run_checks(str(ROOT), spec, git_root=str(host), spec_root=spec, quiet=True)
+    run_checks(str(ROOT), spec, git_root=str(host), spec_root=spec, quiet=True)
     assert capsys.readouterr().err == ""
 
 
@@ -258,7 +302,7 @@ def test_gate_direct_call_without_pre_commit_reads_working_tree(tmp_path: Path) 
     apply_delta(host, "broken_link_in_step_05")
     attest(host)
     spec = str(host / "spec")
-    run = run_step_gate(str(ROOT), spec, ["05"], git_root=str(host), spec_root=spec)
+    run = run_step_gate(str(ROOT), spec, steps=["05"], git_root=str(host), spec_root=spec)
     broken = {e.node_id for e in run.results[0].blocking.errors if e.code == "E700"}
     assert broken == {"fr-broken-link", "api-broken-link"}
 

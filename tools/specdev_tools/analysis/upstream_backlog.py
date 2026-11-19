@@ -160,7 +160,7 @@ class ItemProblem(NamedTuple):
 
     def line(self) -> str:
         """The stderr line of this problem."""
-        return _e520_line(f"{self.reason} in {self.path} (step={self.step}, item={self.item_id or '?'})")
+        return _e520_line(f"{self.reason} in {self.path} (step={self.step}, item={self.item_id or '(no id)'})")
 
 
 def item_problem(item: AmbiguityItem) -> str | None:
