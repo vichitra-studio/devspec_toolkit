@@ -7,11 +7,15 @@ the lock file, relative to the git top level.  With ``--git-root`` the same comm
 """
 from __future__ import annotations
 
+import json
 import shutil
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
+from specdev_tools import cli
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT, git, run_cli
@@ -117,6 +121,27 @@ def test_a_validation_command_names_the_seeds_not_found_once(command: str, neste
     assert "E763" in out
     _code, found = run_cli(*flags, "--git-root", str(nested))
     assert "seed documents not found" not in found and "E763" not in found, found
+
+
+def test_stale_json_stays_valid_json_while_the_note_goes_to_stderr(nested: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.chdir(nested)
+    argv = ["specdev", "stale", "--json", "--repo-root", str(ROOT), "--spec-root", str(nested / "sub" / "spec")]
+    with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", argv):
+        try:
+            cli.main()
+        except SystemExit as exc:
+            assert exc.code in (0, None), exc.code
+    captured = capsys.readouterr()
+    assert isinstance(json.loads(captured.out), dict)
+    assert "seed documents not found" in captured.err
+    assert "seed documents not found" not in captured.out
+
+
+def test_attest_prune_is_not_refused_when_a_seed_is_not_found(nested: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(nested)
+    code, out = _run(["attest", "--prune"], nested, git_root=False)
+    assert code == 0, out
+    assert "E520" not in out, out
 
 
 def test_install_driver_writes_the_line_that_matches_the_lock_file(nested: Path, monkeypatch: pytest.MonkeyPatch) -> None:

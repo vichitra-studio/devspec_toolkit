@@ -812,8 +812,7 @@ changes:
       no longer reports a changed step whose later steps did not change, and E550 is
       no longer reported for one; it stays for a diff against the base ref that cannot
       be computed. W595 is no longer reported by forward replay (specdev context
-      freshness and the seed indexer still report it, and it is still promotable to
-      E595). specdev forward-replay-check stays as a deprecated alias with one line on
+      freshness and the seed indexer still report it). specdev forward-replay-check stays as a deprecated alias with one line on
       stderr: it takes --step NN (it limits the trace-lock findings to the links held
       by nodes of that step), runs the id-regression check (E555, W598, W550;
       --base-ref and --diff-error-mode apply to it) and reports the trace-lock
