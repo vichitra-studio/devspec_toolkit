@@ -105,6 +105,12 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 # resolves project canon, so it avoids the false E110s that validate-all alone can emit)
 ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
+# Step gate (see "Step gate" below): finish step 05, or gate the steps of the files you touched.
+# Exit 1 only when something blocks.
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --step 05
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --step 05 --base-ref main --detail all
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --paths spec/04_fr_list.json spec/05_interface_contracts.json
+
 # Validation
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -181,6 +187,35 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 ./tools/run_specdev.sh json patch --id fr-password-reset .priority '"should-have"' \
   --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
+
+### Step gate: `spec-check --step` and `--paths`
+
+Plain `spec-check` lists every finding of every check. With `--step` or `--paths` it gates one step instead: it says whether you may call that step done. The gate blocks on the errors that step owns and on the errors of earlier steps that are new since the base. It does not block on an earlier step's errors that the base already had (upstream debt), on errors owned by a later step (pending), or on errors owned by a gate such as `merge-check`.
+
+| Flag | Meaning |
+|------|---------|
+| `--step N` | Gate step `N`. Repeat it for several steps: one block per step, in the order given. An unknown step gives E706 and exit 1. |
+| `--paths FILE...` | Gate the steps that the listed files belong to. It takes zero or more files and must come last, because it takes all the words after it. It cannot be combined with `--step`. A file `<spec>/NN_*.json` maps to step `NN`, a milestone plan `<spec>/impl_context/ms_*_plan.json` to `16a`, `16b` and `16c`, and a seed document listed in the seed manifest to the steps whose nodes derive from it and the steps the manifest routes it to (step `00` when there are none). Any other file maps to no step. When no file maps to a step the command exits 0 without running a check; when files were listed it says so on stderr (`no step gated: no listed path maps to a step`), so a mistyped path is seen (with `--json` it prints a `step_gate` with no steps and `"result": "clear"`). |
+| `--base-ref REF` | The branch whose merge-base with `HEAD` is "before". The default is `SPECDEV_REPLAY_BASE_REF`, then `origin/HEAD`, then `origin/main`, `origin/master`, `main` and `master`, the first that exists. On the base branch itself the base is `HEAD`, so edits you have not committed count as new. A ref that does not exist gives `base: unavailable`, and then every upstream error counts as new. |
+| `--detail {summary,all}` | `summary` (the default) prints a count for upstream debt, pending and gate-owned findings; `all` lists them. |
+
+`--base-ref` and `--detail` need `--step` or `--paths`; `--include-forward-replay` cannot be combined with either. Each misuse is a usage error with exit 2. The report goes to stdout, with or without `--json`; notes go to stderr (a seed document that was edited, a path that lies outside the host root, seed documents not found, a file that could not be read). The exit code is 1 when the result is `BLOCKED` and 0 when it is `CLEAR`, with `--json` too.
+
+Run on the worked example with a broken link in step 04, `spec-check spec ... --step 05` prints:
+
+```
+step gate: step 05   base: main 7fc8ef56cf2c (head)
+BLOCKING (1)       own 0, new upstream 1
+  E700  [04 new upstream]   fr-broken-link  fr-broken-link (04_fr_list.json), field derives_from, target 'cap-ghost': no node has that id
+GATE-OWNED (4)     merge-check: 4   (--detail all to list)
+RESULT: BLOCKED
+```
+
+Other lines the report can carry: `WARNINGS` (warnings of the step, and new warnings of earlier steps; they do not block), `WAITING` (errors of the step that sit below a node an open item is about; they are listed with the ids of the items and do not block), `UPSTREAM DEBT`, `PENDING` and `GATE-OWNED`. With `--json` the same buckets are under `step_gate` (`blocking`, `waiting`, `own_warnings`, `new_upstream_warnings`, `upstream_debt`, `pending`, `gate_owned`) beside `baseline` (`ref`, `commit`, `mode`: `merge-base`, `head` or `unavailable`) and `result`.
+
+A relative path after `--paths` is taken from the repository top, never from the current folder: `--git-root` when it is given, else the top of the git working tree that holds the spec folder, else the folder that holds the spec folder. That is where pre-commit runs a hook. With a nested spec folder (`h/sub/spec`, seed documents at `h/docs/seed`), pass `--git-root .` from `h`; without it a seed document lies outside the folder the command can see, and the run prints a note such as `1 path lies outside the host root and maps to no step; pass --git-root <repository root> when the spec folder is nested` (when no other listed file maps to a step, the exit code is 0 and no check runs).
+
+The `spec-check` hook of `templates/pre-commit-config.host.yaml` runs `spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --paths` with `pass_filenames: true` and `require_serial: true`, so pre-commit appends the files of the commit. `init_project.py` writes the template as `.pre-commit-config.yaml` in a new host. A host that already has a `.pre-commit-config.yaml` keeps it: `init_project.py` only prints that the file exists and asks you to check the hooks by hand. A host whose `spec-check` hook still runs the whole spec on every commit has to copy the hook from the template to use the gate.
 
 ### `specdev json` — artifact read/query/edit family
 
@@ -293,7 +328,7 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 ./tools/run_specdev.sh step ready 06 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-`spec-check` reports the lock in two checks: `graph` (E761 for a link with no entry, W720) and `trace-lock` (E760 for a lock that cannot be read, E762 for an entry with no link, E763 for a suspect link, E882 for a baseline marker that was not re-attested). `validate-all` reports E760 to E763, E778, E882 and W720 (it does not run the `graph`, `computed-fields` or `records` checks of `spec-check`) and no longer reads file-level forward replay, so a change in step N that leaves step N+1 untouched is not reported by it; `forward-replay-check` stays as a deprecated alias (one line on stderr; it runs the id-regression check and reports the trace-lock findings). Two more `spec-check` checks belong to this family: `computed-fields` (E768 for a stored computed field such as `content_hash`) and `records` (E774 for an invalid record file).
+`spec-check` reports the lock in two checks: `graph` (E761 for a link with no entry, W720) and `trace-lock` (E760 for a lock that cannot be read, E762 for an entry with no link, E763 for a suspect link, E882 for a baseline marker that was not re-attested). `validate-all` reports E760 to E763, E778, E882 and W720 (it does not run the `graph`, `computed-fields` or `records` checks of `spec-check`) and no longer reads file-level forward replay, so a change in step N that leaves step N+1 untouched is not reported by it; `forward-replay-check` stays as a deprecated alias (one line on stderr; it runs the id-regression check and reports the trace-lock findings). Two more `spec-check` checks belong to this family: `computed-fields` (E768 for a stored computed field such as `content_hash`) and `records` (E774 for an invalid record file). The `open-items` check reports the open items of the spec (W630); see `specdev upstream-backlog` below.
 
 **Verification and evidence records** are the files `spec/extras/verification/ver-<id>.json` and `evd-<id>.json`. Each is `{"$schema": "vc:extras:verification-record" | "vc:extras:evidence-record", "records": [one record]}`, and the file name is the record id. The worked example has `ver-password-reset-expired-token.json`. A record is a node of role `record`: its `verifies` (or `about`) link is resolved by the `graph` check (E700 for an id no node has) and needs no lock entry; `records` reports E774 for a file that is not valid.
 
@@ -312,7 +347,7 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 | `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH] [--cli-commands-out PATH] [--step-order-out PATH] [--checklist-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` + `step_order.json` + `cli_commands.json` and `docs/developers/schema-change-checklist.md` from toolkit schemas, annotations and the CLI parser (byte-deterministic; run after any schema, annotation or parser change — see CLAUDE.md). `--step-order-out`, `--cli-commands-out` and `--checklist-out` each default to their file (`tools/step_order.json`, `tools/cli_commands.json`, `docs/developers/schema-change-checklist.md`) only when `--out` is absent. With no annotated step, when the annotation lint finds issues, or when `tools/schema_changes.json` is malformed, the command exits 1 and prints `registry-generate: failed:` with the reason. Annotation reference: [schema-annotations.md](schema-annotations.md) |
 | `specdev guide <CODE> [--json]` | Show the remediation playbook for an error/warning code, e.g. `specdev guide E110` or `specdev guide E530-INVENTED_ENUM_OR_ID` |
 | `specdev hardcoded-seed-check [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Detect literal seed-doc filenames hardcoded in prompts (W554 regression guard); with `--git-root` also scans `<git-root>/prompts/` for submodule deployments |
-| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate both `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) across `impl_context` plans by implicated upstream step (read-only). An open item (`about`, no `severity`) is listed with severity null and status `open` in the `unclassified` bucket |
+| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | List every open ambiguity item of the spec (read-only), from the step files 00 to 15, the anchor and the `plan.ambiguities[]` and `execution.emergent_ambiguities[]` of the milestone plans, grouped by the step of the nodes the item is `about`. A seed item is grouped under `seed`; an item about nodes of several steps is listed in each group and counted once; an item none of whose `about` ids names a node, and an item of the old shape whose `impact[]` names no step, is listed under `unplaced` and fires W613. Each record says whether the answer is known (the item has a `decision`) or needed from the operator. `--severity` and `--status` filter items of the old shape only; an item with `about` is always listed. `--json` has `schema_version` `"2"`. An artifact that cannot be read, or a spec folder that does not exist (`E520 UNRESOLVED_INPUT missing_spec_dir <dir>`), stops the run with E520 and exit 2. It takes `--repo-root` and accepts `--spec-root` and ignores it; it does not accept `--git-root` |
 | `specdev canon-accept --from SPEC_FILE [--namespace NAMESPACE] [--owner OWNER] [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--dry-run] [--json]` | Promote `canonical_proposals` from a spec file into `canon/manifest.json`; with `--git-root`, writes project canon to `<git-root>/spec/canon/` instead (accepts `--git-root`, not `--spec-root` — see CLAUDE.md exception list) |
 
 ### DAG & Extraction Intent Commands

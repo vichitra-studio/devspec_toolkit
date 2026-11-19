@@ -502,11 +502,10 @@ changes:
       structure; and the step 16 checks of 1.1.1 plan items, E308 [ownership]
       (reads fr_refs) and E309 [mapping] (reads spec_ref); E308 [scope] and E309
       [prefix] read fields that stay and still fire. specdev upstream-backlog and milestone-state read both
-      ambiguity shapes: an open item (about, no severity) is listed with severity
-      null and status open in the unclassified bucket, never fires W613, is never
-      hidden by --severity (it passes --severity critical), and never blocks a
-      group in milestone-state. --status resolved hides it, as it hides any open
-      record, and reports W617. forward-replay-check no longer reports E555 for an id that lived only in a field removed from the schema when its row in tools/schema_changes.json has shim: true.
+      ambiguity shapes: an open item (about, no severity) is listed by
+      upstream-backlog under the step of its about nodes, is never hidden by
+      --severity or --status, and never blocks a group in milestone-state; an item
+      none of whose about ids names a node is listed under unplaced and fires W613. forward-replay-check no longer reports E555 for an id that lived only in a field removed from the schema when its row in tools/schema_changes.json has shim: true.
     migration:
       action: none
 
@@ -850,5 +849,74 @@ changes:
       seed-accounts: changed and the suggested bump patch, and a whitespace-only
       edit gives no change. A spec whose manifest wrote seed paths relative to the
       spec folder now shows its seeds as missing.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev spec-check gates one step: --step N (repeat it for several steps) blocks
+      on the errors that step N owns and on errors of earlier steps that are new since
+      the base; --paths FILE... (last; zero or more files) gates the steps of the
+      files you list; --base-ref REF names the base branch (default:
+      SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main, origin/master, main, master);
+      --detail {summary,all} lists upstream debt, pending and gate-owned findings in
+      full. The report goes to stdout and notes to stderr, and the exit code is 1 only
+      when the result is BLOCKED, with --json too. A new error is told from an old one
+      by the tuple (code, owner, node id, link target, file, jq path, subcode, path),
+      never by its message. --step with --paths, --include-forward-replay with either,
+      and --base-ref or --detail without a gate are usage errors (exit 2). A relative
+      path after --paths is taken from the repository top: --git-root, else the top of
+      the git working tree that holds the spec folder, else the folder that holds the
+      spec folder. See docs/developers/reference.md, section "Step gate".
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      New error codes W630 (OPEN_ITEM), E631 (OPEN_ITEM_AT_MERGE), E632
+      (OPEN_ITEM_IN_PLAN) and W633 (OPEN_ITEM_LEGACY_TRIAGE), in the catalogue
+      docs/developers/error-codes.md and registered in
+      tools/specdev_tools/core/errors.py. spec-check has a new check, open-items (19
+      checks), which reports W630: one warning for each open item of the 1.2.0 shape
+      and one summary for each artifact and step for items of the 1.1.1 shape. W630
+      and W633 are not promotable. No command reports E631, E632 or W633 yet: the
+      merge gate and the close gate that raise them are not run by any command.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      Every finding in spec-check --json has an owner: the one the finding carries,
+      else the row of tools/error_ownership.json for its code, else the default owner
+      of its check (merge-check for most checks). A finding that had no owner now
+      shows its row's owner or merge-check. Plain spec-check prints the same text as
+      before except for the open-items row and the check count.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev upstream-backlog lists every open item of the spec grouped by the step
+      of the nodes the item is about, not by the text of impact[]: a seed item under
+      seed, a silent-spec item under the step of its missing kind, an item about nodes
+      of several steps in each group (counted once), and an item that no group can
+      hold under unplaced with W613. The JSON has schema_version "2"; each record has
+      group, also_in, artifact, step, item_id, about, about_steps, decision, shape,
+      description and impact, and a record of the 1.1.1 shape also has severity,
+      status, bucket and matched_rule. --severity and --status filter items of the
+      1.1.1 shape only. An artifact that cannot be read, or a spec folder that does
+      not exist, stops the run with E520 and exit 2. --spec-root is still accepted
+      and ignored.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The host pre-commit template templates/pre-commit-config.host.yaml runs
+      spec-check ... --paths as its spec-check hook, with pass_filenames: true and
+      require_serial: true, so a commit gates only the steps of the files it touches.
+      scripts/init_project.py writes the template into a new host. A host that already
+      has a .pre-commit-config.yaml keeps it, with its old hook that checks the whole
+      spec on every commit, until its owner copies the new hook by hand.
     migration:
       action: none

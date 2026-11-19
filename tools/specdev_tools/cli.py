@@ -141,6 +141,8 @@ def _spec_check_step_gate(
                 if note:
                     print(note, file=sys.stderr)
             steps = list(touched.steps)
+            if args.paths and not steps:
+                print("no step gated: no listed path maps to a step", file=sys.stderr)
         run = (
             run_step_gate(repo_root, spec_dir, steps, git_root, spec_root, project_canon_dir, base_ref=args.base_ref)
             if steps

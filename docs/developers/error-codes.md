@@ -889,15 +889,15 @@ File-level forward replay is retired. `specdev forward-replay-check` is a deprec
 
 ### W613 UPSTREAM_BACKLOG_UNCLASSIFIED
 
-**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an ambiguity record's `impact[]` matches none of the three classifier rules used to bucket ambiguities by upstream step, falling through to the `unclassified` bucket. Applies equally to `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) records of the 1.1.1 shape. A 1.2.0 open item (it has `about` and no `severity`) has no `impact[]`: it is listed in the `unclassified` bucket and never fires W613.
+**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) for each item it lists under the group `unplaced`: an item none of whose `about` ids names a node of the spec (the message names `<artifact>:<item id>`), or an item of the old shape (no `about`) whose `impact[]` names no step. An item with at least one `about` id that names a node is placed under the step of that node and never fires W613. Applies to the open items of the step files, the anchor and the milestone plans (`plan.ambiguities[]`, `execution.emergent_ambiguities[]`).
 
-**Resolution**: Informational only — review the flagged ambiguity's `impact[]` text and, if appropriate, extend the classifier rules in `upstream_backlog.py` to recognize the pattern; no per-artifact fix is required.
+**Resolution**: Informational only. For an item with `about`, correct the id (it may be misspelled, or the node was renamed or deleted). For an item of the old shape, name a spec file in its `impact[]` or give it `about`. No per-artifact fix is required.
 
 **Promotable**: No. Deliberately excluded from `PROMOTABLE_PAIRS` — informational only, never promoted.
 
 ### W617 UPSTREAM_BACKLOG_STATUS_FILTERED
 
-**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view. A 1.2.0 open item has status `open`: the default filter shows it, and `--status resolved` hides it and counts it in this warning.
+**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view. The filters apply to items of the old shape only: an item with `about` is always listed and is never counted in this warning.
 
 **Resolution**: Informational only — re-run with `--status all` (or `--status resolved`) to see the hidden records. The JSON payload also carries this count as `summary.hidden_by_status_count`, which is always present (0 when nothing is hidden) for programmatic consumers.
 
@@ -937,9 +937,47 @@ File-level forward replay is retired. `specdev forward-replay-check` is a deprec
 
 **Promotable**: No (warning only).
 
+## Open Items (63x)
+
+An open item is an entry of an `ambiguities` array (the step files 00 to 15, the anchor's `plan.ambiguities`, a milestone plan's `plan.ambiguities` and `execution.emergent_ambiguities`) that has not been answered and deleted: a question the spec cannot answer yet. An item of the 1.2.0 shape has `about` (the ids of the nodes it is about, or a node kind with `missing_kind`) and, once the operator has answered, a non-empty `decision`. An item of the 1.1.1 shape has `severity` and `status` and is open until `status` is `resolved`. The check is `check_open_items` (`validation/open_items.py`) at one of three gates.
+
+Today one command reports these codes. `spec-check` runs `check_open_items` at the step gate: W630 appears in plain `spec-check` (check `open-items`) and in `spec-check --step` and `--paths`. No command runs the merge gate or the close gate yet, so no command reports E631, E632 or W633.
+
+### W630 OPEN_ITEM
+
+**Trigger**: An open item exists. The step gate reports one W630 for each item of the 1.2.0 shape, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; answer known: apply in the batch pass` (the item has a `decision`) or `... answer needed from the operator` (it has none). For items of the 1.1.1 shape it reports one summary for each artifact and step, for example `3 legacy open items in 05_interface_contracts.json; see `upstream-backlog``. The owner is `step:<step of the file>` and, for one item, the finding carries its `node_id`. An item of a frozen milestone plan is skipped; today no plan is frozen. A spec file that cannot be read ends the check with one E520, `cannot read <file>: <reason>` (in `spec-check --json` its owner is `merge-check`).
+
+**Resolution**: Warning only; it never blocks. `specdev upstream-backlog` lists the items by the step they are about. Apply a known answer in the batch pass and delete the item; ask the operator for an answer that is needed.
+
+**Promotable**: No. Not in `PROMOTABLE_PAIRS`: `SPECDEV_WARNINGS_AS_ERRORS=1` leaves it a warning, and `SPECDEV_PROMOTE_CODES=W630` is ignored with a warning on stderr.
+
+### E631 OPEN_ITEM_AT_MERGE
+
+**Trigger**: The merge gate finds an open item that is not in a frozen plan, one E631 for each item, owner `merge-check`, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; apply the answer (known: apply in the batch pass), then delete the item`. No command runs the merge gate yet: `check_open_items(spec_dir, gate="merge")` has no caller outside the tests.
+
+**Resolution**: Apply the answer to the spec, then delete the item.
+
+**Promotable**: No (error only).
+
+### E632 OPEN_ITEM_IN_PLAN
+
+**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan named by `plan_path` only. No command runs the close gate yet: `check_open_items(spec_dir, gate="close", plan_path=...)` has no caller outside the tests.
+
+**Resolution**: Answer the item and delete it before the milestone closes.
+
+**Promotable**: No (error only).
+
+### W633 OPEN_ITEM_LEGACY_TRIAGE
+
+**Trigger**: The merge gate finds an open item in a frozen milestone plan, one W633 for each item, owner `merge-check`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; in a frozen plan: listed for triage, does not fail the merge`. No command runs the merge gate yet, and no plan is frozen yet (`default_frozen` answers no for every plan), so nothing reports W633.
+
+**Resolution**: Informational only. Decide for each item whether it still matters; a frozen plan is not edited.
+
+**Promotable**: No. Not in `PROMOTABLE_PAIRS`.
+
 ## Spec Graph (70x / 72x)
 
-A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and, when a node is involved, a `node_id`. `spec-check --json` prints both. The codes of the spec graph that do this are E700 to E704, W720, E761 to E763, E768, E771, E772, E774, E778 and E882 (E760 carries an owner and no node id). The rows of `tools/error_ownership.json` give the owner of some of them (the others set it when they are raised): the owner of a link finding is the step of the node that holds the link, and E762 and E763 are for the merge check. The codes that refuse a command (E705 to E709, E764, E765, E767, E769, E770, E773) carry no owner.
+A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and, when a node is involved, a `node_id`. `spec-check --json` prints both, and every finding in it has an `owner`: the one the finding carries, else the row of `tools/error_ownership.json` for its code, else the default owner of its check (`merge-check` for most checks). The codes of the spec graph that do this are E700 to E704, W720, E761 to E763, E768, E771, E772, E774, E778 and E882 (E760 carries an owner and no node id), and the open-item codes W630, E631, E632 and W633 (owners `step:<id>`, `merge-check`, `close-gate` and `merge-check`). The rows of `tools/error_ownership.json` give the owner of some of them (the others set it when they are raised): the owner of a link finding is the step of the node that holds the link, and E762 and E763 are for the merge check. The codes that refuse a command (E705 to E709, E764, E765, E767, E769, E770, E773) carry no owner.
 
 ### E700 LINK_TARGET_NOT_FOUND
 

@@ -248,6 +248,13 @@ def test_zero_filenames_after_paths_exits_0_and_runs_no_check(tmp_path: Path) ->
     assert (done.returncode, done.stdout, done.stderr) == (0, "", "")
 
 
+def test_listed_paths_that_map_to_no_step_exit_0_and_say_so_on_stderr(tmp_path: Path) -> None:
+    host = step_gate_host(tmp_path / "host")
+    done = run_hook(host, ["README.md", "sepc/04_fr_list.json"])
+    assert (done.returncode, done.stdout) == (0, "")
+    assert done.stderr.strip() == "no step gated: no listed path maps to a step"
+
+
 def test_2000_paths_map_correctly(tmp_path: Path) -> None:
     host = step_gate_host(tmp_path / "host")
     unmapped = [f"src/package{n % 40}/module{n}.py" for n in range(1996)]

@@ -308,9 +308,10 @@ def test_paths_with_no_mapped_path_exits_0_without_running_a_check(
     register_check("forbidden", forbidden)
     host = step_gate_host(tmp_path / "host")
     monkeypatch.chdir(host)
+    note = "no step gated: no listed path maps to a step\n"
     for paths in ([], ["README.md"], ["extras/anything.json"]):
         code, out = run_spec_check(host, "--paths", *paths)
-        assert (code, out) == (0, ""), (paths, out)
+        assert (code, out) == (0, note if paths else ""), (paths, out)
 
 
 def test_paths_gate_the_steps_of_the_touched_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

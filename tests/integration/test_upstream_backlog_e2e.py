@@ -101,6 +101,12 @@ def test_skill_jq_expression_turns_the_backlog_json_into_pointers_that_resolve(
     assert len(results) == len(pointers) and all(result["exists"] for result in results)
 
 
+def test_backlog_refuses_a_spec_folder_that_does_not_exist(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, err = _backlog(capsys, tmp_path / "no_host")
+    assert (code, out) == (2, "")
+    assert err.strip() == f"E520 UNRESOLVED_INPUT missing_spec_dir {tmp_path / 'no_host' / 'spec'}"
+
+
 def test_backlog_is_empty_after_the_answers_are_applied(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     host = step_gate_host(tmp_path / "host")
     insert_delta_items_with_the_cli(host, capsys, "open_items")

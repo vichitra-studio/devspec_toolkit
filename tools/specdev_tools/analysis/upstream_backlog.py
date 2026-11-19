@@ -403,8 +403,11 @@ def run(
     """Return ``(stdout_payload, stderr_lines, exit_code)``.
 
     ``repo_root`` is the toolkit root (kind registry and step order for the graph).  Exit 2 when a file or array
-    cannot be read, an item has no id or a legacy item has an invalid severity (E520), or the toolkit has no registry.
+    cannot be read, an item has no id or a legacy item has an invalid severity (E520), the spec folder does not exist
+    (E520), or the toolkit has no registry.
     """
+    if not os.path.isdir(spec_dir):
+        return "", [_e520_line(f"missing_spec_dir {spec_dir}")], 2
     try:
         items, stderr_lines = load_items(spec_dir)
     except AmbiguityReadError as exc:
