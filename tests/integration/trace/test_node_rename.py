@@ -16,10 +16,12 @@ from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace import rename as rename_module
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.trace.label_rename import rename_label
+from specdev_tools.trace.label_rename import label_users, own_leaves, rename_label
 from specdev_tools.trace.lockfile import Lock, LockEntry, lock_path
 from specdev_tools.trace.rename import RenameRefusedError, rename_node
 from specdev_tools.trace.suspects import orphan_entries
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
+from specdev_tools.validation.graph_checks.term_use import check_term_use, label_matches
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT, load_doc, run_cli, write_json
@@ -452,3 +454,21 @@ def test_label_rename_does_not_rewrite_a_closed_milestone_and_lists_what_it_skip
     assert not {"tc-confirm-expired-token", "task-implement-password-reset-confirm"} & {use["node_id"] for use in result["uses"]}
     assert _rename(host, "--label", TERM, NEW_LABEL)[0] == 0
     assert json.loads(path.read_text(encoding="utf-8"))["milestones"][0]["tasks"][0]["acceptance_criteria"][0]["text"] == criterion["text"]
+
+
+def test_label_rename_and_e741_share_one_user_set(host: Example) -> None:
+    """The nodes the rename rewrites are users of ``label_users`` and the matcher of E741 finds the new label in exactly them."""
+    graph = host.graph()
+    reading = {node.id for node in label_users(graph)}
+    dry = rename_label(str(host.spec), str(ROOT), TERM, NEW_LABEL, graph=graph)
+    assert [use.node_id for use in dry.uses] == LABEL_USERS and set(LABEL_USERS) <= reading
+    assert all(use.field_path in dict(own_leaves(graph, graph.by_id[use.node_id])) for use in dry.uses)
+    assert [e for e in check_term_use(GraphCheckContext.from_graph(graph, None, str(ROOT)), "merge") if e.node_id == TERM] == []
+    assert rename_label(str(host.spec), str(ROOT), TERM, NEW_LABEL, apply=True).written
+    after = host.graph()
+    holders = {
+        node.id for node in label_users(after)
+        if any(label_matches(NEW_LABEL, text) for _path, text in own_leaves(after, node))
+    }
+    assert holders == set(LABEL_USERS)
+    assert [e for e in check_term_use(GraphCheckContext.from_graph(after, None, str(ROOT)), "merge") if e.node_id == TERM] == []

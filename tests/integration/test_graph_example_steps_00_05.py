@@ -20,6 +20,7 @@ from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import DEEP_VALIDATORS
+from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
 from unit.graph._synth import run_cli as _run_cli
 
 _ROOT = shared.ROOT
@@ -191,7 +192,8 @@ def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
     errors, context = run_spec_check_json(
         str(_ROOT), spec_dir, spec_root=spec_dir, project_canon_dir=str(stamped_example / "spec" / "canon")
     )
-    assert [e.render() for e in errors if not e.code.startswith("W")] == []
+    other = [e.render() for e in errors if not e.code.startswith("W") and e.code not in GRAPH_CHECK_CODES]
+    assert other == []  # the graph checks' findings on the example are pinned in test_graph_roles_example.py
     about_00_05 = [e for e in errors if _is_about_00_05(e.render())]
     assert Counter(e.code for e in about_00_05) == _PINNED_WARNINGS
     subjects = Counter(

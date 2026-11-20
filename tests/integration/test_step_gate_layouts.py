@@ -24,6 +24,7 @@ from integration._step_gate_support import (
     run_split,
     step_gate_host,
 )
+from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
 from unit.graph._synth import ROOT
 from unit.trace._lock_support import EXAMPLE_HOST
 
@@ -99,7 +100,7 @@ def test_step_gate_from_the_host_root(tmp_path: Path, monkeypatch: pytest.Monkey
         code, found, err = _run_gate(capsys, spec, flags, "--step", step)
         assert code == 1 and SEED_NOTE not in err, err
         _assert_decided(found, expected)
-    assert found["pending"] == {}
+    assert {code for findings in found["pending"].values() for code, *_rest in findings} <= GRAPH_CHECK_CODES
 
 
 def test_step_gate_from_the_folder_above_without_git_root(

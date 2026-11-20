@@ -85,7 +85,7 @@ def _term_to_relabel(graph: Graph, term_id: str, new_label: str) -> tuple[Node, 
     return node, held
 
 
-def _users(graph: Graph) -> list[Node]:
+def label_users(graph: Graph) -> list[Node]:
     """The nodes whose text is read for uses: steps 04 to 15 by rank, not a record, not ``not_applicable``."""
     ranks = graph.shape.step_ranks
     low, high = ranks.get(FIRST_STEP), ranks.get(LAST_STEP)
@@ -117,7 +117,7 @@ def _object_leaves(value: dict[str, Any], path: str, skipped_paths: frozenset[st
             yield from _leaves(item, child, skipped_paths)
 
 
-def _own_leaves(graph: Graph, node: Node) -> Iterator[tuple[str, str]]:
+def own_leaves(graph: Graph, node: Node) -> Iterator[tuple[str, str]]:
     """The strings of the item of *node* that a use may be in: not its id, its links, its aliases or its child nodes."""
     item, decl = item_of(graph, node), graph.decls.get(node.kind)
     if item is None or decl is None:
@@ -137,8 +137,8 @@ def _uses(graph: Graph, old_label: str, new_label: str) -> tuple[list[LabelUse],
     frozen = historical_node_ids(graph)
     found: list[LabelUse] = []
     skipped: list[LabelSkip] = []
-    for node in sorted(_users(graph), key=graph.shape.order_key):
-        for path, text in _own_leaves(graph, node):
+    for node in sorted(label_users(graph), key=graph.shape.order_key):
+        for path, text in own_leaves(graph, node):
             if not pattern.search(text):
                 continue
             if node.id in frozen:
