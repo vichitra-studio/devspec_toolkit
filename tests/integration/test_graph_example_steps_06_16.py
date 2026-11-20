@@ -22,7 +22,6 @@ import _graph_example as shared
 import pytest
 
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
-from specdev_tools.context.reviewer import review_artifact
 from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
@@ -276,9 +275,3 @@ def test_scope_resolver_finds_the_fr_and_its_lineage_but_not_its_sibling(tmp_pat
     assert scope["resolved_ids"]["fr"] == ["fr-password-reset"]
     assert "cap-account-recovery" in scope["resolved_ids"]["capability"]
     assert "fr-password-reset-request" not in scope["source_files"]
-
-
-def test_structural_reviewer_finds_nothing_to_report() -> None:
-    review = review_artifact(str(_SPEC / "05_interface_contracts.json"), "05", str(_SPEC), str(_ROOT)).structural
-    assert review.upstream_coverage == {"covered": [], "dropped": []}
-    assert review.reverse_trace == {"unjustified": [], "scope_creep": []}

@@ -136,7 +136,7 @@ def spec_path_in_repo(spec_root: str, git_root: str) -> str:
 def git_top_level(folder: str) -> str | None:
     """The top folder of the git working tree that holds *folder* (``git rev-parse --show-toplevel``); ``None`` outside a repository.
 
-    The one home of this lookup: ``touched_steps``, ``validate._detect_git_root`` and the lock merge driver (through its own wrapper) call it.
+    The one home of this lookup: ``touched_steps`` and the lock merge driver (through its own wrapper) call it.
 
     Raises:
         GitViewError: E708 when git is missing or does not answer in time.

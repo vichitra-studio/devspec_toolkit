@@ -468,7 +468,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root, ctx.get("artifact_path")),
     "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root, ctx.get("spec_root")),
     "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root, ctx.get("spec_root")),
-    "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
+    "14": lambda instance, root, ctx: step_14.validate_step_14(instance),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
     # "16" → Trinity Anchor validator (spec/16_impl_context.json, not in impl_context/).
     # "16a" / "16b" / "16c" → all live under spec/impl_context/ and initially land on "16a"

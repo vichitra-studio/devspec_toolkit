@@ -19,6 +19,7 @@ CONSTRAINS = "constrains"
 PROVIDED_BY = "provided_by"
 REMOVES = "removes"
 SCHEDULES = "schedules"
+MITIGATED_BY = "mitigated_by"
 
 # kinds
 API = "api"

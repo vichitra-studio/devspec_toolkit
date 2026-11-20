@@ -1,10 +1,9 @@
-"""Two-pass structural + semantic review gate for freshly-emitted spec artifacts.
+"""Semantic review gate for freshly-emitted spec artifacts.
 
-Implements A5 from the toolkit optimisation plan:
-  - Pass 1: Structural review (zero LLM tokens) — reports nothing: the 1.1.1 `trace` arrays it counted are gone
-            from the 1.2.0 schemas (coverage is graph-based, see `trace/` and `graph_checks/`).
-  - Pass 2: Semantic pair generation (heuristics, no LLM) — faithfulness, acceptance_gap,
-            quantifier_weakening, seed_distillation, scope_completeness.
+Implements A5 from the toolkit optimisation plan: generates semantic review pairs by heuristics, with no LLM
+(faithfulness, acceptance_gap, quantifier_weakening, seed_distillation, scope_completeness), and gives the verdict
+``PASS`` (no pair) or ``NEEDS_SEMANTIC_REVIEW`` (at least one pair).  Coverage of upstream ids is not checked here: it is
+graph-based, see ``trace/`` and ``graph_checks/``.
 
 Public API:
     review_artifact(artifact_path, step_id, spec_dir, repo_root, entry_id=None) -> ReviewResult
@@ -117,19 +116,11 @@ class ReviewPair:
 
 
 @dataclass
-class StructuralReview:
-    """Results from Pass 1 structural analysis."""
-    upstream_coverage: dict  # {covered: [id...], dropped: [id...]}
-    reverse_trace: dict      # {unjustified: [id...], scope_creep: [id...]}
-
-
-@dataclass
 class ReviewResult:
-    """Aggregated result of both review passes."""
-    structural: StructuralReview
+    """The result of the review: the semantic pairs, the verdict and the estimated token cost."""
     semantic_pairs: list          # list[ReviewPair]
-    verdict: str                  # PASS | NEEDS_SEMANTIC_REVIEW | FAIL
-    token_cost: dict              # {structural: 0, semantic_total: N}
+    verdict: str                  # PASS | NEEDS_SEMANTIC_REVIEW
+    token_cost: dict              # {semantic_total: N}
 
 
 # ---------------------------------------------------------------------------
@@ -213,19 +204,7 @@ def _load_upstream_specs(step_id: str, spec_dir: str, repo_root: str) -> list[tu
 
 
 # ---------------------------------------------------------------------------
-# Pass 1 — Structural review
-# ---------------------------------------------------------------------------
-
-def _empty_structural_review() -> StructuralReview:
-    """A structural review that reports nothing: no covered or dropped upstream id, no unjustified id."""
-    return StructuralReview(
-        upstream_coverage={"covered": [], "dropped": []},
-        reverse_trace={"unjustified": [], "scope_creep": []},
-    )
-
-
-# ---------------------------------------------------------------------------
-# Pass 2 — Semantic pair generation (heuristics, no LLM)
+# Semantic pair generation (heuristics, no LLM)
 # ---------------------------------------------------------------------------
 
 def _tokenize(text: str) -> set[str]:
@@ -622,26 +601,9 @@ def _check_scope_completeness(
 # Verdict computation
 # ---------------------------------------------------------------------------
 
-def _compute_verdict(structural: StructuralReview, semantic_pairs: list) -> str:
-    """Determine overall verdict from structural results and semantic pairs.
-
-    - FAIL if dropped fraction > 0.20 (more than 20% of upstream IDs dropped)
-    - NEEDS_SEMANTIC_REVIEW if any semantic pairs were generated
-    - PASS otherwise
-    """
-    dropped = structural.upstream_coverage.get("dropped", [])
-    covered = structural.upstream_coverage.get("covered", [])
-    total_upstream = len(dropped) + len(covered)
-
-    if total_upstream > 0 and len(dropped) > 0:
-        dropped_fraction = len(dropped) / total_upstream
-        if dropped_fraction > 0.20:
-            return "FAIL"
-
-    if semantic_pairs:
-        return "NEEDS_SEMANTIC_REVIEW"
-
-    return "PASS"
+def _compute_verdict(semantic_pairs: list) -> str:
+    """``NEEDS_SEMANTIC_REVIEW`` if any semantic pairs were generated, ``PASS`` otherwise."""
+    return "NEEDS_SEMANTIC_REVIEW" if semantic_pairs else "PASS"
 
 
 # ---------------------------------------------------------------------------
@@ -656,38 +618,34 @@ def review_artifact(
     entry_id: str | None = None,
     git_root: str | None = None,
 ) -> ReviewResult:
-    """Run a two-pass structural + semantic review on a freshly-emitted spec artifact.
+    """Run the semantic review on a freshly-emitted spec artifact.
 
     Args:
         artifact_path: Absolute or relative path to the artifact JSON file.
         step_id:       Step identifier (e.g., "04", "16a").
         spec_dir:      Directory containing spec/*.json files.
         repo_root:     Root of the devspec_toolkit (for schema_registry, step_order).
-        entry_id:      Optional entity ID to scope the review (currently informational).
+        entry_id:      Optional entity ID to scope the review (currently informational; not used).
         git_root:      Host repo root (authoritative for seed path resolution).
                        When None, falls back to os.path.dirname(spec_dir), which is
                        correct for the standard flat layout.
 
     Returns:
-        ReviewResult with structural analysis, semantic pairs, verdict, and token cost.
+        ReviewResult with the semantic pairs, the verdict and the token cost.
         Returns a minimal PASS result if the artifact cannot be read.
     """
     # --- Load artifact ---
-    _ = entry_id  # currently informational; future: scope-filter structural pass
+    _ = entry_id  # accepted for the command line; not used
     artifact = _load_json_safe(artifact_path)
     if artifact is None:
         return ReviewResult(
-            structural=_empty_structural_review(),
             semantic_pairs=[],
             verdict="PASS",
-            token_cost={"structural": 0, "semantic_total": 0},
+            token_cost={"semantic_total": 0},
         )
 
     # Load upstream specs once for the semantic checks.
     upstream_specs = _load_upstream_specs(step_id, spec_dir, repo_root)
-
-    # --- Pass 1: Structural (nothing to count: no `trace` arrays in 1.2.0 artifacts) ---
-    structural = _empty_structural_review()
 
     semantic_pairs: list[ReviewPair] = []
 
@@ -712,16 +670,14 @@ def review_artifact(
     )
 
     # --- Verdict ---
-    verdict = _compute_verdict(structural, semantic_pairs)
+    verdict = _compute_verdict(semantic_pairs)
 
-    # --- Token cost (estimated; structural is always 0 LLM tokens) ---
+    # --- Token cost (estimated) ---
     token_cost = {
-        "structural": 0,
         "semantic_total": len(semantic_pairs) * 50,
     }
 
     return ReviewResult(
-        structural=structural,
         semantic_pairs=semantic_pairs,
         verdict=verdict,
         token_cost=token_cost,

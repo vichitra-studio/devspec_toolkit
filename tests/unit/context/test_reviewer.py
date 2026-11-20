@@ -1,8 +1,7 @@
 """Unit tests for specdev_tools/context/reviewer.py.
 
 Covers the checklist-step set, the gating of ``_check_acceptance_gap`` on it
-(steps 16a, 16b, 16c share vc:16-impl-context), the verdict rule, and that the
-structural pass reports nothing (the 1.1.1 ``trace`` arrays it counted are gone).
+(steps 16a, 16b, 16c share vc:16-impl-context) and the verdict rule.
 """
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ from specdev_tools.context.reviewer import (
     _check_acceptance_gap,
     _compute_verdict,
     review_artifact,
-    StructuralReview,
 )
 
 
@@ -281,77 +279,8 @@ class TestAcceptanceGapGating:
 # ---------------------------------------------------------------------------
 
 class TestVerdict:
-    # --- Direct _compute_verdict unit tests ---
-
-    def test_compute_verdict_pass_when_nothing_dropped_no_pairs(self):
-        sr = StructuralReview(
-            upstream_coverage={"covered": ["fr-a"], "dropped": []},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
-        assert _compute_verdict(sr, []) == "PASS"
+    def test_compute_verdict_pass_when_no_pairs(self):
+        assert _compute_verdict([]) == "PASS"
 
     def test_compute_verdict_needs_semantic_review_when_pairs_present(self):
-        sr = StructuralReview(
-            upstream_coverage={"covered": ["fr-a"], "dropped": []},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
-        assert _compute_verdict(sr, ["pair"]) == "NEEDS_SEMANTIC_REVIEW"
-
-    def test_compute_verdict_exactly_20pct_dropped_is_pass(self):
-        """Threshold is > 0.20 (strict), so exactly 1/5 = 20% must be PASS, not FAIL."""
-        sr = StructuralReview(
-            upstream_coverage={"covered": ["a", "b", "c", "d"], "dropped": ["e"]},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
-        assert _compute_verdict(sr, []) == "PASS"
-
-    def test_compute_verdict_fail_when_dropped_fraction_exceeds_20pct(self):
-        """2/5 = 40% dropped → FAIL."""
-        sr = StructuralReview(
-            upstream_coverage={"covered": ["a", "b", "c"], "dropped": ["d", "e"]},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
-        assert _compute_verdict(sr, []) == "FAIL"
-
-    def test_compute_verdict_fail_beats_needs_semantic_review(self):
-        """FAIL takes priority over NEEDS_SEMANTIC_REVIEW.
-        When dropped > 20% AND semantic pairs are present, verdict must be FAIL,
-        not NEEDS_SEMANTIC_REVIEW — structural failure is checked first."""
-        sr = StructuralReview(
-            upstream_coverage={"covered": ["a", "b", "c"], "dropped": ["d", "e"]},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
-        assert _compute_verdict(sr, ["pair"]) == "FAIL"
-
-    def test_compute_verdict_empty_upstream_is_pass(self):
-        """Zero total upstream IDs → fraction check skipped → PASS."""
-        sr = StructuralReview(
-            upstream_coverage={"covered": [], "dropped": []},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
-        assert _compute_verdict(sr, []) == "PASS"
-
-
-# ---------------------------------------------------------------------------
-# 6. The structural pass reports nothing
-# ---------------------------------------------------------------------------
-
-class TestStructuralPassReportsNothing:
-    def test_artifact_with_1_1_1_trace_arrays_is_not_counted(self, tmp_path):
-        """No ``trace`` array exists in a 1.2.0 artifact, so the pass counts nothing: a 1.1.1-shaped artifact
-        that traces one of five upstream FRs gives an empty structural review and a PASS, not a FAIL."""
-        import json
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        repo_root = tmp_path / "toolkit"
-        (repo_root / "tools").mkdir(parents=True)
-        (repo_root / "tools" / "step_order.json").write_text(json.dumps({"downstream_consumers": {"04": ["06"]}}))
-        upstream_spec = {"functional_requirements": [{"fr_id": f"fr-req-{i}", "statement": f"Req {i}"} for i in range(5)]}
-        (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
-        artifact = _artifact(trace_fr_ids=["fr-req-0"])
-        (spec_dir / "06_invariants.json").write_text(json.dumps(artifact))
-
-        result = review_artifact(str(spec_dir / "06_invariants.json"), "06", str(spec_dir), str(repo_root))
-        assert result.structural.upstream_coverage == {"covered": [], "dropped": []}
-        assert result.structural.reverse_trace == {"unjustified": [], "scope_creep": []}
-        assert result.verdict != "FAIL"
+        assert _compute_verdict(["pair"]) == "NEEDS_SEMANTIC_REVIEW"

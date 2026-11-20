@@ -33,11 +33,11 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
      - Stop and wait for human answers.
 4. **Phase B — Emit**
    - Once answers resolve gating items, run the same prompt to generate the artifact.
-   - Write the JSON artifact directly to disk and validate against the referenced step schema; do not return fenced JSON as primary output.
+   - Write the JSON artifact to disk and validate against the referenced step schema; do not return fenced JSON as primary output. A step that does not exist yet is written as a whole draft file outside `spec/` and created with `specdev step create NN --from <draft>`; a step that exists is edited with `specdev json patch|insert|delete --id <node-id>`; a file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
    - Ensure the artifact conforms to the seed requirements declared in `spec/common/seed_manifest.json`.
 5. **Persist Artifact**
-   - Replace the contents of `spec/NN_name.json` with the generated block.
-   - Preserve the `$schema` field already present in the file.
+   - A new step: `specdev step create NN --from <draft>` writes `spec/NN_name.json` and the lock entry of each of its links; the draft carries the `$schema` of the step.
+   - An existing step: edit it node by node with `specdev json patch|insert|delete --id <node-id>`; the file keeps the `$schema` it has.
 6. **Validate**
    - Run the [core validation commands](../developers/reference.md#core-validation-commands) and inspect results.
    - On failure, re-run with additional clarifications from the guide.
@@ -51,11 +51,11 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 04 | `spec/04_fr_list.json` | Gate with `spec-check --step 04`; then `specdev stale` for the links it makes suspect |
 | 05 | `spec/05_interface_contracts.json` | Gate with `spec-check --step 05`; then `specdev stale`, and fixtures lint |
 | 06 | `spec/06_invariants.json` | Re-run invariants check |
-| 07 | `spec/07_nfrs.json` | Ensure `16_delivery_monitoring.json` links remain valid |
+| 07 | `spec/07_nfrs.json` | Gate with `spec-check --step 07`; then `specdev stale` for the links it makes suspect |
 | 08 | `spec/08_fixtures.json` | Run `fixtures-lint` |
 | 09–12 | `spec/09*_*.json` | Validate-only unless trace references change |
 | 13 | `spec/13_extension_manifest.json` | Review proposed extension schemas |
-| 14 | `spec/14_roadmap.json` | Run `specdev step ready 14` first (it lists what blocks the step); gate with `spec-check --step 14`; then initiate the JIT implementation loop |
+| 14 | `spec/14_roadmap.json` | Run `specdev step ready 14` first (it lists the blockers owned by the steps below 14, to fix first; the gaps step 14 owns, E566, E742, E744, E745 and the E740 of nodes a task criterion uses, are not blockers: step 14 clears them); gate with `spec-check --step 14`; then initiate the JIT implementation loop |
 | 15 | `spec/15_scaffold.json` | Implement scaffold manually |
 | 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Tasks, Security, Delivery, Drift |
 | 16b | `spec/impl_context/{step_id}.json` | Trinity Build: Code, Configs, Docs |
@@ -78,7 +78,7 @@ When reporting back to humans, include:
 2. Commands executed and whether they succeeded.
 3. Outstanding issues or reasons for escalation.
 
-During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), write the JSON artifact to disk and return only a concise status/path confirmation.
+During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), write the JSON artifact to disk (a new step with `specdev step create NN --from <draft>`, an existing step with `specdev json patch|insert|delete --id`) and return only a concise status/path confirmation.
 
 ## 8. Runner Tips
 - Treat prompts as the contract; do not modify them at runtime.

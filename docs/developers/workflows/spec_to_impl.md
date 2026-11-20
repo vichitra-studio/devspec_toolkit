@@ -11,7 +11,7 @@ Where prompts apply in this phase (e.g., Scaffold updates, Trinity Plan/Review, 
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; pause emission until those answers are provided.
 
 ## Step Progression
-Step 13a (the completeness assessment) was removed in 1.2.0. Before step 14, run `specdev step ready 14` and `specdev coverage`.
+Step 13a (the completeness assessment) was removed in 1.2.0. Before step 14, run `specdev step ready 14` and `specdev coverage`: the blockers `step ready 14` lists belong to the steps below 14 and are fixed first; `specdev coverage` and `specdev stale` also list gaps that step 14 owns (the E740 of the nodes a task criterion uses, E742), and `spec-check` reports E566, E744 and E745; none of these is a blocker, and writing step 14 clears them (run on a copy of the worked example with steps 14 to 16 removed: 11 blockers at steps 07, 08 and 12, and 13 more gaps, E740 and E742, owned by step 14).
 
 | Step | Purpose | Key Activities |
 |------|---------|----------------|

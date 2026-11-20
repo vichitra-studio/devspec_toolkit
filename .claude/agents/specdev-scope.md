@@ -58,11 +58,13 @@ Dispatcher supplies a JSON object as the invocation prompt:
 ```json
 {
   "scope": "<step-range | file | all | ms-<batch_id>-plan>",
-  "change_set": "<git_diff | recent_commits | upstream_backlog>"
+  "change_set": "<git_diff | recent_commits | upstream_backlog>",
+  "with_backlog": <bool>
 }
 ```
 
 `change_set` is optional. When absent, the agent probes artifact size using `specdev json structure`.
+`with_backlog` is optional (default `false`): the `--with-backlog` flag of `/specdev-review`; when true, decision rule 3 applies.
 
 ---
 
@@ -94,10 +96,10 @@ Execute this rule against the gathered evidence:
    - `scope_kind` = `theme_group` for each cluster.
 
 2. If the change_set is localized (< 30% of any step's bytes, <= 3 steps total):
-   - Assign one reviewer covering the whole range.
+   - Assign one reviewer covering the whole range (a range of one step too).
    - `scope_kind` = `step_range`.
 
-3. Cross-step concerns (`--with-backlog` active, backlog or pending-replay data present) OR any
+3. Cross-step concerns (`with_backlog` true, backlog or pending-replay data present) OR any
    `cross_step_relational` need:
    - Always add exactly ONE additional reviewer with `scope_kind` = `cross_step_relational`
      covering all in-scope steps.
@@ -150,7 +152,7 @@ Input: `{ "scope": "04", "change_set": "git_diff" }`
 Output:
 ```json
 {
-  "fan_out": [{ "reviewer_id": "r1", "steps": ["04"], "scope_kind": "single_step" }],
+  "fan_out": [{ "reviewer_id": "r1", "steps": ["04"], "scope_kind": "step_range" }],
   "max_rounds": 5,
   "rationale": "3 lines changed in step 04 (42 KB) = <1% of bytes. Single reviewer covers full step."
 }

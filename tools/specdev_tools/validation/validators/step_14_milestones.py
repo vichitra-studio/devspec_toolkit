@@ -18,11 +18,10 @@ from specdev_tools.trace.history import contained
 from specdev_tools.validation.graph_checks.built import walk_derivations
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
 from specdev_tools.validation.graph_checks.design_milestones import unrefined_scheduled
-from specdev_tools.validation.graph_checks.names import DERIVES_FROM, FR, REALISES, REFINES, TASK_CRITERION
+from specdev_tools.validation.graph_checks.names import DERIVES_FROM, FR, MITIGATED_BY, REALISES, REFINES, TASK_CRITERION
 
 UNCOVERED_FR_MILESTONE = "E566"
 INCOMPLETE_MILESTONE_DECOMPOSITION = "E567"
-MITIGATED_BY = "mitigated_by"  # the one verb of the four that graph_checks.names does not hold
 BUILT_VERBS = (REFINES, REALISES, DERIVES_FROM, MITIGATED_BY)
 """The verbs a derivation from an FR to a task criterion follows."""
 

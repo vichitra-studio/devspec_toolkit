@@ -95,7 +95,7 @@ class StepValidatorsTests(unittest.TestCase):
 
     def test_step_14_duplicate_task_id(self):
         milestone = {"milestone_id": "ms-a", "target_date": "2026-01-01", "tasks": [{"task_id": "task-a"}, {"task_id": "task-a"}]}
-        self.assertEqual(step_14.validate_step_14({"milestones": [milestone]}, "."), [])
+        self.assertEqual(step_14.validate_step_14({"milestones": [milestone]}), [])
         errs = unique_id_errors({"14_roadmap.json": {"milestones": [milestone]}})
         self.assertEqual([(e.code, e.owner, e.node_id) for e in errs], [("E704", "step:14", "task-a")])
 
@@ -103,12 +103,12 @@ class StepValidatorsTests(unittest.TestCase):
         for milestones in ("nope", [None, 3], [{"milestone_id": ["x"], "target_date": 5, "tasks": "t"}],
                            [{"milestone_id": "ms-a", "tasks": [None, {"task_id": ["t"], "depends_on": "task-b"}, {"task_id": "task-b", "depends_on": [3, None]}]}]):
             with self.subTest(milestones=milestones):
-                self.assertEqual(step_14.validate_step_14({"milestones": milestones}, "."), [])
+                self.assertEqual(step_14.validate_step_14({"milestones": milestones}), [])
 
     def test_step_14_does_not_read_removed_fields(self):
         milestone = {"milestone_id": "ms-a", "source_milestones": ["ghost"], "fr_refs": ["fr-ghost"], "tasks": []}
         removed = {"tech_stack": {"languages": [{"name": "x"}]}, "dependencies": [{"type": "external", "id": "dep"}]}
-        self.assertEqual(step_14.validate_step_14({"milestones": [milestone], **removed}, "."), [])
+        self.assertEqual(step_14.validate_step_14({"milestones": [milestone], **removed}), [])
 
 
     # T09a: step_04 tests

@@ -61,7 +61,7 @@ Choose a path based on your intent:
 
   Sub-case A — Propagate an upstream change to this step:
     specdev stale --step <NN>
-    then /specdev-review step-<NN>
+    then /specdev-review <NN>
     (Lists the links of this step that point at a node that changed above it. Read what
     changed, fix the step, then `specdev attest <node-id> --yes` for a link you checked;
     /specdev-review then validates the result.)
@@ -71,7 +71,7 @@ Choose a path based on your intent:
     specdev json patch --id <node-id> <field-path> '<value>'              (a field of a node)
     specdev json insert --id <node-id> <array-field> '<item>'             (an item of an array field)
     specdev json delete --id <node-id>                                    (a node)
-    then /specdev-review step-<NN>
+    then /specdev-review <NN>
     (Surgically changes what you've already composed; /specdev-review then validates it.)
 
   Sub-case C — Add new content from a natural-language description:
@@ -87,9 +87,14 @@ If no existing artifact is found, proceed to the **author dispatch** below.
 ```bash
 specdev step ready <NN> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
-Exit 0 prints `step <NN>: ready`; go on. Exit 1 (E773) means a step above this one has no spec
-file yet or has pending replay, and the output names it (for example `step 04: no spec file yet`
-and `write step 04 first`). Print that output and stop; do not dispatch.
+The step has no file yet, so the command checks its declared inputs (the `required_spec_inputs`
+of `<NN>` in `tools/step_order.json`): each has a spec file and holds no pending replay (a suspect
+link, or a coverage gap E740, E742 or E743 that the input step owns). Exit 0 prints
+`step <NN>: ready`; go on. Exit 1 (E773) means an input has no spec file yet or has pending
+replay, and the output names it (for example `step 04: no spec file yet` and `write step 04
+first`, or, on a copy of the worked example with the files from step 08 on removed, `step 08: not
+ready, 1 blocker`, `step 07: coverage gap E740: metric-reset-completion-rate`). Print that output
+and stop; do not dispatch.
 
 Dispatch `specdev-impl` with `mode: "author"`:
 
@@ -250,14 +255,14 @@ After Agent returns:
 After the author step completes with a clean gate, run the review-fix loop inline using
 the same protocol as `/specdev-review`:
 
-1. Dispatch `specdev-scope` with `{ "scope": "step-<NN>", "change_set": "git_diff" }`.
+1. Dispatch `specdev-scope` with `{ "scope": "<NN>", "change_set": "git_diff" }`.
 2. For each round up to max_rounds=5:
    a. Dispatch all planned `specdev-reviewer` instances in parallel (single message,
       multiple Agent tool calls).
    b. Merge with the jq one-liner (ensure directory exists once: `mkdir -p .specdev/findings`):
       ```bash
-      jq -s '{round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
-        .specdev/findings/findings_step-<NN>_<round>_r*.json > .specdev/findings/findings_step-<NN>_<round>.json
+      jq -s '{"$schema": "vc:infra:findings", round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
+        .specdev/findings/findings_<NN>_<round>_r*.json > .specdev/findings/findings_<NN>_<round>.json
       ```
    c. If `findings[]` is empty: CONVERGED.
    d. Else dispatch `specdev-impl` with `mode: "fix"` and the merged findings path.
@@ -299,7 +304,7 @@ the same protocol as `/specdev-review`:
 
    Write the HALT artifact:
    ```
-   .specdev/findings/findings_step-<NN>_5_<unix_timestamp>.json
+   .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
    ```
    This is a timestamped copy of the round-5 merged findings file. It is the audit trail.
    Do not promote it to a canonical name. The timestamped file IS the record.
@@ -307,14 +312,14 @@ the same protocol as `/specdev-review`:
    Print:
    ```
    HALT: max_rounds=5 reached with unresolved findings.
-   Findings path: .specdev/findings/findings_step-<NN>_5_<unix_timestamp>.json
+   Findings path: .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
    Finding count: <N> (<P0_count> P0, <P1_count> P1, <P2_count> P2)
    Human action required: proceed-with-gaps | replay | hand-edit then re-invoke /specdev-step <NN>
    ```
 
    Do not silently accept partial convergence. HALT is a first-class verdict.
 
-The scope identifier for this step is `step-<NN>` (e.g. `step-04`, `step-02a`).
+The review scope for this step is `<NN>` (e.g. `04`, `02a`), as `/specdev-review` takes it; the findings files are named from it (`findings_<NN>_<round>.json`).
 
 ---
 
@@ -340,7 +345,7 @@ Review verdict: CONVERGED at round <N> | HALT at round 5
 Artifact: spec/<NN>_*.json
 Blocking (own, new upstream): <node ids, or none>
 Pending (not blocking): upstream debt <node ids>; later steps <step: node ids>; waiting <node ids, with the open item ids>
-Findings path (on HALT): .specdev/findings/findings_step-<NN>_5_<unix_timestamp>.json
+Findings path (on HALT): .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
 ```
 
 ---
@@ -378,7 +383,7 @@ as an alias. Deleting a node is `specdev json delete --id`.
   to the user via the harness before re-dispatching.
 - Does not author a fresh artifact when `spec/<NN>_*.json` already exists (Step 1
   pre-dispatch check short-circuits). For upstream propagation read `specdev stale --step <NN>`,
-  then `/specdev-review step-<NN>`. For NL-intent-driven new content use
+  then `/specdev-review <NN>`. For NL-intent-driven new content use
   `/specdev-step <NN> --extend "<intent>"` (author-extend mode). For direct JSON changes
   of already-composed content use `specdev json insert|patch|delete` (`--id` or `--step` forms),
-  then `/specdev-review step-<NN>`.
+  then `/specdev-review <NN>`.

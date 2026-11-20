@@ -576,7 +576,7 @@ changes:
       14_roadmap.json equal to the id of an FR criterion in 04_fr_list.json: a
       single-file validate of each file is OK).
       validate still reports an id defined twice inside the one file (E704).
-      Until the step prompts are rewritten, the prompts for steps 12 and 03 do not
+      The prompts for steps 12 and 03 do not
       say that a job_id or a term_id must differ from the ids of nodes of other
       kinds; for example a step 12 job_id equal to the 02a gate_id it implements,
       or a glossary term_id equal to a charter metric_id, is now reported by
@@ -716,7 +716,13 @@ changes:
       to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, ending with what to do
       first by the blockers of the first step: write it (no file), replay it (suspect links), fix its coverage gaps (coverage gaps
       only), or replay it and fix its coverage gaps (both); E520, exit 1, when a spec file
-      cannot be read; the file of NN itself is not required.
+      cannot be read; the file of NN itself is not required. When NN has no spec file
+      yet, the steps checked, for presence and for pending replay, are its declared
+      inputs (the required_spec_inputs of NN in tools/step_order.json); run on copies
+      of the worked example with the files from step K on removed, step ready printed
+      ready for K = 02, 04 and 05, not ready, 1 blocker (step 07: coverage gap E740:
+      metric-reset-completion-rate) for K = 08 and 09, and not ready, 11 blockers
+      (steps 07, 08 and 12) for K = 14.
     migration:
       action: none
 
@@ -1024,8 +1030,7 @@ changes:
       of specdev diff. The keys policy.require_full_forward_replay_on_change and
       policy.status_write_exemptions are removed from tools/step_order.json, and
       schema/step_order.schema.json allows no other key in policy
-      (additionalProperties: false), so a host copy of the file that carries
-      them no longer matches it. The codes E550, W550, E555 and W598 (id
+      (additionalProperties: false). The codes E550, W550, E555 and W598 (id
       regression and replay diff), W560 (a relabelled closure gap), W140 (seed
       content overlap) and W551 (a seed on disk that the manifest does not
       declare) are removed from the registry and the catalogue (specdev guide
@@ -1057,7 +1062,11 @@ changes:
       14 and step ready 16a no longer wait for a 13a file. What answers the same
       question: specdev coverage (the link counts and the ids that are not
       linked), the role findings E740 to E745 of specdev spec-check, and specdev
-      step ready 14. A host must delete its
+      step ready 14, which lists the blockers owned by the steps below 14 (on a copy
+      of the worked example with steps 14 to 16 removed: 11 blockers at steps 07, 08
+      and 12); the gaps that step 14 owns (E566, E742, E744, E745 and the E740 of the
+      nodes a task criterion uses) are not blockers, and writing step 14 clears them.
+      A host must delete its
       spec/13a_completeness_assessment.json: left in place it gives E520
       schema_not_found uri=vc:13a-completeness-assessment from spec-check and
       validate-all (run on a copy of the worked example with such a file). A

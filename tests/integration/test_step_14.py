@@ -252,6 +252,59 @@ def test_fr_covered_through_an_api_that_derives_from_it_gives_no_e566(tmp_path: 
     assert FR_REQUEST not in _found(_milestone_numbers(spec), "E566")
 
 
+def _task_criterion_refining(target: str) -> Callable[[dict[str, Any]], None]:
+    def refine(document: dict[str, Any]) -> None:
+        document["milestones"][0]["tasks"][0]["acceptance_criteria"].append(
+            {"criterion_id": "tc-extra", "text": "An extra thing is done.", "refines": [target], "verified_by": ["fix-password-reset-expired-token"]}
+        )
+
+    return refine
+
+
+def test_the_e566_message_says_how_to_clear_it(tmp_path: Path) -> None:
+    finding = next(f for f in _milestone_numbers(_example(tmp_path)) if f.code == "E566" and f.node_id == FR_REQUEST)
+    assert f"fr {FR_REQUEST} is in scope but no task criterion reaches it" in finding.message
+    assert "add a task criterion that refines it, one of its acceptance criteria or a node derived from it" in finding.message
+    assert "or set its scope to later or out with a scope_reason" in finding.message
+
+
+def test_a_task_criterion_that_refines_an_out_of_play_criterion_of_an_fr_does_not_reach_it(tmp_path: Path) -> None:
+    def park_criterion(document: dict[str, Any]) -> None:
+        fr = next(f for f in document["functional_requirements"] if f["fr_id"] == FR_REQUEST)
+        criterion = next(c for c in fr["acceptance_criteria"] if c["criterion_id"] == AC_REQUEST)
+        criterion.update(scope="out", scope_reason="Dropped from this release.")
+
+    spec = _example(tmp_path, **{"04_fr_list.json": park_criterion, "14_roadmap.json": _refine_request})
+    assert FR_REQUEST in _found(_milestone_numbers(spec), "E566")
+
+
+def test_fr_reached_through_a_node_linked_by_realises_gives_no_e566(tmp_path: Path) -> None:
+    """FR <- api (derives_from) <- scaffold row (realises) <- task criterion (refines)."""
+    def derive(document: dict[str, Any]) -> None:
+        api = next(a for a in document["apis"] if a.get("api_id") == "api-password-reset-confirm")
+        api.setdefault("derives_from", []).append(FR_REQUEST)
+
+    spec = _example(tmp_path, **{"05_interface_contracts.json": derive})
+    assert FR_REQUEST in _found(_milestone_numbers(spec), "E566")
+    from unit.validation.graph_checks._example_support import edit_documents
+
+    edit_documents(spec, **{"14_roadmap.json": _task_criterion_refining("scaffold-password-reset-confirm")})
+    assert FR_REQUEST not in _found(_milestone_numbers(spec), "E566")
+
+
+def test_fr_reached_through_a_node_linked_by_mitigated_by_gives_no_e566(tmp_path: Path) -> None:
+    """FR <- threat (mitigated_by) <- task criterion (refines)."""
+    def mitigate(document: dict[str, Any]) -> None:
+        document["threats"][0]["mitigated_by"].append(FR_REQUEST)
+
+    spec = _example(tmp_path, **{"11_redteam.json": mitigate})
+    assert FR_REQUEST in _found(_milestone_numbers(spec), "E566")
+    from unit.validation.graph_checks._example_support import edit_documents
+
+    edit_documents(spec, **{"14_roadmap.json": _task_criterion_refining("threat-reset-token-replay")})
+    assert FR_REQUEST not in _found(_milestone_numbers(spec), "E566")
+
+
 def test_fr_with_scope_later_gives_no_e566(tmp_path: Path) -> None:
     def park(document: dict[str, Any]) -> None:
         _add_fr(document)

@@ -1436,6 +1436,21 @@ class CliTests(unittest.TestCase):
                 self.assertIn(f"{command} was removed in 1.2.0", err)
                 self.assertIn(pointer, err)
 
+    def test_a_removed_name_is_refused_only_in_first_position(self):
+        """`spec-check matrix` names a spec folder `matrix`, and `matrixx` is no command: neither gets the pointer."""
+        from specdev_tools.cli import _refuse_removed_command
+
+        _refuse_removed_command(["spec-check", "matrix"])
+        _refuse_removed_command(["--repo-root", ".", "matrix"])
+        _refuse_removed_command(["matrixx", "spec"])
+        code, out, err = self._run_cli(["spec-check", "matrix", "--repo-root", "."])
+        self.assertNotIn("was removed", out + err)
+        code, out, err = self._run_cli(["matrixx", "spec", "--repo-root", "."])
+        self.assertEqual(2, code)
+        self.assertEqual("", out)
+        self.assertIn("invalid choice: 'matrixx'", err)
+        self.assertNotIn("was removed", err)
+
     def test_spec_check_has_no_include_forward_replay_flag(self):
         code, out, _ = self._run_cli(["spec-check", "--help"])
         self.assertEqual(0, code)

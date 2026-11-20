@@ -128,7 +128,7 @@ Each reviewer writes its own file:
 **2b. Merge findings with the jq one-liner:**
 
 ```bash
-jq -s '{round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
+jq -s '{"$schema": "vc:infra:findings", round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
   .specdev/findings/findings_<scope>_<round>_r*.json > .specdev/findings/findings_<scope>_<round>.json
 ```
 

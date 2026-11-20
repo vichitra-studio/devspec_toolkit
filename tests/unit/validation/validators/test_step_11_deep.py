@@ -131,7 +131,7 @@ class TestApiCoverageCheck:
         assert any("api-login" in e for e in _codes(toolkit_root, instance, "W583"))
 
 
-class TestApiCoverageWontHaveFrExclusion:
+class TestApiCoverageSkipsApisOfParkedFrs:
     """W583 must not demand threat coverage for an API whose every FR is parked: it will never be built."""
 
     def _setup(self, toolkit_root, frs, apis):
@@ -141,10 +141,8 @@ class TestApiCoverageWontHaveFrExclusion:
     def test_w583_api_deriving_only_from_parked_frs_stays_exempt(self, toolkit_root):
         self._setup(
             toolkit_root,
-            [{"fr_id": "fr-legacy-export", "scope": "out"},
-             {"fr_id": "fr-out", "scope": "out", "scope_reason": "dropped"}],
-            [{"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]},
-             {"api_id": "api-out", "derives_from": ["fr-out"]}],
+            [{"fr_id": "fr-legacy-export", "scope": "out"}],
+            [{"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]}],
         )
         assert _codes(toolkit_root, {"threats": []}, "W583") == []
 
@@ -199,7 +197,7 @@ class TestInvariantCoverageW615:
         assert any("inv-auth-required" in e for e in _codes(toolkit_root, instance, "W615"))
 
 
-class TestInvariantCoverageWontHaveFrExclusion:
+class TestInvariantCoverageSkipsInvariantsOfParkedFrs:
     """W615 must not demand threat coverage for an invariant that only ``constrains`` parked FRs."""
 
     def _setup(self, toolkit_root, frs, constrains):

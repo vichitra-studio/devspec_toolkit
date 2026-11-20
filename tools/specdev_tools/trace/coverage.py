@@ -205,7 +205,7 @@ def _dimension(nodes: list[Node], linked: Mapping[str, bool]) -> Dimension:
 
 
 def link_counts(graph: Graph) -> tuple[tuple[str, Dimension], ...]:
-    """The three link counts (FR with an API, FR with a fixture, capability with an FR) over the nodes that count: FR with an API, FR with a fixture, capability with an FR.
+    """The three link counts (FR with an API, FR with a fixture, capability with an FR), each over the nodes that count.
 
     FR with an API: an API ``derives_from`` it.  FR with a fixture: a fixture ``verifies`` one of its criteria.
     Capability with an FR: an FR ``derives_from`` it.  Direct links only; ``not_applicable`` holders do not count.

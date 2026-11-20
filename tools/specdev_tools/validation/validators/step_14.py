@@ -7,12 +7,12 @@ from ...core.errors import make_error, SpecError
 from ...core.scope_helpers import dict_items
 
 
-def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path: str | None = None) -> list[SpecError]:
+def validate_step_14(instance: dict[str, Any]) -> list[SpecError]:
     """Deep checks of a step 14 artifact: valid and ordered milestone dates.
 
     Duplicate milestone and task ids (E704) and a task ``depends_on`` cycle (E703) are the graph's checks, run by
     ``spec-check``. Reads only values of the expected type; a malformed ``milestones`` or milestone is skipped and
-    left to the schema's own error. Never raises on wrong-typed input. *artifact_path* is passed by the dispatcher and not read.
+    left to the schema's own error. Never raises on wrong-typed input.
     """
     errors: list[SpecError] = []
     milestone_dates: list[tuple[str, str]] = []

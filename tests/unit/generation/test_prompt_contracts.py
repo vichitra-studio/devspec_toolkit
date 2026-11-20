@@ -76,7 +76,7 @@ class PromptContractsTests(unittest.TestCase):
             "Hardening Protocol",
             "- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.",
             "- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.",
-            "- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.",
+            "- Completeness Closure: run a final closure pass to confirm required sections, link and canonical closure (every link and every canonical ref names a node or entry that exists), and seed coverage are complete.",
             "- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.",
         )
         shared_expectations_path = self.repo_root / "docs" / "prompts" / "shared_expectations.md"

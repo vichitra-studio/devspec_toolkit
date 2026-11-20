@@ -34,7 +34,7 @@ Use the `category` field to classify threats precisely. Valid values are defined
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Product scope boundaries, compliance posture, and regulatory constraints that define which threat categories are mandatory and which data sensitivity levels apply
-- **01_capabilities.json**: Capability IDs, priority rankings, and scope definitions to assess which capabilities carry the highest business impact if compromised or degraded
+- **01_capabilities.json**: Capability IDs and scope definitions to assess which capabilities carry the highest business impact if compromised or degraded
 - **02_system_sketch.json**: Component IDs and subsystem boundaries to identify trust boundary crossings; inter-component communication paths and external integration points to map attack surfaces; `third_parties` entries (specific frameworks, services and runtimes, with their pinned versions, known CVE surfaces or security-critical configuration defaults — e.g., Django CSRF middleware vs manual CSRF in Express) to bind every threat to a concrete `threatens` entry; a third party is a valid target
 - **02a_delivery_baseline.json**: Deployment environment definitions and infrastructure topology to identify environment-specific attack surfaces and operational failure modes per stage
 - **03_glossary.json**: Domain term definitions and entity relationships to write threat descriptions and vectors using precise, unambiguous domain language rather than generic security jargon
@@ -95,7 +95,7 @@ Before emitting, verify:
 - [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
 - [ ] `mitigated_by` holds bare ids of existing nodes (not strings of prose, not objects)
 - [ ] Every threat has ≥1 node in `mitigated_by` — required for every threat, not only high-severity ones
-- [ ] Every high-priority FR has at least one threat scenario modeled
+- [ ] Every `must-have` FR has at least one threat scenario modeled
 - [ ] Every id in `mitigated_by` is a specific control (not just "add validation")
 - [ ] Attack surfaces align with trust zone boundaries from the system sketch
 - [ ] All `edge_cases` entries have a structured `id` field

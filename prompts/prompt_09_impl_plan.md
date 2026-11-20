@@ -13,7 +13,7 @@ Translate the validated spec into an executable delivery roadmap that covers seq
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Project constraints, stated risks, timeline boundaries, and success metrics that bound milestone sequencing, target dates, and risk mitigation planning
-- **01_capabilities.json**: Capability IDs and priority rankings to ensure every capability is reached by at least one milestone or explicitly scoped out with rationale
+- **01_capabilities.json**: Capability IDs to ensure every capability is reached by at least one milestone or explicitly scoped out with rationale
 - **02_system_sketch.json**: Component IDs, inter-component data flows, and `third_parties` (pinned services, libraries and platforms) to see which components and environments a milestone must have ready and which third-party limits bear on milestone dates
 - **02a_delivery_baseline.json**: Deployment environment definitions, infrastructure constraints, and CI gate expectations that shape milestone phasing
 - **03_glossary.json**: Domain term definitions and canonical vocabulary to ensure milestone names, risks and spikes use consistent domain language
@@ -37,7 +37,7 @@ For each upstream artifact ingested, extract the following:
 **Extraction Mandate**: Every in-scope capability from `01_capabilities.json` must be reached by ≥1 milestone: a milestone's `schedules` names an FR of the capability. List any capability not reached and explain why (e.g., deferred with `scope` `later` in Step 01, handled by infrastructure).
 
 ## Heuristics For Completeness
-- MUST populate `target_date` on every milestone and list the milestones in ascending date order. MUST include `migration_plan` when the plan replaces a running system or data schema, or breaks a public API contract.
+- MUST populate `target_date` on every milestone (the schema accepts a milestone without one; this step does not) and list the milestones in ascending date order. MUST include `migration_plan` when the plan replaces a running system or data schema, or breaks a public API contract.
 - Ambiguity scrub: milestones should schedule the FRs/APIs they deliver and name the CI gates that pass them.
 
 ## Self-Audit Gate

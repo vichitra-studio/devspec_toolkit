@@ -27,14 +27,14 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 
 ## Transition: Extensions
 1.  **Step 13 (Extension Generator)**: Identify if you need specialized extensions (e.g., `ext_01_database.json`) for complex domains found in System Sketch.
-2.  **Step 14 (Roadmap)**: Run `specdev step ready 14`. It exits 0 and prints `step 14: ready` when every step 14 links to has a file and has no pending replay or coverage gap; otherwise it lists the blockers. Step 13a (the completeness assessment) was removed in 1.2.0: `specdev coverage` and the role findings of `specdev spec-check` (E740 to E745) answer the same question.
+2.  **Step 14 (Roadmap)**: Run `specdev step ready 14`. Before step 14 is written it checks the steps it will read (07, 08 and 12 among them): it exits 0 and prints `step 14: ready` when each has a file and no pending replay or coverage gap; otherwise it lists the blockers, and those are the findings to fix first (on a copy of the worked example with steps 14 to 16 removed: 11 blockers, 1 at step 07, 5 at step 08 and 5 at step 12, the same that `specdev stale` lists under those steps). The gaps that step 14 itself owns (E740 of the nodes a task criterion uses, E742 of the fixtures, and E566 of the FRs no criterion reaches, which `spec-check` reports) are not blockers: writing step 14 clears them. Step 13a (the completeness assessment) was removed in 1.2.0: `specdev coverage` and the role findings of `specdev spec-check` (E740 to E745) answer the same question.
 
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.
 
 ## AI Assist Flow
 Prompts are designed for a two‑phase interaction to reduce rework:
 - Phase A — Clarify: the assistant ingests the step’s context and asks targeted Gap Questions when the “Self‑Audit Gate” is not satisfied.
-- Phase B — Emit: once answers are provided, the assistant writes the artifact JSON directly to disk and validates against the schema.
+- Phase B — Emit: once answers are provided, the assistant writes the artifact JSON to disk (`specdev step create NN --from <draft>` for a new step, `specdev json patch|insert|delete --id` for an existing one) and validates against the schema.
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; the assistant stops until answers are provided.
 
 ## Validation Cadence

@@ -121,7 +121,7 @@ line of the invocation prompt. This agent reads it and branches.
             },
             {
               "label": "Add new content",
-              "description": "Insert new content surgically with specdev json insert --step or --id, then validate with /specdev-review step-<NN>"
+              "description": "Insert new content surgically with specdev json insert --step or --id, then validate with /specdev-review <NN>"
             }
           ],
           "recommended_option_index": null

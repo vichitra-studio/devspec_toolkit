@@ -25,12 +25,6 @@ from unit.graph._synth import ROOT, load_doc, write_json
 from unit.trace._lock_support import run_on_example
 from unit.validation.graph_checks._example_support import context_of_spec
 
-SOURCES = ROOT / "tools" / "specdev_tools"
-M8_MODULES = (
-    "context/milestone_state.py",
-    "validation/validators/step_16.py",
-    "validation/validators/step_16_anchor.py",
-)
 COUNT_NAMES = ("fr_api_coverage", "fr_fixture_coverage", "capability_fr_coverage")
 COUNT_KEYS = {"linked", "total", "ratio", "unlinked"}
 SEED = "seed-accounts"

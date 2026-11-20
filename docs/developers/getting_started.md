@@ -102,8 +102,8 @@ Before writing formal specs, you must define the "Seed" of your project using th
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
    - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate” (and “Context To Ingest” where applicable, or “Coverage Closure” for steps that use it), and outputs only a short bulleted list of targeted questions if critical info is missing.
-   - Phase B — Emit: after answering questions, rerun and write the artifact JSON directly to disk (`spec/NN_name.json`).
-4. Confirm the artifact JSON is written directly to `spec/NN_name.json` in your host repo.
+   - Phase B — Emit: after answering questions, rerun and write the artifact JSON to disk: a step that does not exist yet as a whole draft file outside `spec/`, created with `specdev step create NN --from <draft>`; a step that exists with `specdev json patch|insert|delete --id <node-id>`. A file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
+4. Confirm the artifact JSON is in `spec/NN_name.json` in your host repo (`specdev step create` writes it there).
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
@@ -123,7 +123,7 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
 - Use the two‑phase flow:
   - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.
-  - Phase B — Emit: the assistant writes the artifact JSON directly to disk and validates against the referenced step schema.
+  - Phase B — Emit: the assistant writes the artifact JSON to disk (`specdev step create NN --from <draft>` for a new step, `specdev json patch|insert|delete --id` for an existing one) and validates against the referenced step schema.
 - Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (links/owners/units/security) and stop after asking until you respond.
 - If validation fails, consult the guide, address errors, and re-run the emission.
 - Need a quick reminder of the workflow for a given step? Run `./tools/run_specdev.sh ai-help --step NN`.

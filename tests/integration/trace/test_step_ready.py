@@ -138,3 +138,39 @@ def test_unknown_step_is_refused(host: Example, step: str) -> None:
     assert code == 1 and text.startswith("E706") and f"no step {step!r}" in text and "known steps: 00, 01, 02, 02a" in text
     document = _ready_json(host, step, code=1)
     assert document["errors"][0]["code"] == "E706" and f"no step {step!r}" in document["errors"][0]["message"]
+
+
+INVARIANTS_FILE = "06_invariants.json"
+
+
+def test_a_step_with_no_file_is_not_ready_while_a_declared_input_has_a_suspect_link(host: Example) -> None:
+    """Step 06 has no file, so it holds no links: pending replay is looked for in the steps it would link to and its required inputs."""
+    (host.spec / INVARIANTS_FILE).unlink()
+    host.edit_criterion()
+    code, out = _ready(host, "06")
+    assert code == 1 and "step 06: not ready" in out and f"  step 05: {API}.derives_from -> fr-password-reset" in out, out
+    document = _ready_json(host, "06", code=1)
+    assert _blocker_steps(document, "suspect") == ["05"] and document["replay_first"] == "05"
+    error = document["errors"][0]
+    assert error["code"] == "E773" and error["message"].startswith("step 06 is not ready: step 05 (")
+
+
+def test_a_step_with_no_file_is_not_ready_while_a_declared_input_owns_a_coverage_gap(host: Example, gap_providers: Any) -> None:
+    (host.spec / INVARIANTS_FILE).unlink()
+    assert _ready(host, "06") == (0, "step 06: ready\n")
+    gap_providers(lambda graph, lock: [CoverageGap("E740", "cap-account-recovery", "05")])
+    document = _ready_json(host, "06", code=1)
+    assert [(b["step"], b["reason"], b["code"]) for b in document["blockers"]] == [("05", "gap", "E740")]
+
+
+def test_a_step_with_no_file_is_ready_when_its_declared_inputs_are_clean(host: Example) -> None:
+    (host.spec / INVARIANTS_FILE).unlink()
+    assert _ready(host, "06") == (0, "step 06: ready\n")
+    assert _ready_json(host, "06", code=0)["upstream"] == ["00", "02", "04", "05"]
+
+
+def test_a_gap_owned_by_the_step_itself_never_blocks_it_with_or_without_a_file(host: Example, gap_providers: Any) -> None:
+    gap_providers(lambda graph, lock: [CoverageGap("E743", "fx-whatever", "06")])
+    assert _ready(host, "06")[0] == 0
+    (host.spec / INVARIANTS_FILE).unlink()
+    assert _ready(host, "06")[0] == 0

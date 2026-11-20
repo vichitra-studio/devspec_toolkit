@@ -5,7 +5,7 @@
 Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds downstream steps (see `specdev prompt-context 08` for the current consumer list).
 
 ## Role
-You are a **test architect specializing in fixture design**. Your job is to emit a single JSON artifact for **Step 08 · Fixtures** that provides concrete test data covering every high-priority FR acceptance criterion. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+You are a **test architect specializing in fixture design**. Your job is to emit a single JSON artifact for **Step 08 · Fixtures** that provides concrete test data proving every acceptance criterion of the spec. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
 ## Purpose
 Supply deterministic inputs and expected outputs that exercise functional and non-functional behaviors across the spec. These fixtures form the backbone of automated validation, red-team loops, and regression detection.
@@ -19,7 +19,7 @@ Lint the fixtures for completeness:
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Product scope boundaries and success metrics to determine which behaviors are in-scope for fixture coverage and to tag smoke fixtures for critical business flows
-- **01_capabilities.json**: Capability IDs and priority rankings to identify high-priority capabilities whose criteria require mandatory smoke-tagged fixtures and to prioritize fixture creation order
+- **01_capabilities.json**: Capability IDs to group the FRs of each capability, so that the fixtures of the capabilities whose FRs are `must-have` are written first and their criteria get smoke-tagged fixtures
 - **02_system_sketch.json**: Component IDs, inter-component data flow paths, and `third_parties` (framework choices that determine test runner, fixture format, and setup/teardown patterns — e.g., pytest fixtures for Python, Jest for TypeScript, testcontainers for integration tests) to determine which components need contract-mode fixtures and to structure end-to-end fixture chains across service boundaries
 - **02a_delivery_baseline.json**: Environment definitions and CI pipeline configuration to determine which fixture tags map to which pipeline stages and to validate that fixture execution is feasible in each environment
 - **03_glossary.json**: Canonical term IDs, entity field names, and domain vocabulary to ensure all fixture input payloads and expected output fields use exact glossary terms rather than invented or inconsistent field names
@@ -29,12 +29,12 @@ For each upstream artifact ingested, extract the following:
 - **07_nfrs.json**: NFR IDs with category latency or throughput, their numeric targets, and units to generate benchmark and load-test fixtures tagged appropriately for performance validation in CI pipelines
 
 ## Operating Flow: Map → Generate → Validate → Emit
-- **Map**: For each high-priority FR and its acceptance criteria, identify the fixture(s) needed. Track coverage in a private Context Ledger.
+- **Map**: For each FR and its acceptance criteria (the `must-have` FRs first), identify the fixture(s) needed. Track coverage in a private Context Ledger.
 - **Generate**: Create fixture data that is concrete, realistic, and deterministic. Each fixture should represent a specific scenario (happy path, boundary case, error case).
-- **Validate**: Verify every automatable acceptance criterion of a high-priority FR is named in the `verifies` of at least one fixture; no fixture is missing `verifies`.
+- **Validate**: Verify every acceptance criterion is named in the `verifies` of at least one fixture (unless it is exempt, see the Extraction Mandate); no fixture is missing `verifies`.
 - **Emit**: Write the artifact only when coverage is complete.
 
-**Extraction Mandate**: A functional requirement is proven through its acceptance criteria, so a fixture's `verifies` names criteria, never the FR itself. Every automatable acceptance criterion of a high-priority FR (`priority: high`) must be named in the `verifies` of at least one fixture. A criterion that needs no executable fixture is either proven by a `manual` fixture (with `manual_reason`) or parked with `scope` `later` or `out` and a `scope_reason` (an upstream decision: raise it as a gap question); a criterion with neither a fixture nor a parked scope is reported as a missing verifier.
+**Extraction Mandate**: A functional requirement is proven through its acceptance criteria, so a fixture's `verifies` names criteria, never the FR itself. Every acceptance criterion must be named in the `verifies` of at least one fixture, whatever the priority of its FR: the gate (`E743`) does not look at priority. It exempts only a criterion whose own `scope` is `later` or `out`, whose lifecycle is `not_applicable`, or that a task criterion of a closed milestone lists in `removes`. A criterion that cannot run as an automated fixture is proven by a `manual` fixture (with `manual_reason`) or parked with `scope` `later` or `out` and a `scope_reason` (an upstream decision: raise it as a gap question); a criterion with neither a fixture nor a parked scope is reported as a missing verifier. Priority (`must-have`, `should-have`, `could-have`, the values of Step 04) only orders the work and picks the `smoke` tag, see the Heuristics.
 
 ### Weak-vs-Strong Fixture Examples
 
@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 | Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `verifies` naming every acceptance criterion, API, invariant or NFR this fixture proves (the kinds `verifies` accepts are defined by `schema/08_fixtures.schema.json`, the authority; an FR is never named: name its criteria); MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures verifying criteria of high-priority FRs; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tags` and `tag_ref` are write-only fields — they are not validated by `step_08.py` or `fixtures_lint.py`; populate them correctly by hand since no automated gate checks their content.
+- MUST add `verifies` naming every acceptance criterion, API, invariant or NFR this fixture proves (the kinds `verifies` accepts are defined by `schema/08_fixtures.schema.json`, the authority; an FR is never named: name its criteria); MUST ensure `tag_ref` references the appropriate canonical tag entry for fixture categorisation (e.g., the smoke canonical tag for fixtures covering `must-have` FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures verifying criteria of `must-have` FRs; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tags` and `tag_ref` are write-only fields — they are not validated by `step_08.py` or `fixtures_lint.py`; populate them correctly by hand since no automated gate checks their content.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -65,7 +65,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every automatable acceptance criterion in `spec/04_fr_list.json` is named in the `verifies` of ≥1 fixture.
+- Every acceptance criterion in `spec/04_fr_list.json` (unless exempt, see the Extraction Mandate) is named in the `verifies` of ≥1 fixture.
 - Every `api_id` in `spec/05_interface_contracts.json` is named in the `verifies` of ≥1 contract-mode fixture covering its request/response shape.
 - Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
@@ -77,13 +77,13 @@ Run `specdev spec-check <spec_dir> --step 08` to see what is still unproven: a c
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
+- [ ] Every `must-have` FR has at least one fixture covering its happy path
 - [ ] Every FR with error conditions has at least one fixture covering the failure path
 - [ ] Every fixture has valid entries in `verifies` naming existing criteria, APIs, invariants or NFRs (see `schema/08_fixtures.schema.json` for the kinds it accepts)
 - [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
 
 ## Step-Specific Completeness Checklist
-- Fixtures cover happy-path, edge, and failure scenarios for high-priority FRs and APIs.
+- Fixtures cover happy-path, edge, and failure scenarios for `must-have` FRs and APIs.
 - Mix `mode` values across layers (see schema/08_fixtures.schema.json → `vc:core:atoms#testingMode` for the authoritative mode enum) to prove behavior.
 - Each fixture has minimal `input` and precise `expected` output/state; ambiguous assertions are avoided.
 - `verifies` links fixtures to the criteria, APIs, invariants and NFRs they prove, to enable coverage reporting; a `manual` fixture also has `manual_reason`.

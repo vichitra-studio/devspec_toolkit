@@ -100,7 +100,7 @@ Before starting, ensure your current specs are clean and valid.
 Before scheduling, confirm that all upstream specs are complete and internally consistent. Step 13a (the completeness assessment) was removed in 1.2.0; the checks below replace it.
 
 *   **Action**: Run `specdev coverage` to see the FRs, criteria and capabilities that are not linked, and `specdev spec-check` for the role findings (E740 to E745) and broken links (E700, E701).
-*   If gaps are found, return to the relevant upstream step and address them **before** proceeding to Phase 4. `specdev step ready 14` lists what still blocks step 14.
+*   If gaps are found in a step below 14, return to that step and address them **before** proceeding to Phase 4: `specdev step ready 14` lists the blockers (the findings that steps 07 to 12 own). Gaps that step 14 owns (E566, E742, E744, E745 and the E740 of the nodes a task criterion uses) are not blockers: Phase 4 clears them.
 
 ```bash
 ./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .

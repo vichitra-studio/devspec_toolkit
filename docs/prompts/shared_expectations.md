@@ -30,7 +30,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 - fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- Completeness Closure: run a final closure pass to confirm required sections, link and canonical closure (every link and every canonical ref names a node or entry that exists), and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 ## 5. Default Role & Task Framing
@@ -50,7 +50,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 > **Applies to**: Steps 00–15. Steps 16–16c have different output rules defined in their own prompts. Note: Steps 11, 13 define their own Role/Task (see Section 5) but still follow these output rules.
 
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path). Do not return the artifact as a fenced code block in the response.
+1. Write the final JSON artifact to disk, never as a fenced code block in the response. A step that does not exist yet is written as a whole draft file outside `spec/` and created with `specdev step create NN --from <draft>`; a step that exists is edited with `specdev json patch|insert|delete --id <node-id>` (section 10). A file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
@@ -111,7 +111,7 @@ After generating or modifying a spec artifact, run the unified check command. It
 specdev spec-check <spec_dir> --repo-root ./devspec_toolkit
 ```
 
-With `--step NN` (written as in the file name: `05`, `02a`) it is the gate of step NN instead: it blocks on the step's own errors and on new errors of earlier steps, lists a finding that a later step owns as PENDING (not blocking), and leaves a finding of the merge or release gate as GATE-OWNED. `specdev coverage` shows how the obligations are linked (`--by fr` for the view per FR) and `specdev trace <id> --up|--down` the lineage of one node; neither is a gate.
+With `--step NN` (written as in the file name: `05`, `02a`) it is the gate of step NN instead: it blocks on the step's own errors and on new errors of earlier steps, lists a finding that a later step owns as PENDING (not blocking), and leaves a finding of the merge or release gate as GATE-OWNED. `UPSTREAM DEBT (N)` counts the errors of earlier steps that the baseline (the tree the gate compares with, `--base-ref`) already had: they do not block step NN and are fixed at their own step (run: `spec-check spec --step 14` on the worked example printed `UPSTREAM DEBT (11) 07: 1, 08: 5, 12: 5`; `--detail all` lists them). `specdev coverage` shows how the obligations are linked (`--by fr` for the view per FR) and `specdev trace <id> --up|--down` the lineage of one node; neither is a gate.
 
 To write a new step artifact from a draft file: `specdev step create NN --from <draft>` (ids of sub-items may be left out; `--dry-run` prints the report and writes nothing). It writes the lock entry of every link it writes.
 
@@ -119,7 +119,7 @@ To write a new step artifact from a draft file: `specdev step create NN --from <
 
 For submodule deployments, add `--spec-root ./spec --git-root .` to resolve seed paths correctly.
 
-A fix that adds, changes or removes a link ends with the attest step: `specdev attest <node-id> --yes` for each node that E761 or E763 names, `specdev attest --prune` after a link was removed, then `spec-check` again (`docs/developers/error-codes.md`, "The attest step" under "Graph Role Checks").
+The attest step is needed after a link was written by path or by hand (E761) and after an edit to a node that other nodes link to (E763); the id forms (`json patch|insert|delete --id`, `json insert --step`) and `step create` write the lock entry of each link themselves, and `attest` then says `nothing to attest`. The step is `specdev attest <node-id> --yes` for each node that E761 or E763 names, `specdev attest --prune` after a link was removed, then `spec-check` again (`docs/developers/error-codes.md`, "The attest step" under "Graph Role Checks").
 
 For single-file quick validation during iterative editing:
 ```bash
@@ -162,6 +162,6 @@ Cross-step relationships (dependencies, downstream consumers) are derivable from
 Use these resources to orient yourself within the toolkit before emitting output:
 
 - **`docs/README.md`** — index of all documentation; start here to find the right guide.
-- **`docs/`** — organized into subdirectories: `workflows/` (how-to guides), `reference/` (CLI and schema reference), `ops/` (operational runbooks), `plans/` (roadmaps and design records), `agents/` (agent manifests and protocols).
+- **`docs/`** — organized into subdirectories: `developers/` (getting started, `reference.md`, `error-codes.md` and `workflows/`, the how-to guides), `ops/` (operational runbooks), `architecture/` (design records), `agents/` (agent manifests and protocols) and `prompts/` (this file).
 - **`tools/step_docs.json`** — machine-readable mapping from step name to its documentation files; use this to locate step-specific guides programmatically.
-- **Step guides** — human-readable guidance for each step lives at `docs/spec/NN_name.guide.md` (if present) or inline in the step's prompt file. Check step_docs.json for the authoritative list.
+- **Step guides** — human-readable guidance for each step is inline in the step's prompt file and in the guides that step_docs.json lists for it (the authoritative list).

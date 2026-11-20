@@ -19,7 +19,8 @@ from specdev_tools.trace.lockfile import with_write_lock
 
 LIFECYCLE_KEY = "lifecycle"
 NOT_APPLICABLE_GUIDANCE = (
-    "not_applicable is for a closed milestone's historical step-14 nodes whose built target was deleted"
+    "not_applicable parks a node that takes no part: a glossary term no node uses (E741), or a closed milestone's "
+    "historical step-14 node whose built target was deleted"
 )
 
 

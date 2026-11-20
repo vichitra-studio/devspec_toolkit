@@ -80,7 +80,7 @@ Dispatcher (skill or orchestrator) provides:
   findings) and of `specdev stale --json` (include regression/drift findings for suspect links not yet
   re-read). The skill passes both outputs inline in the dispatch; a reviewer for one step gets that step's
   slice (`specdev stale --step <NN> --json`). When an output is not in the dispatch, run the command.
-- `scope_kind`: one of `step_range | single_step | cross_step_relational | plan_artifact | theme_group`.
+- `scope_kind`: one of `step_range | cross_step_relational | plan_artifact | theme_group`.
   - `cross_step_relational`: focus exclusively on cross-step drift, pending replay, and backlog.
   - `plan_artifact`: the scope is a single plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`)
     dispatched by `/specdev-trinity` (branch 4 of the decision rule in specdev-scope). Step-counting
@@ -175,13 +175,14 @@ Write the findings file to:
 .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json
 ```
 
-The `.specdev/findings/` directory is host-gitignored scratch.
+The `.specdev/findings/` directory is scratch.
 If it does not exist, create it: `mkdir -p .specdev/findings`.
 
 The file MUST conform to `vc:infra:findings` (schema URI). Wrapper shape:
 
 ```json
 {
+  "$schema": "vc:infra:findings",
   "round": 1,
   "scope": "steps-04-05",
   "generated_at": 1716220800,
@@ -200,6 +201,7 @@ The file MUST conform to `vc:infra:findings` (schema URI). Wrapper shape:
 ```
 
 Field discipline:
+- `$schema`: the string `vc:infra:findings`, always (without it the self-check below fails with E520).
 - `round`: integer, starts at 1.
 - `scope`: verbatim from dispatch input.
 - `generated_at`: Unix epoch seconds (numeric, not string).
