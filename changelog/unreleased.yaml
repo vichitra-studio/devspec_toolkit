@@ -748,14 +748,12 @@ changes:
       specdev step create NN --from DRAFT [--dry-run] writes the file of step NN from
       a draft that holds the whole artifact (ids of sub-items may be left out), checks
       it against the step's schema, requires every link to resolve and writes the lock
-      entries of its links; E767 when the step already has its file, for steps 13a and 16 to 16c, for a draft that cannot be read, for a draft whose $schema is not the step's
+      entries of its links; E767 when the step already has its file, for steps 16 to 16c, for a draft that cannot be read, for a draft whose $schema is not the step's
       and for a link that does not resolve; E520 when a spec file cannot be read or a seed document is not found under the host root (also for a dry run). specdev step ready NN prints step NN: ready and exits 0 when the steps NN links
       to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, ending with what to do
       first by the blockers of the first step: write it (no file), replay it (suspect links), fix its coverage gaps (coverage gaps
       only), or replay it and fix its coverage gaps (both); E520, exit 1, when a spec file
-      cannot be read; the file of NN itself is not required. Until a later 1.2.0
-      change retires step 13a, tools/step_order.json still lists it as an input of 14
-      and 16a, so step ready 14 reports E773 on a spec with no 13a file.
+      cannot be read; the file of NN itself is not required.
     migration:
       action: none
 
@@ -1051,7 +1049,7 @@ changes:
       lists a finding under PENDING (owned by a later step) until the step that owns it is
       gated, so spec-check --step 05 on the worked example now prints a
       PENDING line, and step ready 14 on it reports E773 with the E743
-      gaps of step 08 and step 13a as blockers, ending fix the coverage gaps
+      gaps of step 08 as blockers, ending fix the coverage gaps
       of step 08 first.
     migration:
       action: none

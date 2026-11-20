@@ -352,7 +352,7 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 
 **Verification and evidence records** are the files `spec/extras/verification/ver-<id>.json` and `evd-<id>.json`. Each is `{"$schema": "vc:extras:verification-record" | "vc:extras:evidence-record", "records": [one record]}`, and the file name is the record id. The worked example has `ver-password-reset-expired-token.json`. A record is a node of role `record`: its `verifies` (or `about`) link is resolved by the `graph` check (E700 for an id no node has) and needs no lock entry; `records` reports E774 for a file that is not valid.
 
-**Interim states** until later 1.2.0 changes: `lock install-driver` is not run by any setup script, so a host has to run it once; `step ready 14` and `step ready 16a` report E773 on a spec with no step 13a file, because `tools/step_order.json` still lists 13a as an input; and the skills and agents under `.claude/` still call `forward-replay-check` and write links with the path form of `specdev json`, which writes no lock entry.
+**Interim state** until a later 1.2.0 change: `lock install-driver` is not run by any setup script, so a host has to run it once.
 
 ### Registry, Canon & Prompt Maintenance Commands
 
