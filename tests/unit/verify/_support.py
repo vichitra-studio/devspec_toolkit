@@ -61,6 +61,14 @@ def edit_doc(host: Path, rel: str, edit: Any) -> None:
     write_json(path, document)
 
 
+def edit_binding(host: Path, binding_id: str, edit: Any) -> None:
+    """Apply *edit* (a function of the one record, edited in place) to the verification or evidence record file *binding_id* of *host*."""
+    path = host / "spec" / "extras" / "verification" / f"{binding_id}.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    edit(document["records"][0])
+    write_json(path, document)
+
+
 def graph_of(host: Path) -> Graph:
     """The graph of the spec folder of *host*, built with the real toolkit."""
     return build_graph(str(host / "spec"), str(ROOT))

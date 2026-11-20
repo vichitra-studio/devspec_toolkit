@@ -4,7 +4,7 @@ A record file is ``{"$schema": <the record schema>, "records": [<one record>]}``
 record id.  Each kind owns the files whose name starts with its id prefix (``ver-``, ``evd-``): the registry gives one
 glob per kind, so the builder reads a file as exactly one kind.  ``check_records`` finds a file that is not a record of
 the kind its name declares, and a file that holds more than one record.  The links of a record are resolved by the
-``graph`` check (E700 to E702), not here.  No command here writes a record; the stage and ``proves`` lint of the bindings is ``verify/lint.py``.
+``graph`` check (E700 to E702), not here.  No command here writes a record (``prune_orphan_records`` deletes the records whose node is gone); the stage and ``proves`` lint of the bindings is ``verify/lint.py``.
 """
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from pathlib import Path
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations, violation_text
+from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.names import ABOUT, VERIFIES
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 
 RECORDS_DIR = "extras/verification"
@@ -74,3 +76,36 @@ def check_records(spec_dir: str, repo_root: str, graph: Graph) -> list[SpecError
         problems = _schema_findings(rel, document, repo_root)
         findings.extend(problems or _node_findings(rel, nodes_by_file.get(rel, [])))
     return findings
+
+
+_RECORD_LINKS = (VERIFIES, ABOUT)
+
+
+def _dangling(node: Node, graph: Graph, gone: set[str]) -> bool:
+    """Whether every target of the ``verifies`` or ``about`` links of the record *node* is no node of *graph* or is in *gone*."""
+    targets = [graph.canonical_id(link.target) for link in node.links if link.field in _RECORD_LINKS]
+    return bool(targets) and all(graph.find(target) is None or target in gone for target in targets)
+
+
+def orphan_records(graph: Graph) -> list[Node]:
+    """The record nodes whose every ``verifies``/``about`` target is gone, in graph order.
+
+    A record about an orphan record is an orphan too: the rule is applied again until no record is added.
+    """
+    records = [node for node in graph.nodes if node.role == RECORD_ROLE]
+    gone: set[str] = set()
+    while added := [node.id for node in records if node.id not in gone and _dangling(node, graph, gone)]:
+        gone.update(added)
+    return [node for node in records if node.id in gone]
+
+
+def prune_orphan_records(spec_dir: str, graph: Graph, dry_run: bool = False) -> list[Path]:
+    """Delete the orphan records of *graph* from *spec_dir* and return their paths in graph order; with *dry_run*, delete nothing.
+
+    The caller holds the write lock and built *graph* under it.
+    """
+    paths = [Path(spec_dir) / node.file for node in orphan_records(graph)]
+    if not dry_run:
+        for path in paths:
+            path.unlink()
+    return paths

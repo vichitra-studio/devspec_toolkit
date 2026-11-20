@@ -2,7 +2,7 @@
 
 **Unused (E742).**  A verifier (a fixture or a job) is used when a node that is in play lists it in ``verified_by`` (a
 criterion of a closed milestone counts: the fixture is used, not unused), when a record names it (the ``record_users``
-seam, empty until M7), or, for a job, when it ``realises`` a node that is in play or ``verifies`` one.  A job reached
+seam, bound by ``proof.built_evidence``), or, for a job, when it ``realises`` a node that is in play or ``verifies`` one.  A job reached
 only through ``depends_on`` is not used.
 
 **Missing (E743).**  A node that is in play and in scope, of a kind a fixture's ``verifies`` may name (read from the
@@ -20,7 +20,7 @@ from specdev_tools.graph.model import Graph, Node
 
 from .codes import MISSING_VERIFIER, UNUSED_VERIFIER
 from .context import GraphCheckContext, Mode
-from .names import FIXTURE, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
+from specdev_tools.graph.names import FIXTURE, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
 from .removal import links_clause
 
 

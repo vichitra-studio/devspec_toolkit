@@ -73,3 +73,18 @@ def test_a_run_with_no_selection_or_two_is_a_usage_error(tmp_path: Path, flags: 
     host = _host(tmp_path, "true")
     code, out = run_on_example(host, "verify", "run", *flags)
     assert code == 2 and "exactly one" in out
+
+
+@pytest.mark.parametrize("name", ["tp-nope", "api-password-reset-confirm"])
+def test_installed_names_that_are_no_third_party_are_refused_and_nothing_is_written(tmp_path: Path, name: str) -> None:
+    host = _host(tmp_path, "echo expected line")
+    code, out = run_on_example(host, "verify", "run", "--all", "--installed", f"{name}=1.0")
+    assert code == 1 and "E706" in out
+    assert not list((host / RECORDS).glob("evd-*"))
+
+
+def test_a_third_party_named_twice_in_installed_is_a_usage_error(tmp_path: Path) -> None:
+    host = _host(tmp_path, "echo expected line")
+    code, out = run_on_example(host, "verify", "run", "--all", "--installed", "tp-argon2=0.1", "tp-argon2=0.41.1")
+    assert code == 2 and "--installed names 'tp-argon2' twice" in out
+    assert not list((host / RECORDS).glob("evd-*"))

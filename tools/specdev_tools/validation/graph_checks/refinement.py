@@ -14,7 +14,7 @@ from specdev_tools.trace.history import contained
 
 from .codes import VERIFIER_DOES_NOT_VERIFY_REFINED
 from .context import GraphCheckContext, Mode
-from .names import JOB, MITIGATED_BY, REALISES, REFINES, RULE, TASK_CRITERION, VERIFIED_BY, VERIFIES, link_targets
+from specdev_tools.graph.names import JOB, MITIGATED_BY, REALISES, REFINES, RULE, TASK_CRITERION, VERIFIED_BY, VERIFIES, link_targets
 
 
 def _ancestors(graph: Graph, node: Node) -> set[str]:

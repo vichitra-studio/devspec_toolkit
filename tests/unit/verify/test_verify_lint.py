@@ -11,11 +11,13 @@ from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import run_graph_check
 from specdev_tools.graph.kinds import RECORD_ROLE
-from specdev_tools.verify.lint import PROVES_UNKNOWN_CODE, lint_verification_records, orphan_records, prune_orphan_records
+from specdev_tools.trace.records import orphan_records, prune_orphan_records
+from specdev_tools.validation.spec_check import run_spec_check_json
+from specdev_tools.verify.lint import PROVES_UNKNOWN_CODE, lint_verification_records
 from unit.graph._synth import ROOT
 from unit.trace._lock_support import lock_for, run_on_example
 
-from ._support import edit_doc, example_host, graph_of, write_json
+from ._support import edit_binding, edit_doc, example_host, graph_of, write_json
 
 FIXTURE = "fix-password-reset-expired-token"
 BINDING = "ver-password-reset-expired-token"
@@ -48,13 +50,6 @@ def _evidence(evidence_id: str, about: str) -> dict[str, Any]:
 
 def _write_record(host: Path, uri: str, record: dict[str, Any], name: str) -> None:
     write_json(host / "spec" / RECORDS / f"{name}.json", {"$schema": uri, "records": [record]})
-
-
-def _edit_binding(host: Path, edit: Any) -> None:
-    path = host / "spec" / RECORDS / f"{BINDING}.json"
-    document = json.loads(path.read_text(encoding="utf-8"))
-    edit(document["records"][0])
-    write_json(path, document)
 
 
 def _delete_fixture(host: Path) -> None:
@@ -132,7 +127,7 @@ def test_prune_removes_evidence_about_a_pruned_verification_record(bound: Path) 
 
 
 def test_prune_keeps_a_record_that_still_has_a_target(bound: Path) -> None:
-    _edit_binding(bound, lambda record: record.update(verifies=[FIXTURE, "fix-password-reset-reused-token"]))
+    edit_binding(bound, BINDING, lambda record: record.update(verifies=[FIXTURE, "fix-password-reset-reused-token"]))
     _delete_fixture(bound)
     assert orphan_records(graph_of(bound)) == []
     assert prune_orphan_records(str(bound / "spec"), graph_of(bound)) == []
@@ -155,17 +150,17 @@ def test_prune_text_and_json_name_the_removed_records(bound: Path) -> None:
 
 def test_stage_edit_after_binding_gives_e330(host: Path) -> None:
     assert lint_verification_records(graph_of(host)) == []
-    _edit_binding(host, lambda record: record.update(stage="ci"))
+    edit_binding(host, BINDING, lambda record: record.update(stage="ci"))
     (finding,) = lint_verification_records(graph_of(host))
     assert finding.code == "E330" and finding.node_id == BINDING
     assert "stage 'ci' does not match the stage 'dev'" in finding.message
-    _edit_binding(host, lambda record: record.update(stage="dev"))
+    edit_binding(host, BINDING, lambda record: record.update(stage="dev"))
     assert lint_verification_records(graph_of(host)) == []
 
 
 def test_a_retired_binding_is_not_a_stage_mismatch(host: Path) -> None:
     edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"].update(qa={"scope": "out"}))
-    _edit_binding(host, lambda record: record.update(stage="qa"))
+    edit_binding(host, BINDING, lambda record: record.update(stage="qa"))
     assert [error.code for error in lint_verification_records(graph_of(host))] == []
 
 
@@ -180,7 +175,7 @@ def test_unknown_environment_stage_gives_e334(host: Path) -> None:
 
 
 def test_a_proves_id_that_names_no_node_is_a_finding_and_a_renamed_one_is_not(host: Path) -> None:
-    _edit_binding(host, lambda record: record.update(proves=[CRITERION, "ac-gone-1"]))
+    edit_binding(host, BINDING, lambda record: record.update(proves=[CRITERION, "ac-gone-1"]))
     (finding,) = lint_verification_records(graph_of(host))
     assert finding.code == PROVES_UNKNOWN_CODE and "'ac-gone-1'" in finding.message
     edit_doc(host, "04_fr_list.json", _alias_criterion)
@@ -195,15 +190,14 @@ def test_lint_passes_on_the_doc_12_20_records(host: Path) -> None:
 
 
 def test_lint_findings_carry_the_merge_check_owner_and_file(host: Path) -> None:
-    _edit_binding(host, lambda record: record.update(stage="staging", proves=[CRITERION, "ac-gone-1"]))
+    edit_binding(host, BINDING, lambda record: record.update(stage="staging", proves=[CRITERION, "ac-gone-1"]))
     findings = lint_verification_records(build_graph(str(host / "spec"), str(ROOT)))
     assert sorted(error.code for error in findings) == ["E330", PROVES_UNKNOWN_CODE]
     assert {(error.owner, error.file) for error in findings} == {("merge-check", f"{RECORDS}/{BINDING}.json")}
 
 
 def test_the_records_check_of_spec_check_carries_the_lint_findings(host: Path) -> None:
-    from specdev_tools.validation.spec_check import _records_result
-
-    _edit_binding(host, lambda record: record.update(stage="staging"))
-    result = _records_result(build_graph(str(host / "spec"), str(ROOT)), str(ROOT), str(host / "spec"))
-    assert result["status"] == "FAIL" and "E330" in str(result)
+    edit_binding(host, BINDING, lambda record: record.update(stage="staging"))
+    spec = str(host / "spec")
+    errors, _context = run_spec_check_json(str(ROOT), spec, git_root=str(host), spec_root=spec, project_canon_dir=f"{spec}/canon")
+    assert "E330" in {error.code for error in errors}

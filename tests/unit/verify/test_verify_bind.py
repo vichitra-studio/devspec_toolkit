@@ -87,6 +87,17 @@ def test_two_binds_on_one_fixture_yield_two_records(host: Path) -> None:
     assert {"ver-mixed.json", "ver-mixed-staging.json"} <= set(_record_files(host))
 
 
+def test_a_rebind_after_the_stage_of_a_proved_node_changed_replaces_the_record_without_id(host: Path) -> None:
+    """E330 on the stored record says its stage is not the one its nodes need: the same bind again is the way out, and it keeps the id."""
+    _add_fixture(host, fixture_id="fix-reset-email-delivery-time", verifies=[NFR])
+    first = _bind(host, "fix-reset-email-delivery-time")
+    edit_doc(host, "07_nfrs.json", lambda doc: doc["nfrs"][0].update(stage="prod"))
+    second = _bind(host, "fix-reset-email-delivery-time")
+    assert (first.plan.stage, second.plan.stage) == ("staging", "prod")
+    assert (second.plan.record_id, second.plan.replaced) == (first.plan.record_id, True)
+    assert not [name for name in _record_files(host) if name.startswith("ver-reset-email-delivery-time-")]
+
+
 @pytest.mark.parametrize("guard", [None, ""])
 def test_missing_guard_is_e332(host: Path, guard: str | None) -> None:
     assert _refusal(host, guard=guard).error.code == "E332"
@@ -149,6 +160,12 @@ def test_unknown_environment_stage_is_e334(host: Path) -> None:
     edit_doc(host, "12_ci_gates.json", lambda doc: doc["jobs"].append({"job_id": "job-qa-smoke", "name": "QA smoke", "realises": ["qa"]}))
     error = _refusal(host, "job-qa-smoke")
     assert error.error.code == "E334" and "qa" in error.error.message
+
+
+def test_a_not_applicable_verifier_takes_no_binding(host: Path) -> None:
+    edit_doc(host, "08_fixtures.json", lambda doc: doc["fixtures"][0].update(lifecycle="not_applicable"))
+    error = _refusal(host).error
+    assert error.code == "E767" and "not_applicable" in error.message
 
 
 def test_a_job_binds_what_it_realises_at_its_environment_stage(host: Path) -> None:

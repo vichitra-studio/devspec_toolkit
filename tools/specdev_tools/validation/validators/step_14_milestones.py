@@ -18,7 +18,7 @@ from specdev_tools.trace.history import contained
 from specdev_tools.validation.graph_checks.built import walk_derivations
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
 from specdev_tools.validation.graph_checks.design_milestones import unrefined_scheduled
-from specdev_tools.validation.graph_checks.names import DERIVES_FROM, FR, MITIGATED_BY, REALISES, REFINES, TASK_CRITERION
+from specdev_tools.graph.names import DERIVES_FROM, FR, MITIGATED_BY, REALISES, REFINES, TASK_CRITERION
 
 UNCOVERED_FR_MILESTONE = "E566"
 INCOMPLETE_MILESTONE_DECOMPOSITION = "E567"

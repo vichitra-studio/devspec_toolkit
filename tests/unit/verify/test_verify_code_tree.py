@@ -150,3 +150,14 @@ def test_commit_id_equals_clean_checkout_id_and_later_edit_changes_only_the_work
     write(repo / "src" / "app.py", "print('later')\n")
     assert _id(repo, "v1") == tagged
     assert _id(repo) != tagged
+
+
+def test_a_repository_with_no_commit_has_an_id_that_follows_its_files(tmp_path: Path) -> None:
+    repo = tmp_path / "fresh"
+    repo.mkdir()
+    git(repo, "init", "-q", "-b", "main")
+    write(repo / "src" / "app.py", "print('app')\n")
+    first = _id(repo)
+    assert first == _id(repo)
+    write(repo / "src" / "app.py", "print('changed')\n")
+    assert _id(repo) != first

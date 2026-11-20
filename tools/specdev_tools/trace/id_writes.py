@@ -47,8 +47,8 @@ from specdev_tools.graph.queries import require_known_step, unknown_node_error
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
-from specdev_tools.trace.history import contract_lines
-from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of, read_lock, replace_file_atomically, write_lock
+from specdev_tools.trace.history import containers_of, contract_lines
+from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, write_lock
 from specdev_tools.trace.writing import seed_texts_for_write, writing_graph
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
 from specdev_tools.validation.linter_utils import graph_known_ids

@@ -10,10 +10,13 @@ from typing import Any
 import pytest
 
 from specdev_tools.core.errors import FindingError
+from specdev_tools.verify import run as run_module
 from specdev_tools.verify.code_tree import code_tree_for_host
 from specdev_tools.verify.records import Evidence, records_folder, write_binding
 from specdev_tools.verify.run import TIMEOUT_EXIT_CODE, run_bindings, selected_ids
 from unit.graph._synth import ROOT
+
+from unit.proof._closed import add_milestone, criterion
 
 from ._support import commit_all, edit_doc, example_host, graph_of, write, write_json
 
@@ -58,7 +61,7 @@ def test_passing_command_writes_all_fields_and_a_second_run_overwrites_the_file(
     assert record["about"] == ["ver-alpha"] and record["type"] == "run" and record["stage"] == "dev"
     assert (record["exit_code"], record["guard_matched"]) == (0, True)
     assert record["output_hash"] == "sha256:" + hashlib.sha256(b"expected line\n").hexdigest()
-    assert set(record["recorded_hashes"]) == {FIXTURE, CRITERION, API} and record["installed_versions"] == {}
+    assert set(record["recorded_hashes"]) == {"ver-alpha", FIXTURE, CRITERION, API} and record["installed_versions"] == {}
     _run(host, ["ver-alpha"])
     assert list(_evidence_files(host)) == ["evd-alpha-dev"]
 
@@ -231,3 +234,37 @@ def test_other_stage_files_are_independent(tmp_path: Path) -> None:
     _run(host, ["ver-alpha"], stage="ci")
     assert dev_file.read_bytes() == stored
     assert _evidence_files(host)["evd-alpha-ci"]["exit_code"] == 1
+
+
+def test_a_guard_that_is_no_regular_expression_is_refused_before_any_command_runs(tmp_path: Path) -> None:
+    """A hand-edited record with a bad guard: E332, and the command (which would leave a file behind) did not run."""
+    host = _host(tmp_path, _binding("ver-alpha", commands=("touch ran-before-the-guard-check",), guard="("))
+    with pytest.raises(FindingError) as caught:
+        _run(host, ["ver-alpha"])
+    assert caught.value.error.code == "E332"
+    assert not (host / "ran-before-the-guard-check").exists()
+    assert _evidence_files(host) == {}
+
+
+def test_the_tree_measured_after_one_group_is_the_one_before_the_next(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two groups, three measurements of the code tree (before the first, after each), not four."""
+    host = _host(tmp_path, _binding("ver-alpha"), _binding("ver-beta", commands=("echo second line",), guard="second line", verifier="fix-password-reset-reused-token"))
+    measured: list[str] = []
+    real = run_module.code_tree_for_host
+
+    def counting(*args: Any) -> str:
+        measured.append(real(*args))
+        return measured[-1]
+
+    monkeypatch.setattr(run_module, "code_tree_for_host", counting)
+    first, second = _run(host, ["ver-alpha", "ver-beta"])
+    assert len(measured) == 3 and first.tested_tree == second.tested_tree == measured[-1]
+
+
+def test_milestone_takes_only_the_bindings_of_the_verifiers_its_own_criteria_name(tmp_path: Path) -> None:
+    host = _host(tmp_path, _binding("ver-alpha"), _binding("ver-other", verifier="fix-only-other"))
+    edit_doc(host, "08_fixtures.json", lambda doc: doc["fixtures"].append({**doc["fixtures"][0], "fixture_id": "fix-only-other"}))
+    add_milestone(host, "ms-other-work", [criterion("tc-other-work", verified_by=["fix-only-other"])], done=False)
+    graph = graph_of(host)
+    assert selected_ids(graph, every=False, milestone="ms-account-recovery", stage="dev", only_stage=False) == ["ver-alpha"]
+    assert selected_ids(graph, every=False, milestone="ms-other-work", stage="dev", only_stage=False) == ["ver-other"]

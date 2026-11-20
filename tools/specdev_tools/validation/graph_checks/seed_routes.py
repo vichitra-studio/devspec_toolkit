@@ -22,7 +22,7 @@ from specdev_tools.graph.ownership import STEP_PREFIX
 
 from .codes import SEED_LINK_NOT_ROUTED, SEED_NOT_ROUTED, SEED_ROUTE_UNUSED
 from .context import SEED_MANIFEST_PATH, GraphCheckContext, Mode
-from .names import DERIVES_FROM
+from specdev_tools.graph.names import DERIVES_FROM
 from .removal import links_clause
 
 STEP_REQUIREMENTS = "step_requirements"

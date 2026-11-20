@@ -12,23 +12,17 @@ from pathlib import Path
 
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.host_declarations import HostDeclarations, PinSource
-from specdev_tools.graph.contract import item_of
-from specdev_tools.graph.ids import mint_slug
-from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.queries import THIRD_PARTY, unknown_node_error
+from specdev_tools.core.pin_sources import SourceError, read_source
+from specdev_tools.graph.model import Graph
+from specdev_tools.graph.names import THIRD_PARTY
+from specdev_tools.graph.queries import pin_of
 from specdev_tools.thirdparty.pin import not_exact_error, pin_is_exact
-from specdev_tools.thirdparty.sources import SourceError, read_source
 from specdev_tools.trace.lockfile import with_write_lock
 from specdev_tools.verify.code_tree import code_tree_for_host
-from specdev_tools.verify.records import EVIDENCE_PREFIX, records_folder, refusal, write_evidence
+from specdev_tools.verify.installed_versions import third_party_of
+from specdev_tools.verify.records import install_check_id, records_folder, write_evidence
 
 INSTALL_CHECK_TYPE = "install-check"
-_ID_PREFIX = "tp-"
-
-
-def _pin_of(graph: Graph, node: Node) -> str:
-    pin = (item_of(graph, node) or {}).get("pin")
-    return pin if isinstance(pin, str) else ""
 
 
 def _where(source: PinSource) -> str:
@@ -65,21 +59,12 @@ def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Pat
         if graph.canonical_id(name) not in third_parties
     ]
     for node in graph.by_kind.get(THIRD_PARTY, ()):
-        sources, pin = sources_of.get(node.id, ()), _pin_of(graph, node)
+        sources, pin = sources_of.get(node.id, ()), pin_of(graph, node.id)
         if sources and not pin_is_exact(pin):
             findings.append(not_exact_error(node.id, pin))
             continue
         findings.extend(error for source in sources if (error := _source_error(node.id, pin, source, str(git_root))) is not None)
     return findings
-
-
-def _third_party(graph: Graph, name: str) -> Node:
-    node = graph.find(name)
-    if node is None:
-        raise unknown_node_error(graph, name)
-    if node.kind != THIRD_PARTY:
-        raise refusal("E706", f"'{node.id}' is of kind {node.kind}, not a third party; give the id of a third-party node")
-    return node
 
 
 def check_installed(graph: Graph, installed: Mapping[str, str]) -> tuple[dict[str, str], list[SpecError]]:
@@ -88,7 +73,7 @@ def check_installed(graph: Graph, installed: Mapping[str, str]) -> tuple[dict[st
     Raises:
         FindingError: E706 when a name is no node, or the node is not a third party.
     """
-    resolved = {_third_party(graph, name).id: version for name, version in installed.items()}
+    resolved = {third_party_of(graph, name).id: version for name, version in installed.items()}
     findings = [
         make_error(
             "E339",
@@ -96,22 +81,9 @@ def check_installed(graph: Graph, installed: Mapping[str, str]) -> tuple[dict[st
             node_id=node_id,
         )
         for node_id, version in resolved.items()
-        if version != (pin := _pin_of(graph, graph.by_id[node_id]))
+        if version != (pin := pin_of(graph, node_id))
     ]
     return resolved, findings
-
-
-def install_check_id(third_party_id: str, env: str) -> str:
-    """The id of the install-check record of *third_party_id* for *env*: ``evd-install-``, the id without ``tp-``, then the environment.
-
-    Raises:
-        FindingError: E767 when *env* has no letter or digit to make an id from.
-    """
-    try:
-        slug = mint_slug(env, ())
-    except ValueError as exc:
-        raise refusal("E767", f"the environment '{env}' has no letter or digit to name the install-check record from; give --env a name such as prod") from exc
-    return f"{EVIDENCE_PREFIX}install-{third_party_id.removeprefix(_ID_PREFIX)}-{slug}"
 
 
 def install_check_item(third_party_id: str, version: str, env: str, tag: str | None, tested_tree: str) -> dict[str, object]:

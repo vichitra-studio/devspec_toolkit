@@ -1,7 +1,7 @@
 """The stage model: ``dev < ci < staging < prod``, the stage a node requires, and retired bindings.
 
 A binding is a verification record (kind ``verification-record``): it names the verifiers it covers in ``verifies`` and
-declares a ``stage``.  The stage names are stated once, here; ``tests/unit/proof/test_proof_stages.py`` checks them
+declares a ``stage``.  The stage names are stated once, here; ``tests/unit/graph/test_stages.py`` checks them
 against the ``stageName`` enum of ``schema/core/collections.schema.json``.  Every function takes the graph; none reads a
 file.  An environment key that is not a stage raises ``UnknownStageForEnvironment``, which the caller reports as E334.
 """
@@ -11,19 +11,14 @@ from collections.abc import Iterable
 
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.names import BINDING_KIND, ENVIRONMENT, JOB, NFR, REALISES, RULE, VERIFIES
 
 STAGES = ("dev", "ci", "staging", "prod")
 DEFAULT_STAGE = "dev"
-COMMAND_RULE_STAGE = "ci"  # a rule enforced by a toolkit command, when the host chose to bind one
+CI_STAGE = "ci"
+COMMAND_RULE_STAGE = CI_STAGE  # a rule enforced by a toolkit command, when the host chose to bind one
 
-_ENVIRONMENT = "environment"
-_JOB = "job"
-_RULE = "rule"
-_NFR = "nfr"
 _JOB_ENFORCED = ("gate", "secret")
-_BINDING = "verification-record"
-_REALISES = "realises"
-_VERIFIES = "verifies"
 _SCOPE_OUT = "out"
 
 
@@ -45,6 +40,15 @@ def stage_rank(stage: str) -> int:
         return STAGES.index(stage)
     except ValueError:
         raise ValueError(f"'{stage}' is not a stage ({', '.join(STAGES)})") from None
+
+
+def stage_at_least(stage: str, other: str) -> bool:
+    """Whether *stage* is *other* or a later stage.
+
+    Raises:
+        ValueError: *stage* or *other* is not a stage name.
+    """
+    return stage_rank(stage) >= stage_rank(other)
 
 
 def highest_stage(stages: Iterable[str]) -> str:
@@ -69,13 +73,13 @@ def _targets(node: Node, field: str, graph: Graph) -> list[Node]:
 
 
 def _job_stage(job: Node, graph: Graph) -> str:
-    environments = _targets(job, _REALISES, graph)
-    return highest_stage(environment_stage(env.id) for env in environments if env.kind == _ENVIRONMENT)
+    environments = _targets(job, REALISES, graph)
+    return highest_stage(environment_stage(env.id) for env in environments if env.kind == ENVIRONMENT)
 
 
 def _realising_jobs(node: Node, graph: Graph) -> list[Node]:
-    sources = (graph.by_id.get(link.source) for link in graph.incoming.get(node.id, ()) if link.field == _REALISES)
-    return [source for source in sources if source is not None and source.kind == _JOB]
+    sources = (graph.by_id.get(link.source) for link in graph.incoming.get(node.id, ()) if link.field == REALISES)
+    return [source for source in sources if source is not None and source.kind == JOB]
 
 
 def _declared_stage(node: Node, graph: Graph) -> str:
@@ -96,17 +100,17 @@ def required_stage(node: Node, graph: Graph, via_job: Node | None = None) -> str
         UnknownStageForEnvironment: an environment involved is not a stage.
         ValueError: an NFR declares a stage that is not one.
     """
-    if node.kind == _NFR:
+    if node.kind == NFR:
         stage = _declared_stage(node, graph)
         stage_rank(stage)
         return stage
-    if node.kind == _ENVIRONMENT:
+    if node.kind == ENVIRONMENT:
         return environment_stage(node.id)
-    if node.kind == _JOB:
+    if node.kind == JOB:
         return _job_stage(node, graph)
-    if node.kind == _RULE and via_job is None:
+    if node.kind == RULE and via_job is None:
         return COMMAND_RULE_STAGE
-    if node.kind in (_RULE, *_JOB_ENFORCED):
+    if node.kind in (RULE, *_JOB_ENFORCED):
         if via_job is not None:
             return _job_stage(via_job, graph)
         return highest_stage(_job_stage(job, graph) for job in _realising_jobs(node, graph))
@@ -127,13 +131,13 @@ def binding_stage(binding: Node, graph: Graph) -> str:
 def is_retired_binding(binding: Node, graph: Graph) -> bool:
     """True when the stage of *binding* names an environment whose node has ``scope: out``; false when no such environment exists."""
     environment = graph.by_id.get(binding_stage(binding, graph))
-    return environment is not None and environment.kind == _ENVIRONMENT and environment.scope == _SCOPE_OUT
+    return environment is not None and environment.kind == ENVIRONMENT and environment.scope == _SCOPE_OUT
 
 
 def bindings_of(verifier: Node, graph: Graph) -> list[Node]:
     """The bindings (verification records) that name *verifier* in ``verifies``, in graph order."""
-    sources = (graph.by_id.get(link.source) for link in graph.incoming.get(verifier.id, ()) if link.field == _VERIFIES)
-    return [source for source in sources if source is not None and source.kind == _BINDING]
+    sources = (graph.by_id.get(link.source) for link in graph.incoming.get(verifier.id, ()) if link.field == VERIFIES)
+    return [source for source in sources if source is not None and source.kind == BINDING_KIND]
 
 
 def retired_binding_ids(verifier: Node, graph: Graph) -> set[str]:

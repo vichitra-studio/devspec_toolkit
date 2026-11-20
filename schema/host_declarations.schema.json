@@ -83,7 +83,7 @@
                 "pattern": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Regular expression with exactly one capture group; the first match in the file gives the value. Example: 'MAILRELAY_API_VERSION = \"(api-v[0-9]+)\"'."
+                  "description": "Regular expression with exactly one capture group; the first match in the file gives the value. Compiled in multi-line mode, so '^' and '$' match at the start and end of each line, as in the output guard of a binding. Example: 'MAILRELAY_API_VERSION = \"(api-v[0-9]+)\"'."
                 }
               }
             }

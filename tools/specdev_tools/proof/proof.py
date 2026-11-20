@@ -18,22 +18,23 @@ import os
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 
-from specdev_tools.core.errors import SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error, refusal
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.ownership import OwnerContext, load_owner_context, owner_for
-from specdev_tools.proof.stages import (
-    DEFAULT_STAGE, UnknownStageForEnvironment, bindings_of, is_retired_binding, is_retired_verifier, required_stage, stage_rank,
+from specdev_tools.graph.stages import (
+    CI_STAGE, DEFAULT_STAGE, STAGES, UnknownStageForEnvironment, bindings_of, is_retired_binding, is_retired_verifier, required_stage, stage_at_least, stage_rank,
 )
 from specdev_tools.proof.validity import (
-    NO_EVIDENCE, STAGE_TOO_LOW, ProofContext, Validity, attestation_valid, effective_stage, evidence_for, evidence_valid, same_run,
+    GUARD_NOT_MATCHED, NO_EVIDENCE, NONZERO_EXIT, STAGE_TOO_LOW, STALE_HASH, STALE_TP_VERSION, STALE_TREE, ProofContext, Validity,
+    attestation_valid, effective_stage, evidence_for, evidence_valid, same_run,
 )
 from specdev_tools.trace.coverage import exemption
-from specdev_tools.trace.history import contained
-from specdev_tools.trace.lockfile import containers_of
-from specdev_tools.validation.graph_checks.names import (
-    API_ERROR, DERIVES_FROM, FIXTURE, JOB, MITIGATED_BY, REALISES, REFINES, RULE, TASK_CRITERION, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets,
+from specdev_tools.trace.history import contained, containers_of
+from specdev_tools.graph.names import (
+    API_ERROR, DERIVES_FROM, FIXTURE, FR, JOB, MANUAL_MODE, MITIGATED_BY, OBLIGATION_ROLES, REALISES, REFINES, REVIEW_ENFORCER, RULE, TASK_CRITERION,
+    VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets,
 )
 from specdev_tools.verify.bind import proved_ids
 from specdev_tools.verify.records import Binding, Evidence, attestations_about, binding_of
@@ -47,25 +48,27 @@ NOT_REQUIRED = "not-required"
 """Every verifier of the node is out of play, retired, or (close mode) bound only above the close gate: nothing is asked of it at this gate."""
 REASON_UNBOUND = "UNBOUND"
 REASON_NO_VERIFIER = "NO_VERIFIER"
+STAGE_UNKNOWN = "E334"
 OBLIGATION_NOT_PROVEN = "E348"
 VERIFIER_NO_VALID_EVIDENCE = "E347"
-CLOSE_IGNORED_STAGES = ("staging", "prod")
+CLOSE_IGNORED_STAGES = STAGES[STAGES.index(CI_STAGE) + 1:]
+"""The stages above ``ci``: the close gate ignores a binding at one of them."""
 COARSE_STEPS = ("00", "01")
 _CLI_COMMANDS_PATH = os.path.join("tools", "cli_commands.json")
-_MANUAL_MODE = "manual"
-_REVIEW = "review"
-_OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
-_FR = "fr"
 _CAUSE = {
-    "NONZERO_EXIT": "the commands failed",
-    "GUARD_NOT_MATCHED": "the output did not match the guard",
-    "STALE_TREE": "the code changed since the run",
-    "STALE_HASH": "a spec node the run rests on changed",
-    "STALE_TP_VERSION": "a third party is at another version than the pin",
-    "STAGE_TOO_LOW": "the run was at a lower stage than the binding",
+    NONZERO_EXIT: "the commands failed",
+    GUARD_NOT_MATCHED: "the output did not match the guard",
+    STALE_TREE: "the code changed since the run",
+    STALE_HASH: "the binding, its verifier or a node it proves changed since the run",
+    STALE_TP_VERSION: "a third party is at another version than the pin",
+    STAGE_TOO_LOW: "the run was at a lower stage than the binding",
     NO_EVIDENCE: "no run has written evidence for it",
 }
-_FIX_FIRST = ("NONZERO_EXIT", "GUARD_NOT_MATCHED")
+_FIX_FIRST = (NONZERO_EXIT, GUARD_NOT_MATCHED)
+_WAY_OUT = {
+    STALE_TP_VERSION: "make the version the repository declares equal the pin (`specdev third-party check` names the file), then run",
+}
+"""What to do before the run, for a cause the run itself cannot clear: a run records the version the repository declares, so it says the same until the repository says the pin."""
 
 
 @dataclass(frozen=True)
@@ -110,13 +113,19 @@ def _combine(obligation: str, outcomes: Sequence[_Outcome]) -> ProofResult:
 
 
 def _needed_stage(graph: Graph, obligation: Node | None, verifier: Node) -> str:
-    """The stage the obligation needs proof at, as far as a stored binding can be held to it; ``dev`` when the stage cannot be told."""
+    """The stage the obligation needs proof at, as far as a stored binding can be held to it.
+
+    Raises:
+        FindingError: E334 when the stage cannot be told (an environment that is not a stage, or an NFR with a stage that is not one): such a node is not proven.
+    """
     if obligation is None:
         return DEFAULT_STAGE
     try:
         return required_stage(obligation, graph, verifier if verifier.kind == JOB else None)
-    except (UnknownStageForEnvironment, ValueError):
-        return DEFAULT_STAGE
+    except UnknownStageForEnvironment as exc:
+        raise refusal(STAGE_UNKNOWN, f"environment '{exc.environment}' is not a stage; name it dev, ci, staging or prod") from exc
+    except ValueError as exc:
+        raise refusal(STAGE_UNKNOWN, str(exc)) from exc
 
 
 class _Prover:
@@ -157,9 +166,9 @@ class _Prover:
         return bool(set(proved_ids(binding, self.graph)) & related)
 
     def _bindings_for(self, verifier: Node, obligation: Node | None) -> list[Binding]:
-        needed = stage_rank(_needed_stage(self.graph, obligation, verifier))
+        needed = _needed_stage(self.graph, obligation, verifier)
         bindings = (binding_of(node, self.graph) for node in bindings_of(verifier, self.graph) if not is_retired_binding(node, self.graph))
-        return [b for b in bindings if self._names(b, verifier, obligation) and stage_rank(b.stage) >= needed]
+        return [b for b in bindings if self._names(b, verifier, obligation) and stage_at_least(b.stage, needed)]
 
     # --- one verifier ----------------------------------------------------------------------------------------------
 
@@ -168,17 +177,17 @@ class _Prover:
 
     def _is_manual(self, verifier: Node) -> bool:
         if verifier.kind == FIXTURE:
-            return (item_of(self.graph, verifier) or {}).get("mode") == _MANUAL_MODE
-        return verifier.kind == RULE and (item_of(self.graph, verifier) or {}).get("enforcer") == _REVIEW
+            return (item_of(self.graph, verifier) or {}).get("mode") == MANUAL_MODE
+        return verifier.kind == RULE and (item_of(self.graph, verifier) or {}).get("enforcer") == REVIEW_ENFORCER
 
     def _attested(self, verifier: Node, obligation: Node | None) -> _Outcome:
         needed = _needed_stage(self.graph, obligation, verifier) if obligation is not None and obligation.kind != RULE else DEFAULT_STAGE
-        if stage_rank(needed) > stage_rank(self.cap):
+        if not stage_at_least(self.cap, needed):
             return _Outcome(PENDING_STAGE)
         reason = NO_EVIDENCE
         for attestation in attestations_about(self.graph, verifier.id):
             verdict = attestation_valid(attestation, verifier.id, self.graph, self.ctx)
-            if verdict.valid and stage_rank(attestation.stage) >= stage_rank(needed):
+            if verdict.valid and stage_at_least(attestation.stage, needed):
                 return _Outcome(PROVEN)
             reason = verdict.reason or STAGE_TOO_LOW
         return _Outcome(UNPROVEN, (Shortfall(verifier.id, None, reason),))
@@ -193,7 +202,7 @@ class _Prover:
         considered = [binding for binding in bindings if not self._ignored_in_close(binding)]
         if not considered:
             return _Outcome(NOT_REQUIRED)
-        due = [binding for binding in considered if stage_rank(effective_stage(binding.stage, self.treat_ci_as_dev)) <= stage_rank(self.cap)]
+        due = [binding for binding in considered if stage_at_least(self.cap, effective_stage(binding.stage, self.treat_ci_as_dev))]
         if not due:
             return _Outcome(PENDING_STAGE)
         for binding in due:
@@ -228,7 +237,7 @@ class _Prover:
             if command not in self._known_commands():
                 return []
             return [self.verifier_outcome(node, node)] if bindings_of(node, self.graph) else [_Outcome(PROVEN)]
-        if item.get("enforcer") == _REVIEW:
+        if item.get("enforcer") == REVIEW_ENFORCER:
             return [self.verifier_outcome(node, node)]
         return self._by_verifiers(node)
 
@@ -246,7 +255,7 @@ class _Prover:
         """The outcomes of the nodes a coarse item or a container rests on: the proof of each of them that is an obligation and in play (one that nothing verifies fails the whole)."""
         outcomes: list[_Outcome] = []
         for node in nodes:
-            if node.role not in _OBLIGATION_ROLES or exemption(node) is not None or node.id in visiting:
+            if node.role not in OBLIGATION_ROLES or exemption(node) is not None or node.id in visiting:
                 continue
             outcomes.append(self._as_outcome(self._prove(node, visiting | {node.id})))
         return outcomes
@@ -284,7 +293,7 @@ class _Prover:
         if node.step in COARSE_STEPS:
             sources = (self.graph.by_id.get(link.source) for link in self.graph.incoming.get(node.id, ()) if link.field == DERIVES_FROM)
             return self._derived((source for source in sources if source is not None), visiting)
-        if node.kind == _FR:
+        if node.kind == FR:
             return self._derived((self.graph.by_id[child] for child in self.graph.children.get(node.id, ())), visiting)
         return []
 
@@ -315,6 +324,7 @@ def proof(
     Raises:
         KeyError: no node has the id *obligation_id*.
         ValueError: *cap* is not a stage.
+        FindingError: E334 when the stage a verifier of the node needs cannot be told.
         GitViewError: E708 when git fails.
         FindingError: E520 when the host declarations cannot be read.
     """
@@ -351,7 +361,8 @@ def _advice(shortfall: Shortfall) -> str:
     if shortfall.binding is None:
         return "a person attests it: it needs a valid attestation record"
     command = f"`specdev verify run {shortfall.binding} --stage {shortfall.stage}`"
-    return f"{_CAUSE[shortfall.reason]}; {'fix it, then run' if shortfall.reason in _FIX_FIRST else 'run'} {command}"
+    first = _WAY_OUT.get(shortfall.reason, "fix it, then run" if shortfall.reason in _FIX_FIRST else "run")
+    return f"{_CAUSE[shortfall.reason]}; {first} {command}"
 
 
 def _finding(node: Node, shortfall: Shortfall, owners: OwnerContext) -> SpecError:
@@ -368,13 +379,20 @@ def _finding(node: Node, shortfall: Shortfall, owners: OwnerContext) -> SpecErro
     )
 
 
+def _stage_finding(node: Node, error: SpecError, owners: OwnerContext) -> SpecError:
+    """The E334 the proof of *node* raised (its stage cannot be told), as a finding about *node*."""
+    return make_error(
+        error.code, f"{node.kind} {node.id}: {error.message}", file=node.file, jq_path=node.jq_path or None, node_id=node.id, owner=owner_for(error.code, node, owners),
+    )
+
+
 def proof_errors(
     graph: Graph, ctx: ProofContext, scope: Collection[str], cap: str, *, treat_ci_as_dev: bool = False, transient_evidence: Sequence[Evidence] | None = None,
 ) -> list[SpecError]:
     """The findings of the gate that checks the nodes *scope* at *cap* (the keywords as ``proof``): E347 for each binding with no valid evidence, E348 for a verifier with no binding or a node with no verifier.
 
     A node that is proven, pending a higher stage or not required gives nothing.  An id of *scope* that names no node is
-    skipped.  The owner of a finding is the one the ownership table gives for the node (its step).  Findings come in the order of *scope*.
+    skipped.  A node whose stage cannot be told (an environment that is not a stage) gives E334 instead.  The owner of a finding is the one the ownership table gives for the node (its step).  Findings come in the order of *scope*.
     """
     owners = load_owner_context(resolve_effective_toolkit_root(None))
     prover = _Prover(graph, ctx, cap, treat_ci_as_dev, transient_evidence or ())
@@ -383,5 +401,10 @@ def proof_errors(
         node = graph.find(obligation_id)
         if node is None:
             continue
-        findings.extend(_finding(node, shortfall, owners) for shortfall in prover.prove(node.id).shortfalls)
+        try:
+            findings.extend(_finding(node, shortfall, owners) for shortfall in prover.prove(node.id).shortfalls)
+        except FindingError as exc:
+            if exc.error.code != STAGE_UNKNOWN:
+                raise
+            findings.append(_stage_finding(node, exc.error, owners))
     return findings

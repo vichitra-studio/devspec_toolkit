@@ -612,7 +612,7 @@ def build_parser() -> _SpecdevParser:
     # `stale`, `coverage` and `step ready` read the coverage gaps; the role gap provider they ask is installed by a call.
     from .validation.graph_checks import install_gap_provider
     install_gap_provider()
-    # the graph checks every command can run read the proof package through four seams; bind them once
+    # the graph checks every command can run read the proof package through seams; bind them once (three are bound, `extra_verifiers` keeps its default)
     from .proof.built_evidence import bind_proof_seams
     bind_proof_seams()
     p.ctx_parser = ctx_p

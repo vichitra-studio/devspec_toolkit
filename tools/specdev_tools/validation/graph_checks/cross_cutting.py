@@ -11,7 +11,7 @@ from specdev_tools.graph.model import Graph, Node
 
 from .codes import CROSS_CUTTING_NOT_REFINED
 from .context import GraphCheckContext, Mode
-from .names import API, API_ERROR, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINS, CRITERION, DERIVES_FROM, FR, PROVIDED_BY, REFINES, TASK, link_targets
+from specdev_tools.graph.names import API, API_ERROR, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINS, CRITERION, DERIVES_FROM, FR, PROVIDED_BY, REFINES, TASK, link_targets
 
 
 def _linked(graph: Graph, node: Node, field: str, *kinds: str) -> list[Node]:

@@ -14,7 +14,7 @@ from typing import NamedTuple
 from specdev_tools.graph.kinds import RECORD_ROLE, KindDecl
 from specdev_tools.graph.model import SpecShape
 
-from .names import REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES
+from specdev_tools.graph.names import REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES
 
 EXCLUDED_VERBS = frozenset({"about", "replaces", REMOVES, VERIFIES, VERIFIED_BY})
 """Verbs that are never a use: a record's ``about``, the id-history links, and the verifier verbs (a fixture that verifies a node does not use it)."""

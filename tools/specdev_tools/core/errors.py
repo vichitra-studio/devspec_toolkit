@@ -351,6 +351,11 @@ def make_error(
     )
 
 
+def refusal(code: str, message: str) -> FindingError:
+    """The finding a command prints before it exits 1: *code* with *message*, no owner, no node."""
+    return FindingError(make_error(code, message))
+
+
 def render_errors(errors: list[SpecError]) -> list[str]:
     """Convert SpecError list to string list for backward compat."""
     return [e.render() for e in errors]

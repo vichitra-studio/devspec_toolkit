@@ -27,7 +27,7 @@ from specdev_tools.validation.check_registry import CheckContext
 from .built import BuiltState, compute_built
 from .codes import SCAFFOLD_PATH_NOT_TRACKED
 from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
-from .names import MERGE, REALISES, SCAFFOLD_ROW, link_targets
+from specdev_tools.graph.names import MERGE, REALISES, SCAFFOLD_ROW, link_targets
 
 PATH_FIELD = "path"
 GITLINK_MODE = "160000"

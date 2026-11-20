@@ -58,3 +58,19 @@ def test_pin_of_a_node_that_is_not_a_third_party_is_refused(host: Path, node: st
     code, out = run_on_example(host, "third-party", "pin", node, version)
     assert code == 1 and text in out
     assert (host / SKETCH).read_text(encoding="utf-8") == before
+
+
+def test_an_unchanged_pin_writes_nothing_and_says_so(host: Path) -> None:
+    before = {path: path.read_bytes() for path in (host / "spec").rglob("*.json")}
+    code, out = run_on_example(host, "third-party", "pin", ARGON, "0.41.1")
+    assert code == 0 and out.strip() == "tp-argon2 already has the pin 0.41.1; nothing written"
+    code, out = run_on_example(host, "third-party", "pin", ARGON, "  0.41.1 ", "--json")
+    assert code == 0 and json.loads(out) == {"command": "third-party pin", "id": ARGON, "pin": "0.41.1", "written": False}
+    assert {path: path.read_bytes() for path in (host / "spec").rglob("*.json")} == before
+
+
+def test_the_pin_is_written_stripped(host: Path) -> None:
+    code, out = run_on_example(host, "third-party", "pin", ARGON, " 0.42.0 ")
+    assert code == 0, out
+    document = json.loads((host / SKETCH).read_text(encoding="utf-8"))
+    assert [item["pin"] for item in document["third_parties"] if item["third_party_id"] == ARGON] == ["0.42.0"]

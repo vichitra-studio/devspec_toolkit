@@ -20,7 +20,7 @@ from specdev_tools.thirdparty.pin import pin_third_party
 from specdev_tools.trace.records import RECORDS_DIR
 from specdev_tools.trace.write_report import render_text, result_to_dict
 from specdev_tools.verify.code_tree import declarations_of
-from specdev_tools.verify.commands import installed_overrides
+from specdev_tools.verify.installed_versions import installed_overrides, installed_pairs
 
 CHANGE_REMINDER = (
     "The code change for this pin is made in this branch, through a change milestone whose task criteria refine "
@@ -47,7 +47,7 @@ CHECK_DESCRIPTION = (
     "E338 for a source that gives none; exit 1 on any finding. With --installed TP=VERSION (repeat for more) and --env, "
     "compare what a deploy installed with the pins: a different version is E339 and exit 1, which stops the deploy; when "
     "all match, one install-check evidence record per third party is written to spec/extras/verification/ "
-    "(evd-install-<tp>-<env>.json, with --tag when given)."
+    "(evd-install-<name>-<env>.json, <name> being the third-party id without its tp- prefix; with --tag when given)."
 )
 
 
@@ -74,6 +74,13 @@ def _pin(args: argparse.Namespace, graph: Graph) -> int:
     result = pin_third_party(
         graph, os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args), args.third_party_id, args.version
     )
+    if result is None:
+        node_id, value = graph.canonical_id(args.third_party_id), args.version.strip()
+        if args.json_output:
+            print_json({"command": "third-party pin", "id": node_id, "pin": value, "written": False})
+        else:
+            print(f"{node_id} already has the pin {value}; nothing written")
+        return 0
     if args.json_output:
         print_json({**result_to_dict(result), "command": "third-party pin", "reminder": CHANGE_REMINDER})
     else:
@@ -110,7 +117,11 @@ def _check_sources(args: argparse.Namespace, graph: Graph) -> int:
     return 0
 
 
-def _check_deploy(args: argparse.Namespace, graph: Graph, installed: dict[str, str]) -> int:
+def _check_deploy(args: argparse.Namespace, graph: Graph, pairs: list[tuple[str, str]]) -> int:
+    try:
+        installed = installed_overrides(pairs, graph)
+    except ValueError as exc:
+        return usage_error("third-party check", str(exc))
     resolved, findings = check_installed(graph, installed)
     if findings:
         return _report_findings(findings, args.json_output)
@@ -130,9 +141,9 @@ def run_third_party_check(args: argparse.Namespace) -> int:
         if args.env is not None or args.tag is not None:
             return usage_error("third-party check", "--env and --tag go with --installed")
         return run_on_graph("third-party check", args, lambda graph: _check_sources(args, graph))
-    installed = installed_overrides(args.installed)
-    if installed is None:
+    pairs = installed_pairs(args.installed)
+    if pairs is None:
         return usage_error("third-party check", "--installed takes TP=VERSION")
     if not args.env:
         return usage_error("third-party check", "--installed needs --env, the environment deployed to")
-    return run_on_graph("third-party check", args, lambda graph: _check_deploy(args, graph, installed))
+    return run_on_graph("third-party check", args, lambda graph: _check_deploy(args, graph, pairs))

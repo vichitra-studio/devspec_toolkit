@@ -164,3 +164,48 @@ def test_deleting_a_closed_removal_fixture_and_a_closed_verified_by_target_repor
     findings = [*run_graph_check(str(host / "spec"), str(ROOT), graph=graph, lock=lock), *run_graph_checks(GraphCheckContext.from_graph(graph, lock), "merge")]
     assert [(error.code, error.node_id) for error in findings if error.node_id in frozen] == []
     assert {error.node_id for error in resolve_graph(graph) if error.code == "E700"} >= {TASK_CRITERION, "tc-confirm-reused-token", "tc-retire-reset"}
+
+
+def test_two_closed_milestones_that_both_refined_the_old_version_stay_outdated(tmp_path: Path) -> None:
+    """Neither refines the current version: a link whose hash is not current does not supersede another."""
+    host = closed_example(tmp_path)
+    add_milestone(host, "ms-token-copy", [criterion("tc-copy", refines=[CRITERION])], done=True)
+    reword_criterion(host, CRITERION, NEW_TEXT)
+    assert (statuses(host)[KEY], statuses(host)[("tc-copy", CRITERION)]) == (OUTDATED, OUTDATED)
+    assert [entry.code for entry in unresolved(host)].count("E343") == 2
+
+
+def test_a_milestone_does_not_supersede_itself(tmp_path: Path) -> None:
+    """One closed milestone: a criterion refined the old text, another (accepted after the change) refines the new one: still outdated."""
+    host = closed_example(tmp_path)
+    reword_criterion(host, CRITERION, NEW_TEXT)
+    edit_doc(host, "14_roadmap.json", lambda doc: doc["milestones"][0]["tasks"][0]["acceptance_criteria"].append(criterion("tc-again", refines=[CRITERION])))
+    accept(host, "tc-again")
+    assert (statuses(host)[KEY], statuses(host)[("tc-again", CRITERION)]) == (OUTDATED, CURRENT)
+
+
+def test_an_open_criterion_that_refined_the_old_version_is_not_the_existing_change_milestone(tmp_path: Path) -> None:
+    host = closed_example(tmp_path)
+    add_milestone(host, "ms-token-ttl", [criterion("tc-ttl-31", refines=[CRITERION])], done=False)
+    reword_criterion(host, CRITERION, NEW_TEXT)
+    assert [(entry.code, entry.existing_milestone) for entry in unresolved(host)] == [("E343", None)]
+    accept(host, "tc-ttl-31")
+    assert [(entry.code, entry.existing_milestone) for entry in unresolved(host)] == [("E343", "ms-token-ttl")]
+
+
+def test_a_renamed_container_still_answers_a_removal(tmp_path: Path) -> None:
+    """The lock recorded the FR under its old id; the removal criterion names its new id."""
+    host = closed_example(tmp_path)
+    renamed = "fr-password-reset-v2"
+    edit_doc(host, "04_fr_list.json", lambda doc: doc["functional_requirements"][0].update(fr_id=renamed, aliases=[FR]))
+    delete_criterion(host, CRITERION)
+    assert [(entry.code, entry.target) for entry in unresolved(host)] == [("E344", CRITERION)]
+    edit_doc(host, "08_fixtures.json", lambda doc: doc["fixtures"].append({**doc["fixtures"][0], "fixture_id": "fix-reset-gone", "verifies": [], "removes": [renamed]}))
+    add_milestone(host, "ms-retire-reset", [criterion("tc-retire-reset", removes=[renamed], verified_by=["fix-reset-gone"])], done=True)
+    assert unresolved(host) == []
+
+
+def test_a_not_applicable_target_is_hashed_on_its_own_and_stays_current(tmp_path: Path) -> None:
+    host = closed_example(tmp_path)
+    edit_doc(host, "04_fr_list.json", lambda doc: doc["functional_requirements"][0]["acceptance_criteria"][2].update(lifecycle="not_applicable"))
+    assert statuses(host)[KEY] == CURRENT

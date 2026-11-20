@@ -8,7 +8,7 @@ from specdev_tools.graph.queries import milestone_of
 from specdev_tools.trace.history import contained
 
 from .context import GraphCheckContext
-from .names import DESIGN_MILESTONE, REFINES, ROADMAP_MILESTONE, SCHEDULES, TASK_CRITERION, link_targets
+from specdev_tools.graph.names import DESIGN_MILESTONE, REFINES, ROADMAP_MILESTONE, SCHEDULES, TASK_CRITERION, link_targets
 from .use_table import Use, use_pairs
 
 

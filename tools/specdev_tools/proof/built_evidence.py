@@ -24,29 +24,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cache
 
+from specdev_tools.core.errors import FindingError
 from specdev_tools.core.host_declarations import HostDeclarationsError, load_host_declarations
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.proof.proof import NOT_REQUIRED, PENDING_STAGE, PROVEN, ProofResult, proof, verifier_proof
-from specdev_tools.proof.stages import STAGES, binding_stage, bindings_of, is_retired_binding, retired_binding_ids, stage_rank
+from specdev_tools.proof.proof import NOT_REQUIRED, PENDING_STAGE, PROVEN, REASON_NO_VERIFIER, REASON_UNBOUND, ProofResult, proof, verifier_proof
+from specdev_tools.graph.stages import STAGES, binding_stage, bindings_of, is_retired_binding, retired_binding_ids, stage_at_least, stage_rank
 from specdev_tools.proof.validity import ProofContext
 from specdev_tools.thirdparty.check import check_pins
 from specdev_tools.validation.graph_checks.built import (
-    EVIDENCE_KINDS, OBLIGATION_ROLES, PIN_MISMATCH, PIN_OK, BuiltComputation, BuiltResult, BuiltState, combine, compute_built,
+    EVIDENCE_KINDS, PIN_MISMATCH, PIN_OK, BuiltComputation, BuiltResult, BuiltState, combine, compute_built,
     register_built_provider,
 )
 from specdev_tools.validation.graph_checks.context import PIN_UNKNOWN, GraphCheckContext, bind_seams
-from specdev_tools.validation.graph_checks.names import REALISES, RULE, THIRD_PARTY, VERIFIER_ROLE, VERIFIES
+from specdev_tools.graph.names import ABOUT, BINDING_KIND, NFR, OBLIGATION_ROLES, REALISES, REVIEW_ENFORCER, RULE, THIRD_PARTY, VERIFIER_ROLE, VERIFIES
 from specdev_tools.validation.graph_checks.refinement import mitigations
-from specdev_tools.verify.records import BINDING_KIND, EVIDENCE_KIND, records_folder
+from specdev_tools.verify.records import EVIDENCE_KIND, records_folder
 
-NFR = "nfr"
 THREAT_KINDS = frozenset({"threat", "edge-case"})
-_REVIEW = "review"
 _PROOF_KEY = "proof-context"
 _PINS_KEY = "pin-results"
-_RECORD_LINKS = {BINDING_KIND: VERIFIES, EVIDENCE_KIND: "about"}
+_RECORD_LINKS = {BINDING_KIND: VERIFIES, EVIDENCE_KIND: ABOUT}
 """For each kind of record, the link field through which it names a verifier."""
 _NO_HOST = "no host repository to read evidence from"
 
@@ -118,16 +117,16 @@ def _waits_for(graph: Graph, node: Node, cap: str) -> str:
     stages = [
         binding_stage(record, graph) for verifier in verifiers for record in bindings_of(verifier, graph) if not is_retired_binding(record, graph)
     ]
-    above = [stage for stage in stages if stage_rank(stage) > stage_rank(cap)]
+    above = [stage for stage in stages if not stage_at_least(cap, stage)]
     return min(above, key=stage_rank) if above else STAGES[min(stage_rank(cap) + 1, len(STAGES) - 1)]
 
 
 def _unproven_reason(result: ProofResult) -> str:
     """Why *result* (an ``UNPROVEN``, ``UNBOUND`` or ``NO_VERIFIER`` proof) is not built, in a few words."""
     shortfall = result.shortfalls[0] if result.shortfalls else None
-    if shortfall is None or shortfall.reason == "NO_VERIFIER":
+    if shortfall is None or shortfall.reason == REASON_NO_VERIFIER:
         return "no verifier proves it"
-    if shortfall.reason == "UNBOUND":
+    if shortfall.reason == REASON_UNBOUND:
         return f"its verifier {shortfall.verifier} has no binding"
     return f"{shortfall.binding or shortfall.verifier} has no valid evidence ({shortfall.reason})"
 
@@ -159,10 +158,11 @@ class _EvidenceBranches:
         if node.role not in OBLIGATION_ROLES:
             return False
         if node.kind == RULE:
-            return (item_of(self.graph, node) or {}).get("enforcer") != _REVIEW
+            return (item_of(self.graph, node) or {}).get("enforcer") != REVIEW_ENFORCER
         return node.kind in EVIDENCE_KINDS or node.kind == NFR
 
     def __call__(self, computation: BuiltComputation, node: Node) -> BuiltResult:
+        """The state of *node* from its proof; a proof that cannot be made (E334: the stage cannot be told) is not built, with the finding's message as the reason."""
         if node.kind == NFR:
             return self._nfr(computation, node)
         host = proof_context(computation.ctx)
@@ -174,6 +174,8 @@ class _EvidenceBranches:
             return _from_proof(self.graph, node, proof(self.graph, host, node.id, self.cap), self.cap)
         except GitViewError as exc:
             return BuiltResult(BuiltState.PENDING_EVIDENCE, f"the code tree cannot be read: {exc}")
+        except FindingError as exc:
+            return BuiltResult(BuiltState.NOT_BUILT, exc.error.message)
 
     def _nfr(self, computation: BuiltComputation, node: Node) -> BuiltResult:
         """The default state; relieved when that is built and the proof of the NFR waits only for a stage above the cap (an unreadable host leaves the default)."""
@@ -185,6 +187,8 @@ class _EvidenceBranches:
             result = proof(self.graph, host, node.id, self.cap)
         except GitViewError:
             return default
+        except FindingError as exc:
+            return BuiltResult(BuiltState.NOT_BUILT, exc.error.message)
         return _relieved(self.graph, node, self.cap, default.reason + "; its proof waits for a later stage") if result.status == PENDING_STAGE else default
 
     def _threat(self, computation: BuiltComputation, node: Node, host: ProofContext) -> BuiltResult:

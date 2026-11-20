@@ -27,12 +27,11 @@ from specdev_tools.graph.gitview import (
 )
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.queries import ROADMAP_MILESTONE
+from specdev_tools.graph.names import ABOUT, ROADMAP_MILESTONE
 from specdev_tools.trace.hashing import content_hash
 from specdev_tools.trace.lockfile import LockEntry
 
 ANCHOR_ROW_KIND = "anchor-row"
-ABOUT_FIELD = "about"
 DONE_STATUS = "done"
 _DEFAULT_STATUS = "pending"
 
@@ -50,7 +49,7 @@ def done_milestones(graph: Graph) -> set[str]:
         if anchor.kind != ANCHOR_ROW_KIND or _anchor_status(graph, anchor) != DONE_STATUS:
             continue
         for link in anchor.links:
-            milestone = graph.find(link.target) if link.field == ABOUT_FIELD else None
+            milestone = graph.find(link.target) if link.field == ABOUT else None
             if milestone is not None and milestone.kind == ROADMAP_MILESTONE:
                 done.add(milestone.id)
     return done
@@ -66,6 +65,20 @@ def contained(graph: Graph, root: str) -> set[str]:
             found.add(node_id)
             pending.extend(graph.children.get(node_id, ()))
     return found
+
+
+def containers_of(graph: Graph, node: Node) -> tuple[str, ...]:
+    """The ids of the nodes that enclose *node*: its containment parent, then that node's parent, up to the top.
+
+    Nearest first, and empty for a node with no parent.  This is what ``LockEntry.target_containers`` records for the
+    target of a link when the entry is written.
+    """
+    found: list[str] = []
+    parent = graph.by_id.get(node.parent) if node.parent else None
+    while parent is not None and parent.id not in found:
+        found.append(parent.id)
+        parent = graph.by_id.get(parent.parent) if parent.parent else None
+    return tuple(found)
 
 
 def historical_node_ids(graph: Graph) -> set[str]:

@@ -14,10 +14,11 @@ from typing import Any
 
 from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
-from specdev_tools.proof.stages import STAGES
+from specdev_tools.graph.stages import DEFAULT_STAGE, STAGES
 from specdev_tools.trace.writing import locked_graph
 from specdev_tools.verify.bind import BindRequest, BindResult, apply_bind
 from specdev_tools.verify.code_tree import submodule_warnings
+from specdev_tools.verify.installed_versions import installed_overrides, installed_pairs
 from specdev_tools.trace.records import RECORDS_DIR
 from specdev_tools.verify.records import Evidence, records_folder
 from specdev_tools.verify.run import run_bindings, selected_ids
@@ -71,7 +72,7 @@ def add_verify_parsers(sub: Any) -> None:
     run.add_argument("binding_ids", nargs="*", metavar="ver-ID", help="The bindings to run")
     run.add_argument("--all", action="store_true", dest="every", help="Run every binding")
     run.add_argument("--milestone", metavar="ms-ID", help="Run the bindings of the verifiers this milestone's task criteria name in verified_by")
-    run.add_argument("--stage", choices=STAGES, default=STAGES[0], help="The stage this run executes in (default dev)")
+    run.add_argument("--stage", choices=STAGES, default=DEFAULT_STAGE, help="The stage this run executes in (default dev)")
     run.add_argument("--only-stage", action="store_true", dest="only_stage", help="Run only the bindings whose stage is exactly --stage")
     run.add_argument("--no-record", action="store_true", dest="no_record", help="Write no evidence; the run is the proof")
     run.add_argument("--installed", action="extend", nargs="+", metavar="TP=VERSION", help="The version of a third party as installed, instead of the declared one")
@@ -124,17 +125,6 @@ def run_verify_bind(args: argparse.Namespace) -> int:
     return run_on_graph("verify bind", args, lambda _graph: _bind(args))
 
 
-def installed_overrides(pairs: Sequence[str]) -> dict[str, str] | None:
-    """``{third party: version}`` from ``TP=VERSION`` items; ``None`` when one is not of that form."""
-    overrides: dict[str, str] = {}
-    for pair in pairs:
-        name, separator, version = pair.partition("=")
-        if not separator or not name or not version:
-            return None
-        overrides[name] = version
-    return overrides
-
-
 def _evidence_line(evidence: Evidence) -> str:
     verdict = "PASS" if evidence.passed else "FAIL"
     reason = "" if evidence.passed else f" ({'guard not matched' if evidence.exit_code == 0 else f'exit {evidence.exit_code}'})"
@@ -172,11 +162,15 @@ def _binding_ids(args: argparse.Namespace, graph: Graph) -> list[str] | None:
 
 def _run(args: argparse.Namespace, graph: Graph) -> int:
     ids = _binding_ids(args, graph)
-    overrides = installed_overrides(args.installed or ())
+    pairs = installed_pairs(args.installed or ())
     if ids is None:
         return usage_error("verify run", "name bindings, or give exactly one of --all and --milestone")
-    if overrides is None:
+    if pairs is None:
         return usage_error("verify run", "--installed takes TP=VERSION")
+    try:
+        overrides = installed_overrides(pairs, graph)
+    except ValueError as exc:
+        return usage_error("verify run", str(exc))
     spec_root, git_root = os.path.abspath(args.spec_root), resolve_git_root(args)
     warnings = [error.render() for error in submodule_warnings(git_root)]
     record = not args.no_record

@@ -10,21 +10,23 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from specdev_tools.core.errors import FindingError, make_error
+from specdev_tools.core.errors import refusal
 from specdev_tools.core.json_utils import JQ_INDENT
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.schema_validate import schema_violations, violation_text
 from specdev_tools.graph.contract import item_of
+from specdev_tools.graph.ids import mint_slug, suggest_prefix
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.proof.stages import STAGES, binding_stage
+from specdev_tools.graph.names import BINDING_KIND, THIRD_PARTY, VERIFIES
+from specdev_tools.graph.stages import DEFAULT_STAGE, STAGES, binding_stage
 from specdev_tools.trace.lockfile import replace_file_atomically
 from specdev_tools.trace.records import RECORD_FILE_SUFFIX, RECORDS_DIR
 
-BINDING_KIND = "verification-record"
 EVIDENCE_KIND = "evidence-record"
 ATTESTATION_TYPE = "attestation"
 RUN_TYPE = "run"
@@ -32,12 +34,33 @@ VERIFICATION_SCHEMA = "vc:extras:verification-record"
 EVIDENCE_SCHEMA = "vc:extras:evidence-record"
 BINDING_PREFIX = "ver-"
 EVIDENCE_PREFIX = "evd-"
-_VERIFIES = "verifies"
+INSTALL_CHECK_INFIX = "install-"
+BINDING_ID = re.compile(rf"^{re.escape(BINDING_PREFIX)}[a-z0-9]+(?:-[a-z0-9]+)*$")
+"""The form of a binding id: ``ver-`` and a kebab-case name."""
 
 
-def refusal(code: str, message: str) -> FindingError:
-    """The finding a command prints before it exits 1: *code* with *message*, no owner, no node."""
-    return FindingError(make_error(code, message))
+def id_suffix(kind: str, node_id: str) -> str:
+    """*node_id* without the prefix ``graph.ids`` suggests for *kind* (the whole id when it does not start with it)."""
+    prefix = suggest_prefix(kind)
+    return node_id.removeprefix(prefix) if prefix else node_id
+
+
+def evidence_id(binding_id: str, stage: str) -> str:
+    """The id of the run evidence of *binding_id* at *stage*: ``evd-``, the binding id without ``ver-``, then the stage."""
+    return f"{EVIDENCE_PREFIX}{binding_id.removeprefix(BINDING_PREFIX)}-{stage}"
+
+
+def install_check_id(third_party_id: str, env: str) -> str:
+    """The id of the install-check record of *third_party_id* for *env*: ``evd-install-``, the id without its prefix, then the environment.
+
+    Raises:
+        FindingError: E767 when *env* has no letter or digit to make an id from.
+    """
+    try:
+        slug = mint_slug(env, ())
+    except ValueError as exc:
+        raise refusal("E767", f"the environment '{env}' has no letter or digit to name the install-check record from; give --env a name such as prod") from exc
+    return f"{EVIDENCE_PREFIX}{INSTALL_CHECK_INFIX}{id_suffix(THIRD_PARTY, third_party_id)}-{slug}"
 
 
 @dataclass(frozen=True)
@@ -55,7 +78,7 @@ class Binding:
 def binding_of(node: Node, graph: Graph) -> Binding:
     """The binding the verification record *node* declares; ``proves`` ids are resolved to current ids (a rename leaves the old id in the file)."""
     item = item_of(graph, node) or {}
-    targets = [graph.canonical_id(link.target) for link in node.links if link.field == _VERIFIES]
+    targets = [graph.canonical_id(link.target) for link in node.links if link.field == VERIFIES]
     return Binding(
         id=node.id,
         verifier=targets[0] if targets else "",
@@ -123,7 +146,7 @@ def _about(item: Mapping[str, Any]) -> tuple[str, ...] | None:
 
 def evidence_from_item(item: Mapping[str, Any]) -> Evidence | None:
     """The run evidence a stored evidence record *item* states; ``None`` when it is another type or is not shaped as the evidence schema says (the record check reports that)."""
-    about, stage, tree = _about(item), item.get("stage", "dev"), item.get("tested_tree")
+    about, stage, tree = _about(item), item.get("stage", DEFAULT_STAGE), item.get("tested_tree")
     code, matched, digest = item.get("exit_code"), item.get("guard_matched"), item.get("output_hash")
     if item.get("type", RUN_TYPE) != RUN_TYPE or about is None or stage not in STAGES or not isinstance(tree, str):
         return None
@@ -163,7 +186,7 @@ def attestations_about(graph: Graph, node_id: str) -> list[Attestation]:
     found: list[Attestation] = []
     for node in graph.by_kind.get(EVIDENCE_KIND, ()):
         item = item_of(graph, node) or {}
-        about, stage, tree = _about(item), item.get("stage", "dev"), item.get("tested_tree")
+        about, stage, tree = _about(item), item.get("stage", DEFAULT_STAGE), item.get("tested_tree")
         if item.get("type") != ATTESTATION_TYPE or about is None or stage not in STAGES or not isinstance(tree, str):
             continue
         if wanted in (graph.canonical_id(name) for name in about):
@@ -200,9 +223,26 @@ def write_binding(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     return _write_record(folder, repo_root, VERIFICATION_SCHEMA, item["verification_id"], item)
 
 
+def _stored_type(path: str) -> str | None:
+    """The ``type`` of the one record of the evidence file at *path*; ``None`` when there is no file or it holds no record."""
+    document = read_json_object(path)
+    records = document.get("records") if document is not None else None
+    item = records[0] if isinstance(records, list) and records and isinstance(records[0], dict) else None
+    return item.get("type", RUN_TYPE) if item is not None else None
+
+
 def write_evidence(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     """Write (or replace) the evidence record *item* as ``<id>.json`` in *folder* (``records_folder``); returns the file name.
 
-    The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
+    A record of another ``type`` than *item*'s is never replaced: a run, an install check and an attestation can share an id.
+    The caller holds the write lock.  Raises ``FindingError`` (E767) for that, and (E774) when *item* breaks the record schema;
+    nothing is written then.
     """
+    wanted, stored = item.get("type", RUN_TYPE), _stored_type(os.path.join(folder, record_file(item["evidence_id"])))
+    if stored is not None and stored != wanted:
+        raise refusal(
+            "E767",
+            f"{record_file(item['evidence_id'])} holds a record of type '{stored}' and this write has type '{wanted}', which would replace it; "
+            f"choose another binding id with `specdev verify bind ... --id ver-<name>` or another --env for the install check",
+        )
     return _write_record(folder, repo_root, EVIDENCE_SCHEMA, item["evidence_id"], item)

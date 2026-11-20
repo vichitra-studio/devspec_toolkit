@@ -9,7 +9,7 @@ from specdev_tools.proof.validity import ProofContext
 from specdev_tools.verify.records import Binding, Evidence, binding_of, records_folder, write_binding, write_evidence
 from specdev_tools.verify.run import run_bindings
 from unit.graph._synth import ROOT
-from unit.verify._support import commit_all, edit_doc, example_host, graph_of, write
+from unit.verify._support import commit_all, edit_binding, edit_doc, example_host, graph_of, write
 
 FIXTURE = "fix-password-reset-expired-token"
 OTHER_FIXTURE = "fix-password-reset-reused-token"
@@ -81,6 +81,15 @@ def attest(host: Path, node_id: str, *, stage: str = "dev", evidence_id: str = "
     write_evidence(records_folder(str(host / "spec")), str(ROOT), item)
 
 
+def ci_host(tmp_path: Path, *, binding_id: str = "ver-alpha", verifier: str = FIXTURE, proves: tuple[str, ...] = (CRITERION, API),
+            commands: tuple[str, ...] = (PASSING,), ran: bool = True) -> Path:
+    """The example with one ``ci`` binding of *verifier*, run once at ``ci`` when *ran*."""
+    host = host_with(tmp_path, binding_item(binding_id, verifier=verifier, proves=proves, stage="ci", commands=commands))
+    if ran:
+        run(host, [binding_id], stage="ci")
+    return host
+
+
 def edit_code(host: Path, text: str = "changed\n") -> None:
     """Change the code of *host* (not committed: the code tree sees the working tree)."""
     write(host / "src" / "hello.txt", text)
@@ -88,5 +97,5 @@ def edit_code(host: Path, text: str = "changed\n") -> None:
 
 __all__ = [
     "API", "CRITERION", "REUSED_BINDING", "EXAMPLE_BINDING", "FIXTURE", "GUARD", "INVARIANT", "NFR", "OTHER_FIXTURE", "PASSING", "TP", "add_fixture", "binding",
-    "attest", "binding_item", "commit_all", "context", "edit_code", "edit_doc", "graph_of", "host_with", "prove", "run",
+    "attest", "binding_item", "ci_host", "commit_all", "context", "edit_binding", "edit_code", "edit_doc", "graph_of", "host_with", "prove", "run",
 ]

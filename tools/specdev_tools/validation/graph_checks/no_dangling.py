@@ -13,7 +13,7 @@ from specdev_tools.graph.model import NOT_APPLICABLE, Node
 
 from .codes import NODE_DANGLING
 from .context import GraphCheckContext, Mode
-from .names import DESIGN_MILESTONE, SCAFFOLD_ROW, SCHEDULES, VERIFIER_ROLE
+from specdev_tools.graph.names import DESIGN_MILESTONE, SCAFFOLD_ROW, SCHEDULES, VERIFIER_ROLE
 from .use_table import Use, step_of, use_pairs
 
 CHECKED_ROLES = frozenset({"obligation-system", "obligation-delivery", "context"})

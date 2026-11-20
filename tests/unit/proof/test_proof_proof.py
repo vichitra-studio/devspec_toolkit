@@ -1,22 +1,21 @@
 """Proof of an obligation at a gate: the statuses, the routing per kind, the close mode and the findings of a gate."""
 from __future__ import annotations
 
-import json
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from specdev_tools.core.errors import FindingError
 from specdev_tools.proof.proof import (
     NO_VERIFIER, NOT_REQUIRED, PENDING_STAGE, PROVEN, UNBOUND, UNPROVEN, proof, proof_errors, verifier_proof,
 )
-from specdev_tools.proof.validity import NO_EVIDENCE, NONZERO_EXIT, STALE_TREE, node_evidence
-from specdev_tools.verify.records import records_folder, write_binding
+from specdev_tools.proof.validity import NO_EVIDENCE, NONZERO_EXIT, STALE_TREE, evidence_for
+from specdev_tools.verify.records import binding_of, records_folder, write_binding
 from unit.graph._synth import ROOT
 
 from ._support import (
-    API, CRITERION, FIXTURE, INVARIANT, NFR, OTHER_FIXTURE, REUSED_BINDING, add_fixture, attest, binding_item, context, edit_code, edit_doc, graph_of,
+    API, ci_host, edit_binding, CRITERION, FIXTURE, INVARIANT, NFR, OTHER_FIXTURE, REUSED_BINDING, add_fixture, attest, binding_item, context, edit_code, edit_doc, graph_of,
     host_with, prove, run,
 )
 
@@ -26,13 +25,6 @@ TASK_CRITERION = "tc-confirm-expired-token"
 CLI_RULE = "rule-spec-check-on-every-pr"
 THREAT = "threat-reset-token-replay"
 SECOND = "fix-second-expired-token"
-
-
-def _edit_binding(host: Path, binding_id: str, edit: Callable[[dict[str, Any]], None]) -> None:
-    path = host / "spec" / "extras" / "verification" / f"{binding_id}.json"
-    document = json.loads(path.read_text(encoding="utf-8"))
-    edit(document["records"][0])
-    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
 def _bound(tmp_path: Path, *extra: dict[str, Any], run_ids: tuple[str, ...] = (ALPHA,)) -> Path:
@@ -105,13 +97,8 @@ def test_manual_fixture_with_valid_attestation_is_proven_and_unproven_without(tm
     assert prove(host, CRITERION).status == UNPROVEN
 
 
-def _ci_host(tmp_path: Path, commands: tuple[str, ...] = ("echo expected line",)) -> Path:
-    host = host_with(tmp_path, binding_item(ALPHA, stage="ci", commands=commands))
-    return host
-
-
 def test_ci_binding_is_proven_at_cap_ci_from_transient_evidence_without_a_file(tmp_path: Path) -> None:
-    host = _ci_host(tmp_path)
+    host = ci_host(tmp_path, ran=False)
     transient = run(host, [ALPHA], stage="ci", record=False)
     assert list((host / "spec" / "extras" / "verification").glob("evd-*")) == []
     assert prove(host, CRITERION, "ci").status == UNPROVEN
@@ -119,15 +106,14 @@ def test_ci_binding_is_proven_at_cap_ci_from_transient_evidence_without_a_file(t
 
 
 def test_failing_transient_run_is_unproven(tmp_path: Path) -> None:
-    host = _ci_host(tmp_path, (FAILING,))
+    host = ci_host(tmp_path, commands=(FAILING,), ran=False)
     transient = run(host, [ALPHA], stage="ci", record=False)
     result = prove(host, CRITERION, "ci", transient_evidence=transient)
     assert (result.status, result.shortfalls[0].reason) == (UNPROVEN, NONZERO_EXIT)
 
 
 def test_close_mode_ci_binding_with_dev_evidence_is_proven(tmp_path: Path) -> None:
-    host = _bound(tmp_path)
-    _edit_binding(host, ALPHA, lambda record: record.update(stage="ci"))
+    host = _bound(tmp_path, binding_item("ver-beta", proves=(CRITERION,), stage="ci"))
     assert prove(host, CRITERION, "dev", treat_ci_as_dev=True).status == PROVEN
     assert prove(host, CRITERION, "ci").status == UNPROVEN
 
@@ -146,7 +132,7 @@ def test_close_mode_ignores_a_staging_binding(tmp_path: Path) -> None:
 
 def test_plain_cap_dev_leaves_the_ci_binding_pending_stage(tmp_path: Path) -> None:
     host = _bound(tmp_path)
-    _edit_binding(host, ALPHA, lambda record: record.update(stage="ci"))
+    edit_binding(host, ALPHA, lambda record: record.update(stage="ci"))
     assert prove(host, CRITERION, "dev").status == PENDING_STAGE
 
 
@@ -215,13 +201,124 @@ def test_verifier_proof_for_no_binding_no_evidence_other_tree_lower_stage_and_re
     edit_code(host)
     assert verifier_proof(graph_of(host), context(host), FIXTURE, "dev").shortfalls[0].reason == STALE_TREE
     run(host, [ALPHA])
-    _edit_binding(host, ALPHA, lambda record: record.update(stage="staging"))
-    assert verifier_proof(graph_of(host), context(host), FIXTURE, "staging").shortfalls[0].reason == "STAGE_TOO_LOW"
+    edit_binding(host, ALPHA, lambda record: record.update(stage="staging"))
+    assert verifier_proof(graph_of(host), context(host), FIXTURE, "staging").shortfalls[0].reason == "STALE_HASH"
     edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"]["staging"].update(scope="out"))
     assert verifier_proof(graph_of(host), context(host), FIXTURE, "staging").status == NOT_REQUIRED
+    host = host_with(tmp_path, binding_item(ALPHA), binding_item("ver-late", proves=(CRITERION,), stage="staging"), name="lower")
+    run(host, [ALPHA])
+    assert verifier_proof(graph_of(host), context(host), FIXTURE, "staging").shortfalls[0].reason == "STAGE_TOO_LOW"
 
 
-def test_node_evidence_lists_the_evidence_of_the_bindings_that_prove_the_node(tmp_path: Path) -> None:
+def test_the_advice_for_a_stale_third_party_version_names_the_repository_before_the_run(tmp_path: Path) -> None:
+    """A run records the version the repository declares: running again does not clear it until the declared version is the pin."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(API,)))
+    run(host, [ALPHA], installed={"tp-argon2": "0.41.1"})
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(pin="0.42.0"))
+    [error] = proof_errors(graph_of(host), context(host), [API], "dev")
+    assert (error.code, error.subcode) == ("E347", "STALE_TP_VERSION")
+    assert "equal the pin" in error.message and "third-party check" in error.message
+    assert error.message.endswith("then run `specdev verify run ver-alpha --stage dev`")
+
+
+def test_a_node_whose_stage_cannot_be_told_is_not_proven_and_proof_errors_reports_e334(tmp_path: Path) -> None:
+    """An environment that is not a stage was read as ``dev``; now the proof raises and the gate's findings carry E334 for the node."""
     host = _bound(tmp_path)
-    assert [e.evidence_id for e in node_evidence(graph_of(host), context(host), CRITERION)] == ["evd-alpha-dev"]
-    assert node_evidence(graph_of(host), context(host), INVARIANT) == []
+    edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"].update(qa={"scope": "in"}))
+    edit_doc(host, "12_ci_gates.json", lambda doc: doc["jobs"].append({"job_id": "job-qa-smoke", "name": "QA smoke", "realises": ["qa"]}))
+    with pytest.raises(FindingError) as caught:
+        prove(host, "qa")
+    assert caught.value.error.code == "E334"
+    errors = proof_errors(graph_of(host), context(host), [CRITERION, "qa"], "dev")
+    assert [(e.code, e.node_id) for e in errors] == [("E334", "qa")]
+    assert "environment 'qa' is not a stage" in errors[0].message
+
+
+# --- the neighbour answers of the "proven" branches (round 1, B-4, A3, A4) --------------------------------------------
+
+
+def test_a_binding_that_proves_only_one_node_does_not_bind_the_other_obligation_of_its_verifier(tmp_path: Path) -> None:
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)))
+    run(host, [ALPHA])
+    assert prove(host, CRITERION).status == PROVEN
+    result = prove(host, API)
+    assert (result.status, result.shortfalls[0].reason) == (UNBOUND, "UNBOUND")
+
+
+def test_an_attestation_below_the_stage_the_obligation_needs_is_stage_too_low(tmp_path: Path) -> None:
+    host = host_with(tmp_path)
+    manual = "fix-latency-manual"
+    add_fixture(host, fixture_id=manual, verifies=[NFR], mode="manual", manual_reason="A person times the delivery of the reset email.")
+    attest(host, manual, stage="dev")
+    result = prove(host, NFR, "staging")
+    assert (result.status, result.shortfalls[0].reason) == (UNPROVEN, "STAGE_TOO_LOW")
+    attest(host, manual, stage="staging", evidence_id="evd-attest-two")
+    assert prove(host, NFR, "staging").status == PROVEN
+
+
+def test_a_sibling_binding_with_another_guard_gets_no_credit_for_a_run_it_did_not_make(tmp_path: Path) -> None:
+    """Same verifier, same commands, another guard: the run of the first is not a run of the second."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)), binding_item("ver-beta", proves=(API,), guard="expected"))
+    run(host, [ALPHA])
+    assert prove(host, CRITERION).status == PROVEN
+    result = prove(host, API)
+    assert (result.status, result.shortfalls[0].reason, result.shortfalls[0].binding) == (UNPROVEN, NO_EVIDENCE, "ver-beta")
+
+
+def test_an_evidence_file_that_is_about_another_binding_is_not_the_evidence_of_this_one(tmp_path: Path) -> None:
+    host = host_with(tmp_path, binding_item(ALPHA))
+    run(host, [ALPHA])
+    edit_binding(host, "evd-alpha-dev", lambda record: record.update(about=["ver-someone-else"]))
+    graph = graph_of(host)
+    assert evidence_for(binding_of(graph.by_id[ALPHA], graph), context(host)) == []
+    assert prove(host, CRITERION).shortfalls[0].reason == NO_EVIDENCE
+
+
+def test_the_hashes_of_a_context_follow_the_graph_it_is_asked_about(tmp_path: Path) -> None:
+    host = host_with(tmp_path)
+    ctx = context(host)
+    before = dict(ctx.content_hashes(graph_of(host)))
+    edit_doc(host, "04_fr_list.json", lambda doc: doc["functional_requirements"][0]["acceptance_criteria"][2].update(text="A reset link older than 31 minutes is refused with HTTP 410."))
+    after = ctx.content_hashes(graph_of(host))
+    assert after[CRITERION] != before[CRITERION]
+
+
+def test_an_unproven_verifier_outweighs_a_pending_one(tmp_path: Path) -> None:
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)), binding_item("ver-late", verifier=SECOND, proves=(CRITERION,), stage="ci"))
+    add_fixture(host, fixture_id=SECOND, verifies=[CRITERION])
+    result = prove(host, CRITERION, "dev")
+    assert (result.status, [s.verifier for s in result.shortfalls]) == (UNPROVEN, [FIXTURE])
+
+
+def test_a_manual_fixture_that_also_has_a_binding_record_is_not_proven_by_an_attestation(tmp_path: Path) -> None:
+    """The attestation covers a manual fixture with no binding at all; a record that names it (by hand) leaves it to the binding rules."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)))
+    edit_doc(host, "08_fixtures.json", lambda doc: doc["fixtures"][0].update(mode="manual", manual_reason="A person reads the mail relay log."))
+    attest(host, FIXTURE)
+    result = prove(host, API)
+    assert (result.status, result.shortfalls[0].reason) == (UNBOUND, "UNBOUND")
+
+
+def test_the_advice_for_a_failing_run_says_to_fix_it_before_running(tmp_path: Path) -> None:
+    host = host_with(tmp_path, binding_item(ALPHA, commands=(FAILING,)))
+    run(host, [ALPHA])
+    [first, *_rest] = proof_errors(graph_of(host), context(host), [CRITERION], "dev")
+    assert first.subcode == NONZERO_EXIT and "the commands failed; fix it, then run `specdev verify run ver-alpha --stage dev`" in first.message
+
+
+def test_a_threat_with_one_unproven_mitigation_is_unproven(tmp_path: Path) -> None:
+    """A3: the threat has two mitigations (the invariant and the expired-token fixture); only the invariant is run."""
+    host = host_with(tmp_path, binding_item(ALPHA), binding_item(REUSED_BINDING, verifier=OTHER_FIXTURE, proves=(INVARIANT,)))
+    run(host, [REUSED_BINDING])
+    result = prove(host, THREAT)
+    assert (result.status, [s.verifier for s in result.shortfalls]) == (UNPROVEN, [FIXTURE])
+
+
+def test_a_verifier_with_two_bindings_at_the_cap_is_unproven_when_the_second_fails(tmp_path: Path) -> None:
+    """A4: both bindings are due at dev; the first has a run, the second none."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)), binding_item("ver-api", proves=(API,), commands=("echo api line",), guard="api line"))
+    run(host, [ALPHA])
+    result = verifier_proof(graph_of(host), context(host), FIXTURE, "dev")
+    assert (result.status, result.shortfalls[0].binding) == (UNPROVEN, "ver-api")
+    run(host, ["ver-api"])
+    assert verifier_proof(graph_of(host), context(host), FIXTURE, "dev").status == PROVEN

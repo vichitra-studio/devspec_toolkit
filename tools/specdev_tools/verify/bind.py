@@ -6,26 +6,21 @@ holds the write lock, builds the graph under it, plans and writes (``apply_bind`
 """
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from specdev_tools.core.errors import refusal
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import mint_slug
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.names import BINDING_KIND, FIXTURE, JOB, MANUAL_MODE, REALISES, RULE, VERIFIES
 from specdev_tools.graph.queries import unknown_node_error
-from specdev_tools.proof.stages import UnknownStageForEnvironment, binding_required_stage, bindings_of, required_stage
+from specdev_tools.graph.stages import UnknownStageForEnvironment, binding_required_stage, bindings_of, required_stage
 from specdev_tools.verify.guard import GuardError, compile_guard
-from specdev_tools.verify.records import BINDING_KIND, BINDING_PREFIX, Binding, binding_of, records_folder, refusal, write_binding
+from specdev_tools.verify.records import BINDING_ID, BINDING_PREFIX, Binding, binding_of, id_suffix, records_folder, write_binding
 
-FIXTURE = "fixture"
-JOB = "job"
-RULE = "rule"
-_TARGET_FIELDS = {FIXTURE: ("verifies",), JOB: ("realises", "verifies"), RULE: ()}
-_ID_PREFIXES = ("fix-", "job-", "rule-")
-_RECORD_ID = re.compile(r"^ver-[a-z0-9]+(?:-[a-z0-9]+)*$")
-_MANUAL_MODE = "manual"
+_TARGET_FIELDS = {FIXTURE: (VERIFIES,), JOB: (REALISES, VERIFIES), RULE: ()}
 EMPTY_GUARD_NOTE = "the guard matches empty output, so it cannot tell a run that printed nothing; prefer a line only a real run prints"
 
 
@@ -73,7 +68,7 @@ def _verifier_of(graph: Graph, verifier_id: str) -> Node:
     if node.lifecycle == NOT_APPLICABLE:
         raise refusal("E767", f"'{node.id}' is not_applicable and takes no binding; set it active first or bind another verifier")
     item = item_of(graph, node) or {}
-    if node.kind == FIXTURE and item.get("mode") == _MANUAL_MODE:
+    if node.kind == FIXTURE and item.get("mode") == MANUAL_MODE:
         raise refusal("E767", f"fixture '{node.id}' is manual and is not run, so it takes no binding; a person attests it")
     return node
 
@@ -92,6 +87,16 @@ def proved_ids(binding: Binding, graph: Graph) -> tuple[str, ...]:
     """
     verifier = graph.find(binding.verifier)
     return binding.proves or (targets_of(verifier, graph) if verifier is not None else ())
+
+
+def hashed_ids(binding: Binding, graph: Graph) -> tuple[str, ...]:
+    """The ids a run of *binding* hashes and evidence rests on: the binding itself, its verifier and the nodes it proves (``proved_ids``).
+
+    A run records each one; evidence is valid only while each is as the run read it.  A file that another binding of the same
+    verifier wrote (same commands and guard) recorded that binding's hash, not this one's: it must have this binding's
+    verifier and proved nodes, and it goes stale when its writer changes.
+    """
+    return (binding.id, binding.verifier, *proved_ids(binding, graph))
 
 
 def _proved(request: BindRequest, verifier: Node, graph: Graph) -> tuple[str, ...]:
@@ -150,21 +155,17 @@ def _checked_guard(guard: str | None) -> tuple[str, ...]:
     return (EMPTY_GUARD_NOTE,) if pattern.search("") else ()
 
 
-def _suffix(verifier: Node) -> str:
-    return next((verifier.id.removeprefix(prefix) for prefix in _ID_PREFIXES if verifier.id.startswith(prefix)), verifier.id)
-
-
 def _own_bindings(verifier: Node, graph: Graph) -> list[Binding]:
     return [binding_of(node, graph) for node in bindings_of(verifier, graph)]
 
 
-def _owned(existing: Binding | None, stage: str, proves: tuple[str, ...]) -> bool:
-    """Whether the existing binding is the one this request updates: the same stage, and the same proved nodes (or none stated)."""
-    return existing is not None and existing.stage == stage and (set(existing.proves) == set(proves) or not existing.proves)
+def _owned(existing: Binding | None, proves: tuple[str, ...]) -> bool:
+    """Whether the existing binding is the one this request updates: the same proved nodes (or none stated); its stage is rewritten, so it may differ."""
+    return existing is not None and (set(existing.proves) == set(proves) or not existing.proves)
 
 
 def _explicit_id(record_id: str, verifier: Node, graph: Graph) -> str:
-    if not _RECORD_ID.match(record_id):
+    if not BINDING_ID.match(record_id):
         raise refusal("E767", f"'{record_id}' is not a binding id: ver- followed by a kebab-case name")
     holder = graph.find(record_id)
     if holder is not None and (holder.kind != BINDING_KIND or binding_of(holder, graph).verifier != verifier.id):
@@ -178,9 +179,9 @@ def _record_id(request: BindRequest, verifier: Node, stage: str, proves: tuple[s
         return _explicit_id(request.record_id, verifier, graph)
     own = {binding.id: binding for binding in _own_bindings(verifier, graph)}
     taken = set(graph.by_id) | set(graph.alias_index)
-    suffix = _suffix(verifier)
+    suffix = id_suffix(verifier.kind, verifier.id)
     for candidate in (mint_slug(suffix, (), prefix=BINDING_PREFIX), mint_slug(f"{suffix}-{stage}", (), prefix=BINDING_PREFIX)):
-        if candidate not in taken or _owned(own.get(candidate), stage, proves):
+        if candidate not in taken or _owned(own.get(candidate), proves):
             return candidate
     return mint_slug(f"{suffix}-{stage}", taken, prefix=BINDING_PREFIX)
 

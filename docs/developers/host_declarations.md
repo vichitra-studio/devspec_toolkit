@@ -10,14 +10,14 @@ The file is written by hand. Its shape is `schema/host_declarations.schema.json`
 |------|------------------|---------------|
 | `release_tag_pattern` | The regular expression a git tag must match to count as a release tag | No command yet; the release gates of milestone M9 read it |
 | `setup_command` | The command that prepares a clean checkout to run verification commands | No command yet; the gates of milestone M9 read it |
-| `code_tree_exclusions` | Git pathspecs left out of the code-tree id, so a change under them does not make recorded evidence stale | `specdev verify run` (the tree it records and compares, W351) |
+| `code_tree_exclusions` | Git pathspecs left out of the code-tree id, so a change under them does not make recorded evidence stale | `specdev verify run` (the tree it records and compares, W351); `specdev third-party check --installed` (the tree its install-check record names) |
 | `pin_sources` | Where the repository declares the version of a third party, keyed by the id of its third-party node: a `json-pointer` into a JSON file, or a `regex` with one capture group over a text file | `specdev third-party check` (E337, E338); `specdev verify run` (the `installed_versions` it records) |
 
 An item no command reads yet is still validated, so a mistake in it is found now and not at the first gate that needs it.
 
 `code_tree_exclusions` is for what is not the product's own code: the toolkit submodule path, generated report folders. A source folder of the product does not belong there, because evidence would then outlive a change to the code. A path that a run writes into and that is not ignored gives W351 (see its entry in [error-codes.md](error-codes.md)); add the path here or to `.gitignore`.
 
-`pin_sources` lists, for a third party, every place that must equal the node's `pin`. A third party with no entry is not checked. A key that names no third-party node is E338.
+`pin_sources` lists, for a third party, every place that must equal the node's `pin`. A third party with no entry is not checked, and it gets no stale-version check either: after a pin bump the evidence of a binding that relies on it is never `STALE_TP_VERSION` (run on the declarations fixture with the entry of `tp-argon2` removed: a bound record run once, then `third-party pin tp-argon2 0.42.0`, and `proof_errors` returned nothing). A key that names no third-party node is E338. A `regex` source is matched with MULTILINE, as the output guard of a binding is: `^` and `$` match at the start and end of each line (`^version = "(.*)"$` read `0.41.1` from a line of a `pkg.toml`, and `third-party check` printed `every pin matches its declared sources`).
 
 ## Example
 

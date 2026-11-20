@@ -15,27 +15,25 @@ import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from specdev_tools.core.errors import make_error
+from specdev_tools.core.errors import make_error, refusal
 from specdev_tools.core.host_declarations import HostDeclarations
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.queries import ROADMAP_MILESTONE, milestone_of, unknown_node_error
-from specdev_tools.proof.stages import stage_rank
+from specdev_tools.graph.names import BINDING_KIND, ROADMAP_MILESTONE, TASK_CRITERION, VERIFIED_BY
+from specdev_tools.graph.queries import milestone_of, unknown_node_error
+from specdev_tools.graph.stages import DEFAULT_STAGE, stage_at_least
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.lockfile import with_write_lock
 from specdev_tools.trace.writing import seed_texts_for_write
-from specdev_tools.verify.bind import proved_ids
+from specdev_tools.verify.bind import hashed_ids, proved_ids
 from specdev_tools.verify.code_tree import code_tree_for_host, declarations_of
-from specdev_tools.verify.guard import GuardError, guard_matches
+from specdev_tools.verify.guard import GuardError, compile_guard, guard_matches
 from specdev_tools.verify.installed_versions import installed_versions
-from specdev_tools.verify.records import BINDING_KIND, Binding, Evidence, EVIDENCE_PREFIX, all_bindings, binding_of, refusal, write_evidence
+from specdev_tools.verify.records import Binding, Evidence, all_bindings, binding_of, evidence_id, write_evidence
 
 TIMEOUT_EXIT_CODE = 124
 """The exit code recorded for a command that was killed at ``--timeout`` (the code of ``timeout(1)``)."""
-_TASK_CRITERION = "task-criterion"
-_VERIFIED_BY = "verified_by"
-_BINDING_PREFIX = "ver-"
 _NO_HASH = "sha256:"
 
 
@@ -77,21 +75,22 @@ def _run_commands(commands: Sequence[str], cwd: str, timeout: float | None) -> t
     return 0, output
 
 
-def _execute(binding: Binding, spec_dir: str, git_root: str, timeout: float | None) -> _Execution:
-    """Run the commands of *binding* between two measurements of the code tree; the evidence records the tree after the run."""
-    before = code_tree_for_host(git_root, spec_dir)
-    exit_code, output = _run_commands(binding.commands, git_root, timeout)
-    after = code_tree_for_host(git_root, spec_dir)
+def _execute(binding: Binding, spec_dir: str, git_root: str, timeout: float | None, before: str | None) -> _Execution:
+    """Run the commands of *binding* between two measurements of the code tree; the evidence records the tree after the run.
+
+    *before* is the tree measured by the caller (the ``tested_tree`` of the group run before, which no write in between changes); ``None`` measures it.
+
+    The guard is compiled first: a guard that is no regular expression is E332 and no command runs.
+    """
     try:
-        matched = exit_code != TIMEOUT_EXIT_CODE and guard_matches(binding.guard, output)
+        compile_guard(binding.guard)
     except GuardError as exc:
         raise refusal("E332", f"binding '{binding.id}': {exc}") from exc
+    before = before if before is not None else code_tree_for_host(git_root, spec_dir)
+    exit_code, output = _run_commands(binding.commands, git_root, timeout)
+    after = code_tree_for_host(git_root, spec_dir)
+    matched = exit_code != TIMEOUT_EXIT_CODE and guard_matches(binding.guard, output)
     return _Execution(exit_code, _NO_HASH + hashlib.sha256(output).hexdigest(), matched, after, after != before)
-
-
-def evidence_id(binding_id: str, stage: str) -> str:
-    """The id of the evidence of *binding_id* run at *stage*: ``evd-`` and the binding id without ``ver-``, then the stage."""
-    return f"{EVIDENCE_PREFIX}{binding_id.removeprefix(_BINDING_PREFIX)}-{stage}"
 
 
 def _tree_note(binding_id: str) -> str:
@@ -115,10 +114,10 @@ def _selected(bindings: Sequence[Binding], stage: str, only_stage: bool, *, expl
     A binding named by the caller (*explicit*) above the run stage is refused (E767); a binding found by ``--all`` or
     ``--milestone`` above it is left out.
     """
-    above = next((binding for binding in bindings if stage_rank(binding.stage) > stage_rank(stage)), None)
+    above = next((binding for binding in bindings if not stage_at_least(stage, binding.stage)), None)
     if explicit and above is not None:
         raise refusal("E767", f"binding '{above.id}' is a {above.stage} binding and this run is at {stage}; run with --stage {above.stage}")
-    wanted = [binding for binding in bindings if stage_rank(binding.stage) <= stage_rank(stage)]
+    wanted = [binding for binding in bindings if stage_at_least(stage, binding.stage)]
     return [binding for binding in wanted if binding.stage == stage] if only_stage else wanted
 
 
@@ -133,8 +132,8 @@ def milestone_binding_ids(graph: Graph, milestone: str) -> list[str]:
         raise unknown_node_error(graph, milestone) if found is None else refusal("E706", f"'{found.id}' is not a roadmap milestone")
     verifiers = {
         graph.canonical_id(link.target)
-        for node in graph.by_kind.get(_TASK_CRITERION, ()) if milestone_of(graph, node) == found.id
-        for link in node.links if link.field == _VERIFIED_BY
+        for node in graph.by_kind.get(TASK_CRITERION, ()) if milestone_of(graph, node) == found.id
+        for link in node.links if link.field == VERIFIED_BY
     }
     return [binding.id for binding in all_bindings(graph) if binding.verifier in verifiers]
 
@@ -165,7 +164,7 @@ def _evidence_for(binding: Binding, execution: _Execution, context: _Context) ->
     proves = proved_ids(binding, context.graph)
     proved = [node for node_id in proves if (node := context.graph.find(node_id)) is not None]
     versions, notes = installed_versions(proved, context.graph, context.declarations, context.git_root, context.overrides)
-    hashed = {node_id: context.hashes[node_id][0] for node_id in (binding.verifier, *proves) if node_id in context.hashes}
+    hashed = {node_id: context.hashes[node_id][0] for node_id in hashed_ids(binding, context.graph) if node_id in context.hashes}
     return Evidence(
         evidence_id=evidence_id(binding.id, context.stage),
         about=(binding.id,),
@@ -180,15 +179,15 @@ def _evidence_for(binding: Binding, execution: _Execution, context: _Context) ->
     )
 
 
-def _run_group(group: Sequence[Binding], context: _Context, record: bool) -> list[Evidence]:
-    """Run the commands of the first binding of *group* once, and make (and write) the evidence of every binding in it."""
-    execution = _execute(group[0], context.spec_dir, context.git_root, context.timeout)
+def _run_group(group: Sequence[Binding], context: _Context, record: bool, before: str | None) -> tuple[list[Evidence], str]:
+    """Run the commands of the first binding of *group* once, make (and write) the evidence of every binding in it; with the code tree after the run."""
+    execution = _execute(group[0], context.spec_dir, context.git_root, context.timeout, before)
     results = [_evidence_for(binding, execution, context) for binding in group]
     if record:
         for evidence in results:
             with with_write_lock(context.spec_dir):
                 write_evidence(context.evidence_dir, context.repo_root, evidence.to_item())
-    return results
+    return results, execution.tested_tree
 
 
 def _groups(bindings: Sequence[Binding]) -> list[list[Binding]]:
@@ -205,7 +204,7 @@ def run_bindings(
     evidence_dir: str,
     git_root: str,
     record: bool = True,
-    stage: str = "dev",
+    stage: str = DEFAULT_STAGE,
     only_stage: bool = False,
     *,
     timeout: float | None = None,
@@ -236,7 +235,9 @@ def run_bindings(
         compute_all(known, seed_texts_for_write(known, host_root)), timeout, installed or {},
     )
     results: dict[str, Evidence] = {}
+    tree: str | None = None
     for group in _groups(chosen):
-        for evidence in _run_group(group, context, record):
+        evidences, tree = _run_group(group, context, record, tree)
+        for evidence in evidences:
             results[evidence.about[0]] = evidence
     return [results[binding.id] for binding in chosen]

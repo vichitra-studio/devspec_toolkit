@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
-from specdev_tools.validation.graph_checks.names import FIXTURE, REMOVES, TASK_CRITERION, VERIFIED_BY, link_targets
+from specdev_tools.graph.names import FIXTURE, REMOVES, TASK_CRITERION, VERIFIED_BY, link_targets
+
+from .context import GraphCheckContext, Mode
 
 REMOVAL_FIXTURE_MISMATCH = "E341"
 REMOVES_TARGET_PRESENT = "E342"

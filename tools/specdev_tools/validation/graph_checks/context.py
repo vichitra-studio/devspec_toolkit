@@ -6,8 +6,9 @@ registry context and builds one from a graph and a lock (``GraphCheckContext.fro
 
 Four seams carry what the proof package (``specdev_tools.proof``) knows.  Each is a function of the context and the
 node, has a default that says "nothing known" and is replaced through ``bind_seams``, which returns the function that
-removes that binding; the proof package binds its implementations when it is imported, which
-``validation/graph_checks/__init__.py`` does, so every path that builds a context has them.
+removes that binding.  This package cannot import ``proof``, so the callers bind its three implementations
+(``proof.built_evidence.bind_proof_seams``): ``cli.py`` when it builds the parser and ``validation/spec_check.py`` when it is imported.
+A path that builds a context without either has the defaults.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ from specdev_tools.trace.lockfile import Lock
 from specdev_tools.validation import check_registry
 from specdev_tools.validation.check_registry import CheckContext, CheckFn
 
-from .names import MERGE, VERIFIER_ROLE
+from specdev_tools.graph.names import MERGE, VERIFIER_ROLE
 from .schema_slots import SchemaSlots
 from .use_table import furthest_steps
 
@@ -50,7 +51,7 @@ def _pin_unknown(_ctx: GraphCheckContext, _third_party: Node) -> str:
 
 @dataclass(frozen=True)
 class Seams:
-    """The four answers the proof package supplies, each a function of the context and the node; each default says that nothing is known.
+    """The four answers the proof package supplies (three of them: ``extra_verifiers`` is unbound by design), each a function of the context and the node; each default says that nothing is known.
 
     ``retired_bindings(ctx, verifier)``: the retired bindings of a verifier whose bindings are all retired, else empty.
     ``record_users(ctx, verifier)``: the verification or evidence records that name the verifier.
@@ -60,7 +61,7 @@ class Seams:
 
     retired_bindings: Callable[[GraphCheckContext, Node], set[str]] = _no_ids
     record_users: Callable[[GraphCheckContext, Node], set[str]] = _no_ids
-    extra_verifiers: Callable[[GraphCheckContext, Node], set[str]] = _no_ids
+    extra_verifiers: Callable[[GraphCheckContext, Node], set[str]] = _no_ids  # unbound by design: no package supplies it; two checks read it
     pin_matches: Callable[[GraphCheckContext, Node], str] = _pin_unknown
 
 

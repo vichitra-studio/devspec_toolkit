@@ -20,17 +20,10 @@ from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import check_unique_ids, defining_file
 from specdev_tools.graph.kinds import SEED_KIND, SEED_STEP, LinkDecl
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.names import COMPONENT, CONNECTION, CONNECTS_TO, DERIVES_FROM, PROVIDED_BY, RELIES_ON, ROADMAP_MILESTONE, THIRD_PARTY
 from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
 NEAREST_COUNT = 3
-ROADMAP_MILESTONE = "roadmap-milestone"
-THIRD_PARTY = "third-party"
-COMPONENT = "component"
-CONNECTION = "connection"
-RELIES_ON = "relies_on"
-PROVIDED_BY = "provided_by"
-CONNECTS_TO = "connects_to"
-DERIVES_FROM = "derives_from"
 _NO_VALUE = "-"
 
 
@@ -162,6 +155,12 @@ class CandidateList:
     field: str
     candidates: tuple[Candidate, ...]
     total: int = 0
+
+
+def pin_of(graph: Graph, node_id: str) -> str:
+    """The ``pin`` of the third-party node *node_id* as written; ``""`` when it has none."""
+    pin = (item_of(graph, graph.by_id[node_id]) or {}).get("pin")
+    return pin if isinstance(pin, str) else ""
 
 
 def nearest_suffix(wanted: str, known: Iterable[str]) -> str:

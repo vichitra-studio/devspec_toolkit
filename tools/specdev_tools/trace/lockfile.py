@@ -21,13 +21,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from dataclasses import field as dataclass_field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME, resolve_extras_path
 from specdev_tools.core.errors import FindingError, make_error
-
-if TYPE_CHECKING:
-    from specdev_tools.graph.model import Graph, Node
 
 LOCK_SCHEMA_URI = "vc:extras:trace-lock"
 LOCK_VERSION = 1
@@ -94,20 +91,6 @@ class Lock:
     def get(self, holder: str, field: str, target: str) -> LockEntry | None:
         """The entry for the link (*holder*, *field*, *target*) with the ids exactly as written, or ``None``."""
         return self._by_key.get((holder, field, target))
-
-
-def containers_of(graph: Graph, node: Node) -> tuple[str, ...]:
-    """The ids of the nodes that enclose *node*: its containment parent, then that node's parent, up to the top.
-
-    Nearest first, and empty for a node with no parent.  This is what ``LockEntry.target_containers`` records for the
-    target of a link when the entry is written.
-    """
-    found: list[str] = []
-    parent = graph.by_id.get(node.parent) if node.parent else None
-    while parent is not None and parent.id not in found:
-        found.append(parent.id)
-        parent = graph.by_id.get(parent.parent) if parent.parent else None
-    return tuple(found)
 
 
 def lock_path(spec_dir: str) -> str:

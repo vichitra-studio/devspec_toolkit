@@ -9,8 +9,8 @@ from specdev_tools.validation.graph_checks import run_graph_checks
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from unit.verify._support import example_host, graph_of
 
-from ._closed import FR, add_milestone, closed_example, criterion, with_removal
-from ._support import add_fixture
+from unit.proof._closed import FR, add_milestone, closed_example, criterion, with_removal
+from unit.proof._support import add_fixture
 
 GONE, ALSO_GONE = "fr-retired-feature", "fr-retired-extra"
 
@@ -67,3 +67,12 @@ def test_historical_removes_is_never_checked(tmp_path: Path) -> None:
     host = closed_example(tmp_path)
     with_removal(host, removes=[FR], done=True)
     assert _findings(host) == []
+
+
+def test_a_removal_fixture_named_by_a_closed_and_an_open_criterion_is_not_closed_work(tmp_path: Path) -> None:
+    """The fixture is frozen only when every criterion that lists it is closed: the open one keeps it live (E342 for a removed id still present)."""
+    host = closed_example(tmp_path)
+    with_removal(host, removes=[FR], done=True)
+    assert _findings(host) == []
+    add_milestone(host, "ms-again", [criterion("tc-retire-again", removes=[FR], verified_by=["fix-reset-gone"])], done=False)
+    assert [(error.code, error.node_id) for error in _findings(host)] == [("E342", "tc-retire-again"), ("E342", "fix-reset-gone")]

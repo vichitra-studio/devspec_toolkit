@@ -10,11 +10,11 @@ from __future__ import annotations
 import json
 import re
 
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.errors import FindingError, SpecError, make_error, refusal
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.queries import THIRD_PARTY, unknown_node_error
+from specdev_tools.graph.names import THIRD_PARTY
+from specdev_tools.graph.queries import pin_of, unknown_node_error
 from specdev_tools.trace.id_writes import WriteRequest, WriteResult, execute_write
-from specdev_tools.verify.records import refusal
 
 PIN_FIELD = ".pin"
 _FLOATING_WORDS = frozenset({"latest", "any"})
@@ -48,8 +48,10 @@ def not_exact_error(node_id: str, value: str) -> SpecError:
 
 def pin_third_party(
     graph: Graph, spec_root: str, repo_root: str, git_root: str, third_party_id: str, version: str, *, dry_run: bool = False
-) -> WriteResult:
-    """Write *version* as the pin of the third-party node *third_party_id* (an id or an alias); returns what the write did.
+) -> WriteResult | None:
+    """Write *version* (stripped of surrounding space) as the pin of the third-party node *third_party_id* (an id or an alias); returns what the write did.
+
+    ``None`` when the node already has that pin: nothing is written (no lock entry, no content-hash change, no suspect link).
 
     Raises:
         FindingError: E706 when the id names no node or a node that is not a third party, E336 when *version* is not
@@ -62,5 +64,8 @@ def pin_third_party(
         raise refusal("E706", f"'{node.id}' is of kind {node.kind}, not a third party; give the id of a third-party node")
     if not pin_is_exact(version):
         raise FindingError(not_exact_error(node.id, version))
-    request = WriteRequest(action="patch", node_id=node.id, path=PIN_FIELD, value=json.dumps(version))
+    value = version.strip()
+    if pin_of(graph, node.id) == value:
+        return None
+    request = WriteRequest(action="patch", node_id=node.id, path=PIN_FIELD, value=json.dumps(value))
     return execute_write(graph, spec_root, repo_root, git_root, request, dry_run=dry_run)

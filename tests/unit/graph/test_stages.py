@@ -7,7 +7,8 @@ from typing import Any
 import pytest
 
 from specdev_tools.graph.model import Graph
-from specdev_tools.proof.stages import (
+from specdev_tools.proof.proof import CLOSE_IGNORED_STAGES
+from specdev_tools.graph.stages import (
     STAGES,
     UnknownStageForEnvironment,
     binding_required_stage,
@@ -16,10 +17,11 @@ from specdev_tools.proof.stages import (
     is_retired_verifier,
     required_stage,
     retired_binding_ids,
+    stage_at_least,
     stage_rank,
 )
 
-from ..graph._synth import ROOT, docs_graph
+from ._synth import ROOT, docs_graph
 
 
 def _envs(**scopes: str) -> dict[str, Any]:
@@ -145,3 +147,13 @@ def test_non_canonical_environment_key_is_e334() -> None:
     assert caught.value.environment == "qa"
     with pytest.raises(UnknownStageForEnvironment):
         required_stage(_node(graph, "job-qa"), graph)
+
+
+def test_stage_at_least_reads_the_order_of_the_stages() -> None:
+    assert [stage_at_least(stage, "ci") for stage in STAGES] == [False, True, True, True]
+    with pytest.raises(ValueError):
+        stage_at_least("qa", "dev")
+
+
+def test_the_stages_the_close_gate_ignores_are_those_above_ci() -> None:
+    assert CLOSE_IGNORED_STAGES == tuple(stage for stage in STAGES if stage_rank(stage) > stage_rank("ci"))

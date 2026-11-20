@@ -15,16 +15,14 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import NamedTuple
 
-from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.gitview import read_seed_texts_at, read_seed_texts_noting
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.queries import relied_on_third_parties
-from specdev_tools.proof.stages import STAGES, stage_rank
+from specdev_tools.graph.queries import pin_of, relied_on_third_parties
+from specdev_tools.graph.stages import CI_STAGE, DEFAULT_STAGE, STAGES, stage_at_least
 from specdev_tools.trace.hashing import compute_all
-from specdev_tools.verify.bind import proved_ids
+from specdev_tools.verify.bind import hashed_ids, proved_ids
 from specdev_tools.verify.code_tree import code_tree_for_host, same_code_tree
-from specdev_tools.verify.records import Attestation, Binding, Evidence, all_bindings, read_evidence
-from specdev_tools.verify.run import evidence_id
+from specdev_tools.verify.records import Attestation, Binding, Evidence, evidence_id, read_evidence
 
 GUARD_NOT_MATCHED = "GUARD_NOT_MATCHED"
 NONZERO_EXIT = "NONZERO_EXIT"
@@ -34,8 +32,6 @@ STALE_TP_VERSION = "STALE_TP_VERSION"
 STAGE_TOO_LOW = "STAGE_TOO_LOW"
 NO_EVIDENCE = "NO_EVIDENCE"
 """The reason of a binding that no run has written evidence for (not a reason of one evidence file)."""
-CI_STAGE = "ci"
-DEV_STAGE = "dev"
 
 
 class Validity(NamedTuple):
@@ -87,24 +83,13 @@ class ProofContext:
 
 def effective_stage(stage: str, treat_ci_as_dev: bool) -> str:
     """The stage a binding counts as: its own, except that with *treat_ci_as_dev* (the close gate) ``ci`` counts as ``dev``."""
-    return DEV_STAGE if treat_ci_as_dev and stage == CI_STAGE else stage
+    return DEFAULT_STAGE if treat_ci_as_dev and stage == CI_STAGE else stage
 
 
 def evidence_for(binding: Binding, ctx: ProofContext) -> list[Evidence]:
     """The stored run evidence of *binding*: one file for each run stage that has one, in stage order."""
     found = (read_evidence(ctx.evidence_dir, evidence_id(binding.id, stage)) for stage in STAGES)
     return [evidence for evidence in found if evidence is not None and binding.id in evidence.about]
-
-
-def node_evidence(graph: Graph, ctx: ProofContext, node_id: str) -> list[Evidence]:
-    """The stored run evidence of every binding that proves the node *node_id* (a record that states no ``proves`` proves all its verifier's targets), bindings in graph order, each binding's files in stage order."""
-    wanted = graph.canonical_id(node_id)
-    return [evidence for binding in all_bindings(graph) if wanted in proved_ids(binding, graph) for evidence in evidence_for(binding, ctx)]
-
-
-def hashed_ids(binding: Binding, graph: Graph) -> tuple[str, ...]:
-    """The ids a run of *binding* hashes: its verifier and the nodes it proves (``verify.bind.proved_ids``)."""
-    return (binding.verifier, *proved_ids(binding, graph))
 
 
 def _passes(evidence: Evidence) -> str | None:
@@ -114,31 +99,28 @@ def _passes(evidence: Evidence) -> str | None:
 
 
 def _stale_hash(evidence: Evidence, binding: Binding, graph: Graph, ctx: ProofContext) -> bool:
-    """Whether a node the evidence rests on is gone or reads differently.
+    """Whether a node the evidence rests on is gone, reads differently, or was never hashed by the run.
 
-    The ids checked are those the file recorded; for a file written for another binding, also this binding's verifier and
-    proved nodes, each of which the file must have recorded.
+    Every id the file recorded must still read as recorded; that includes the binding whose run wrote the file, whose hash
+    is the only record of which commands and guard ran (so a file counted for a sibling binding goes stale with its writer).
+    The file must also have recorded the verifier of *binding* and every node it proves: an id it did not record is stale.
     """
     current = ctx.content_hashes(graph)
-    recorded = evidence.recorded_hashes
-    names = set(recorded) | (set() if binding.id in evidence.about else set(hashed_ids(binding, graph)))
-    for name in names:
+    recorded = {graph.canonical_id(name): digest for name, digest in evidence.recorded_hashes.items()}
+    own = binding.id in evidence.about
+    required = [name for name in hashed_ids(binding, graph) if own or name != binding.id]
+    for name in dict.fromkeys((*required, *recorded)):
         node = graph.find(name)
         if node is None or recorded.get(name) != current.get(node.id):
             return True
     return False
 
 
-def _pin(graph: Graph, third_party: str) -> str:
-    pin = (item_of(graph, graph.by_id[third_party]) or {}).get("pin")
-    return pin if isinstance(pin, str) else ""
-
-
 def _stale_third_party(evidence: Evidence, binding: Binding, graph: Graph) -> bool:
     """Whether a third party the proved nodes rely on is at another version than the evidence recorded; one the evidence omits is skipped."""
     installed = {graph.canonical_id(name): version for name, version in evidence.installed_versions.items()}
     proved = [node for name in proved_ids(binding, graph) if (node := graph.find(name)) is not None]
-    return any(version != _pin(graph, third_party) for third_party in relied_on_third_parties(graph, proved) if (version := installed.get(third_party)) is not None)
+    return any(version != pin_of(graph, third_party) for third_party in relied_on_third_parties(graph, proved) if (version := installed.get(third_party)) is not None)
 
 
 def evidence_valid(evidence: Evidence, binding: Binding, graph: Graph, ctx: ProofContext, *, treat_ci_as_dev: bool = False) -> Validity:
@@ -159,7 +141,7 @@ def evidence_valid(evidence: Evidence, binding: Binding, graph: Graph, ctx: Proo
         failed = STALE_HASH
     if failed is None and _stale_third_party(evidence, binding, graph):
         failed = STALE_TP_VERSION
-    if failed is None and stage_rank(evidence.stage) < stage_rank(effective_stage(binding.stage, treat_ci_as_dev)):
+    if failed is None and not stage_at_least(evidence.stage, effective_stage(binding.stage, treat_ci_as_dev)):
         failed = STAGE_TOO_LOW
     return Validity(failed is None, failed)
 
@@ -176,7 +158,7 @@ def attestation_valid(attestation: Attestation, node_id: str, graph: Graph, ctx:
     if not same_code_tree(attestation.tested_tree, ctx.code_tree):
         return Validity(False, STALE_TREE)
     node = graph.find(node_id)
-    recorded = attestation.recorded_hashes.get(node_id)
+    recorded = {graph.canonical_id(name): digest for name, digest in attestation.recorded_hashes.items()}.get(graph.canonical_id(node_id))
     if node is None or recorded is None or recorded != ctx.content_hashes(graph).get(node.id):
         return Validity(False, STALE_HASH)
     return Validity(True, None)

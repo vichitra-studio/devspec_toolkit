@@ -1,6 +1,6 @@
 """Read the version a repository declares for a third party (a pin source of the host declarations).
 
-Two source types exist, both declared in ``core/host_declarations.py::PinSource``: ``json-pointer`` (an RFC 6901
+Two source types exist, both declared in ``host_declarations.py::PinSource``: ``json-pointer`` (an RFC 6901
 pointer into a JSON file) and ``regex`` (the one capture group of the first match in a text file).  A source that
 cannot give a version raises ``SourceError``; the callers decide what that means (an error line for the pin check, no
 recorded version for ``verify run``).
@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..core.host_declarations import JSON_POINTER_TYPE, REGEX_TYPE, PinSource
+from specdev_tools.core.host_declarations import JSON_POINTER_TYPE, REGEX_TYPE, PinSource
 
 _ARRAY_INDEX = re.compile(r"0|[1-9][0-9]*")
 
@@ -81,7 +81,7 @@ def _step(value: Any, key: str, pointer: str, name: str) -> Any:
 def _regex_value(text: str, source: PinSource) -> str:
     pattern = source.pattern or ""
     try:
-        compiled = re.compile(pattern)
+        compiled = re.compile(pattern, re.MULTILINE)
     except re.error as exc:
         raise SourceError(f"{source.file}: pattern '{pattern}' does not compile ({exc})") from exc
     if compiled.groups != 1:

@@ -69,10 +69,16 @@ def test_non_semver_values_of_the_hosts_are_accepted(value: str) -> None:
 def test_pin_edit_changes_the_node_content_hash(host: Path) -> None:
     before = _hash_of(host, ARGON)
     result = pin_third_party(graph_of(host), str(host / "spec"), str(ROOT), str(host), ARGON, "0.42.0")
-    assert result.written and result.lock_written == ()
+    assert result is not None and result.written and result.lock_written == ()
     assert _hash_of(host, ARGON) != before
     document = json.loads((host / "spec" / "02_system_sketch.json").read_text(encoding="utf-8"))
     assert [item["pin"] for item in document["third_parties"] if item["third_party_id"] == ARGON] == ["0.42.0"]
+
+
+def test_the_pin_the_node_already_has_is_not_written(host: Path) -> None:
+    before = (host / "spec" / "02_system_sketch.json").read_text(encoding="utf-8")
+    assert pin_third_party(graph_of(host), str(host / "spec"), str(ROOT), str(host), ARGON, " 0.41.1 ") is None
+    assert (host / "spec" / "02_system_sketch.json").read_text(encoding="utf-8") == before
 
 
 def test_a_refused_pin_writes_nothing(host: Path) -> None:

@@ -24,11 +24,11 @@ from specdev_tools.graph.queries import require_known_step
 from specdev_tools.trace import attest, coverage, replay, step_ready
 from specdev_tools.trace.history import OldTextResolver
 from specdev_tools.trace.lockfile import Lock, read_lock, write_lock
+from specdev_tools.trace.records import prune_orphan_records
 from specdev_tools.trace.writing import locked_graph, refuse_unreadable, seed_texts_for_write
 from specdev_tools.trace.merge_driver import git_top_level, install_driver, merge_files
 from specdev_tools.trace.step_create import StepCreateRequest, create_step
 from specdev_tools.trace.write_report import render_text as render_write, result_to_dict as write_to_dict
-from specdev_tools.verify.lint import prune_orphan_records
 
 STALE_DESCRIPTION = (
     "Show what is still to be re-read after an upstream change: the suspect links (links whose target changed after "

@@ -10,7 +10,8 @@ from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.graph.build import build_graph
 from specdev_tools.trace.attest import apply_attest, plan_node_attest
 from specdev_tools.trace.id_writes import _lock_after
-from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of, parse_lock, serialise_lock
+from specdev_tools.trace.history import containers_of
+from specdev_tools.trace.lockfile import Lock, LockEntry, parse_lock, serialise_lock
 from specdev_tools.trace.merge_driver import merge_files, merge_locks
 from specdev_tools.trace.records import check_records
 from specdev_tools.validation.spec_check import run_spec_check_json

@@ -13,7 +13,8 @@ from specdev_tools.graph.gitview import read_seed_texts
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace import gaps
 from specdev_tools.trace.hashing import compute_all
-from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of, write_lock
+from specdev_tools.trace.history import containers_of
+from specdev_tools.trace.lockfile import Lock, LockEntry, write_lock
 from specdev_tools.trace.suspects import lock_links
 
 ROOT = Path(__file__).parents[3]

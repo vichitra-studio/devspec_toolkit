@@ -38,6 +38,7 @@ from specdev_tools.graph.diff import diff_snapshots
 from specdev_tools.graph.gitview import GitViewError, Snapshot, default_base_ref, load_snapshot_at, spec_path_in_repo
 from specdev_tools.graph.kinds import RECORD_ROLE, SEED_KIND
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node, article, collapse_whitespace
+from specdev_tools.graph.names import ABOUT
 from specdev_tools.graph.queries import milestone_of, own_content
 
 START = "start"
@@ -46,7 +47,6 @@ AMBIGUITY, DEPENDENCY = "ambiguity", "dependency"
 REPORT_NAMES = (AMBIGUITY, DEPENDENCY)
 OUT, IN, PARENT, CHILDREN = "out", "in", "parent", "children"
 DIRECTIONS = (OUT, IN, PARENT, CHILDREN)
-ABOUT_FIELD = "about"
 _TABLE_RELATIVE = os.path.join("tools", "graph_recipes.json")
 PARENT_VIA = "parent of "
 _START_SET_VIA = "start set"
@@ -588,7 +588,7 @@ def _ambiguity_report(graph: Graph, start: Node, pack_ids: Collection[str], spec
     rows = []
     for node in graph.nodes:
         if node.kind in spec.kinds and node.file in files:
-            targets = (graph.canonical_id(link.target) for link in node.links if link.field == ABOUT_FIELD)
+            targets = (graph.canonical_id(link.target) for link in node.links if link.field == ABOUT)
             outside = tuple(target for target in targets if target not in inside)
             if outside:
                 rows.append(AmbiguityRow(node.id, node.file, node.label, outside))

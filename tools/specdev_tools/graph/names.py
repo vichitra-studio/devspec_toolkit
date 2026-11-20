@@ -1,13 +1,12 @@
-"""The kind, role and link-verb names that two or more graph check modules use, and ``link_targets``.
+"""The kind, role, field and link-verb names that two or more modules use, and ``link_targets``.
 
-A check module imports its vocabulary from here, never from another check's module; a name only one module uses stays in that module.
+A module imports its vocabulary from here, never from another module of the same layer; a name only one module uses stays in that module.
 """
 from __future__ import annotations
 
 from typing import Final
 
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.queries import ROADMAP_MILESTONE
 
 # link verbs
 REFINES = "refines"
@@ -20,6 +19,9 @@ PROVIDED_BY = "provided_by"
 REMOVES = "removes"
 SCHEDULES = "schedules"
 MITIGATED_BY = "mitigated_by"
+RELIES_ON = "relies_on"
+CONNECTS_TO = "connects_to"
+ABOUT = "about"
 
 # kinds
 API = "api"
@@ -38,12 +40,19 @@ FR = "fr"
 JOB = "job"
 RULE = "rule"
 TASK = "task"
+ROADMAP_MILESTONE = "roadmap-milestone"
+NFR = "nfr"
+ENVIRONMENT = "environment"
+BINDING_KIND = "verification-record"
 
-# modes
-MERGE: Final = "merge"
+# values of a field
+MERGE: Final = "merge"  # the merge-driver mode
+MANUAL_MODE = "manual"  # ``mode`` of a fixture that a person attests
+REVIEW_ENFORCER = "review"  # ``enforcer`` of a rule that a review enforces
 
 # roles
 VERIFIER_ROLE = "verifier"
+OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 
 
 def link_targets(graph: Graph, node: Node, field: str) -> list[str]:

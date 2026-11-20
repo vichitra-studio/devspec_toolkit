@@ -768,7 +768,7 @@ changes:
       New error codes E760 to E765, E767 to E774, E778 and E882 (E766 does not
       exist), in the catalogue docs/developers/error-codes.md and registered in
       tools/specdev_tools/core/errors.py. tools/cli_commands.json lists the new
-      commands (46 top-level commands).
+      commands.
     migration:
       action: none
 
@@ -1212,20 +1212,35 @@ changes:
 
   - type: add_module
     description: >
-      specdev verify bind <verifier-id> --command CMD [--command CMD ...] --guard
-      REGEX [--proves ID ...] [--stage dev|ci|staging|prod] [--id ver-ID] writes
-      the verification record spec/extras/verification/<id>.json of a fixture, a
-      job or a rule (never a spec file), and specdev verify run [ver-ID ...]
-      [--all | --milestone ms-ID] [--stage S] [--only-stage] [--no-record]
-      [--installed TP=VERSION ...] [--timeout SEC] runs the commands of bindings
-      and writes one evidence record evd-<binding>-<stage>.json for each, with the
-      code-tree id of the run and the version that each declared source reads for
-      the third parties the proved nodes rely on (those reached through the
-      providing component's connections included). verify run exits 1 when a
-      binding fails and warns W350 (a submodule with uncommitted content) and W351
-      (the run changed the code tree). Shown by specdev verify bind --help,
-      specdev verify run --help and specdev verify run --all, which prints one
-      PASS or FAIL line for each binding and then N run, N passed, N failed.
+      specdev verify bind <verifier-id> --command CMD [--command CMD ...]
+      --guard REGEX [--proves ID ...] [--stage dev|ci|staging|prod] [--id
+      ver-ID] writes the verification record spec/extras/verification/<id>.json
+      of a fixture, a job or a rule (never a spec file), and specdev verify run
+      [ver-ID ...] [--all | --milestone ms-ID] [--stage S] [--only-stage]
+      [--no-record] [--installed TP=VERSION ...] [--timeout SEC] runs the
+      commands of bindings and writes one evidence record
+      evd-<binding>-<stage>.json for each, with the code-tree id of the run and
+      the version that each declared source reads for the third parties the
+      proved nodes rely on (those reached through the providing component's
+      connections included). verify run exits 1 when a binding fails and warns
+      W350 (a registered submodule with uncommitted content; an embedded
+      repository that is not a registered submodule is not seen) and W351 (the
+      run changed the code tree). Evidence rests on the binding too: the run
+      records the hash of the binding itself beside the hashes of its verifier
+      and of the nodes it proves, so after a change of a binding (its commands,
+      guard, stage or proves) its evidence is stale (E347 STALE_HASH) until
+      verify run is repeated, while a verify bind that changes nothing leaves it
+      valid; evidence written without the hash of the binding is stale once.
+      verify bind of the same verifier and nodes replaces the record also when
+      the stage differs, so the plain command is the way out of E330 for a
+      stored binding. The guard of a binding is compiled before its commands
+      run, so a guard that is no regular expression is E332 and nothing ran. An
+      id of --installed that is no third-party node is E706 and a third party
+      named twice is a usage error (exit 2). A write never replaces an evidence
+      file that holds a record of another type: E767. Shown by specdev verify
+      bind --help, specdev verify run --help and specdev verify run --all, which
+      prints one PASS or FAIL line for each binding and then N run, N passed, N
+      failed.
     migration:
       action: none
 
@@ -1234,28 +1249,37 @@ changes:
       specdev third-party pin <tp-id> <version> writes the pin of a third-party
       node through the id-keyed write path (the links into the node become
       suspect; E336 for a pin that is not exact: empty, latest, *, an x-wildcard
-      or a range). specdev third-party check compares the pin of each third party
-      that declares pin_sources with the version its sources read (E336, E337,
-      E338; every pin matches its declared sources and exit 0, or exit 1); with
-      --installed TP=VERSION [TP=VERSION ...] --env ENV [--tag TAG] it compares
-      what a deploy installed with the pins (E339 and exit 1, which stops the
-      deploy) and, when all match, writes one install-check evidence record for
-      each third party. Shown by specdev third-party check.
+      or a range). specdev third-party check compares the pin of each third
+      party that declares pin_sources with the version its sources read (E336,
+      E337, E338; every pin matches its declared sources and exit 0, or exit 1);
+      with --installed TP=VERSION [TP=VERSION ...] --env ENV [--tag TAG] it
+      compares what a deploy installed with the pins (E339 and exit 1, which
+      stops the deploy; E706 for an id that is no third-party node; a third
+      party named twice is a usage error) and, when all match, writes one
+      install-check evidence record for each third party (E767 when the file
+      already holds the run evidence of a binding). third-party pin of the pin a
+      node already has writes nothing and prints <id> already has the pin
+      <version>; nothing written (exit 0, no reminder), and writes the value
+      without surrounding spaces. Shown by specdev third-party check and specdev
+      third-party pin.
     migration:
       action: none
 
   - type: add_config
     description: >
       The optional host file spec/common/host_declarations.json ($schema
-      vc:host-declarations, schema schema/host_declarations.schema.json, template
-      templates/host_declarations.host.json, page
+      vc:host-declarations, schema schema/host_declarations.schema.json,
+      template templates/host_declarations.host.json, page
       docs/developers/host_declarations.md) holds release_tag_pattern,
       setup_command, code_tree_exclusions and pin_sources. specdev verify run
-      reads code_tree_exclusions and pin_sources and specdev third-party check
-      reads pin_sources; no command reads the other two keys in this release.
+      reads code_tree_exclusions and pin_sources, specdev third-party check
+      reads pin_sources, and specdev third-party check --installed also reads
+      code_tree_exclusions; a regex source is matched with MULTILINE, as the
+      output guard is, and a third party with no pin_sources entry gets no
+      stale-version check; no command reads the other two keys in this release.
       spec-check reports a file that breaks its schema as E520. A host that does
-      not use the file has nothing to do, and no command installs the template yet
-      (copy it by hand).
+      not use the file has nothing to do, and no command installs the template
+      yet (copy it by hand).
     migration:
       action: none
 
@@ -1295,11 +1319,14 @@ changes:
       VERIFIER_NO_VALID_EVIDENCE, E348 OBLIGATION_NOT_PROVEN, and the warnings
       W350 SUBMODULE_DIRTY_NOT_COVERED and W351 RUN_CHANGED_CODE_TREE, in the
       catalogue docs/developers/error-codes.md and registered in
-      tools/specdev_tools/core/errors.py. E343 and E344 (unresolved_realisations,
-      for the release gate) and E347 and E348 (proof_errors, for the close and
-      release gates) are returned by library functions that no command runs in
-      this release. tools/cli_commands.json lists verify, verify bind, verify run,
-      third-party, third-party pin and third-party check.
+      tools/specdev_tools/core/errors.py. E343 and E344
+      (unresolved_realisations, for the release gate) and E347 and E348
+      (proof_errors, for the close and release gates) are returned by library
+      functions that no command runs in this release; proof_errors reports a
+      node whose stage cannot be told (an environment that is not a stage) as
+      E334 and goes on with the other nodes. tools/cli_commands.json lists
+      verify, verify bind, verify run, third-party, third-party pin and
+      third-party check.
     migration:
       action: none
 

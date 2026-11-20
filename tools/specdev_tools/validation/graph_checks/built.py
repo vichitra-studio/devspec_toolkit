@@ -22,14 +22,15 @@ from specdev_tools.graph.model import Link, Node
 from specdev_tools.trace.hashing import compute_all
 
 from .context import GraphCheckContext
-from .names import API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINT, CONSTRAINS, DERIVES_FROM, PROVIDED_BY, REFINES, RULE, THIRD_PARTY
+from specdev_tools.graph.names import (
+    API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINT, CONSTRAINS, DERIVES_FROM, OBLIGATION_ROLES, PROVIDED_BY, REFINES, RELIES_ON, RULE, THIRD_PARTY,
+)
 
-OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", RULE, "threat", "edge-case"})
 """Kinds proved by evidence (step 02a deliveries, step-10 rules, step-11 threats and edge cases): ``PENDING_EVIDENCE`` by default."""
 COARSE_KINDS = frozenset({"scope-item", "risk", CAPABILITY})
 COMPONENT_USE_FIELDS = frozenset({PROVIDED_BY, CONSTRAINS})
-RELIES_ON = frozenset({"relies_on"})
+RELIES_ON_FIELDS = frozenset({RELIES_ON})
 PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
 """``disposition.value`` of a task that is postponed or cancelled: its criteria give no coverage (DOC L684)."""
 PIN_OK = "OK"
@@ -259,7 +260,7 @@ class BuiltComputation:
     def _third_parties(self, constraint: Node) -> list[tuple[str, BuiltResult]]:
         return [
             (source.id, self._pin_result(source)) for source, _link in inbound_sources(self.ctx, constraint, (DERIVES_FROM,))
-            if source.kind == THIRD_PARTY and self._built_users(source, RELIES_ON)
+            if source.kind == THIRD_PARTY and self._built_users(source, RELIES_ON_FIELDS)
         ]
 
     def _pin_result(self, third_party: Node) -> BuiltResult:

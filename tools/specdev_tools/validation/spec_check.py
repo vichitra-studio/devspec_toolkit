@@ -27,7 +27,7 @@ from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
 from ..proof.built_evidence import bind_proof_seams
-from ..proof.removal import check_removal_rules
+from .graph_checks.removal_rules import check_removal_rules
 from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import Lock, lock_path
 from ..trace.records import check_records, record_files

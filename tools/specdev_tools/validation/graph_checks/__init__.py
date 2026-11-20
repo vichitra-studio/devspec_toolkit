@@ -26,7 +26,7 @@ from .cross_cutting import check_cross_cutting
 from .no_dangling import check_no_dangling
 from .prose_ids import check_prose_ids
 from .refinement import check_refinement
-from .names import MERGE
+from specdev_tools.graph.names import MERGE
 from .scaffold import check_scaffold_paths, run_scaffold_paths
 from .seed_routes import check_seed_routes
 from .term_use import check_term_use

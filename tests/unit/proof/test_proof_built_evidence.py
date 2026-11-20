@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,7 @@ from unit.validation.graph_checks._built_support import built_context, node
 
 from ._closed import add_milestone, closed_example, criterion
 from ._support import (
-    EXAMPLE_BINDING, FIXTURE, INVARIANT, NFR, PASSING, add_fixture, attest, binding_item, commit_all, edit_code, edit_doc, graph_of, host_with, prove, run,
+    EXAMPLE_BINDING, FIXTURE, INVARIANT, NFR, PASSING, add_fixture, attest, binding_item, ci_host, commit_all, edit_code, edit_doc, graph_of, host_with, prove, run,
 )
 from unit.verify._support import write, write_json
 
@@ -29,6 +30,8 @@ JOB, ENVIRONMENT, GATE = "job-contract-tests", "ci", "contract-tests"
 JOB_RULE, COMMAND_RULE, REVIEW_RULE = "rule-contract-tests-on-every-pr", "rule-spec-check-on-every-pr", "rule-security-review-of-token-handling"
 THREAT, EDGE_CASE = "threat-reset-token-replay", "ec-token-at-expiry-second"
 CI_BINDING, LATENCY_FIXTURE, LATENCY_BINDING = "ver-ci-job", "fix-latency", "ver-latency"
+_ci_host = partial(ci_host, binding_id=CI_BINDING, verifier=JOB, proves=())
+"""The example whose job ``job-contract-tests`` (it realises environment ci, the gate and a rule) has a ci binding, run once unless ``ran=False``."""
 FAILING = "echo expected line; exit 3"
 CONSTRAINT, TP, CLIENT = "con-pinned", "tp-mailrelay", "src/mail/client.ts"
 CLIENT_TEXT = 'export const MAILRELAY_API_VERSION = "{}";\n'
@@ -46,14 +49,6 @@ def _built(host: Path, cap: str = "ci") -> dict[str, BuiltResult]:
 
 def _state(host: Path, node_id: str, cap: str = "ci") -> BuiltState:
     return _built(host, cap)[node_id].state
-
-
-def _ci_host(tmp_path: Path, *, commands: tuple[str, ...] = (PASSING,), ran: bool = True) -> Path:
-    """The example whose job ``job-contract-tests`` (it realises environment ci, the gate and a rule) has a ci binding, run once unless *ran* is false."""
-    host = host_with(tmp_path, binding_item(CI_BINDING, verifier=JOB, proves=(), stage="ci", commands=commands))
-    if ran:
-        run(host, [CI_BINDING], stage="ci")
-    return host
 
 
 def _closed_host(tmp_path: Path, *bindings: dict[str, Any]) -> Path:
@@ -370,6 +365,17 @@ def test_a_spec_outside_a_git_repository_leaves_the_evidence_kinds_pending(tmp_p
     states = _built(host)
     assert {states[name].state for name in (ENVIRONMENT, GATE, JOB_RULE)} == {PENDING}
     assert states[ENVIRONMENT].reason.startswith("the code tree cannot be read")
+
+
+def test_a_node_whose_stage_cannot_be_told_is_not_built_and_the_other_nodes_are_still_answered(tmp_path: Path) -> None:
+    """The proof raises E334 for such a node; the built computation must report it on that node, not stop."""
+    host = _ci_host(tmp_path)
+    edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"].update(qa={"scope": "in"}))
+    edit_doc(host, "12_ci_gates.json", lambda doc: doc["jobs"].append({"job_id": "job-qa-smoke", "name": "QA smoke", "realises": ["qa"]}))
+    states = _built(host)
+    assert states["qa"].state is BuiltState.NOT_BUILT
+    assert "environment 'qa' is not a stage" in states["qa"].reason
+    assert ENVIRONMENT in states
 
 
 def test_a_host_with_no_verification_folder_and_no_declarations_reports_what_the_branches_say(tmp_path: Path) -> None:

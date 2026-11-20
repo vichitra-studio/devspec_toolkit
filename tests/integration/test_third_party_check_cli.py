@@ -68,3 +68,9 @@ def test_installed_without_env_is_a_usage_error_before_anything_is_read(host: Pa
     assert code == 2 and "--env and --tag go with --installed" in out
     code, out = run_on_example(host, "third-party", "check", "--installed", "tp-argon2", "--env", "prod")
     assert code == 2 and "--installed takes TP=VERSION" in out
+
+
+def test_a_third_party_named_twice_in_installed_is_a_usage_error_and_writes_nothing(host: Path) -> None:
+    code, out = run_on_example(host, "third-party", "check", "--installed", "tp-argon2=0.0.1", "tp-argon2=0.41.1", "--env", "prod")
+    assert code == 2 and "--installed names 'tp-argon2' twice" in out
+    assert not list((host / RECORDS).glob("evd-install-*"))
