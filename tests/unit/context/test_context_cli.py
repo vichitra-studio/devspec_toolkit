@@ -291,11 +291,8 @@ class TestContextFreshness:
             "indexed_hash and current_hash must match for an unmodified seed"
         )
 
-    def test_stale_seed_detected(self, tmp_path):
-        """Modifying a seed file after indexing must cause stale=True.
-
-        Uses the standard flat layout (no --git-root).
-        """
+    def _indexed_overview_seed(self, tmp_path):
+        """A flat-layout host with one indexed seed (`seed-overview`); returns the spec dir and the seed file."""
         spec_dir = tmp_path / "spec"
         common_dir = spec_dir / "common"
         seed_file_dir = tmp_path / "docs" / "seed"
@@ -325,19 +322,22 @@ class TestContextFreshness:
         (common_dir / "seed_manifest.json").write_text(
             json.dumps(manifest, indent=2), encoding="utf-8"
         )
-
-        # Index the seed
         idx_proc = _run(
             "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
         assert idx_proc.returncode == 0, f"seed-index failed: {idx_proc.stderr}"
+        return spec_dir, seed_file
 
-        # Modify the seed file so it's stale
+    def test_stale_seed_detected(self, tmp_path):
+        """Modifying a seed file after indexing must cause stale=True.
+
+        Uses the standard flat layout (no --git-root).
+        """
+        spec_dir, seed_file = self._indexed_overview_seed(tmp_path)
         seed_file.write_text("Modified content — now stale!\n", encoding="utf-8")
 
-        # Check freshness — expect stale=True
         proc = _run(
             "context", "freshness", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
@@ -348,8 +348,21 @@ class TestContextFreshness:
             "Seed content changed after indexing; must report stale=True"
         )
 
+    def test_context_freshness_prints_no_w595_on_stderr(self, tmp_path):
+        """A stale seed is a suspect (`specdev stale`), not a W595 line: freshness prints its JSON only."""
+        spec_dir, seed_file = self._indexed_overview_seed(tmp_path)
+        seed_file.write_text("Modified content — now stale!\n", encoding="utf-8")
+
+        proc = _run(
+            "context", "freshness", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+        )
+        assert proc.returncode == 0
+        assert _parse_json(proc)["seed-overview"]["stale"] is True
+        assert "W595" not in proc.stderr and proc.stderr.strip() == ""
+
     def test_untracked_manifest_seed_detected(self, tmp_path):
-        """A manifest seed absent from the index reports untracked=True and W595.
+        """A manifest seed absent from the index reports untracked=True in the JSON (and no W595 line).
 
         Regression guard for DEVSPEC-125 Gap 2: previously check_freshness only
         iterated indexed seeds, so a manifest seed added after the last index
@@ -406,9 +419,7 @@ class TestContextFreshness:
         assert "seed-extra" in data, f"untracked seed missing from output: {data}"
         assert data["seed-extra"]["untracked"] is True
         assert data["seed-overview"]["untracked"] is False
-        assert "W595" in proc.stderr and "seed-extra" in proc.stderr, (
-            f"expected W595 SEED_UNTRACKED for seed-extra on stderr: {proc.stderr!r}"
-        )
+        assert "W595" not in proc.stderr
 
     def test_nested_layout_freshness_resolves_via_git_root(self, tmp_path):
         """Nested layout: spec_dir is NOT a direct child of the host root.

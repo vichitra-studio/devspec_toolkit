@@ -264,10 +264,6 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                 project_canon_dir=project_canon_dir,
             )
         )
-        from .traceability_closure import check_traceability_closure
-        tc_errors = check_traceability_closure(spec_dir, repo_root)
-        # Only propagate hard errors (E-codes); W-codes are informational
-        failures.extend(e for e in tc_errors if not e.code.startswith("W"))
 
     root = Path(os.path.abspath(repo_root))
     failures.extend(

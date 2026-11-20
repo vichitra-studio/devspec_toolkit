@@ -4,7 +4,7 @@ Continues ``test_graph_example_steps_00_05.py`` on the same folder, ``tests/fixt
 files of steps 06-16 and the one plan file of ``spec/impl_context/``.  These tests pin that they are valid against
 the real schemas, validators, registry and ``spec-check`` with a known set of warnings, that every link of the whole
 folder (00-16) names an existing id of an allowed kind, and that the readers meant to stay silent on the new shape
-(matrix, closure, completeness, milestone state, upstream backlog, scope resolver, reviewer) do,
+(matrix, milestone state, upstream backlog, scope resolver, reviewer) do,
 as does the W604 staleness check of step 14.
 
 Two consumers are not run on the folder because they read no 1.1.1 field of a spec artifact: ``extraction-intent-check``
@@ -29,7 +29,6 @@ from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.spec_check import run_spec_check_json
-from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 from specdev_tools.validation.validate import DEEP_VALIDATORS
 from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
 from unit.graph._synth import run_cli as _run_cli
@@ -126,8 +125,6 @@ _MATRIX_NOT_COMPUTED = [
     "milestone_coverage", "invariant_threat_coverage",
 ]
 _MATRIX_COVERAGE = {"fr_total": 2, "fr_total_fixture": 2, "scaffolds_found": 0}
-_SKIPPED_DIMENSIONS = ["fr_api_coverage", "fr_fixture_coverage", "fr_milestone_coverage", "capability_fr_coverage"]
-_VACUOUS_DIMENSION = {"covered_count": 0, "total_count": 0, "ratio": 1.0, "uncovered_ids": []}
 
 
 def _validated(name: str) -> list[tuple[tuple, str]]:
@@ -254,11 +251,6 @@ def test_matrix_names_every_value_it_cannot_compute() -> None:
     assert "integrity_errors" not in result
 
 
-def test_traceability_closure_is_silent() -> None:
-    assert check_traceability_closure(str(_SPEC)) == []
-    assert uncomputed_dimensions(str(_SPEC)) == _SKIPPED_DIMENSIONS
-
-
 def test_step_14_skips_the_stale_matrix_warning_on_the_full_folder(stamped_example: Path) -> None:
     """W604 reads the 1.1.1 ``fr_refs`` / ``source_milestones``: the folder has none, so it does not fire.
 
@@ -271,21 +263,6 @@ def test_step_14_skips_the_stale_matrix_warning_on_the_full_folder(stamped_examp
     assert [e.code for e in DEEP_VALIDATORS["14"](roadmap, str(_ROOT), context) if e.code == "W604"] == []
     roadmap["milestones"][0]["fr_refs"] = ["fr-password-reset"]
     assert [e.code for e in DEEP_VALIDATORS["14"](roadmap, str(_ROOT), context) if e.code == "W604"] == ["W604"]
-
-
-def test_completeness_check_json_skips_the_dimensions_it_cannot_compute() -> None:
-    code, out = _run_cli("completeness-check", str(_SPEC), "--repo-root", str(_ROOT), "--json")
-    payload = json.loads(out)
-    assert code == 0
-    assert payload["not_computed"] == _SKIPPED_DIMENSIONS
-    assert all(payload["coverage"][name] == _VACUOUS_DIMENSION for name in _SKIPPED_DIMENSIONS)
-
-
-def test_completeness_check_text_prints_one_skip_line_per_skipped_dimension() -> None:
-    code, out = _run_cli("completeness-check", str(_SPEC), "--repo-root", str(_ROOT))
-    assert code == 0
-    assert out.count("[SKIP]") == len(_SKIPPED_DIMENSIONS)
-    assert "[SKIP] FR → API coverage: not computed on this spec shape" in out
 
 
 def test_milestone_state_reads_the_plan_file(tmp_path: Path) -> None:

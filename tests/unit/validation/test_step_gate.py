@@ -199,8 +199,8 @@ def test_pending_error_for_step_06_does_not_block_step_05() -> None:
     assert gate([err("E600", "step:06", "api-a")], "05").clear
 
 
-def test_e560_owned_by_step_01_is_pending_for_step_00_and_blocks_step_01() -> None:
-    error = err("E560", "step:01", "cap-a")
+def test_e740_owned_by_step_01_is_pending_for_step_00_and_blocks_step_01() -> None:
+    error = err("E740", "step:01", "cap-a")
     assert gate([error], "00").pending == {"01": (error,)}
     assert gate([error], "01").blocking.own == (error,)
 

@@ -163,13 +163,6 @@ class CheckContext:
         """
         return not any(not e.code.startswith("W") for e in self.canon_errors)
 
-    @cached_property
-    def closure_errors(self) -> list[SpecError]:
-        """The findings of the traceability closure; ``completeness-check`` is the subset with its codes."""
-        from .traceability_closure import check_traceability_closure
-
-        return check_traceability_closure(self.spec_dir, self.repo_root)
-
 
 CheckFn = Callable[[CheckContext], dict[str, Any]]
 """``ctx -> result``: ``check_result(errors)`` or ``{"status": "SKIP", "reason": ...}``."""

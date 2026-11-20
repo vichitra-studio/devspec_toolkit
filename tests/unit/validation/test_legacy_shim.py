@@ -1,18 +1,13 @@
 """Guards for readers of retired 1.1.1 fields (M3 extends the field set and these cases)."""
 import ast
-import io
 import json
 import re
 import shutil
-import sys
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import NamedTuple
-from unittest import mock
 
 import pytest
 
-from specdev_tools import cli
 from specdev_tools.validation.validators.step_14 import validate_step_14
 
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
@@ -40,10 +35,7 @@ from specdev_tools.validation._legacy_shim import (
 from specdev_tools.validation.validate import validate_file
 from specdev_tools.validation.cross_artifact_checks import check_step_02_integrity, check_step_04_integrity
 from specdev_tools.validation.matrix import build_trace_matrix
-from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 from specdev_tools.validation.validators.step_11 import _load_parked_fr_ids
-
-_CLOSURE_CODES = ("E560", "E535", "W564", "W568")
 
 NEW_SHAPE = {
     "01_capabilities.json": {"capabilities": [
@@ -75,10 +67,6 @@ def _write_spec(tmp_path: Path, files: dict) -> str:
     return str(spec_dir)
 
 
-def _closure_codes(spec_dir: str) -> set[str]:
-    return {code for e in check_traceability_closure(spec_dir) for code in _CLOSURE_CODES if e.code == code}
-
-
 _ALL_LEGACY_NAMES = (
     LEGACY_TRACE_FIELDS, LEGACY_CHARTER_GOAL_FIELDS, LEGACY_CAPABILITY_GOAL_FIELDS,
     LEGACY_CAPABILITY_METRIC_FIELDS, LEGACY_COMPONENT_TRACE_FIELDS,
@@ -105,10 +93,6 @@ class _Spec(NamedTuple):
     root: Path
     spec_dir: str
     files: dict
-
-
-def _silent_closure(spec):
-    assert _closure_codes(spec.spec_dir) == set()
 
 
 def _silent_matrix_integrity(spec):
@@ -142,7 +126,6 @@ def _silent_reviewer(spec):
 
 
 SILENT_READERS = {
-    "closure": _silent_closure,
     "matrix_integrity": _silent_matrix_integrity,
     "matrix_fr_to_api": _silent_matrix_fr_to_api,
     "step_02_integrity": _silent_step_02_integrity,
@@ -172,7 +155,6 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     spec_dir = _write_spec(tmp_path, LEGACY_SHAPE)
     arts = {f"spec/{name}": data for name, data in LEGACY_SHAPE.items()}
 
-    assert {"E560", "W568"} <= _closure_codes(spec_dir), "traceability_closure reader (E560/W568)"
     matrix = build_trace_matrix(str(tmp_path), spec_dir)
     assert matrix["matrix"][0]["apis"] == ["api-a"], "matrix reader"
     assert any(
@@ -185,33 +167,7 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     assert review.upstream_coverage["covered"] == ["fr-a"], "reviewer _run_structural_pass reader"
 
 
-_CHARTER_METRIC = {"metric_id": "metric-a"}
-_CHARTER_1_1_1 = {"goals": [{"goal_id": "goal-a"}], "success_metrics": [_CHARTER_METRIC]}
-_CHARTER_1_2_0 = {"goals": [{"id": "goal-a"}], "success_metrics": [_CHARTER_METRIC]}
 _CAPABILITIES_1_1_1 = {"capabilities": [{"capability_id": "cap-a", "scope": "in", "trace": [], "success_metric_refs": []}]}
-_CAPABILITIES_1_1_1_TRACE_ONLY = {"capabilities": [{"capability_id": "cap-a", "scope": "in", "trace": []}]}
-_CAPABILITIES_1_2_0 = {"capabilities": [{"capability_id": "cap-a", "scope": "in", "derives_from": ["goal-a"]}]}
-
-
-@pytest.mark.parametrize(("charter", "capabilities", "reports"), [
-    (_CHARTER_1_1_1, _CAPABILITIES_1_1_1, True),
-    (_CHARTER_1_2_0, _CAPABILITIES_1_2_0, False),
-    (_CHARTER_1_1_1, _CAPABILITIES_1_2_0, False),
-    (_CHARTER_1_2_0, _CAPABILITIES_1_1_1_TRACE_ONLY, False),
-], ids=["both-1.1.1", "both-1.2.0", "charter-only-1.1.1", "capabilities-only-1.1.1"])
-def test_e560_goal_half_runs_only_when_both_sides_carry_the_1_1_1_fields(tmp_path, charter, capabilities, reports):
-    spec_dir = _write_spec(tmp_path, {"00_charter.json": charter, "01_capabilities.json": capabilities})
-    goal_findings = [e for e in render_errors(check_traceability_closure(spec_dir)) if "charter_goal_without_capability" in e]
-    assert bool(goal_findings) is reports
-
-
-def test_e560_metric_half_reports_for_1_1_1_capabilities_with_trace_and_no_metric_refs(tmp_path):
-    """A 1.1.1 capability carries `trace`; `success_metric_refs` is optional, so the charter metrics still need a capability."""
-    charter = {"goals": [{"goal_id": "goal-a"}], "success_metrics": [{"metric_id": "metric-a"}, {"metric_id": "metric-b"}]}
-    spec_dir = _write_spec(tmp_path, {"00_charter.json": charter, "01_capabilities.json": _CAPABILITIES_1_1_1_TRACE_ONLY})
-    rendered = render_errors(check_traceability_closure(spec_dir))
-    assert [e for e in rendered if "charter_success_metric_without_capability" in e and ("metric-a" in e or "metric-b" in e)]
-    assert len([e for e in rendered if "charter_success_metric_without_capability" in e]) == 2
 
 
 def test_reader_on_is_the_one_rule_of_the_guards():
@@ -281,7 +237,6 @@ def test_legacy_later_file_does_not_switch_on_00_05_readers(tmp_path, name):
     plain = _example_copy(tmp_path / "plain")
     mixed = _example_copy(tmp_path / "mixed", {name: LEGACY_LATER_FILES[name]})
 
-    assert _closure_codes(mixed) == _closure_codes(plain) == set()
     plain_matrix = build_trace_matrix(str(TOOLKIT_ROOT), plain)
     mixed_matrix = build_trace_matrix(str(TOOLKIT_ROOT), mixed)
     assert mixed_matrix["coverage"] == plain_matrix["coverage"]
@@ -342,7 +297,7 @@ def test_matrix_threshold_silent_when_apis_exist_and_none_carries_trace(tmp_path
     assert not any("fr_coverage" in line for line in result.get("integrity_errors", []))
 
 
-def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
+def test_new_shape_scope_later_fr_is_parked_in_matrix(tmp_path):
     files = {
         "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
             {"fr_id": "fr-a", "priority": "must-have", "scope": "in", "derives_from": ["cap-a"]},
@@ -350,8 +305,6 @@ def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
         "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "fr_refs": [], "tasks": []}]},
     }
     spec_dir = _write_spec(tmp_path, files)
-    messages = [e.message for e in check_traceability_closure(spec_dir)]
-    assert not any("fr-later" in m for m in messages)
     assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
 
 
@@ -380,7 +333,7 @@ def test_legacy_parked_scopes_is_the_1_1_1_value():
 
 def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
     # A legacy FR parked by `priority: wont-have` stays out of every FR denominator of the readers
-    # that can meet a 1.1.1 file: closure, matrix, the step-11 sibling loader and the CLI.
+    # that can meet a 1.1.1 file: the matrix and the step-11 sibling loader.
     files = {
         "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
             {"fr_id": "fr-a", "priority": "must-have", "trace": []},
@@ -388,32 +341,9 @@ def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
         "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "fr_refs": [], "tasks": []}]},
     }
     spec_dir = _write_spec(tmp_path, files)
-    messages = [e.message for e in check_traceability_closure(spec_dir)]
-    assert not any("fr-legacy-export" in m for m in messages)
     assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
     artifact = str(Path(spec_dir) / "11_adversarial.json")
     assert _load_parked_fr_ids(str(tmp_path), artifact) == {"fr-legacy-export"}
-
-
-def _w568_ids(tmp_path: Path, capabilities: list[dict]) -> set[str]:
-    """W568 messages of a spec whose FR file is legacy (switches the reader on)."""
-    spec_dir = _write_spec(tmp_path, {
-        "01_capabilities.json": {"capabilities": capabilities},
-        "04_fr_list.json": LEGACY_SHAPE["04_fr_list.json"],
-    })
-    return {e.message for e in check_traceability_closure(spec_dir) if e.code == "W568"}
-
-
-@pytest.mark.parametrize("scope", ["later", "out", "future"])
-def test_w568_exempts_parked_capability_of_either_shape(tmp_path, scope):
-    # legacy FR file + a capability file already in the new shape (scope later) or the old one
-    messages = _w568_ids(tmp_path, [{"capability_id": "cap-parked", "scope": scope}])
-    assert not any("cap-parked" in m for m in messages), messages
-
-
-def test_w568_still_reports_an_uncovered_in_scope_capability(tmp_path):
-    messages = _w568_ids(tmp_path, [{"capability_id": "cap-live", "scope": "in"}])
-    assert any("cap-live" in m for m in messages), messages
 
 
 # --- readers of steps 06-16 on a new-shape spec (WI-M3-17a) -------------------------------------
@@ -471,19 +401,6 @@ def _graph_spec(root: Path, extra: dict | None = None) -> str:
     """A new-shape spec: the graph example (00-05) plus the inline 06-16 documents."""
     spec_dir = _example_copy(root, {**NEW_SHAPE_06_16, **(extra or {})})
     return spec_dir
-
-
-def _run_cli(argv: list[str]) -> tuple[int, str]:
-    out, err = io.StringIO(), io.StringIO()
-    with mock.patch("specdev_tools.cli.check_venv", return_value=None), \
-            mock.patch.object(sys, "argv", ["specdev-tools", *argv]), \
-            redirect_stdout(out), redirect_stderr(err):
-        try:
-            cli.main()
-            code = 0
-        except SystemExit as exc:
-            code = exc.code if isinstance(exc.code, int) else 1
-    return code, out.getvalue()
 
 
 def test_matrix_silent_on_new_shape_06_16(tmp_path):
@@ -562,113 +479,6 @@ def test_matrix_does_not_raise_on_wrong_typed_link_fields(tmp_path, field):
     root = tmp_path / "repo"
     root.mkdir()
     assert build_trace_matrix(str(root), _write_spec(root, files))["matrix"][0]["fr_id"] == "fr-a"
-
-
-def test_closure_silent_on_new_shape_06_16(tmp_path):
-    spec_dir = _graph_spec(tmp_path)
-    assert check_traceability_closure(spec_dir) == []
-
-
-_LEGACY_CLOSURE_FILES = {
-    "00_charter.json": {"goals": [], "success_metrics": []},
-    "01_capabilities.json": {"capabilities": [{"capability_id": "cap-a", "scope": "in"}]},
-    "04_fr_list.json": {"functional_requirements": [{"fr_id": "fr-a", "trace": []}, {"fr_id": "fr-b", "trace": []}]},
-    "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "trace": []}]},
-    "08_fixtures.json": {"fixtures": [{"fixture_id": "fx-a", "targets": []}]},
-    "09_impl_plan.json": {"milestones": [{"milestone_id": "m09", "deliverables": [{"type": "fr", "id": "dl-a"}]}]},
-    "10_governance.json": {"pr_rules": ["rule-a"]},
-    "12_ci_gates.json": {"jobs": [{"job_id": "j", "steps": [{"command": "make"}]}]},
-    "14_roadmap.json": {"milestones": [
-        {"milestone_id": "m1", "fr_refs": ["fr-b"], "tasks": [{"task_id": "t1", "fr_refs": []}]}, {"milestone_id": "m2"}]},
-}
-
-
-def test_closure_reports_every_reader_on_legacy_06_16(tmp_path):
-    codes = {e.code for e in check_traceability_closure(_write_spec(tmp_path, _LEGACY_CLOSURE_FILES))}
-    assert {"W564", "W565", "W568", "W569", "W575"} <= codes
-
-
-def _plan_spec(root: Path, checklist_item: dict) -> str:
-    """A roadmap with one task, an anchor that registers one milestone plan, and that plan."""
-    files = {
-        "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "tasks": [{"task_id": "t1"}]}]},
-        "16_impl_context.json": {"plan": {"milestone_index": [
-            {"milestone_id": "m1", "context_path": "impl_context/ms_a_plan.json"}]}},
-    }
-    spec_dir = _write_spec(root, files)
-    plans = Path(spec_dir) / "impl_context"
-    plans.mkdir()
-    plan = {"plan": {"spec_alignment": {"checklist": [checklist_item]}},
-            "execution": {"execution_results": [{"id": "r1"}]}}
-    (plans / "ms_a_plan.json").write_text(json.dumps(plan), encoding="utf-8")
-    return spec_dir
-
-
-def test_closure_plan_readers_skip_a_plan_item_without_spec_ref(tmp_path):
-    codes = {e.code for e in check_traceability_closure(_plan_spec(tmp_path, {"id": "cl-1", "realises": ["c1"]}))}
-    assert not codes & {"W562", "W563", "W576"}
-
-
-def test_closure_plan_readers_report_a_plan_item_with_spec_ref(tmp_path):
-    item = {"id": "cl-1", "spec_ref": {"type": "task", "id": "other"}}
-    codes = {e.code for e in check_traceability_closure(_plan_spec(tmp_path, item))}
-    assert {"W562", "W563", "W576"} <= codes
-
-
-@pytest.mark.parametrize("roadmap", [
-    {"milestones": "m1"},
-    {"milestones": ["m1", 7, {"milestone_id": "m2", "tasks": "t", "fr_refs": 5}]},
-    {"milestones": [{"milestone_id": "m1", "fr_refs": [["x"]], "tasks": [7, {"task_id": "t", "fr_refs": "x"}]}]},
-])
-def test_closure_does_not_raise_on_a_wrong_typed_roadmap(tmp_path, roadmap):
-    files = {
-        "04_fr_list.json": {"functional_requirements": ["fr-a", {"fr_id": "fr-b", "trace": 7}]},
-        "05_interface_contracts.json": {"apis": [7, {"api_id": "api-a", "trace": "x"}], "out_of_scope": 3},
-        "08_fixtures.json": {"fixtures": [{"fixture_id": "fx", "targets": 1}]},
-        "09_impl_plan.json": {"milestones": [{"milestone_id": "m", "deliverables": 4}, 5]},
-        "14_roadmap.json": roadmap,
-    }
-    check_traceability_closure(_write_spec(tmp_path, files))
-
-
-def test_closure_reads_nothing_of_a_graph_shape_roadmap_beside_legacy_fixtures(tmp_path):
-    spec_dir = _graph_spec(tmp_path / "plain")
-    legacy_08 = {"08_fixtures.json": {"fixtures": [{"fixture_id": "fx-a", "targets": []}]}}
-    codes = {e.code for e in check_traceability_closure(_graph_spec(tmp_path / "mixed", legacy_08))}
-    assert check_traceability_closure(spec_dir) == []
-    assert codes == {"W565"}
-
-
-def test_uncomputed_dimensions_lists_the_skipped_readers(tmp_path):
-    assert uncomputed_dimensions(_graph_spec(tmp_path / "new")) == [
-        "fr_api_coverage", "fr_fixture_coverage", "fr_milestone_coverage", "capability_fr_coverage"]
-    assert uncomputed_dimensions(_write_spec(tmp_path, _LEGACY_CLOSURE_FILES)) == []
-    assert uncomputed_dimensions(str(tmp_path / "absent")) == []
-
-
-def test_completeness_check_follows_guards(tmp_path):
-    code, out = _run_cli(["completeness-check", _graph_spec(tmp_path / "new"), "--repo-root", str(TOOLKIT_ROOT),
-                          "--json"])
-    payload = json.loads(out)
-    skipped = ["fr_api_coverage", "fr_fixture_coverage", "fr_milestone_coverage", "capability_fr_coverage"]
-    assert code == 0
-    assert payload["not_computed"] == skipped
-    vacuous = {"covered_count": 0, "total_count": 0, "ratio": 1.0, "uncovered_ids": []}
-    assert all(payload["coverage"][name] == vacuous for name in skipped)
-    assert payload["coverage"]["milestone_decomp_completeness"]["total_count"] == 1
-    _, text = _run_cli(["completeness-check", _graph_spec(tmp_path / "text"), "--repo-root", str(TOOLKIT_ROOT)])
-    assert text.count("[SKIP]") == len(skipped)
-    assert "[SKIP] FR → API coverage: not computed on this spec shape" in text
-    assert "[OK] Milestone decomp completeness: 100.0%" in text
-
-
-def test_completeness_check_reports_every_dimension_on_legacy_shape(tmp_path):
-    _, out = _run_cli(["completeness-check", _write_spec(tmp_path, _LEGACY_CLOSURE_FILES), "--repo-root",
-                       str(TOOLKIT_ROOT), "--json"])
-    payload = json.loads(out)
-    assert payload["not_computed"] == []
-    assert payload["coverage"]["fr_api_coverage"]["uncovered_ids"] == ["fr-a", "fr-b"]
-    assert payload["coverage"]["fr_fixture_coverage"]["uncovered_ids"] == ["fr-a", "fr-b"]
 
 
 def test_step_14_w604_skipped_on_new_shape(tmp_path):
@@ -786,8 +596,6 @@ def test_inline_m8_guards_run_on_the_legacy_item_and_skip_the_new_one():
 
 def test_legacy_shape_suites_unchanged():
     corpus = TOOLKIT_ROOT / "tests" / "fixtures" / "spec_corpus"
-    assert uncomputed_dimensions(str(corpus)) == []
-    assert [e.code for e in check_traceability_closure(str(corpus))] == ["W570", "W570", "W565"]
     result = build_trace_matrix(str(TOOLKIT_ROOT), str(corpus))
     assert "not_computed" not in result
     assert result["coverage"]["fr_with_api"] == 1
@@ -806,21 +614,14 @@ GUARD_SITES = {
     ("context/reviewer.py", "_run_structural_pass"): "context/reviewer.py",
     ("validation/cross_artifact_checks.py", "check_step_02_integrity"): "step-02 capability coverage (M2)",
     ("validation/matrix.py", "build_trace_matrix"): "validation/matrix.py",
-    ("validation/traceability_closure.py", "_api_reader_on"): "validation/traceability_closure.py",
-    ("validation/traceability_closure.py", "_fixture_reader_on"): "validation/traceability_closure.py",
-    ("validation/traceability_closure.py", "_milestone_reader_on"): "validation/traceability_closure.py",
-    ("validation/traceability_closure.py", "_capability_reader_on"): "validation/traceability_closure.py",
-    ("validation/traceability_closure.py", "check_traceability_closure"): "validation/traceability_closure.py",
     ("validation/validators/step_14.py", "validate_step_14"): "validators/step_14.py W604",
 }
 
 # Every module that imports the shim (guard sites and the other shim functions).
 SHIM_CONSUMERS = {
-    "cli.py": "completeness-check",
     "context/reviewer.py": "context/reviewer.py",
     "validation/cross_artifact_checks.py": "step-02 capability coverage (M2)",
     "validation/matrix.py": "validation/matrix.py",
-    "validation/traceability_closure.py": "validation/traceability_closure.py",
     "validation/validators/step_11.py": "is_parked_any_shape",
     "validation/validators/step_14.py": "validators/step_14.py W604",
 }

@@ -17,9 +17,6 @@ from ..trace._lock_support import EXAMPLE_HOST
 ROOT = Path(__file__).parents[3]
 MERGE_CHECK = "merge-check"
 SCHEMA_URI_MISSING = "missing_schema_uri"
-DEAD_CLOSURE_CODES = (
-    "E560", "W562", "W563", "W564", "W565", "W568", "W569", "W575", "W576", "E535", "E536",
-)
 
 
 @pytest.fixture(scope="module")
@@ -46,13 +43,6 @@ def test_e607_row_gives_fixed_step_03(context: OwnerContext) -> None:
 @pytest.mark.parametrize("code", ["E608", "E620", "E621", "E622", "W554"])
 def test_merge_check_rows_for_legacy_codes(context: OwnerContext, code: str) -> None:
     assert owner_for(code, None, context) == MERGE_CHECK
-
-
-@pytest.mark.parametrize("code", DEAD_CLOSURE_CODES)
-def test_dead_closure_codes_have_no_owner_row(context: OwnerContext, code: str) -> None:
-    """The readers of these codes report nothing on a 1.2.0 spec and M6c deletes them: no row, so no owner from the table."""
-    assert all(code not in row.codes for row in context.rows)
-    assert owner_for(code, None, context) is None
 
 
 def test_e590_missing_capability_coverage_is_owned_by_step_02(tmp_path: Path) -> None:

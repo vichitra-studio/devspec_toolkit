@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 
-from specdev_tools.core.errors import SpecError
 from specdev_tools.trace.coverage import (
     REFINED_CURRENT,
     REFINED_NONE,
@@ -24,7 +23,6 @@ from specdev_tools.trace.coverage import (
 )
 from specdev_tools.trace.gaps import CoverageGap
 from specdev_tools.trace.lockfile import Lock
-from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 
 from ..graph._synth import ROOT, docs_graph, run_cli
 from ._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
@@ -159,35 +157,11 @@ GRAPH_DOCS = {
     "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-a", "fr-b"], "scope": "in"}]},
     FIXTURE_FILE: {"fixtures": [{"fixture_id": "fix-a", "verifies": ["ac-fr-a"]}]},
 }
-LEGACY_DOCS = {
-    "01_capabilities.json": {"capabilities": [
-        {"capability_id": "cap-a", "scope": "in", "trace": []}, {"capability_id": "cap-b", "scope": "in", "trace": []},
-        {"capability_id": "cap-parked", "scope": "later", "trace": []}]},
-    FR_FILE: {"$schema": "vc:04_fr_list", "functional_requirements": [
-        {"fr_id": fr_id, "priority": "must-have", "trace": [{"type": "capability", "id": "cap-a"}]} for fr_id in ("fr-a", "fr-b", "fr-c")]},
-    "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "trace": [{"type": "fr", "id": "fr-a"}, {"type": "fr", "id": "fr-b"}]}]},
-    FIXTURE_FILE: {"fixtures": [{"fixture_id": "fix-a", "targets": [{"type": "fr", "id": "fr-a"}]}]},
-}
-LEGACY_LABELS = {"fr_api_coverage": "UNCOVERED_FR_API", "fr_fixture_coverage": "UNCOVERED_FR_FIXTURE", "capability_fr_coverage": "UNCOVERED_CAPABILITY"}
-
-
-def _legacy_unlinked(spec_dir: Path) -> dict[str, set[str]]:
-    """The ids ``completeness-check`` finds uncovered on a 1.1.1-shaped spec folder, by dimension."""
-    findings = [error.message for error in check_traceability_closure(str(spec_dir)) if isinstance(error, SpecError)]
-    return {name: {message.split()[1] for message in findings if message.startswith(label)} for name, label in LEGACY_LABELS.items()}
-
-
-def test_three_dimensions_match_the_legacy_completeness_check_on_the_equivalent_fixture(tmp_path: Path) -> None:
-    """The legacy side is 1.1.1-shaped (``trace``, ``targets``): on a graph-shaped spec the dimension is listed as not computed."""
-    spec_dir = tmp_path / "legacy"
-    spec_dir.mkdir()
-    for name, document in LEGACY_DOCS.items():
-        (spec_dir / name).write_text(json.dumps(document), encoding="utf-8")
-    assert uncomputed_dimensions(str(spec_dir)) == []
-    legacy = _legacy_unlinked(spec_dir)
-    assert legacy == {"fr_api_coverage": {"fr-c"}, "fr_fixture_coverage": {"fr-b", "fr-c"}, "capability_fr_coverage": {"cap-b"}}
+def test_three_dimensions_name_the_ids_the_retired_completeness_check_found_on_the_equivalent_fixture() -> None:
+    """The ids ``completeness-check`` (retired) found uncovered on the 1.1.1-shaped twin of ``GRAPH_DOCS``, as literals."""
     counts = dict(link_counts(docs_graph(GRAPH_DOCS)))
-    assert {name: set(dimension.unlinked) for name, dimension in counts.items()} == legacy
+    assert {name: set(dimension.unlinked) for name, dimension in counts.items()} == {
+        "fr_api_coverage": {"fr-c"}, "fr_fixture_coverage": {"fr-b", "fr-c"}, "capability_fr_coverage": {"cap-b"}}
     assert {name: dimension.total for name, dimension in counts.items()} == {"fr_api_coverage": 3, "fr_fixture_coverage": 3, "capability_fr_coverage": 2}
 
 

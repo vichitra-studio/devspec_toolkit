@@ -1,9 +1,8 @@
 """Plan discovery: which 16a plan file belongs to which milestone.
 
 A plan names its milestone in one file-level key, ``milestone``. Discovery scans ``<spec_root>/impl_context/*.json``
-for that key. This is the place the 1.2.0 shape maps a milestone to its plan file; two readers still build a plan path
-from 1.1.1 data (``cli.py`` ``milestone-state`` by name, ``traceability_closure._load_milestone_plans_from_anchor`` by
-``context_path``).
+for that key. This is the place the 1.2.0 shape maps a milestone to its plan file; one reader still builds a plan path
+from 1.1.1 data (``cli.py`` ``milestone-state``, by name).
 """
 from __future__ import annotations
 

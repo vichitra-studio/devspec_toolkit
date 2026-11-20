@@ -64,7 +64,6 @@ def _run_validate_dir_with_injected_failures(
          patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
          patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
          patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
-         patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
          patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]), \
          patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]):
         return validate_dir(str(root), str(root / "spec"))
@@ -368,7 +367,7 @@ class TestR9PromotablePairsIntegrity(unittest.TestCase):
 
     def test_promotable_pairs_count(self):
         """PROMOTABLE_PAIRS has the expected entries (W590 and W597 excluded — no semantically-correct E-counterpart)."""
-        self.assertEqual(len(PROMOTABLE_PAIRS), 19)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 11)
 
     def test_all_w_codes_map_to_e_codes(self):
         """Every key is a W-code and every value is the corresponding E-code."""

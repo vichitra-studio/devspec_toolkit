@@ -60,22 +60,6 @@
 
 **Removed prior to 1.0.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The associated sub-field has been removed.
 
-### E535 CONTRADICTORY_OUT_OF_SCOPE_FR
-
-**Trigger**: A functional requirement appears in both `apis.out_of_scope[]` in step 05 (declaring it has no HTTP API surface) and in an API's `trace[]` in the same step 05 file (declaring it is covered by an API endpoint). The two claims are mutually exclusive. The check reads the 1.1.1 `trace` field and runs only when the file it reads carries it (see E564).
-
-**Resolution**: Remove the FR from `out_of_scope[]` if an API does cover it, or remove the trace reference from the API if the FR genuinely has no API surface.
-
-**Note**: `out_of_scope[]` entries suppress W564 (UNCOVERED_FR_API). Without this check, a contradicted `out_of_scope[]` entry would silently mask a real API trace from coverage reporting.
-
-### E536 CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE
-
-**Trigger**: A functional requirement appears in both `fixtures.out_of_scope[]` in step 08 (declaring it needs no fixture) and in a fixture's `targets[]` in the same step 08 file (declaring it is covered by a fixture). The two claims are mutually exclusive. Independent of E535 — Step 05's "no API surface" and Step 08's "no fixture" are separate scoping decisions (see `step08_oos_fr_ids` in `traceability_closure.py`).
-
-**Resolution**: Remove the FR from `out_of_scope[]` if a fixture does cover it, or remove the target reference from the fixture if the FR genuinely needs no fixture.
-
-**Note**: `out_of_scope[]` entries suppress W565 (UNCOVERED_FR_FIXTURE). Without this check, a contradicted `out_of_scope[]` entry would silently mask a real fixture target from coverage reporting.
-
 ### E541 UNBOUND_CANONICAL_TERM
 
 **Trigger**: A free-text field (e.g. a `description`, `rationale`, or `intent`) mentions a canonical term registered in `canon/` without a sibling binding reference (a `*_ref` slot) that pins the term to its canonical ID. The mention reads as an unbound, hallucination-prone reference.
@@ -112,46 +96,6 @@
 
    For artifacts with no resolvable `$schema` (where structural suppression and namespace-aware slot-kind suppression are inactive), two mechanisms remain active: the key-name skip (mechanism 4) and the term-specific runtime `bound_ref_ids` suppression (mechanism 3). Mechanism 3 — the `bound_ref_ids` collection in `_check_free_text_terms` of `hallucination_lint.py` — is unconditional and has no guard on `schema_node`; the check `if cids & bound_ref_ids: continue` fires regardless of whether `$schema` resolved. A sibling `*_ref` binding the mentioned term therefore suppresses E541 for that specific term even in a schema-free artifact.
 
-**Note on the closure codes** (E535, E536, E560, W562, W563, W564, W565, W568, W569, W575, W576): their Trigger and Resolution texts below describe the 1.1.1 shape. Each reads fields that 1.2.0 removed (`trace`, `targets`, `out_of_scope`, `fr_refs`, `spec_ref`, `deliverables`, `critical_evidence`, `pr_rules`) and runs only when the files it reads carry those fields, or hold no entries to read. A 1.2.0-shaped spec gets none of them until a later 1.2.0 change replaces them with graph coverage. The two milestone numbers of this list have been replaced already: E566 and E567 (check `milestone-numbers`) read the graph. A new-shape anchor has no `plan.milestone_index[].context_path`, so the closure checks load no milestone plans from it. Where a text below says to add a removed field to a 1.1.1 file, a 1.2.0 spec marks a node that needs no API or fixture with `scope: out` and `scope_reason`.
-
-### E560 TRACEABILITY_GAP
-
-**Trigger**: Fired by the traceability-closure check (`check_traceability_closure()`) for two Charter → Capabilities gaps: (1) `charter_goal_without_capability` — a Step 00 charter `goals[].goal_id` is not referenced by any Step 01 capability's `trace[]` (a trace entry of the charter-goal type); or (2) `charter_success_metric_without_capability` — a Step 00 charter `success_metrics[].metric_id` is not referenced by any capability's `success_metric_refs[]`. Only fires when both `00_charter.json` and `01_capabilities.json` are present and carry the 1.1.1 fields this check reads (`goal_id`, `success_metric_refs`, `trace`). A spec whose steps 00 to 05 have the new shape gets no E560, whatever shape its later steps have, until graph coverage later in this release. Note: E560 previously covered a `capability_without_fr` check (a capability with no tracing FR); that check was superseded by W568/E568 UNCOVERED_CAPABILITY, and E560 now covers only the two charter-level gaps described above.
-
-**Resolution**: For a pre-1.2.0 spec, for `charter_goal_without_capability`, add a capability in `01_capabilities.json` with a `trace[]` entry referencing the uncovered `goal_id`. For `charter_success_metric_without_capability`, add the `metric_id` to the appropriate capability's `success_metric_refs[]`.
-
-**Promotable**: No (error only).
-
-**See also**: E568 (capability → FR coverage — the check E560 formerly performed).
-
-### E562 / W562 ORPHAN_MILESTONE
-
-**Trigger**: A milestone in step 14 is not referenced by any checklist item in step 16a.
-
-**Resolution**: Either add FR references to the milestone or add checklist items that reference the milestone's tasks.
-
-### E563 / W563 CHECKLIST_ROADMAP_MISMATCH
-
-**Trigger**: A roadmap task exists in step 14 but has no corresponding checklist item in step 16a.
-
-**Resolution**: Create a checklist item with `spec_ref.id` matching the roadmap `task_id`, or mark the task as deferred.
-
-### E564 / W564 UNCOVERED_FR_API
-
-**Trigger**: A functional requirement defined in step 04 has no API trace reference — no API in step 05 has a trace link with type "fr" pointing to this FR. The check reads only the 1.1.1 `trace` field of step 05 APIs and runs only when the files it reads carry that field. A spec whose steps 00 to 05 have the new shape gets no E564 / W564 / E535 and no FR-to-API coverage warning from the matrix, whatever shape its later steps have, until graph coverage later in this release.
-
-**Resolution**: In a pre-1.2.0 spec, add a trace link of type "fr" in the appropriate API contract in `05_interface_contracts.json`. If the FR genuinely has no HTTP API surface (infra, ops, external constraint), add it to `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that suppresses W564, W561, and W566 for that FR. See also E535 for the contradiction check.
-
-**Promotable**: W564 → E564.
-
-### E565 / W565 UNCOVERED_FR_FIXTURE
-
-**Trigger**: A functional requirement defined in step 04 has no fixture coverage — no fixture in step 08 has a target with type "fr" pointing to this FR.
-
-**Resolution**: Add a fixture in `08_fixtures.json` with a target referencing the FR, or add it to `out_of_scope[]` in `08_fixtures.json` with a non-empty rationale — that suppresses W565 for that FR. This is a separate exemption list from `05_interface_contracts.json`'s `out_of_scope[]`: an FR with no API surface can still need a fixture (e.g. a background job), so the two are not interchangeable — populate whichever step's `out_of_scope[]` actually applies to the FR.
-
-**Promotable**: W565 → E565.
-
 ### E566 UNCOVERED_FR_MILESTONE
 
 **Trigger**: A functional requirement that is in scope (its `scope` is not `later` or `out` and its lifecycle is not `not_applicable`) and that no task criterion of step 14 reaches. A task criterion reaches an FR when it refines the FR, a node the FR contains (an acceptance criterion) or a node derived from either: the check follows the links `refines`, `realises`, `derives_from` and `mitigated_by` that point at the FR and at its acceptance criteria, then those that point at the nodes it found, until none is left; it reads no hash and no milestone state. So an API that lists the FR in `derives_from` covers it when a task criterion refines the API. Reported by `spec-check` and by the step gate (check `milestone-numbers`), not by `validate` of one file; with no graph the check is skipped (`graph could not be built (see the `graph` check)`). An FR that is `later` or `out` is not checked and stays listed by `specdev coverage` as exempt. Example, from the worked example, which is a partial spec: `E566 fr fr-password-reset-request is in scope but no task criterion reaches it: add a task criterion that refines it, one of its acceptance criteria or a node derived from it, or set its scope to later or out with a scope_reason`.
@@ -167,38 +111,6 @@
 **Resolution**: Owner `step:14`. Two ways, both run on a copy of the worked example, E567 cleared and no finding came that was not there before. Add a task criterion that refines the node or a node it contains, with a verifier, then the attest step (see [Graph Role Checks (74x)](#graph-role-checks-74x); the run attested the fixture, the criterion and the milestone, whose new `schedules` link had E761). Or remove the node from `schedules` of the step 09 milestone: the E761 of the milestone went with the link, the attest step found nothing to write and `attest --prune` found no entry, but the node is then unscheduled again and gets back the E740 it had before it was scheduled.
 
 **Promotable**: No (error only).
-
-### E568 / W568 UNCOVERED_CAPABILITY
-
-**Trigger**: A capability defined in step 01 has no functional requirement tracing to it. This replaces the former E560 `capability_without_fr` check. The check reads 1.1.1 fields and runs only when the files it reads carry them; a spec whose steps 00 to 05 have the new shape gets no W568 / E568 until graph coverage later in this release.
-
-**Resolution**: Add an FR in `04_fr_list.json` that traces to the uncovered capability, or remove the capability if it is no longer relevant.
-
-**Promotable**: W568 → E568.
-
-### E569 / W569 GOVERNANCE_PR_RULE_UNCOVERED
-
-**Trigger**: Fired by the traceability-closure check when a Step 10 governance `pr_rules[]` entry (a rule-name string) is not a substring of any CI job step's `command` field across all jobs in `12_ci_gates.json`. Only fires when both `10_governance.json` and `12_ci_gates.json` are present.
-
-**Resolution**: Add or update a CI job step in `12_ci_gates.json` whose `command` references the uncovered rule name, so the governance rule is demonstrably enforced in CI.
-
-**Promotable**: W569 → E569.
-
-### E575 / W575 IMPL_PLAN_DELIVERABLE_UNCOVERED
-
-**Trigger**: Fired by the traceability-closure check for Step 09 impl-plan deliverable → Step 14 roadmap pairwise completeness. For each Step 09 milestone `deliverables[].id`, the ID must be referenced by at least one Step 14 task's `fr_refs[]` or appear in any Step 14 milestone's `deliverables[].id`. Only fires when both `09_impl_plan.json` and `14_roadmap.json` are present.
-
-**Resolution**: Reference the Step 09 deliverable ID from a Step 14 task's `fr_refs[]`, or add a matching `deliverables[]` entry to the covering Step 14 milestone.
-
-**Promotable**: W575 → E575.
-
-### E576 / W576 TASK_EXECUTION_MISSING
-
-**Trigger**: Fired by the traceability-closure check for Step 14 task → Step 16b execution pairwise completeness. For each Step 14 task with `status` not in (`done`, `deferred`, `wont_do`), verify the task_id appears in the executed-task set derived from `execution.critical_evidence.satisfied_checklist_ids` on each Trinity Anchor milestone plan, resolved through that plan's checklist `spec_ref.id`. A task is also exempt if every checklist item covering it already has `checklist_status` `deferred` or `wont_do` (a transitional-pause allowance mirroring E304). Only fires when execution data was loaded from at least one milestone plan and `14_roadmap.json` is present.
-
-**Resolution**: Record execution evidence for the task — add its checklist item's `id` to `execution.critical_evidence.satisfied_checklist_ids` in the covering milestone plan, or mark the task `deferred`/`wont_do` in `14_roadmap.json` if it is legitimately paused or cancelled.
-
-**Promotable**: W576 → E576.
 
 ### W584 REMEDIATION_TASK_LINK_UNKNOWN
 
@@ -250,7 +162,7 @@
 
 **Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and an API id of step 05 is not named in the `threatens` of any threat in the artifact (`threatens` accepts api, component, connection and third-party ids). Each API should be threatened by at least one threat. The check only runs when Step 05 is present.
 
-**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
+**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py` (DEVSPEC-122 follow-up).
 
 **Resolution**: Add a threat in Step 11 whose `threatens` includes the uncovered API id, or confirm the API is intentionally outside threat scope.
 
@@ -370,15 +282,16 @@
 
 ### E595 / W595 CONTENT_STALENESS
 
-**Trigger**: Reported by `specdev context freshness` and by the seed indexer for the two seed sub-reasons below. File-level forward replay, which reported W595 when an upstream artifact gained content tokens that no downstream artifact shows, is retired: `specdev forward-replay-check` and `validate-all` no longer report W595 for that reason, and `SPECDEV_STALENESS_THRESHOLD` has no effect. The suspect links of the trace lock ([E763](#e763-suspect_link)) replace that check.
+**Trigger**: Reported by the seed indexer (`specdev seed-index`) for the three reasons below. File-level forward replay, which reported W595 when an upstream artifact gained content tokens that no downstream artifact shows, is retired: `specdev forward-replay-check` and `validate-all` no longer report W595 for that reason, and `SPECDEV_STALENESS_THRESHOLD` has no effect. The suspect links of the trace lock ([E763](#e763-suspect_link)) replace that check.
 
-**Resolution**: For the seed sub-reasons, re-index the seeds (below). For a change in a spec artifact, run `specdev stale` and read the pending replay.
+**Resolution**: For the seed reasons, fix the manifest or the seed file (below) and index again. For a change in a spec artifact or in a seed document, run `specdev stale`: the nodes that link the changed seed or the changed node are listed as suspect. `specdev context freshness` prints its JSON only and no longer writes W595 lines to stderr.
 
 **Promotable**: W595 → E595.
 
-**Sub-reasons** (emitted by `specdev context freshness`):
-- `CONTENT_STALENESS` — a seed's on-disk hash differs from its hash in `seed_requirements.json` (seed edited since last index). Re-index with `/specdev-step`.
-- `SEED_UNTRACKED` — a seed listed in `seed_manifest.json` (with a path) is **absent** from `seed_requirements.json`, so edits to it trip no drift signal. `build_seed_index` hashes every manifest seed, so an untracked seed means the index is stale-by-omission — re-index with `/specdev-step` to bring it under drift detection.
+**Reasons** (emitted by `specdev seed-index`, as `W595 <REASON> <detail>`):
+- `EMPTY_MANIFEST` — `seed_manifest.json` lists no seeds.
+- `MISSING_PATH` — a seed entry has no `path`; it is skipped.
+- `SEED_NOT_FOUND` — the file at a seed's `path` does not exist (run on a copy of the worked example with `docs/seed/seed_accounts.md` removed: `W595 SEED_NOT_FOUND seed 'seed-accounts' file not found`).
 
 ### E596 DAG_DEAD_END_PRODUCER
 
@@ -460,7 +373,7 @@
 
 ### W570 GRACEFUL_SKIP
 
-**Trigger**: A validator cannot resolve an optional upstream input needed for a cross-reference check, so it skips that check rather than emitting a false unresolved-reference error. W570 is a general graceful-skip signal emitted from several validators (`hallucination_lint`, `traceability_closure`, `seed_lint`, `canonical/autofix`, and the step-16 validator) whenever a dependency they would cross-check is absent. The representative case is the NFR-ref check in `hallucination_lint`: when `spec/07_nfrs.json` is absent, `nfr_refs` in downstream artifacts (e.g. `13_impl.json`) cannot be validated, so the linter records `W570 GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent` and proceeds without flagging any `nfr-*` reference as unresolved. Each emitter's message payload names the specific check and the missing input.
+**Trigger**: A validator cannot resolve an optional upstream input needed for a cross-reference check, so it skips that check rather than emitting a false unresolved-reference error. W570 is a general graceful-skip signal emitted from several validators (`hallucination_lint`, `seed_lint`, `canonical/autofix`, and the step-16 validator) whenever a dependency they would cross-check is absent. The representative case is the NFR-ref check in `hallucination_lint`: when `spec/07_nfrs.json` is absent, `nfr_refs` in downstream artifacts (e.g. `13_impl.json`) cannot be validated, so the linter records `W570 GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent` and proceeds without flagging any `nfr-*` reference as unresolved. Each emitter's message payload names the specific check and the missing input.
 
 **Resolution**: None required — the skip is intentional and informational. To make the skipped check actually run, provide the missing upstream artifact named in the message (e.g. `spec/07_nfrs.json` via the step-07 NFR prompt) and re-run the validator.
 
@@ -490,7 +403,7 @@
 
 Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
 
-**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
+**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py` (DEVSPEC-122 follow-up).
 
 **Resolution**: Either add the flagged `inv_id` to the `mitigated_by` of a threat in `11_redteam.json`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 
@@ -608,9 +521,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 #### W588 ANCHOR_MILESTONE_UNREADABLE
 
-**Trigger**: A milestone-plan JSON file in `impl_context/*.json` exists on disk but cannot be read or parsed as JSON. Two independent emitters share this code: `traceability_closure.py` (which finds plans through the `plan.milestone_index[].context_path` of a 1.1.1 anchor, feeding the coverage checks above) and `step_16_anchor.py` (directory-glob discovery, feeding E308/E309 cross-milestone drift detection) — the same underlying condition surfaces through whichever path finds it first. A declared `context_path` that is missing from disk reports nothing.
+**Trigger**: A milestone-plan JSON file in `impl_context/*.json` exists on disk but cannot be read or parsed as JSON. `step_16_anchor.py` emits it (directory-glob discovery, feeding E308/E309 cross-milestone drift detection). A declared `context_path` that is missing from disk reports nothing.
 
-**Resolution**: Fix the malformed JSON in the named milestone-plan file, or restore its file-read permissions. Until fixed, the file is excluded from traceability coverage checks and from E308/E309 drift detection — see W611 below if this causes every milestone plan to be filtered out.
+**Resolution**: Fix the malformed JSON in the named milestone-plan file, or restore its file-read permissions. Until fixed, the file is excluded from E308/E309 drift detection — see W611 below if this causes every milestone plan to be filtered out.
 
 **Promotable**: No. W588 has no `E588` counterpart — an unreadable file is a data-integrity problem to fix directly, not a severity to escalate.
 

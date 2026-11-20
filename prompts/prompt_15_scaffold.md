@@ -16,10 +16,10 @@ After generating the JSON artifact, implement the scaffold manually or using you
 
 #### Primary Sources (directly consumed)
 - `spec/15_scaffold.json` (if updating): current scaffold state for incremental generation
-- **02_system_sketch.json**: Component IDs, service boundaries, and **tech_stack** (`tech_stack.languages`, `tech_stack.frameworks`, `tech_stack.infrastructure`, `tech_stack.tools` — primary source of technology decisions) used to derive the project_skeleton module structure, language/framework selection, and scaffold directory conventions
+- **02_system_sketch.json**: Component IDs, service boundaries, and `third_parties` (each with a `name` and an exact `pin` — the primary source of technology decisions: language runtime, framework, infrastructure, tools) used to derive the project_skeleton module structure, language/framework selection, and scaffold directory conventions
 - **02a_delivery_baseline.json**: Deployment environment and infrastructure constraints used to select appropriate framework configurations and container orchestration templates for the scaffold
-- **05_interface_contracts.json**: All API endpoint definitions (api_id, path, method) used to generate the interface_map with one-to-one binding between each contract and its scaffold route entry
-- **09_impl_plan.json**: Refined technology stack (version pins, spike-discovered tools) and milestone sequencing consumed to supplement Step 02 tech_stack with implementation-time additions
+- **05_interface_contracts.json**: All API definitions (`api_id`, `path`, `method`) used to generate the `interface_map`: each row names the APIs its file implements in `realises`
+- **09_impl_plan.json**: Design milestones (what each one `schedules`, and its `target_date`) used to decide which modules the first scaffold must contain. Technology choices and pins are not read here: they are the `third_parties` of Step 02
 - **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 
 #### Reference Sources (context only)
@@ -37,12 +37,12 @@ After generating the JSON artifact, implement the scaffold manually or using you
 
 ## Operating Flow: Inventory → Map → Validate → Emit
 - **Inventory**: Build a private Scaffold Ledger from system sketch components and delivery baseline constraints. Map each component to its scaffold directory and framework config.
-- **Map**: For each public interface_ref in `05_interface_contracts.json`, create one `interface_map` entry binding the canonical API to a route path, method, and handler stub.
+- **Map**: For each public API in `05_interface_contracts.json`, create at least one `interface_map` row: a `row_id`, the API in `realises`, and the `path` of the handler stub file. Add a further row for a test file or configuration file of the same API; an API may have several rows.
 - **Validate**: Self-audit: verify every capability has a module entry, every public API has a route binding, validators are executable commands.
 - **Emit**: Write artifact only when all components are mapped and all required fields are populated.
 
 ## Heuristics For Completeness
-- Optional→expected: include validators (schema sync, openapi/gen consistency, trace checks).
+- Optional→expected: include validators (`spec-check`, schema sync, openapi/gen consistency).
 - Ambiguity scrub: minimal module set, clear names; avoid framework‑specific jargon where not needed.
 
 ## Self-Audit Gate
@@ -64,10 +64,12 @@ After generating the JSON artifact, implement the scaffold manually or using you
 Before emitting, verify:
 - Route map includes all public APIs; paths/methods consistent with contracts.
 - Service skeleton sufficient to run a minimal service; validators listed.
-- Every `api_id` in `spec/05_interface_contracts.json` has a corresponding entry in `interface_map` with a matching `method` and `path`.
+- Every `api_id` in `spec/05_interface_contracts.json` is named in `realises` of at least one `interface_map` row. `spec-check` does not report an API that no row realises (a missing row is silent unless nothing at all uses the API: E740), so this step asks for it on its own. A row holds no `method` and no route: the handler file its `path` names must implement the `method` and `path` of the API in Step 05.
 - Every service `component_id` in `spec/02_system_sketch.json` has a scaffold module or directory represented in `project_skeleton`.
 - Every `fr_id` with an acceptance criterion requiring a specific HTTP endpoint has that endpoint present in the generated scaffold.
-- All `interface_ref` values in `interface_map` resolve to valid `api_id` entries in `spec/05_interface_contracts.json`.
+- Every id in `realises` is the `api_id` of an API in `spec/05_interface_contracts.json`. An id that names no node is reported as E700; an id that names a node of another kind (a functional requirement, a component) as E701.
+- Every `row_id` is a new id: it is not the id of an API or of any other node (E704), so use `scaffold-` followed by the API slug.
+- Every row's `path` is a file that git tracks. Once an API a row realises is built (a task criterion of a closed milestone refines it), `spec-check` reports an untracked file as `E746 scaffold row <row_id> names <path>, which is not a tracked file (merge mode); add and commit the file, or correct the row's path`.
 - If any API contract cannot be scaffolded (e.g., async job, event): add a gap question (Clarify mode) rather than silently omitting the route.
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
@@ -76,15 +78,16 @@ Before emitting, verify:
 - [ ] Directory structure matches the component hierarchy and trust boundaries from Step 02
 - [ ] Every scaffold stub has at least one corresponding test file placeholder
 - [ ] Every `interface_map` route has a corresponding stub handler in the `project_skeleton` directory structure (not just a directory entry)
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
 - `project_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
-- `interface_map` covers all in-scope APIs (Step 5) with path/method and `interface_ref` links.
+- `interface_map` covers all in-scope APIs (Step 5): each row has a `row_id`, a file `path` (relative to the project root, forward slashes) and `realises`, the APIs it implements (at least one, only APIs).
 - `validators` must be populated when `build_status` is `green` (minimum item count per schema). Include commands that verify schema correctness, type safety, and lint compliance for the project languages.
 - `build_status` reflects build health; allowed values are defined in the schema.
 
 ## Best Practices
-- **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping `interface_ref`, `path`, and `method` in sync.
+- **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping each row's `realises` and `path` in step with the API's `api_id`, `path` and `method`.
 - **Reproducibility**: Document `project_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
 - **Validation**: Populate `validators` with commands (lint, type-check, schema validation) executed after scaffold generation.
 - **Status**: Track `build_status` honestly (allowed values are defined in the schema) to surface blockers before implementation accelerates.
@@ -94,6 +97,7 @@ Before emitting, verify:
 - **Drift**: Forgetting to include new or versioned APIs, leading to missing routes and broken fixtures.
 - **False Green**: Marking build status green without running validators, giving a false sense of readiness.
 - **Route Drift**: Creating route paths that differ from Step 05 definitions, breaking client compatibility.
+- **Wrong Link**: Naming a functional requirement or a component in `realises`; only APIs are accepted.
 
 # Clarification Questions
 - What language/framework should the scaffold target? Any org standards or templates to reuse?
@@ -116,7 +120,15 @@ Before emitting, verify:
   "project_skeleton": {
     "language": "python"
   },
-  "interface_map": [],
+  "interface_map": [
+    {
+      "row_id": "scaffold-user-authenticate",
+      "realises": [
+        "api-user-authenticate"
+      ],
+      "path": "src/api/handlers/auth_handler.py"
+    }
+  ],
   "validators": [
     "./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root ."
   ],

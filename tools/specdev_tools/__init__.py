@@ -35,7 +35,6 @@ _MOVED = {
     "canonical_registry": "specdev_tools.canonical.registry",
     "spec_quality_lint": "specdev_tools.validation.spec_quality_lint",
     "dependency_order_lint": "specdev_tools.validation.dependency_order_lint",
-    "traceability_closure": "specdev_tools.validation.traceability_closure",
     "prompt_generator": "specdev_tools.generation.prompt_generator",
     "prompt_schema_sync": "specdev_tools.generation.prompt_schema_sync",
     "schema_differ": "specdev_tools.generation.schema_differ",

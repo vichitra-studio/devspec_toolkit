@@ -23,6 +23,13 @@ class ValidateIntegrationTests(unittest.TestCase):
         self.assertTrue(all(isinstance(e.code, str) for e in errs))
         self.assertEqual(set(), {e.code for e in errs} & {"E550", "E555", "W550", "W598"})
 
+    def test_validate_all_runs_after_closure_removal(self):
+        """The worked example validates with no traceability closure: none of its codes exists any more."""
+        root = Path(__file__).resolve().parents[3]
+        errs = validate_dir(str(root), str(root / "tests" / "fixtures" / "graph_example" / "spec"))
+        self.assertTrue(all(isinstance(e.code, str) for e in errs))
+        self.assertEqual(set(), {e.code for e in errs} & {"E535", "E536", "E560", "E569", "E575", "E576", "E562", "E563", "E565"})
+
     def test_get_step_from_path_supports_lettered_steps(self):
         self.assertEqual("02a", get_step_from_path("02a_delivery_baseline.json"))
         self.assertEqual("16c", get_step_from_path("tests/fixtures/step_16c/something.json"))
@@ -53,7 +60,6 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]) as p_integrity, \
                  patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]) as p_canon, \
                  patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]) as p_dep, \
-                 patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
                  patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]), \
                  patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]) as p_intent:
                 errs = validate_dir(str(root), str(root / "spec"))
@@ -204,7 +210,6 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
-                 patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
                  patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]):
                 errs = validate_dir(str(root), str(root / "spec"))
             self.assertTrue(any("invalid_step_order" in e.message for e in errs))

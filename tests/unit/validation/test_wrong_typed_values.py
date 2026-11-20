@@ -5,10 +5,9 @@ and of the 1.1.1 corpus (``tests/fixtures/spec_corpus``) has the value at every 
 ``_WRONG_VALUES``; the step's deep validator (called directly, not through the E521 wrapper of ``validate.py``) must
 return a list.  The same is done for the files a validator READS besides its own (found by recording the opens of a
 run on the unmutated folder): each is mutated on disk while the validator checks its unmutated document.  A validator
-may report its own finding on a wrong type; raising is the failure.  ``check_traceability_closure``,
-``uncomputed_dimensions`` and ``build_trace_matrix`` run over a copy of the folder with one file mutated, and
-``compute_milestone_state`` over the mutated plan.  A whole file of the wrong kind (top level not an object, bytes that
-are not UTF-8) is read as an unreadable file by the three folder readers and gives the deep validators no finding;
+may report its own finding on a wrong type; raising is the failure.  ``build_trace_matrix`` runs over a copy of the
+folder with one file mutated, and ``compute_milestone_state`` over the mutated plan.  A whole file of the wrong kind
+(top level not an object, bytes that are not UTF-8) is read as an unreadable file by the folder reader and gives the deep validators no finding;
 a sibling file replaced by ``{`` or by non-UTF-8 bytes does not make a validator raise, except through the three
 1.1.1 loaders of ``_LOADERS_THAT_RAISE`` (steps 03 and 04), and a present roadmap that cannot be read keeps
 ``ROADMAP_PARSE_ERROR``.  A free-form payload holding every guarded field name, put in each of
@@ -39,7 +38,6 @@ from specdev_tools.validation import _legacy_shim
 from specdev_tools.validation.graph_checks import run_graph_checks
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.matrix import build_trace_matrix
-from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import (
     DEEP_VALIDATORS,
@@ -54,7 +52,7 @@ _CORPUS = _ROOT / "tests" / "fixtures" / "spec_corpus"
 _WRONG_VALUES: tuple[Any, ...] = (
     "x", None, [], {}, 5, [None], ["x"], [[1]], "", True, 1.5, {"id": []}, [{"id": []}],
 )
-# The 1.1.1 readers of closure and matrix are all off on the example (it is graph-shaped), so its paths are mutated
+# The 1.1.1 readers of the matrix are all off on the example (it is graph-shaped), so its paths are mutated
 # with four kinds of wrong value (string, null, array, object): this keeps the run short.  The corpus, where the
 # readers run, gets every value.
 _EXAMPLE_FOLDER_VALUES: tuple[Any, ...] = ("x", None, [], {"id": []})
@@ -291,11 +289,7 @@ def test_milestone_state_does_not_raise_on_a_wrong_value_in_the_plan(tmp_path: P
 
 
 def _readers_raise(spec_dir: Path, label: str) -> list[str]:
-    return (
-        _raise_of(label, lambda: check_traceability_closure(str(spec_dir), str(_ROOT)))
-        + _raise_of(label, lambda: uncomputed_dimensions(str(spec_dir), str(_ROOT)))
-        + _raise_of(label, lambda: build_trace_matrix(str(_ROOT), str(spec_dir)))
-    )
+    return _raise_of(label, lambda: build_trace_matrix(str(_ROOT), str(spec_dir)))
 
 
 def _first_entries(document: dict[str, Any], values: tuple[Any, ...]) -> Iterator[tuple[tuple, Any, dict[str, Any]]]:
@@ -322,12 +316,12 @@ def _mutate_folder(
     return failures
 
 
-def test_closure_and_matrix_do_not_raise_on_the_example(tmp_path: Path) -> None:
+def test_matrix_does_not_raise_on_the_example(tmp_path: Path) -> None:
     names = tuple(_STEP_OF_FILE) + ("00_charter.json",)
     assert _mutate_folder(_EXAMPLE, tmp_path, names, _EXAMPLE_FOLDER_VALUES) == []
 
 
-def test_closure_and_matrix_do_not_raise_on_the_1_1_1_corpus(tmp_path: Path) -> None:
+def test_matrix_does_not_raise_on_the_1_1_1_corpus(tmp_path: Path) -> None:
     names = tuple(sorted(path.name for path in _CORPUS.glob("*.json")))
     assert _mutate_folder(_CORPUS, tmp_path, names, _WRONG_VALUES) == []
 
@@ -349,7 +343,7 @@ def test_deep_validation_gives_no_finding_on_a_whole_document_of_the_wrong_kind(
 
 
 def _replace_whole_files(source: Path, tmp_path: Path) -> list[str]:
-    """Replace each JSON file of *source* in a copy, once per whole document, and run the three folder readers."""
+    """Replace each JSON file of *source* in a copy, once per whole document, and run the folder readers."""
     folder = tmp_path / source.parent.name / "spec"
     shutil.copytree(source, folder)
     failures: list[str] = []
@@ -403,8 +397,6 @@ def _payload() -> dict[str, Any]:
 
 def _outputs(folder: Path) -> dict[str, Any]:
     return {
-        "closure": [error.render() for error in check_traceability_closure(str(folder), str(_ROOT))],
-        "uncomputed": uncomputed_dimensions(str(folder), str(_ROOT)),
         "matrix": build_trace_matrix(str(_ROOT), str(folder)),
         "scope": resolve_scope("FR-CORPUS-001", str(folder), str(_ROOT)),
     }
@@ -426,9 +418,6 @@ def test_a_free_form_payload_with_every_guarded_field_name_leaves_every_reader_o
         target[path[-1]] = [_payload()] if path[-1] in _ARRAYS_OF_OBJECTS else _payload()
     (clean / name).write_text(json.dumps(document), encoding="utf-8")
     assert _outputs(clean) == expected
-    assert expected["uncomputed"] == [
-        "fr_api_coverage", "fr_fixture_coverage", "fr_milestone_coverage", "capability_fr_coverage"
-    ]
 
 
 @pytest.mark.parametrize("field", ["trace", "targets", "target_ids"])

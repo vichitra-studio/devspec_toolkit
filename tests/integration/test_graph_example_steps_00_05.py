@@ -218,10 +218,10 @@ def test_wrong_typed_scope_gives_schema_error_not_traceback(stamped_example: Pat
     root = str(_ROOT)
     errors, _context = run_spec_check_json(root, spec, spec_root=spec, project_canon_dir=str(work / "spec" / "canon"))
     assert any(e.code == "E520" and "scope" in e.render() for e in errors)
-    code, out = _run_cli("completeness-check", spec, "--repo-root", root, "--json")
+    code, out = _run_cli("coverage", "--repo-root", root, "--spec-root", spec, "--git-root", str(work), "--json")
     assert "Traceback" not in out and "unhashable" not in out
     assert code == 0
-    assert "coverage" in json.loads(out)
+    assert "counts" in json.loads(out)
     code, out = _run_cli("matrix", spec, "--out", str(work / "matrix.json"), "--repo-root", root)
     assert "Traceback" not in out and "unhashable" not in out
     assert code == 0

@@ -1,7 +1,7 @@
 """Unified spec-check: runs all applicable validation and lint checks in one pass.
 
 Wraps validate-all as the core, then adds checks that validate-all doesn't run
-(seed-lint, fixtures-lint, completeness-check, canon-schema-alignment).
+(seed-lint, fixtures-lint, canon-schema-alignment).
 Reports per-check breakdown with PASS/WARN/FAIL/SKIP status.
 
 This module holds the check bodies, their registrations and the plain run with its summary.  The registry they are
@@ -239,21 +239,6 @@ def _check_hallucination_lint(ctx: CheckContext) -> dict[str, Any]:
     return check_result(_owned_by_file(hall_errs, ctx.spec_dir))
 
 
-def _check_traceability_closure(ctx: CheckContext) -> dict[str, Any]:
-    return check_result(ctx.closure_errors)
-
-
-_COMPLETENESS_CHECK = "completeness-check"
-_COMPLETENESS_CODES = frozenset({
-    "W564", "W565", "W568",
-    "E564", "E565", "E568",
-})
-
-
-def _check_completeness(ctx: CheckContext) -> dict[str, Any]:
-    return check_result([e for e in ctx.closure_errors if isinstance(e, SpecError) and e.code in _COMPLETENESS_CODES])
-
-
 def _check_seed_lint(ctx: CheckContext) -> dict[str, Any]:
     if not os.path.exists(os.path.join(ctx.project_root, "spec", "common", "seed_manifest.json")):
         return skip("seed_manifest.json not present")
@@ -342,8 +327,6 @@ register_check("spec-quality-lint", _check_spec_quality_lint)
 register_check("canonical-lint", _check_canonical_lint)
 register_check("canonical-integrity", _check_canonical_integrity)
 register_check("hallucination-lint", _check_hallucination_lint)
-register_check("traceability-closure", _check_traceability_closure)
-register_check(_COMPLETENESS_CHECK, _check_completeness)
 register_check("seed-lint", _check_seed_lint)
 register_check("fixtures-lint", _check_fixtures_lint, default_owner=STEP_PREFIX + "08")
 register_check("dependency-order-lint", _check_dependency_order_lint)
@@ -398,12 +381,8 @@ def run_checks(
 
 
 def check_findings(checks: Mapping[str, dict[str, Any]]) -> list[SpecError]:
-    """Every finding of *checks*, in check order, except those of ``completeness-check``.
-
-    The completeness findings are a subset of the ``traceability-closure`` ones, so counting both would count them
-    twice.  This is the one place that rule is coded; ``_collect_errors`` and the step gate both read it.
-    """
-    return [e for name, info in checks.items() if name != _COMPLETENESS_CHECK for e in info.get("errors", ())]
+    """Every finding of *checks*, in check order; ``_collect_errors`` and the step gate both read it."""
+    return [e for info in checks.values() for e in info.get("errors", ())]
 
 
 def _collect_errors(checks: OrderedDict[str, dict[str, Any]]) -> list[SpecError]:

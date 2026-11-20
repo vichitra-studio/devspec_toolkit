@@ -21,7 +21,6 @@ from typing import NoReturn
 from .core.config import get_config, reset_config
 from .core.errors import SpecError
 from .core.toolkit_root import detect_toolkit_root
-from .validation._legacy_shim import is_parked_any_shape, out_of_scope_fr_ids
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
 # Also match warnings prefixed with file paths (e.g., "spec/05_x.json: W590 ...")
@@ -317,20 +316,6 @@ def build_parser() -> _SpecdevParser:
     gd.add_argument("--spec-root", default=None, help="Host repo spec root for submodule deployments")
     gd.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     gd.add_argument("--json", action="store_true", dest="json_output", help="Emit JSON output")
-
-    tc = sub.add_parser("traceability-check")
-    tc.add_argument("spec_dir")
-    tc.add_argument("--repo-root", default=".")
-    tc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    tc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    tc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
-    cc = sub.add_parser("completeness-check", help="Run pairwise completeness checks (W564–W568) and report coverage ratios")
-    cc.add_argument("spec_dir")
-    cc.add_argument("--repo-root", default=".")
-    cc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    cc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    cc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     sc = sub.add_parser("spec-check", help="Run all applicable validation/lint checks in one pass with per-check breakdown")
     sc.add_argument("spec_dir")
@@ -638,6 +623,8 @@ def build_parser() -> _SpecdevParser:
 
 REMOVED_COMMANDS: dict[str, str] = {
     "forward-replay-check": "use `specdev stale` for the pending replay and `specdev spec-check` for broken links",
+    "completeness-check": "use `specdev coverage` for the link counts and the ids that are not linked",
+    "traceability-check": "use `specdev spec-check` for the role-rule findings (E740 to E745) and broken links",
 }
 
 
@@ -1080,194 +1067,6 @@ def main():
             _json_exit(errs, "glossary-drift-check")
         else:
             _print_and_exit_if_errors(errs)
-    elif args.cmd == "traceability-check":
-        from .validation.traceability_closure import check_traceability_closure
-        spec_dir = os.path.abspath(args.spec_dir)
-        repo_root = os.path.abspath(args.repo_root)
-        errs = check_traceability_closure(spec_dir, repo_root)
-        if getattr(args, "json_output", False):
-            _json_exit(errs, "traceability-check", {"spec_dir": spec_dir})
-        else:
-            _print_and_exit_if_errors(errs)
-    elif args.cmd == "completeness-check":
-        from .validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
-        spec_dir = os.path.abspath(args.spec_dir)
-        repo_root = os.path.abspath(args.repo_root)
-        all_errs = check_traceability_closure(spec_dir, repo_root)
-
-        # Filter for pairwise completeness codes W564–W568 (and E-code counterparts).
-        _completeness_codes = frozenset({
-            "W564", "W565", "W568",
-            "E564", "E565", "E568",
-        })
-        from .core.errors import SpecError
-        completeness_errs = [
-            e for e in all_errs
-            if (isinstance(e, SpecError) and e.code in _completeness_codes)
-            or (isinstance(e, str) and any(e.lstrip().startswith(c) for c in _completeness_codes))
-        ]
-
-        # Compute per-check coverage ratios by counting uncovered IDs.
-        # Each warning message has the form: "LABEL {id} [optional tail...]"
-        # For W564–W568 the uncovered ID is always the second token (parts[1]).
-        # Message forms:
-        #   W564: "UNCOVERED_FR_API {fr_id}"
-        #   W565: "UNCOVERED_FR_FIXTURE {fr_id}"
-        #   W568: "UNCOVERED_CAPABILITY {cap_id}"
-        _PAIRWISE_CODES = frozenset({"W564", "W565", "W568",
-                                     "E564", "E565", "E568"})
-
-        def _extract_ids_for_code(code: str) -> list[str]:
-            result = []
-            # e_variant: the E-code counterpart of the W-code passed by callers (e.g. "W564" → "E564").
-            # Callers always pass W-codes (W564–W568); e_variant lets us match promoted E-code errors too.
-            e_variant = code.replace("W", "E", 1)
-            for e in completeness_errs:
-                msg = e.message if isinstance(e, SpecError) else e
-                # Match both W-code and promoted E-code
-                if isinstance(e, SpecError) and e.code in (code, e_variant):
-                    parts = msg.split()
-                    if len(parts) >= 2 and code in _PAIRWISE_CODES:
-                        # ID is always the second token for W564–W568.
-                        # Strip a trailing colon from the id.
-                        result.append(parts[1].rstrip(':'))
-                    elif parts:
-                        result.append(parts[1] if len(parts) >= 2 else parts[-1])
-                # String format: legacy support; check_traceability_closure always returns SpecError objects
-                elif isinstance(e, str) and (e.lstrip().startswith(code) or e.lstrip().startswith(e_variant)):
-                    parts = e.split()
-                    if len(parts) >= 2:
-                        result.append(parts[1] if code in _PAIRWISE_CODES else parts[-1])
-            return list(dict.fromkeys(result))
-
-        # Gather totals by loading spec data inline (cheap re-read for ratio computation).
-        # We parse the raw spec files directly to avoid coupling with internal state.
-        def _load_spec_json(filename: str) -> dict:
-            import json as _json
-            path = os.path.join(spec_dir, filename)
-            if not os.path.isfile(path):
-                return {}
-            try:
-                with open(path, encoding="utf-8") as _f:
-                    loaded = _json.load(_f)
-            except (OSError, ValueError):
-                return {}
-            return loaded if isinstance(loaded, dict) else {}
-
-        # Exclude parked FRs (scope later/out; the 1.1.1 priority:"wont-have" too) from
-        # every FR-based denominator below. W564 (API coverage)
-        # additionally exempts FRs listed in Step 05's
-        # apis.out_of_scope[]; W565 (fixture coverage) exempts a *different*
-        # set -- FRs listed in Step 08's fixtures.out_of_scope[] -- per
-        # traceability_closure.py's deliberate separation (DEVSPEC-122: "no
-        # API surface" and "no fixture" are independent scoping decisions).
-        # A single shared denominator for all three would desync from what
-        # each W-code's own uncovered-set actually excludes.
-        frs_data = _load_spec_json("04_fr_list.json")
-        all_fr_ids = {
-            fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
-            if fr.get("fr_id")
-        }
-        wont_have_fr_ids = {
-            fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
-            if is_parked_any_shape(fr) and fr.get("fr_id")
-        }
-        apis_data = _load_spec_json("05_interface_contracts.json")
-        step05_oos_fr_ids = out_of_scope_fr_ids(apis_data)
-        fixtures_data = _load_spec_json("08_fixtures.json")
-        step08_oos_fr_ids = out_of_scope_fr_ids(fixtures_data)
-        total_frs_api_milestone = len(all_fr_ids - wont_have_fr_ids - step05_oos_fr_ids)
-        total_frs_fixture = len(all_fr_ids - wont_have_fr_ids - step08_oos_fr_ids)
-
-        # Parked capabilities (scope "later": deferred; scope "out": permanently
-        # excluded; the 1.1.1 "future" too) are not expected to have an FR yet, so
-        # they leave the W568 denominator.
-        # Same predicate as the W568 exemption in traceability_closure.py (any shape).
-        caps_data = _load_spec_json("01_capabilities.json")
-        total_caps = sum(
-            1 for cap in caps_data.get("capabilities", [])
-            if not is_parked_any_shape(cap)
-        )
-
-        roadmap_data = _load_spec_json("14_roadmap.json")
-        total_milestones = len(roadmap_data.get("milestones", [])) if roadmap_data else 0
-
-        def _ratio(total: int, uncovered_count: int) -> float:
-            if total == 0:
-                return 1.0
-            return round((total - uncovered_count) / total, 4)
-
-        uncovered_w564 = _extract_ids_for_code("W564")
-        uncovered_w565 = _extract_ids_for_code("W565")
-        uncovered_w566: list[str] = []  # E566 and E567 are the graph check `milestone-numbers` now (M6c)
-        uncovered_w567: list[str] = []
-        uncovered_w568 = _extract_ids_for_code("W568")
-
-        # A dimension whose closure reader is skipped on this spec shape is written in the 13a schema's
-        # vacuous form and named under `not_computed` (M6c retires 13a and these readers).
-        not_computed = uncomputed_dimensions(spec_dir, repo_root)
-
-        def _dim(name: str, total: int, uncovered: list) -> dict:
-            if name in not_computed:
-                total, uncovered = 0, []
-            covered = max(0, total - len(uncovered))
-            return {
-                "covered_count": covered,
-                "total_count": total,
-                "ratio": _ratio(total, len(uncovered)),
-                "uncovered_ids": uncovered,
-            }
-
-        coverage = {
-            "fr_api_coverage":               _dim("fr_api_coverage", total_frs_api_milestone, uncovered_w564),
-            "fr_fixture_coverage":           _dim("fr_fixture_coverage", total_frs_fixture, uncovered_w565),
-            "fr_milestone_coverage":         _dim("fr_milestone_coverage", total_frs_api_milestone, uncovered_w566),
-            "milestone_decomp_completeness": _dim("milestone_decomp_completeness", total_milestones, uncovered_w567),
-            "capability_fr_coverage":        _dim("capability_fr_coverage", total_caps, uncovered_w568),
-        }
-
-        if getattr(args, "json_output", False):
-            from .core.errors import ensure_spec_errors
-            from .core.json_output import format_errors_json
-            spec_errors = ensure_spec_errors(completeness_errs)
-            ctx: dict = {
-                "command": "completeness-check",
-                "spec_dir": spec_dir,
-                "coverage": coverage,
-                "not_computed": not_computed,
-            }
-            print(format_errors_json(spec_errors, context=ctx))
-            has_ecodes = any(not e.code.startswith("W") for e in spec_errors)
-            if _warnings_as_errors() and spec_errors:
-                sys.exit(1)
-            if has_ecodes:
-                sys.exit(1)
-            sys.exit(0)
-        else:
-            print("=== Pairwise Completeness Check ===")
-            print()
-            labels = [
-                ("fr_api_coverage",               "FR → API coverage"),
-                ("fr_fixture_coverage",           "FR → Fixture coverage"),
-                ("fr_milestone_coverage",         "FR → Milestone coverage"),
-                ("milestone_decomp_completeness", "Milestone decomp completeness"),
-                ("capability_fr_coverage",        "Capability → FR coverage"),
-            ]
-            for name, label in labels:
-                dim = coverage[name]
-                if name in not_computed:
-                    print(f"  [SKIP] {label}: not computed on this spec shape")
-                    continue
-                ratio = dim["ratio"]
-                uncovered = dim["uncovered_ids"]
-                pct = f"{ratio * 100:.1f}%"
-                status = "OK" if ratio == 1.0 else "WARN"
-                print(f"  [{status}] {label}: {pct}")
-                for uid in uncovered:
-                    print(f"        - uncovered: {uid}")
-            print()
-            if _has_error_messages(completeness_errs):
-                sys.exit(1)
     elif args.cmd == "dependency-order-lint":
         from .validation.dependency_order_lint import lint_dependency_order
         repo_root = os.path.abspath(args.repo_root)
@@ -2103,35 +1902,6 @@ def main():
                 git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
                 result = check_freshness(spec_dir, repo_root, git_root=git_root)
                 print(json.dumps(result, indent=2))
-                # Emit W595 (CONTENT_STALENESS) for any stale seed — §A6
-                stale_seeds = [
-                    sid for sid, info in result.items()
-                    if isinstance(info, dict) and info.get("stale")
-                ]
-                # Emit W595 (SEED_UNTRACKED) for manifest seeds missing from the
-                # index — they escape drift detection until re-indexed.
-                untracked_seeds = [
-                    sid for sid, info in result.items()
-                    if isinstance(info, dict) and info.get("untracked")
-                ]
-                if stale_seeds or untracked_seeds:
-                    cfg = get_config()
-                    warn_or_error = "error" if cfg.warnings_as_errors else "warning"
-                    for sid in stale_seeds:
-                        print(
-                            f"specdev: {warn_or_error} W595: seed '{sid}' is stale — "
-                            "re-index with /specdev-step (CONTENT_STALENESS)",
-                            file=sys.stderr,
-                        )
-                    for sid in untracked_seeds:
-                        print(
-                            f"specdev: {warn_or_error} W595: seed '{sid}' is in the "
-                            "manifest but not hash-tracked in seed_requirements.json — "
-                            "re-index with /specdev-step (SEED_UNTRACKED)",
-                            file=sys.stderr,
-                        )
-                    if cfg.warnings_as_errors:
-                        sys.exit(1)
             elif context_cmd == "review":
                 from .context.reviewer import review_artifact
                 import dataclasses
