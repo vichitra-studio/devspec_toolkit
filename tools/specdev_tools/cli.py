@@ -337,7 +337,6 @@ def build_parser() -> _SpecdevParser:
     sc.add_argument("--repo-root", default=".")
     sc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     sc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Also check id regressions (E555) against the base ref; file-level forward replay is retired, see `specdev stale`")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
     sc_scope = sc.add_mutually_exclusive_group()
     sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N (written as in the file name: 05, 13a, 16) instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
@@ -416,15 +415,6 @@ def build_parser() -> _SpecdevParser:
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
     dol.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
-    frc = sub.add_parser("forward-replay-check")
-    frc.add_argument("--repo-root", default=".")
-    frc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    frc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    frc.add_argument("--base-ref", help="Diff base ref for the id-regression check (E555); default: auto-resolved in validate-all")
-    frc.add_argument("--diff-error-mode", choices=["error", "ignore"], default="error", help="What a failed diff of the base ref does (error: E550; ignore: skip the id-regression check)")
-    frc.add_argument("--step", metavar="NN", help="Only this step: the suspect links its nodes hold and the id regressions of its file")
-    frc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     gov = sub.add_parser("governance-check")
     gov.add_argument("spec_dir")
@@ -646,6 +636,18 @@ def build_parser() -> _SpecdevParser:
     return p
 
 
+REMOVED_COMMANDS: dict[str, str] = {
+    "forward-replay-check": "use `specdev stale` for the pending replay and `specdev spec-check` for broken links",
+}
+
+
+def _refuse_removed_command(argv: list[str]) -> None:
+    """Exit 2 with a pointer when the first word of *argv* names a command that 1.2.0 removed (before argparse sees it)."""
+    if argv and argv[0] in REMOVED_COMMANDS:
+        print(f"specdev: {argv[0]} was removed in 1.2.0; {REMOVED_COMMANDS[argv[0]]}", file=sys.stderr)
+        sys.exit(2)
+
+
 def main():
     # --version must bypass venv check so it works in any environment.
     # We short-circuit here before check_venv() and before argparse, because
@@ -657,6 +659,7 @@ def main():
         print(f"specdev {_ver}")
         sys.exit(0)
 
+    _refuse_removed_command(sys.argv[1:])
     check_venv()
     # Reset config singleton so each CLI invocation reads current env vars
     reset_config()
@@ -1278,30 +1281,6 @@ def main():
         errs = lint_dependency_order(repo_root)
         if getattr(args, "json_output", False):
             _json_exit(errs, "dependency-order-lint")
-        else:
-            _print_and_exit_if_errors(errs)
-    elif args.cmd == "forward-replay-check":
-        from .validation.forward_replay_check import check_forward_replay_alias
-        from .validation.validate import _resolve_replay_base_ref
-        print(
-            "specdev: forward-replay-check is deprecated; use `specdev stale` for the pending replay "
-            "(it now reports suspect links of the trace lock and id regressions)",
-            file=sys.stderr,
-        )
-        repo_root = os.path.abspath(args.repo_root)
-        git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
-        spec_root = os.path.abspath(args.spec_root) if getattr(args, 'spec_root', None) else None
-        base_ref = args.base_ref or _resolve_replay_base_ref(Path(git_root or repo_root))
-        errs = check_forward_replay_alias(
-            repo_root,
-            base_ref=base_ref,
-            diff_error_mode=args.diff_error_mode,
-            git_root=git_root,
-            spec_root=spec_root,
-            step=args.step,
-        )
-        if getattr(args, "json_output", False):
-            _json_exit(errs, "forward-replay-check")
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "governance-check":
@@ -2307,8 +2286,7 @@ def main():
         from .core.errors import FindingError
         from .validation.step_gate_run import gate_usage_error
         usage = gate_usage_error(
-            steps=args.steps, paths=args.paths, include_forward_replay=args.include_forward_replay,
-            base_ref=args.base_ref, detail=args.detail,
+            steps=args.steps, paths=args.paths, base_ref=args.base_ref, detail=args.detail,
         )
         if usage:
             p.error(usage)
@@ -2317,11 +2295,11 @@ def main():
         try:
             if args.json_output:
                 from .validation.spec_check import run_spec_check_json
-                errs, ctx = run_spec_check_json(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+                errs, ctx = run_spec_check_json(repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir)
                 _json_exit(errs, "spec-check", extra_context=ctx)
             else:
                 from .validation.spec_check import run_spec_check
-                errs = run_spec_check(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+                errs = run_spec_check(repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir)
                 _print_and_exit_if_errors(errs)
         except FindingError as exc:
             _refuse_spec_check(exc.error, args.json_output)

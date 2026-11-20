@@ -36,9 +36,6 @@ from .touched_steps import (
 )
 
 NO_STEP_NOTE = "no step gated: no listed path maps to a step that has an artifact"
-FORWARD_REPLAY_USAGE = (
-    "spec-check: --include-forward-replay cannot be combined with --step or --paths (id regressions are suspects there)"
-)
 GATE_ONLY_USAGE = "spec-check: --base-ref and --detail apply only with --step or --paths"
 EMPTY_BASE_REF_USAGE = "spec-check: --base-ref needs a ref name, not an empty one"
 
@@ -57,16 +54,14 @@ class StepGateRun:
 
 
 def gate_usage_error(
-    *, steps: Sequence[str] | None, paths: Sequence[str] | None, include_forward_replay: bool, base_ref: str | None, detail: str | None
+    *, steps: Sequence[str] | None, paths: Sequence[str] | None, base_ref: str | None, detail: str | None
 ) -> str | None:
     """The usage error for a flag combination of ``spec-check`` that the step gate refuses, or ``None``.
 
-    ``--step`` and ``--paths`` (*steps*, *paths*) start the gate; ``--include-forward-replay`` cannot be combined with
-    them, ``--base-ref`` and ``--detail`` need them, and ``--base-ref`` names a ref.
+    ``--step`` and ``--paths`` (*steps*, *paths*) start the gate; ``--base-ref`` and ``--detail`` need them, and
+    ``--base-ref`` names a ref.
     """
     gating = steps is not None or paths is not None
-    if gating and include_forward_replay:
-        return FORWARD_REPLAY_USAGE
     if not gating and (base_ref is not None or detail is not None):
         return GATE_ONLY_USAGE
     if base_ref == "":

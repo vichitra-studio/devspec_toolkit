@@ -17,7 +17,6 @@ spec-check: 27 checks run, 24 errors, 8 warnings
   [PASS] registry-check                 0 errors  0 warnings
   [PASS] hardcoded-seed-check           0 errors  0 warnings
   [PASS] glossary-drift-check           0 errors  0 warnings
-  [SKIP] forward-replay-check           (use --include-forward-replay to check id regressions (E555) against the base ref)
   [PASS] trace-lock                     0 errors  0 warnings
   [FAIL] no-dangling                    17 errors  0 warnings
   [PASS] term-use                       0 errors  0 warnings

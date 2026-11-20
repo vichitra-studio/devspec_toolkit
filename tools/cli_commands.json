@@ -97,9 +97,6 @@
       "path": "fixtures-lint"
     },
     {
-      "path": "forward-replay-check"
-    },
-    {
       "path": "glossary-drift-check"
     },
     {

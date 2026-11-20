@@ -8,18 +8,18 @@ Run `specdev prompt-context 01` to see downstream consumers.
 You are a **senior capability architect and systems analyst**. Your job is to decompose product intent into a complete, non-overlapping set of system capabilities that fully covers stakeholder JTBD and cross-cutting concerns.
 
 ## Purpose
-Translate the charter into a catalog of system capabilities with explicit verbs, scope boundaries, and operating conditions. This step defines what value the system must deliver, when it is intentionally deferred, and how each capability traces back to stakeholders and success metrics.
+Translate the charter into a catalog of system capabilities with explicit verbs, scope boundaries, and operating conditions. This step defines what value the system must deliver, when it is intentionally deferred, and which charter scope items, user segments and success metrics each capability derives from.
 
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
 - **Seeds**: per spec/common/seed_manifest.json step_requirements["01"]
-- **00_charter.json**: Project goals, success metrics, in/out-of-scope items, and stakeholder needs to anchor capability boundaries; use canonical nouns/verbs from charter language; do not depend on downstream glossary/FR artifacts
+- **00_charter.json**: Project goals, success metrics, `scope_items` (each with its `scope`), and stakeholder needs to anchor capability boundaries; use canonical nouns/verbs from charter language; do not depend on downstream glossary/FR artifacts
 
-## Operating Flow: Discover → Cross-Cut → Trace → Emit
-- **Discover**: Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
-- **Cross-Cut**: Verify each capability exists in `spec/00_charter.json` `in_scope` or `goals`, and does not contradict `out_of_scope` or constraints in the ingested seeds. If a capability cannot be traced to a charter goal or seed requirement, ask a Gap Question. Apply the Cross-Cutting Capability Checklist below.
-- **Trace**: Rewrite to single, testable behaviors with explicit boundaries and error states; propose `trace` hooks to FRs (if any exist) or omit the trace entry until FR IDs are known. For each in-scope user segment's `jobs_to_be_done` from `00_charter.json`, verify at least one capability traces to that job. Any uncovered JTBD must either generate a new capability or be explicitly listed as out-of-scope.
+## Operating Flow: Discover → Cross-Cut → Derive → Emit
+- **Discover**: Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (`in`, `later` or `out`), natural owner, inputs/outputs, and key error states. Do not output it.
+- **Cross-Cut**: Verify each capability rests on a `scope_items` entry of `spec/00_charter.json` with `scope` `in`, a user segment or a success metric, and does not contradict a `scope_items` entry with `scope` `out`, a charter `constraints` item or the ingested seeds. If a capability cannot be derived from a charter node or seed requirement, ask a Gap Question. Apply the Cross-Cutting Capability Checklist below.
+- **Derive**: Rewrite to single, testable behaviors with explicit boundaries and error states; set `derives_from` on every capability to the charter scope items, user segments or success metrics it comes from. Later steps link to the capability; the capability holds no links to them. For each user segment's `jobs_to_be_done` from `00_charter.json`, verify at least one capability derives from that segment. Any uncovered JTBD must either generate a new capability or be recorded as a capability with `scope` `out` and a `scope_reason`.
 - **Emit**: Emit JSON after alignment.
 
 ### Cross-Cutting Capability Checklist (AUDIT-081)
@@ -35,26 +35,26 @@ Before finalizing, verify these system-level capabilities are considered:
 
 ## Heuristics For Completeness
 - MUST include pre/postconditions for capabilities when `spec/00_charter.json` constraints or ingested seeds define prerequisites or side effects; MUST include owner for any capability that spans multiple components as identified in upstream artifacts.
-- Auto-trace seeds: if an FR list has been generated downstream and contains FR IDs, add a `trace` to matching FRs; otherwise, omit the trace entry until FR IDs are known.
+- Link upward only: the FRs of step 04 link to the capabilities they refine. Do not add links from a capability to FRs or interfaces.
 - Naming: MUST use `cap-{noun}-{verb-or-noun}` format (e.g., `cap-user-authentication`) when a matching term exists in `spec/00_charter.json` or the ingested seeds; MUST NOT use UI-screen or database-table names as capability identifiers.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- `spec/00_charter.json` is present and contains at least one in_scope entry.
+- `spec/00_charter.json` is present and contains at least one `scope_items` entry.
 - `spec/00_charter.json` is present and contains at least one user_segments entry.
 - All seeds listed for step "01" in `spec/common/seed_manifest.json` are present and non-empty.
 
 ## Negative Constraints
 - **DO NOT** overlap capability scopes; each capability must have a clear boundary.
 - **DO NOT** use generic verbs ("manage", "handle"); MUST use specific action verbs derived from `spec/00_charter.json` goals and the ingested seeds.
-- **DO NOT** leave `trace` fields empty; omit `trace` entries whose target IDs are not yet known rather than using invalid placeholder values.
+- **DO NOT** leave `derives_from` empty or fill it with placeholder values; name the charter nodes the capability comes from.
 - **DO NOT** invent capabilities that are not supported by the Charter goals.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every in-scope item and success metric in `spec/00_charter.json` is addressed by ≥1 `capability_id`, OR explicitly listed in `out_of_scope` with rationale.
+- Every `scope_items` entry with `scope` `in` and every success metric in `spec/00_charter.json` is addressed by ≥1 `capability_id`, OR explicitly recorded as a capability with `scope` `out` and a `scope_reason`.
 - No charter scope item is silently dropped — each must map to at least one named capability.
-- All `trace` entries reference IDs present in `spec/00_charter.json` (`success_metrics[*].metric_id`, `user_segments[*].segment_id`).
+- All `derives_from` entries are ids present in `spec/00_charter.json` (`scope_items[*].scope_id`, `user_segments[*].segment_id`, `success_metrics[*].metric_id`).
 - If any charter goal cannot be mapped to a capability: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
@@ -62,7 +62,8 @@ Before emitting, verify:
 - [ ] Every JTBD from charter's `user_segments` is served by at least one in-scope capability
 - [ ] All cross-cutting concerns (auth, observability, error handling, rate limiting, audit) have dedicated capabilities
 - [ ] No two capabilities describe overlapping behaviors (check for duplication)
-- [ ] Every capability has a clearly defined `scope` value
+- [ ] Every capability has a clearly defined `scope` value, and a `scope_reason` when it is `later` or `out`
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
 - Capabilities cover the full scope of the charter/user segments; each is a single verb-driven behavior (e.g., "search products", "issue refund").
@@ -70,20 +71,20 @@ Before emitting, verify:
 - Include `owner` for each capability reflecting the accountable team for delivery.
 - Preconditions, postconditions, and error_states are set for non-trivial capabilities.
 - Inputs/outputs are concrete (e.g., IDs, payload shapes, key fields), not hand-wavy.
-- Trace includes at least one reference to FRs or known interfaces once available; omit trace entries whose target IDs are not yet known.
+- `derives_from` names at least one charter scope item, user segment or success metric.
 
 ## Best Practices
 - **Verbs**: Phrase each `verb` as an observable action (e.g., "issue invoice"), avoiding generic "manage" or "handle".
 - **Scope**: Set realistic scope to focus delivery; align with charter.
 - **Handshake**: Enumerate `inputs`, `outputs`, `preconditions`, and `postconditions` so downstream FRs and interfaces know the full handshake.
 - **Failures**: Capture `error_states` with user-visible impacts to drive fixture coverage.
-- **Trace**: Use `trace` to connect capabilities to charter metrics, FRs, or governance requirements.
+- **Derivation**: Use `derives_from` to connect each capability to the charter scope items, user segments or success metrics that justify it.
 
 ## Common Pitfalls
 - **Marketing Fluff**: Copying marketing language instead of measurable verbs leads to ambiguous FRs.
 - **Hidden Dependencies**: Marking items `in` scope without explicit preconditions.
 - **Implementation Leak**: Capabilities that mirror UI screens or database tables instead of user value.
-- **Duplicate IDs**: Duplicating capabilities with different IDs, breaking traceability.
+- **Duplicate IDs**: Duplicating capabilities with different IDs, splitting the links that later steps make to them.
 - **Undefined I/O**: Leaving inputs/outputs undefined makes API generation impossible.
 
 # Clarification Questions
@@ -93,7 +94,7 @@ Before emitting, verify:
 - What are the top 3 error states per high-risk capability and how should they be surfaced?
 - Which team owns each capability across build/operate/support? Any shared ownership to flag?
     - *Note:* Owner must be one of the canonical values defined in the schema (vc:core:atoms#owner); choose whoever is accountable for building and maintaining this capability.
-- Which FRs or APIs (existing or anticipated) does each capability map to?
+- Which charter scope items, user segments or success metrics justify each capability?
 
 # Schema Reference
 - Schema URI: vc:01-capabilities

@@ -12,21 +12,21 @@ Document the external facing contracts (routes, schemas, security, and versionin
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Product scope boundaries, success metrics, and high-level constraints that determine which interfaces are in-scope and what security or compliance postures apply to each API
-- **01_capabilities.json**: Capability IDs and their priority rankings to ensure every high-priority capability surfaces at least one corresponding API contract entry
-- **02_system_sketch.json**: Component IDs, trust boundaries, inter-component communication paths, and **tech_stack** (framework and language choices that inform API style — e.g., REST with FastAPI, GraphQL with Apollo, gRPC with protobuf) to assign each API to an owning component and enforce correct security at boundary crossings
+- **00_charter.json**: `scope_items`, success metrics, and `constraints` that determine which interfaces are in scope and what security or compliance postures apply to each API
+- **01_capabilities.json**: Capability ids and their `scope` to ensure every capability with `scope` `in` surfaces at least one corresponding API contract entry
+- **02_system_sketch.json**: Component ids, trust boundaries, inter-component communication paths, and `third_parties` (framework and platform choices that inform API style — e.g., REST with FastAPI, GraphQL with Apollo, gRPC with protobuf) to assign each API to a providing component and to the third parties it relies on and enforce correct security at boundary crossings
 - **02a_delivery_baseline.json**: Deployment environments and infrastructure constraints that influence protocol choices, versioning strategies, and transport-level security requirements for each API
 - **03_glossary.json**: Term IDs, canonical resource names, and action vocabulary to align all route paths, request/response field names, and error names with the shared domain language
-- **04_fr_list.json**: Functional requirement IDs, acceptance criteria, preconditions, postconditions, and input/output payload descriptions to derive one or more API contracts per externally observable FR behavior
+- **04_fr_list.json**: Functional requirement ids, acceptance criteria (their `criterion_id` values), preconditions, postconditions, and input/output payload descriptions to derive one or more API contracts per externally observable FR behavior
 
-## Operating Flow: Map → Design → Validate → Trace → Emit
+## Operating Flow: Map → Design → Validate → Link → Emit
 - **Map**: For every FR with external-observable behavior, identify the API operation(s) needed. Track coverage in a private Context Ledger.
 - **Design**: Apply REST Design Heuristics to shape resource URLs, method semantics, request/response schemas, and error contracts.
 - **Validate**: Verify every FR with observable behavior has ≥1 API. Every endpoint has ≥1 error response. Avoid duplicate `interface_ref` values — each distinct contract should have a unique `interface_ref` entry.
-- **Trace**: Link each API to its originating FR(s) and any NFR performance targets.
+- **Link**: Set `derives_from` on each API to its originating FR(s), and on each error to the acceptance criteria it comes from. Name the providing component in `provided_by` and any third party in `relies_on`. Later steps (NFRs, fixtures) link back to the API; an API holds no links to them.
 - **Emit**: Write the artifact only when all FRs are covered and design heuristics pass.
 
-**Extraction Mandate**: Every FR with observable external behavior must map to ≥1 API. List any FR left without an API and explain why (e.g., internal-only behavior, handled by event system).
+**Extraction Mandate**: Every FR with observable external behavior must map to ≥1 API. List any FR left without an API and explain why (e.g., internal-only behavior, handled by event system), or park the behavior with `scope` `later` or `out` and a `scope_reason`.
 
 ### REST Design Heuristics
 - **Resource naming**: Use plural nouns for collections (`/users`, `/sessions`). Avoid verbs in URLs except for RPC-style actions (`/auth/refresh`).
@@ -55,7 +55,7 @@ Before finalizing, ensure these are addressed:
 ## Heuristics For Completeness
 - MUST provide `input_schema_ref` and `output_schema_ref` when the corresponding FR in `spec/04_fr_list.json` specifies input/output payloads or when fixtures in Step 8 will need payload shapes; MUST include at least one error state for every non-GET mutating operation.
 - Versioning: MUST bump version when request/response formats or semantics change materially.
-- Security: MUST NOT use `none` for APIs that access authenticated resources, PII, or state-mutating operations as identified in `spec/04_fr_list.json` preconditions; MUST align with NFRs and governance.
+- Security: MUST NOT use `none` for APIs that access authenticated resources, PII, or state-mutating operations as identified in `spec/04_fr_list.json` preconditions, nor for any user-facing endpoint (`none` is for internal-only endpoints with no public exposure); MUST align with NFRs and governance.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -72,13 +72,13 @@ Before finalizing, ensure these are addressed:
 - **DO NOT** use vague or non-specific error codes.
 
 ## Clarification Questions
-- If access control rules, permission boundaries, or identity model are not defined in `spec/04_fr_list.json` preconditions or `spec/00_charter.json` constraints, MUST ask Gap Questions — do not assume a model.
+- If access control rules, permission boundaries, or identity model are not defined in `spec/04_fr_list.json` preconditions or the `constraints` of `spec/00_charter.json`, MUST ask Gap Questions — do not assume a model.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every FR in `spec/04_fr_list.json` that specifies an observable external behavior is covered by ≥1 `api_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
-- All `trace` entries on APIs reference valid `fr_id` values from `spec/04_fr_list.json`.
-- Every `component_id` from `spec/02_system_sketch.json` that exposes an interface has at least one API contract defined here.
+- Every FR in `spec/04_fr_list.json` that specifies an observable external behavior is named in the `derives_from` of ≥1 API in this artifact, OR explained as internal-only.
+- All `derives_from` entries on APIs are `fr_id` values and all `derives_from` entries on errors are `criterion_id` values from `spec/04_fr_list.json`.
+- Every `component_id` from `spec/02_system_sketch.json` that exposes an interface is named in `provided_by` of at least one API contract defined here.
 - All resource and action names align with `term_id` values from `spec/03_glossary.json`.
 - If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.
 - [ ] Every upstream ID from ingested context has been consumed
@@ -88,25 +88,25 @@ Before emitting, verify:
 - [ ] Resource naming is consistent across all APIs (no mixed singular/plural, no verbs in resource paths)
 - [ ] Every externally-observable FR behavior has at least one API endpoint
 - [ ] No ID referenced by this step (fr_id, nfr_id, inv_id) conflicts with the same ID in a sibling step
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
 - Each API entry has version, protocol, route/path (or equivalent), method (where applicable), and owner.
 - Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
 - `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
 - `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` field (see schema/05_interface_contracts.schema.json → `vc:core:atoms#apiSecurity`).
-- `trace` links to FRs/capabilities that justify the API; add example_refs where helpful for fixtures.
+- `derives_from` names the FRs that justify the API; each entry of `errors` has an `error_id`, a `scope` and a `derives_from` naming the acceptance criteria it comes from.
 - No mixed concerns: separate entries for distinct behaviors or versioned variants.
 
 ## Cross-Step Synthesis Notes
-- **Trace Format**: When specifying trace references, use the exact JSON object format: `[{"type": "fr", "id": "fr-login", "note": "Implements: ..."}]` - not string arrays like `["fr-login"]` or simple objects like `{"fr": "fr-login"}`. At step 05, use type `fr` (the kind of the target) pointing to fr-* IDs; state the implements relationship in note.
-- **Semantic Drift Prevention**: When tracing an API to an upstream FR, copy the exact FR `statement` text verbatim into the trace `note` field. Do not paraphrase. Example: `"note": "Implements: 'The system shall authenticate a registered user and return a signed session token.'"`. This prevents trace drift when FR text is later revised.
+- **Link Format**: A link is a list of bare ids: `"derives_from": ["fr-login"]`. Do not add notes or copy upstream text into the API; the trace lock detects when a linked FR changes.
 
 ## Best Practices
-- **Stability**: Keep `api_id` stable and map each entry to an owning component from the system sketch.
+- **Stability**: Keep `api_id` stable and name the providing component from the system sketch in `provided_by`.
 - **Versioning**: Use `version` strings conforming to the pattern enforced by schema/05_interface_contracts.schema.json, and update in lockstep with schema changes.
 - **Payloads**: Provide `input_schema_ref`, `output_schema_ref`, and enumerated `errors` so fixtures and clients know exact payloads.
 - **Security**: Define `security` and `auth` expectations explicitly to align with governance and monitoring.
-- **Trace**: Populate `trace` references to FR IDs or capabilities proving why the interface exists.
+- **Links**: Populate `derives_from` with the FR ids proving why the interface exists.
 - **Non-HTTP Protocols**: For gRPC methods, use POST method; for MQTT, map routes to topic paths (e.g., `/topic/{id}`).
 
 ## Common Pitfalls

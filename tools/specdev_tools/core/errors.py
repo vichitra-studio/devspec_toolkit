@@ -58,7 +58,6 @@ ERROR_CODES = {
     "W110": "DEPRECATED_CANONICAL_USED",
     "W120": "ALIAS_DEPRECATED",
     "W130": "CANONICAL_REF_VERSION_OMITTED",
-    "W140": "SEED_CONTENT_OVERLAP_LOW",
     "W150": "SEED_MANIFEST_NOT_PROVIDED",
     # Cross-artifact drift (2xx)
     "E210": "CROSS_ARTIFACT_DRIFT",
@@ -92,12 +91,10 @@ ERROR_CODES = {
     "E540": "SELF_OR_FORWARD_DEPENDENCY",
     "E541": "UNBOUND_CANONICAL_TERM",
     "E543": "STEP_METADATA_INCONSISTENT",
-    "E550": "FORWARD_REPLAY_MISSING",
     "E551": "SCHEMA_ENUM_EXTRA",
     "E552": "MISSING_PAIRED_SCHEMA",
     "E553": "MISSING_ENUM_PATH",
     "E554": "CANON_ENUM_DRIFT",
-    "E555": "SEMANTIC_COVERAGE_REGRESSION",
     "E560": "TRACEABILITY_GAP",
     "E561": "UNCOVERED_FR",
     "E562": "ORPHAN_MILESTONE",
@@ -115,17 +112,13 @@ ERROR_CODES = {
     "E576": "TASK_EXECUTION_MISSING",
     "E580": "SUBSTEP_DRIFT",
     "E585": "DAG_CIRCULAR_DEPENDENCY",
-    "W550": "SEMANTIC_COVERAGE_SKIP",
-    "W551": "UNDECLARED_SEED",
     "W552": "POTENTIAL_UNREGISTERED_PAIRING",
     "W553": "SEED_STEP_UNKNOWN",
     "W554": "HARDCODED_SEED_REFERENCE",
     # W555 STEP00_SEED_OUT_OF_SCOPE_THIN — warn-only, non-promotable.
-    # E555 is SEMANTIC_COVERAGE_REGRESSION (different semantic); W555 is intentionally
-    # excluded from PROMOTABLE_PAIRS so neither SPECDEV_WARNINGS_AS_ERRORS nor
-    # SPECDEV_PROMOTE_CODES can escalate it.
+    # W555 is intentionally excluded from PROMOTABLE_PAIRS so neither
+    # SPECDEV_WARNINGS_AS_ERRORS nor SPECDEV_PROMOTE_CODES can escalate it.
     "W555": "STEP00_SEED_OUT_OF_SCOPE_THIN",
-    "W560": "TRACEABILITY_GAP",
     "W561": "UNCOVERED_FR",
     "W562": "ORPHAN_MILESTONE",
     "W563": "CHECKLIST_ROADMAP_MISMATCH",
@@ -168,7 +161,6 @@ ERROR_CODES = {
     "W595": "CONTENT_STALENESS",
     "W596": "UNDECLARED_UPSTREAM_REF",
     "W597": "EXTRACTION_INTENT_VAGUE",
-    "W598": "ID_STABILITY_REMOVAL",
     "W599": "EVIDENCE_TOO_SHORT",
     "W600": "VERIFIED_ACTION_NO_EVIDENCE",
     "W601": "EVIDENCE_NO_ARTIFACT_REF",
@@ -294,7 +286,7 @@ ERROR_CODES = {
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W553/W554/W555/W590/
+# Non-promotable codes are excluded: W110/W120/W130/W552/W553/W554/W555/W590/
 # W596/W597/W606 have E-counterparts with different semantics; W570
 # (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
 # its name with the registered-but-unemitted E604 and stays advisory (see the
@@ -303,11 +295,6 @@ ERROR_CODES = {
 # W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
 # W630 (OPEN_ITEM) and W633 (OPEN_ITEM_LEGACY_TRIAGE) likewise have none (no E630 or E633 exists).
 PROMOTABLE_PAIRS = {
-    # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
-    # on semantic coverage; the warning fires when coverage is skipped, the
-    # error when it is provably missing — promotion is appropriate.
-    "W550": "E550",
-    "W560": "E560",
     # W561 (UNCOVERED_FR) is intentionally NOT in PROMOTABLE_PAIRS.
     # W561 is a legacy informational signal that co-fires with W566 for the
     # same condition (FR not covered by any milestone fr_refs). W566 is the

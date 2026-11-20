@@ -67,7 +67,6 @@ class CliTests(unittest.TestCase):
             "spec-quality-lint",
             "hallucination-lint",
             "dependency-order-lint",
-            "forward-replay-check",
         ):
             self.assertIn(name, out)
 
@@ -1441,19 +1440,20 @@ class CliTests(unittest.TestCase):
                 self.assertIn("OK", out)
                 p_dep.assert_called_once_with(os.path.abspath(str(repo_root)))
 
-            with patch("specdev_tools.validation.validate._resolve_replay_base_ref", return_value="feature/x") as p_base, \
-                 patch("specdev_tools.validation.forward_replay_check.check_forward_replay", return_value=[]) as p_replay:
-                code, out, err = self._run_cli(["forward-replay-check", "--repo-root", str(repo_root)])
-                self.assertEqual(0, code, msg=err)
-                self.assertIn("OK", out)
-                p_base.assert_called_once_with(Path(os.path.abspath(str(repo_root))))
-                p_replay.assert_called_once_with(
-                    os.path.abspath(str(repo_root)),
-                    base_ref="feature/x",
-                    diff_error_mode="error",
-                    git_root=None,
-                    spec_root=None,
-                )
+    def test_forward_replay_check_hard_fails_with_pointer(self):
+        code, out, err = self._run_cli(["forward-replay-check", "--repo-root", "."])
+        self.assertEqual(2, code)
+        self.assertEqual("", out)
+        self.assertIn("forward-replay-check was removed in 1.2.0", err)
+        self.assertIn("specdev stale", err)
+
+    def test_spec_check_has_no_include_forward_replay_flag(self):
+        code, out, _ = self._run_cli(["spec-check", "--help"])
+        self.assertEqual(0, code)
+        self.assertNotIn("--include-forward-replay", out)
+        code, _, err = self._run_cli(["spec-check", "spec", "--include-forward-replay"])
+        self.assertEqual(2, code)
+        self.assertIn("unrecognized arguments: --include-forward-replay", err)
 
     def test_hallucination_lint_fails_when_canon_dir_missing(self):
         with tempfile.TemporaryDirectory() as td:

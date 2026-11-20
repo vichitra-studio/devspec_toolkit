@@ -42,17 +42,9 @@ from specdev_tools.registry.annotations import (
 Pair = tuple[str, str]  # (holder step, target step): the holder requires the target
 
 _NOTES = {
-    "status_write_exemptions": (
-        "policy.status_write_exemptions maps a step to field paths whose change alone did not "
-        "count as a change of that step in forward replay. No code reads the key (only the generator checks its shape); "
-        "it stays until the legacy shim goes. Entries 09 and 14 (milestones[].status) name fields "
-        "only a 1.1.1-shaped spec has; nothing reads them. "
-        "Entry 16 (plan.milestone_index[].status) names a field 1.2.0 keeps: the status of the step 16 anchor row."
-    ),
     "downstream_consumers": (
         "Records which steps actively consume each step's output. Read by 'specdev prompt-context', the context loaders, "
-        "'dag-lint' and 'dependency-order-lint'. The id-regression check of forward replay (E555) does not read it: "
-        "it uses the positional order in 'steps'."
+        "'dag-lint' and 'dependency-order-lint'."
     ),
     "declared_edges": (
         "Hand-carried [producer, consumer] pairs. Steps 13, 13a, 16a, 16b and 16c keep their 1.1.1 "
@@ -409,22 +401,10 @@ def _declared_edges_problems(hand: dict[str, Any]) -> list[str]:
     return [f"declared_edges: names step(s) {', '.join(unlisted)} that steps does not list"] if unlisted else []
 
 
-def _exemptions_problems(hand: dict[str, Any]) -> list[str]:
-    """Problems of ``policy.status_write_exemptions`` (optional): an object of lists of field paths."""
-    policy = hand.get("policy")
-    if not isinstance(policy, dict) or "status_write_exemptions" not in policy:
-        return []
-    exemptions = policy["status_write_exemptions"]
-    well_formed = isinstance(exemptions, dict) and all(
-        isinstance(paths, list) and all(isinstance(p, str) for p in paths) for paths in exemptions.values()
-    )
-    return [] if well_formed else ["policy.status_write_exemptions: must be an object of lists of field paths"]
-
-
 def _hand_kept_problems(hand: dict[str, Any]) -> list[str]:
     """Problems of the hand-kept keys of a parsed ``step_order.json`` (empty when usable); never raises."""
     types = [f"{key}: must be {what}" for key, kind, what in _HAND_KEPT_TYPES if not isinstance(hand.get(key), kind)]
-    return _steps_problems(hand) + types + _declared_edges_problems(hand) + _exemptions_problems(hand)
+    return _steps_problems(hand) + types + _declared_edges_problems(hand)
 
 
 def _load_checked(path: str | os.PathLike[str], problems_of: Callable[[dict[str, Any]], list[str]]) -> dict[str, Any]:
@@ -453,8 +433,7 @@ def load_hand_kept(path: str | os.PathLike[str]) -> dict[str, Any]:
     """Read ``tools/step_order.json`` at *path* for the keys the step-order generation copies.
 
     Raises ``StepOrderError`` naming every problem when the file cannot be read, is not a JSON object, or
-    ``version``, ``steps``, ``policy``, ``coverage_thresholds``, ``declared_edges`` or
-    ``policy.status_write_exemptions`` has the wrong shape.
+    ``version``, ``steps``, ``policy``, ``coverage_thresholds`` or ``declared_edges`` has the wrong shape.
     """
     return _load_checked(path, _hand_kept_problems)
 

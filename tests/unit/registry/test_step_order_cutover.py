@@ -172,7 +172,7 @@ def test_build_step_order_document_keeps_hand_steps_and_declared_edges():
     }
     doc = build_step_order_document(derived, hand)
     assert doc["steps"] == hand["steps"] and doc["declared_edges"] == hand["declared_edges"]
-    assert set(doc["_notes"]) == {"status_write_exemptions", "downstream_consumers", "declared_edges", "step_metadata"}
+    assert set(doc["_notes"]) == {"downstream_consumers", "declared_edges", "step_metadata"}
     assert doc["step_metadata"]["01"] == {"required_spec_inputs": []}
     assert doc["downstream_consumers"]["00"] == ["01"] and doc["downstream_consumers"]["01"] == []
 

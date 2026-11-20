@@ -26,7 +26,6 @@ from specdev_tools.validation import check_registry
 from specdev_tools.validation.check_registry import CheckContext, register_check, unregister_check
 from specdev_tools.validation.step_gate_run import (
     EMPTY_BASE_REF_USAGE,
-    FORWARD_REPLAY_USAGE,
     GATE_ONLY_USAGE,
     NO_STEP_NOTE,
     gate_run,
@@ -55,19 +54,16 @@ def _gate(host: Path, **kwargs: Any) -> Any:
 @pytest.mark.parametrize(
     ("flags", "message"),
     [
-        ({"steps": ["05"], "include_forward_replay": True}, FORWARD_REPLAY_USAGE),
-        ({"paths": [], "include_forward_replay": True}, FORWARD_REPLAY_USAGE),
         ({"base_ref": "main"}, GATE_ONLY_USAGE),
         ({"detail": "all"}, GATE_ONLY_USAGE),
         ({"steps": ["05"], "base_ref": ""}, EMPTY_BASE_REF_USAGE),
         ({"paths": ["a.json"], "base_ref": ""}, EMPTY_BASE_REF_USAGE),
         ({"steps": ["05"], "base_ref": "main", "detail": "summary"}, None),
-        ({"include_forward_replay": True}, None),
         ({}, None),
     ],
 )
 def test_gate_usage_error_names_the_refused_combination(flags: dict[str, Any], message: str | None) -> None:
-    given = {"steps": None, "paths": None, "include_forward_replay": False, "base_ref": None, "detail": None, **flags}
+    given = {"steps": None, "paths": None, "base_ref": None, "detail": None, **flags}
     assert gate_usage_error(**given) == message
 
 

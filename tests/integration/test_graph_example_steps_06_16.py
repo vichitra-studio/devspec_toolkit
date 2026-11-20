@@ -4,12 +4,12 @@ Continues ``test_graph_example_steps_00_05.py`` on the same folder, ``tests/fixt
 files of steps 06-16 and the one plan file of ``spec/impl_context/``.  These tests pin that they are valid against
 the real schemas, validators, registry and ``spec-check`` with a known set of warnings, that every link of the whole
 folder (00-16) names an existing id of an allowed kind, and that the readers meant to stay silent on the new shape
-(matrix, closure, completeness, forward replay, milestone state, upstream backlog, scope resolver, reviewer) do,
+(matrix, closure, completeness, milestone state, upstream backlog, scope resolver, reviewer) do,
 as does the W604 staleness check of step 14.
 
 Two consumers are not run on the folder because they read no 1.1.1 field of a spec artifact: ``extraction-intent-check``
-reads the prompts and ``tools/step_order.json`` only, and seed-lint (W140, W551) reads the seed manifest, the seed
-folder and each artifact as raw text for a token overlap, never a field of it.
+reads the prompts and ``tools/step_order.json`` only, and seed-lint reads the seed manifest and the seed
+folder, never a field of an artifact.
 """
 from __future__ import annotations
 
@@ -18,8 +18,6 @@ import json
 import shutil
 from collections import Counter
 from pathlib import Path
-from typing import Any
-from unittest.mock import Mock, patch
 
 import _graph_example as shared
 import pytest
@@ -29,7 +27,6 @@ from specdev_tools.context.reviewer import _run_structural_pass
 from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
-from specdev_tools.validation.forward_replay_check import check_forward_replay
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
@@ -289,29 +286,6 @@ def test_completeness_check_text_prints_one_skip_line_per_skipped_dimension() ->
     assert code == 0
     assert out.count("[SKIP]") == len(_SKIPPED_DIMENSIONS)
     assert "[SKIP] FR → API coverage: not computed on this spec shape" in out
-
-
-def _replay_repo(root: Path) -> None:
-    (root / "tools").mkdir(parents=True)
-    for name in ("step_order.json", "schema_changes.json"):
-        shutil.copy(_ROOT / "tools" / name, root / "tools" / name)
-    shutil.copytree(shared.EXAMPLE / "spec", root / "spec")
-
-
-def test_forward_replay_is_silent_when_every_step_changed(tmp_path: Path) -> None:
-    """The base ref holds every document with another ``created_at``: no id is dropped, no token is new, and no
-    step counts as a status-only change (steps 09, 14 and 16 would otherwise be exempt)."""
-    _replay_repo(tmp_path)
-    changed = [f"spec/{name}" for name in _ALL_FILES]
-
-    def git_show(cmd: list[str], **_: Any) -> Mock:
-        document = json.loads((tmp_path / cmd[-1].split(":", 1)[1]).read_text(encoding="utf-8"))
-        return Mock(returncode=0, stdout=json.dumps({**document, "created_at": "2020-01-01T00:00:00Z"}), stderr="")
-
-    with patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=(changed, None)), \
-            patch("subprocess.run", side_effect=git_show):
-        errors = check_forward_replay(str(tmp_path), base_ref="origin/main")
-    assert [e.render() for e in errors] == []
 
 
 def test_milestone_state_reads_the_plan_file(tmp_path: Path) -> None:

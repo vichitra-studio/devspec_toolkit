@@ -218,11 +218,6 @@ def test_unpromoted_code_is_an_own_warning(tmp_path: Path, capsys: pytest.Captur
     assert payload["step_gate"]["blocking"] == [] and payload["status"] == "WARN"
 
 
-def test_step_with_include_forward_replay_is_a_usage_error(tmp_path: Path) -> None:
-    code, out = run_spec_check(step_gate_host(tmp_path / "host"), "--step", "04", "--include-forward-replay")
-    assert code == 2 and "--include-forward-replay" in out
-
-
 def test_step_with_paths_is_a_usage_error(tmp_path: Path) -> None:
     code, out = run_spec_check(step_gate_host(tmp_path / "host"), "--step", "04", "--paths", "spec/04_fr_list.json")
     assert code == 2 and "not allowed with" in out

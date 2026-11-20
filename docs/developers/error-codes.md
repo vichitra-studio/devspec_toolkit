@@ -120,7 +120,7 @@
 
 **Resolution**: For a pre-1.2.0 spec, for `charter_goal_without_capability`, add a capability in `01_capabilities.json` with a `trace[]` entry referencing the uncovered `goal_id`. For `charter_success_metric_without_capability`, add the `metric_id` to the appropriate capability's `success_metric_refs[]`.
 
-**Promotable**: `PROMOTABLE_PAIRS` registers `W560 → E560`, but the emission direction is inverted in practice: `check_traceability_closure()` only ever emits `E560` directly (never `W560`). The forward-replay check (`forward_replay_check.py`) re-runs traceability closure during PR-scoped analysis and downgrades any `E560` finding it sees to `W560` (code substitution), so a Charter→Capability gap is advisory during incremental replay. Outside forward-replay, E560 fires as a full error.
+**Promotable**: No (error only).
 
 **See also**: E568 (capability → FR coverage — the check E560 formerly performed).
 
@@ -228,18 +228,6 @@
 
 **Promotable**: W150 → E150.
 
-### W140 SEED_CONTENT_OVERLAP_LOW
-
-**Trigger**: A spec artifact for a seed-consuming step shares fewer than 3 content tokens with the seed documents required by `seed_manifest.json` for that step. Applies to any pipeline step (00–16c) for which `step_requirements` declares seeds.
-
-**Resolution**: Either incorporate content from the required seed documents into the artifact or review whether the step truly depends on those seeds.
-
-### W551 UNDECLARED_SEED
-
-**Trigger**: An on-disk seed file (under a directory declared in the manifest's `seeds[].path` entries) is not declared in the `seeds[]` array of `spec/common/seed_manifest.json`.
-
-**Resolution**: Either add the file to the `seeds[]` array in `seed_manifest.json` with an appropriate `seed_id` and `path`, or remove the undeclared file from the seed directory.
-
 ### W553 SEED_STEP_UNKNOWN
 
 **Trigger**: A key in `seed_manifest.json` `step_requirements` is not a recognized pipeline step in `step_order.json` (e.g. a typo such as `"9"` instead of `"09"`, a non-existent step `"02b"`, or an out-of-range value `"17"`). Real pipeline steps including `"16"`, `"16a"`, `"16b"`, and `"16c"` do not trigger this warning.
@@ -262,7 +250,7 @@
 
 **Resolution**: Add at least 3 real, project-specific out-of-scope items to the seed(s) routed to step 00. The heading must match one of the accepted variants (case-insensitive): `Out-of-Scope`, `Non-Goals`, or `Non-Goal`. A good out-of-scope item describes a concrete capability that is deliberately excluded from scope — for example "Multi-tenant support is deferred to Phase 2" or "Offline mode is not in scope for MVP".
 
-**Warning-only and non-promotable**: E555 already exists as `SEMANTIC_COVERAGE_REGRESSION` (a structurally different code with different semantics) and W555 is intentionally excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate W555 to an error.
+**Warning-only and non-promotable**: W555 is intentionally excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate W555 to an error.
 
 ### W583 API_UNCOVERED_BY_THREAT
 
@@ -333,14 +321,6 @@
 **Trigger**: A JSON Schema enum does not include all values defined in the canonical registry for that kind.
 
 **Resolution**: Add the missing canonical values to the schema enum, or register the missing values in `canon/manifest.json`.
-
-**Promotable**: No (error only).
-
-### E555 SEMANTIC_COVERAGE_REGRESSION
-
-**Trigger**: IDs present in the old version of an upstream artifact are absent from the new version, indicating dropped coverage. An id that lived only in a field the schema removed is not counted when that field's row in `tools/schema_changes.json` has `shim: true`.
-
-**Resolution**: Restore the dropped IDs or update all downstream artifacts that reference them.
 
 **Promotable**: No (error only).
 
@@ -784,30 +764,6 @@ Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by 
 
 **Promotable**: No (error only).
 
-## Forward Replay & ID Stability (55x / 59x)
-
-### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP
-
-File-level forward replay is retired. `specdev forward-replay-check` is a deprecated alias: it prints one line on stderr, runs the id-regression check (E555, W598, W550) and reports trace-lock findings (for example E763 and E778, with the messages of `spec-check`); `specdev stale` and `specdev attest` take its place. The E550 that remains is the one of the id-regression check.
-
-**Trigger (E550)**: The diff against the base ref could not be computed (for example the ref does not exist) and the diff error mode is `error` (the default of `forward-replay-check`; `validate-all` reads `SPECDEV_REPLAY_DIFF_ERROR_MODE`). Example, from `specdev forward-replay-check --base-ref no-such-ref`: `E550 FORWARD_REPLAY_MISSING unable_to_compute_diff base_ref=no-such-ref reason=fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in the working tree.` With the mode `ignore` nothing is reported and the id-regression check is skipped. A step that changed while a later step did not (for example a changed step 03 with no change to the steps after it) is no longer an E550.
-
-**Trigger (W550)**: Fired when semantic coverage checking could not read the base-ref version of an artifact (e.g. the file didn't exist at the base ref), so the coverage-regression check for that artifact is skipped rather than failing closed.
-
-**Resolution (E550)**: Make the base ref reachable and diffable (`--base-ref`, `SPECDEV_REPLAY_BASE_REF`), or set the mode to `ignore` to skip the check.
-
-**Resolution (W550)**: Confirm the base ref genuinely predates the artifact (expected for newly-added files); no action needed if so.
-
-**Promotable**: `PROMOTABLE_PAIRS` registers `W550 → E550`, though the two are emitted by structurally different conditions (skip vs. hard failure) — promotion escalates the skip to a hard failure under `SPECDEV_WARNINGS_AS_ERRORS`/`SPECDEV_PROMOTE_CODES=W550`.
-
-### W598 ID_STABILITY_REMOVAL
-
-**Trigger**: Fired by `forward_replay_check.py` alongside an E555 `SEMANTIC_COVERAGE_REGRESSION` finding — for each individual ID that was present in the base-ref version of an artifact and is now absent, W598 fires once per removed ID (in addition to the aggregate E555), to surface likely ID renames early.
-
-**Resolution**: If the ID was renamed, update all downstream references to the new ID. If it was genuinely removed, confirm no downstream artifact still depends on it.
-
-**Promotable**: No (warning only; co-fires with E555 rather than promoting to it).
-
 ## Glossary Parity (60x)
 
 ### E606 GLOSSARY_PROPOSAL_DRIFT
@@ -1140,7 +1096,7 @@ The messages below are copied from runs on copies of the worked example (`tests/
 
 **Trigger**: A seed in `seeds[]` of the seed manifest that no `step_requirements` entry names. The finding points at the manifest. A seed that no entry routes gets this finding only, even when a node links it: E749 is for a seed that is routed somewhere, but not to the step of the node that links it. Reported by `spec-check` (check `seed-routes`). Example, after `seed-extra` was added to `seeds[]` with no route: `E747 seed seed-extra is listed in the seed manifest but no step_requirements entry routes it to a step; route it to the step that distils it and list it in derives_from of a node of that step, or remove the seed (its seeds[] entry and its document)`. When a node already links the seed the message names the step: `... route it to step 02 (where a node lists it in derives_from), or remove the seed (its seeds[] entry and its document) and the derives_from links to it, then run specdev attest --prune` (`steps 00, 02` for several).
 
-**Resolution**: Owner `step:00`. Two cases, as the message says. No node links the seed: route it to the step that distils it (add it to `step_requirements`) and list it in `derives_from` of a node of that step, then the attest step (the run routed `seed-extra` to `02` and listed it in `tp-argon2`; routing alone gave E748). Or remove the seed: its entry in `seeds[]` and its document (removing the entry alone gave W551, the document stays). A node links the seed: route it to the step of that node (the run routed to `02`: clean, no attest step). Or remove the seed, its document and the `derives_from` links to it, then the attest step and `specdev attest --prune` (without the prune E762 stayed).
+**Resolution**: Owner `step:00`. Two cases, as the message says. No node links the seed: route it to the step that distils it (add it to `step_requirements`) and list it in `derives_from` of a node of that step, then the attest step (the run routed `seed-extra` to `02` and listed it in `tp-argon2`; routing alone gave E748). Or remove the seed: its entry in `seeds[]` and its document (removing the entry alone leaves the document on disk, which seed-lint does not report). A node links the seed: route it to the step of that node (the run routed to `02`: clean, no attest step). Or remove the seed, its document and the `derives_from` links to it, then the attest step and `specdev attest --prune` (without the prune E762 stayed).
 
 **Promotable**: No (error only).
 

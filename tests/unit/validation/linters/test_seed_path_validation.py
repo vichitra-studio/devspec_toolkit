@@ -87,8 +87,8 @@ class SeedPathValidationTests(unittest.TestCase):
             f"Expected missing path field error, got: {errors}",
         )
 
-    def test_undeclared_seed_on_disk_emits_warning(self):
-        """On-disk .md file not declared in manifest triggers W551 UNDECLARED_SEED."""
+    def test_unlisted_seed_on_disk_is_silent(self):
+        """A markdown file next to the seeds but not in the manifest produces no seed-lint finding."""
         manifest = {
             "$schema": "vc:seed-manifest",
             "seeds": [
@@ -98,18 +98,10 @@ class SeedPathValidationTests(unittest.TestCase):
             "seed_directory": "docs/seed",
         }
         tmpdir, spec_dir, repo_root = self._create_temp_project(
-            manifest, seed_files=["docs/seed/overview.md", "docs/seed/extra_undeclared.md"]
+            manifest, seed_files=["docs/seed/overview.md", "docs/seed/extra_unlisted.md"]
         )
         errors = lint_seeds(repo_root, spec_dir)
-        w551_errors = [e for e in render_errors(errors) if "W551" in e or "UNDECLARED_SEED" in e]
-        self.assertTrue(
-            len(w551_errors) > 0,
-            f"Expected W551 UNDECLARED_SEED warning for extra_undeclared.md, got: {errors}",
-        )
-        self.assertTrue(
-            any("extra_undeclared.md" in e for e in w551_errors),
-            f"W551 should mention the undeclared file, got: {w551_errors}",
-        )
+        self.assertEqual([], [e for e in render_errors(errors) if "extra_unlisted" in e or "W551" in e], errors)
 
     def test_path_escape_fails(self):
         """Seed path that escapes project root produces an error."""

@@ -179,19 +179,18 @@ def test_route_of_makes_the_e748_of_its_step_wait_on_an_open_item_about_the_seed
     assert [error["node_id"] for error in blocking] == [SEED]
 
 
-def test_seed_lint_w140_w551_and_route_checks_on_one_new_shape_manifest(tmp_path: Path) -> None:
+def test_seed_lint_is_silent_and_the_route_check_reports_the_unused_route(tmp_path: Path) -> None:
     """The new-shape manifest (no key 16) with a declared seed routed to 02 that nothing links and an undeclared seed on disk.
 
-    The older lint and the route checks run side by side and do not agree until M6c removes W140 and W551: W551 names the
-    undeclared document, W140 may warn on the routes the new design keeps, and the route check reports the unused route.
+    Seed-lint has no check of a seed's use or of a document the manifest does not list: the document on disk is not
+    reported, and the route check reports the unused route.
     """
     host = _host(tmp_path, "new_shape")
     seed_dir = host / "docs" / "seed"
     (seed_dir / "seed_extra.md").write_text("# Extra\n\nBilling export cadence and invoice numbering.\n", encoding="utf-8")
     (seed_dir / "stray.md").write_text("# Stray\n\nNot declared anywhere.\n", encoding="utf-8")
     lint = lint_seeds(str(ROOT), str(host / "spec"), str(host))
-    assert [error.message for error in lint if error.code == "W551"] == ["UNDECLARED_SEED on-disk seed 'stray.md' not declared in seed_manifest.json"]
-    assert {error.code for error in lint} <= {"W140", "W551", "W555"}
+    assert {error.code for error in lint} <= {"W555"}
     assert [(error.code, error.node_id, error.jq_path) for error in _found(host)] == [(SEED_ROUTE_UNUSED, EXTRA, '.step_requirements["02"]')]
 
 

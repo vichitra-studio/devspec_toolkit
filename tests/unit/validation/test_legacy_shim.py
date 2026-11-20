@@ -13,7 +13,6 @@ from unittest import mock
 import pytest
 
 from specdev_tools import cli
-from specdev_tools.validation.forward_replay_check import _prune_removed_paths, check_forward_replay
 from specdev_tools.validation.validators.step_14 import validate_step_14
 
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
@@ -38,7 +37,6 @@ from specdev_tools.validation._legacy_shim import (
     records_of,
     removed_paths,
 )
-from specdev_tools.validation.seed_lint import lint_seeds
 from specdev_tools.validation.validate import validate_file
 from specdev_tools.validation.cross_artifact_checks import check_step_02_integrity, check_step_04_integrity
 from specdev_tools.validation.matrix import build_trace_matrix
@@ -690,40 +688,6 @@ def test_step_14_w604_skipped_on_new_shape(tmp_path):
     assert codes(legacy) == ["W604"]
 
 
-def _forward_replay_repo(root: Path, *, shim: bool) -> None:
-    (root / "tools").mkdir(parents=True)
-    (root / "spec").mkdir()
-    (root / "tools" / "step_order.json").write_text(json.dumps({"steps": ["00", "01"]}), encoding="utf-8")
-    row = {"id": "SC-01-90", "step": "01", "path": "capabilities[].trace", "change": "remove", "shim": shim,
-           "replaced_by": None, "owner": "M2", "design": [], "tickets": []}
-    (root / "tools" / "schema_changes.json").write_text(json.dumps({"rows": [row]}), encoding="utf-8")
-    (root / "spec" / "00_charter.json").write_text("{}", encoding="utf-8")
-    (root / "spec" / "01_capabilities.json").write_text(
-        json.dumps({"capabilities": [{"capability_id": "cap-a"}]}), encoding="utf-8")
-
-
-_BASE_01 = {"capabilities": [{"capability_id": "cap-a", "trace": [{"type": "charter-goal", "id": "goal-gone"}]}]}
-
-
-def _forward_replay_codes(root: Path) -> list[str]:
-    changed = (["spec/00_charter.json", "spec/01_capabilities.json"], None)
-
-    def git_show(cmd, **_):
-        base = _BASE_01 if cmd[-1].endswith("01_capabilities.json") else {}
-        return mock.Mock(returncode=0, stdout=json.dumps(base), stderr="")
-
-    with mock.patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=changed), \
-            mock.patch("subprocess.run", side_effect=git_show):
-        return [e.code for e in check_forward_replay(str(root), base_ref="origin/main")]
-
-
-def test_forward_replay_prunes_removed_paths_before_dropped_id_diff(tmp_path):
-    _forward_replay_repo(tmp_path / "flagged", shim=True)
-    _forward_replay_repo(tmp_path / "unflagged", shim=False)
-    assert not {"E555", "W598"} & set(_forward_replay_codes(tmp_path / "flagged"))
-    assert {"E555", "W598"} <= set(_forward_replay_codes(tmp_path / "unflagged"))
-
-
 def test_removed_paths_lists_shim_removals_of_one_step(tmp_path):
     def row(seq: int, step: str, path: str, change: str, shim: bool) -> dict:
         return {"id": f"SC-{step}-{seq:02d}", "step": step, "path": path, "change": change, "shim": shim,
@@ -763,20 +727,6 @@ def test_out_of_scope_fr_ids_needs_a_rationale_and_never_raises():
         {"fr_id": "fr-a", "rationale": "no api"}, {"fr_id": "fr-b"}, {"fr_id": 7, "rationale": "x"}, "fr-c"]}) == {"fr-a"}
     assert out_of_scope_fr_ids({"out_of_scope": "fr-a"}) == set()
     assert out_of_scope_fr_ids({}) == set()
-
-
-@pytest.mark.parametrize(("doc", "paths", "expected"), [
-    ({"a": 1, "trace": [1]}, ["trace"], {"a": 1}),
-    ({"items": [{"trace": 1, "k": 2}, {"k": 3}]}, ["items[].trace"], {"items": [{"k": 2}, {"k": 3}]}),
-    ({"env": {"x": {"cfg": 1, "keep": 2}}}, ["env{}.cfg"], {"env": {"x": {"keep": 2}}}),
-    ({"a": {"b": {"c": 1, "d": 2}}}, ["a.b.c"], {"a": {"b": {"d": 2}}}),
-    ({"items": [1, 2]}, ["items[]"], {"items": [1, 2]}),
-    ({"items": "text", "m": [1]}, ["items[].trace", "m{}.x", "missing.deep", "$defs.t", "**.lifecycle"],
-     {"items": "text", "m": [1]}),
-    ([1, 2], ["trace"], [1, 2]),
-])
-def test_prune_removed_paths(doc, paths, expected):
-    assert _prune_removed_paths(doc, paths) == expected
 
 
 # --- readers of WI-M3-17b: scope resolver, reviewer, upstream backlog, seed lint -----------------
@@ -826,16 +776,6 @@ def test_upstream_backlog_lists_pd3_items_and_places_unresolved_about_in_unplace
     assert not any(line.startswith("E520") for line in stderr_lines)
 
 
-def test_seed_lint_w140_w551_on_new_shape_fixtures(tmp_path):
-    example = TOOLKIT_ROOT / "tests" / "fixtures" / "graph_example"
-    project = tmp_path / "project"
-    shutil.copytree(example, project)
-    for name, doc in NEW_SHAPE_06_16.items():
-        (project / "spec" / name).write_text(json.dumps(doc), encoding="utf-8")
-    codes = {e.code for e in lint_seeds(str(TOOLKIT_ROOT), str(project / "spec"), project_root=str(project))}
-    assert not codes & {"W140", "W551"}
-
-
 def test_inline_m8_guards_run_on_the_legacy_item_and_skip_the_new_one():
     impl_context = TOOLKIT_ROOT / "tests" / "fixtures" / "step_16" / "impl_context"
 
@@ -882,7 +822,6 @@ SHIM_CONSUMERS = {
     "cli.py": "completeness-check",
     "context/reviewer.py": "context/reviewer.py",
     "validation/cross_artifact_checks.py": "step-02 capability coverage (M2)",
-    "validation/forward_replay_check.py": "removed_paths",
     "validation/matrix.py": "validation/matrix.py",
     "validation/traceability_closure.py": "validation/traceability_closure.py",
     "validation/validators/step_11.py": "is_parked_any_shape",

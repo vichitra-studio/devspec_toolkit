@@ -15,7 +15,7 @@ Capture the minimum delivery infrastructure (environments, CI expectations, and 
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Deployment targets, compliance requirements, and operational constraints for environment scoping
 - **01_capabilities.json**: Capability owners and operational modes to determine environment tier requirements and CI pipeline stages
-- **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure; do not depend on downstream NFR/governance specs — use charter constraints and required seeds for baseline coverage
+- **02_system_sketch.json**: Component ids, `third_parties` and connections that affect environment setup; connection protocols requiring specific infrastructure; do not depend on downstream NFR/governance specs — use charter constraints and required seeds for baseline coverage
 - **Seeds**: per spec/common/seed_manifest.json step_requirements["02a"]
 - **Current CI configs** (if present): Existing pipeline configuration and `$TOOLKIT_ROOT/tests/run.sh` usage for gate alignment
 
@@ -26,7 +26,7 @@ For each upstream artifact ingested, extract the following:
 - **Emit**: Write the artifact when all stages are defined and constraints are sourced from seed documents.
 
 ## Heuristics For Completeness
-- Include `secrets` (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external` when secrets are required by those systems; MUST include compliance labels when `spec/00_charter.json` constraints or the ingested seeds reference regulatory frameworks.
+- Include a `secrets` item (names only) for every connection in `spec/02_system_sketch.json` whose `connects_to` names a third party that requires a credential; the secret names that connection (or the component or charter constraint behind it) in its `derives_from`. MUST include compliance labels when `spec/00_charter.json` constraints or the ingested seeds reference regulatory frameworks.
 - Staging parity: staging should reflect prod's configuration as closely as possible; explicitly document any intentional deviations with rationale.
 - Ambiguity scrub: MUST use kebab-case gate names derived from the actual CI pipeline steps in this project (e.g., `schema-validate`, `fixtures-lint`, `governance-check`); do not invent gate names that do not correspond to real pipeline steps.
 
@@ -34,7 +34,7 @@ For each upstream artifact ingested, extract the following:
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/02_system_sketch.json` is present and contains at least one component entry.
 - All seeds listed for step "02a" in `spec/common/seed_manifest.json` are present and non-empty.
-- `spec/00_charter.json` is present and contains at least one in_scope entry.
+- `spec/00_charter.json` is present and contains at least one `scope_items` entry.
 
 ## Negative Constraints
 - **DO NOT** include actual secret values (use names only); specific values belong in secure stores.
@@ -45,8 +45,8 @@ For each upstream artifact ingested, extract the following:
 ## Coverage Closure
 Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that requires deployment has a corresponding environment config in `environments`.
-- All external dependencies listed in `spec/02_system_sketch.json` connections appear in `dependencies` or `secrets` sections.
-- No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
+- Every connection in `spec/02_system_sketch.json` to a third party that needs a credential has a `secrets` item deriving from it.
+- No component's infrastructure needs are silently omitted — databases and queues must be represented in `environments` config, and third-party credentials in `secrets`.
 - All environment names align with the canonical stage values defined in the schema.
 - If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
 - Compliance labels in `environments[].compliance_labels` reflect real obligations documented in upstream specs or are explicitly marked as none.
@@ -56,10 +56,11 @@ Before emitting, verify:
 - [ ] Every deployment stage identified in the ingested seeds is represented
 - [ ] All environment-specific constraints and SLA targets are explicitly defined
 - [ ] No environment name referenced in other spec files is missing from this baseline
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
 - All required environments present (see schema for the required set) with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
-- `ci_gates` enumerates the gates we actually enforce (schema-validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
+- `ci_gates` enumerates the gates we actually enforce (for example schema-validate, fixtures-lint, invariants-check, governance-check); every gate names the components or charter constraints it checks in `derives_from`.
 - `secrets` includes names of required secrets; values are not embedded.
 - `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI-DSS) if relevant; use the canonical short names defined in the schema.
 

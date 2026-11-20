@@ -1,7 +1,6 @@
 """Shared linter helper functions.
 
-Centralises duplicate helpers found across hallucination_lint, spec_quality_lint,
-and forward_replay_check, eliminating ~200 LOC of near-identical code.
+Helpers shared by hallucination_lint, spec_quality_lint and the other linters.
 
 Created by FIX-002 (Batch 0).
 """
@@ -21,7 +20,7 @@ from ..graph.model import Graph
 
 
 # ---------------------------------------------------------------------------
-# Stopword sets — aligned across hallucination_lint and forward_replay_check
+# Stopword sets shared by the linters
 # ---------------------------------------------------------------------------
 
 DERIVATION_STOPWORDS: frozenset[str] = frozenset({

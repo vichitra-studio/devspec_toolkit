@@ -9,7 +9,7 @@ description: >
   Milestone-state mode (mode: "milestone_state"): delegates per-group implementation state
   and milestone-level phase position computation to the `specdev milestone-state` CLI and
   returns its JSON verbatim; used by /specdev-trinity --phase impl|review orchestration
-  (§11.2 protocol).
+  orchestration.
 model: haiku
 tools: [Bash, Read, Grep]
 ---
@@ -19,8 +19,6 @@ tools: [Bash, Read, Grep]
 Read-only pre-flight agent. Receives a scope descriptor and an optional change_set hint,
 studies artifact size and change density, and returns a JSON fan-out plan for the review
 round. Cheap to dispatch (Haiku); always runs even when the answer is "no fan-out needed."
-
-**Source spec:** K_agentification.md §5.3.
 
 ---
 
@@ -68,7 +66,7 @@ Dispatcher supplies a JSON object as the invocation prompt:
 
 ---
 
-## Decision rule (K_agentification.md §5.3)
+## Decision rule
 
 Execute this rule against the gathered evidence:
 
@@ -81,7 +79,7 @@ Execute this rule against the gathered evidence:
      to respect a DAG adjacency boundary visible in `step_order.json`. Cite `step_order.json`
      step order in rationale; do not hardcode a step list.
      Note: "shared FR/domain affinity" grouping requires reading `spec/` content, which this
-     agent is prohibited from doing (§Tools). The DAG-adjacency/≤6 rule is the sole
+     agent is prohibited from doing (see Tools). The DAG-adjacency/≤6 rule is the sole
      deterministic grouping criterion for spec steps.
    - **Clustering algorithm — toolkit/WIP files:** group by file-type affinity — schema files
      together (`schema/`), prompt files together (`prompts/`), CLI/tool source together
@@ -99,11 +97,12 @@ Execute this rule against the gathered evidence:
    - Assign one reviewer covering the whole range.
    - `scope_kind` = `step_range`.
 
-3. Cross-step concerns (relational flags active, replay or backlog data present) OR any
+3. Cross-step concerns (`--with-backlog` active, backlog or pending-replay data present) OR any
    `cross_step_relational` need:
    - Always add exactly ONE additional reviewer with `scope_kind` = `cross_step_relational`
      covering all in-scope steps.
-   - This reviewer is the consumer of `--with-replay` / `--with-backlog` output.
+   - This reviewer is the consumer of `--with-backlog` output (`specdev upstream-backlog --json`
+     and `specdev stale --json`).
 
 4. If the scope value matches `ms-<batch_id>-plan` (a plan artifact scope from
    `/specdev-trinity`):
@@ -112,10 +111,8 @@ Execute this rule against the gathered evidence:
    - Step-counting and byte-threshold rules (branches 1–2) do not apply.
    - Cross-step concerns (branch 3) do not apply unless explicitly flagged.
 
-The 80% / 30% / 3-step thresholds are starting estimates (K_agentification.md §7 open decision #1).
-K §7 open decision #1 specifies that they may be exposed as env vars after calibration
-on the next 1–2 milestones; no specific env var names have been committed yet.
-Env-var exposure is deferred to a follow-up calibration round; these thresholds are
+The 80% / 30% / 3-step thresholds are starting estimates. They may be exposed as env vars
+after calibration; no env var names have been committed yet. These thresholds are
 hard-coded constants until that work lands.
 
 ---
@@ -136,7 +133,7 @@ Return a single JSON object to stdout. Do not print any other text.
 }
 ```
 
-`max_rounds` is always 5 (K_agentification.md §3 empirical bound). Do not vary this.
+`max_rounds` is always 5 (a fixed bound on review rounds). Do not vary this.
 `rationale` must cite the threshold values and evidence from the probes.
 
 ---
@@ -184,16 +181,14 @@ Output:
 ## Mode discriminator
 
 Dispatcher specifies mode in input. Two modes:
-- (default, no `mode` field) — fan-out planning for /specdev-review et al (§5.3 protocol above)
-- `mode: "milestone_state"` — derive milestone-level state for /specdev-trinity --phase impl|review orchestration (§11.2 protocol below)
+- (default, no `mode` field) — fan-out planning for /specdev-review et al (the decision rule above)
+- `mode: "milestone_state"` — derive milestone-level state for /specdev-trinity --phase impl|review orchestration (the section below)
 
 ---
 
 ## Mode: milestone_state
 
-**Source spec:** K_agentification.md §11.2.
-
-**Mode-scoped Bash carve-out (extends §Tools allowlist for this mode only):**
+**Mode-scoped Bash carve-out (extends the Tools allowlist for this mode only):**
 | Command | Purpose |
 |---|---|
 | `specdev milestone-state --batch-id <batch_id> --repo-root <toolkit-root> --spec-root <host-spec> --git-root <host-root>` | Compute full milestone state deterministically |

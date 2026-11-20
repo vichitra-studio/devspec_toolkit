@@ -11,7 +11,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
         expected = {
             # Canonical integrity (1xx)
             "E110", "E120", "E125", "E130", "E140", "E150",
-            "W110", "W120", "W130", "W140", "W150",
+            "W110", "W120", "W130", "W150",
             # Cross-artifact drift (2xx)
             "E210", "E211",
             # Proof / review closure (3xx)
@@ -22,13 +22,13 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)
             "E510", "E512", "E520", "E521", "E530", "E535", "E536", "E540", "E541", "E543",
-            "E550", "E551", "E552", "E553", "E554", "E555",
+            "E551", "E552", "E553", "E554",
             "E560", "E561", "E562", "E563",
             "E564", "E565", "E566", "E567", "E568", "E569",
             "E571", "E572", "E573",
             "E575", "E576",
             "E580", "E585",
-            "W550", "W551", "W552", "W553", "W554", "W555", "W560", "W561", "W562", "W563",
+            "W552", "W553", "W554", "W555", "W561", "W562", "W563",
             "W564", "W565", "W566", "W567", "W568", "W569",
             "W570", "W571", "W572", "W573",
             "W575", "W576",
@@ -37,7 +37,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E590", "E591", "E592", "E593", "E594", "E595",
             "E596", "E597", "E598", "E599",
             "W590", "W591", "W592", "W593", "W594", "W595",
-            "W596", "W597", "W598", "W599", "W600",
+            "W596", "W597", "W599", "W600",
             "W601", "W603",
             "E604", "W604",
             # Glossary parity (6xx)

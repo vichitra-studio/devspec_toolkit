@@ -91,7 +91,6 @@ class CheckContext:
 
     repo_root: str
     spec_dir: str
-    include_forward_replay: bool = False
     git_root: str | None = None
     spec_root: str | None = None
     project_canon_dir: str | None = None

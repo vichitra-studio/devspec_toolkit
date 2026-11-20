@@ -37,8 +37,6 @@ class SpecdevConfig:
         ``SPECDEV_MATRIX_STRICT`` — make matrix coverage errors fatal.
     replay_base_ref : str | None
         ``SPECDEV_REPLAY_BASE_REF`` — explicit git base ref override.
-    replay_diff_error_mode : str
-        ``SPECDEV_REPLAY_DIFF_ERROR_MODE`` — ``"error"`` or ``"ignore"``.
     """
 
     __slots__ = (
@@ -46,7 +44,6 @@ class SpecdevConfig:
         "promote_codes",
         "matrix_strict",
         "replay_base_ref",
-        "replay_diff_error_mode",
     )
 
     def __init__(self) -> None:
@@ -56,10 +53,6 @@ class SpecdevConfig:
 
         raw_base_ref = os.environ.get("SPECDEV_REPLAY_BASE_REF", "").strip()
         self.replay_base_ref: str | None = raw_base_ref if raw_base_ref else None
-
-        self.replay_diff_error_mode: str = os.environ.get(
-            "SPECDEV_REPLAY_DIFF_ERROR_MODE", ""
-        ).strip().lower()
 
     def __repr__(self) -> str:
         attrs = ", ".join(f"{attr}={getattr(self, attr)!r}" for attr in self.__slots__)

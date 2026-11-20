@@ -593,11 +593,11 @@ class TestW555Step00OutOfScopeThin(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_w555_is_non_promotable(self):
-        """W555 must be absent from PROMOTABLE_PAIRS (E555 is a different code)."""
+        """W555 must be absent from PROMOTABLE_PAIRS (it has no error twin)."""
         self.assertNotIn(
             "W555",
             PROMOTABLE_PAIRS,
-            "W555 must be non-promotable (E555=SEMANTIC_COVERAGE_REGRESSION is different)",
+            "W555 must be non-promotable (it has no error twin)",
         )
 
     # ------------------------------------------------------------------

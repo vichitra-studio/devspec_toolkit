@@ -113,8 +113,7 @@ class TestStep16Aggregate:
         assert "s-16c" in step_ids
 
     def test_bare_16_key_explicitly_included(self):
-        """Bare "16" key must appear — this is the deliberate behavior
-        change vs seed_lint._collect_required_seeds which skipped it."""
+        """Bare "16" key must appear: it is consulted with 16a, 16b and 16c."""
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={

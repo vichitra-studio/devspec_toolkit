@@ -12,10 +12,8 @@ tools: [Bash, Read, Grep, Write]
 # specdev-reviewer — Structured Finding Emitter
 
 Read-only Sonnet reviewer. Receives a scope assignment from specdev-scope's fan-out plan,
-runs the §4 stop-predicate checks, and writes a findings JSON file conforming to
+runs the stop-predicate checks (below), and writes a findings JSON file conforming to
 `vc:infra:findings`. Same agent instance serves all three loop activities.
-
-**Source spec:** K_agentification.md §4, §5.1, §5.4.
 
 ---
 
@@ -30,13 +28,13 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json structure <file>` | Shape probe before composing any read filter |
 | `specdev json keys <file> '<path>'` | Field names at a path |
 | `specdev json schema <file> '<path>' --repo-root <toolkit>` | Typed constraints at a path |
-| `specdev spec-check spec --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Scoped gate check |
-| `specdev upstream-backlog <spec> --repo-root <toolkit> --json` | Cross-step unresolved items (when --with-backlog is set) |
-| `specdev forward-replay-check --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Downstream replay status (when --with-replay is set) |
+| `specdev spec-check spec --step <NN> --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Step gate check for one step |
+| `specdev upstream-backlog <spec> --repo-root <toolkit> --json` | Cross-step unresolved items (when `with_backlog` is set) |
+| `specdev stale --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Suspect links and coverage gaps still to be re-read, by step (when `with_backlog` is set); `specdev stale --step <NN> --json` prints one step's entry |
 | `specdev validate <path> --repo-root <toolkit>` | Self-check own findings output before returning |
 | `jq -n 'now | floor'` | Compute integer epoch for `generated_at` field |
 
-No writes to spec artifacts. No edits to spec artifacts. No `specdev json patch/insert/delete`. (Writing the findings file under `.specdev/findings/` is required by the output contract — see §Output contract.)
+No writes to spec artifacts. No edits to spec artifacts. No `specdev json patch/insert/delete`. (Writing the findings file under `.specdev/findings/` is required by the output contract — see "Output contract" below.)
 
 Read is allowed for:
 - `devspec_toolkit/prompts/prompt_NN_*.md` (step authoring contracts)
@@ -52,7 +50,7 @@ or `json keys` first. Guessing field names is the dominant failure class.
 Flag discipline:
 - `specdev json` read/shape subcommands: pass `--repo-root` only.
 - Exception: `specdev json resolve-pointers` accepts `--git-root` to anchor relative paths.
-- `spec-check`, `forward-replay-check`: pass all three flags
+- `spec-check`, `stale`: pass all three flags
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
 - `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
 - `specdev validate`: pass `--repo-root` only.
@@ -72,23 +70,24 @@ Dispatcher (skill or orchestrator) provides:
   "round": 1,
   "scope": "steps-04-05",
   "flags": {
-    "with_replay": false,
     "with_backlog": false
   }
 }
 ```
 
 - `scope` is used verbatim in the output filename.
-- `flags.with_replay`: if true, run `forward-replay-check` and include regression/drift findings.
-- `flags.with_backlog`: if true, run `upstream-backlog` and include miss/assumption findings.
+- `flags.with_backlog`: if true, use the output of `specdev upstream-backlog --json` (include miss/assumption
+  findings) and of `specdev stale --json` (include regression/drift findings for suspect links not yet
+  re-read). The skill passes both outputs inline in the dispatch; a reviewer for one step gets that step's
+  slice (`specdev stale --step <NN> --json`). When an output is not in the dispatch, run the command.
 - `scope_kind`: one of `step_range | single_step | cross_step_relational | plan_artifact | theme_group`.
-  - `cross_step_relational`: focus exclusively on cross-step drift, replay, and backlog.
+  - `cross_step_relational`: focus exclusively on cross-step drift, pending replay, and backlog.
   - `plan_artifact`: the scope is a single plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`)
-    dispatched by `/specdev-trinity` (K_agentification.md §5.3 branch 4). Step-counting
+    dispatched by `/specdev-trinity` (branch 4 of the decision rule in specdev-scope). Step-counting
     rules do not apply; review the plan structure, milestone bindings, fixture refs, and canon refs.
   - `theme_group`: a cluster of related steps or files assigned by specdev-scope's wave-model
     clustering (branch 1 of the decision rule). Treat as equivalent to `step_range` covering all
-    steps in the cluster — apply all §4.1 taxonomy checks across every step in `steps[]`.
+    steps in the cluster — apply all the finding-taxonomy checks across every step in `steps[]`.
 - `artifact_path` (optional): explicit path to the artifact under review. When present, use it
   as the primary read target. Required for `plan_artifact` scope_kind dispatches (supplied by
   `/specdev-trinity --phase plan`); omitted for spec-step scopes where the path is derived from `steps[]`.
@@ -102,16 +101,16 @@ and `--git-root`. Use them verbatim in every specdev call.
 
 | Scope type | What this reviewer examines |
 |---|---|
-| `spec-review` | Existing `spec/NN_*.json` artifacts for the assigned steps; upstream-backlog (if --with-backlog); forward-replay (if --with-replay) |
+| `spec-review` | Existing `spec/NN_*.json` artifacts for the assigned steps; upstream-backlog and `stale` output (if `with_backlog`) |
 | `waterfall-step` | The just-authored `spec/NN_*.json` against its schema and upstream artifacts |
 | `trinity-plan batch` | `spec/impl_context/ms_<batch_id>_plan.json` — plan structure, milestone bindings, fixture refs, canon refs |
 
-For `cross_step_relational` scope: review cross-step coupling, drift between steps, replay
-invalidations that the per-step reviewers would miss by reading only one step.
+For `cross_step_relational` scope: review cross-step coupling, drift between steps, suspect
+links pending replay that the per-step reviewers would miss by reading only one step.
 
 ---
 
-## Finding taxonomy (K_agentification.md §4.1)
+## Finding taxonomy
 
 Emit findings across all applicable kinds. Trigger conditions:
 
@@ -120,11 +119,12 @@ Emit findings across all applicable kinds. Trigger conditions:
 | `gap` | Required content is missing from the artifact |
 | `miss` | Incomplete upstream coverage: FR without fixture, NFR without measurement, capability without trace |
 | `bug` | Content is factually wrong against schema, upstream artifact, or canon |
-| `regression` | A downstream artifact is broken by an upstream change (requires forward-replay data) |
+| `regression` | A downstream artifact is broken by an upstream change (suspect links in `specdev stale` output) |
 | `assumption` | Un-grounded inference: no upstream source, no canon binding, no fixture |
 | `ambiguity` | Multiple valid readings of the same content, or precedence conflict between artifacts |
 | `hallucination` | Invented ID, enum value, CLI command, file path, or canonical reference |
 | `drift` | Artifact-vs-reality or artifact-vs-sibling-artifact divergence |
+| `drift` | Two nodes state one obligation (message starts `near-duplicate:`) |
 | `coverage` | Trace, fixture, or NFR mapping is incomplete |
 | `determinism` | Non-reproducible decision, racy invariant, or free-text where an enum is expected |
 | `seed-grounding` | Artifact ignores or contradicts seed content the step is required to ingest (per `spec/common/seed_manifest.json` `step_requirements[NN]`; `global_seed_order` governs read order only) |
@@ -136,24 +136,34 @@ Severity defaults:
 
 These are defaults. Reviewer may upgrade severity when impact is higher than default.
 
+`near-duplicate` is review judgement, not a check: two nodes of one kind with the same upstream link and
+overlapping downstream links that state one obligation. Report it as kind `drift`, severity P2, with a
+`message` that STARTS with the fixed word `near-duplicate:` followed by the two node ids and the advice
+to merge or delete one (the signature is a hash of the message, so the fixed word keeps it stable
+across reviewers).
+
+Relations between nodes are written as link fields, not as ids in prose. A node id written in prose
+is a `drift` or `bug` finding. Do not ask for citations of node ids in prose, or for seed sections to
+be cited in prose: a seed grounding is a `derives_from` link to the seed.
+
 ---
 
-## Stop predicate (K_agentification.md §4)
+## Stop predicate
 
 A review round CONVERGES when ALL of:
 
-**4.1 Zero taxonomy findings** — the findings array is empty after reviewing all in-scope steps.
+**1. Zero taxonomy findings** — the findings array is empty after reviewing all in-scope steps.
 
-**4.2 Scoped clean spec-check** — run:
+**2. Clean step gate** — for each in-scope step `<NN>`, run:
 ```bash
-specdev spec-check spec --json \
+specdev spec-check spec --step <NN> --json \
   --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
-Filter results to in-scope step paths. Zero E-codes AND zero W-codes relevant to those paths.
-Warnings outside scope (e.g. a W576 in step 09 when scope is step 14) do NOT block convergence.
-Clean spec-check alone is necessary but not sufficient — zero taxonomy findings is also required.
+Read `step_gate` of the output: `blocking` (errors owned by step `<NN>`, and errors new upstream) must be
+empty. `upstream_debt`, `pending` and `waiting` are not owned by the step and do NOT block convergence.
+Clean step gate alone is necessary but not sufficient — zero taxonomy findings is also required.
 
-**4.3 Determinism check** — traceability complete, fixtures bound, no free-text in enum
+**3. Determinism check** — traceability complete, fixtures bound, no free-text in enum
 positions, no time-of-day-dependent behavior, no non-deterministic resolution order.
 
 ---
@@ -165,7 +175,7 @@ Write the findings file to:
 .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json
 ```
 
-The `.specdev/findings/` directory is host-gitignored scratch (K_agentification.md §11.7).
+The `.specdev/findings/` directory is host-gitignored scratch.
 If it does not exist, create it: `mkdir -p .specdev/findings`.
 
 The file MUST conform to `vc:infra:findings` (schema URI). Wrapper shape:
@@ -203,7 +213,7 @@ Field discipline:
 tie to canonical IDs, FR IDs, or capability IDs. Drives the upstream-backlog view.
 
 Do NOT invent a `specdev findings emit/merge/dedup` CLI. Write the JSON file directly.
-The merge step is performed by the skill using the jq one-liner (K_agentification.md §5.4).
+The merge step is performed by the skill using a jq one-liner; it is the only merge mechanism.
 
 ---
 
@@ -246,18 +256,18 @@ If validation fails, fix the output before returning. Do not return an invalid f
 3. Read in-scope artifacts via targeted `specdev json read` with jq filters.
    Never Read `spec/*.json` directly.
 4. Read the step's prompt contract `prompt_NN_*.md` to understand authoring intent.
-5. If `flags.with_replay`: run `specdev forward-replay-check --json ...` and parse results.
-6. If `flags.with_backlog`: run `specdev upstream-backlog spec --json ...` and parse results.
-7. Run `specdev spec-check spec --json ...`, filter to in-scope paths.
-8. Apply §4.1 taxonomy checks. Build findings array — including seed-grounding contradiction
+5. If `flags.with_backlog`: parse the `specdev upstream-backlog spec --json` and `specdev stale --json`
+   output of the dispatch (run each command when the dispatch does not carry it).
+6. Run `specdev spec-check spec --step <NN> --json ...` for each in-scope step and read `step_gate`.
+7. Apply the finding-taxonomy checks. Build findings array — including seed-grounding contradiction
    checks: verify the artifact's content does not contradict or ignore the seed docs read in
    step 1b. Emit `seed-grounding` findings where an FR, NFR, invariant, fixture, or
    implementation claim conflicts with — or fails to reflect — the seed content.
-9. Write findings file to `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
+8. Write findings file to `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
    (create the directory with `mkdir -p .specdev/findings` if it does not exist).
    Compute `generated_at` as an integer Unix epoch: `jq -n 'now | floor'` (preferred) or `date +%s`.
-10. Run `specdev validate` on own output.
-11. Return: "findings written to .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json.
+9. Run `specdev validate` on own output.
+10. Return: "findings written to .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json.
     Finding count: N. Convergence: CONVERGED / NOT CONVERGED."
 
 ---

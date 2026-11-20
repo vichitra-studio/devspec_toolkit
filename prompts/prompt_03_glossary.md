@@ -13,9 +13,9 @@ Create a single vocabulary that removes ambiguity across product, engineering, a
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Business terms from `goals`, metric names and units from `success_metrics`, persona names from `user_segments`; derive metric names/units from charter and seed sources — do not depend on downstream NFR/monitoring artifacts
+- **00_charter.json**: Business terms from `problem_statement` and `scope_items`, metric names and units from `success_metrics`, persona names from `user_segments`; derive metric names/units from charter and seed sources — do not depend on downstream NFR/monitoring artifacts
 - **01_capabilities.json**: Recurring nouns and action verbs from capability names and descriptions for domain vocabulary
-- **02_system_sketch.json**: Component names, protocol terms, architectural patterns, and technology names from `tech_stack` (languages, frameworks, infrastructure, tools) for technical vocabulary alignment; technology names are domain terms that downstream specs will reference
+- **02_system_sketch.json**: Component names, protocol terms, architectural patterns, and technology names from `third_parties` for technical vocabulary alignment; technology names are domain terms that downstream specs will reference
 - **02a_delivery_baseline.json**: Environment names, CI pipeline terminology, and infrastructure concepts for deployment domain terms
 
 ## Operating Flow: Collect → Define → Canonicalize → Emit
@@ -26,6 +26,7 @@ For each upstream artifact ingested, extract the following:
 - **Emit**: Write artifact JSON once all terms are reconciled and canonical proposals are prepared.
 
 ## Heuristics For Completeness
+- Term-use rule: a term stores no link. It counts as used when its `term` label appears in the text of a node of steps 04 to 15 (case is ignored, `-`, `_` and `/` read as a space, whole words only, an `s` or `es` may follow the last word). Choose the label as the words downstream text will actually use. `spec-check` reports a term whose label no node mentions (E741); the way out is to use the label in the text of a node of steps 04 to 15, or to park the term with `specdev node status <term_id> not_applicable`.
 - Populate `units` for every term whose `term_id` corresponds to a metric in `spec/00_charter.json` `success_metrics` to enable downstream alignment; populate `domain` for every term where a grouping domain can be clearly identified from the upstream artifacts.
 - Coverage rule: every metric name in `spec/00_charter.json` `success_metrics[*].name` should have a corresponding `term_id` entry with `units` populated.
 - Completeness formula: % of key nouns from charter/capability statements and upstream metrics covered in the glossary.
@@ -33,7 +34,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- `spec/00_charter.json` is present and contains at least one user_segments entry.
+- `spec/00_charter.json` is present and contains at least one `user_segments` entry.
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
 - `spec/02_system_sketch.json` is present and contains at least one component entry.
 
@@ -44,7 +45,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every domain noun used in `spec/00_charter.json` (`goals`, `success_metrics`, `user_segments`) and in `spec/01_capabilities.json` capability names is defined as a `term_id`.
+- Every domain noun used in `spec/00_charter.json` (`problem_statement`, `scope_items`, `success_metrics`, `user_segments`) and in `spec/01_capabilities.json` capability names is defined as a `term_id`.
 - No charter or capability concept is left undefined — vocabulary must be grounded before downstream specs use it.
 - All `term_ref` cross-references resolve to valid canonical registry IDs (either existing entries in `canon/manifest.json` or anticipated IDs matching `canonical_proposals` entries).
 - Units referenced in `spec/00_charter.json` `success_metrics` are defined here with canonical unit values.
@@ -59,6 +60,7 @@ Before emitting, verify:
 - [ ] Every domain term used in charter, capabilities, and system sketch is defined here
 - [ ] No circular definitions (A defined using B, B defined using A without resolution)
 - [ ] Every term with a matching canonical entry has `term_ref` populated
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
 - Terms include all domain objects, key metrics, roles, and acronyms used across specs.
@@ -81,7 +83,7 @@ Before emitting, verify:
 - **Circular**: Writing circular definitions that reference the term itself or other undefined jargon.
 - **Missing Units**: Skipping units for metrics, leading to mismatches across FRs and monitoring.
 - **Duplicates**: Allowing duplicate or near-duplicate entries that confuse schema validation.
-- **Drift**: Every domain noun introduced in steps 04-16c MUST have a corresponding `term_id` in this glossary; downstream steps MUST NOT introduce terms not defined here.
+- **Drift**: Every domain noun introduced in steps 04-16c MUST have a corresponding `term_id` in this glossary; downstream steps MUST NOT introduce terms not defined here, and MUST write a defined term by its label.
 - **Broadness**: Definitions that are too broad or business-jargon-heavy to guide engineers.
 
 # Clarification Questions

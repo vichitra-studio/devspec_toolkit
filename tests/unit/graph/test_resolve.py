@@ -435,6 +435,18 @@ def test_plan_item_realises_missing_id_e700_not_e530(tmp_path: Path) -> None:
     assert not [e for e in errors if e.code == "E530" and "tc-no-such-criterion" in e.message]
 
 
+def test_deleted_node_surfaces_as_broken_link(tmp_path: Path) -> None:
+    """Replaces the id-regression check of forward replay: an FR deleted from the list is a broken link at every holder, owned by the holder's step."""
+    spec = copy_example(tmp_path / "spec")
+    fr_list = load_doc(spec, "04_fr_list.json")
+    fr_list["functional_requirements"] = [fr for fr in fr_list["functional_requirements"] if fr["fr_id"] != "fr-password-reset"]
+    write_json(spec, "04_fr_list.json", fr_list)
+    _errors, context = run_spec_check_json(str(ROOT), str(spec))
+    findings = {(f["code"], f["owner"], f["node_id"]) for f in context["checks"]["graph"]["findings"]}
+    assert ("E700", "step:05", "api-password-reset-confirm") in findings
+    assert {code for code, _owner, _node in findings} == {"E700"}
+
+
 # --- hand-off cases of the deleted E590 tests ------------------------------------------------------------------------
 
 _HANDOFF = ROOT / "tests" / "fixtures" / "graph" / "m4_handoff_cases.json"

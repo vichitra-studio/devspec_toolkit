@@ -132,10 +132,8 @@ def test_registered_without_emitter_holds_no_m5_code():
     assert "W720" not in REGISTERED_WITHOUT_EMITTER
 
 
-def test_error_codes_md_no_longer_says_forward_replay_emits_the_retired_codes():
+def test_error_codes_md_describes_w595_and_w720_as_the_trace_lock_emits_them():
     text = _ERROR_CODES_MD.read_text(encoding="utf-8")
-    e550 = _entry(text, "E550 / W550") or text.split("### E550 / W550", 1)[1].split("\n### ", 1)[0]
-    assert "`unknown_step_in_diff`" not in e550 and "four shapes" not in e550
     w595 = text.split("### E595 / W595", 1)[1].split("\n### ", 1)[0]
     assert "no longer report W595" in w595
     assert "no check emits" not in text.split("### W720", 1)[1].split("\n### ", 1)[0]

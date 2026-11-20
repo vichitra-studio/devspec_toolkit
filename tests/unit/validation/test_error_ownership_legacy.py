@@ -43,7 +43,7 @@ def test_e607_row_gives_fixed_step_03(context: OwnerContext) -> None:
     assert owner_for("E607", None, context) == "step:03"
 
 
-@pytest.mark.parametrize("code", ["E608", "E620", "E621", "E622", "W554", "E550", "E555", "W598", "W550"])
+@pytest.mark.parametrize("code", ["E608", "E620", "E621", "E622", "W554"])
 def test_merge_check_rows_for_legacy_codes(context: OwnerContext, code: str) -> None:
     assert owner_for(code, None, context) == MERGE_CHECK
 

@@ -28,13 +28,11 @@
     },
     "policy": {
       "type": "object",
-      "description": "Pipeline execution policy governing dependency resolution and replay behavior.",
+      "description": "Pipeline execution policy governing dependency resolution.",
       "required": [
         "mode",
         "allow_self_dependency",
-        "allow_forward_dependency",
-        "require_full_forward_replay_on_change",
-        "status_write_exemptions"
+        "allow_forward_dependency"
       ],
       "additionalProperties": false,
       "properties": {
@@ -49,22 +47,6 @@
         "allow_forward_dependency": {
           "type": "boolean",
           "description": "Whether a step may depend on a step that appears later in the pipeline ordering."
-        },
-        "require_full_forward_replay_on_change": {
-          "type": "boolean",
-          "description": "When true, any upstream change requires full replay of all downstream steps."
-        },
-        "status_write_exemptions": {
-          "type": "object",
-          "description": "Maps step IDs to arrays of JSON path patterns that are exempt from triggering forward replay. Prevents infinite replay cycles for status-only writes.",
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "description": "A field path exempt from replay, in dotted notation with '[]' for array items (e.g., 'milestones[].status')."
-            },
-            "description": "Array of JSON path patterns exempt from triggering forward replay for this step."
-          }
         }
       }
     },

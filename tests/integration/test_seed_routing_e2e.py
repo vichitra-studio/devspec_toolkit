@@ -17,7 +17,13 @@ import os
 
 import pytest
 
+from pathlib import Path
+
+from specdev_tools.core.seed_routing import resolve_seeds_for_step
+from specdev_tools.validation.graph_checks.codes import SEED_ROUTE_UNUSED
+from specdev_tools.validation.graph_checks.seed_routes import check_seed_routes
 from specdev_tools.validation.seed_lint import lint_seeds
+from unit.validation.graph_checks._example_support import context_of_spec
 from specdev_tools.core.errors import render_errors
 from specdev_tools.context.structure import get_step_structure
 from specdev_tools.context.reviewer import _check_seed_distillation
@@ -87,8 +93,7 @@ def late_step_seed_project(tmp_path):
     (common_dir / "seed_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
     # -------------------------------------------------------------- artifacts
-    # Step 09 artifact — distills domain model terms (no W140).
-    # Uses the same simple proper nouns as the seed so W140 doesn't fire.
+    # Step 09 artifact — distills domain model terms.
     impl_plan = {
         "id": "impl-plan",
         "description": (
@@ -97,7 +102,7 @@ def late_step_seed_project(tmp_path):
     }
     (spec_dir / "09_impl_plan.json").write_text(json.dumps(impl_plan), encoding="utf-8")
 
-    # Step 14 artifact — distills roadmap seed terms (no W140).
+    # Step 14 artifact — distills roadmap seed terms.
     roadmap_artifact = {
         "id": "roadmap",
         "description": (
@@ -106,7 +111,7 @@ def late_step_seed_project(tmp_path):
     }
     (spec_dir / "14_roadmap.json").write_text(json.dumps(roadmap_artifact), encoding="utf-8")
 
-    # impl_context artifact — distills impl seed terms (no W140 for step 16)
+    # impl_context artifact — distills impl seed terms
     ms_plan = {
         "id": "ms-alpha",
         "description": (
@@ -149,20 +154,6 @@ class TestSeedLintNoFalseWarnings:
         w553 = [e for e in rendered if "W553" in e]
         assert w553 == [], f"No W553 expected for bare '16' umbrella key. Got: {w553}"
 
-    def test_no_w140_for_step_09_artifact_with_sufficient_overlap(self, late_step_seed_project):
-        """Artifact distills seed-domain-model terms → W140 must not fire for that pair."""
-        errors = lint_seeds(
-            repo_root=_TOOLKIT_ROOT,
-            spec_dir=late_step_seed_project["spec_dir"],
-            project_root=late_step_seed_project["tmp_path"],
-        )
-        rendered = render_errors(errors)
-        w140 = [e for e in rendered if "W140" in e and "seed-domain-model" in e]
-        assert w140 == [], (
-            "No W140 expected for seed-domain-model/09_impl_plan pair "
-            f"(artifact has sufficient overlap). Got: {w140}"
-        )
-
     def test_no_w553_for_late_step_14(self, late_step_seed_project):
         errors = lint_seeds(
             repo_root=_TOOLKIT_ROOT,
@@ -173,33 +164,6 @@ class TestSeedLintNoFalseWarnings:
         w553 = [e for e in rendered if "W553" in e]
         assert w553 == [], f"No W553 expected for known step '14'. Got: {w553}"
 
-    def test_no_w140_for_step_14_artifact_with_sufficient_overlap(self, late_step_seed_project):
-        """Artifact distills seed-roadmap terms → W140 must not fire for that pair."""
-        errors = lint_seeds(
-            repo_root=_TOOLKIT_ROOT,
-            spec_dir=late_step_seed_project["spec_dir"],
-            project_root=late_step_seed_project["tmp_path"],
-        )
-        rendered = render_errors(errors)
-        w140 = [e for e in rendered if "W140" in e and "seed-roadmap" in e]
-        assert w140 == [], (
-            "No W140 expected for seed-roadmap/14_roadmap pair "
-            f"(artifact has sufficient overlap). Got: {w140}"
-        )
-
-    def test_no_w140_for_impl_context_artifact_with_bare_16_key(self, late_step_seed_project):
-        """impl_context artifact distills seed-impl (16 umbrella) → no W140."""
-        errors = lint_seeds(
-            repo_root=_TOOLKIT_ROOT,
-            spec_dir=late_step_seed_project["spec_dir"],
-            project_root=late_step_seed_project["tmp_path"],
-        )
-        rendered = render_errors(errors)
-        w140 = [e for e in rendered if "W140" in e and "seed-impl" in e]
-        assert w140 == [], (
-            "No W140 expected for seed-impl/ms_alpha_plan pair "
-            f"(artifact has sufficient overlap). Got: {w140}"
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -308,39 +272,24 @@ class TestReviewerDistillationE2E:
 
 
 # ---------------------------------------------------------------------------
-# §G: bare "16" umbrella key at seed_lint integration level
+# §G: routing resolved through ``seed_routing`` and checked by the route-use error
 # ---------------------------------------------------------------------------
 
-class TestBare16UmbrellaKeyE2E:
-    """seed_lint union for impl_context artifacts includes bare step_requirements["16"] seeds."""
+class TestSeedRoutingE2E:
+    """The manifest routes a seed to a step; ``resolve_seeds_for_step`` says where, the route check says whether a node uses it."""
 
-    def test_seed_impl_included_for_impl_context_artifact(self, late_step_seed_project):
-        """seed-impl is routed via bare "16" key.
-
-        The impl_context artifact distills seed-impl terms → no W140.
-        This confirms seed-impl was included in the required set for step "16"
-        (as opposed to not being checked at all, which would also produce no W140).
-
-        Cross-check: alter the artifact to be empty and confirm W140 DOES fire
-        for seed-impl, proving it was checked.
-        """
+    def test_routed_seed_is_proved_by_the_route_check(self, late_step_seed_project):
+        """seed-impl is routed through the bare "16" umbrella key: it is required by every trinity step, and the route check
+        reports the route (seed-impl, step 16) as used by no node (E748).  Seed-lint reports neither W140 nor W551."""
         spec_dir = late_step_seed_project["spec_dir"]
-        tmp = late_step_seed_project["tmp_path"]
+        manifest = json.loads(open(os.path.join(spec_dir, "common", "seed_manifest.json"), encoding="utf-8").read())
+        for step in ("16", "16a", "16b", "16c"):
+            assert "seed-impl" in resolve_seeds_for_step(step, manifest)[1], step
+        assert "seed-impl" not in resolve_seeds_for_step("09", manifest)[1]
 
-        # Overwrite the impl_context artifact with empty content
-        impl_artifact_path = os.path.join(spec_dir, "impl_context", "ms_alpha_plan.json")
-        with open(impl_artifact_path, "w", encoding="utf-8") as f:
-            json.dump({"id": "ms-alpha", "description": "nothing related here"}, f)
+        codes = {e.code for e in lint_seeds(repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=late_step_seed_project["tmp_path"])}
+        assert {"W140", "W551"}.isdisjoint(codes)
 
-        errors = lint_seeds(
-            repo_root=_TOOLKIT_ROOT,
-            spec_dir=spec_dir,
-            project_root=tmp,
-        )
-        rendered = render_errors(errors)
-        # With empty artifact, W140 must fire for seed-impl (proving it's checked)
-        w140_impl = [e for e in rendered if "W140" in e and "seed-impl" in e]
-        assert len(w140_impl) >= 1, (
-            "W140 must fire for seed-impl when impl_context artifact lacks distillation "
-            f"(confirms seed-impl is checked for step '16'). Got W140: {rendered}"
-        )
+        context = context_of_spec(Path(spec_dir))
+        unused = [(e.code, e.node_id) for e in check_seed_routes(context, "merge") if e.code == SEED_ROUTE_UNUSED]
+        assert ("E748", "seed-impl") in unused

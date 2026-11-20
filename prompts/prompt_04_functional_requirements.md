@@ -16,25 +16,25 @@ For each upstream artifact ingested, extract the following:
 
 ### Must-Extract (required for valid output)
 Items without which this step cannot emit a valid artifact:
-- **01_capabilities.json**: Capability IDs for traceability binding; scope (in/out/future) to determine which behaviors need FRs; use as primary source of behaviors alongside charter goals/constraints
-- **00_charter.json**: `problem_statement` and project scope boundaries for grounding FR rationale and priority decisions; in-scope items drive FR coverage
+- **01_capabilities.json**: Capability ids to name in each FR's `derives_from`; `scope` (`in`, `later` or `out`, with `scope_reason`) to determine which behaviors need FRs; use as primary source of behaviors alongside the charter `scope_items` and `constraints`
+- **00_charter.json**: `problem_statement` and the `scope_items` for grounding FR rationale and priority decisions; items with `scope` `in` drive FR coverage
 
 ### Should-Extract (strongly recommended)
 Items that substantially improve FR quality:
 - **00_charter.json**: `user_segments` jobs-to-be-done (JTBDs) and `success_metrics` to validate that FRs address real user needs and measurable outcomes
-- **02_system_sketch.json**: Component IDs and trust boundaries for mapping FRs to responsible system components and integration points
+- **02_system_sketch.json**: Component ids and trust boundaries for mapping FRs to responsible system components and integration points
 
 ### May-Extract (if present, enriches output)
 Optional signals that improve specificity when available:
 - **02a_delivery_baseline.json**: Environment definitions and deployment stages for determining FR acceptance criteria feasibility constraints
 - **03_glossary.json**: Domain terms for consistent naming in FR statements and acceptance criteria; do not depend on downstream interface/NFR artifacts in this step
 
-## Operating Flow: Enumerate → Decompose → Falsify → Trace → Emit
-- **Enumerate**: Build a private Context Ledger mapping every in-scope capability to ≥1 candidate FR. Include rationale and boundary conditions. Do not output it.
+## Operating Flow: Enumerate → Decompose → Falsify → Link → Emit
+- **Enumerate**: Build a private Context Ledger mapping every capability with `scope` `in` to ≥1 candidate FR. Include rationale and boundary conditions. Do not output it.
 - **Decompose**: Split multi-behavior candidates using the Granularity Heuristic. One FR = one observable behavior = one subject + one verb + one measurable outcome.
 - **Falsify**: For each FR, write ≥2 acceptance criteria that could prove the FR false if violated. Confirm Given–When–Then phrasing and measurability.
-- **Trace**: Link every FR to its originating capability; add API, NFR, and governance trace refs where known IDs exist.
-- **Emit**: Write artifact only when every FR is falsifiable, decomposed to a single behavior, and fully traced.
+- **Link**: Set `derives_from` on every FR to the capability it comes from. Later steps (APIs, NFRs, fixtures, tasks) link back to the FR; an FR holds no links to them.
+- **Emit**: Write artifact only when every FR is falsifiable, decomposed to a single behavior, and linked to its capability.
 
 ### Implicit Requirements Discovery Checklist
 Before emitting, verify these system-level behaviors have been considered as FR candidates:
@@ -47,7 +47,7 @@ Before emitting, verify these system-level behaviors have been considered as FR 
 - **Concurrency**: Which operations need locking, queuing, or conflict detection?
 - **Rate limiting**: Which operations must be protected from abusive call volumes?
 - **Data lifecycle**: Where must data be retained, archived, or purged?
-If any of these apply to in-scope capabilities, they MUST generate FRs unless explicitly excluded in the charter.
+If any of these apply to capabilities with `scope` `in`, they MUST generate FRs unless the charter excludes them with a `scope_items` entry whose `scope` is `out`.
 
 ### Granularity Heuristics
 **Rule**: One FR = one behavior = one subject + one verb + one measurable outcome.
@@ -64,7 +64,7 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 
 ## Heuristics For Completeness
 - MUST include pre/postconditions for FRs that modify state or enforce permissions (as identified in `spec/01_capabilities.json` scope).
-- Auto-trace: link FRs to capability and any API that delivers the behavior; include NFR trace where performance is key.
+- Link upward only: `derives_from` names the capability. Do not name APIs or NFRs here; steps 05 and 07 link to the FR.
 - Ambiguity scrub: ban “should/could/fast/easy”; use “Given–When–Then” phrasing in acceptance criteria.
 
 ### Weak-vs-Strong FR Examples
@@ -87,17 +87,16 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 - **DO NOT** use implementation details (function names, DB tables) in statements.
 - **DO NOT** bundle multiple behaviors into one FR.
 - **DO NOT** leave acceptance criteria vague ('it works').
-- **DO NOT** trace to non-existent IDs.
-- **DO NOT** use simple strings for trace field values — the schema enforces the object structure.
+- **DO NOT** name ids in `derives_from` that do not exist in `spec/01_capabilities.json`.
 - **DO NOT** use subjective language ("fast", "secure", "user-friendly").
 - **DO NOT** write FRs that are implementation steps rather than observable behaviors.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every upstream requirement referenced in "Extraction Intent" is represented in at least one FR's `trace` array, OR explicitly documented as a gap with rationale.
+- Every upstream requirement referenced in "Extraction Intent" is named in the `derives_from` of at least one FR, OR explicitly documented as a gap with rationale.
 - No upstream capability, FR, or milestone ID is silently dropped.
-- All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
-- If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+- All `derives_from` ids resolve to ids present in `spec/01_capabilities.json`.
+- If any upstream id cannot be named in a `derives_from`: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
@@ -106,6 +105,7 @@ Before emitting, verify:
 - [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
 - [ ] Each FR's `acceptance_criteria` is written at the behavioral level — concrete enough that Step 14 tasks can derive execution-level criteria without contradiction
 - [ ] Functional requirements meet the schema minimum count
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 **Extraction Mandate**:
 - Every capability ID from `01_capabilities.json` must map to ≥1 FR. List any capability left without an FR and explain why.
@@ -114,23 +114,23 @@ Before emitting, verify:
 - FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
 - Each FR includes preconditions and postconditions where relevant to bound the behavior.
 - Every FR has acceptance criteria that meet the schema minimum count; each criterion has a stable `criterion_id` and specific, measurable text.
-- Do **not** declare fixture coverage on acceptance criteria — fixture↔FR binding is authored in Step 08 via `fixture.targets[]`. Step 04 acceptance criteria carry only `criterion_id` and `text`.
-- `trace` links MUST map every FR to its originating capability from `spec/01_capabilities.json`; MUST also map to APIs, NFRs, or governance IDs when those IDs exist in the corresponding upstream spec files.
+- Do **not** declare fixture coverage on acceptance criteria — a fixture proves a criterion through its `verifies` field, authored in Step 08. Step 04 acceptance criteria carry `criterion_id`, `text` and `scope` (with `scope_reason` when `later` or `out`).
+- `derives_from` MUST name the originating capability from `spec/01_capabilities.json` for every FR.
 - IDs are stable and descriptive (avoid renaming once referenced downstream).
 
 ## Cross-Step Synthesis Notes
-- **Trace Object Structure**: The trace field must be an array of objects with the structure: `{"type": "capability", "id": "cap-user-auth", "note": "Implements core behavior"}` for capability links; use `"fr"` when linking to another FR (e.g., when an FR splits or refines another). Valid `type` values must match a canonical trace type from `canon/kinds/trace_type.json` (e.g., `capability`, `fr`, `api`, `nfr`, `charter-goal`). Do not use simple strings or arrays of strings.
+- **Link Fields**: `derives_from` is a list of capability ids (bare ids, no notes). Use `depends_on` (a list of FR ids of this file) only when one FR cannot hold without another. Park an FR or a criterion that is deferred or excluded with `scope` `later` or `out` and a `scope_reason`; do not delete it. A relation is never written as an id inside `statement` or `text`.
 
 ## Best Practices
 - **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
 - **Boundaries**: Provide `preconditions` and `postconditions` so testers and implementers know the boundaries of each behavior.
 - **Criteria**: Ensure every acceptance criterion has a stable `criterion_id` and concrete, falsifiable `text`. Fixture coverage is authored later in Step 08.
-- **Trace**: Use `trace` arrays to link FRs back to capabilities, APIs, NFRs, or governance rules cover-to-cover.
+- **Links**: Use `derives_from` to link each FR to its capability; the other steps link back to the FR.
 
 ## Common Pitfalls
 - **Bundling**: Bundling multiple behaviors into one FR, making it impossible to prove completeness.
 - **Vague Criteria**: Leaving acceptance criteria generic or missing, which blocks fixture authoring.
-- **Missing Link**: Skipping trace links, severing coverage reporting across spec steps.
+- **Missing Link**: Leaving `derives_from` out or naming the wrong capability, severing coverage reporting across spec steps.
 - **Implementation**: Embedding implementation details (function names, DB tables, internal method signatures) instead of outcomes, limiting design options.
 
 # Clarification Questions
@@ -138,7 +138,7 @@ Before emitting, verify:
 - For each FR, what are the minimal inputs and exact expected outputs or state changes?
 - What are the preconditions (auth, data presence, configuration) and postconditions (side effects, persisted state)?
 - What are the negative paths and error conditions we must handle? Which belong in acceptance criteria?
-- Which capabilities, APIs, or NFRs does each FR map to? Any governance constraints to reflect?
+- Which capability does each FR come from? Any charter constraints to reflect?
 
 # Schema Reference
 - Schema URI: vc:04-fr-list

@@ -96,5 +96,5 @@ def resolve_extras_path(spec_dir: str, filename: str) -> str:
 
 
 # Refs tried, in order, when a command needs the repository's default branch and none is given.
-# Used by the forward-replay base ref (validation/validate.py) and the graph's default base ref (graph/gitview.py).
+# Used by the step gate's base ref (core/git_base.py) and the graph's default base ref (graph/gitview.py).
 DEFAULT_BRANCH_CANDIDATES: tuple[str, ...] = ("origin/main", "origin/master", "main", "master")

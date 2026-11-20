@@ -26,7 +26,6 @@ class TestSpecdevConfig:
             "SPECDEV_PROMOTE_CODES",
             "SPECDEV_MATRIX_STRICT",
             "SPECDEV_REPLAY_BASE_REF",
-            "SPECDEV_REPLAY_DIFF_ERROR_MODE",
         ):
             monkeypatch.delenv(var, raising=False)
         cfg = SpecdevConfig()
@@ -34,20 +33,17 @@ class TestSpecdevConfig:
         assert cfg.promote_codes == set()
         assert cfg.matrix_strict is False
         assert cfg.replay_base_ref is None
-        assert cfg.replay_diff_error_mode == ""
 
     def test_all_env_vars_set(self, monkeypatch):
         monkeypatch.setenv("SPECDEV_WARNINGS_AS_ERRORS", "1")
         monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W571,W593")
         monkeypatch.setenv("SPECDEV_MATRIX_STRICT", "true")
         monkeypatch.setenv("SPECDEV_REPLAY_BASE_REF", "origin/develop")
-        monkeypatch.setenv("SPECDEV_REPLAY_DIFF_ERROR_MODE", "error")
         cfg = SpecdevConfig()
         assert cfg.warnings_as_errors is True
         assert cfg.promote_codes == {"W571", "W593"}
         assert cfg.matrix_strict is True
         assert cfg.replay_base_ref == "origin/develop"
-        assert cfg.replay_diff_error_mode == "error"
 
     def test_boolean_true_variants(self, monkeypatch):
         for val in ("1", "true", "yes", "TRUE", "Yes", " 1 "):
@@ -90,7 +86,6 @@ class TestSpecdevConfig:
         monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
         monkeypatch.delenv("SPECDEV_MATRIX_STRICT", raising=False)
         monkeypatch.delenv("SPECDEV_REPLAY_BASE_REF", raising=False)
-        monkeypatch.delenv("SPECDEV_REPLAY_DIFF_ERROR_MODE", raising=False)
         cfg = SpecdevConfig()
         r = repr(cfg)
         assert r.startswith("SpecdevConfig(")

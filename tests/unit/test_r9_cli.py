@@ -110,7 +110,7 @@ class TestEnvCheck(_CliMixin, unittest.TestCase):
         """When SPECDEV_PROMOTE_CODES is set, env-check reports SELECTIVE promotion."""
         # Make sure SPECDEV_WARNINGS_AS_ERRORS is off so selective path is taken
         clean_env = {k: v for k, v in os.environ.items() if k != "SPECDEV_WARNINGS_AS_ERRORS"}
-        clean_env["SPECDEV_PROMOTE_CODES"] = "W550,W560"
+        clean_env["SPECDEV_PROMOTE_CODES"] = "W571,W593"
         with patch.dict(os.environ, clean_env, clear=True):
             code, out, _ = self._run_cli(["env-check", "--repo-root", str(REPO_ROOT)])
         self.assertEqual(code, 0)

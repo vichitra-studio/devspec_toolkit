@@ -107,12 +107,11 @@ def test_a_reader_goes_on_and_names_the_seeds_not_found_once(name: str, nested: 
     assert "seed documents not found" not in found
 
 
-@pytest.mark.parametrize("command", ["spec-check", "validate-all", "forward-replay-check"])
+@pytest.mark.parametrize("command", ["spec-check", "validate-all"])
 def test_a_validation_command_names_the_seeds_not_found_once(command: str, nested: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(nested)
     spec = str(nested / "sub" / "spec")
-    positional = [] if command == "forward-replay-check" else [spec]
-    flags = [command, *positional, "--repo-root", str(ROOT), "--spec-root", spec]
+    flags = [command, spec, "--repo-root", str(ROOT), "--spec-root", spec]
     _code, out = run_cli(*flags)
     lines = [line for line in out.splitlines() if "seed documents not found" in line]
     assert len(lines) == 1, out

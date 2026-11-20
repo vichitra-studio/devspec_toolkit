@@ -18,7 +18,7 @@ REMOVED_CODES = (
 # The W->E pairs of PROMOTABLE_PAIRS. A later change that adds or removes a pair
 # edits this list in the same commit as its code change.
 EXPECTED_PROMOTABLE_PAIRS = {
-    "W550": "E550", "W560": "E560", "W562": "E562", "W563": "E563",
+    "W562": "E562", "W563": "E563",
     "W564": "E564", "W565": "E565", "W566": "E566", "W567": "E567",
     "W568": "E568", "W569": "E569", "W571": "E571", "W572": "E572",
     "W573": "E573", "W575": "E575", "W576": "E576", "W580": "E580",
@@ -48,19 +48,14 @@ CROSS_PREFIX_SEMANTIC_ALLOWLIST = {
     "110",  # E=UNKNOWN_CANONICAL_ID          / W=DEPRECATED_CANONICAL_USED
     "120",  # E=CANONICAL_KIND_MISMATCH       / W=ALIAS_DEPRECATED
     "130",  # E=CANONICAL_VERSION_MISMATCH    / W=CANONICAL_REF_VERSION_OMITTED
-    "140",  # E=AMBIGUOUS_ALIAS               / W=SEED_CONTENT_OVERLAP_LOW
-    "550",  # E=FORWARD_REPLAY_MISSING        / W=SEMANTIC_COVERAGE_SKIP
-    "551",  # E=SCHEMA_ENUM_EXTRA             / W=UNDECLARED_SEED
     "552",  # E=MISSING_PAIRED_SCHEMA         / W=POTENTIAL_UNREGISTERED_PAIRING
     "553",  # E=MISSING_ENUM_PATH             / W=SEED_STEP_UNKNOWN
     "554",  # E=CANON_ENUM_DRIFT              / W=HARDCODED_SEED_REFERENCE
-    "555",  # E=SEMANTIC_COVERAGE_REGRESSION  / W=STEP00_SEED_OUT_OF_SCOPE_THIN
     "585",  # E=DAG_CIRCULAR_DEPENDENCY       / W=ANCHOR_DRIFT_SKIP
     "590",  # E=CROSS_STEP_ID_NOT_FOUND       / W=CROSS_STEP_UPSTREAM_MISSING
     "592",  # E=COVERAGE_THRESHOLD_BREACH     / W=COVERAGE_THRESHOLD_WARN
     "596",  # E=DAG_DEAD_END_PRODUCER         / W=UNDECLARED_UPSTREAM_REF
     "597",  # E=EXTRACTION_INTENT_UPSTREAM_GAP/ W=EXTRACTION_INTENT_VAGUE
-    "598",  # E=EXTRACTION_INTENT_INVALID_REF / W=ID_STABILITY_REMOVAL
     "599",  # E=DAG_CONSUMER_INCONSISTENCY    / W=EVIDENCE_TOO_SHORT
     "606",  # E=GLOSSARY_PROPOSAL_DRIFT       / W=GLOSSARY_CANON_ORPHAN
     "608",  # E=TOOLKIT_VERSION_MISMATCH      / W=ANCHOR_LEGACY_SCHEMA
@@ -72,7 +67,7 @@ class TestR9ErrorCodes(unittest.TestCase):
 
     # All new R9 codes (26 new + 4 previously unregistered) + DEVSPEC-89 additions
     R9_NEW_CODES = {
-        "E150", "E551", "E552", "E553", "E554", "E555",
+        "E150", "E551", "E552", "E553", "E554",
         "E571", "E572", "E573", "E580", "E585",
         "E590", "E591", "E592", "E593", "E594", "E595",
         "E596", "E597", "E598", "E599",
@@ -89,10 +84,10 @@ class TestR9ErrorCodes(unittest.TestCase):
             self.assertIn(code, ERROR_CODES, f"{code} not registered in ERROR_CODES")
 
     def test_promotable_pairs_match_expected_list(self):
-        """PROMOTABLE_PAIRS equals the explicit W->E list above (23 pairs)."""
+        """PROMOTABLE_PAIRS equals the explicit W->E list above (21 pairs)."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
         self.assertEqual(PROMOTABLE_PAIRS, EXPECTED_PROMOTABLE_PAIRS)
-        self.assertEqual(len(PROMOTABLE_PAIRS), 23)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 21)
 
     def test_removed_codes_not_registered(self):
         """The codes whose input fields were removed are gone from ERROR_CODES and PROMOTABLE_PAIRS."""
@@ -160,15 +155,13 @@ class TestR9ErrorCodes(unittest.TestCase):
                 + "\n".join(unexpected_divergences)
             )
 
-    def test_e550_no_longer_overloaded(self):
-        """E550 is exclusively FORWARD_REPLAY_MISSING; E554 handles CANON_ENUM_DRIFT."""
-        self.assertEqual(ERROR_CODES["E550"], "FORWARD_REPLAY_MISSING")
+    def test_e554_is_canon_enum_drift(self):
+        """E554 is CANON_ENUM_DRIFT."""
         self.assertEqual(ERROR_CODES["E554"], "CANON_ENUM_DRIFT")
-        self.assertEqual(ERROR_CODES["E555"], "SEMANTIC_COVERAGE_REGRESSION")
 
     def test_non_promotable_codes_excluded(self):
         """Non-promotable W-codes are NOT in PROMOTABLE_PAIRS."""
-        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W553", "W554", "W555", "W570", "W590", "W596", "W597", "W606"}
+        non_promotable = {"W110", "W120", "W130", "W552", "W553", "W554", "W555", "W570", "W590", "W596", "W597", "W606"}
         for code in non_promotable:
             self.assertNotIn(code, PROMOTABLE_PAIRS,
                              f"{code} should not be promotable")

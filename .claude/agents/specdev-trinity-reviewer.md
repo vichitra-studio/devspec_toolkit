@@ -31,7 +31,6 @@ Bash surface is restricted to these subcommand families only:
 |---|---|
 | `git diff`, `git log`, `git show` | Read-only git ops — inspect changed files, diffs, commit history |
 | `specdev spec-check spec --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Gate check against full spec |
-| `specdev forward-replay-check --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Downstream replay status (milestone scope) |
 | `specdev upstream-backlog spec --json --repo-root <toolkit>` | Orphan ambiguity detection (milestone scope) |
 | `specdev validate <path> --repo-root <toolkit>` | Self-check own findings output before returning |
 | `specdev json structure <file>` | Shape probe before composing any read filter |
@@ -64,7 +63,7 @@ Flag discipline:
   The CLI silently strips `--spec-root`/`--git-root` from these, so passing them is harmless —
   but the canonical invocation omits both. Exception: `specdev json resolve-pointers` legitimately
   accepts `--git-root` to anchor relative paths.
-- `spec-check`, `forward-replay-check`: pass all three flags —
+- `spec-check`: pass all three flags —
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
 - `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
 - `specdev validate`: pass `--repo-root` only.
@@ -112,7 +111,7 @@ and `--git-root`. Use them verbatim in every specdev call.
 | scope_kind | Review surface |
 |---|---|
 | `code_phase_group` | Just-applied edits for one group's `actions[]`; code files matching `actions[].target` union within `plan.summary.target_file_patterns`; per-group review-fix loop (§11.3.1). Focus: correctness of this group's changes — no regressions, no hallucinations, no drift from the plan's spec alignment, no determinism violations. |
-| `code_phase_milestone` | Full plan + full `git diff` over milestone-start..HEAD + `spec-check` final state + `forward-replay-check` + `upstream-backlog` (orphan amb detection); cross-group file-change overlap drift; plan-vs-execution divergence (§11.3.2). Focus: milestone-wide coherence that per-group reviewers cannot see. |
+| `code_phase_milestone` | Full plan + full `git diff` over milestone-start..HEAD + `spec-check` final state + `upstream-backlog` (orphan amb detection); cross-group file-change overlap drift; plan-vs-execution divergence (§11.3.2). Focus: milestone-wide coherence that per-group reviewers cannot see. |
 
 ---
 
@@ -160,7 +159,7 @@ invocation, regardless of scope_kind:
 | **gaps** — required content, function, file, or configuration item missing from changed code | `gap` |
 | **misses** — FR/NFR/acceptance criterion present in plan but not exercised in changed code | `miss` |
 | **bugs** — factually wrong logic, wrong value, wrong import, wrong cross-reference | `bug` |
-| **regressions** — downstream test or spec artifact broken by this group's edits (run forward-replay-check for `code_phase_milestone`) | `regression` |
+| **regressions** — downstream test or spec artifact broken by this group's edits | `regression` |
 | **assumptions** — ungrounded inference in code with no upstream source or canon binding | `assumption` |
 | **hallucinations / fabrication** — invented function names, file paths, canonical IDs, CLI commands, sha256 hashes | `hallucination` |
 | **citation drift** — cited primary source no longer matches the reality of the file or URL it points to | `drift` |
@@ -278,7 +277,7 @@ A `code_phase_group` review round CONVERGES when ALL of:
 A `code_phase_milestone` review round CONVERGES when ALL of:
 
 1. **Zero taxonomy findings** — findings array is empty after the full-sweep over the
-   entire milestone's changed files, plan, spec-check, forward-replay-check, and
+   entire milestone's changed files, plan, spec-check, and
    upstream-backlog.
 2. **Every blocking_amb well-formed** — each emergent_ambiguity item with
    `status='blocked'` must have `severity` present (required field per the live
@@ -430,7 +429,6 @@ If validation fails, fix the output before returning. Do not return an invalid f
    `spec/*.json` directly.
 8. Run `specdev spec-check spec --json ...`, filter to in-scope paths.
 9. **If `code_phase_milestone`**:
-   - Run `specdev forward-replay-check --json ...` and parse results.
    - Run `specdev upstream-backlog spec --json ...` and parse results.
 10. Apply all E-pattern enforcement checks in order: E2 full-sweep (all eleven buckets),
     E3 sha256, E4 timestamps, E5 architectural invariants, E8 citations. Build findings array.

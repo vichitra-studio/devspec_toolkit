@@ -3,7 +3,7 @@
 This module is intentionally the single entry point for both single-file
 (``validate_file``) and full-directory (``validate_dir``) validation.
 ``validate_dir`` further orchestrates quality lint, canonical integrity,
-forward-replay, dependency-order, extraction-intent, and prompt-schema-sync
+dependency-order, extraction-intent, and prompt-schema-sync
 checks.  A future refactor could split ``validate_dir`` into a dedicated
 ``orchestrator.py`` module (see AUDIT-004).
 """
@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -30,7 +29,6 @@ from ..core.schema_validate import (
 from ..canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
 from ..canonical.lint import lint_canon_dirs
 from .dependency_order_lint import lint_dependency_order
-from .forward_replay_check import check_forward_replay
 from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from .linter_utils import build_lint_graph
@@ -38,12 +36,11 @@ from .check_registry import graph_for_checks
 from .spec_check import lock_link_findings
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
-from ..core.constants import DEFAULT_BRANCH_CANDIDATES
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import SchemaRegistry, get_shared_registry
 from ..graph.build import build_file_graph
-from ..graph.gitview import GitViewError, git_top_level, host_root_of
+from ..graph.gitview import host_root_of
 from ..graph.ids import check_unique_ids
 from ..graph.kinds import KindRegistryError
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
@@ -283,36 +280,8 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
         )
     )
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
-        step_order = _load_step_order(root / "tools" / "step_order.json")
-        dep_errors = lint_dependency_order(repo_root)
-        failures.extend(dep_errors)
-        if step_order.get("require_full_forward_replay_on_change", True):
-            if not any("invalid_step_order" in e.message for e in dep_errors):
-                cfg = get_config()
-                mode = cfg.replay_diff_error_mode
-                if not mode:
-                    in_ci = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
-                    mode = "error" if (in_ci or _is_git_repo(root)) else "ignore"
-                if mode == "ignore":
-                    import sys as _sys
-                    print(
-                        "specdev: forward-replay check skipped (not in CI and not a git repo). "
-                        "Set SPECDEV_REPLAY_DIFF_ERROR_MODE=error to force.",
-                        file=_sys.stderr,
-                    )
-                detected_git_root = _detect_git_root(root)
-                base_ref = _resolve_replay_base_ref(detected_git_root)
-                failures.extend(
-                    check_forward_replay(
-                        repo_root,
-                        base_ref=base_ref,
-                        diff_error_mode=mode,
-                        git_root=str(detected_git_root),
-                        spec_root=spec_root or str(root / "spec"),
-                    )
-                )
-    # R9/T26: Extraction intent validation (prompts vs step_order.json)
-    if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
+        failures.extend(lint_dependency_order(repo_root))
+        # R9/T26: Extraction intent validation (prompts vs step_order.json)
         failures.extend(check_extraction_intent(repo_root))
 
     # Prompt-schema sync validation
@@ -536,112 +505,3 @@ def _run_deep_validation(
         return validator(data, repo_root, context)
     except Exception as e:
         return [make_error("E521", f"Deep Validation Critical Error: {str(e)}")]
-
-
-def _load_step_order(path: Path) -> dict[str, object]:
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        policy = data.get("policy", {})
-        if isinstance(policy, dict):
-            return policy
-    except (OSError, json.JSONDecodeError, ValueError, TypeError):
-        pass
-    return {}
-
-
-def _detect_git_root(repo_root: Path) -> Path:
-    """Detect the host repo git root, which may differ from repo_root in submodule deployments.
-
-    In a submodule layout, ``repo_root`` points to the toolkit directory
-    (e.g. ``host_repo/devspec_toolkit/``) but git operations must run from
-    the host repo root.  This function asks git for the top of the working
-    tree that holds *repo_root* (``gitview.git_top_level``, which also
-    resolves the ``.git`` file a submodule has).
-    Falls back to *repo_root* when git does not answer or names no folder.
-    """
-    try:
-        top = git_top_level(str(repo_root))
-    except GitViewError:
-        return repo_root
-    return Path(top) if top and Path(top).exists() else repo_root
-
-
-def _is_git_repo(root: Path) -> bool:
-    cmd = ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
-    except subprocess.TimeoutExpired:
-        import sys as _sys
-        print(f"specdev: git rev-parse timed out for {root}; assuming not a git repo", file=_sys.stderr)
-        return False
-    except (OSError, ValueError):
-        return False
-    return result.returncode == 0 and result.stdout.strip() == "true"
-
-
-def _resolve_replay_base_ref(root: Path) -> str:
-    """Resolve the git base ref for forward-replay checks.
-
-    Resolution order (first match wins):
-    1. ``SPECDEV_REPLAY_BASE_REF`` environment variable (explicit override)
-    2. Current branch's upstream tracking branch (``@{upstream}``)
-    3. Well-known remote defaults: ``origin/main``, ``origin/master``
-    4. Well-known local defaults: ``main``, ``master``
-    5. Current branch name (self-diff — effectively a no-op)
-    6. Fallback: ``origin/main`` (may fail if remote is not configured)
-    """
-    explicit = get_config().replay_base_ref
-    if explicit:
-        return explicit
-    upstream = _git_upstream_branch(root)
-    if upstream:
-        return upstream
-    for candidate in DEFAULT_BRANCH_CANDIDATES:
-        if _git_ref_exists(root, candidate):
-            return candidate
-    current = _git_current_branch(root)
-    if current:
-        return current
-    return "origin/main"
-
-
-def _git_ref_exists(root: Path, ref: str) -> bool:
-    cmd = ["git", "-C", str(root), "rev-parse", "--verify", "--quiet", ref]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
-    except subprocess.TimeoutExpired:
-        return False
-    except (OSError, ValueError):
-        return False
-    return result.returncode == 0
-
-
-def _git_upstream_branch(root: Path) -> str | None:
-    cmd = ["git", "-C", str(root), "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
-    except subprocess.TimeoutExpired:
-        return None
-    except (OSError, ValueError):
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    return out or None
-
-
-def _git_current_branch(root: Path) -> str | None:
-    cmd = ["git", "-C", str(root), "rev-parse", "--abbrev-ref", "HEAD"]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
-    except subprocess.TimeoutExpired:
-        return None
-    except (OSError, ValueError):
-        return None
-    if result.returncode != 0:
-        return None
-    out = result.stdout.strip()
-    if out in {"", "HEAD"}:
-        return None
-    return out

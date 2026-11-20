@@ -339,9 +339,6 @@ def _without(key: str):
         (lambda hand: {**hand, "declared_edges": "abc"}, "declared_edges"),
         (lambda hand: {**hand, "declared_edges": None}, "declared_edges"),
         (lambda hand: {**hand, "declared_edges": [["01"], [1, 2]]}, "declared_edges"),
-        (lambda hand: {**hand, "policy": {**hand["policy"], "status_write_exemptions": 5}}, "status_write_exemptions"),
-        (lambda hand: {**hand, "policy": {**hand["policy"], "status_write_exemptions": {"09": "x"}}},
-         "status_write_exemptions"),
     ],
 )
 def test_hand_kept_keys_that_cannot_be_used_fail_and_write_nothing(edit, fragment, tmp_path):

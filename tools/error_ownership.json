@@ -151,24 +151,6 @@
       "authority": "M6a PD"
     },
     {
-      "class": "replay-diff-unavailable",
-      "owner": "merge-check",
-      "codes": [
-        "E550"
-      ],
-      "authority": "M6a PD"
-    },
-    {
-      "class": "id-regression-on-replay",
-      "owner": "merge-check",
-      "codes": [
-        "E555",
-        "W598",
-        "W550"
-      ],
-      "authority": "M6a PD"
-    },
-    {
       "class": "term-not-used-by-label",
       "owner": "fixed_step:14",
       "codes": [

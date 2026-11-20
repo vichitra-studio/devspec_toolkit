@@ -16,7 +16,6 @@ import sys
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 from ..core.config import reset_config
@@ -324,25 +323,6 @@ def _check_glossary_drift(ctx: CheckContext) -> dict[str, Any]:
     )
 
 
-def _check_forward_replay(ctx: CheckContext) -> dict[str, Any]:
-    """Id regression against the base ref (opt-in; file-level forward replay is retired)."""
-    if not ctx.include_forward_replay:
-        return skip("use --include-forward-replay to check id regressions (E555) against the base ref")
-    from .forward_replay_check import check_forward_replay
-    from .validate import _detect_git_root, _resolve_replay_base_ref
-
-    effective_git_root = ctx.git_root or str(_detect_git_root(ctx.root))
-    return check_result(
-        check_forward_replay(
-            ctx.repo_root,
-            base_ref=_resolve_replay_base_ref(Path(effective_git_root)),
-            diff_error_mode="error",
-            git_root=effective_git_root,
-            spec_root=ctx.spec_root or str(ctx.root / "spec"),
-        )
-    )
-
-
 def _check_trace_lock(ctx: CheckContext) -> dict[str, Any]:
     """Suspect links, orphan entries, baseline markers."""
     lock, lock_error = ctx.lock_state
@@ -372,7 +352,6 @@ register_check("records", _check_records)
 register_check("registry-check", _check_registry)
 register_check("hardcoded-seed-check", _check_hardcoded_seed)
 register_check("glossary-drift-check", _check_glossary_drift, default_owner=STEP_PREFIX + "03")
-register_check("forward-replay-check", _check_forward_replay)
 register_check("trace-lock", _check_trace_lock)
 graph_checks.publish_graph_checks()
 register_check("open-items", _check_open_items)
@@ -391,7 +370,6 @@ def warn_ignored_promotions() -> None:
 def run_checks(
     repo_root: str,
     spec_dir: str,
-    include_forward_replay: bool = False,
     git_root: str | None = None,
     spec_root: str | None = None,
     project_canon_dir: str | None = None,
@@ -407,7 +385,6 @@ def run_checks(
     ctx = CheckContext(
         repo_root=repo_root,
         spec_dir=spec_dir,
-        include_forward_replay=include_forward_replay,
         git_root=git_root,
         spec_root=spec_root,
         project_canon_dir=project_canon_dir,
@@ -442,7 +419,6 @@ def _collect_errors(checks: OrderedDict[str, dict[str, Any]]) -> list[SpecError]
 def run_spec_check(
     repo_root: str,
     spec_dir: str,
-    include_forward_replay: bool = False,
     git_root: str | None = None,
     spec_root: str | None = None,
     project_canon_dir: str | None = None,
@@ -452,7 +428,7 @@ def run_spec_check(
     Prints a per-check summary to stderr before returning.
     """
     reset_config()
-    checks = run_checks(repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+    checks = run_checks(repo_root, spec_dir, git_root, spec_root, project_canon_dir=project_canon_dir)
     _print_summary(checks)
     return _collect_errors(checks)
 
@@ -460,14 +436,13 @@ def run_spec_check(
 def run_spec_check_json(
     repo_root: str,
     spec_dir: str,
-    include_forward_replay: bool = False,
     git_root: str | None = None,
     spec_root: str | None = None,
     project_canon_dir: str | None = None,
 ) -> tuple[list[SpecError], dict[str, Any]]:
     """Run all checks and return (errors, json_context) for ``_json_exit``."""
     reset_config()
-    checks = run_checks(repo_root, spec_dir, include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+    checks = run_checks(repo_root, spec_dir, git_root, spec_root, project_canon_dir=project_canon_dir)
     checks_summary: dict[str, Any] = {}
     for name, info in checks.items():
         if info.get("status") == "SKIP":
