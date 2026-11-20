@@ -1,7 +1,8 @@
 """Two-pass structural + semantic review gate for freshly-emitted spec artifacts.
 
 Implements A5 from the toolkit optimisation plan:
-  - Pass 1: Structural review (zero LLM tokens) — ID coverage, reverse trace.
+  - Pass 1: Structural review (zero LLM tokens) — reports nothing: the 1.1.1 `trace` arrays it counted are gone
+            from the 1.2.0 schemas (coverage is graph-based, see `trace/` and `graph_checks/`).
   - Pass 2: Semantic pair generation (heuristics, no LLM) — faithfulness, acceptance_gap,
             quantifier_weakening, seed_distillation, scope_completeness.
 
@@ -18,7 +19,6 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
-from ..validation._legacy_shim import LEGACY_REVIEWER_TRACE_FIELDS, has_legacy_fields, records_of
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
 from ._utils import merge_allof as _u_merge_allof
@@ -136,58 +136,6 @@ class ReviewResult:
 # Helpers — JSON traversal
 # ---------------------------------------------------------------------------
 
-def _collect_id_values(obj: Any, suffix: str = "_id") -> list[str]:
-    """Recursively collect all string values whose key ends with `suffix`."""
-    results: list[str] = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k.endswith(suffix) and isinstance(v, str):
-                results.append(v)
-            results.extend(_collect_id_values(v, suffix))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_collect_id_values(item, suffix))
-    return results
-
-
-def _collect_trace_ids(obj: Any) -> list[str]:
-    """Recursively collect all IDs found inside 'trace' arrays.
-
-    Handles both:
-      - trace: [{id: "...", ...}, ...]          (list of objects with an 'id' key)
-      - trace: ["fr-foo", "api-bar"]             (list of plain strings)
-    """
-    results: list[str] = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k == "trace" and isinstance(v, list):
-                for item in v:
-                    if isinstance(item, str):
-                        results.append(item)
-                    elif isinstance(item, dict) and isinstance(item.get("id"), str):
-                        results.append(item["id"])
-            else:
-                results.extend(_collect_trace_ids(v))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_collect_trace_ids(item))
-    return results
-
-
-def _find_items_by_key(obj: Any, key: str) -> list[Any]:
-    """Recursively collect all values whose dict key equals `key`."""
-    results: list[Any] = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k == key:
-                results.append(v)
-            results.extend(_find_items_by_key(v, key))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_find_items_by_key(item, key))
-    return results
-
-
 def _find_dicts_with_key(obj: Any, key: str, path: str = "") -> list[tuple[str, dict]]:
     """Recursively find all dicts that contain `key`, returning (path, dict) pairs."""
     results: list[tuple[str, dict]] = []
@@ -273,73 +221,6 @@ def _empty_structural_review() -> StructuralReview:
     return StructuralReview(
         upstream_coverage={"covered": [], "dropped": []},
         reverse_trace={"unjustified": [], "scope_creep": []},
-    )
-
-
-def _run_structural_pass(
-    artifact: dict,
-    artifact_path: str,
-    upstream_specs: list[tuple[str, dict]],
-    step_id: str = "",
-) -> StructuralReview:
-    """Execute Pass 1: automated structural analysis with zero LLM token cost.
-
-    Coverage and reverse trace are counted from the artifact's ``trace`` arrays (and ``scope.apis`` /
-    ``scope.components``); an artifact without any ``trace`` array is of the graph shape, so both sub-passes
-    are skipped and report nothing (M4 / M6a replace them; M6c deletes the guard).
-    """
-    _ = artifact_path  # currently unused
-    if not has_legacy_fields(records_of(artifact), LEGACY_REVIEWER_TRACE_FIELDS):
-        return _empty_structural_review()
-
-    # --- Collect upstream entity IDs ---
-    all_upstream_ids: set[str] = set()
-    for _, spec_data in upstream_specs:
-        ids = _collect_id_values(spec_data, suffix="_id")
-        all_upstream_ids.update(ids)
-
-    # For non-checklist steps, acceptance criteria (ac-*) are child entities of
-    # FRs and are covered at FR granularity via trace arrays — not individually.
-    # Including them in the coverage denominator causes a false FAIL because
-    # ~80% of upstream IDs would always be "dropped".
-    if step_id not in _CHECKLIST_STEPS:
-        all_upstream_ids = {uid for uid in all_upstream_ids if not uid.startswith("ac-")}
-
-    # --- Collect artifact trace IDs ---
-    artifact_trace_ids: set[str] = set(_collect_trace_ids(artifact))
-
-    # Also collect IDs referenced in scope.apis and scope.components fields.
-    # Invariant-style artifacts (step 06) express API and component coverage via
-    # the scope object rather than trace arrays; both are valid traceability refs.
-    for scope_dict in _find_items_by_key(artifact, "scope"):
-        if isinstance(scope_dict, dict):
-            for scope_key in ("apis", "components"):
-                scope_val = scope_dict.get(scope_key, [])
-                if not isinstance(scope_val, list):
-                    continue  # guard: a string "api-foo" would iterate as chars
-                for item in scope_val:
-                    if isinstance(item, str):
-                        artifact_trace_ids.add(item)
-
-    # --- ID coverage ---
-    covered = sorted(all_upstream_ids & artifact_trace_ids)
-    dropped = sorted(all_upstream_ids - artifact_trace_ids)
-
-    upstream_coverage = {
-        "covered": covered,
-        "dropped": dropped,
-    }
-
-    # --- Reverse trace / scope creep ---
-    unjustified = sorted(artifact_trace_ids - all_upstream_ids)
-    reverse_trace = {
-        "unjustified": unjustified,
-        "scope_creep": list(unjustified),
-    }
-
-    return StructuralReview(
-        upstream_coverage=upstream_coverage,
-        reverse_trace=reverse_trace,
     )
 
 
@@ -802,16 +683,11 @@ def review_artifact(
             token_cost={"structural": 0, "semantic_total": 0},
         )
 
-    # Load upstream specs once for both passes.
+    # Load upstream specs once for the semantic checks.
     upstream_specs = _load_upstream_specs(step_id, spec_dir, repo_root)
 
-    # --- Pass 1: Structural ---
-    structural = _run_structural_pass(
-        artifact=artifact,
-        artifact_path=artifact_path,
-        upstream_specs=upstream_specs,
-        step_id=step_id,
-    )
+    # --- Pass 1: Structural (nothing to count: no `trace` arrays in 1.2.0 artifacts) ---
+    structural = _empty_structural_review()
 
     semantic_pairs: list[ReviewPair] = []
 

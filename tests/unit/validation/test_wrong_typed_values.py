@@ -34,7 +34,6 @@ from specdev_tools.graph.ids import check_unique_ids
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.ownership import step_for_file
 from specdev_tools.graph.resolve import resolve_graph
-from specdev_tools.validation import _legacy_shim
 from specdev_tools.validation.graph_checks import run_graph_checks
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.spec_check import run_spec_check_json
@@ -366,10 +365,12 @@ def test_folder_readers_do_not_raise_on_a_whole_file_of_the_wrong_kind_in_the_co
 
 # --- free-form payloads: a key named like a 1.1.1 field inside a value the schema does not describe -----------
 
-_GUARDED_NAMES = sorted(
-    {name for const in vars(_legacy_shim).values() if isinstance(const, frozenset) for name in const}
-    | {"out_of_scope", "spec_ref", "critical_evidence", "trace_refs"}
-)
+# The 1.1.1 field names that the 1.2.0 schemas dropped (the keys the removed shim used to gate on, and `future`, the
+# retired parked scope).  No reader looks at them now; the test keeps the readers from reading a payload key by name.
+_GUARDED_NAMES = sorted({
+    "trace", "goal_id", "success_metric_refs", "trace_refs", "targets", "target_ids", "mitigations", "fr_refs",
+    "source_milestones", "deliverables", "future", "wont-have", "out_of_scope", "spec_ref", "critical_evidence",
+})
 # Free-form locations of the 1.2.0 schemas: fixture `input` and `expected`, API `parameters` and `errors` entries,
 # the plan item's `implementation`, a CI job's `token_permissions`, a plan's `command_overrides` and
 # `test_results[]`, the `environments{}` map of 02a.  (file, path of the object that receives the payload keys;

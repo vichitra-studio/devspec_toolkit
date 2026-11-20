@@ -141,7 +141,7 @@ class TestApiCoverageWontHaveFrExclusion:
     def test_w583_api_deriving_only_from_parked_frs_stays_exempt(self, toolkit_root):
         self._setup(
             toolkit_root,
-            [{"fr_id": "fr-legacy-export", "priority": "wont-have"},
+            [{"fr_id": "fr-legacy-export", "scope": "out"},
              {"fr_id": "fr-out", "scope": "out", "scope_reason": "dropped"}],
             [{"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]},
              {"api_id": "api-out", "derives_from": ["fr-out"]}],
@@ -159,7 +159,7 @@ class TestApiCoverageWontHaveFrExclusion:
     def test_api_deriving_from_parked_fr_and_other_id_not_exempt(self, toolkit_root):
         self._setup(
             toolkit_root,
-            [{"fr_id": "fr-parked", "priority": "wont-have"}, {"fr_id": "fr-login", "priority": "must-have"}],
+            [{"fr_id": "fr-parked", "scope": "out"}, {"fr_id": "fr-login", "priority": "must-have"}],
             [{"api_id": "api-mixed", "derives_from": ["fr-parked", "fr-login"]},
              {"api_id": "api-mixed-ids", "derives_from": ["fr-parked", "cap-x"]},
              {"api_id": "api-only-parked", "derives_from": ["fr-parked"]}],
@@ -208,7 +208,7 @@ class TestInvariantCoverageWontHaveFrExclusion:
             {"inv_id": "inv-guarded", "risk_category_ref": _SECURITY_REF, "constrains": constrains}]})
 
     def test_w615_invariant_constraining_only_parked_frs_stays_exempt(self, toolkit_root):
-        self._setup(toolkit_root, [{"fr_id": "fr-legacy-export", "priority": "wont-have"}], ["fr-legacy-export"])
+        self._setup(toolkit_root, [{"fr_id": "fr-legacy-export", "scope": "out"}], ["fr-legacy-export"])
         assert _codes(toolkit_root, {"threats": []}, "W615") == []
 
     def test_invariant_constraining_a_scope_out_fr_stays_exempt(self, toolkit_root):
@@ -220,12 +220,12 @@ class TestInvariantCoverageWontHaveFrExclusion:
         assert any("inv-guarded" in e for e in _codes(toolkit_root, {"threats": []}, "W615"))
 
     def test_invariant_constraining_a_parked_fr_and_an_api_is_not_exempt(self, toolkit_root):
-        self._setup(toolkit_root, [{"fr_id": "fr-parked", "priority": "wont-have"}], ["fr-parked", "api-x"])
+        self._setup(toolkit_root, [{"fr_id": "fr-parked", "scope": "out"}], ["fr-parked", "api-x"])
         assert any("inv-guarded" in e for e in _codes(toolkit_root, {"threats": []}, "W615"))
 
     def test_old_trace_is_not_a_fallback(self, toolkit_root):
         _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
-            {"fr_id": "fr-legacy-export", "priority": "wont-have"}]})
+            {"fr_id": "fr-legacy-export", "scope": "out"}]})
         _write_spec(toolkit_root, "06_invariants.json", {"rules": [{
             "inv_id": "inv-guarded", "risk_category_ref": _SECURITY_REF,
             "trace": [{"type": "fr", "id": "fr-legacy-export"}]}]})
@@ -253,7 +253,7 @@ class TestHostSpecSiblingResolution:
         spec.mkdir()
         (spec / "04_aaa_broken.json").write_text("{not json")
         (spec / "04_fr_list.json").write_text(json.dumps({"functional_requirements": [
-            {"fr_id": "fr-legacy-export", "priority": "wont-have"}]}))
+            {"fr_id": "fr-legacy-export", "scope": "out"}]}))
         (spec / "05_aaa_broken.json").write_text("[1, 2]")
         (spec / "05_interface_contracts.json").write_text(json.dumps({"apis": [
             {"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]}, {"api_id": "api-live"}]}))

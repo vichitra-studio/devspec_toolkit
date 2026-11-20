@@ -55,7 +55,6 @@ class ChangeRow:
     owner: str
     design: tuple[str, ...]
     tickets: tuple[str, ...]
-    shim: bool
 
 
 def _is_str_list(value: Any) -> bool:
@@ -75,8 +74,6 @@ def _row_problems(raw: Any) -> list[str]:
     if "replaced_by" not in raw or not isinstance(raw["replaced_by"], (str, type(None))):
         problems.append("replaced_by: must be a string or null")
     problems += [f"{key}: must be a list of strings" for key in _STRING_LISTS if not _is_str_list(raw.get(key))]
-    if not isinstance(raw.get("shim"), bool):
-        problems.append("shim: must be a boolean")
     return problems or _id_problems(raw)
 
 
@@ -111,7 +108,7 @@ def parse_rows(document: Any) -> tuple[list[ChangeRow], list[str]]:
         seen.add(raw["id"])
         rows.append(ChangeRow(
             raw["id"], raw["step"], raw["path"], raw["change"], raw["replaced_by"], raw["owner"],
-            tuple(raw["design"]), tuple(raw["tickets"]), raw["shim"],
+            tuple(raw["design"]), tuple(raw["tickets"]),
         ))
     return rows, problems
 
@@ -230,7 +227,7 @@ def _cell(value: str) -> str:
 def _row_line(row: ChangeRow) -> str:
     cells = [
         row.id, f"`{_cell(row.path)}`", row.change, _cell(row.replaced_by or ""),
-        ", ".join(row.tickets), "yes" if row.shim else "",
+        ", ".join(row.tickets),
     ]
     return "| " + " | ".join(cells) + " |"
 
@@ -252,15 +249,15 @@ def render_checklist(rows: Iterable[ChangeRow]) -> str:
         "",
         f"{len(rows)} changes since the 1.1.1 baseline across {len(groups)} schema groups. "
         "Each row says what happened to one path (or a glob of paths) of a schema; "
-        "`replaced_by` names where the content went, `shim` marks a removed field that forward replay leaves out when it compares the ids of the old and the new file.",
+        "`replaced_by` names where the content went.",
     ]
     for step, group in groups.items():
         lines += [
             "",
             f"## {step}",
             "",
-            "| ID | Path | Change | Replaced by | Tickets | Shim |",
-            "|---|---|---|---|---|---|",
+            "| ID | Path | Change | Replaced by | Tickets |",
+            "|---|---|---|---|---|",
             *(_row_line(r) for r in group),
         ]
     return "\n".join(lines) + "\n"

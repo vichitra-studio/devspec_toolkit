@@ -6,7 +6,6 @@ are the ones that shipped (``WIP/1.2.0/impl/INTERFACE_CHANGES.md``), not the one
 """
 from __future__ import annotations
 
-import ast
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -26,9 +25,6 @@ from unit.graph._synth import ROOT, load_doc, write_json
 from unit.trace._lock_support import run_on_example
 from unit.validation.graph_checks._example_support import context_of_spec
 
-SHIM_MODULE = ROOT / "tools" / "specdev_tools" / "validation" / "_legacy_shim.py"
-SHIM_TEST = ROOT / "tests" / "unit" / "validation" / "test_legacy_shim.py"
-SCHEMA_CHANGES = ROOT / "tools" / "schema_changes.json"
 SOURCES = ROOT / "tools" / "specdev_tools"
 M8_MODULES = (
     "context/milestone_state.py",
@@ -118,7 +114,6 @@ def test_spec_check_accepts_step_14(host: Path) -> None:
 def test_the_checklist_modules_import_under_the_named_names(host: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The hand-offs of M3 to M6b: every name the retirement bundles rely on exists, and each one runs on the example."""
     spec = str(host / "spec")
-    assert SHIM_MODULE.is_file() and SHIM_TEST.is_file()
     assert run_graph_check(spec, str(ROOT)) == []
     graph = build_graph(spec, str(ROOT))
     ctx = context_of_spec(spec, git_root=host)
@@ -137,31 +132,3 @@ def test_the_checklist_modules_import_under_the_named_names(host: Path, capsys: 
         )
         assert code in (0, 1), (command, err)
         assert "invalid choice" not in err, command
-
-
-def _importers_of_the_shim() -> set[str]:
-    """The paths under ``tools/specdev_tools`` (as ``a/b.py``) of the modules that import ``_legacy_shim``."""
-    found: set[str] = set()
-    for path in SOURCES.rglob("*.py"):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            names = [node.module or ""] if isinstance(node, ast.ImportFrom) else (
-                [alias.name for alias in node.names] if isinstance(node, ast.Import) else []
-            )
-            if any(name.split(".")[-1] == "_legacy_shim" or name.endswith("._legacy_shim") for name in names) or (
-                isinstance(node, ast.ImportFrom) and any(alias.name == "_legacy_shim" for alias in node.names)
-            ):
-                found.add(path.relative_to(SOURCES).as_posix())
-    return found
-
-
-def test_no_shim_guard_is_owned_by_m8() -> None:
-    """Every shim row and every importer of the shim retires in M4, M6a or M6c; the M8 guards are inline, tagged ``# M8 rewrites``."""
-    rows = json.loads(SCHEMA_CHANGES.read_text(encoding="utf-8"))["rows"]
-    shim_owners = {row["owner"] for row in rows if row["shim"]}
-    assert shim_owners and "M8" not in shim_owners, shim_owners
-    importers = _importers_of_the_shim()
-    assert importers, "the shim has no importer: M6c may already have deleted it"
-    assert importers.isdisjoint(M8_MODULES), importers & set(M8_MODULES)
-    assert "M8" not in SHIM_MODULE.read_text(encoding="utf-8")
-    for module in M8_MODULES:
-        assert "# M8 rewrites" in (SOURCES / module).read_text(encoding="utf-8"), module

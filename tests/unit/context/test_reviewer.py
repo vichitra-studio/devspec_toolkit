@@ -1,13 +1,8 @@
 """Unit tests for specdev_tools/context/reviewer.py.
 
-Covers the three behaviour changes introduced to fix false-positive FAIL
-verdicts when running ``context review`` on non-checklist step artifacts
-(e.g. step 06 invariants):
-
-  1. ac-* IDs excluded from upstream coverage denominator for non-checklist steps.
-  2. scope.apis / scope.components IDs counted as valid traceability references.
-  3. _check_acceptance_gap gated on _CHECKLIST_STEPS
-     (steps 16, 16a, 16b, 16c — all share vc:16-impl-context schema).
+Covers the checklist-step set, the gating of ``_check_acceptance_gap`` on it
+(steps 16a, 16b, 16c share vc:16-impl-context), the verdict rule, and that the
+structural pass reports nothing (the 1.1.1 ``trace`` arrays it counted are gone).
 """
 from __future__ import annotations
 
@@ -15,7 +10,6 @@ import pytest
 
 from specdev_tools.context.reviewer import (
     _CHECKLIST_STEPS,
-    _run_structural_pass,
     _check_acceptance_gap,
     _compute_verdict,
     review_artifact,
@@ -116,176 +110,6 @@ class TestChecklistSteps:
     def test_step_16c_in_checklist_steps(self):
         # 16c uses vc:16-impl-context and records the review verdict.
         assert "16c" in _CHECKLIST_STEPS
-
-
-# ---------------------------------------------------------------------------
-# 2. ac-* IDs excluded from coverage denominator for non-checklist steps
-# ---------------------------------------------------------------------------
-
-class TestAcIdExclusion:
-    def test_ac_ids_not_in_dropped_for_step06(self):
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        dropped = result.upstream_coverage["dropped"]
-        assert "ac-post-publish-1" not in dropped
-        assert "ac-post-publish-2" not in dropped
-
-    def test_ac_ids_do_not_inflate_denominator_for_step06(self):
-        """With 1 FR covered and 2 AC IDs excluded, dropped fraction must be 0."""
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        covered = result.upstream_coverage["covered"]
-        dropped = result.upstream_coverage["dropped"]
-        assert "fr-post-publish" in covered
-        assert dropped == []
-
-    def test_ac_ids_remain_in_dropped_for_checklist_step(self):
-        """For checklist steps (16a/16b/16c), ac-* IDs appear in dropped when not traced.
-
-        Step 16 (anchor) is intentionally NOT a checklist step post-split — its
-        exclusion from the ac-* denominator is covered by
-        test_step_16_not_in_checklist_steps.
-        """
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(
-            artifact, "spec/impl_context/ms_post_plan.json", upstream, step_id="16a",
-        )
-        dropped = result.upstream_coverage["dropped"]
-        assert "ac-post-publish-1" in dropped
-
-    def test_non_ac_ids_always_appear_in_dropped_when_untraced(self):
-        """API and component IDs not referenced in trace or scope appear in dropped."""
-        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])  # no scope.apis
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        dropped = result.upstream_coverage["dropped"]
-        assert "api-post-page" in dropped
-
-
-# ---------------------------------------------------------------------------
-# 3. scope.apis and scope.components counted as covered
-# ---------------------------------------------------------------------------
-
-class TestScopeCoverage:
-    def test_scope_apis_counted_as_covered(self):
-        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"], scope_apis=["api-post-page"])
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        covered = result.upstream_coverage["covered"]
-        dropped = result.upstream_coverage["dropped"]
-        assert "api-post-page" in covered
-        assert "api-post-page" not in dropped
-
-    def test_scope_components_counted_as_covered(self):
-        upstream = _upstream(frs=["fr-post-publish"], components=["ghost-cms"])
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"], scope_components=["ghost-cms"])
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        covered = result.upstream_coverage["covered"]
-        assert "ghost-cms" in covered
-
-    def test_scope_apis_and_components_both_covered(self):
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            apis=["api-post-page", "api-admin-post-publish"],
-            components=["ghost-cms", "headline-theme"],
-        )
-        artifact = _artifact(
-            trace_fr_ids=["fr-post-publish"],
-            scope_apis=["api-post-page", "api-admin-post-publish"],
-            scope_components=["ghost-cms", "headline-theme"],
-        )
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        covered = result.upstream_coverage["covered"]
-        assert "api-post-page" in covered
-        assert "api-admin-post-publish" in covered
-        assert "ghost-cms" in covered
-        assert "headline-theme" in covered
-        assert result.upstream_coverage["dropped"] == []
-
-    def test_scope_empty_arrays_do_not_crash(self):
-        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"], scope_apis=[], scope_components=[])
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        # api still dropped since scope.apis is empty
-        assert "api-post-page" in result.upstream_coverage["dropped"]
-
-    def test_scope_apis_as_string_is_skipped_not_iterated(self):
-        """If scope.apis is a plain string instead of an array, iterating it would
-        produce single characters ('a', 'p', 'i', ...) as IDs — each a false
-        unjustified reference.  The list guard in the scope collector must skip it."""
-        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
-        artifact = {
-            "id": "test",
-            "rules": [{
-                "inv_id": "inv-test",
-                "description": "test",
-                "language": "cel",
-                "expression": "true",
-                "scope": {
-                    # Malformed: string instead of array
-                    "apis": "api-post-page",
-                    "components": [],
-                },
-                "trace": [{"type": "fr", "id": "fr-post-publish"}],
-            }],
-        }
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        # The string should be ignored — no single-char IDs in unjustified
-        unjustified = result.reverse_trace["unjustified"]
-        assert all(len(uid) > 1 for uid in unjustified), (
-            f"Single-character IDs found in unjustified — string was iterated as chars: {unjustified}"
-        )
-        # api-post-page itself should be in dropped (string wasn't parsed as ID)
-        assert "api-post-page" in result.upstream_coverage["dropped"]
-
-    def test_scope_non_string_items_ignored(self):
-        """Non-string items in scope.apis/components must not crash the collector."""
-        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
-        artifact = {
-            "id": "test",
-            "rules": [{
-                "inv_id": "inv-test",
-                "description": "test",
-                "language": "cel",
-                "expression": "true",
-                "scope": {
-                    "apis": [None, 42, {"id": "api-post-page"}, "api-post-page"],
-                    "components": [],
-                },
-                "trace": [{"type": "fr", "id": "fr-post-publish"}],
-            }],
-        }
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        # Only the plain string "api-post-page" should be collected.
-        covered = result.upstream_coverage["covered"]
-        assert "api-post-page" in covered
-
-    def test_artifact_with_no_scope_field_does_not_crash(self):
-        upstream = _upstream(frs=["fr-post-publish"])
-        artifact = {
-            "id": "test",
-            "rules": [{
-                "inv_id": "inv-test",
-                "description": "test",
-                "language": "cel",
-                "expression": "true",
-                "trace": [{"type": "fr", "id": "fr-post-publish"}],
-            }],
-        }
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        assert "fr-post-publish" in result.upstream_coverage["covered"]
 
 
 # ---------------------------------------------------------------------------
@@ -507,108 +331,27 @@ class TestVerdict:
         )
         assert _compute_verdict(sr, []) == "PASS"
 
-    # --- Structural pass helpers ---
 
-    def test_structural_pass_zero_dropped_when_all_upstream_ids_covered(self):
-        """All FRs + APIs + components covered → dropped is empty.
-        (Verdict computation is tested separately via review_artifact.)"""
-        upstream = _upstream(
-            frs=["fr-post-publish", "fr-post-read"],
-            apis=["api-post-page"],
-            components=["ghost-cms"],
-        )
-        artifact = _artifact(
-            trace_fr_ids=["fr-post-publish", "fr-post-read"],
-            scope_apis=["api-post-page"],
-            scope_components=["ghost-cms"],
-        )
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        assert result.upstream_coverage["dropped"] == []
+# ---------------------------------------------------------------------------
+# 6. The structural pass reports nothing
+# ---------------------------------------------------------------------------
 
-    def test_verdict_fail_when_more_than_20pct_dropped(self, tmp_path):
-        """Dropped fraction > 20% → FAIL verdict from review_artifact."""
+class TestStructuralPassReportsNothing:
+    def test_artifact_with_1_1_1_trace_arrays_is_not_counted(self, tmp_path):
+        """No ``trace`` array exists in a 1.2.0 artifact, so the pass counts nothing: a 1.1.1-shaped artifact
+        that traces one of five upstream FRs gives an empty structural review and a PASS, not a FAIL."""
         import json
         spec_dir = tmp_path / "spec"
         spec_dir.mkdir()
         repo_root = tmp_path / "toolkit"
-        repo_root.mkdir()
-        (repo_root / "tools").mkdir()
-        step_order = {"downstream_consumers": {"04": ["06"]}}
-        ((repo_root / "tools") / "step_order.json").write_text(json.dumps(step_order))
-
-        # 5 FRs upstream; artifact only traces 1 → 4/5 = 80% dropped → FAIL
-        upstream_spec = {
-            "functional_requirements": [
-                {"fr_id": f"fr-req-{i}", "statement": f"Req {i}"}
-                for i in range(5)
-            ]
-        }
+        (repo_root / "tools").mkdir(parents=True)
+        (repo_root / "tools" / "step_order.json").write_text(json.dumps({"downstream_consumers": {"04": ["06"]}}))
+        upstream_spec = {"functional_requirements": [{"fr_id": f"fr-req-{i}", "statement": f"Req {i}"} for i in range(5)]}
         (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
-
-        artifact = {
-            "id": "invariants-catalog",
-            "rules": [{
-                "inv_id": "inv-one",
-                "description": "Only one fr covered",
-                "language": "cel",
-                "expression": "true",
-                "scope": {"components": [], "apis": []},
-                "trace": [{"type": "fr", "id": "fr-req-0"}],
-            }],
-        }
-        artifact_path = str(spec_dir / "06_invariants.json")
+        artifact = _artifact(trace_fr_ids=["fr-req-0"])
         (spec_dir / "06_invariants.json").write_text(json.dumps(artifact))
 
-        result = review_artifact(artifact_path, "06", str(spec_dir), str(repo_root))
-        assert result.verdict == "FAIL"
-
-
-# ---------------------------------------------------------------------------
-# 6. Edge cases and additional coverage
-# ---------------------------------------------------------------------------
-
-class TestEdgeCases:
-    def test_empty_upstream_functional_requirements(self):
-        """When upstream has no FRs, all collections are empty and dropped is []."""
-        upstream = [("spec/04_fr_list.json", {"functional_requirements": []})]
-        artifact = _artifact()  # no rules
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        assert result.upstream_coverage["covered"] == []
-        assert result.upstream_coverage["dropped"] == []
-
-    def test_scope_and_trace_same_id_not_double_counted(self):
-        """If scope.apis and a trace array both reference the same ID, the ID
-        appears exactly once in covered (set semantics prevent duplication)."""
-        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
-        # Build artifact where trace AND scope both reference api-post-page
-        artifact = {
-            "id": "test",
-            "rules": [{
-                "inv_id": "inv-test",
-                "description": "test",
-                "language": "cel",
-                "expression": "true",
-                "scope": {"apis": ["api-post-page"], "components": []},
-                "trace": [
-                    {"type": "fr", "id": "fr-post-publish"},
-                    {"type": "api", "id": "api-post-page"},
-                ],
-            }],
-        }
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        covered = result.upstream_coverage["covered"]
-        assert covered.count("api-post-page") == 1
-
-    def test_scope_reference_to_nonexistent_upstream_id_flagged_as_scope_creep(self):
-        """A scope.apis entry that has no matching upstream ID is flagged as
-        unjustified (scope creep) because artifact_trace_ids is used for the
-        reverse-trace check after scope IDs are added."""
-        upstream = _upstream(frs=["fr-post-publish"])  # no apis in upstream
-        artifact = _artifact(
-            trace_fr_ids=["fr-post-publish"],
-            scope_apis=["api-does-not-exist"],
-        )
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        assert "api-does-not-exist" in result.reverse_trace["unjustified"]
-        # scope_creep is kept in sync with unjustified
-        assert "api-does-not-exist" in result.reverse_trace["scope_creep"]
+        result = review_artifact(str(spec_dir / "06_invariants.json"), "06", str(spec_dir), str(repo_root))
+        assert result.structural.upstream_coverage == {"covered": [], "dropped": []}
+        assert result.structural.reverse_trace == {"unjustified": [], "scope_creep": []}
+        assert result.verdict != "FAIL"

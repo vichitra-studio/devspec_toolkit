@@ -3,10 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from ...core.scope_helpers import as_list, dict_items, str_items
+from ...core.scope_helpers import as_list, dict_items, is_parked, str_items
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_artifact, load_sibling_json
-from ...validation._legacy_shim import is_parked_any_shape
 
 
 def validate_step_11(
@@ -126,12 +125,13 @@ def _load_security_invariant_ids(toolkit_root: str, artifact_path: str | None = 
 
 
 def _load_parked_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
-    """Load the set of step-04 fr_ids that are parked (``is_parked_any_shape``: a 1.1.1 FR parks with
-    ``priority: wont-have``). Returns an empty set when step 04 is absent or contains no such FRs."""
+    """Load the set of step-04 fr_ids that are parked (``is_parked``).
+
+    Returns an empty set when step 04 is absent or contains no such FRs."""
     return {
         str(fr["fr_id"])
         for fr in _load_entities(toolkit_root, artifact_path, "04", "functional_requirements")
-        if fr.get("fr_id") and is_parked_any_shape(fr)
+        if fr.get("fr_id") and is_parked(fr)
     }
 
 

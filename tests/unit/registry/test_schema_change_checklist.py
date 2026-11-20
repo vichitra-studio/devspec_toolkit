@@ -98,7 +98,7 @@ def current() -> dict[str, dict[str, PathInfo]]:
 
 def _row(**fields: Any) -> dict[str, Any]:
     base = {"id": "SC-00-01", "step": "00", "path": "a", "change": "add", "replaced_by": None,
-            "owner": "M2", "design": [], "tickets": [], "shim": False}
+            "owner": "M2", "design": [], "tickets": []}
     return {**base, **fields}
 
 
@@ -123,7 +123,6 @@ def test_rows_are_well_formed_and_ids_unique() -> None:
         ({"rows": [_row(replaced_by=3)]}, "replaced_by"),
         ({"rows": [_row(design="DS L1")]}, "design"),
         ({"rows": [_row(tickets=[1])]}, "tickets"),
-        ({"rows": [_row(shim="no")]}, "shim"),
         ({"rows": [_row(path="")]}, "path"),
         ({"rows": [_row(id=7)]}, "id"),
         ({"rows": [_row(id="SC-01-01")]}, "not SC-<step>-<nn>"),
@@ -256,14 +255,23 @@ def test_render_groups_rows_by_step_and_escapes_pipes() -> None:
     parsed = parse_rows({"rows": [
         _row(id="SC-00-01", path="a|b", replaced_by="c"),
         _row(id="SC-01-01", step="01"),
-        _row(id="SC-00-02", path="z", design=["DS L1", "DS L2"], tickets=["DEVSPEC-9"], shim=True),
+        _row(id="SC-00-02", path="z", design=["DS L1", "DS L2"], tickets=["DEVSPEC-9"]),
     ]})[0]
     text = render_checklist(parsed)
     assert text.count("\n## ") == 2 and text.index("## 00") < text.index("## 01")
-    assert "| ID | Path | Change | Replaced by | Tickets | Shim |" in text
-    assert "| SC-00-01 | `a\\|b` | add | c |  |  |" in text
-    assert "| SC-00-02 | `z` | add |  | DEVSPEC-9 | yes |" in text
+    assert "| ID | Path | Change | Replaced by | Tickets |" in text
+    assert "| SC-00-01 | `a\\|b` | add | c |  |" in text
+    assert "| SC-00-02 | `z` | add |  | DEVSPEC-9 |" in text
     assert "Owner" not in text and "Design" not in text and "DS L1" not in text
+
+
+def test_rendered_checklist_has_no_shim_column() -> None:
+    """The ``shim`` column is gone from the rows and from the rendered table and its header sentence."""
+    text = render_checklist(parse_rows({"rows": [_row(), _row(id="SC-00-02", change="remove")]})[0])
+    assert "shim" not in text.lower()
+    assert "| ID | Path | Change | Replaced by | Tickets |\n|---|---|---|---|---|\n" in text
+    assert all(line.count("|") == 6 for line in text.splitlines() if line.startswith("| SC-"))
+    assert not hasattr(ChangeRow, "shim") and "shim" not in ChangeRow.__dataclass_fields__
 
 
 def test_generate_checklist_raises_naming_the_problem(tmp_path: Path) -> None:
