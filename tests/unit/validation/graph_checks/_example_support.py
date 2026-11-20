@@ -5,7 +5,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from unit.graph._synth import copy_example, load_doc, write_json
+from specdev_tools.graph.build import build_graph
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
+from unit.graph._synth import EXAMPLE_SPEC, ROOT, copy_example, load_doc, write_json
 
 Edit = Callable[[dict[str, Any]], None]
 """An edit of a spec file: a function over the parsed document."""
@@ -23,3 +25,8 @@ def edit_documents(spec: Path, **edits: Edit) -> Path:
 def edited_example(dest: Path, **edits: Edit) -> Path:
     """A copy of the worked example spec folder at *dest* with each edit applied (see ``edit_documents``); *dest*."""
     return edit_documents(copy_example(dest), **edits)
+
+
+def context_of_spec(spec: Path | str = EXAMPLE_SPEC, *, git_root: Path | str | None = None) -> GraphCheckContext:
+    """The graph check context on the spec folder *spec* (the worked example by default), with no lock and, when *git_root* is given, that host root."""
+    return GraphCheckContext.from_graph(build_graph(str(spec), str(ROOT)), None, git_root=None if git_root is None else str(git_root))

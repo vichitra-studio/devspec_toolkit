@@ -14,7 +14,7 @@ from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.term_use import check_term_use, label_matches, normalise
 from unit.graph._synth import HASH_SEEDS, ROOT, copy_example
 
-from ._example_support import Edit, edited_example
+from ._example_support import Edit, context_of_spec, edited_example
 from ._order_support import seeded
 
 GLOSSARY = "03_glossary.json"
@@ -33,7 +33,7 @@ def _fr(doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def _context(spec: Path) -> GraphCheckContext:
-    return GraphCheckContext.from_graph(build_graph(str(spec), str(ROOT)), None)
+    return context_of_spec(spec)
 
 
 def _found(spec: Path) -> list[tuple[str, str | None]]:

@@ -702,7 +702,7 @@ changes:
       step), E704 (an id defined twice). specdev coverage [--by fr] prints how many
       FRs have an API or a fixture and how many capabilities have an FR, the criteria
       that have a current refinement and the exempt nodes (not_applicable, scope later
-      or out); it prints information and exits 0 when it shows the counts and gaps, because no rule requires those links; a spec file that cannot be read is a warning on stderr and a lock that cannot be read is E760, exit 1. The coverage gaps are the findings E740, E742 and E743 of the role checks of spec-check: stale counts them under the step that owns each, coverage lists them under Role findings, and step ready counts them as blockers.
+      or out); it prints information and exits 0 when it shows the counts and unlinked ids, because no rule requires those links; a spec file that cannot be read is a warning on stderr and a lock that cannot be read is E760, exit 1. The coverage gaps are the findings E740, E742 and E743 of the role checks of spec-check: stale counts them under the step that owns each, coverage lists them under Role findings, and step ready counts them as blockers.
     migration:
       action: none
 
@@ -750,8 +750,9 @@ changes:
       it against the step's schema, requires every link to resolve and writes the lock
       entries of its links; E767 when the step already has its file, for steps 13a and 16 to 16c, for a draft that cannot be read, for a draft whose $schema is not the step's
       and for a link that does not resolve; E520 when a spec file cannot be read or a seed document is not found under the host root (also for a dry run). specdev step ready NN prints step NN: ready and exits 0 when the steps NN links
-      to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, naming the step to write
-      first (a step with no file) or to replay first; E520, exit 1, when a spec file
+      to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, ending with what to do
+      first by the blockers of the first step: write it (no file), replay it (suspect links), fix its coverage gaps (coverage gaps
+      only), or replay it and fix its coverage gaps (both); E520, exit 1, when a spec file
       cannot be read; the file of NN itself is not required. Until a later 1.2.0
       change retires step 13a, tools/step_order.json still lists it as an input of 14
       and 16a, so step ready 14 reports E773 on a spec with no 13a file.
@@ -860,7 +861,7 @@ changes:
       spec_dir before it) gates the steps of the files you list; --base-ref REF
       (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main,
       origin/master, main, master) names the base ref, and the baseline is its
-      merge-base with HEAD; --detail {summary,all} lists upstream debt, pending
+      merge-base with HEAD; --detail {summary,all} lists upstream debt, pending (owned by a later step)
       and gate-owned findings in full. The report goes to stdout and notes to
       stderr, and the exit code is 1 only when the result is BLOCKED, with
       --json too. A new error is told from an old one by the key (code, owner,
@@ -952,9 +953,27 @@ changes:
       The checks run on every spec: none is skipped because the files look
       like 1.1.1, so a spec that has not been migrated gets them too (E752
       reports its old link fields trace and targets). A child keeps its own
-      scope: an FR set to scope: later does not park its criteria. E740 tells
-      the author to set scope to later or out, with a scope_reason, only for a
-      kind whose schema has a scope field. E745 reads a threat or an edge case
+      scope: an FR set to scope: later does not park its criteria. E740 ends
+      with the ways out that exist for the kind: link it always, schedule it
+      only for a kind that a step 09 milestone's schedules is one of the ways to
+      use (a criterion, an FR, an NFR, an API, an invariant, a risk), and set
+      scope later or out with a scope_reason only for a kind whose schema has a
+      scope field. E742 ends list it in a criterion's verified_by, or remove it
+      and run specdev attest --prune; E743 asks for a fixture at step 08 that
+      verifies the node and that a task criterion lists in verified_by (for an
+      NFR, or a job at step 12 that verifies it); E744 asks for a task
+      criterion that refines the node and lists in verified_by a verifier that
+      verifies it; E747 says to route the seed and list it in derives_from of a
+      node of that step, or to remove the seed (its seeds[] entry and its
+      document, and the derives_from links to it, then specdev attest --prune);
+      E748 says to distil the seed in that step, to move the route to step 00,
+      02 or 02a when no node of the step can link a seed, to remove the route,
+      or, when it is the seed's only route, to remove the seed with it; E749
+      ends or remove the link and run specdev attest --prune (a derives_from
+      that would be left empty needs another entry). A fix that adds, changes
+      or removes a link ends with specdev attest <node> --yes for each node an
+      E761 or E763 names, and specdev attest --prune after a removed link. E752
+      does not report a node's own id. E745 reads a threat or an edge case
       through its mitigations. E752 reads nodes parked with scope: later or
       out, and the description of a task. E747 is the only finding for a seed
       that no route names; E749 is one finding for each link. scaffold-paths
@@ -1019,10 +1038,11 @@ changes:
       A spec that has only some of its steps written fails spec-check on the
       role checks until its nodes are linked, or marked scope: later or out
       with a scope_reason where the kind has that field: the worked example, which is a partial
-      spec, reports 17 E740, 5 E743 and 1 E744 and exits 1. The step gate
-      lists a finding as pending (PENDING) until the step that owns it is
+      spec, reports role findings (the counts are in docs/developers/error-codes.md) and exits 1. The step gate
+      lists a finding under PENDING (owned by a later step) until the step that owns it is
       gated, so spec-check --step 05 on the worked example now prints a
-      PENDING line, and step ready 14 on it reports E773 with the five E743
-      gaps of step 08 and step 13a as blockers.
+      PENDING line, and step ready 14 on it reports E773 with the E743
+      gaps of step 08 and step 13a as blockers, ending fix the coverage gaps
+      of step 08 first.
     migration:
       action: none

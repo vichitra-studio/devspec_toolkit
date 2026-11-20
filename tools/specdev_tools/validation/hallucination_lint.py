@@ -293,6 +293,21 @@ class SchemaResolverCtx:
             return _resolve_urn_ref(ref, self._id_index, self._ref_cache)
         return _resolve
 
+    def load_raw_schema(self, data: dict) -> dict | None:
+        """The schema file named by the ``$schema`` of *data*, as written (nothing merged), or ``None`` when *data* names none the toolkit has or the file cannot be read."""
+        schema_uri = data.get("$schema") if isinstance(data, dict) else None
+        if not isinstance(schema_uri, str) or not schema_uri:
+            return None
+        schema_path = self._id_index.get(schema_uri)
+        if not schema_path:
+            return None
+        try:
+            with open(schema_path, "r", encoding="utf-8") as f:
+                raw_schema = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+        return raw_schema if isinstance(raw_schema, dict) else None
+
     def load_file_schema(self, data: dict) -> tuple[dict, Any] | tuple[None, None]:
         """Return ``(effective_root_schema, resolve_fn)`` for *data*, or ``(None, None)``.
 
@@ -305,16 +320,8 @@ class SchemaResolverCtx:
         Falls back to ``(None, None)`` on any error so callers treat it as
         "schema unknown → fire E541 as usual."
         """
-        schema_uri = data.get("$schema") if isinstance(data, dict) else None
-        if not isinstance(schema_uri, str) or not schema_uri:
-            return None, None
-        schema_path = self._id_index.get(schema_uri)
-        if not schema_path:
-            return None, None
-        try:
-            with open(schema_path, "r", encoding="utf-8") as f:
-                raw_schema = json.load(f)
-        except (OSError, json.JSONDecodeError):
+        raw_schema = self.load_raw_schema(data)
+        if raw_schema is None:
             return None, None
         resolve_fn = self.make_resolve_fn(raw_schema)
         try:

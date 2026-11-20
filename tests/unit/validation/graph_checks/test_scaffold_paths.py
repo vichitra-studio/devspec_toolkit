@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import tempfile
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,7 +12,7 @@ import pytest
 
 from specdev_tools.validation.graph_checks import scaffold
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
-from specdev_tools.validation.graph_checks.scaffold import _scan, check_scaffold_paths, run_scaffold_paths, scaffold_rows_untracked
+from specdev_tools.validation.graph_checks.scaffold import scaffold_scan, check_scaffold_paths, run_scaffold_paths, scaffold_rows_untracked
 from unit.graph._synth import HASH_SEEDS
 
 from ._order_support import seeded
@@ -57,7 +58,7 @@ def test_a_folder_that_only_shares_the_prefix_of_an_unchecked_submodule_is_check
     host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a"})
     clone = clone_without_submodules(host, tmp_path / "clone")
     rows = {"row-in": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-near": (f"{SUBMODULE}s/none.ts", ["api-1"])}
-    scan = _scan(_context(rows, clone), None, "close")
+    scan = scaffold_scan(_context(rows, clone), None, "close")
     assert [error.node_id for error in scan.findings] == ["row-near"]
     assert len(scan.notes) == 1 and "row-in" in scan.notes[0]
 
@@ -65,7 +66,7 @@ def test_a_folder_that_only_shares_the_prefix_of_an_unchecked_submodule_is_check
 def test_uninitialised_submodule_rows_skip_not_e746(tmp_path: Path) -> None:
     host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a"})
     clone = clone_without_submodules(host, tmp_path / "clone")
-    scan = _scan(_context({"row-in": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-gone": ("src/none.ts", ["api-1"])}, clone), None, "close")
+    scan = scaffold_scan(_context({"row-in": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-gone": ("src/none.ts", ["api-1"])}, clone), None, "close")
     assert [error.node_id for error in scan.findings] == ["row-gone"]
     assert len(scan.notes) == 1 and "row-in" in scan.notes[0] and SUBMODULE in scan.notes[0]
 
@@ -75,7 +76,7 @@ def test_every_row_under_an_unchecked_submodule_skips_the_whole_check(tmp_path: 
     host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a", "b.txt": "b"})
     clone = clone_without_submodules(host, tmp_path / "clone")
     everything = _context({"row-a": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-b": (f"{SUBMODULE}/b.txt", ["api-1"])}, clone, built=["api-1"])
-    scan = _scan(everything, None, "merge")
+    scan = scaffold_scan(everything, None, "merge")
     assert scan.findings == [] and len(scan.notes) == 2
     assert scan.skip_reason is not None and SUBMODULE in scan.skip_reason and "every scaffold row" in scan.skip_reason
     with patch.object(GraphCheckContext, "from_registry", return_value=everything):
@@ -83,17 +84,37 @@ def test_every_row_under_an_unchecked_submodule_skips_the_whole_check(tmp_path: 
     assert result["status"] == "SKIP" and result["reason"] == scan.skip_reason
 
     some = _context({"row-a": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-h": ("h.txt", ["api-1"])}, clone, built=["api-1"])
-    scan = _scan(some, None, "merge")
+    scan = scaffold_scan(some, None, "merge")
     assert scan.skip_reason is None and len(scan.notes) == 1
     with patch.object(GraphCheckContext, "from_registry", return_value=some):
         assert run_scaffold_paths(object())["status"] == "PASS"  # type: ignore[arg-type]
+
+
+def test_the_note_of_rows_under_an_unchecked_submodule_is_left_out_of_a_quiet_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a"})
+    clone = clone_without_submodules(host, tmp_path / "clone")
+    rows = {"row-a": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-h": ("h.txt", ["api-1"])}
+    for quiet, noted in ((False, True), (True, False)):
+        context = replace(_context(rows, clone, built=["api-1"]), quiet=quiet)
+        with patch.object(GraphCheckContext, "from_registry", return_value=context):
+            assert run_scaffold_paths(object())["status"] == "PASS"  # type: ignore[arg-type]
+        assert ("is under submodule" in capsys.readouterr().err) is noted
+
+
+def test_the_scan_tells_clean_from_could_not_check(repo: Path) -> None:
+    """A gate that reads only the findings cannot: no host root gives no findings and a skip reason, a clean repository gives no findings and none."""
+    rows = {"row-a": ("src/a.ts", ["api-1"])}
+    unreadable = scaffold_scan(_context(rows, None), None, "close")
+    assert unreadable.findings == [] and unreadable.skip_reason is not None
+    clean = scaffold_scan(_context(rows, repo), None, "close")
+    assert clean.findings == [] and clean.skip_reason is None
 
 
 def test_non_git_host_skips(tmp_path: Path) -> None:
     plain = tmp_path / "plain"
     plain.mkdir()
     for root in (plain, None):
-        scan = _scan(_context({"row-a": ("src/a.ts", ["api-1"])}, root), None, "close")
+        scan = scaffold_scan(_context({"row-a": ("src/a.ts", ["api-1"])}, root), None, "close")
         assert scan.findings == [] and scan.skip_reason
 
 

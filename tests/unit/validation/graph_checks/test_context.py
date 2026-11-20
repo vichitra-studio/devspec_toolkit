@@ -32,6 +32,7 @@ from unit.graph._synth import EXAMPLE_SPEC, ROOT
 from unit.trace._lock_support import git_copy_of_example
 
 from ._bindings_support import Bindings
+from ._example_support import context_of_spec
 from ._built_support import closed_milestone, context_of, graph_of, spec
 from ._built_support import node as make_node
 
@@ -59,7 +60,7 @@ def _context(*nodes: Node) -> GraphCheckContext:
 
 @pytest.fixture(scope="module")
 def example() -> GraphCheckContext:
-    return GraphCheckContext.from_graph(build_graph(str(EXAMPLE_SPEC), str(ROOT)), None)
+    return context_of_spec(EXAMPLE_SPEC)
 
 
 @pytest.mark.parametrize(
@@ -269,3 +270,33 @@ def test_a_later_binding_of_the_same_seam_wins_until_it_is_removed() -> None:
     assert _context(node).pin_matches(node) == "MISMATCH"
     restore_second()
     assert _context(node).pin_matches(node) == "UNKNOWN"
+
+
+def test_the_later_binding_wins_while_both_are_in_place_and_the_earlier_one_is_back_when_it_is_removed(bindings: Bindings) -> None:
+    node = _node("tp-1", kind="third-party", step="04")
+    bindings.seams(pin_matches=lambda _node: "OK")
+    restore_second = bindings.seams(pin_matches=lambda _node: "MISMATCH")
+    assert _context(node).pin_matches(node) == "MISMATCH"
+    restore_second()
+    assert _context(node).pin_matches(node) == "OK"
+
+
+def _seedless_context(tmp_path: Path, *, quiet: bool) -> GraphCheckContext:
+    """A context on the example whose host root holds none of the seed documents."""
+    context = context_of_spec(EXAMPLE_SPEC, git_root=tmp_path)
+    return replace(context, quiet=quiet)
+
+
+def test_a_missing_seed_document_is_noted_on_stderr_unless_the_run_is_quiet(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _seedless_context(tmp_path, quiet=False).seed_texts == {}
+    assert "seed documents not found under" in capsys.readouterr().err
+    assert _seedless_context(tmp_path, quiet=True).seed_texts == {}
+    assert capsys.readouterr().err == ""
+
+
+def test_a_context_built_from_a_graph_alone_finds_the_toolkit_from_any_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``role_gaps`` builds its context this way, and ``stale`` runs in a host folder, not in the toolkit."""
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    monkeypatch.chdir(tmp_path)
+    context = GraphCheckContext.from_graph(graph, None)
+    assert Path(context.repo_root).resolve() == ROOT.resolve() and context.owner_context.furthest_step

@@ -162,8 +162,10 @@ def test_every_dangling_node_has_its_left_out_part_named(example_checks: dict[st
     assert all(part.strip() for _owner, part in DANGLING.values())
     findings = {f["node_id"]: f["message"] for f in example_checks["no-dangling"]["findings"]}
     assert set(findings) == set(DANGLING)
-    assert all(" is not used by any node" in message and "link it, schedule it" in message for message in findings.values())
-    assert findings["metric-reset-completion-rate"].endswith("link it, schedule it")
+    assert all(" is not used by any node" in message and "link it" in message for message in findings.values())
+    schedulable = {"ac-password-reset-1", "ac-password-reset-2", "ac-password-reset-request-1", "ac-password-reset-request-2", "fr-password-reset-request", NFR}
+    assert {node_id for node_id, message in findings.items() if "schedule it" in message} == schedulable
+    assert findings["metric-reset-completion-rate"].endswith("link it")
     assert all(message.endswith("or set scope later or out with a scope_reason") for node_id, message in findings.items() if node_id != "metric-reset-completion-rate")
 
 
@@ -339,3 +341,12 @@ def test_delta_ops_set_and_remove_change_exactly_the_path_they_name(tmp_path: Pa
     for bad in (["jobs", 5, "name"], ["jobs", "name"], ["nothing", "x"]):
         with pytest.raises(DeltaError):
             _apply_op(host, {"op": "remove", "file": "spec/12_ci_gates.json", "path": bad}, "spec")
+
+
+def test_the_example_design_milestone_is_realised_through_containment(example_checks: dict[str, Any]) -> None:
+    """The 09 milestone schedules ``fr-password-reset``; the 14 criteria refine a criterion of it: it is computed, not unrealised (ruling R17)."""
+    from specdev_tools.validation.graph_checks.design_milestones import matching_milestones, unrealised_design_milestones
+
+    context = GraphCheckContext.from_graph(build_graph(str(ROOT / "tests/fixtures/graph_example/spec"), str(ROOT)), None, str(ROOT))
+    assert [design.id for design, _roadmap in matching_milestones(context)] == ["milestone-account-recovery"]
+    assert unrealised_design_milestones(context) == []

@@ -4,6 +4,8 @@ A check module imports its vocabulary from here, never from another check's modu
 """
 from __future__ import annotations
 
+from typing import Final
+
 from specdev_tools.graph.model import Graph, Node
 
 # link verbs
@@ -12,15 +14,29 @@ VERIFIED_BY = "verified_by"
 VERIFIES = "verifies"
 REALISES = "realises"
 DERIVES_FROM = "derives_from"
+CONSTRAINS = "constrains"
+PROVIDED_BY = "provided_by"
+REMOVES = "removes"
+SCHEDULES = "schedules"
 
 # kinds
 API = "api"
 COMPONENT = "component"
+CAPABILITY = "capability"
+CONNECTION = "connection"
+CONSTRAINT = "constraint"
+CRITERION = "criterion"
+DESIGN_MILESTONE = "design-milestone"
+THIRD_PARTY = "third-party"
 TASK_CRITERION = "task-criterion"
+ROADMAP_MILESTONE = "roadmap-milestone"
 SCAFFOLD_ROW = "scaffold-row"
 FIXTURE = "fixture"
 JOB = "job"
 RULE = "rule"
+
+# modes
+MERGE: Final = "merge"
 
 # roles
 VERIFIER_ROLE = "verifier"

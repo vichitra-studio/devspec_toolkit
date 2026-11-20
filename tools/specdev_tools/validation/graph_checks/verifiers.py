@@ -20,9 +20,8 @@ from specdev_tools.graph.model import Graph, Node
 
 from .codes import MISSING_VERIFIER, UNUSED_VERIFIER
 from .context import GraphCheckContext, Mode
-from .names import FIXTURE, REALISES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
+from .names import FIXTURE, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
 
-REMOVES = "removes"
 
 
 def _verifiers(ctx: GraphCheckContext) -> list[Node]:
@@ -78,13 +77,18 @@ def missing_verifiers(ctx: GraphCheckContext) -> list[Node]:
 
 
 def _fixes(graph: Graph, kind: str) -> str:
-    """The fixes that clear E743 for a node of *kind*: each verifier kind whose ``verifies`` accepts it, with its step."""
+    """The fixes that clear E743 for a node of *kind*: each verifier kind whose ``verifies`` accepts it, with its step.
+
+    A fixture is used only when a task criterion lists it in ``verified_by`` (E742), so its fix says so; a job that
+    ``verifies`` a node is used by that.
+    """
     options = []
     for decl in graph.decls.values():
         if decl.role == VERIFIER_ROLE and any(link.field == VERIFIES and link.accepts(kind) for link in decl.links):
             steps = graph.shape.kind_steps.get(decl.kind, ())
-            options.append(f"a {decl.kind} at step {'/'.join(steps)}" if steps else f"a {decl.kind}")
-    return " or ".join(options)
+            where = f"a {decl.kind} at step {'/'.join(steps)}" if steps else f"a {decl.kind}"
+            options.append(f"{where} that verifies it" + (" and that a task criterion lists in verified_by" if decl.kind == FIXTURE else ""))
+    return ", or ".join(options)
 
 
 def check_verifier_rules(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
@@ -94,14 +98,14 @@ def check_verifier_rules(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
             UNUSED_VERIFIER, verifier,
             f"{verifier.kind} {verifier.id} is not used: no task criterion lists it in verified_by"
             + ("" if verifier.kind == FIXTURE else ", and it neither realises nor verifies a node")
-            + "; list it in a criterion's verified_by or remove it",
+            + "; list it in a criterion's verified_by, or remove it and run specdev attest --prune",
         )
         for verifier in _verifiers(ctx) if not _is_used(ctx, verifier)
     ]
     missing = [
         ctx.finding(
             MISSING_VERIFIER, node,
-            f"{node.kind} {node.id} has no verifier: add {_fixes(ctx.graph, node.kind)} that verifies it",
+            f"{node.kind} {node.id} has no verifier: add {_fixes(ctx.graph, node.kind)}",
         )
         for node in missing_verifiers(ctx)
     ]

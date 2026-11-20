@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from specdev_tools.validation.graph_checks.scaffold import _scan, scaffold_rows_untracked
+from specdev_tools.validation.graph_checks.scaffold import scaffold_scan, scaffold_rows_untracked
 from unit.validation.graph_checks._git_support import SUBMODULE, clone_without_submodules, make_host_with_submodule
 from unit.validation.graph_checks._scaffold_support import scaffold_context
 
@@ -30,6 +30,6 @@ def test_submodule_layout_tracked_untracked_uninitialised_and_merge_filter(tmp_p
     assert _flagged(context, "merge") == ["row-host-untracked", "row-theme-untracked"]
 
     clone = clone_without_submodules(host, tmp_path / "clone")
-    scan = _scan(scaffold_context(ROWS, clone, built=["api-1"]), None, "close")
+    scan = scaffold_scan(scaffold_context(ROWS, clone, built=["api-1"]), None, "close")
     assert [error.node_id for error in scan.findings] == ["row-host-untracked", "row-unbuilt-api"]
     assert len(scan.notes) == 2 and all(SUBMODULE in note for note in scan.notes)

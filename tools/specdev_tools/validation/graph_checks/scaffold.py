@@ -7,7 +7,7 @@ submodule the whole check skips with that reason.  Without git or outside a repo
 reason.
 
 ``merge`` checks a row only when one of the APIs it ``realises`` is built (a built API needs its file); ``close`` and
-``release`` check every row.  ``scaffold_rows_untracked`` is the single rule the close and release gates call.
+``release`` check every row.  ``scaffold_scan`` is the whole outcome (findings, notes, skip reason); ``scaffold_rows_untracked`` is its findings.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from specdev_tools.validation.check_registry import CheckContext
 from .built import BuiltState, compute_built
 from .codes import SCAFFOLD_PATH_NOT_TRACKED
 from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
-from .names import REALISES, SCAFFOLD_ROW, link_targets
+from .names import MERGE, REALISES, SCAFFOLD_ROW, link_targets
 
 PATH_FIELD = "path"
 GITLINK_MODE = "160000"
@@ -89,7 +89,7 @@ def _row_path(ctx: GraphCheckContext, row: Node) -> str | None:
 def _rows_to_check(ctx: GraphCheckContext, api_ids: Collection[str] | None, mode: Mode) -> list[Node]:
     """The scaffold rows in play, those that realise one of *api_ids* when given, and in merge mode only those with a built API."""
     wanted = None if api_ids is None else {ctx.graph.canonical_id(name) for name in api_ids}
-    built = compute_built(ctx) if mode == "merge" else {}
+    built = compute_built(ctx) if mode == MERGE else {}
     rows = []
     for row in ctx.in_play_nodes():
         if row.kind != SCAFFOLD_ROW:
@@ -97,13 +97,17 @@ def _rows_to_check(ctx: GraphCheckContext, api_ids: Collection[str] | None, mode
         apis = link_targets(ctx.graph, row, REALISES)
         if wanted is not None and not wanted.intersection(apis):
             continue
-        if mode == "merge" and not any(built.get(api) is not None and built[api].state is BuiltState.BUILT for api in apis):
+        if mode == MERGE and not any(built.get(api) is not None and built[api].state is BuiltState.BUILT for api in apis):
             continue
         rows.append(row)
     return rows
 
 
-def _scan(ctx: GraphCheckContext, api_ids: Collection[str] | None, mode: Mode) -> ScaffoldScan:
+def scaffold_scan(ctx: GraphCheckContext, api_ids: Collection[str] | None, mode: Mode) -> ScaffoldScan:
+    """The whole outcome of the scaffold check: the findings, the notes of rows under a submodule that is not checked out, and ``skip_reason`` when the check could not run.
+
+    A gate that must know "every row is tracked" reads this: an empty ``findings`` with a ``skip_reason`` is "could not check" (no host root, no git, every row under an absent submodule), not "clean".
+    """
     if ctx.git_root is None:
         return ScaffoldScan(skip_reason=NO_HOST_ROOT)
     try:
@@ -135,9 +139,9 @@ def scaffold_rows_untracked(ctx: GraphCheckContext, api_ids: Collection[str] | N
     """E746 for each scaffold row in play whose path is not a tracked file, in step then id order.
 
     Only rows that realise one of *api_ids* are read when it is given; in ``merge`` mode only rows with a built API.
-    Empty when git cannot be read (the registered check reports that as a skip).
+    Empty when git cannot be read, and then also when it is clean: a gate that must tell the two apart calls ``scaffold_scan`` and reads ``skip_reason``.
     """
-    return _scan(ctx, api_ids, mode).findings
+    return scaffold_scan(ctx, api_ids, mode).findings
 
 
 def check_scaffold_paths(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
@@ -150,7 +154,7 @@ def run_scaffold_paths(ctx: CheckContext) -> dict[str, Any]:
     gctx = GraphCheckContext.from_registry(ctx)
     if gctx is None:
         return check_registry.skip(GRAPH_NOT_BUILT)
-    scan = _scan(gctx, None, "merge")
+    scan = scaffold_scan(gctx, None, MERGE)
     if scan.skip_reason is not None:
         return check_registry.skip(scan.skip_reason)
     if not gctx.quiet:

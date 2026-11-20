@@ -6,12 +6,12 @@ from dataclasses import replace
 import pytest
 
 from specdev_tools.core.errors import link_target
-from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.model import Node
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.cross_cutting import check_cross_cutting
-from unit.graph._synth import EXAMPLE_SPEC, HASH_SEEDS, ROOT
+from unit.graph._synth import EXAMPLE_SPEC, HASH_SEEDS
 
+from ._example_support import context_of_spec
 from ._order_support import seeded
 from ._built_support import closed_milestone, node, spec
 
@@ -125,7 +125,7 @@ def test_e744_finding_carries_task_node_id_and_refines_target() -> None:
 
 
 def test_graph_example_gives_exactly_one_e744() -> None:
-    context = GraphCheckContext.from_graph(build_graph(str(EXAMPLE_SPEC), str(ROOT)), None)
+    context = context_of_spec(EXAMPLE_SPEC)
     assert _e744(context) == [_gap("task-implement-password-reset-confirm", "nfr-latency-reset-email")]
 
 
@@ -139,3 +139,9 @@ def test_cross_cutting_reports_in_the_same_order_whatever_the_hash_seed(seed: in
     expected = _scenario(False)
     assert len(expected) == 4
     assert seeded(seed, __name__, "_scenario", True) == expected
+
+
+def test_the_message_says_the_criterion_needs_a_verifier_of_the_obligation() -> None:
+    """A criterion that refines an obligation and lists none that verifies it starts E745: the advice names both."""
+    (error,) = check_cross_cutting(spec(*_devspec_288()), "merge")
+    assert error.message.endswith(f"add a task criterion that refines {NFR} and lists in verified_by a verifier that verifies it")

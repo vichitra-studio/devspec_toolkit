@@ -26,7 +26,7 @@ from specdev_tools.trace.lockfile import Lock
 from specdev_tools.validation import check_registry
 from specdev_tools.validation.check_registry import CheckContext, CheckFn
 
-from .names import VERIFIER_ROLE
+from .names import MERGE, VERIFIER_ROLE
 from .schema_slots import SchemaSlots
 from .use_table import furthest_steps
 
@@ -104,14 +104,14 @@ def merge_check(rule: Callable[[GraphCheckContext, Mode], list[SpecError]]) -> C
         graph_ctx = GraphCheckContext.from_registry(ctx)
         if graph_ctx is None:
             return check_registry.skip(GRAPH_NOT_BUILT)
-        return check_registry.check_result(rule(graph_ctx, "merge"))
+        return check_registry.check_result(rule(graph_ctx, MERGE))
 
     return run
 
 
 @dataclass(eq=False)
 class GraphCheckContext:
-    """The graph, the lock and the helpers every graph check shares, built once per run.
+    """The graph, the lock and the helpers every graph check shares, built once for each registered check of a run (``merge_check``), not once per run.
 
     ``git_root`` is the host repository root and ``spec_root`` the spec folder; both are ``None`` for a context built
     from a graph alone, which has no seed texts.  ``owner_context`` carries the furthest step that can use each kind.

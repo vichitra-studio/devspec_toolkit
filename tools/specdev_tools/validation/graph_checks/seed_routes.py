@@ -1,7 +1,7 @@
 """The seed route checks (E747, E748, E749): the seed manifest routes each seed to the steps that distil it, and the graph shows the distillation.
 
 E747: a seed listed in ``seeds[]`` that no ``step_requirements`` entry routes (owner step 00).
-E748: a route ``(seed, step N)`` that no node of step N backs with a ``derives_from`` link to the seed (owner step N).
+E748: a route ``(seed, step N)`` that no node of step N backs with a ``derives_from`` link to the seed (owner step N).  When it is the seed's only route, removing it alone would start E747, so the message says to remove the seed with it.
 E749: a ``derives_from`` link to a seed that is routed to some step but not to the step of the node that holds the link (owner: the holder's step).
 A seed no entry routes anywhere is E747 alone: one fault, one finding.
 
@@ -11,6 +11,7 @@ value that is not a list is the schema's: neither is reported here.
 """
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.core.schema_validate import jq_path_of
@@ -64,37 +65,75 @@ def _used_routes(ctx: GraphCheckContext) -> set[tuple[str, str]]:
     }
 
 
+def _linking_steps(ctx: GraphCheckContext) -> dict[str, list[str]]:
+    """For each seed, the steps of the in-play nodes that list it in ``derives_from``, in step order."""
+    steps: dict[str, set[str]] = {}
+    for node in ctx.in_play_nodes():
+        if node.step is not None:
+            for _target, seed in _seed_links(ctx.graph, node):
+                steps.setdefault(seed.id, set()).add(node.step)
+    return {seed: sorted(found, key=ctx.graph.shape.step_key) for seed, found in steps.items()}
+
+
+def _unrouted_message(seed: str, linking: list[str]) -> str:
+    """E747 with the way out that clears it: route the seed where a node already lists it, or (no node does) route it and have a node list it; or remove the seed with what refers to it."""
+    head = f"seed {seed} is listed in the seed manifest but no step_requirements entry routes it to a step; "
+    if linking:
+        steps = f"step {linking[0]}" if len(linking) == 1 else f"steps {', '.join(linking)}"
+        return (
+            f"{head}route it to {steps} (where a node lists it in derives_from), or remove the seed (its seeds[] entry and its document) "
+            f"and the derives_from links to it, then run specdev attest --prune"
+        )
+    return f"{head}route it to the step that distils it and list it in derives_from of a node of that step, or remove the seed (its seeds[] entry and its document)"
+
+
 def _unrouted_seeds(ctx: GraphCheckContext, routes: Routes) -> list[SpecError]:
     routed = {seed for seeds in routes.values() for seed in seeds}
+    linking = _linking_steps(ctx)
     findings = []
     for seed in sorted((node for node in ctx.graph.by_kind.get(SEED_KIND, ()) if ctx.in_play(node)), key=ctx.graph.shape.order_key):
         if seed.id in routed:
             continue
-        message = f"seed {seed.id} is listed in the seed manifest but no step_requirements entry routes it to a step; route it to the step that distils it, or remove it"
-        findings.append(ctx.finding(SEED_NOT_ROUTED, seed, message, file=SEED_MANIFEST_PATH))
+        findings.append(ctx.finding(SEED_NOT_ROUTED, seed, _unrouted_message(seed.id, linking.get(seed.id, [])), file=SEED_MANIFEST_PATH))
     return findings
 
 
-def _unused_message(seed: str, step: str, linkable: set[str]) -> str:
+def _unused_message(seed: str, step: str, linkable: set[str], only_route: bool) -> str:
+    """E748: why the route is unused and the ways out that clear it.
+
+    When no node of the step can link a seed (a trinity key, or a step none of whose kinds links one), distilling it
+    there cannot be done: the route moves to a step that can.  When it is the seed's only route, removing it alone
+    would start E747, so the seed goes with it.
+    """
     where = f"step {step}"
+    can_distil = step in linkable and step not in TRINITY_KEYS
     if step in TRINITY_KEYS:
         reason = f"the trinity key {step} cannot be used: no node of the trinity steps links a seed"
     elif step not in linkable:
         reason = f"no node kind of step {step} can link a seed (only the kinds of steps {', '.join(sorted(linkable))} can)"
     else:
         reason = f"no node of {where} lists {seed} in derives_from"
-    return f"the seed manifest routes {seed} to {where} but {reason}; distil the seed in that step, or remove the route"
+    remove = (
+        "remove the seed from the manifest (its seeds[] entry, this route and its document), as this is its only route and a seed with no route is E747"
+        if only_route else "remove the route"
+    )
+    if can_distil:
+        advice = f"distil the seed in that step (a node of {where} lists {seed} in derives_from), or {remove}"
+    else:
+        advice = f"move the route to a step whose nodes can link a seed ({', '.join(sorted(linkable))}) and list {seed} in derives_from of a node there, or {remove}"
+    return f"the seed manifest routes {seed} to {where} but {reason}; {advice}"
 
 
 def _unused_routes(ctx: GraphCheckContext, routes: Routes) -> list[SpecError]:
     used, linkable = _used_routes(ctx), _linkable_steps(ctx.graph)
     seed_nodes = {node.id: node for node in ctx.graph.by_kind.get(SEED_KIND, ())}
     findings = []
+    routed_steps = Counter(seed for seeds in routes.values() for seed in set(seeds))
     for step in sorted((key for key in routes if key in ctx.graph.shape.step_ranks), key=ctx.graph.shape.step_key):
         for seed in dict.fromkeys(routes[step]):
             if seed in seed_nodes and (seed, step) not in used:
                 findings.append(ctx.finding(
-                    SEED_ROUTE_UNUSED, seed_nodes[seed], _unused_message(seed, step, linkable), owner=f"{STEP_PREFIX}{step}", route=(seed, step),
+                    SEED_ROUTE_UNUSED, seed_nodes[seed], _unused_message(seed, step, linkable, routed_steps[seed] == 1), owner=f"{STEP_PREFIX}{step}", route=(seed, step),
                     file=SEED_MANIFEST_PATH, jq_path=jq_path_of((STEP_REQUIREMENTS, step)),
                 ))
     return findings
@@ -111,7 +150,7 @@ def _links_to_unrouted_seeds(ctx: GraphCheckContext, routes: Routes) -> list[Spe
         for target, seed in _seed_links(ctx.graph, holder):
             if seed.id in routed or seed.id not in routed_anywhere:
                 continue
-            message = f"{holder.id} derives from seed {seed.id}, which the seed manifest does not route to step {holder.step}; add {seed.id} to step_requirements[\"{holder.step}\"] or remove the link"
+            message = f"{holder.id} derives from seed {seed.id}, which the seed manifest does not route to step {holder.step}; add {seed.id} to step_requirements[\"{holder.step}\"], or remove the link and run specdev attest --prune (a derives_from that would be left empty needs another entry)"
             findings.append(ctx.finding(SEED_LINK_NOT_ROUTED, holder, message, target=link_target(DERIVES_FROM, target), route=(seed.id, holder.step)))
     return findings
 

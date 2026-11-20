@@ -13,7 +13,7 @@ from specdev_tools.graph.model import NOT_APPLICABLE, Node
 
 from .codes import NODE_DANGLING
 from .context import GraphCheckContext, Mode
-from .names import SCAFFOLD_ROW, VERIFIER_ROLE
+from .names import DESIGN_MILESTONE, SCAFFOLD_ROW, SCHEDULES, VERIFIER_ROLE
 from .use_table import Use, step_of, use_pairs
 
 CHECKED_ROLES = frozenset({"obligation-system", "obligation-delivery", "context"})
@@ -24,7 +24,10 @@ MAX_LISTED_USES = 5
 
 
 def _counts_as_holder(ctx: GraphCheckContext, holder: Node) -> bool:
-    """Whether a link held by *holder* can be a use: it is not ``not_applicable``, not ``scope: out`` (``later`` counts) and not a verifier whose bindings are all retired."""
+    """Whether a link held by *holder* can be a use: it is not ``not_applicable``, not ``scope: out`` (``later`` counts) and not a verifier whose bindings are all retired.
+
+    A different rule from ``GraphCheckContext.in_play`` on purpose: a holder parked with ``later`` is still a use of what it links.
+    """
     if holder.lifecycle == NOT_APPLICABLE or holder.scope == SCOPE_OUT:
         return False
     return not (holder.role == VERIFIER_ROLE and ctx.retired_bindings(holder))
@@ -82,6 +85,15 @@ def _what_would_use(ctx: GraphCheckContext, pairs: frozenset[Use]) -> str:
     return ", ".join(listed) + (f" and {more} more" if more > 0 else "")
 
 
+def _advice(ctx: GraphCheckContext, node: Node, pairs: frozenset[Use]) -> str:
+    """The ways out of E740 that exist for the kind of *node*: always the link; scheduling only where a step-09 milestone's ``schedules`` is one of the ways to use the kind (*pairs*, which read the registry's link declarations: ``schedules`` refuses a metric, a secret, a threat, a rule, an API error and an edge case, and the use table gives an environment no such way); parking only where its schema has a ``scope`` field."""
+    schedule = Use(DESIGN_MILESTONE, SCHEDULES) in pairs
+    park = ctx.slots.has_property(ctx.graph, node, SCOPE)
+    if park:
+        return "link it, schedule it, or set scope later or out with a scope_reason" if schedule else "link it, or set scope later or out with a scope_reason"
+    return "link it, schedule it" if schedule else "link it"
+
+
 def _is_checked(node: Node, search: _UseSearch) -> bool:
     return node.role in CHECKED_ROLES and node.kind != SCAFFOLD_ROW and bool(search.pairs(node.kind))
 
@@ -95,10 +107,9 @@ def check_no_dangling(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
     findings: list[SpecError] = []
     for node in ctx.in_play_nodes():
         if _is_checked(node, search) and not search.is_used(node):
-            parking = ", or set scope later or out with a scope_reason" if ctx.slots.has_property(ctx.graph, node, SCOPE) else ""
             message = (
                 f"{node.kind} {node.id} is not used by any node; a node of this kind is used by {_what_would_use(ctx, search.pairs(node.kind))}: "
-                f"link it, schedule it{parking}"
+                f"{_advice(ctx, node, search.pairs(node.kind))}"
             )
             findings.append(ctx.finding(NODE_DANGLING, node, message))
     return findings

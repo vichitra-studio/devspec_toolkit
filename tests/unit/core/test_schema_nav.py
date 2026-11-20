@@ -729,3 +729,40 @@ def test_schema_ref_sibling_census():
     allowed = {"description", "default", "items", "minItems", "maxItems"}
     offenders = {siblings: n for siblings, n in counts.items() if not set(siblings) <= allowed}
     assert offenders == {}
+
+
+# ---------------------------------------------------------------------------
+# child_schema: the schema of one member of an already effective node
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402
+
+from specdev_tools.core.schema_nav import child_schema  # noqa: E402
+
+_NODE: dict[str, Any] = {
+    "properties": {"name": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string", "enum": ["a"]}}, "flag": True},
+    "patternProperties": {"^x-": {"type": "integer"}, "(": {"type": "boolean"}},
+    "additionalProperties": {"type": "number"},
+    "items": {"type": "object"},
+}
+
+
+@pytest.mark.parametrize(
+    ("step", "additional", "expected"),
+    [
+        ("name", False, {"type": "string"}),
+        (0, False, {"type": "object"}),
+        ("x-extra", False, {"type": "integer"}),
+        ("other", False, None),
+        ("other", True, {"type": "number"}),
+        ("flag", True, None),
+    ],
+)
+def test_child_schema_reads_property_index_pattern_and_additional(step: str | int, additional: bool, expected: dict[str, Any] | None) -> None:
+    """A property wins over a pattern, an index reads ``items``, a pattern matches by search, ``additionalProperties`` only on request, and a boolean schema is no schema."""
+    assert child_schema(_NODE, step, additional=additional) == expected
+
+
+def test_child_schema_treats_a_pattern_that_is_not_a_regular_expression_as_matching_nothing() -> None:
+    assert child_schema({"patternProperties": {"(": {"type": "boolean"}}}, "(") is None
+    assert child_schema({}, "anything", additional=True) is None

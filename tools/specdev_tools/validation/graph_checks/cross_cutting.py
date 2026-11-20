@@ -11,14 +11,10 @@ from specdev_tools.graph.model import Graph, Node
 
 from .codes import CROSS_CUTTING_NOT_REFINED
 from .context import GraphCheckContext, Mode
-from .names import API, COMPONENT, DERIVES_FROM, REFINES, link_targets
+from .names import API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINS, CRITERION, DERIVES_FROM, PROVIDED_BY, REFINES, link_targets
 
-CONSTRAINS = "constrains"
 TASK = "task"
-CAPABILITY = "capability"
 FR = "fr"
-CRITERION = "criterion"
-PROVIDED_BY = "provided_by"
 
 
 def _linked(graph: Graph, node: Node, field: str, *kinds: str) -> list[Node]:
@@ -44,7 +40,7 @@ def lineage(graph: Graph, node: Node) -> set[str]:
         return _lineage_of(graph, _linked(graph, node, DERIVES_FROM, FR)) | {target.id for target in _linked(graph, node, PROVIDED_BY, COMPONENT)}
     if kind == "api-error":
         return _lineage_of(graph, _linked(graph, node, DERIVES_FROM, CRITERION))
-    if kind == "connection":
+    if kind == CONNECTION:
         return {target.id for target in _linked(graph, node, DERIVES_FROM, COMPONENT)}
     if _constrains(node):
         return _lineage_of(graph, [graph.by_id[target] for target in link_targets(graph, node, CONSTRAINS) if target in graph.by_id])
@@ -87,7 +83,7 @@ def check_cross_cutting(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
             if shared and obligation.id not in refined:
                 message = (
                     f"task {task.id} falls under {obligation.id} through {', '.join(sorted(shared))} "
-                    f"but no criterion of the task refines it; add a task criterion that refines {obligation.id}"
+                    f"but no criterion of the task refines it; add a task criterion that refines {obligation.id} and lists in verified_by a verifier that verifies it"
                 )
                 findings.append(ctx.finding(CROSS_CUTTING_NOT_REFINED, task, message, target=link_target(REFINES, obligation.id)))
     return findings

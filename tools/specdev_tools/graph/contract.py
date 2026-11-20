@@ -45,28 +45,34 @@ def _normalise_value(value: Any) -> Any:
     return value
 
 
-def value_at(document: Mapping[str, Any], jq_path: str) -> Any:
-    """The value at the jq-style *jq_path* (``.milestones[0].tasks[2]``, ``.environments["prod"]``) of *document*.
-
-    Returns ``None`` when the path leads nowhere (a JSON ``null`` gives ``None`` too); never raises.
-    """
-    current: Any = document
+def path_steps(jq_path: str) -> list[str | int] | None:
+    """The object keys (strings) and array indexes (ints) of the jq-style *jq_path*, in order; ``None`` when the path is not made only of steps."""
+    steps: list[str | int] = []
     position = 0
     while position < len(jq_path):
         step = PATH_STEP.match(jq_path, position)
         if step is None:
             return None
         name, index, quoted = step.groups()
+        steps.append(name if name is not None else int(index) if index is not None else json.loads(quoted))
+        position = step.end()
+    return steps
+
+
+def value_at(document: Mapping[str, Any], jq_path: str) -> Any:
+    """The value at the jq-style *jq_path* (``.milestones[0].tasks[2]``, ``.environments["prod"]``) of *document*.
+
+    Returns ``None`` when the path leads nowhere (a JSON ``null`` gives ``None`` too); never raises.
+    """
+    steps = path_steps(jq_path)
+    if steps is None:
+        return None
+    current: Any = document
+    for step in steps:
         try:
-            if name is not None:
-                current = current[name]
-            elif index is not None:
-                current = current[int(index)]
-            else:
-                current = current[json.loads(quoted)]
+            current = current[step]
         except (KeyError, IndexError, TypeError):
             return None
-        position = step.end()
     return current
 
 

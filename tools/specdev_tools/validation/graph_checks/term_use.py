@@ -13,7 +13,7 @@ import re
 import unicodedata
 from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.contract import item_of
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph
+from specdev_tools.graph.model import Graph
 from specdev_tools.trace.label_rename import LABEL_KEY, TERM_KIND, label_users, own_leaves
 
 from .codes import TERM_NOT_USED_BY_LABEL
@@ -49,7 +49,7 @@ def _user_texts(graph: Graph) -> list[str]:
 def check_term_use(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
     """E741 for each term (not ``not_applicable``) whose current label no user holds; in step then id order."""
     graph = ctx.graph
-    terms = sorted((node for node in graph.nodes if node.kind == TERM_KIND and node.lifecycle != NOT_APPLICABLE), key=graph.shape.order_key)
+    terms = sorted((node for node in graph.gated_nodes() if node.kind == TERM_KIND), key=graph.shape.order_key)
     texts = _user_texts(graph) if terms else []
     findings: list[SpecError] = []
     for term in terms:

@@ -9,12 +9,10 @@ from typing import Any
 import pytest
 
 from specdev_tools.core.errors import SpecError, link_target
-from specdev_tools.graph.build import build_graph
-from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.prose_ids import _is_fixed, check_prose_ids
-from unit.graph._synth import HASH_SEEDS, ROOT, load_doc
+from unit.graph._synth import HASH_SEEDS, load_doc
 
-from ._example_support import Edit, edited_example
+from ._example_support import Edit, context_of_spec, edited_example
 from ._order_support import jsonable, seeded
 
 FR_FILE, NFR_FILE = "04_fr_list.json", "07_nfrs.json"
@@ -30,7 +28,7 @@ def _criteria(doc: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _findings(spec: Path) -> list[SpecError]:
-    return check_prose_ids(GraphCheckContext.from_graph(build_graph(str(spec), str(ROOT)), None), "merge")
+    return check_prose_ids(context_of_spec(spec), "merge")
 
 
 def _statement(text: str) -> Edit:
@@ -162,6 +160,9 @@ def test_a_format_slot_is_a_fixed_value(tmp_path: Path) -> None:
         ({"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}, True),
         ({"type": "string", "pattern": "^(?P<broken"}, True),
         ({"type": "string", "pattern": "\\S"}, False),
+        ({"type": "string", "pattern": "^[a-z ]+$"}, False),
+        ({"type": "string", "pattern": "^[A-Z]"}, False),
+        ({"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*( [a-z0-9][a-z0-9-]*)*$"}, False),
         ({"type": "string", "pattern": "\\S\\s+\\S"}, False),
         ({"type": "string", "pattern": "^\\S+\\s+\\S+.*$"}, False),
         ({"type": "string"}, False),
@@ -184,7 +185,7 @@ def test_prose_ids_read_a_node_parked_with_scope_later_or_out(tmp_path: Path, sc
 def _scenario(reverse: bool) -> list[tuple[str | None, str | None]]:
     def mention(doc: dict[str, Any]) -> None:
         for criterion in _criteria(doc):
-            criterion["text"] = f"Mentions {criterion['criterion_id']} and seed-accounts."
+            criterion["text"] = "Mentions cap-account-recovery and seed-accounts."
         if reverse:
             _fr(doc)["acceptance_criteria"] = list(reversed(_criteria(doc)))
 
@@ -197,3 +198,11 @@ def test_prose_ids_report_in_the_same_order_whatever_the_hash_seed(seed: int) ->
     expected = _scenario(False)
     assert [node for node, _ in expected] == ["ac-password-reset-1"] * 2 + ["ac-password-reset-2"] * 2 + ["ac-password-reset-3"] * 2
     assert seeded(seed, __name__, "_scenario", True) == jsonable(_scenario(True)) == jsonable(expected)
+
+
+def test_a_nodes_own_id_in_its_text_is_not_a_finding(tmp_path: Path) -> None:
+    """A node cannot link itself, so "turn the mention into the link" could not be followed; another node's id in the same text is still reported."""
+    own = edited_example(tmp_path / "own" / "spec", **{FR_FILE: _statement("This is fr-password-reset, as agreed.")})
+    assert _findings(own) == []
+    both = edited_example(tmp_path / "both" / "spec", **{FR_FILE: _statement("This is fr-password-reset and not fr-password-reset-request.")})
+    assert _found(both) == [("fr-password-reset", link_target("statement", "fr-password-reset-request"))]

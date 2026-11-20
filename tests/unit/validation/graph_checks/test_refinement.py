@@ -8,15 +8,14 @@ from typing import Any
 import pytest
 
 from specdev_tools.core.errors import link_target
-from specdev_tools.graph.build import build_graph
 from specdev_tools.validation.graph_checks import run_graph_checks
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.refinement import check_refinement, covering_verifiers
-from unit.graph._synth import EXAMPLE_SPEC, HASH_SEEDS, ROOT
+from unit.graph._synth import EXAMPLE_SPEC, HASH_SEEDS
 
 from ._order_support import seeded
 from ._bindings_support import Bindings
-from ._example_support import edited_example
+from ._example_support import context_of_spec, edited_example
 from ._built_support import closed_milestone, node, spec
 
 
@@ -33,7 +32,7 @@ def _base(*nodes):
 
 
 def test_doc_example_tc1_fx1_and_tc2_fx2_pass() -> None:
-    context = GraphCheckContext.from_graph(build_graph(str(EXAMPLE_SPEC), str(ROOT)), None)
+    context = context_of_spec(EXAMPLE_SPEC)
     assert check_refinement(context, "merge") == []
 
 
@@ -160,7 +159,7 @@ def test_a_criterion_that_refines_a_threat_and_lists_its_fixtures_clears_both_e7
         })
 
     def findings(spec: Path) -> list[tuple[str, str | None]]:
-        context = GraphCheckContext.from_graph(build_graph(str(spec), str(ROOT)), None)
+        context = context_of_spec(spec)
         return [(error.code, error.node_id) for error in run_graph_checks(context, "merge", only={"E740", "E745"})]
 
     before = findings(edited_example(tmp_path / "before"))
@@ -169,3 +168,8 @@ def test_a_criterion_that_refines_a_threat_and_lists_its_fixtures_clears_both_e7
     assert ("E740", "threat-reset-token-replay") in before and ("E740", "ec-token-at-expiry-second") in before
     assert [found for found in after if found[1] in ("threat-reset-token-replay", "ec-token-at-expiry-second", "tc-x")] == []
     assert not [found for found in after if found[0] == "E745"]
+
+
+def test_a_threat_whose_mitigated_by_names_no_node_is_covered_by_nothing_and_does_not_fail() -> None:
+    nodes = _base(node("threat-1", "threat", mitigated_by=["no-such-id"]), node("fix-1", "fixture", verifies=["ac-a-1"]), _criterion(["threat-1"], ["fix-1"]))
+    assert _e745(spec(*nodes)) == [("tc-1", link_target("refines", "threat-1"))]

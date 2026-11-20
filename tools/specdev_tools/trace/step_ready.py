@@ -66,9 +66,14 @@ class Readiness:
 
 
 def first_clause(readiness: Readiness) -> str:
-    """What to do first, worded by the kind of the first blocker: ``write step NN first`` for a missing file, else ``replay step NN first``."""
-    verb = "write" if readiness.blockers and readiness.blockers[0].reason == REASON_MISSING else "replay"
-    return f"{verb} step {readiness.replay_first} first"
+    """What to do first, worded by the blockers of the first step: ``write step NN first`` for a missing file; ``replay step NN first`` for suspect links; ``fix the coverage gaps of step NN first`` when there are only coverage gaps (no replay or attest clears a gap); ``replay step NN first and fix its coverage gaps`` for both."""
+    step = readiness.replay_first
+    reasons = {blocker.reason for blocker in readiness.blockers if blocker.step == step}
+    if readiness.blockers and readiness.blockers[0].reason == REASON_MISSING:
+        return f"write step {step} first"
+    if reasons == {REASON_GAP}:
+        return f"fix the coverage gaps of step {step} first"
+    return f"replay step {step} first and fix its coverage gaps" if REASON_GAP in reasons else f"replay step {step} first"
 
 
 def link_steps(graph: Graph, step: str) -> tuple[str, ...]:

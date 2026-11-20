@@ -13,13 +13,15 @@ from typing import Any
 import pytest
 
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.kinds import KindDecl, LinkDecl
 from specdev_tools.graph.model import Node
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.no_dangling import check_no_dangling
-from specdev_tools.validation.graph_checks.use_table import EXCLUDED_VERBS, USE_TABLE, Use, use_pairs
+from specdev_tools.validation.graph_checks.use_table import EXCLUDED_VERBS, USE_TABLE, Use, step_of, use_pairs
 from unit.graph._synth import EXAMPLE_SPEC, ROOT, run_specdev
 from unit.trace._lock_support import git_copy_of_example
 
+from ._example_support import context_of_spec
 from ._built_support import context_of, graph_of
 from ._built_support import node as make_node
 
@@ -70,6 +72,22 @@ def test_the_kinds_that_use_an_assumption_are_the_kinds_the_registry_gives_an_as
     """The row of ``assumption`` lists its holders by hand: it holds every kind whose declaration has an ``assumes`` link, and no other."""
     declared = {kind for kind, decl in _EXAMPLE.decls.items() if any(link.field == "assumes" for link in decl.links)}
     assert {use.holder_kind for use in USE_TABLE["assumption"] if use.verb == "assumes"} == declared
+
+
+def test_a_kind_declared_at_two_steps_is_placed_at_the_later_one() -> None:
+    shape = replace(_EXAMPLE.shape, kind_steps={**_EXAMPLE.shape.kind_steps, "two-step-kind": ("04", "08")})
+    assert step_of("two-step-kind", shape) == "08" and step_of("not-a-kind", shape) is None
+
+
+def test_a_verifier_is_a_holder_only_through_realises() -> None:
+    """A job that ``depends_on`` a kind that has no row does not use it; the same job that ``realises`` it does."""
+    job = _EXAMPLE.decls["job"]
+
+    def decls(verb: str) -> dict[str, KindDecl]:
+        return {"job": replace(job, links=(LinkDecl(verb, ("capability",), False, False, ()),))}
+
+    assert use_pairs("capability", decls("depends_on")) == frozenset()
+    assert use_pairs("capability", decls("realises")) == {Use("job", "realises")}
 
 
 def test_a_kind_without_a_row_is_used_by_any_link_that_is_not_excluded() -> None:
@@ -224,6 +242,28 @@ def test_e740_message_names_the_kind_the_way_to_use_it_and_the_way_out() -> None
     assert "link it, schedule it" in finding.message and "scope" not in finding.message.split("link it")[-1]  # no schema to read: no advice to park
 
 
+@pytest.mark.parametrize(
+    ("kind", "schedulable"),
+    [
+        ("fr", True), ("criterion", True), ("nfr", True), ("api", True), ("invariant", True), ("risk", True),
+        ("metric", False), ("secret", False), ("threat", False), ("rule", False), ("api-error", False), ("edge-case", False),
+        ("environment", False), ("component", False), ("capability", False),
+    ],
+)
+def test_e740_says_schedule_it_only_where_scheduling_is_a_use(kind: str, schedulable: bool) -> None:
+    """``schedules`` of a step-09 milestone refuses some kinds (E701) and the use table gives others no such use (an environment, a component): for those the milestone changes nothing, so the advice is left out."""
+    [finding] = check_no_dangling(_context(_node("node-a", kind)), "merge")
+    assert (", schedule it" in finding.message) is schedulable
+    assert finding.message.endswith("link it, schedule it" if schedulable else "link it")
+    assert (("design-milestone", "schedules") in {(use.holder_kind, use.verb) for use in use_pairs(kind, _EXAMPLE.decls)}) is schedulable
+
+
+def test_scheduling_a_kind_that_is_advised_to_be_scheduled_clears_it() -> None:
+    fr = _node("fr-a", "fr")
+    milestone = _node("ms-a", "design-milestone", schedules=["fr-a"])
+    assert _dangling(fr) == ["fr-a"] and _dangling(fr, milestone) == []
+
+
 def test_e740_findings_are_listed_in_step_order_and_carry_a_node_id() -> None:
     nodes = [_node("z-nfr", "nfr"), _node("a-threat", "threat"), _node("m-cap", "capability"), _node("b-env", "environment")]
     errors = check_no_dangling(_context(*nodes), "merge")
@@ -296,6 +336,9 @@ def test_a_fresh_process_names_the_role_gaps_that_block_step_ready(tmp_path: Pat
     done = run_specdev("step", "ready", "14", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
     assert "step 08 (5 blockers)" in done.stdout + done.stderr
     assert done.stdout.count("step 08: coverage gap E743: ") == 5
+    assert "E773 step 14 is not ready: step 08 (5 blockers); step 13a (1 blocker); fix the coverage gaps of step 08 first" in done.stdout + done.stderr
+    assert "replay step" not in done.stdout + done.stderr  # no replay or attest clears a coverage gap
+    assert done.returncode == 1
 
 
 def test_building_the_command_line_parser_installs_the_gap_provider_once() -> None:
@@ -310,7 +353,7 @@ def test_building_the_command_line_parser_installs_the_gap_provider_once() -> No
 
 def test_e740_advises_parking_only_for_a_kind_whose_schema_has_a_scope_field() -> None:
     """A charter metric has no ``scope``: setting one is a schema error, so only a link clears it.  A requirement has one."""
-    context = GraphCheckContext.from_graph(build_graph(str(EXAMPLE_SPEC), str(ROOT)), None)
+    context = context_of_spec(EXAMPLE_SPEC)
     messages = {finding.node_id: finding.message for finding in check_no_dangling(context, "merge")}
     assert "scope" not in messages["metric-reset-completion-rate"] and "link it" in messages["metric-reset-completion-rate"]
     parked = [message for node_id, message in messages.items() if node_id != "metric-reset-completion-rate"]

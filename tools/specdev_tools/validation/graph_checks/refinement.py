@@ -48,7 +48,7 @@ def _covers_directly(ctx: GraphCheckContext, verifier: Node, obligation: Node) -
 
 
 def covers(ctx: GraphCheckContext, verifier: Node, obligation: Node) -> bool:
-    """Whether *verifier* covers *obligation*: it is the rule *obligation* itself, it is a job that realises it, or what it verifies is the obligation, a container of it or something it contains; for an obligation with ``mitigated_by``, it is one of the mitigations or covers one (a threat is proven through all of them)."""
+    """Whether *verifier* covers *obligation*: it is the rule *obligation* itself, it is a job that realises it, or what it verifies is the obligation, a container of it or something it contains; for an obligation with ``mitigated_by``, it is one of the mitigations or covers one (a threat is covered when ANY ONE of them is)."""
     if _covers_directly(ctx, verifier, obligation):
         return True
     return any(verifier.id == mitigation.id or _covers_directly(ctx, verifier, mitigation) for mitigation in mitigations(ctx.graph, obligation))

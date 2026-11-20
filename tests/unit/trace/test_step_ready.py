@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 
 from specdev_tools.trace.replay import ReplayPlan
-from specdev_tools.trace.step_ready import check_ready, link_steps, present_steps, required_spec_inputs
+from specdev_tools.graph.queries import plural
+from specdev_tools.trace.step_ready import Blocker, Readiness, check_ready, first_clause, link_steps, not_ready_error, present_steps, required_spec_inputs
 
 from ..graph._synth import ROOT
 from .test_suspects import Example
@@ -58,3 +59,30 @@ def test_check_ready_takes_the_present_steps_as_values(example: Example) -> None
     missing = check_ready(graph, empty, "06", [], frozenset(linked) - {linked[0]})
     assert [(blocker.step, blocker.reason) for blocker in missing.blockers] == [(linked[0], "missing")]
     assert missing.replay_first == linked[0]
+
+
+def _blocker(step: str, reason: str) -> Blocker:
+    return Blocker(step, reason, node=None if reason == "missing" else "n-1", code="E743" if reason == "gap" else None)
+
+
+@pytest.mark.parametrize(
+    ("reasons", "clause"),
+    [
+        (("missing",), "write step 08 first"),
+        (("suspect",), "replay step 08 first"),
+        (("gap", "gap"), "fix the coverage gaps of step 08 first"),
+        (("suspect", "gap"), "replay step 08 first and fix its coverage gaps"),
+        (("gap", "suspect"), "replay step 08 first and fix its coverage gaps"),
+    ],
+)
+def test_the_last_clause_is_worded_by_what_blocks_the_first_step(reasons: tuple[str, ...], clause: str) -> None:
+    """A coverage gap is fixed in the nodes (a fixture, a scope): no replay and no attest clears it, so the clause for a step that has only gaps does not say replay."""
+    readiness = Readiness("14", ("08",), tuple(_blocker("08", reason) for reason in reasons))
+    assert first_clause(readiness) == clause
+    assert not_ready_error(readiness).message == f"step 14 is not ready: step 08 ({plural(len(reasons), 'blocker')}); {clause}"
+
+
+def test_the_clause_is_about_the_first_step_only() -> None:
+    """Step 05 has a suspect link and step 08 has gaps: the first step decides the clause, step 08's gaps are not mentioned yet."""
+    readiness = Readiness("14", ("05", "08"), (_blocker("05", "suspect"), _blocker("08", "gap")))
+    assert first_clause(readiness) == "replay step 05 first"

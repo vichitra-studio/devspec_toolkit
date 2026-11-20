@@ -19,6 +19,7 @@ from specdev_tools.validation.graph_checks import (
     BUILTIN_GRAPH_CHECKS,
     GRAPH_CHECKS,
     install_gap_provider,
+    publish_graph_checks,
     register_graph_check,
     role_gaps,
     run_graph_checks,
@@ -26,9 +27,12 @@ from specdev_tools.validation.graph_checks import (
 )
 from specdev_tools.validation.graph_checks.codes import MISSING_VERIFIER, NODE_DANGLING, UNUSED_VERIFIER
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
+from specdev_tools.validation.graph_checks.scaffold import check_scaffold_paths, run_scaffold_paths
 from specdev_tools.validation.spec_check import run_spec_check_json  # noqa: F401  (importing it fills CHECK_REGISTRY)
 from unit.graph._synth import EXAMPLE_SPEC, ROOT
 from unit.trace._lock_support import gap_providers, git_copy_of_example  # noqa: F401  (gap_providers is a fixture)
+
+from ._example_support import context_of_spec
 
 CHECK_NAMES = [name for name, _rule, _check in BUILTIN_GRAPH_CHECKS]
 
@@ -56,7 +60,7 @@ def test_a_rule_that_is_not_registered_cannot_be_removed() -> None:
 
 
 def test_run_graph_checks_keeps_the_codes_of_only_and_refuses_an_unknown_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    context = GraphCheckContext.from_graph(build_graph(str(EXAMPLE_SPEC), str(ROOT)), None)
+    context = context_of_spec(EXAMPLE_SPEC)
     node = context.graph.by_kind["component"][0]
 
     def probe(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
@@ -151,3 +155,79 @@ def test_the_rules_run_in_a_process_that_imports_only_the_package() -> None:
     )
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(ROOT / "tools")}, check=True)
     assert done.stdout.split() == ["23", "False"]
+
+
+@pytest.fixture
+def restored_registry():
+    """Whatever a test registers or removes, the rule table, the ``spec-check`` entries (with their order) and the stored check functions are as they were."""
+    rules, entries, stored = list(GRAPH_CHECKS), list(CHECK_REGISTRY), dict(graph_checks._registered_check_functions)
+    yield
+    GRAPH_CHECKS[:] = rules
+    CHECK_REGISTRY[:] = entries
+    graph_checks._registered_check_functions.clear()
+    graph_checks._registered_check_functions.update(stored)
+
+
+def _rule(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
+    return []
+
+
+def _spec_check_function(name: str):
+    return next(spec.fn for spec in CHECK_REGISTRY if spec.name == name)
+
+
+def test_a_registration_that_raises_changes_nothing(restored_registry: None) -> None:
+    """A name that ``spec-check`` already holds: no rule, no stored check function, no entry added."""
+    before = ([name for name, _ in GRAPH_CHECKS], [spec.name for spec in CHECK_REGISTRY], dict(graph_checks._registered_check_functions))
+    with pytest.raises(ValueError, match="already registered"):
+        register_graph_check("open-items", _rule, check=lambda ctx: {})
+    assert ([name for name, _ in GRAPH_CHECKS], [spec.name for spec in CHECK_REGISTRY], dict(graph_checks._registered_check_functions)) == before
+
+
+def test_the_check_function_given_at_registration_is_the_one_spec_check_runs(restored_registry: None) -> None:
+    def check(ctx: object) -> dict[str, object]:
+        return {}
+
+    register_graph_check("probe-own-check", _rule, check=check)
+    assert _spec_check_function("probe-own-check") is check
+    unregister_graph_check("probe-own-check")
+    register_graph_check("probe-own-check", _rule)
+    assert _spec_check_function("probe-own-check") is not check
+
+
+def test_a_built_in_rule_registered_again_gets_its_own_check_back(restored_registry: None) -> None:
+    """The scaffold rule has its own ``spec-check`` function (the note and the skip): removing the rule and registering it again keeps it; ``spec-check`` runs it from the start."""
+    assert _spec_check_function("scaffold-paths") is run_scaffold_paths
+    unregister_graph_check("scaffold-paths")
+    register_graph_check("scaffold-paths", check_scaffold_paths)
+    assert _spec_check_function("scaffold-paths") is run_scaffold_paths
+    assert _spec_check_function("no-dangling") is not run_scaffold_paths
+
+
+def test_the_graph_checks_are_published_once() -> None:
+    with pytest.raises(ValueError, match="already published"):
+        publish_graph_checks()
+
+
+def test_the_findings_come_in_the_order_the_rules_were_registered(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = context_of_spec(EXAMPLE_SPEC)
+    node = context.graph.by_kind["component"][0]
+
+    def rule(label: str):
+        return lambda ctx, mode: [ctx.finding(NODE_DANGLING, node, label)]
+
+    monkeypatch.setattr(graph_checks, "GRAPH_CHECKS", [("zeta", rule("zeta")), ("alpha", rule("alpha"))])
+    assert [error.message for error in run_graph_checks(context, "merge")] == ["zeta", "alpha"]
+
+
+def test_a_check_function_given_before_the_publication_is_the_one_the_publication_registers(restored_registry: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Before ``publish_graph_checks`` a registration only joins the table and remembers its check function; the publication then registers that function."""
+    def check(ctx: object) -> dict[str, object]:
+        return {}
+
+    monkeypatch.setattr(graph_checks, "_published", False)
+    monkeypatch.setattr(graph_checks, "GRAPH_CHECKS", [])
+    register_graph_check("probe-before", _rule, check=check)
+    assert "probe-before" not in [spec.name for spec in CHECK_REGISTRY]
+    publish_graph_checks()
+    assert _spec_check_function("probe-before") is check

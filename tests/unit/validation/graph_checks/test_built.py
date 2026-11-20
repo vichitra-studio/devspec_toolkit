@@ -186,3 +186,11 @@ def test_built_reports_in_the_same_order_whatever_the_hash_seed(seed: int) -> No
     expected = _scenario(False)
     assert seeded(seed, __name__, "_scenario", True) == expected
     assert [row[0] for row in expected] == sorted((row[0] for row in expected), key=lambda i: (ctx.graph.shape.step_key(ctx.graph.by_id[i].step), i))
+
+
+def test_a_parked_criterion_does_not_realise_a_design_milestone() -> None:
+    """A criterion with ``scope: later`` is out of play: what it refines is still unrealised."""
+    parked = node("tc-parked", "task-criterion", "plan", step="14", scope="later", links=[("refines", "fr-1")])
+    milestone = node("dm-1", "design-milestone", "plan", step="09", links=[("schedules", "fr-1")])
+    assert [item.id for item in unrealised_design_milestones(built_context([node("fr-1", "fr"), milestone, parked]))] == ["dm-1"]
+    assert unrealised_design_milestones(built_context([node("fr-1", "fr"), milestone], {"tc-live": "fr-1"})) == []

@@ -134,8 +134,8 @@ def test_e743_kinds_are_read_from_the_fixture_verifies_declaration() -> None:
 def test_nfr_message_names_a_fixture_at_08_and_a_job_at_12() -> None:
     errors = [e for e in check_verifier_rules(_spec(node("nfr-1", "nfr"), node("ac-a-1", "criterion")), "merge") if e.code == "E743"]
     messages = {error.node_id: error.message for error in errors}
-    assert "a fixture at step 08 or a job at step 12" in messages["nfr-1"]
-    assert "a job" not in messages["ac-a-1"] and "a fixture at step 08" in messages["ac-a-1"]
+    assert messages["nfr-1"].endswith("add a fixture at step 08 that verifies it and that a task criterion lists in verified_by, or a job at step 12 that verifies it")
+    assert "a job" not in messages["ac-a-1"] and messages["ac-a-1"].endswith("add a fixture at step 08 that verifies it and that a task criterion lists in verified_by")
 
 
 def test_removal_criterion_gives_no_e745_e742_or_e743() -> None:
@@ -261,3 +261,16 @@ def test_verifier_rules_report_in_the_same_order_whatever_the_hash_seed(seed: in
     expected = jsonable(_scenario(False))
     assert [code for code, _ in expected].count("E742") == 3 and len(expected) == 7
     assert seeded(seed, __name__, "_scenario", True) == expected
+
+
+def test_unused_fixture_message_says_how_to_clear_it_and_what_removing_it_leaves() -> None:
+    """Removing a fixture whose links were attested leaves their lock entries (E762) until ``attest --prune``: the message says so."""
+    message = next(error.message for error in check_verifier_rules(_spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]))), "merge") if error.node_id == "fix-spare")
+    assert message.endswith("list it in a criterion's verified_by, or remove it and run specdev attest --prune")
+
+
+def test_a_verifier_that_names_a_retired_id_still_verifies_the_renamed_node() -> None:
+    renamed = replace(node("nfr-new", "nfr"), aliases=("nfr-old",))
+    context = _spec(renamed, node("fix-1", "fixture", verifies=["nfr-old"]))
+    assert [item.id for item in missing_verifiers(context)] == []
+    assert [item.id for item in missing_verifiers(_spec(renamed))] == ["nfr-new"]

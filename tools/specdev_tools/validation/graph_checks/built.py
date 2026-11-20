@@ -21,16 +21,13 @@ from specdev_tools.graph.model import Link, Node
 from specdev_tools.trace.hashing import compute_all
 
 from .context import GraphCheckContext
-from .names import API, COMPONENT, DERIVES_FROM, REFINES
+from .names import API, COMPONENT, CONNECTION, CONSTRAINT, CONSTRAINS, DERIVES_FROM, PROVIDED_BY, REFINES, THIRD_PARTY
 
 OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", "rule", "threat", "edge-case"})
 """Kinds proved by evidence (step 02a deliveries, step-10 rules, step-11 threats and edge cases): ``PENDING_EVIDENCE`` by default."""
 COARSE_KINDS = frozenset({"scope-item", "risk", "capability"})
-CONSTRAINT_KIND = "constraint"
-CONNECTION_KIND = "connection"
-THIRD_PARTY_KIND = "third-party"
-COMPONENT_USE_FIELDS = frozenset({"provided_by", "constrains"})
+COMPONENT_USE_FIELDS = frozenset({PROVIDED_BY, CONSTRAINS})
 RELIES_ON = frozenset({"relies_on"})
 PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
 """``disposition.value`` of a task that is postponed or cancelled: its criteria give no coverage (DOC L684)."""
@@ -168,7 +165,7 @@ class BuiltComputation:
             return BuiltResult(BuiltState.IGNORED, f"a {node.role or 'node'} is not built")
         if node.kind in EVIDENCE_KINDS:
             return BuiltResult(BuiltState.PENDING_EVIDENCE, f"{node.kind} is proven by evidence")
-        if node.kind == CONSTRAINT_KIND:
+        if node.kind == CONSTRAINT:
             return self._constraint(node)
         if node.kind in COARSE_KINDS:
             return self._coarse(node)
@@ -245,13 +242,13 @@ class BuiltComputation:
 
     def _component_used(self, component: Node) -> bool:
         """Whether a built obligation provides, or is constrained by, the component or a connection that derives from it."""
-        connections = [source for source, _link in inbound_sources(self.ctx, component, (DERIVES_FROM,)) if source.kind == CONNECTION_KIND]
+        connections = [source for source, _link in inbound_sources(self.ctx, component, (DERIVES_FROM,)) if source.kind == CONNECTION]
         return any(self._built_users(target, COMPONENT_USE_FIELDS) for target in (component, *connections))
 
     def _third_parties(self, constraint: Node) -> list[tuple[str, BuiltResult]]:
         return [
             (source.id, self._pin_result(source)) for source, _link in inbound_sources(self.ctx, constraint, (DERIVES_FROM,))
-            if source.kind == THIRD_PARTY_KIND and self._built_users(source, RELIES_ON)
+            if source.kind == THIRD_PARTY and self._built_users(source, RELIES_ON)
         ]
 
     def _pin_result(self, third_party: Node) -> BuiltResult:
