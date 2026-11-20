@@ -23,11 +23,24 @@ from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
 NEAREST_COUNT = 3
+ROADMAP_MILESTONE = "roadmap-milestone"
 _NO_VALUE = "-"
 
 
 class QueryTargetError(FindingError):
     """A read command was given an id, kind or field the graph does not know; the E706 finding is in ``error``."""
+
+
+def milestone_of(graph: Graph, node: Node) -> str | None:
+    """The id of the milestone *node* belongs to: the ``milestone`` of its plan file, else its containing roadmap milestone (walking up through the parents), else ``None``."""
+    current: Node | None = node
+    while current is not None:
+        if current.milestone is not None:
+            return graph.canonical_id(current.milestone)
+        if current.kind == ROADMAP_MILESTONE:
+            return current.id
+        current = graph.by_id.get(current.parent) if current.parent else None
+    return None
 
 
 def _unknown(message: str, *, unknown_id: bool = False) -> QueryTargetError:

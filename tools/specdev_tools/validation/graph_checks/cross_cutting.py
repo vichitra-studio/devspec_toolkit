@@ -11,10 +11,7 @@ from specdev_tools.graph.model import Graph, Node
 
 from .codes import CROSS_CUTTING_NOT_REFINED
 from .context import GraphCheckContext, Mode
-from .names import API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINS, CRITERION, DERIVES_FROM, PROVIDED_BY, REFINES, link_targets
-
-TASK = "task"
-FR = "fr"
+from .names import API, API_ERROR, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINS, CRITERION, DERIVES_FROM, FR, PROVIDED_BY, REFINES, TASK, link_targets
 
 
 def _linked(graph: Graph, node: Node, field: str, *kinds: str) -> list[Node]:
@@ -38,7 +35,7 @@ def lineage(graph: Graph, node: Node) -> set[str]:
         return _lineage_of(graph, [graph.by_id[node.parent]] if node.parent in graph.by_id else [])
     if kind == API:
         return _lineage_of(graph, _linked(graph, node, DERIVES_FROM, FR)) | {target.id for target in _linked(graph, node, PROVIDED_BY, COMPONENT)}
-    if kind == "api-error":
+    if kind == API_ERROR:
         return _lineage_of(graph, _linked(graph, node, DERIVES_FROM, CRITERION))
     if kind == CONNECTION:
         return {target.id for target in _linked(graph, node, DERIVES_FROM, COMPONENT)}

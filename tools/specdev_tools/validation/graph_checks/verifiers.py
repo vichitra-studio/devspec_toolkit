@@ -21,6 +21,7 @@ from specdev_tools.graph.model import Graph, Node
 from .codes import MISSING_VERIFIER, UNUSED_VERIFIER
 from .context import GraphCheckContext, Mode
 from .names import FIXTURE, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
+from .removal import links_clause
 
 
 
@@ -98,7 +99,9 @@ def check_verifier_rules(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
             UNUSED_VERIFIER, verifier,
             f"{verifier.kind} {verifier.id} is not used: no task criterion lists it in verified_by"
             + ("" if verifier.kind == FIXTURE else ", and it neither realises nor verifies a node")
-            + "; list it in a criterion's verified_by, or remove it and run specdev attest --prune",
+            + "; list it in a criterion's verified_by, or remove it"
+            + (f" and the links to it {clause}" if (clause := links_clause(ctx.graph, verifier.id)) else "")
+            + " and run specdev attest --prune",
         )
         for verifier in _verifiers(ctx) if not _is_used(ctx, verifier)
     ]

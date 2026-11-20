@@ -50,7 +50,7 @@ BUILTIN_GRAPH_CHECKS: tuple[tuple[str, GraphCheck, CheckFn | None], ...] = (
 GRAPH_CHECKS: list[tuple[str, GraphCheck]] = [(name, rule) for name, rule, _check in BUILTIN_GRAPH_CHECKS]
 """The rules ``run_graph_checks`` runs, in order, by name: the built-in ones from the import on, then each ``register_graph_check`` appends."""
 
-_BUILTIN_CHECK_FUNCTIONS: dict[str, CheckFn] = {name: check for name, _rule, check in BUILTIN_GRAPH_CHECKS if check is not None}
+_BUILTIN_CHECK_FUNCTIONS: dict[str, tuple[GraphCheck, CheckFn]] = {name: (rule, check) for name, rule, check in BUILTIN_GRAPH_CHECKS if check is not None}
 _registered_check_functions: dict[str, CheckFn] = {}
 _published = False
 
@@ -80,8 +80,9 @@ def register_graph_check(name: str, rule: GraphCheck, *, check: CheckFn | None =
 
 
 def _check_function(name: str, rule: GraphCheck, check: CheckFn | None = None) -> CheckFn:
-    """The ``spec-check`` function of the rule *name*: the one given at registration, else the built-in rule's own, else the merge wrapper."""
-    return check or _registered_check_functions.get(name) or _BUILTIN_CHECK_FUNCTIONS.get(name) or merge_check(rule)
+    """The ``spec-check`` function of the rule *name*: the one given at registration, else the built-in rule's own (only when *rule* IS the built-in rule of that name), else the merge wrapper."""
+    builtin_rule, builtin_check = _BUILTIN_CHECK_FUNCTIONS.get(name, (None, None))
+    return check or _registered_check_functions.get(name) or (builtin_check if rule is builtin_rule else None) or merge_check(rule)
 
 
 def unregister_graph_check(name: str) -> None:

@@ -73,6 +73,8 @@ def _blocker(step: str, reason: str) -> Blocker:
         (("gap", "gap"), "fix the coverage gaps of step 08 first"),
         (("suspect", "gap"), "replay step 08 first and fix its coverage gaps"),
         (("gap", "suspect"), "replay step 08 first and fix its coverage gaps"),
+        (("suspect", "missing"), "replay step 08 first"),
+        (("missing", "suspect"), "write step 08 first"),
     ],
 )
 def test_the_last_clause_is_worded_by_what_blocks_the_first_step(reasons: tuple[str, ...], clause: str) -> None:

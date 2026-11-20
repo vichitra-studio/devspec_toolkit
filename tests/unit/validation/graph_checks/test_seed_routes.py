@@ -89,13 +89,14 @@ def test_used_route_gives_no_e748(tmp_path: Path) -> None:
 def test_route_to_step_whose_kinds_cannot_link_a_seed_is_e748(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "non_linkable_route"))
     assert (found.code, found.node_id, found.owner, found.jq_path) == (SEED_ROUTE_UNUSED, SEED, "step:04", '.step_requirements["04"]')
-    assert "step 04" in found.message and "link a seed" in found.message
+    assert found.message.startswith(f"the seed manifest routes {SEED} to step 04 but no node kind of step 04 can link a seed (only the kinds of steps 00, 02, 02a can); move the route to a step whose nodes can link a seed (00, 02, 02a)")
 
 
 def test_trinity_key_gives_e748_naming_the_trinity_case(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "trinity_route"))
     assert (found.code, found.node_id, found.owner, found.jq_path) == (SEED_ROUTE_UNUSED, SEED, "step:16", '.step_requirements["16"]')
-    assert "trinity" in found.message and "remove the route" in found.message
+    assert found.message.startswith(f"the seed manifest routes {SEED} to step 16 but the trinity key 16 cannot be used: no node of the trinity steps links a seed; move the route")
+    assert "remove the route" in found.message
 
 
 def test_link_to_unrouted_seed_gives_e749_owned_by_holder_step(tmp_path: Path) -> None:
@@ -284,9 +285,20 @@ def test_e748_of_a_seeds_only_route_says_to_remove_the_seed_with_it(tmp_path: Pa
     assert message.endswith("remove the seed from the manifest (its seeds[] entry, this route and its document), as this is its only route and a seed with no route is E747")
 
 
-def test_e748_of_a_route_that_is_not_the_seeds_only_one_says_to_remove_the_route(tmp_path: Path) -> None:
+def test_e748_of_a_seeds_only_route_names_the_links_to_the_seed_in_other_steps(tmp_path: Path) -> None:
+    """Removing the seed alone leaves the links of a node of another step (E700): the advice names them, and a node left with no other entry."""
+    edits = {SEED_MANIFEST_PATH: _extra_seed({"02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
+    message = _messages(_host(tmp_path, **edits), SEED_ROUTE_UNUSED)[EXTRA]
+    assert message.endswith(
+        "remove the seed from the manifest (its seeds[] entry, this route and its document) and the derives_from links to it "
+        "(1 node, in step 02; it holds no other entry and needs one first), as this is its only route and a seed with no route is E747; then run specdev attest --prune"
+    )
+
+def test_e748_of_a_route_that_is_not_the_seeds_only_one_says_to_remove_the_route_whoever_links_the_seed(tmp_path: Path) -> None:
+    """The route is the thing removed: the links of the nodes of other steps (here all of steps 00 and 02) stay and are not named."""
     message = _messages(_host(tmp_path, "unused_route"), SEED_ROUTE_UNUSED)[SEED]
     assert message.endswith("distil the seed in that step (a node of step 02a lists seed-accounts in derives_from), or remove the route")
+    assert "links to it" not in message
 
 
 @pytest.mark.parametrize("step", ["05", "16"])
@@ -302,11 +314,62 @@ def test_e747_of_a_seed_no_node_links_says_to_route_it_and_have_a_node_list_it(t
     assert message.endswith("route it to the step that distils it and list it in derives_from of a node of that step, or remove the seed (its seeds[] entry and its document)")
 
 
-def test_e747_of_a_seed_a_node_links_names_the_step_of_that_node(tmp_path: Path) -> None:
-    """The route clears it at once; removing the seed leaves the link, which the message says to remove and prune."""
-    third_party = {"02_system_sketch.json": lambda doc: doc["third_parties"][0]["derives_from"].append(EXTRA)}
-    message = _messages(_host(tmp_path, "unrouted_seed", **third_party), SEED_NOT_ROUTED)[EXTRA]
-    assert "route it to step 02 (where a node lists it in derives_from), or remove the seed (its seeds[] entry and its document) and the derives_from links to it, then run specdev attest --prune" in message
+def _tp_derives_from(*entries: str, index: int = 0) -> Edit:
+    return lambda doc: doc["third_parties"][index].update(derives_from=list(entries))
+
+
+def _e747(tmp_path: Path, **edits: Edit) -> str:
+    return _messages(_host(tmp_path, "unrouted_seed", **edits), SEED_NOT_ROUTED)[EXTRA]
+
+
+_REMOVE = "or remove the seed (its seeds[] entry and its document)"
+
+
+def test_e747_of_a_seed_a_node_links_names_the_step_of_that_node_and_what_removing_the_seed_takes(tmp_path: Path) -> None:
+    """The route clears it at once; removing the seed leaves the link, which the message says to remove (how many nodes, in which steps) and prune."""
+    message = _e747(tmp_path, **{"02_system_sketch.json": _tp_derives_from(SEED, EXTRA)})
+    assert f"route it to step 02 (where a node lists it in derives_from), {_REMOVE} and the derives_from links to it (1 node, in step 02), then run specdev attest --prune" in message
+
+
+def test_e747_says_that_a_node_whose_only_entry_the_seed_is_needs_another_entry_first(tmp_path: Path) -> None:
+    message = _e747(tmp_path, **{"02_system_sketch.json": _tp_derives_from(EXTRA)})
+    assert message.endswith("and the derives_from links to it (1 node, in step 02; it holds no other entry and needs one first), then run specdev attest --prune")
+    both = _e747(tmp_path / "two", **{"02_system_sketch.json": lambda doc: [_tp_derives_from(EXTRA, index=i)(doc) for i in (0, 1)]})
+    assert "(2 nodes, in step 02; 2 of them hold no other entry and need one first)" in both
+    one_of_two = _e747(tmp_path / "one-of-two", **{"02_system_sketch.json": lambda doc: [_tp_derives_from(EXTRA)(doc), _tp_derives_from(SEED, EXTRA, index=1)(doc)]})
+    assert "(2 nodes, in step 02; 1 of them holds no other entry and needs one first)" in one_of_two
+
+
+def test_e747_of_a_seed_linked_in_two_steps_names_both_steps_in_the_route_and_in_the_links(tmp_path: Path) -> None:
+    def link_in_charter(document: dict[str, Any]) -> None:
+        document["success_metrics"][0]["derives_from"].append(EXTRA)
+
+    message = _e747(tmp_path, **{"02_system_sketch.json": _tp_derives_from(SEED, EXTRA), "00_charter.json": link_in_charter})
+    assert "route it to steps 00, 02 (where a node lists it in derives_from)" in message
+    assert "and the derives_from links to it (2 nodes, in steps 00, 02), then run specdev attest --prune" in message
+
+
+def test_e747_names_a_parked_node_in_the_links_but_not_in_the_steps_to_route_to(tmp_path: Path) -> None:
+    """A node parked with ``scope: later`` still holds the link (removing the seed leaves E700 on it), but a route to its step would be an unused one (E748)."""
+    def park(document: dict[str, Any]) -> None:
+        third_party = document["third_parties"][0]
+        third_party.update(derives_from=[SEED, EXTRA], scope="later", scope_reason="later")
+
+    message = _e747(tmp_path, **{"02_system_sketch.json": park})
+    assert "route it to the step that distils it and list it in derives_from of a node of that step" in message
+    assert "and the derives_from links to it (1 node, in step 02), then run specdev attest --prune" in message
+
+
+def test_e747_names_the_global_seed_order_entry_when_the_seed_has_one(tmp_path: Path) -> None:
+    def order(document: dict[str, Any]) -> None:
+        document["global_seed_order"].append(EXTRA)
+
+    assert "(its seeds[] entry, its global_seed_order entry and its document)" in _e747(tmp_path / "listed", **{SEED_MANIFEST_PATH: order})
+    alone = _e747(tmp_path / "alone", **{SEED_MANIFEST_PATH: lambda doc: doc.update(global_seed_order=[EXTRA])})
+    assert "(its seeds[] entry, its global_seed_order entry (which then needs another seed) and its document)" in alone
+    assert "(which then needs another seed)" not in _e747(tmp_path / "with-other", **{SEED_MANIFEST_PATH: order})
+    sole = _messages(_host(tmp_path / "sole", **{SEED_MANIFEST_PATH: lambda doc: doc.update(step_requirements={})}), SEED_NOT_ROUTED)[SEED]
+    assert "(its seeds[] entry (which then needs another seed), its global_seed_order entry (which then needs another seed) and its document)" in sole
 
 
 def test_e749_says_to_prune_after_removing_the_link(tmp_path: Path) -> None:
@@ -314,9 +377,10 @@ def test_e749_says_to_prune_after_removing_the_link(tmp_path: Path) -> None:
     assert messages["tp-argon2"].endswith('add seed-accounts to step_requirements["02"], or remove the link and run specdev attest --prune (a derives_from that would be left empty needs another entry)')
 
 
-def test_a_seed_listed_twice_under_one_step_is_one_unused_route(tmp_path: Path) -> None:
+def test_a_seed_listed_twice_under_one_step_is_one_unused_route_and_its_only_one(tmp_path: Path) -> None:
     host = _host(tmp_path, **{SEED_MANIFEST_PATH: _extra_seed({"02a": [EXTRA, EXTRA]})})
     assert _rows(_found(host)) == [(SEED_ROUTE_UNUSED, EXTRA, "step:02a")]
+    assert "remove the seed from the manifest" in _messages(host, SEED_ROUTE_UNUSED)[EXTRA]
 
 
 def test_a_route_to_an_id_that_is_no_seed_is_not_reported_here(tmp_path: Path) -> None:

@@ -19,6 +19,7 @@ from specdev_tools.graph.queries import (
     candidates,
     candidates_json,
     candidates_text,
+    milestone_of,
     node_json,
     node_text,
     node_view,
@@ -336,3 +337,11 @@ def test_error_json_omits_target() -> None:
     error = make_error("E700", "m", node_id="api-y", target="derives_from->fr-x")
     (document,) = node_json(NodeReport(views=(), errors=(error,)))["errors"]
     assert document == {"code": "E700", "message": "m", "node_id": "api-y"}
+
+
+def test_milestone_of_reads_a_plan_files_milestone_then_the_containing_roadmap_milestone(example: Graph) -> None:
+    plan_node = next(node for node in example.nodes if node.milestone is not None)
+    assert milestone_of(example, plan_node) == example.canonical_id(plan_node.milestone)
+    criterion = example.by_id["tc-confirm-expired-token"]
+    assert milestone_of(example, criterion) == "ms-account-recovery" == milestone_of(example, example.by_id["ms-account-recovery"])
+    assert milestone_of(example, example.by_id["fr-password-reset"]) is None

@@ -17,7 +17,7 @@ from unit.graph._synth import EXAMPLE_SPEC, HASH_SEEDS, ROOT
 
 from ._order_support import jsonable, seeded
 from ._bindings_support import Bindings
-from ._built_support import STEP_RANKS, closed_milestone, node, spec as build_spec
+from ._built_support import STEP_RANKS, closed_milestone, declared, node, spec as build_spec
 
 
 @cache
@@ -136,6 +136,13 @@ def test_nfr_message_names_a_fixture_at_08_and_a_job_at_12() -> None:
     messages = {error.node_id: error.message for error in errors}
     assert messages["nfr-1"].endswith("add a fixture at step 08 that verifies it and that a task criterion lists in verified_by, or a job at step 12 that verifies it")
     assert "a job" not in messages["ac-a-1"] and messages["ac-a-1"].endswith("add a fixture at step 08 that verifies it and that a task criterion lists in verified_by")
+
+
+def test_a_verifier_kind_with_no_step_is_named_without_one() -> None:
+    """A declaration no step file holds has no step to name: the message does not end in "at step " with nothing after it."""
+    context = build_spec(node("nfr-1", "nfr"), shape=SpecShape(step_ranks=STEP_RANKS), decls=_real_decls())
+    message = next(error.message for error in check_verifier_rules(context, "merge") if error.code == "E743")
+    assert message.endswith("add a fixture that verifies it and that a task criterion lists in verified_by, or a job that verifies it") and "at step" not in message
 
 
 def test_removal_criterion_gives_no_e745_e742_or_e743() -> None:
@@ -267,6 +274,22 @@ def test_unused_fixture_message_says_how_to_clear_it_and_what_removing_it_leaves
     """Removing a fixture whose links were attested leaves their lock entries (E762) until ``attest --prune``: the message says so."""
     message = next(error.message for error in check_verifier_rules(_spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]))), "merge") if error.node_id == "fix-spare")
     assert message.endswith("list it in a criterion's verified_by, or remove it and run specdev attest --prune")
+
+
+def _e742_message(context: GraphCheckContext, verifier: str) -> str:
+    return next(error.message for error in check_verifier_rules(context, "merge") if error.code == "E742" and error.node_id == verifier)
+
+
+def test_unused_verifier_message_names_the_links_that_go_with_it() -> None:
+    """Removing a verifier that a node of another step still links leaves E700 on that node: the advice names the links (how many nodes, in which steps), and a node left with an empty required list."""
+    mitigates = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), node("threat-1", "threat", step="11", mitigated_by=["fix-spare"])))
+    assert _e742_message(mitigates, "fix-spare").endswith("list it in a criterion's verified_by, or remove it and the links to it (1 node, in step 11) and run specdev attest --prune")
+    only_entry = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), declared(node("ec-1", "edge-case", step="11", mitigated_by=["fix-spare"]), _real_decls())))
+    assert _e742_message(only_entry, "fix-spare").endswith("or remove it and the links to it (1 node, in step 11; it holds no other entry and needs one first) and run specdev attest --prune")
+    with_other = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), declared(node("ec-1", "edge-case", step="11", mitigated_by=["fix-spare", "fix-ac"]), _real_decls())))
+    assert "(1 node, in step 11)" in _e742_message(with_other, "fix-spare")
+    job = _spec(*_base(node("job-1", "job", step="12"), node("job-2", "job", step="12", depends_on=["job-1"])))
+    assert _e742_message(job, "job-1").endswith("list it in a criterion's verified_by, or remove it and the links to it (1 node, in step 12) and run specdev attest --prune")
 
 
 def test_a_verifier_that_names_a_retired_id_still_verifies_the_renamed_node() -> None:

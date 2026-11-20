@@ -959,19 +959,27 @@ changes:
       use (a criterion, an FR, an NFR, an API, an invariant, a risk), and set
       scope later or out with a scope_reason only for a kind whose schema has a
       scope field. E742 ends list it in a criterion's verified_by, or remove it
-      and run specdev attest --prune; E743 asks for a fixture at step 08 that
+      and run specdev attest --prune (or remove it and the links to it (1 node,
+      in step 11) and run specdev attest --prune when a node still links it);
+      E743 asks for a fixture at step 08 that
       verifies the node and that a task criterion lists in verified_by (for an
       NFR, or a job at step 12 that verifies it); E744 asks for a task
       criterion that refines the node and lists in verified_by a verifier that
       verifies it; E747 says to route the seed and list it in derives_from of a
-      node of that step, or to remove the seed (its seeds[] entry and its
-      document, and the derives_from links to it, then specdev attest --prune);
+      node of that step, or to remove the seed (its seeds[] entry, its
+      global_seed_order entry when it has one, and its document, and the
+      derives_from links to it with their count and steps, then specdev attest
+      --prune);
       E748 says to distil the seed in that step, to move the route to step 00,
       02 or 02a when no node of the step can link a seed, to remove the route,
-      or, when it is the seed's only route, to remove the seed with it; E749
+      or, when it is the seed's only route, to remove the seed with it and the
+      links to it that nodes of other steps still hold; E749
       ends or remove the link and run specdev attest --prune (a derives_from
-      that would be left empty needs another entry). A fix that adds, changes
-      or removes a link ends with specdev attest <node> --yes for each node an
+      that would be left empty needs another entry). A message that says to
+      remove a node names the nodes that still link it (how many, in which
+      steps) and says needs one first for a node that holds no other entry in a
+      required list; the catalogue says once what removing a node takes. A fix
+      that adds, changes or removes a link ends with specdev attest <node> --yes for each node an
       E761 or E763 names, and specdev attest --prune after a removed link. E752
       does not report a node's own id. E745 reads a threat or an edge case
       through its mitigations. E752 reads nodes parked with scope: later or

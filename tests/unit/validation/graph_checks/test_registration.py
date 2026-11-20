@@ -204,6 +204,13 @@ def test_a_built_in_rule_registered_again_gets_its_own_check_back(restored_regis
     assert _spec_check_function("no-dangling") is not run_scaffold_paths
 
 
+def test_another_rule_registered_under_a_built_in_name_runs_as_that_rule(restored_registry: None) -> None:
+    """The built-in ``spec-check`` function belongs to the built-in rule, not to its name: a different rule under the name is run through the merge wrapper."""
+    unregister_graph_check("scaffold-paths")
+    register_graph_check("scaffold-paths", _rule)
+    assert _spec_check_function("scaffold-paths") is not run_scaffold_paths
+
+
 def test_the_graph_checks_are_published_once() -> None:
     with pytest.raises(ValueError, match="already published"):
         publish_graph_checks()

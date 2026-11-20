@@ -82,6 +82,27 @@ def test_alias_of_a_renamed_node_is_flagged(tmp_path: Path) -> None:
     assert "fr-reset-old" in error.message and "fr-password-reset" in error.message
 
 
+def test_a_node_naming_its_own_retired_name_is_not_flagged(tmp_path: Path) -> None:
+    """A link to itself cannot be written: the retired name of the node itself in its text is no finding, a retired name of another node is."""
+    def rename(doc: dict[str, Any]) -> None:
+        _fr(doc)["aliases"] = ["fr-reset-old"]
+        _fr(doc)["statement"] = "This is what fr-reset-old used to say."
+
+    assert _findings(edited_example(tmp_path / "own" / "spec", **{FR_FILE: rename})) == []
+
+    def other(doc: dict[str, Any]) -> None:
+        _fr(doc)["aliases"] = ["fr-reset-old"]
+        _criteria(doc)[0]["text"] = "This is what fr-reset-old used to say."
+
+    assert _found(edited_example(tmp_path / "other" / "spec", **{FR_FILE: other})) == [("ac-password-reset-1", link_target("text", "fr-password-reset"))]
+
+
+def test_a_leaf_with_no_schema_slot_is_read_as_prose_and_gives_e752(tmp_path: Path) -> None:
+    """The free-form ``input`` of a fixture has no slot in the schema: an id written in it is a mention."""
+    spec = edited_example(tmp_path / "spec", **{"08_fixtures.json": lambda doc: doc["fixtures"][0]["input"].__setitem__("method", "POST cap-account-recovery")})
+    assert _found(spec) == [("fix-password-reset-expired-token", link_target("input.method", "cap-account-recovery"))]
+
+
 def test_seed_id_in_prose_is_flagged(tmp_path: Path) -> None:
     assert _found(edited_example(tmp_path / "spec", **{FR_FILE: _statement("As in seed-accounts, a member recovers access.")})) == [
         ("fr-password-reset", link_target("statement", "seed-accounts"))

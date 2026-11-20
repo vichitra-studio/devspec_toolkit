@@ -345,8 +345,9 @@ def test_delta_ops_set_and_remove_change_exactly_the_path_they_name(tmp_path: Pa
 
 def test_the_example_design_milestone_is_realised_through_containment(example_checks: dict[str, Any]) -> None:
     """The 09 milestone schedules ``fr-password-reset``; the 14 criteria refine a criterion of it: it is computed, not unrealised (ruling R17)."""
-    from specdev_tools.validation.graph_checks.design_milestones import matching_milestones, unrealised_design_milestones
+    from specdev_tools.validation.graph_checks.design_milestones import matching_milestones, unrealised_design_milestones, unrefined_scheduled
 
     context = GraphCheckContext.from_graph(build_graph(str(ROOT / "tests/fixtures/graph_example/spec"), str(ROOT)), None, str(ROOT))
     assert [design.id for design, _roadmap in matching_milestones(context)] == ["milestone-account-recovery"]
     assert unrealised_design_milestones(context) == []
+    assert unrefined_scheduled(context) == []  # the FR is refined through one criterion; the scheduled risk is outside it (ruling R18)

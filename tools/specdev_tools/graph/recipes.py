@@ -38,7 +38,7 @@ from specdev_tools.graph.diff import diff_snapshots
 from specdev_tools.graph.gitview import GitViewError, Snapshot, default_base_ref, load_snapshot_at, spec_path_in_repo
 from specdev_tools.graph.kinds import RECORD_ROLE, SEED_KIND
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node, article, collapse_whitespace
-from specdev_tools.graph.queries import own_content
+from specdev_tools.graph.queries import milestone_of, own_content
 
 START = "start"
 POINTER_KIND = "pointer"
@@ -47,7 +47,6 @@ REPORT_NAMES = (AMBIGUITY, DEPENDENCY)
 OUT, IN, PARENT, CHILDREN = "out", "in", "parent", "children"
 DIRECTIONS = (OUT, IN, PARENT, CHILDREN)
 ABOUT_FIELD = "about"
-ROADMAP_MILESTONE = "roadmap-milestone"
 _TABLE_RELATIVE = os.path.join("tools", "graph_recipes.json")
 PARENT_VIA = "parent of "
 _START_SET_VIA = "start set"
@@ -565,21 +564,9 @@ def _start_node(graph: Graph, table: RecipeTable, role: str, start_id: str) -> N
     return node
 
 
-def _milestone_of(graph: Graph, start: Node) -> str | None:
-    """The id of the milestone *start* belongs to: the ``milestone`` of its plan file, else its containing roadmap milestone."""
-    node: Node | None = start
-    while node is not None:
-        if node.milestone is not None:
-            return graph.canonical_id(node.milestone)
-        if node.kind == ROADMAP_MILESTONE:
-            return node.id
-        node = graph.by_id.get(node.parent) if node.parent else None
-    return None
-
-
 def _plan_files(graph: Graph, start: Node) -> set[str]:
     """The plan file(s) whose ``milestone`` is the milestone of *start*."""
-    milestone = _milestone_of(graph, start)
+    milestone = milestone_of(graph, start)
     return {
         node.file for node in graph.nodes
         if milestone is not None and node.milestone is not None and graph.canonical_id(node.milestone) == milestone

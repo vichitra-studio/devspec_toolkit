@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Final
 
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.queries import ROADMAP_MILESTONE
 
 # link verbs
 REFINES = "refines"
@@ -21,6 +22,7 @@ SCHEDULES = "schedules"
 
 # kinds
 API = "api"
+API_ERROR = "api-error"
 COMPONENT = "component"
 CAPABILITY = "capability"
 CONNECTION = "connection"
@@ -29,11 +31,12 @@ CRITERION = "criterion"
 DESIGN_MILESTONE = "design-milestone"
 THIRD_PARTY = "third-party"
 TASK_CRITERION = "task-criterion"
-ROADMAP_MILESTONE = "roadmap-milestone"
 SCAFFOLD_ROW = "scaffold-row"
 FIXTURE = "fixture"
+FR = "fr"
 JOB = "job"
 RULE = "rule"
+TASK = "task"
 
 # modes
 MERGE: Final = "merge"

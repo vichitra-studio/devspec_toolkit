@@ -310,7 +310,7 @@ Eight more checks of `spec-check` read the nodes by role (codes in [Graph Role C
 
 | Check | Code | Reports |
 |-------|------|---------|
-| `no-dangling` | E740 | A node of a requirement, delivery or context kind that no other node uses: link it; schedule it, for a kind that a step 09 milestone's `schedules` is one of the ways to use (a criterion, an FR, an NFR); or, where the kind has a `scope` field, set `scope` to `later` or `out` and give a `scope_reason` |
+| `no-dangling` | E740 | A node of a requirement, delivery or context kind that no other node uses: link it; schedule it, for a kind that a step 09 milestone's `schedules` is one of the ways to use (a criterion, an FR, an NFR, an API, an invariant, a risk); or, where the kind has a `scope` field, set `scope` to `later` or `out` and give a `scope_reason` |
 | `term-use` | E741 | A glossary term whose label no node of steps 04 to 15 mentions |
 | `verifier-rules` | E742, E743 | A fixture that no task criterion lists in `verified_by`, or a job that none lists and that realises and verifies nothing (E742; a closed milestone's criterion counts as listing it); a criterion, API, invariant or NFR that no fixture verifies (E743, and for an NFR a job counts too; a node that a closed milestone's task criterion `removes` is not checked) |
 | `cross-cutting` | E744 | A task that an invariant or NFR applies to, when no criterion of the task refines it |

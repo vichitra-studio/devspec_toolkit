@@ -35,6 +35,12 @@ def link(source: str, field: str, target: str, *, built: bool | None = None) -> 
     return Link(source, field, target, LinkDecl(field, (), False, flag, ()))
 
 
+def declared(item: Node, decls: Mapping[str, KindDecl]) -> Node:
+    """*item* with each link given the declaration the registry (*decls*) has for its field on its kind, so ``required`` and the accepted kinds are the real ones."""
+    by_field = {declared_link.field: declared_link for declared_link in decls[item.kind].links}
+    return replace(item, links=tuple(replace(held, decl=by_field.get(held.field, held.decl)) for held in item.links))
+
+
 def role_of(kind: str) -> str:
     """The role a hand-built node of *kind* has unless the test says otherwise: a verifier, a plan node, or an obligation."""
     return "verifier" if kind in VERIFIER_KINDS else "plan" if kind in PLAN_KINDS else "obligation-system"
@@ -126,8 +132,10 @@ def closed_milestone(milestone_id: str) -> list[Node]:
     return [node(milestone_id, "roadmap-milestone"), anchor]
 
 
-def built_context(nodes: Iterable[Node], refines: Mapping[str, str] | None = None, **closed: Any) -> GraphCheckContext:
-    """The context of *nodes* plus the closed work *refines* (see ``closed_work``) with a lock at the current hashes."""
+def built_context(
+    nodes: Iterable[Node], refines: Mapping[str, str] | None = None, *, decls: Mapping[str, KindDecl] | None = None, **closed: Any,
+) -> GraphCheckContext:
+    """The context of *nodes* plus the closed work *refines* (see ``closed_work``) with a lock at the current hashes; *decls* are the kind declarations the graph holds (none by default)."""
     work, documents = closed_work(refines or {}, **closed)
-    graph = graph_of([*nodes, *work], documents)
+    graph = graph_of([*nodes, *work], documents, decls=decls)
     return context_of(graph, current_lock(graph))

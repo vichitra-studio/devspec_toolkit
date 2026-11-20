@@ -21,12 +21,12 @@ from specdev_tools.graph.model import Link, Node
 from specdev_tools.trace.hashing import compute_all
 
 from .context import GraphCheckContext
-from .names import API, COMPONENT, CONNECTION, CONSTRAINT, CONSTRAINS, DERIVES_FROM, PROVIDED_BY, REFINES, THIRD_PARTY
+from .names import API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINT, CONSTRAINS, DERIVES_FROM, PROVIDED_BY, REFINES, RULE, THIRD_PARTY
 
 OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
-EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", "rule", "threat", "edge-case"})
+EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", RULE, "threat", "edge-case"})
 """Kinds proved by evidence (step 02a deliveries, step-10 rules, step-11 threats and edge cases): ``PENDING_EVIDENCE`` by default."""
-COARSE_KINDS = frozenset({"scope-item", "risk", "capability"})
+COARSE_KINDS = frozenset({"scope-item", "risk", CAPABILITY})
 COMPONENT_USE_FIELDS = frozenset({PROVIDED_BY, CONSTRAINS})
 RELIES_ON = frozenset({"relies_on"})
 PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
