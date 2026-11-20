@@ -1,4 +1,4 @@
-spec-check: 22 checks run, 2 errors, 8 warnings
+spec-check: 27 checks run, 24 errors, 8 warnings
 
   [PASS] schema-validation              0 errors  0 warnings
   [FAIL] toolkit-version                1 errors  0 warnings
@@ -19,13 +19,13 @@ spec-check: 22 checks run, 2 errors, 8 warnings
   [PASS] glossary-drift-check           0 errors  0 warnings
   [SKIP] forward-replay-check           (use --include-forward-replay to check id regressions (E555) against the base ref)
   [PASS] trace-lock                     0 errors  0 warnings
-  [SKIP] no-dangling                    (not built yet)
+  [FAIL] no-dangling                    17 errors  0 warnings
   [PASS] term-use                       0 errors  0 warnings
-  [SKIP] verifier-rules                 (not built yet)
+  [FAIL] verifier-rules                 5 errors  0 warnings
   [FAIL] cross-cutting                  1 errors  0 warnings
   [PASS] refinement                     0 errors  0 warnings
-  [SKIP] scaffold-paths                 (not built yet)
-  [SKIP] seed-routes                    (not built yet)
-  [SKIP] prose-ids                      (not built yet)
+  [PASS] scaffold-paths                 0 errors  0 warnings
+  [PASS] seed-routes                    0 errors  0 warnings
+  [PASS] prose-ids                      0 errors  0 warnings
   [PASS] open-items                     0 errors  0 warnings
 

@@ -39,7 +39,9 @@ EXPIRED_FIXTURE = "fix-password-reset-expired-token"
 
 
 @pytest.fixture
-def example(tmp_path: Path) -> Example:
+def example(tmp_path: Path, gap_providers: Any) -> Example:
+    """The worked example in a copy.  No coverage-gap provider is registered (the ``gap_providers`` fixture clears them): the
+    role gaps the real graph checks report on this partial example are not the subject of these tests."""
     host = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, host)
     return Example(host)

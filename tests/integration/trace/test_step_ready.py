@@ -19,8 +19,12 @@ API_FILE = "05_interface_contracts.json"
 
 
 @pytest.fixture
-def host(tmp_path: Path) -> Example:
-    """The worked example (spec, seed docs and a current lock) in a temporary host."""
+def host(tmp_path: Path, gap_providers: Any) -> Example:
+    """The worked example (spec, seed docs and a current lock) in a temporary host, with no coverage-gap provider registered.
+
+    The role gaps the real graph checks report on the partial example would block every step after them; a test that
+    needs a gap registers its own stub.
+    """
     root = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, root)
     return Example(root)

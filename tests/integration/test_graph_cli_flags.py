@@ -17,7 +17,7 @@ import pytest
 
 from specdev_tools.graph.commands import run_node
 from specdev_tools.trace.lockfile import Lock, lock_path, read_lock, write_lock
-from unit.trace._lock_support import EXAMPLE_HOST
+from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture: no coverage-gap provider registered, so the role gaps of the partial example are not in these outputs)
 from unit.graph._synth import ROOT, copy_build_spec, copy_example, git, make_toolkit, run_cli, write_json
 
 _CRITERION = "ac-password-reset-3"
@@ -451,7 +451,7 @@ def test_stale_diff_adds_the_old_and_new_text_of_each_root(host: Path) -> None:
     assert "changed above:" not in run_cli("stale", *flags)[1]
 
 
-def test_stale_json_prints_the_suspects_by_step_and_the_totals(host: Path) -> None:
+def test_stale_json_prints_the_suspects_by_step_and_the_totals(host: Path, gap_providers: Any) -> None:
     document = _json(*run_cli("stale", *_flags(host / "spec", host), "--json"))
     assert set(document) == {"steps", "totals"}
     assert document["totals"]["suspect_links"] == sum(len(node["links"]) for step in document["steps"] for node in step["suspect_nodes"])
@@ -475,7 +475,7 @@ def test_coverage_by_fr_prints_the_matrix_of_the_frs(host: Path) -> None:
     assert fixtures["links"] == [{"node": "fix-password-reset-expired-token", "field": "verifies", "current": True, "suspect": False, "historical": False}]
 
 
-def test_coverage_json_prints_the_counts_as_json(host: Path) -> None:
+def test_coverage_json_prints_the_counts_as_json(host: Path, gap_providers: Any) -> None:
     flags = _flags(host / "spec", host)
     document = _json(*run_cli("coverage", *flags, "--json"))
     assert set(document) == {"command", "counts", "criteria_refined", "exempt", "role_findings"}

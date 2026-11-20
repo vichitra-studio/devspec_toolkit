@@ -196,9 +196,16 @@ class GraphCheckContext:
         """The in-play nodes in the order of every listing (step, then id); the one place a check starts from."""
         return sorted((node for node in self.graph.gated_nodes() if self.in_play(node)), key=self.graph.shape.order_key)
 
-    def finding(self, code: str, node: Node, message: str, *, target: str | None = None) -> SpecError:
-        """The finding *code* about *node*: it carries the node's file, jq path and id, the owner the ownership table gives for *code* and *node* (``None`` when the table has none), and *target* for a finding about one link."""
+    def finding(
+        self, code: str, node: Node, message: str, *, target: str | None = None, owner: str | None = None,
+        route: tuple[str, str] | None = None,
+    ) -> SpecError:
+        """The finding *code* about *node*: it carries the node's file, jq path and id, and the owner the ownership table gives for *code* and *node* (``None`` when the table has none).
+
+        *target* names the one link a finding is about; *owner*, when given, wins over the table's; *route* is the
+        ``(seed id, step)`` of a seed-route finding (``SpecError.route``).
+        """
         return make_error(
             code, message, file=node.file, jq_path=node.jq_path or None, node_id=node.id,
-            owner=owner_for(code, node, self.owner_context), target=target,
+            owner=owner if owner is not None else owner_for(code, node, self.owner_context), target=target, route=route,
         )

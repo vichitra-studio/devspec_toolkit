@@ -22,7 +22,8 @@ _TYPOGRAPHY = {
     **dict.fromkeys((0x201C, 0x201D, 0x201E, 0x201F), '"'),
     **dict.fromkeys((*range(0x2010, 0x2016), 0x2212), "-"),
 }
-_PATH_STEP = re.compile(r'\.([^.\[\]]+)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]')
+PATH_STEP = re.compile(r'\.([^.\[\]]+)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]')
+"""One step of a jq-style path as the graph writes it; the groups are ``(object key, array index, quoted key)``, one of them set."""
 
 
 def normalise_text(text: str) -> str:
@@ -52,7 +53,7 @@ def value_at(document: Mapping[str, Any], jq_path: str) -> Any:
     current: Any = document
     position = 0
     while position < len(jq_path):
-        step = _PATH_STEP.match(jq_path, position)
+        step = PATH_STEP.match(jq_path, position)
         if step is None:
             return None
         name, index, quoted = step.groups()

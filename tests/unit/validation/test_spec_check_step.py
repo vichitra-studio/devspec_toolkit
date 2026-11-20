@@ -244,6 +244,7 @@ def test_json_exit_code_ignores_pending_debt_and_gate_owned_findings(
     host = step_gate_host(tmp_path / "host", ["uncovered_capability"], commit=True)
     for name in ("broken_link_in_step_05", "missing_seed_file", "open_items"):
         apply_delta(host, name)
+    attest(host)  # the missing-seed delta adds a link (to its routed seed), which needs its lock entry
     for environment in ({}, {"SPECDEV_WARNINGS_AS_ERRORS": "1"}):
         for variable, value in environment.items():
             monkeypatch.setenv(variable, value)

@@ -639,6 +639,8 @@ def build_parser() -> _SpecdevParser:
     # --- trace commands (stale, ...): each parser names its handler ---
     from .trace.commands import add_trace_parsers
     add_trace_parsers(sub)
+    # `stale`, `coverage` and `step ready` read the coverage gaps; importing the package registers the role gap provider they ask.
+    import specdev_tools.validation.graph_checks  # noqa: F401
     p.ctx_parser = ctx_p
     return p
 

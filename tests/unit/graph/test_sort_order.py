@@ -416,3 +416,31 @@ def test_coverage_rows_and_groups_are_listed_in_step_then_id_order_whatever_the_
     assert [group["kind"] for group in criterion["groups"]] == ["api-error", "fixture", "edge-case", "task-criterion"]
     fixture_group = next(group for group in criterion["groups"] if group["kind"] == "fixture")
     assert [link["node"] for link in fixture_group["links"]] == ["fix-aaa-early", "fix-mmm-middle", "fix-password-reset-expired-token", "fix-zzz-late"]
+
+
+# --- validation/graph_checks/no_dangling.py  the E740 findings, listed in step then id order ---------------------------------
+
+_NO_DANGLING_CODE = f"""
+import json
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.model import Graph
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
+from specdev_tools.validation.graph_checks.no_dangling import check_no_dangling
+
+graph = build_graph({str(EXAMPLE_SPEC)!r}, {str(ROOT)!r})
+
+def listed(nodes):
+    reordered = Graph.from_nodes(nodes, shape=graph.shape)
+    reordered.decls = graph.decls
+    return [error.node_id for error in check_no_dangling(GraphCheckContext.from_graph(reordered, None, {str(ROOT)!r}), "merge")]
+
+print(json.dumps({{"forward": listed(graph.nodes), "reversed": listed(list(reversed(graph.nodes)))}}))
+"""
+
+
+@pytest.mark.parametrize("seed", HASH_SEEDS)
+def test_no_dangling_reports_in_the_same_order_whatever_the_hash_seed(seed: int) -> None:
+    """The nodes come in reverse order; the findings are in step order, then by id, as with the nodes in build order."""
+    got = json.loads(run_python_seeded(seed, _NO_DANGLING_CODE))
+    assert got["forward"] and got["reversed"] == got["forward"]
+    assert got["forward"].index("metric-reset-completion-rate") < got["forward"].index("dev") < got["forward"].index("nfr-latency-reset-email")

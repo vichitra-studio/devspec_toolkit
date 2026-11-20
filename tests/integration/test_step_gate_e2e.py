@@ -64,6 +64,12 @@ def _pairs(findings: list[dict[str, Any]]) -> list[tuple[str, str | None]]:
     return sorted((finding["code"], finding.get("node_id")) for finding in findings)
 
 
+def _not_graph_check(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The finding objects of *findings* whose code is not a graph check's: the worked example is a partial example, so its
+    graph-check findings (``tests/integration/test_graph_roles_example.py`` pins them) are left out of the cases about other rules."""
+    return [finding for finding in findings if finding["code"] not in GRAPH_CHECK_CODES]
+
+
 def _headers(output: str) -> list[str]:
     return STEP_HEADER.findall(output)
 
@@ -78,7 +84,7 @@ def test_doc_13_2_open_items_waiting_backlog_and_merge_gate(tmp_path: Path, caps
     assert _pairs(gate["own_warnings"]) == [("W630", "amb-reset-seed")]
 
     code, gate = _gate(capsys, host, "--step", "08")
-    assert code == 1 and gate["waiting"] == []
+    assert code == 1 and _not_graph_check([w["error"] for w in gate["waiting"]]) == []
     assert _pairs(gate["blocking"]) == [("E700", "api-below-items"), ("E700", "err-below-items-token-expired")]
     assert ("W630", "amb-reset-criterion") in _pairs(gate["own_warnings"])
 
@@ -136,7 +142,7 @@ def test_doc_13_9_rows_3_4_pending_with_stub_and_new_upstream_blocks(
     host = step_gate_host(tmp_path / "host", ["fr_nothing_uses"])
     code, gate = _gate(capsys, host, "--step", "04")
     assert code == 0 and gate["blocking"] == []
-    assert {owner: _pairs(found) for owner, found in gate["pending"].items() if owner == "08"} == {
+    assert {owner: _pairs(_not_graph_check(found)) for owner, found in gate["pending"].items() if owner == "08"} == {
         "08": [("E520", "fr-account-export")]
     }
 

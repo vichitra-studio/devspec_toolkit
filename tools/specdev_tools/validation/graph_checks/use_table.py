@@ -18,6 +18,8 @@ VERIFIER_ROLE = "verifier"
 EXCLUDED_VERBS = frozenset({"about", "replaces", "removes", "verifies", "verified_by"})
 """Verbs that are never a use: a record's ``about``, the id-history links, and the verifier verbs (a fixture that verifies a node does not use it)."""
 NON_HOLDER_ROLES = frozenset({RECORD_ROLE, VERIFIER_ROLE})
+VERIFIER_USE_VERB = "realises"
+"""The one verb through which a verifier is a use: a job that ``realises`` a rule uses it (DOC: a job is used through what it realises)."""
 
 
 class Use(NamedTuple):
@@ -66,11 +68,15 @@ USE_TABLE: Mapping[str, tuple[Use, ...]] = {
 }
 
 
+def _can_hold(holder: KindDecl, verb: str) -> bool:
+    return holder.role not in NON_HOLDER_ROLES or (holder.role == VERIFIER_ROLE and verb == VERIFIER_USE_VERB)
+
+
 def use_pairs(kind: str, decls: Mapping[str, KindDecl]) -> frozenset[Use]:
     """The (holder kind, verb) pairs whose link uses a node of *kind*.
 
     A kind with a row of ``USE_TABLE`` gets that row.  Any other kind gets every link declaration of *decls* that
-    accepts it, except the ``EXCLUDED_VERBS`` and the holders whose role is record or verifier.
+    accepts it, except the ``EXCLUDED_VERBS`` and the holders whose role is record or verifier (a verifier holds a use only through ``VERIFIER_USE_VERB``).
     """
     row = USE_TABLE.get(kind)
     if row is not None:
@@ -78,9 +84,8 @@ def use_pairs(kind: str, decls: Mapping[str, KindDecl]) -> frozenset[Use]:
     return frozenset(
         Use(holder.kind, link.field)
         for holder in decls.values()
-        if holder.role not in NON_HOLDER_ROLES
         for link in holder.links
-        if link.field not in EXCLUDED_VERBS and link.accepts(kind)
+        if link.field not in EXCLUDED_VERBS and link.accepts(kind) and _can_hold(holder, link.field)
     )
 
 

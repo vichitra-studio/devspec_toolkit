@@ -25,7 +25,7 @@ from specdev_tools.validation.graph_checks.term_use import check_term_use, label
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT, load_doc, run_cli, write_json
-from unit.trace._lock_support import EXAMPLE_HOST
+from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
 from unit.trace.test_suspects import CRITERION, Example
 
 NEW = "ac-password-reset-3b"
@@ -48,7 +48,8 @@ LABEL_USERS = [
 
 
 @pytest.fixture
-def host(tmp_path: Path) -> Example:
+def host(tmp_path: Path, gap_providers: Any) -> Example:
+    """The worked example in a copy, with no coverage-gap provider registered (the role gaps of the partial example are not the subject here)."""
     root = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, root)
     return Example(root)

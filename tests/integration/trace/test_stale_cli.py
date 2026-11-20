@@ -16,7 +16,7 @@ from specdev_tools.trace.lockfile import Lock, lock_path, read_lock, write_lock
 from specdev_tools.trace.merge_driver import install_driver
 
 from unit.graph._synth import ROOT, git, run_cli
-from unit.trace._lock_support import EXAMPLE_HOST
+from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
 from unit.trace.test_suspects import CRITERION, Example
 
 from .test_merge_driver_git import DRIVER_COMMAND
@@ -36,8 +36,11 @@ NAMED_NODES = {
 
 
 @pytest.fixture
-def host(tmp_path: Path) -> Example:
-    """The worked example (spec, seed docs and a current lock) in a git repository with one commit."""
+def host(tmp_path: Path, gap_providers: Any) -> Example:
+    """The worked example (spec, seed docs and a current lock) in a git repository with one commit.
+
+    No coverage-gap provider is registered (the role gaps of the partial example are not the subject of these tests).
+    """
     root = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, root)
     git(root, "init", "-q", "-b", "main")

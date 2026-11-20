@@ -127,7 +127,7 @@ def _waiting_on(ctx: CheckContext) -> WaitingOn | None:
     read = ctx.ambiguity_read
     if ctx.check_graph is None or read.error is not None:
         return None
-    return WaitingOn.from_items(ctx.check_graph, read.items)
+    return WaitingOn.from_items(ctx.check_graph, read.items, route_of=lambda error: error.route)
 
 
 def _gate_notes(ctx: CheckContext, baseline: BaselineResult) -> tuple[str, ...]:

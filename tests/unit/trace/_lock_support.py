@@ -22,11 +22,13 @@ EXAMPLE_HOST = ROOT / "tests" / "fixtures" / "graph_example"
 
 @pytest.fixture
 def gap_providers() -> Iterator[object]:
-    """``register_gap_provider`` for one test; the list of registered providers (module state) is restored when it ends.
+    """``register_gap_provider`` for one test, starting with NO provider registered; the registered providers (module state) are restored when it ends.
 
-    The one fixture of the tests that register a coverage-gap provider: import it into the test module.
+    The one fixture of the tests that register a coverage-gap provider, or that need the worked example without the role
+    gaps it reports under the real graph checks (M6b registers its provider on import): import it into the test module.
     """
     saved = list(gaps._providers)
+    gaps._providers.clear()
     yield gaps.register_gap_provider
     gaps._providers[:] = saved
 

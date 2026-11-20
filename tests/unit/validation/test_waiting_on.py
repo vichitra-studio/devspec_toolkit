@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from specdev_tools.core.ambiguity_items import AmbiguityItem
-from specdev_tools.core.errors import SpecError
+from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.git_base import BaselineResult
 from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.model import Graph
+from specdev_tools.validation.step_gate_run import _waiting_on
 from specdev_tools.validation.step_gate import WaitingOn, classify_for_step, declared_owner, waiting_map
 
 ROOT = Path(__file__).parents[3]
@@ -79,12 +81,16 @@ def test_new_upstream_error_under_an_open_item_still_blocks(graph: Graph, doc_it
     assert result.blocking.new_upstream == (found,) and not result.waiting
 
 
-def test_route_stub_waits_for_seed_and_step_05_not_06(graph: Graph, doc_items: list[AmbiguityItem]) -> None:
-    routed = error("step:05", None, "E900")
-    on = waiting(graph, doc_items, route_of=lambda e: (SEED, "05") if e.code == "E900" else None)
-    assert on.reasons(routed, "05") == ("waiting on amb-reset-seed",)
-    assert on.reasons(routed, "06") == ()
-    assert gate([routed], "05", on).clear
+def test_route_of_makes_the_e748_of_its_step_wait_on_an_open_item_about_the_seed(graph: Graph, doc_items: list[AmbiguityItem]) -> None:
+    """The gate's own waiting context (``step_gate_run._waiting_on``) reads the route an E748 carries: step 05 waits, step 06 does not."""
+    read = SimpleNamespace(error=None, items=doc_items)
+    on = _waiting_on(SimpleNamespace(check_graph=graph, ambiguity_read=read))
+    assert on is not None
+    unused = make_error("E748", "m", node_id=SEED, owner="step:05", route=(SEED, "05"))
+    assert on.reasons(unused, "05") == ("waiting on amb-reset-seed",)
+    assert on.reasons(unused, "06") == ()
+    assert gate([unused], "05", on).clear
+    assert on.reasons(make_error("E748", "m", node_id=SEED, owner="step:05"), "05") == ()
 
 
 def test_ambiguity_item_nodes_are_not_in_the_closure(graph: Graph, doc_items: list[AmbiguityItem]) -> None:

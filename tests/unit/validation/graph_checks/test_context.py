@@ -200,6 +200,14 @@ def test_finding_carries_file_jq_path_node_id_owner_and_target(example: GraphChe
     )
 
 
+def test_finding_owner_given_wins_over_the_table_and_route_is_carried(example: GraphCheckContext) -> None:
+    node = example.graph.by_kind["component"][0]
+    assert example.finding(NODE_DANGLING, node, "m").owner == "step:11"
+    error = example.finding(NODE_DANGLING, node, "m", owner="step:05", route=("seed-x", "05"))
+    assert (error.owner, error.route) == ("step:05", ("seed-x", "05"))
+    assert example.finding(NODE_DANGLING, node, "m").route is None
+
+
 def test_finding_without_a_jq_path_carries_none() -> None:
     node = replace(_node(), jq_path="")
     assert _context(node).finding(NODE_DANGLING, node, "m").jq_path is None

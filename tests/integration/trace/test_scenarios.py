@@ -19,7 +19,7 @@ from specdev_tools.trace.lockfile import read_lock
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT
-from unit.trace._lock_support import git_copy_of_example, run_on_example
+from unit.trace._lock_support import gap_providers, git_copy_of_example, run_on_example  # noqa: F401  (gap_providers is a fixture)
 from unit.trace.test_suspects import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
 
 FR, SUCCESSOR = "fr-password-reset", "fr-account-recovery-link"
@@ -42,7 +42,8 @@ SUCCESSOR_FR = {
 
 
 @pytest.fixture
-def host(tmp_path: Path) -> Example:
+def host(tmp_path: Path, gap_providers: Any) -> Example:
+    """A git copy of the example, with no coverage-gap provider registered (the role gaps of the partial example are not the subject here)."""
     return Example(git_copy_of_example(tmp_path / "host"))
 
 
