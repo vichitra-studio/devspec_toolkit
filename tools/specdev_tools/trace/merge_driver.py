@@ -43,15 +43,15 @@ class DriverInstall:
     driver_config: str
 
 
-def _entry_rank(entry: LockEntry) -> tuple[str, str, bool]:
-    return (entry.chain_stamp, entry.content_hash, entry.baseline)
+def _entry_rank(entry: LockEntry) -> tuple[str, str, bool, tuple[str, ...]]:
+    return (entry.chain_stamp, entry.content_hash, entry.baseline, entry.target_containers)
 
 
 def merge_entry(base: LockEntry | None, ours: LockEntry | None, theirs: LockEntry | None) -> LockEntry | None:
     """The merged entry of one key from its three versions (``None`` = absent); ``None`` means the entry is gone.
 
     A change on one side only is taken; one side deleting and the other changing keeps the changed entry; two
-    different changes keep the base entry, or the entry with the smaller (chain stamp, content hash, baseline) when the
+    different changes keep the base entry, or the entry with the smaller (chain stamp, content hash, baseline, target containers) when the
     base has none.
     """
     if ours == theirs or theirs == base:

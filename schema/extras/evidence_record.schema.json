@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:extras:evidence-record",
   "title": "Evidence Record",
-  "description": "An evidence record states that a verification ran (type run) or that a person attests a node (type attestation), against one code tree. One record per file, spec/extras/verification/evd-<id>.json, written by the toolkit and never by hand. The file holds a records array of exactly one record, and the file name without .json is the record id. It carries no timestamp: the git author and commit date the record.",
+  "description": "An evidence record states that a verification ran (type run), that a person attests a node (type attestation) or that a deploy found the installed version of a third party (type install-check), against one code tree. One record per file, spec/extras/verification/evd-<id>.json, written by the toolkit and never by hand. The file holds a records array of exactly one record, and the file name without .json is the record id. It carries no timestamp: the git author and commit date the record.",
   "type": "object",
   "required": ["records"],
   "additionalProperties": false,
@@ -22,7 +22,7 @@
         "files": ["extras/verification/evd-*.json"]
       },
       "items": {
-        "description": "An evidence record. A run names a verification record and holds the exit code, the guard result and the hash of the output; an attestation names the nodes a person attests and holds none of these.",
+        "description": "An evidence record. A run names a verification record and holds the exit code, the guard result and the hash of the output; an attestation names the nodes a person attests and holds the git author; an install-check names one third party and holds the versions installed at deploy. Each of the three holds only its own fields.",
         "type": "object",
         "required": ["evidence_id", "about", "tested_tree"],
         "additionalProperties": false,
@@ -33,13 +33,13 @@
             "pattern": "^evd-[a-z0-9]+(?:-[a-z0-9]+)*$"
           },
           "type": {
-            "description": "run: the commands of a verification record ran. attestation: a person states that the node holds. Default run.",
+            "description": "run: the commands of a verification record ran. attestation: a person states that the node holds. install-check: the deploy job found the installed version of a third party (an audit trail; no proof reads it). Default run.",
             "type": "string",
-            "enum": ["run", "attestation"],
+            "enum": ["run", "attestation", "install-check"],
             "default": "run"
           },
           "about": {
-            "description": "Ids of what the record is about: for a run, the verification record it ran (one item); for an attestation, the nodes attested.",
+            "description": "Ids of what the record is about: for a run, the verification record it ran (one item); for an attestation, the nodes attested; for an install-check, the one third-party node checked.",
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
@@ -73,26 +73,78 @@
             "pattern": "^sha256:[0-9a-f]{64}$"
           },
           "installed_versions": {
-            "description": "Version of each third party the verified nodes rely on, as installed during the run: third-party node id to version string. A run only.",
+            "description": "Version of each third party as installed: third-party node id to version string. A run holds the third parties the verified nodes rely on; an install-check holds the one it checked. Never on an attestation.",
             "type": "object",
             "additionalProperties": {"type": "string", "minLength": 1}
+          },
+          "recorded_hashes": {
+            "description": "Content hash of each node the record rests on, as it was when the tool wrote the record: node id to hash. A run holds the verifier and each proved target; an attestation holds the attested nodes. Never on an install-check.",
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {"type": "string", "minLength": 1},
+            "additionalProperties": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+          },
+          "git_author": {
+            "description": "The git author of the person who attested: name and email as git reports them. An attestation only.",
+            "type": "object",
+            "required": ["name", "email"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "email": {"type": "string", "minLength": 1}
+            }
+          },
+          "env": {
+            "description": "Name of the environment the install-check was made for (the deploy job's --env). An install-check only.",
+            "type": "string",
+            "minLength": 1
+          },
+          "tag": {
+            "description": "Release tag the deploy job deployed (the deploy job's --tag). Optional. An install-check only.",
+            "type": "string",
+            "minLength": 1
           }
         },
-        "if": {
-          "required": ["type"],
-          "properties": {"type": {"const": "attestation"}}
-        },
-        "then": {
-          "properties": {
-            "exit_code": false,
-            "guard_matched": false,
-            "output_hash": false,
-            "installed_versions": false
+        "allOf": [
+          {
+            "if": {"required": ["type"], "properties": {"type": {"const": "attestation"}}},
+            "then": {
+              "required": ["git_author"],
+              "properties": {
+                "exit_code": false,
+                "guard_matched": false,
+                "output_hash": false,
+                "installed_versions": false,
+                "env": false,
+                "tag": false
+              }
+            }
+          },
+          {
+            "if": {"required": ["type"], "properties": {"type": {"const": "install-check"}}},
+            "then": {
+              "required": ["installed_versions", "env"],
+              "properties": {
+                "exit_code": false,
+                "guard_matched": false,
+                "output_hash": false,
+                "recorded_hashes": false,
+                "git_author": false
+              }
+            }
+          },
+          {
+            "if": {"required": ["type"], "properties": {"type": {"enum": ["attestation", "install-check"]}}},
+            "else": {
+              "required": ["exit_code", "guard_matched", "output_hash"],
+              "properties": {
+                "git_author": false,
+                "env": false,
+                "tag": false
+              }
+            }
           }
-        },
-        "else": {
-          "required": ["exit_code", "guard_matched", "output_hash"]
-        }
+        ]
       }
     }
   }

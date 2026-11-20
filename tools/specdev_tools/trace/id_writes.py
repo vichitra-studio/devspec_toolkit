@@ -48,7 +48,7 @@ from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import contract_lines
-from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, replace_file_atomically, write_lock
+from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of, read_lock, replace_file_atomically, write_lock
 from specdev_tools.trace.writing import seed_texts_for_write, writing_graph
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
 from specdev_tools.validation.linter_utils import graph_known_ids
@@ -492,7 +492,7 @@ def _lock_after(base: Graph, candidate: Graph, lock: Lock, seed_texts: Mapping[s
     hashes = compute_all(candidate, seed_texts)
     had = _link_keys(base)
     written = tuple(
-        LockEntry(item.holder.id, item.link.field, item.link.target, *hashes[item.target.id])
+        LockEntry(item.holder.id, item.link.field, item.link.target, *hashes[item.target.id], target_containers=containers_of(candidate, item.target))
         for item in lock_links(candidate)
         if item.key not in had and item.target.id in hashes
     )

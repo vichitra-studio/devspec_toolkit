@@ -4,7 +4,9 @@
   "title": "Verification Record",
   "description": "A verification record binds the commands that prove a fixture, a CI job or a rule to the output they must print. One record per file, spec/extras/verification/ver-<id>.json, written by the toolkit and never by hand. The file holds a records array of exactly one record, and the file name without .json is the record id.",
   "type": "object",
-  "required": ["records"],
+  "required": [
+    "records"
+  ],
   "additionalProperties": false,
   "properties": {
     "records": {
@@ -15,14 +17,26 @@
       "x-node": {
         "kind": "verification-record",
         "role": "record",
-        "contract": ["verifies", "stage", "commands", "output_guard"],
+        "contract": [
+          "verifies",
+          "stage",
+          "commands",
+          "output_guard"
+        ],
         "id": "verification_id",
-        "files": ["extras/verification/ver-*.json"]
+        "files": [
+          "extras/verification/ver-*.json"
+        ]
       },
       "items": {
         "description": "A verification record: what it verifies, at which stage, the commands to run and the guard the output must match.",
         "type": "object",
-        "required": ["verification_id", "verifies", "commands", "output_guard"],
+        "required": [
+          "verification_id",
+          "verifies",
+          "commands",
+          "output_guard"
+        ],
         "additionalProperties": false,
         "properties": {
           "verification_id": {
@@ -35,11 +49,37 @@
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": {"$ref": "vc:core:atoms#kebabId"},
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
             "x-link": {
-              "kinds": ["fixture", "job", "rule"],
+              "kinds": [
+                "fixture",
+                "job",
+                "rule"
+              ],
               "required": true
             }
+          },
+          "proves": {
+            "description": "Ids of the nodes this binding proves: the targets of the fixture, or what the job realises. Empty (the default) for a removal fixture or a rule, which prove no node. The stage of the binding is the highest stage these nodes need.",
+            "type": "array",
+            "uniqueItems": true,
+            "default": [],
+            "items": {
+              "$ref": "vc:core:graph#nodeId"
+            },
+            "x-link": {
+              "kinds": "*",
+              "required": false
+            }
+          },
+          "proves": {
+            "description": "Ids of the nodes this binding proves: the targets of the fixture, or what the job realises. Empty (the default) for a removal fixture or a rule, which prove no node. The stage of the binding is the highest stage these nodes need.",
+            "type": "array",
+            "uniqueItems": true,
+            "default": [],
+            "items": {"$ref": "vc:core:graph#nodeId"}
           },
           "stage": {
             "description": "Stage at which the commands run: dev, ci, staging or prod. Default dev. Evidence from a later stage on the same code tree also satisfies an earlier stage, never the reverse.",
@@ -50,7 +90,10 @@
             "description": "The commands to run, each a shell command line. At least one.",
             "type": "array",
             "minItems": 1,
-            "items": {"type": "string", "minLength": 1}
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "output_guard": {
             "description": "A regular expression the output of the commands must match. It is the only protection against a command that exits 0 having run nothing, so it is required; use the test's own name or a line only a real run prints.",

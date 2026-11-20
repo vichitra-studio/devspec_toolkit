@@ -23,7 +23,7 @@ from specdev_tools.graph.queries import plural, unknown_node_error
 from specdev_tools.trace import replay
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.trace.lockfile import Lock, LockEntry
+from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of
 from specdev_tools.trace.replay import ReplayNode, ReplayPlan, ReplayStep, RootDiff
 from specdev_tools.trace.suspects import EntryIndex, LockedLink, SuspectLink, lock_links, orphan_entries
 
@@ -115,7 +115,7 @@ class _State:
                 continue
             key = entry.key if entry is not None else item.key
             content, chain = self.hashes[item.target.id]
-            links.append(AttestedLink(LockEntry(*key, content, chain), entry, suspect))
+            links.append(AttestedLink(LockEntry(*key, content, chain, target_containers=containers_of(self.graph, item.target)), entry, suspect))
         return links
 
     def blockers(self, holder: str, cleared: Collection[str] = ()) -> tuple[Blocker, ...]:

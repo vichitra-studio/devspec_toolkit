@@ -28,8 +28,9 @@ from specdev_tools.registry.schema_paths import PathInfo, flatten_schema_dir
 _ROOT = Path(__file__).parents[3]
 _BASELINE = _ROOT / "tests" / "fixtures" / "schema_baseline" / "paths_1.1.1.json"
 
-#: Schemas that describe the toolkit's own file formats; no host migrates them, so no row covers them.
-_TOOLKIT_FORMAT_SCHEMAS = frozenset({"cli_commands", "entry_key_registry", "step_order"})
+#: Schemas with no 1.1.1 form to migrate, so no row covers them: three are the toolkit's own file formats, and
+#: `host_declarations` is an optional host file that is new in 1.2.0.
+_SCHEMAS_WITH_NO_1_1_1_FORM = frozenset({"cli_commands", "entry_key_registry", "step_order", "host_declarations"})
 
 #: Removals the design names (DS L112, DS L352 H9, DOC L1167-1186): ``(where the design names it, schema, baseline path)``.
 _DESIGN_REMOVALS = (
@@ -229,8 +230,8 @@ def test_forward_closure_each_row_change_holds_in_current_schemas(
 def test_backward_closure_every_differing_path_is_covered_by_a_row(
     rows: list[ChangeRow], baseline: dict[str, dict[str, PathInfo]], current: dict[str, dict[str, PathInfo]]
 ) -> None:
-    schemas = (set(baseline) | set(current)) - _TOOLKIT_FORMAT_SCHEMAS
-    assert _TOOLKIT_FORMAT_SCHEMAS <= set(baseline) | set(current)
+    schemas = (set(baseline) | set(current)) - _SCHEMAS_WITH_NO_1_1_1_FORM
+    assert _SCHEMAS_WITH_NO_1_1_1_FORM <= set(baseline) | set(current)
     assert uncovered_paths(rows, baseline, current, schemas) == []
 
 

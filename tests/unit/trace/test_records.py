@@ -57,6 +57,7 @@ DOC_ATTESTATION = {
     "about": [FIXTURE],
     "tested_tree": "9a41c7e2",
     "stage": "staging",
+    "git_author": {"name": "A Person", "email": "person@example.org"},
 }
 
 

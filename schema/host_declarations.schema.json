@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:host-declarations",
+  "title": "host_declarations",
+  "description": "What only the host repository knows and the toolkit cannot derive: the release-tag pattern, the setup command, the paths left out of the code-tree id and where each third-party version is declared in the repository. One file per host, spec/common/host_declarations.json, written by hand; every key is optional and a host that does not have the file keeps working.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URI identifying the schema this file conforms to: vc:host-declarations."
+    },
+    "release_tag_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Regular expression a git tag must match to count as a release tag. Decision rule: write the pattern of the tags your release process creates, anchored at both ends. Correct: '^v[0-9]+\\.[0-9]+\\.[0-9]+$'. Anti-pattern: an unanchored pattern such as 'v1', which also matches candidate tags like 'v1.0.0-stage'."
+    },
+    "setup_command": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Shell command that prepares a clean checkout to run the verification commands (install dependencies, build generated sources). Decision rule: the one command a new contributor runs before the first test. Correct: 'npm ci'. Anti-pattern: a command that also starts services or runs tests."
+    },
+    "code_tree_exclusions": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Git pathspecs left out of the code-tree id, so a change under them does not invalidate recorded evidence. Decision rule: list what is not the product's own code and changes without changing behaviour. Correct: the toolkit submodule path, generated report folders. Anti-pattern: a source folder of the product, which would let evidence outlive a code change.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "description": "One git pathspec, relative to the repository root. Example: 'devspec_toolkit' or 'test-results/'."
+      }
+    },
+    "pin_sources": {
+      "type": "object",
+      "description": "Where the repository declares the version of each third party, keyed by the id of its third-party node. Every listed source must equal the pin of the node. Decision rule: list the files the build or deploy reads the version from (a lock file, a manifest, a version constant in code). A third party with no entry is not checked.",
+      "propertyNames": {
+        "$ref": "vc:core:atoms#kebabId",
+        "description": "Id of a third-party node, as step 02 declares it. Example: 'tp-argon2'."
+      },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "description": "The sources of one third party; all must equal its pin.",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "A value read from a JSON file by an RFC 6901 JSON pointer.",
+              "required": ["type", "file", "pointer"],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "json-pointer",
+                  "description": "Source type: the value is the string the pointer selects in the JSON file."
+                },
+                "file": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Path of the JSON file relative to the repository root. Example: 'package-lock.json'."
+                },
+                "pointer": {
+                  "type": "string",
+                  "pattern": "^/",
+                  "description": "RFC 6901 JSON pointer into the file; '~1' stands for '/' and '~0' for '~' inside a key. The pointer must select a string. Example: '/packages/node_modules~1argon2/version'."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "description": "A value read from a text file by a regular expression.",
+              "required": ["type", "file", "pattern"],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "regex",
+                  "description": "Source type: the value is the capture group of the first match of the pattern in the text file."
+                },
+                "file": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Path of the text file relative to the repository root. Example: 'src/mail/client.ts'."
+                },
+                "pattern": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Regular expression with exactly one capture group; the first match in the file gives the value. Example: 'MAILRELAY_API_VERSION = \"(api-v[0-9]+)\"'."
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

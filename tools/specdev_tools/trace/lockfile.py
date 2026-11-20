@@ -21,10 +21,13 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from dataclasses import field as dataclass_field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME, resolve_extras_path
 from specdev_tools.core.errors import FindingError, make_error
+
+if TYPE_CHECKING:
+    from specdev_tools.graph.model import Graph, Node
 
 LOCK_SCHEMA_URI = "vc:extras:trace-lock"
 LOCK_VERSION = 1
@@ -34,7 +37,7 @@ _DEFAULT_FILE_MODE = 0o644
 _HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CONFLICT_RE = re.compile(rf"^{CONFLICT_MARKER}", re.MULTILINE)
 _REQUIRED_KEYS = ("source", "field", "target", "content_hash", "chain_stamp")
-_ENTRY_KEYS = (*_REQUIRED_KEYS, "baseline")
+_ENTRY_KEYS = (*_REQUIRED_KEYS, "target_containers", "baseline")
 _TOP_KEYS = frozenset({"$schema", "version", "entries"})
 _HASH_KEYS = ("content_hash", "chain_stamp")
 
@@ -57,6 +60,7 @@ class LockEntry:
     content_hash: str
     chain_stamp: str
     baseline: bool = False
+    target_containers: tuple[str, ...] = ()
 
     @property
     def key(self) -> tuple[str, str, str]:
@@ -90,6 +94,20 @@ class Lock:
     def get(self, holder: str, field: str, target: str) -> LockEntry | None:
         """The entry for the link (*holder*, *field*, *target*) with the ids exactly as written, or ``None``."""
         return self._by_key.get((holder, field, target))
+
+
+def containers_of(graph: Graph, node: Node) -> tuple[str, ...]:
+    """The ids of the nodes that enclose *node*: its containment parent, then that node's parent, up to the top.
+
+    Nearest first, and empty for a node with no parent.  This is what ``LockEntry.target_containers`` records for the
+    target of a link when the entry is written.
+    """
+    found: list[str] = []
+    parent = graph.by_id.get(node.parent) if node.parent else None
+    while parent is not None and parent.id not in found:
+        found.append(parent.id)
+        parent = graph.by_id.get(parent.parent) if parent.parent else None
+    return tuple(found)
 
 
 def lock_path(spec_dir: str) -> str:
@@ -139,8 +157,17 @@ def _entry_from_object(raw: object, path: str, index: int) -> LockEntry:
             raise _malformed(path, f"{where}: {key} must be sha256: followed by 64 lower-case hex digits")
     if "baseline" in raw and raw["baseline"] is not True:
         raise _malformed(path, f"{where}: baseline is present only when true")
+    containers = raw.get("target_containers", [])
+    if "target_containers" in raw and (
+        not isinstance(containers, list)
+        or not containers
+        or len(set(containers)) != len(containers)
+        or not all(isinstance(item, str) and item for item in containers)
+    ):
+        raise _malformed(path, f"{where}: target_containers is present only as a non-empty list of distinct ids")
     return LockEntry(
-        raw["source"], raw["field"], raw["target"], raw["content_hash"], raw["chain_stamp"], "baseline" in raw
+        raw["source"], raw["field"], raw["target"], raw["content_hash"], raw["chain_stamp"], "baseline" in raw,
+        tuple(containers),
     )
 
 
@@ -197,7 +224,9 @@ def read_lock(spec_dir: str) -> Lock:
 
 
 def _entry_line(entry: LockEntry) -> str:
-    fields = {key: getattr(entry, key) for key in _REQUIRED_KEYS}
+    fields: dict[str, Any] = {key: getattr(entry, key) for key in _REQUIRED_KEYS}
+    if entry.target_containers:
+        fields["target_containers"] = list(entry.target_containers)
     if entry.baseline:
         fields["baseline"] = True
     return json.dumps(fields, ensure_ascii=False, separators=(",", ":"))

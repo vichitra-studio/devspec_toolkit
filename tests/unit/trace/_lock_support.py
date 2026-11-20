@@ -13,7 +13,7 @@ from specdev_tools.graph.gitview import read_seed_texts
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace import gaps
 from specdev_tools.trace.hashing import compute_all
-from specdev_tools.trace.lockfile import Lock, LockEntry, write_lock
+from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of, write_lock
 from specdev_tools.trace.suspects import lock_links
 
 ROOT = Path(__file__).parents[3]
@@ -45,7 +45,7 @@ def lock_for(graph: Graph, host_root: Path | str, *, only_holders: Iterable[str]
     hashes = compute_all(graph, read_seed_texts(graph, str(host_root)))
     wanted = None if only_holders is None else set(only_holders)
     return Lock(tuple(
-        LockEntry(item.holder.id, item.link.field, item.link.target, *hashes[item.target.id])
+        LockEntry(item.holder.id, item.link.field, item.link.target, *hashes[item.target.id], target_containers=containers_of(graph, item.target))
         for item in lock_links(graph)
         if wanted is None or item.holder.id in wanted
     ))

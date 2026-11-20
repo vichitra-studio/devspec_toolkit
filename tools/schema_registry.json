@@ -30,6 +30,7 @@
   "vc:entry-key-registry": "schema/entry_key_registry.schema.json",
   "vc:seed-manifest": "schema/seed_manifest.schema.json",
   "vc:seed-requirements": "schema/seed_requirements.schema.json",
+  "vc:host-declarations": "schema/host_declarations.schema.json",
   "vc:step-order": "schema/step_order.schema.json",
   "vc:cli-commands": "schema/cli_commands.schema.json",
   "vc:extras:trace-lock": "schema/extras/trace_lock.schema.json",
