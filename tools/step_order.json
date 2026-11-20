@@ -1,6 +1,6 @@
 {
   "_notes": {
-    "declared_edges": "Hand-carried [producer, consumer] pairs. Steps 13, 16a, 16b and 16c keep their 1.1.1 context reads (the Trinity steps have no stored links to them yet): M8 gives 16a-16c records with links and removes their pairs. Step 14 keeps its 1.1.1 read of step 13. [09, 14] and [14, 16] are computed links no annotation carries.",
+    "declared_edges": "Hand-carried [producer, consumer] pairs, counted as required edges for context reads no stored link derives. Steps 13, 16a, 16b and 16c keep their 1.1.1 context reads: a plan item's 'realises' link derives [14, 16a], so that pair is not carried, but an execution record is a record, and the links of a record derive no edge, so [16a, 16b] and the other pairs into 16a to 16c stay (they feed 'specdev step ready' and 'specdev prompt-context'). Step 14 keeps its 1.1.1 read of step 13. [09, 14] and [14, 16] are computed links no annotation carries.",
     "downstream_consumers": "Records which steps actively consume each step's output. Read by 'specdev prompt-context', the context loaders, 'dag-lint' and 'dependency-order-lint'.",
     "step_metadata": "Per-step declarative metadata. required_spec_inputs is the inverse of downstream_consumers (producers that feed into this step) \u2014 kept redundant for O(1) lookup and consistency validation."
   },

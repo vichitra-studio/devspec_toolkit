@@ -23,6 +23,8 @@ from ._lock_support import lock_for
 
 VERIFICATION_URI = "vc:extras:verification-record"
 EVIDENCE_URI = "vc:extras:evidence-record"
+SIGNOFF_URI = "vc:extras:signoff-record"
+AT_DEPLOY_URI = "vc:extras:at-deploy-record"
 VER_REL = "extras/verification/ver-password-reset-expired-token.json"
 FIXTURE = "fix-password-reset-expired-token"
 OUTPUT_HASH = "sha256:" + "c0ffee5e" * 8
@@ -40,6 +42,32 @@ DOC_STAGING_VERIFICATION = {
     "stage": "staging",
     "commands": ["./scripts/synthetic-reset.sh --env staging --max-seconds 60"],
     "output_guard": "delivered in [0-9]+ s",
+}
+DOC_SIGNOFF = {
+    "signoff_id": "so-ms-account-recovery-0001",
+    "about": ["ms-account-recovery"],
+    "tree": "9a41c7e2",
+    "git_author": {"name": "A Person", "email": "person@example.org"},
+    "recorded_at": "2026-12-02T10:00:00Z",
+    "listed": {
+        "manual_fixtures": 1,
+        "attested": 1,
+        "deferred_tasks": [],
+        "wont_do_tasks": [],
+        "open_items": 0,
+        "staging_prod_proof_owed": [],
+    },
+}
+DOC_AT_DEPLOY = {
+    "deploy_id": "dep-0001",
+    "about": ["PWRESET_CONFIRM_EXPIRED_01"],
+    "milestone": "ms-account-recovery",
+    "action": "a01",
+    "env": "staging",
+    "tree": "9a41c7e2",
+    "outcome": "done",
+    "recorded_at": "2026-12-02T10:00:00Z",
+    "git_author": {"name": "ci", "email": ""},
 }
 DOC_RUN = {
     "evidence_id": "evd-20261202-0007",
@@ -281,3 +309,39 @@ def test_spec_check_skips_records_when_there_is_no_record_file(tmp_path: Path) -
 def test_the_worked_example_record_is_the_section12_record() -> None:
     document = json.loads((EXAMPLE_SPEC / VER_REL).read_text(encoding="utf-8"))
     assert document == _verification_file(copy.deepcopy(DOC_VERIFICATION))
+
+
+def test_signoff_folder_is_checked_by_check_records(tmp_path: Path) -> None:
+    spec = _spec(tmp_path, dep_0001=_wrap(AT_DEPLOY_URI, DOC_AT_DEPLOY))
+    write_json(spec, "extras/signoff/so-ms-account-recovery-0001.json", _wrap(SIGNOFF_URI, DOC_SIGNOFF))
+    graph = build_graph(str(spec), str(ROOT))
+    kinds = {node.id: node.kind for node in graph.nodes if node.file.startswith("extras/")}
+    assert kinds["so-ms-account-recovery-0001"] == "signoff-record"
+    assert kinds["dep-0001"] == "at-deploy-record"
+    assert _findings(spec) == []
+    assert _finding_codes(spec) == []
+    broken = {**DOC_SIGNOFF, "tree": ""}
+    write_json(spec, "extras/signoff/so-ms-account-recovery-0001.json", _wrap(SIGNOFF_URI, broken))
+    errors = _findings(spec)
+    assert [(error.code, error.file) for error in errors] == [("E774", "extras/signoff/so-ms-account-recovery-0001.json")]
+    unresolved = _spec(tmp_path / "other", dep_0001=_wrap(AT_DEPLOY_URI, {**DOC_AT_DEPLOY, "about": ["PWRESET_NO_SUCH_01"]}))
+    assert _finding_codes(unresolved) == [("graph", "E700", "dep-0001")]
+
+
+@pytest.mark.parametrize(
+    ("folder", "name", "uri", "document"),
+    [
+        ("signoff", "so-ms-account-recovery-0002", SIGNOFF_URI, DOC_SIGNOFF),
+        ("verification", "dep-0002", AT_DEPLOY_URI, DOC_AT_DEPLOY),
+        ("verification", "so-ms-account-recovery-0001", SIGNOFF_URI, DOC_SIGNOFF),
+        ("signoff", "dep-0001", AT_DEPLOY_URI, DOC_AT_DEPLOY),
+    ],
+    ids=["signoff-stem", "dep-stem", "signoff-in-the-verification-folder", "dep-in-the-signoff-folder"],
+)
+def test_signoff_and_dep_stem_must_equal_the_id(tmp_path: Path, folder: str, name: str, uri: str, document: dict[str, Any]) -> None:
+    spec = copy_example(tmp_path / "spec")
+    write_json(spec, f"extras/{folder}/{name}.json", _wrap(uri, document))
+    errors = _findings(spec)
+    assert {error.code for error in errors} == {"E774"}
+    assert errors[0].file == f"extras/{folder}/{name}.json"
+    assert "is not the record id" in _messages(errors) or "no record found" in _messages(errors)

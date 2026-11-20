@@ -46,7 +46,7 @@ _EXPECTED_KINDS: dict[str, dict[str, str]] = {
     "14": {"roadmap-milestone": "milestone_id", "task": "task_id", "task-criterion": "criterion_id"},
     "15": {"scaffold-row": "row_id"},
     "16_anchor": {"anchor-row": "anchor_id"},
-    "16_impl_context": {"plan-item": "id"},
+    "16_impl_context": {"plan-item": "id", "execution-record": "record_id"},
 }
 
 
@@ -122,6 +122,7 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("16_anchor.schema.json", "/properties/plan/properties/milestone_index/items/properties/about", ["roadmap-milestone"]),
     ("16_impl_context.schema.json", "/properties/plan/properties/spec_alignment/properties/checklist/items/properties/realises", ["task-criterion"]),
     ("16_impl_context.schema.json", "/properties/plan/properties/spec_alignment/properties/checklist/items/properties/replaces", "*"),
+    ("16_impl_context.schema.json", "/properties/execution/properties/records/items/properties/about", ["plan-item"]),
 ]
 
 
@@ -441,7 +442,7 @@ def test_step_16_anchor_row_is_a_record_about_exactly_one_roadmap_milestone(decl
 
 def test_step_16_plan_item_realises_task_criteria_builds_nothing_and_is_a_16a_kind_in_plan_files(decls, reader) -> None:
     fname = "16_impl_context.schema.json"
-    _assert_links(decls, fname, {"realises": (["task-criterion"], True), "replaces": ("*", False)})
+    _assert_links(decls, fname, {"realises": (["task-criterion"], True), "replaces": ("*", False), "about": (["plan-item"], True)})
     assert _link(decls, fname, "realises").value.get("built", False) is False
     node = next(iter(_nodes(decls, fname)))
     assert (node.kind, node.value["role"], node.value["step"]) == ("plan-item", "plan", "16a")

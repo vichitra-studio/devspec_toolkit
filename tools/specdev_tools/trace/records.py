@@ -1,8 +1,8 @@
-"""Verification and evidence records (E774): the files under ``<spec>/extras/verification/``.
+"""Record files (E774): the verification, evidence and at-deploy records under ``<spec>/extras/verification/`` and the sign-off records under ``<spec>/extras/signoff/``.
 
 A record file is ``{"$schema": <the record schema>, "records": [<one record>]}``; the file name without ``.json`` is the
-record id.  Each kind owns the files whose name starts with its id prefix (``ver-``, ``evd-``): the registry gives one
-glob per kind, so the builder reads a file as exactly one kind.  ``check_records`` finds a file that is not a record of
+record id.  Each kind owns the files whose name starts with its id prefix (``ver-``, ``evd-``, ``dep-``, ``so-``): the
+registry gives one glob per kind, so the builder reads a file as exactly one kind.  ``check_records`` finds a file that is not a record of
 the kind its name declares, and a file that holds more than one record.  The links of a record are resolved by the
 ``graph`` check (E700 to E702), not here.  No command here writes a record (``prune_orphan_records`` deletes the records whose node is gone); the stage and ``proves`` lint of the bindings is ``verify/lint.py``.
 """
@@ -20,18 +20,24 @@ from specdev_tools.graph.names import ABOUT, VERIFIES
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 
 RECORDS_DIR = "extras/verification"
+SIGNOFF_DIR = "extras/signoff"
+RECORD_FOLDERS = (RECORDS_DIR, SIGNOFF_DIR)
 RECORD_FILE_SUFFIX = ".json"
 
 
 def record_files(spec_dir: str) -> list[str]:
-    """Paths, relative to *spec_dir* and ``/``-separated, of the JSON files under ``extras/verification/``, sorted.
+    """Paths, relative to *spec_dir* and ``/``-separated, of the JSON files under ``extras/verification/`` and ``extras/signoff/``, sorted.
 
-    Empty when the folder does not exist.
+    Empty when neither folder exists.
     """
-    folder = Path(spec_dir) / RECORDS_DIR
-    if not folder.is_dir():
-        return []
-    return sorted(path.relative_to(spec_dir).as_posix() for path in folder.glob(f"*{RECORD_FILE_SUFFIX}") if path.is_file())
+    root = Path(spec_dir)
+    return sorted(
+        path.relative_to(root).as_posix()
+        for folder in RECORD_FOLDERS
+        if (root / folder).is_dir()
+        for path in (root / folder).glob(f"*{RECORD_FILE_SUFFIX}")
+        if path.is_file()
+    )
 
 
 def _finding(rel: str, message: str, node_id: str | None = None) -> SpecError:
@@ -51,7 +57,7 @@ def _schema_findings(rel: str, document: dict, repo_root: str) -> list[SpecError
 def _node_findings(rel: str, nodes: list[Node]) -> list[SpecError]:
     """Findings for a schema-valid file: it must hold one record of the kind its name declares, named as the file."""
     if not nodes:
-        return [_finding(rel, "no record found: the file is not a record of the kind its name prefix declares (ver- or evd-)")]
+        return [_finding(rel, "no record found: the file is not a record of the kind its name prefix declares (ver-, evd-, dep- or so-)")]
     stem = Path(rel).stem
     return [_finding(rel, f"the file name '{stem}' is not the record id '{node.id}'", node.id) for node in nodes if node.id != stem]
 

@@ -8,7 +8,7 @@ from specdev_tools.graph.recipes import RecipeTable, load_recipes
 
 from ._synth import ROOT
 
-EXEMPT_AS_SETTLED = {SEED_KIND, "extension"}
+EXEMPT_AS_SETTLED = {SEED_KIND, "extension", "execution-record", "signoff-record", "at-deploy-record"}
 
 
 @pytest.fixture(scope="module")

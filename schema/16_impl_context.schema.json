@@ -338,6 +338,25 @@
                           "type": "object",
                           "additionalProperties": false,
                           "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^a[0-9]{2,}$",
+                              "description": "Id of this action within its plan item: 'a' and at least two digits, numbered in order and never reused. Example: 'a01'. Execution records and 'specdev plan record <item>/<action>' name the action by it. Anti-pattern: a kebab-case or free-text id, or the id of another action of the item."
+                            },
+                            "at_deploy": {
+                              "type": "array",
+                              "minItems": 1,
+                              "uniqueItems": true,
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "staging",
+                                  "prod"
+                                ],
+                                "description": "A deploy stage at which this action runs."
+                              },
+                              "description": "Marks an action that can only run in a deploy job, and the stages it runs at: 'staging', 'prod' or both. Such an action does not hold up closing the milestone; its proof is a record written by the deploy job. Example: [\"staging\", \"prod\"]. Anti-pattern: naming a stage of the pipeline other than staging or prod, or an empty list (leave the field out)."
+                            },
                             "type": {
                               "type": "string",
                               "enum": [
@@ -1091,6 +1110,120 @@
             "description": "A file path modified or created during execution."
           }
         },
+        "records": {
+          "type": "array",
+          "maxItems": 1000,
+          "description": "Execution records: one entry for each time an action of a plan item was carried out, failed or blocked. Written by 'specdev plan record', never by hand. Whether an item counts as executed is computed from these records, not stored.",
+          "x-node": {
+            "kind": "execution-record",
+            "role": "record",
+            "contract": [
+              "action",
+              "outcome",
+              "note",
+              "realises_hash",
+              "recorded_at",
+              "git_author"
+            ],
+            "id": "record_id",
+            "step": "16b",
+            "files": [
+              "impl_context/ms_*_plan.json"
+            ]
+          },
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "record_id",
+              "about",
+              "action",
+              "outcome",
+              "recorded_at",
+              "git_author"
+            ],
+            "description": "One execution record: the outcome of one action of one plan item, with the git author who recorded it.",
+            "properties": {
+              "record_id": {
+                "type": "string",
+                "pattern": "^rec-[0-9]{4,}$",
+                "description": "Id of this record: 'rec-' and at least four digits, minted by the tool. Example: 'rec-0001'."
+              },
+              "about": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "plan-item"
+                  ],
+                  "required": true,
+                  "same_step_kinds": [
+                    "plan-item"
+                  ]
+                },
+                "description": "The one plan item the action belongs to, as a one-item array. Example: [\"PWRESET_CONFIRM_EXPIRED_01\"]."
+              },
+              "action": {
+                "type": "string",
+                "pattern": "^a[0-9]{2,}$",
+                "description": "Id of the action of that item this record is about. Example: 'a02'."
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "failed",
+                  "blocked"
+                ],
+                "description": "What happened: 'done' (carried out), 'failed' (tried and did not work) or 'blocked' (could not be tried; the note says why)."
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 200,
+                "description": "Optional short note, at most 200 characters: what was done, or why it failed or is blocked."
+              },
+              "realises_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "description": "Hash of the criteria the item realised when the record was written, 'sha256:' and 64 lower-case hex digits; null when there was no trace lock. A later change to those criteria makes the record stale; the staleness is computed, never stored."
+              },
+              "recorded_at": {
+                "type": "string",
+                "minLength": 1,
+                "description": "UTC time the tool wrote the record, ISO 8601. Informational: nothing compares it."
+              },
+              "git_author": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "additionalProperties": false,
+                "description": "The git author of the person or agent that ran the command, as git reports it.",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Name of the git author."
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Email of the git author."
+                  }
+                }
+              }
+            }
+          }
+        },
         "execution_results": {
           "type": "array",
           "description": "Results from running test and verification commands.",
@@ -1233,6 +1366,7 @@
         "findings": {
           "type": "array",
           "description": "Issues found during review with severity and remediation plans.",
+            "maxItems": 50,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -1270,6 +1404,7 @@
               },
               "description": {
                 "type": "string",
+                "maxLength": 600,
                 "description": "A finding description must include: (1) what was observed (file:line reference where applicable), (2) why it matters (the impact), (3) which spec requirement it violates (checklist item ID or FR/NFR reference). Minimum 40 characters. Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
               },
               "related_checklist_ids": {
@@ -1426,6 +1561,7 @@
         },
         "next_actions": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Specify the concrete action, the responsible party (if known), and the prerequisite condition. Next actions must be executable without further clarification. Examples: 'Fix 3 BLOCKING findings (auth null check, missing retry logic, uncovered error states) before resubmitting for APPROVED verdict.'; 'Deploy to staging via CI pipeline after this APPROVED verdict — coordinate with @platform-team on deployment slot.'; 'Schedule security review with @security-team — required before prod deployment per governance rule gr-security-review.' Anti-pattern: 'Continue with implementation' (not a specific action); 'Review the findings' (circular — this is the current step)."
         },
         "fixture_status": {
@@ -1462,6 +1598,11 @@
             "red"
           ],
           "description": "Security review status: green (no issues) or red (issues present)."
+        },
+        "recorded_at": {
+          "type": "string",
+          "minLength": 1,
+          "description": "UTC time the tool wrote this review block, ISO 8601. Written by 'specdev review record'; informational, nothing compares it."
         },
         "delivery_status": {
           "type": "object",

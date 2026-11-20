@@ -36,6 +36,8 @@
   "vc:extras:trace-lock": "schema/extras/trace_lock.schema.json",
   "vc:extras:verification-record": "schema/extras/verification_record.schema.json",
   "vc:extras:evidence-record": "schema/extras/evidence_record.schema.json",
+  "vc:extras:signoff-record": "schema/extras/signoff_record.schema.json",
+  "vc:extras:at-deploy-record": "schema/extras/at_deploy_record.schema.json",
   "vc:infra:findings": "schema/infra/findings.schema.json",
   "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json"
 }

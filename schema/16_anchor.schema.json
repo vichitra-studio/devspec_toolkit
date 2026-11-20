@@ -172,7 +172,8 @@
               "deferral_reason": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Why the milestone was deferred. Required when status is 'deferred'. Example: 'Waits for the payment provider contract.'"
+                "maxLength": 300,
+                "description": "Why the milestone was deferred, at most 300 characters. Required when status is 'deferred', and present only while it is. Example: 'Waits for the payment provider contract.'"
               },
               "close": {
                 "type": "object",
@@ -180,7 +181,7 @@
                 "required": [
                   "signed_off_by"
                 ],
-                "description": "How the milestone was closed. Required when status is 'done'.",
+                "description": "How the milestone was closed. Required when status is 'done'. Written by 'specdev milestone close', which fills every field but source; a milestone that was already done before the migration carries signed_off_by 'legacy-migration' and its source instead.",
                 "properties": {
                   "signed_off_by": {
                     "type": "string",
@@ -191,6 +192,54 @@
                     "type": "string",
                     "minLength": 1,
                     "description": "Names the legacy status source this close was taken from. Required when signed_off_by is 'legacy-migration'."
+                  },
+                  "tree": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Id of the code tree (a git tree id) the milestone was closed at. Example: '4b825dc642cb6eb9a060e54bf8d69288fbee4904'."
+                  },
+                  "signoff": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "description": "Id of the sign-off record the close rests on, in spec/extras/signoff/; null for a legacy close, which has none. Example: 'so-ms-account-recovery-0001'."
+                  },
+                  "plan_hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "description": "Hash of the milestone's plan file when it was closed, 'sha256:' and 64 lower-case hex digits. The frozen-plan check compares the plan with it, or with the last migration's hash_after."
+                  },
+                  "closed_at": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "UTC time the close was written, ISO 8601. Informational: nothing compares it."
+                  },
+                  "migrations": {
+                    "type": "array",
+                    "description": "Recorded migrations of the frozen plan, oldest first. A plan changes after close only through one of these.",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "hash_after",
+                        "note"
+                      ],
+                      "description": "One recorded migration of the frozen plan.",
+                      "properties": {
+                        "hash_after": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$",
+                          "description": "Hash of the plan file after this migration, 'sha256:' and 64 lower-case hex digits."
+                        },
+                        "note": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "What the migration changed and why."
+                        }
+                      }
+                    }
                   }
                 },
                 "if": {

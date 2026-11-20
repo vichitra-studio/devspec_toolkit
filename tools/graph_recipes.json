@@ -164,6 +164,9 @@
   },
   "exempt": [
     {"kind": "seed", "authority": "top of the graph, not a role (design doc L600)"},
-    {"kind": "extension", "authority": "extension kinds are exempt until they declare a role (CD-21, Q-11)"}
+    {"kind": "extension", "authority": "extension kinds are exempt until they declare a role (CD-21, Q-11)"},
+    {"kind": "execution-record", "authority": "written by 'specdev plan record' and read by the executed rule; no pack names it (M8, WI-M8-02)"},
+    {"kind": "signoff-record", "authority": "written by 'specdev milestone sign-off' and read by the close gate; no pack names it (M8, WI-M8-02)"},
+    {"kind": "at-deploy-record", "authority": "written by 'specdev plan record --at-deploy' and read by the proof rule; no pack names it (M8, WI-M8-02)"}
   ]
 }

@@ -47,11 +47,14 @@ _CHECKLIST_PATH = _TOOLKIT_ROOT / CHECKLIST_FILE
 _KIND_ROLE_TABLE_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "graph" / "kind_role_table.json"
 """Kind to step and role table of the spec graph (M1 fixture, extended with the M3 kinds)."""
 
-_UNLISTED_KINDS = frozenset({"extension"})
-"""Registered kinds the table leaves out: step 13 extension kinds are declared when they become first-class."""
+_UNLISTED_KINDS = frozenset({"extension", "signoff-record", "at-deploy-record"})
+"""Registered kinds the table leaves out: step 13 extension kinds are declared when they become first-class; the sign-off and at-deploy records are M8's own record kinds (the table is the design's)."""
 
-_UNREGISTERED_KINDS = frozenset({"seed", "execution-record", "review-record"})
-"""Table kinds with no registry entry: the seed is an external kind, the execution and review records arrive with a later milestone."""
+_UNREGISTERED_KINDS = frozenset({"seed", "review-record"})
+"""Table kinds with no registry entry: the seed is an external kind; the review block is one object, not an array of nodes, so it is no kind."""
+
+_KINDS_IN_A_SHARED_GLOB_ENTRY = {"execution-record": "16a"}
+"""Kinds whose node step the table gives, but whose registry entry is the plan-file glob that plan-item opened first: the entry step is that of the first node (M1), the node step is read from the ``x-node`` declaration."""
 
 
 def _run_generator() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -246,7 +249,9 @@ class TestNoArraysSteps:
         # belong to the plan files and are registered under their glob key.
         assert paths == {".plan.ambiguities", ".plan.milestone_index"}
         plan_paths = {a["array_path"] for a in reg_doc["registry"]["impl_context/ms_*_plan.json"]["arrays"]}
-        assert plan_paths == {".plan.spec_alignment.checklist", ".plan.ambiguities", ".execution.emergent_ambiguities"}
+        assert plan_paths == {
+            ".plan.spec_alignment.checklist", ".plan.ambiguities", ".execution.records", ".execution.emergent_ambiguities"
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +298,16 @@ class TestDeferredRegistration:
         assert (arr["kind"], arr["id_field"], arr["role"]) == ("plan-item", "id", "plan")
         assert [lk["field"] for lk in arr["links"]] == ["realises", "replaces"]
 
+    def test_execution_record_kind_is_registered(self) -> None:
+        """``execution.records[]`` is the ``execution-record`` kind (a record of step 16b) in the plan-file glob entry; its ``about`` is a link to plan items."""
+        reg_doc, _ = _run_generator()
+        arr = next(a for a in reg_doc["registry"]["impl_context/ms_*_plan.json"]["arrays"] if a["array_path"] == ".execution.records")
+        assert (arr["kind"], arr["id_field"], arr["role"]) == ("execution-record", "record_id", "record")
+        assert [(lk["field"], lk["kinds"], lk["required"]) for lk in arr["links"]] == [("about", ["plan-item"], True)]
+        declared = next(n for n in collect_annotations(str(_TOOLKIT_ROOT)).nodes if n.kind == "execution-record")
+        assert declared.value["step"] == "16b"
+        assert "execution-record" not in _UNREGISTERED_KINDS
+
 
 # ---------------------------------------------------------------------------
 # Registry cutover to the graph shape (WI-M3-18)
@@ -327,6 +342,9 @@ class TestRegistryCutover:
                 continue
             row = table[kind]
             steps = {step for step, _, _ in triples}
+            if kind in _KINDS_IN_A_SHARED_GLOB_ENTRY:
+                assert steps == {_KINDS_IN_A_SHARED_GLOB_ENTRY[kind]}, (kind, steps)
+                continue
             assert steps <= {row["step"]} or row["step"] == "any", (kind, steps)
             assert {role for _, role, _ in triples} == {row["role"]}, kind
             assert {coarse for _, _, coarse in triples} == {row.get("coarse", False)}, kind

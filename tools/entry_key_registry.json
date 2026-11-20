@@ -2026,6 +2026,64 @@
       ],
       "step": "16"
     },
+    "extras/signoff/so-*.json": {
+      "arrays": [
+        {
+          "array_path": ".records",
+          "contract": [
+            "about",
+            "tree",
+            "git_author",
+            "listed"
+          ],
+          "id_field": "signoff_id",
+          "kind": "signoff-record",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": [
+                "roadmap-milestone"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        }
+      ],
+      "step": "extras"
+    },
+    "extras/verification/dep-*.json": {
+      "arrays": [
+        {
+          "array_path": ".records",
+          "contract": [
+            "about",
+            "action",
+            "env",
+            "outcome"
+          ],
+          "id_field": "deploy_id",
+          "kind": "at-deploy-record",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": [
+                "plan-item"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        }
+      ],
+      "step": "extras"
+    },
     "extras/verification/evd-*.json": {
       "arrays": [
         {
@@ -2138,6 +2196,34 @@
               "kinds": "*",
               "required": true,
               "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".execution.records",
+          "contract": [
+            "action",
+            "outcome",
+            "note",
+            "realises_hash",
+            "recorded_at",
+            "git_author"
+          ],
+          "id_field": "record_id",
+          "kind": "execution-record",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": [
+                "plan-item"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "plan-item"
+              ]
             }
           ],
           "role": "record",

@@ -47,9 +47,11 @@ _NOTES = {
         "'dag-lint' and 'dependency-order-lint'."
     ),
     "declared_edges": (
-        "Hand-carried [producer, consumer] pairs. Steps 13, 16a, 16b and 16c keep their 1.1.1 "
-        "context reads (the Trinity steps have no stored links to them yet): M8 gives 16a-16c "
-        "records with links and removes their pairs. Step 14 keeps its 1.1.1 read of step 13. "
+        "Hand-carried [producer, consumer] pairs, counted as required edges for context reads no stored link "
+        "derives. Steps 13, 16a, 16b and 16c keep their 1.1.1 context reads: a plan item's 'realises' link "
+        "derives [14, 16a], so that pair is not carried, but an execution record is a record, and the links of a "
+        "record derive no edge, so [16a, 16b] and the other pairs into 16a to 16c stay (they feed 'specdev step "
+        "ready' and 'specdev prompt-context'). Step 14 keeps its 1.1.1 read of step 13. "
         "[09, 14] and [14, 16] are computed links no annotation carries."
     ),
     "step_metadata": (
