@@ -200,6 +200,16 @@ def test_nested_layout_without_the_git_root_in_a_repository_takes_paths_from_the
     assert touched.outside_root == (SEED_PATH, "spec/04_fr_list.json")
 
 
+def test_a_git_root_below_the_repository_top_is_the_base_of_relative_paths(host: Path, manifest: dict[str, Any]) -> None:
+    """``--git-root`` names the base even when the repository top is higher: a path taken from the top then maps to no step."""
+    _nest(host)
+    subprocess.run(["git", "init", "-q", str(host)], check=True)
+    from_the_top = "sub/spec/04_fr_list.json"
+    assert _touched(host, [from_the_top], manifest, spec="sub/spec").steps == ("04",)
+    assert _touched(host, [from_the_top], manifest, spec="sub/spec", git_root=str(host / "sub")).steps == ()
+    assert _touched(host, ["spec/04_fr_list.json"], manifest, spec="sub/spec", git_root=str(host / "sub")).steps == ("04",)
+
+
 def test_nested_layout_with_the_git_root_finds_the_seeds_at_the_top(host: Path, manifest: dict[str, Any]) -> None:
     _nest(host)
     graph = lambda: build_graph(str(host / "sub" / "spec"), str(ROOT))  # noqa: E731
@@ -215,7 +225,7 @@ def test_paths_outside_the_host_root_are_counted_as_unmapped(host: Path, manifes
     touched = _touched(host, [seed, "../README.md", spec_file], manifest, spec="sub/spec")
     assert touched.steps == ("04",)
     assert touched.outside_root == (seed, "../README.md")
-    note = outside_root_note(touched)
+    note = outside_root_note(touched, git_root_given=False)
     assert note is not None and note.startswith("2 paths lie outside the host root") and "--git-root" in note
 
 
@@ -224,11 +234,11 @@ def test_outside_root_note_leaves_the_advice_out_when_git_root_was_given(host: P
     touched = _touched(host, ["../README.md"], manifest, spec="sub/spec")
     given = outside_root_note(touched, git_root_given=True)
     assert given == "1 path lies outside the host root and maps to no step"
-    assert "--git-root" in (outside_root_note(touched) or "")
+    assert "--git-root" in (outside_root_note(touched, git_root_given=False) or "")
 
 
 def test_outside_root_note_is_absent_without_such_paths(host: Path, manifest: dict[str, Any]) -> None:
-    assert outside_root_note(_touched(host, ["spec/04_fr_list.json"], manifest)) is None
+    assert outside_root_note(_touched(host, ["spec/04_fr_list.json"], manifest), git_root_given=False) is None
 
 
 def test_spec_folder_outside_the_git_root_is_refused(host: Path, manifest: dict[str, Any], tmp_path: Path) -> None:

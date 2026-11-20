@@ -10,6 +10,7 @@ from specdev_tools.graph.gitview import (
     commits_touching,
     git_top_level,
     is_shallow_repository,
+    folder_exists_at,
     path_exists_at,
     read_seed_texts,
     read_seed_texts_at,
@@ -138,3 +139,17 @@ def test_path_exists_at_is_false_only_when_git_says_the_path_is_absent(tmp_path:
     assert path_exists_at("HEAD", str(tmp_path), "docs/b.md") is False
     with pytest.raises(GitViewError):
         path_exists_at("no-such-ref", str(tmp_path), "docs/a.md")
+
+
+def test_folder_exists_at_is_true_for_a_folder_only(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("a", encoding="utf-8")
+    (tmp_path / "spec").write_text("a file", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "a")
+    assert folder_exists_at("HEAD", str(tmp_path), "docs") is True
+    assert folder_exists_at("HEAD", str(tmp_path), "docs/a.md") is False
+    assert folder_exists_at("HEAD", str(tmp_path), "spec") is False
+    assert folder_exists_at("HEAD", str(tmp_path), "nope") is False
+    assert path_exists_at("HEAD", str(tmp_path), "spec") is True

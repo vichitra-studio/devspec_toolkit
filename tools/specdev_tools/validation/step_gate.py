@@ -62,7 +62,8 @@ class IdentityKey(NamedTuple):
 
 _TARGET_SEPARATOR = "->"
 _ERROR_PREFIX = "E"
-_ARRAY_INDEX = re.compile(r"\[\d+\]")
+_ARRAY_INDEX = re.compile(r'"(?:[^"\\]|\\.)*"|\[\d+\]')
+"""A quoted key (kept as it is) or an array index (dropped); the quoted key is tried first."""
 
 
 def declared_owner(error: SpecError) -> str | None:
@@ -89,8 +90,12 @@ def identity_key(error: SpecError, owner_of: OwnerOf, canonical_id: CanonicalId 
     """
     node_id = canonical_id(error.node_id) if error.node_id is not None else None
     target = _canonical_target(error.target, canonical_id)
-    location = _ARRAY_INDEX.sub("[]", error.jq_path) if error.jq_path is not None else None
+    location = _ARRAY_INDEX.sub(_without_index, error.jq_path) if error.jq_path is not None else None
     return IdentityKey(error.code, owner_of(error), node_id, target, error.file, location, error.subcode, error.path)
+
+
+def _without_index(match: re.Match[str]) -> str:
+    return match.group(0) if match.group(0).startswith('"') else "[]"
 
 
 def _canonical_target(target: str | None, canonical_id: CanonicalId) -> str | None:
@@ -128,9 +133,11 @@ def new_since_baseline(
     has ``b`` findings and the current tree ``c`` (exact duplicates, the same key and message, count once).  A current
     finding whose message equals a baseline message of its key is old.  Of the other current findings of that key, the
     first ``b - matched`` in the order given are old (their text changed, or the tree they were found in has other
-    paths), and the rest are new.  So a reworded message, a shifted array index is never new (a node renamed with ``specdev node rename`` keeps its old error old through its
-    alias; a node renamed by hand, or an error in a file that was renamed, counts as new), and a
-    second schema error in a file that already had one is new.  An exact duplicate gets the answer of its first copy.
+    paths), and the rest are new.  So a reworded message or a shifted array index is never new, and a second schema
+    error in a file that already had one is new.  An exact duplicate gets the answer of its first copy.
+
+    A node renamed with ``specdev node rename`` keeps its old error old through its alias; a node renamed by hand, or
+    an error in a file that was renamed, counts as new.
 
     The one known limit: a finding fixed and another of the same key added on the branch is a count that did not grow,
     so the added one stays old; the merge check is where that is caught.  A schema finding has its file and the place of

@@ -1,7 +1,9 @@
 """Tests for validate.py submodule detection, stderr warnings, and 16a/16b/16c routing."""
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
+from specdev_tools.core.errors import make_error
+from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.validation.validate import (
     _detect_git_root,
     _is_git_repo,
@@ -12,26 +14,19 @@ from specdev_tools.validation.validate import (
 class TestDetectGitRoot:
     def test_returns_git_toplevel(self, tmp_path):
         """When git rev-parse succeeds, returns the detected root."""
-        with patch("specdev_tools.validation.validate.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=str(tmp_path) + "\n"
-            )
-            result = _detect_git_root(tmp_path)
-            assert result == tmp_path
+        with patch("specdev_tools.validation.validate.git_top_level", return_value=str(tmp_path)):
+            assert _detect_git_root(tmp_path / "sub") == tmp_path
 
     def test_fallback_on_failure(self, tmp_path):
-        """When git fails, falls back to repo_root."""
-        with patch("specdev_tools.validation.validate.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stdout="")
-            result = _detect_git_root(tmp_path)
-            assert result == tmp_path
+        """When git finds no working tree, falls back to repo_root."""
+        with patch("specdev_tools.validation.validate.git_top_level", return_value=None):
+            assert _detect_git_root(tmp_path) == tmp_path
 
     def test_fallback_on_timeout(self, tmp_path):
-        """When git times out, falls back to repo_root."""
-        with patch("specdev_tools.validation.validate.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired(cmd="git", timeout=10)
-            result = _detect_git_root(tmp_path)
-            assert result == tmp_path
+        """When git times out or is missing, falls back to repo_root."""
+        error = GitViewError(make_error("E708", "git did not finish"))
+        with patch("specdev_tools.validation.validate.git_top_level", side_effect=error):
+            assert _detect_git_root(tmp_path) == tmp_path
 
 
 class TestDeepValidators16abc:

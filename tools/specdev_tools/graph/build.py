@@ -64,7 +64,9 @@ def step_order_ranks(repo_root: str) -> dict[str, int]:
     path = os.path.join(repo_root, "tools", "step_order.json")
     try:
         order = load_step_order(repo_root)
-    except (OSError, ValueError) as exc:
+    except OSError as exc:
+        raise KindRegistryError(make_error("E520", f"step order is unreadable: {exc.strerror or exc}", path)) from exc
+    except ValueError as exc:
         raise KindRegistryError(make_error("E520", f"step order is unreadable: {exc}", path)) from exc
     if not isinstance(order, dict):
         raise KindRegistryError(make_error("E520", "step order is unreadable: not a JSON object", path))

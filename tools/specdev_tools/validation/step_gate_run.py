@@ -78,14 +78,14 @@ def _touched_steps_of(
     repo_root: str,
     spec_dir: str,
     paths: Sequence[str],
+    ranks: Mapping[str, int],
     git_root: str | None = None,
     spec_root: str | None = None,
-    ranks: Mapping[str, int] | None = None,
 ) -> TouchedSteps:
     """The steps the touched *paths* (``--paths``) put under the gate; see ``validation.touched_steps``.
 
     Reads the seed manifest of *spec_dir* (none is an empty manifest) and builds the graph of the spec root only when a
-    listed seed document is among the paths.  *ranks* is the step order; it is read from ``tools/step_order.json`` when absent.
+    listed seed document is among the paths.  *ranks* is the step order (``step_order_ranks``).
 
     Raises:
         FindingError: E708 when the spec folder is outside the host root.
@@ -93,7 +93,7 @@ def _touched_steps_of(
     manifest = read_json_object(os.path.join(spec_dir, SEED_MANIFEST_FILE)) or {}
     return steps_for_paths(
         paths, spec_dir, manifest, lambda: build_graph(spec_root or spec_dir, repo_root),
-        step_order=list(ranks if ranks is not None else step_order_ranks(repo_root)), git_root=git_root,
+        step_order=list(ranks), git_root=git_root,
     )
 
 
@@ -212,8 +212,8 @@ def gate_run(
     ranks = step_order_ranks(repo_root)
     notes: list[str] = []
     if steps is None:
-        touched = _touched_steps_of(repo_root, spec_dir, paths or (), git_root, spec_root, ranks)
-        notes.extend(note for note in (outside_root_note(touched, git_root is not None), SEED_EDIT_NOTE if touched.seed_edited else None) if note)
+        touched = _touched_steps_of(repo_root, spec_dir, paths or (), ranks, git_root, spec_root)
+        notes.extend(note for note in (outside_root_note(touched, git_root_given=git_root is not None), SEED_EDIT_NOTE if touched.seed_edited else None) if note)
         gated = list(touched.steps)
         if paths and not gated:
             notes.append(NO_STEP_NOTE)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from specdev_tools.core.schema_validate import jq_path_of
+from specdev_tools.core.schema_validate import jq_key, jq_path_of
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TOOLS_DIR = REPO_ROOT / "tools"
@@ -25,11 +25,21 @@ GRAPH_EXAMPLE_SPEC = REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
         (("a", "x-y", 0), '.a["x-y"][0]'),
         (("00",), '.["00"]'),
         (("a", 'q"b\\c'), '.a["q\\"b\\\\c"]'),
-        ((0, "a"), "[0].a"),
+        ((0,), ".[0]"),
+        ((0, "a"), ".[0].a"),
+        ((0, "00"), '.[0]["00"]'),
     ],
 )
 def test_jq_path_of(path: tuple, expected: str) -> None:
     assert jq_path_of(path) == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("frs", ".frs"), ("_x1", "._x1"), ("00", '["00"]'), ("a-b", '["a-b"]'), ("é", '["\\u00e9"]'), ('q"b', '["q\\"b"]')],
+)
+def test_jq_key_is_the_one_quoter_of_a_key(name: str, expected: str) -> None:
+    assert jq_key(name) == expected
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:

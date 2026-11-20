@@ -28,9 +28,10 @@ from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from specdev_tools.core.ambiguity_items import PLAN_DIR, PLAN_FILE_RE, STEP_FILE_RE
+from specdev_tools.core.ambiguity_items import PLAN_FILE_RE
 from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
+from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
 from specdev_tools.graph.gitview import git_top_level, host_root_of, relative_inside, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 
@@ -56,7 +57,7 @@ class TouchedSteps:
     seed_edited: bool
 
 
-def outside_root_note(touched: TouchedSteps, git_root_given: bool = False) -> str | None:
+def outside_root_note(touched: TouchedSteps, *, git_root_given: bool) -> str | None:
     """The one stderr line for paths outside the host root, or ``None`` when there are none.
 
     The advice to pass ``--git-root`` is left out when it was passed (*git_root_given*).
@@ -92,7 +93,7 @@ def steps_for_paths(
     Raises:
         GitViewError: E708 when *spec_dir* is not inside the host root.
     """
-    host_root = os.path.realpath(host_root_of(spec_dir, git_root))
+    host_root = host_root_of(spec_dir, git_root)
     spec_prefix = spec_path_in_repo(spec_dir, host_root)
     seed_ids = _seed_ids_by_path(manifest)
     load_graph = functools.cache(graph)
@@ -146,9 +147,9 @@ def _spec_file_steps(relative: str, manifest: Mapping[str, Any]) -> set[str]:
     if relative == SEED_MANIFEST_FILE:
         return {FIRST_STEP, *as_dict(manifest.get("step_requirements"))}
     directory, name = posixpath.split(relative)
-    if directory == PLAN_DIR and PLAN_FILE_RE.match(name):
+    if directory == PLAN_DIR_NAME and PLAN_FILE_RE.match(name):
         return set(PLAN_FILE_STEPS)
-    match = None if directory else STEP_FILE_RE.match(name)
+    match = None if directory else STEP_JSON_RE.match(name)
     return {match.group(1)} if match else set()
 
 
@@ -183,8 +184,8 @@ def steps_without_artifact(steps: Iterable[str], spec_dir: str) -> tuple[str, ..
 
 def _present_steps(spec_dir: str) -> set[str]:
     """Steps with a file in *spec_dir*: a root ``NN_*.json``, or (for 16a to 16c) a milestone plan."""
-    present = {match.group(1) for name in os.listdir(spec_dir) if (match := STEP_FILE_RE.match(name))}
-    plans = os.path.join(spec_dir, PLAN_DIR)
+    present = {match.group(1) for name in os.listdir(spec_dir) if (match := STEP_JSON_RE.match(name))}
+    plans = os.path.join(spec_dir, PLAN_DIR_NAME)
     if os.path.isdir(plans) and any(PLAN_FILE_RE.match(name) for name in os.listdir(plans)):
         present.update(PLAN_FILE_STEPS)
     return present

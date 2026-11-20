@@ -340,7 +340,7 @@ def build_parser() -> _SpecdevParser:
     sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Also check id regressions (E555) against the base ref; file-level forward replay is retired, see `specdev stale`")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
     sc_scope = sc.add_mutually_exclusive_group()
-    sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
+    sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N (written as in the file name: 05, 13a, 16) instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
     sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
     from .validation.step_gate_report import DETAIL_CHOICES
 

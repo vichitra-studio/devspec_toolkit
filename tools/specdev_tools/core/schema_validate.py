@@ -153,19 +153,21 @@ class SchemaViolation(NamedTuple):
 _JQ_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
+def jq_key(name: str) -> str:
+    """The jq path step that selects the key *name* of an object: ``.name``, or ``["name"]`` for a key that is not a plain word."""
+    return f".{name}" if _JQ_IDENTIFIER.fullmatch(name) else f"[{json.dumps(name)}]"
+
+
 def jq_path_of(path: tuple[Any, ...]) -> str:
     """The jq path of a violation's place: ``('frs', 1, 'scope')`` gives ``.frs[1].scope``; the document itself is ``.``.
 
-    A key that is not a jq identifier is written ``["00"]`` (JSON-quoted); as the first segment it is ``.["00"]``.
+    A key that is not a jq identifier is written ``["00"]`` (JSON-quoted); as the first segment, like an index, it is
+    ``.["00"]`` and ``.[0]``.
     """
     out = ""
     for part in path:
-        if isinstance(part, int):
-            out += f"[{part}]"
-        elif _JQ_IDENTIFIER.fullmatch(part):
-            out += f".{part}"
-        else:
-            out += ("." if not out else "") + f"[{json.dumps(part)}]"
+        step = f"[{part}]" if isinstance(part, int) else jq_key(part)
+        out += "." + step if not out and step.startswith("[") else step
     return out or "."
 
 

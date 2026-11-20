@@ -27,7 +27,8 @@ from typing import Any, Optional
 from ...core.errors import make_error, SpecError
 from ...core.loaders import read_json_object
 from ...core.scope_helpers import as_dict, as_list
-from ...lifecycle.plans import MILESTONE_KEY, PLAN_DIR_NAME, find_plan
+from ...core.step_paths import PLAN_DIR_NAME
+from ...lifecycle.plans import MILESTONE_KEY, find_plan
 from .step_16 import _is_anchor
 
 _PLAN_SCHEMA = "vc:16-impl-context"

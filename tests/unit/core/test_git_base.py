@@ -271,6 +271,35 @@ def test_spec_folder_absent_at_base_gives_unavailable(repo: Path) -> None:
         materialise_baseline(str(repo), git(repo, "rev-parse", "HEAD~1"), repo / SPEC, [])
 
 
+def test_a_spec_folder_outside_the_git_root_gives_the_layout_message_as_the_note(repo: Path, tmp_path: Path) -> None:
+    _base_files(repo)
+    elsewhere = tmp_path / "elsewhere" / "spec"
+    elsewhere.mkdir(parents=True)
+    seen: list[Path] = []
+
+    result = merge_base_provider(lambda root, _spec: seen.append(root) or [], lambda _: [])(elsewhere, str(repo))
+
+    assert result.mode == "unavailable" and seen == []
+    assert result.resolution is not None
+    assert result.resolution.note == (
+        f"the spec folder {elsewhere} is not inside the git root {repo}, so it cannot be found in the repository"
+    )
+
+
+def test_a_file_named_like_the_spec_folder_at_base_is_no_spec_folder(repo: Path) -> None:
+    _commit(repo, "a file called spec", spec="not a folder")
+    git(repo, "checkout", "-q", "-b", "feature")
+    git(repo, "rm", "-q", SPEC)
+    _commit(repo, "spec arrives", spec__01_x__json="{}")
+    seen: list[Path] = []
+
+    result = merge_base_provider(lambda root, _spec: seen.append(root) or [], lambda _: [])(repo / SPEC, str(repo))
+
+    assert result.mode == "unavailable" and seen == []
+    assert result.resolution is not None and result.resolution.note is not None
+    assert result.resolution.note.startswith("the spec folder is not in the base commit ")
+
+
 @pytest.mark.parametrize("failure", [ValueError("boom"), AttributeError("'list' object has no attribute 'get'"), KeyError("x")])
 def test_checks_that_raise_on_the_baseline_tree_make_it_unavailable_with_the_reason(repo: Path, failure: Exception) -> None:
     _base_files(repo)

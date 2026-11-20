@@ -10,8 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..core.loaders import read_json_object
+from ..core.step_paths import PLAN_DIR_NAME
 
-PLAN_DIR_NAME = "impl_context"
 MILESTONE_KEY = "milestone"
 
 

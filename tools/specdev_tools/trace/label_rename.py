@@ -19,13 +19,14 @@ from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from typing import Any
 
+from specdev_tools.core.schema_validate import jq_key
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node, article
 from specdev_tools.graph.queries import unknown_node_error
 from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.writing import writing_graph
-from specdev_tools.trace.rename import FileEdit, FileEditor, jq_key, refuse, write_edits
+from specdev_tools.trace.rename import FileEdit, FileEditor, refuse, write_edits
 
 TERM_KIND = "term"
 LABEL_KEY = "term"

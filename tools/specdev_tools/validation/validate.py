@@ -43,7 +43,7 @@ from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import SchemaRegistry, get_shared_registry
 from ..graph.build import build_file_graph
-from ..graph.gitview import host_root_of
+from ..graph.gitview import GitViewError, git_top_level, host_root_of
 from ..graph.ids import check_unique_ids
 from ..graph.kinds import KindRegistryError
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
@@ -559,16 +559,11 @@ def _detect_git_root(repo_root: Path) -> Path:
     ``.git`` directory (or file, as submodules use ``.git`` files).
     Falls back to *repo_root* if detection fails.
     """
-    cmd = ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
-        if result.returncode == 0:
-            detected = Path(result.stdout.strip())
-            if detected.exists():
-                return detected
-    except (subprocess.TimeoutExpired, OSError, ValueError):
-        pass
-    return repo_root
+        top = git_top_level(str(repo_root))
+    except GitViewError:
+        return repo_root
+    return Path(top) if top and Path(top).exists() else repo_root
 
 
 def _is_git_repo(root: Path) -> bool:

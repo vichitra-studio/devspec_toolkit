@@ -10,6 +10,7 @@ import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -29,6 +30,7 @@ from specdev_tools.validation.step_gate_run import (
     NO_STEP_NOTE,
     gate_run,
     gate_usage_error,
+    _gate_notes,
     run_step_gate,
 )
 from specdev_tools.validation.touched_steps import SEED_EDIT_NOTE
@@ -274,3 +276,15 @@ def test_the_help_of_paths_says_it_takes_every_word_up_to_the_next_option(capsys
     _code, out, _err = run_split(capsys, "spec-check", "--help")
     text = " ".join(out.split())
     assert "takes every word after it up to the next option" in text and "must come last" not in text
+
+
+def test_the_could_not_read_note_comes_before_the_baseline_note() -> None:
+    graph = SimpleNamespace(load_errors=[SimpleNamespace(file="spec/04_fr_list.json"), SimpleNamespace(file="spec/05_api.json")])
+    baseline = BaselineResult("unavailable", resolution=BaseResolution("main", None, "unavailable", REASON))
+
+    notes = _gate_notes(SimpleNamespace(check_graph=graph), baseline)
+
+    assert notes == (
+        "specdev spec-check: could not read spec/04_fr_list.json, spec/05_api.json; the answer may be incomplete",
+        f"note: {REASON}",
+    )

@@ -24,6 +24,7 @@ from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.gitview import (
     GitViewError,
     archive_ref,
+    folder_exists_at,
     path_exists_at,
     resolve_ref,
     run_git,
@@ -259,7 +260,7 @@ def merge_base_provider(
     """The default provider: the errors of the checks on the spec tree at the merge-base commit.
 
     ``unavailable``, with the reason in ``resolution.note``, when the baseline cannot be resolved or materialised (no
-    git, no merge-base, a spec folder absent at the commit) or when the checks fail on the baseline tree (any
+    git, no merge-base, a spec folder absent at the commit or outside the git root) or when the checks fail on the baseline tree (any
     ``Exception``: a baseline that older tooling cannot read is no reason to stop the gate).  ``seed_paths`` names the seed documents of the
     current tree; ``compute_errors`` runs the checks on the materialised tree; *base_ref* (``--base-ref``) names the
     branch to compare with, as ``resolve_target_branch`` reads it.
@@ -270,7 +271,11 @@ def merge_base_provider(
         if resolution.commit is None:
             return BaselineResult("unavailable", resolution=resolution)
         try:
-            if not path_exists_at(resolution.commit, git_root, spec_path_in_repo(str(spec_dir), git_root)):
+            spec_in_repo = spec_path_in_repo(str(spec_dir), git_root)
+        except GitViewError as error:
+            return BaselineResult("unavailable", resolution=replace(resolution, note=error.error.message))
+        try:
+            if not folder_exists_at(resolution.commit, git_root, spec_in_repo):
                 reason = f"the spec folder is not in the base commit {resolution.commit[:12]}: every error of an earlier step counts as new"
                 return BaselineResult("unavailable", resolution=replace(resolution, note=reason))
             with materialise_baseline(git_root, resolution.commit, spec_dir, seed_paths(spec_dir)) as tree:

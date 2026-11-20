@@ -866,7 +866,8 @@ changes:
       stderr, and the exit code is 1 only when the result is BLOCKED, with
       --json too. A new error is told from an old one by the key (code, owner,
       node id, link target, file, location, subcode, path; the location is the
-      jq path with the array indexes removed), never by its message, and by
+      jq path with the array indexes removed, except an index inside a quoted key,
+      which is part of the key), never by its message, and by
       count: for each key, a finding is new only when the working tree has more
       findings with it than the baseline had. A reworded message, or an item
       inserted before an old error, is not new. One limit: an error fixed and
@@ -882,15 +883,17 @@ changes:
       steps each bucket of the --json report is the union over the steps. When
       no baseline can be used the report says base: unavailable, every upstream
       error counts as new, and stderr gives the reason; a branch that adds the
-      spec folder, such as a host's first adoption branch, gets the spec folder
+      spec folder, such as a host's first adoption branch (or a base commit that
+      holds a file named like the spec folder), gets the spec folder
       is not in the base commit <12-char sha>: every error of an earlier step
       counts as new. With --step or --paths, a spec folder that does not exist,
       a toolkit with no readable tools/error_ownership.json, and a toolkit whose
       tools/step_order.json is unreadable (E520 <path> step order is unreadable:
-      <reason>) give one E520 and exit 1, an unknown step with --step gives one
+      <reason>, for a missing file No such file or directory) give one E520 and exit 1, an unknown step with --step gives one
       E706 and exit 1, and a spec folder that is not inside --git-root with
       --paths gives one E708 and exit 1 (with --step the report says base:
-      unavailable); plain spec-check on a missing spec folder prints every check
+      unavailable and stderr gives the note the spec folder <dir> is not inside
+      the git root <root>, so it cannot be found in the repository); plain spec-check on a missing spec folder prints every check
       with that E520 among the findings and exits 1. A spec file that cannot be
       read (no permission, or a folder named like a step file) gives one E520
       from the open-items check, and the run goes on; with --step or --paths

@@ -22,11 +22,10 @@ from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple
 
 from .loaders import load_json_artifact
+from .step_paths import PLAN_DIR_NAME, STEP_JSON_RE
 
 Shape = Literal["unified", "legacy"]
 
-STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_[^/]*\.json$")
-PLAN_DIR = "impl_context"
 PLAN_FILE_GLOB = "ms_*_plan.json"
 PLAN_FILE_RE = re.compile(fnmatch.translate(PLAN_FILE_GLOB))
 """The plan file pattern as a regex, derived from ``PLAN_FILE_GLOB`` (match a bare file name with ``.match``)."""
@@ -143,7 +142,7 @@ def about_targets(item: AmbiguityItem) -> tuple[str | SilentTarget, ...]:
 
 def _step_of_file(name: str) -> str | None:
     """The step of a root spec file name (``05_interface_contracts.json`` gives ``05``), ``None`` for others."""
-    match = STEP_FILE_RE.match(name)
+    match = STEP_JSON_RE.match(name)
     return match.group(1) if match else None
 
 
@@ -191,7 +190,7 @@ def _root_files(spec_dir: str) -> Iterator[tuple[str, AmbiguityLocation]]:
 
 def _plan_files(spec_dir: str) -> list[str]:
     """The milestone plan files ``impl_context/ms_*_plan.json`` (immediate children only), in name order."""
-    plan_dir = os.path.join(spec_dir, PLAN_DIR)
+    plan_dir = os.path.join(spec_dir, PLAN_DIR_NAME)
     if not os.path.isdir(plan_dir):
         return []
     return [os.path.join(plan_dir, n) for n in sorted(os.listdir(plan_dir)) if PLAN_FILE_RE.match(n)]

@@ -26,6 +26,7 @@ from specdev_tools.graph.model import Graph, Node, collapse_whitespace
 
 GIT_TIMEOUT_SECONDS = 30
 PREVIOUS_COMMIT = "HEAD~1"
+_TREE_ENTRY = "040000 tree "
 _MAX_REASON_CHARS = 240
 
 
@@ -145,17 +146,31 @@ def git_top_level(folder: str) -> str | None:
     return top if process.returncode == 0 and top else None
 
 
+def _tree_entry(ref: str, git_root: str, path: str) -> str:
+    """The ``git ls-tree`` line of *path* at *ref* (``<mode> <type> <object>\t<path>``), empty when the path is absent."""
+    commit = resolve_ref(ref, git_root)
+    process = run_git(git_root, ["ls-tree", commit, "--", path])
+    if process.returncode != 0:
+        raise _fail("E708", f"{path} cannot be looked up at ref '{ref}': {git_reason(process)}")
+    return process.stdout.decode("utf-8", errors="replace").strip()
+
+
 def path_exists_at(ref: str, git_root: str, path: str) -> bool:
-    """Whether *path* (relative to *git_root*) exists at *ref*; ``False`` only when git answers that it does not.
+    """Whether *path* (relative to *git_root*) exists at *ref*, as a file or a folder; ``False`` only when git answers that it does not.
 
     Raises:
         GitViewError: E708 when the ref does not resolve or git fails.
     """
-    commit = resolve_ref(ref, git_root)
-    process = run_git(git_root, ["ls-tree", "--name-only", commit, "--", path])
-    if process.returncode != 0:
-        raise _fail("E708", f"{path} cannot be looked up at ref '{ref}': {git_reason(process)}")
-    return bool(process.stdout.strip())
+    return bool(_tree_entry(ref, git_root, path))
+
+
+def folder_exists_at(ref: str, git_root: str, path: str) -> bool:
+    """Whether *path* (relative to *git_root*) is a folder at *ref*; a file, a link or nothing there is ``False``.
+
+    Raises:
+        GitViewError: E708 when the ref does not resolve or git fails.
+    """
+    return _tree_entry(ref, git_root, path).startswith(_TREE_ENTRY)
 
 
 def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.TemporaryDirectory[str]:

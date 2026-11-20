@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -26,6 +25,7 @@ from typing import Any
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import JsonUtilsError, check_edit, json_write_atomic, patch_text
+from specdev_tools.core.schema_validate import jq_key
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.contract import item_of
@@ -46,7 +46,6 @@ from specdev_tools.trace.lockfile import (
 from specdev_tools.trace.writing import writing_graph
 
 ALIASES_KEY = "aliases"
-_PLAIN_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 class RenameRefusedError(FindingError):
@@ -113,11 +112,6 @@ class _Plan:
     old_lock: Lock
     lock: Lock
     lock_entries: tuple[RewrittenEntry, ...]
-
-
-def jq_key(name: str) -> str:
-    """The jq path step that selects the key *name* of an object: ``.name``, or ``["name"]`` for a key that is not a plain word."""
-    return f".{name}" if _PLAIN_KEY.fullmatch(name) else f"[{json.dumps(name)}]"
 
 
 def read_spec_file(spec_root: str, rel: str) -> str:

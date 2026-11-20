@@ -223,6 +223,26 @@ def test_an_insert_before_a_finding_does_not_change_its_key() -> None:
     assert identity_key(before, declared_owner) == identity_key(after, declared_owner)
 
 
+def test_an_index_inside_a_quoted_key_is_part_of_the_key() -> None:
+    first = err("E520", "step:05", jq_path='.a["x[3]"]')
+    second = err("E520", "step:05", jq_path='.a["x[4]"]')
+    assert identity_key(first, declared_owner) != identity_key(second, declared_owner)
+    assert identity_key(first, declared_owner).location == '.a["x[3]"]'
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "location"),
+    [
+        (".a[3].b", ".a[4].b", ".a[].b"),
+        ('.a["00"][1]', '.a["00"][2]', '.a["00"][]'),
+        ('.a["q\\"[3]"][5]', '.a["q\\"[3]"][6]', '.a["q\\"[3]"][]'),
+    ],
+)
+def test_an_index_outside_a_quoted_key_is_dropped(before: str, after: str, location: str) -> None:
+    keys = [identity_key(err("E520", "step:05", jq_path=place), declared_owner) for place in (before, after)]
+    assert keys[0] == keys[1] and keys[0].location == location
+
+
 def test_two_findings_with_one_key_and_two_messages_are_two_findings_the_same_message_twice_is_one() -> None:
     first, second = err("E520", "step:05", message="/0/scope"), err("E520", "step:05", message="/1/scope")
     result = gate([first, second, first], "05")
