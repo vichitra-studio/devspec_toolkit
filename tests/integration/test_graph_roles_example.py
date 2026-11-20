@@ -117,9 +117,7 @@ def _ids(checks: dict[str, Any], name: str, code: str) -> set[str]:
 
 def _context(host: Path) -> GraphCheckContext:
     graph = build_graph(str(host / "spec"), str(ROOT))
-    context = GraphCheckContext.from_graph(graph, read_lock(str(host / "spec")), str(ROOT))
-    context.git_root, context.spec_root = str(host), str(host / "spec")
-    return context
+    return GraphCheckContext.from_graph(graph, read_lock(str(host / "spec")), str(ROOT), git_root=str(host), spec_root=str(host / "spec"))
 
 
 def _built(host: Path) -> dict[str, list[str]]:
@@ -164,7 +162,9 @@ def test_every_dangling_node_has_its_left_out_part_named(example_checks: dict[st
     assert all(part.strip() for _owner, part in DANGLING.values())
     findings = {f["node_id"]: f["message"] for f in example_checks["no-dangling"]["findings"]}
     assert set(findings) == set(DANGLING)
-    assert all(message.endswith("link it, schedule it, or set scope later or out") and " is not used by any node" in message for message in findings.values())
+    assert all(" is not used by any node" in message and "link it, schedule it" in message for message in findings.values())
+    assert findings["metric-reset-completion-rate"].endswith("link it, schedule it")
+    assert all(message.endswith("or set scope later or out with a scope_reason") for node_id, message in findings.items() if node_id != "metric-reset-completion-rate")
 
 
 def test_dangling_owners_are_unchanged_without_the_step_14_artifact_and_pending_in_the_gate(
@@ -291,6 +291,16 @@ def _track_scaffold_file(host: Path) -> None:
 
 def _e746(host: Path, mode: Any) -> list[tuple[str, str | None, str | None]]:
     return [(error.code, error.node_id, error.owner) for error in check_scaffold_paths(_context(host), mode)]
+
+
+def test_a_context_built_from_a_graph_gives_the_e746_of_the_registered_check_and_has_seed_texts(tmp_path: Path) -> None:
+    """``from_graph(..., git_root=...)`` is what a close or release gate builds: the same E746 as ``spec-check``, and the seed texts."""
+    built = _host(tmp_path / "built", "milestone_done", "criterion_refines_api")
+    context = _context(built)
+    assert [(e.code, e.node_id, e.owner) for e in check_scaffold_paths(context, "merge")] == _triples(_checks(built), "scaffold-paths") != []
+    assert context.git_root == str(built) and context.spec_root == str(built / "spec")
+    assert context.seed_texts and all(context.seed_texts.values())
+    assert _e746(built, "close") != [] and not GraphCheckContext.from_graph(context.graph, None, str(ROOT)).seed_texts
 
 
 def test_scaffold_row_tracked_passes_and_removed_gives_e746_in_close_mode_and_in_merge_mode_only_when_the_api_is_built(tmp_path: Path) -> None:

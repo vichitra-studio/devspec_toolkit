@@ -8,14 +8,14 @@ import pytest
 from specdev_tools.graph.model import Node
 from specdev_tools.validation.graph_checks.built import (
     EVIDENCE_KINDS,
+    BuiltComputation,
     BuiltResult,
     BuiltState,
     compute_built,
-    register_built_provider,
     walk_derivations,
 )
-from specdev_tools.validation.graph_checks.context import bind_seams
 
+from ._bindings_support import Bindings
 from ._built_support import built_context, link, node
 
 BUILT, NOT_BUILT, PENDING = BuiltState.BUILT, BuiltState.NOT_BUILT, BuiltState.PENDING_EVIDENCE
@@ -44,34 +44,61 @@ def test_pending_child_with_a_not_built_sibling_is_not_built() -> None:
     assert result["scope-1"].state is NOT_BUILT and result["scope-1"].via == ("cap-1",)
 
 
-def test_register_built_provider_first_match_decides() -> None:
+def test_register_built_provider_first_match_decides(bindings: Bindings) -> None:
     nodes = [node("inv-1", "invariant"), node("inv-2", "invariant"), node("nfr-1", "nfr", step="07")]
     ctx = built_context(nodes)
-    answer = lambda state: (lambda _ctx, found: BuiltResult(state, f"{state.value} for {found.id}"))  # noqa: E731
-    restore_all = register_built_provider(lambda found: found.kind == "invariant", answer(BUILT))
-    restore_second = register_built_provider(lambda found: found.id == "inv-2", answer(PENDING))
-    try:
-        result = compute_built(ctx)
-        assert (result["inv-1"].state, result["inv-2"].state, result["nfr-1"].state) == (BUILT, BUILT, NOT_BUILT)
-        assert result["inv-2"].reason == "BUILT for inv-2"
-    finally:
-        restore_second()
-        restore_all()
+    answer = lambda state: (lambda _run, found: BuiltResult(state, f"{state.value} for {found.id}"))  # noqa: E731
+    restore_all = bindings.provider(lambda found: found.kind == "invariant", answer(BUILT))
+    restore_second = bindings.provider(lambda found: found.id == "inv-2", answer(PENDING))
+    result = compute_built(ctx)
+    assert (result["inv-1"].state, result["inv-2"].state, result["nfr-1"].state) == (BUILT, BUILT, NOT_BUILT)
+    assert result["inv-2"].reason == "BUILT for inv-2"
+    restore_second()
+    restore_all()
     assert compute_built(ctx)["inv-1"].state is NOT_BUILT
 
 
-def test_a_provider_is_not_asked_about_a_node_out_of_play() -> None:
+def test_a_provider_gets_the_state_of_another_node_from_the_same_run(bindings: Bindings) -> None:
+    """The computation handed to a provider answers for any node through the memo of the run: a node is computed once, however it is reached."""
     asked: list[str] = []
 
-    def provider(_ctx, found: Node) -> BuiltResult:
+    def about_inv_2(_run: BuiltComputation, found: Node) -> BuiltResult:
         asked.append(found.id)
         return BuiltResult(BUILT, "stub")
 
-    restore = register_built_provider(lambda found: found.kind == "invariant", provider)
-    try:
-        result = compute_built(built_context([node("inv-1", "invariant"), node("inv-later", "invariant", scope="later")]))
-    finally:
-        restore()
+    def about_inv_1(run: BuiltComputation, found: Node) -> BuiltResult:
+        other = run.ctx.graph.by_id["inv-2"]
+        return BuiltResult(run.result_of(other).state, "follows inv-2", (other.id,))
+
+    bindings.provider(lambda found: found.id == "inv-1", about_inv_1)
+    bindings.provider(lambda found: found.id == "inv-2", about_inv_2)
+    result = compute_built(built_context([node("inv-1", "invariant"), node("inv-2", "invariant")]))
+    assert (result["inv-1"].state, result["inv-1"].via, result["inv-2"].state) == (BUILT, ("inv-2",), BUILT)
+    assert asked == ["inv-2"]
+
+
+def test_providers_that_ask_each_other_end_in_the_cycle_guard(bindings: Bindings) -> None:
+    def ask(other: str):
+        def provider(run: BuiltComputation, found: Node) -> BuiltResult:
+            return BuiltResult(run.result_of(run.ctx.graph.by_id[other]).state, f"{found.id} follows {other}")
+
+        return provider
+
+    bindings.provider(lambda found: found.id == "inv-1", ask("inv-2"))
+    bindings.provider(lambda found: found.id == "inv-2", ask("inv-1"))
+    result = compute_built(built_context([node("inv-1", "invariant"), node("inv-2", "invariant")]))
+    assert (result["inv-1"].state, result["inv-2"].state) == (NOT_BUILT, NOT_BUILT)
+
+
+def test_a_provider_is_not_asked_about_a_node_out_of_play(bindings: Bindings) -> None:
+    asked: list[str] = []
+
+    def provider(_run, found: Node) -> BuiltResult:
+        asked.append(found.id)
+        return BuiltResult(BUILT, "stub")
+
+    bindings.provider(lambda found: found.kind == "invariant", provider)
+    result = compute_built(built_context([node("inv-1", "invariant"), node("inv-later", "invariant", scope="later")]))
     assert asked == ["inv-1"] and result["inv-later"].state is BuiltState.IGNORED
 
 
@@ -108,19 +135,14 @@ def test_constraint_component_branch_negative(case: str) -> None:
 
 
 @pytest.mark.parametrize(("pin", "state"), [("OK", BUILT), ("MISMATCH", NOT_BUILT), ("UNKNOWN", PENDING)])
-def test_constraint_third_party_with_a_stub_pin_provider_ok_and_mismatch(pin: str, state: BuiltState) -> None:
+def test_constraint_third_party_with_a_stub_pin_provider_ok_and_mismatch(pin: str, state: BuiltState, bindings: Bindings) -> None:
     nodes = [
         node("con-1", "constraint", step="00"),
         node("tp-1", "third-party", "context", step="02", links=[("derives_from", "con-1")]),
         node("nfr-1", "nfr", step="07", links=[("relies_on", "tp-1")]),
     ]
-    ctx = built_context(nodes, {"tc-1": "nfr-1"})
-    restore = bind_seams(pin_matches=lambda _third_party: pin)
-    try:
-        ctx = built_context(nodes, {"tc-1": "nfr-1"})
-        result = compute_built(ctx)
-    finally:
-        restore()
+    bindings.seams(pin_matches=lambda _third_party: pin)
+    result = compute_built(built_context(nodes, {"tc-1": "nfr-1"}))
     assert result["con-1"].state is state and result["con-1"].via == ("tp-1",)
 
 

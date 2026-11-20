@@ -22,7 +22,9 @@ from specdev_tools.trace.replay import (
     root_diffs,
 )
 
-from ._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
+from unit.graph._synth import run_python_seeded
+
+from ._lock_support import EXAMPLE_HOST, ROOT, gap_providers  # noqa: F401  (gap_providers is a fixture)
 from .test_suspects import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
 
 TERM = "quokka"
@@ -59,9 +61,15 @@ def _add_term(item: dict[str, object]) -> None:
 
 # --- gap seam -------------------------------------------------------------------------------------------------------
 
-def test_default_provider_empty(example: Example) -> None:
-    graph = example.graph()
-    assert coverage_gaps(graph, example.lock()) == []
+def test_default_provider_empty() -> None:
+    """The real default, in a process of its own (the ``gap_providers`` fixture would hide it): with only ``trace`` imported there are no role gaps on the worked example."""
+    code = (
+        "import sys; from specdev_tools.graph.build import build_graph; from specdev_tools.trace.gaps import coverage_gaps; "
+        "from specdev_tools.trace.lockfile import Lock; "
+        f"graph = build_graph({str(EXAMPLE_HOST / 'spec')!r}, {str(ROOT)!r}); "
+        "print(len(coverage_gaps(graph, Lock())), 'specdev_tools.validation.graph_checks' in sys.modules)"
+    )
+    assert run_python_seeded(0, code).split() == ["0", "False"]
 
 
 def test_coverage_gaps_adapter_returns_registered_provider_output(example: Example, gap_providers: Any) -> None:

@@ -21,14 +21,18 @@ EXAMPLE_HOST = ROOT / "tests" / "fixtures" / "graph_example"
 
 
 @pytest.fixture
-def gap_providers() -> Iterator[object]:
+def gap_providers(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     """``register_gap_provider`` for one test, starting with NO provider registered; the registered providers (module state) are restored when it ends.
 
     The one fixture of the tests that register a coverage-gap provider, or that need the worked example without the role
-    gaps it reports under the real graph checks (M6b registers its provider on import): import it into the test module.
+    gaps it reports under the real graph checks: ``cli.main`` installs the role gap provider each time it builds its
+    parser, so the fixture also turns ``install_gap_provider`` into a no-op for the test.  Import it into the test module.
     """
+    from specdev_tools.validation import graph_checks  # local: trace does not import validation
+
     saved = list(gaps._providers)
     gaps._providers.clear()
+    monkeypatch.setattr(graph_checks, "install_gap_provider", lambda: None)
     yield gaps.register_gap_provider
     gaps._providers[:] = saved
 

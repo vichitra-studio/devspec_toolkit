@@ -5,7 +5,7 @@ graph checks read from one, built once through ``GraphCheckContext.from_registry
 registry context and builds one from a graph and a lock (``GraphCheckContext.from_graph``).
 
 Four seams are left for the proof milestone (M7).  Each has a default that says "nothing known" and is replaced
-through ``bind_seams``, which returns the function that puts the previous binding back.
+through ``bind_seams``, which returns the function that removes that binding.
 """
 from __future__ import annotations
 
@@ -14,25 +14,27 @@ from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any, Literal, get_args
 
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.scope_helpers import as_dict
 from specdev_tools.graph.gitview import read_seed_texts, read_seed_texts_noting
-from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
-from specdev_tools.graph.ownership import OwnerContext, OwnershipTableError, load_ownership_table, owner_for
-from specdev_tools.trace.history import done_milestones
+from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.ownership import OwnerContext, load_owner_context, owner_for
+from specdev_tools.trace.coverage import exemption
+from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import Lock
-from specdev_tools.validation.check_registry import CheckContext
+from specdev_tools.validation import check_registry
+from specdev_tools.validation.check_registry import CheckContext, CheckFn
 
-from .use_table import VERIFIER_ROLE, furthest_steps
+from .names import VERIFIER_ROLE
+from .schema_slots import SchemaSlots
+from .use_table import furthest_steps
 
 Mode = Literal["merge", "close", "release"]
 """When a rule runs: at merge (the step view ``spec-check`` always runs), at milestone close, at release."""
 MODES: tuple[str, ...] = get_args(Mode)
 GRAPH_NOT_BUILT = "graph could not be built (see the `graph` check)"
 SEED_MANIFEST_PATH = "common/seed_manifest.json"
-OUT_OF_PLAY_SCOPES = frozenset({"later", "out"})
-IN_SCOPES = frozenset({"in"})
 PIN_UNKNOWN = "UNKNOWN"
 
 
@@ -60,36 +62,51 @@ class Seams:
     pin_matches: Callable[[Node], str] = _pin_unknown
 
 
-_bound = Seams()
+_NOTHING_KNOWN = Seams()
+_bindings: list[dict[str, Callable[..., Any]]] = []
+_bound = _NOTHING_KNOWN
 
 
 def bind_seams(**seams: Callable[..., Any]) -> Callable[[], None]:
-    """Replace the named seams of ``Seams`` for every context built afterwards; returns the function that restores the previous binding.
+    """Bind the named seams of ``Seams`` for every context built afterwards; returns the function that removes this binding.
+
+    A later binding of the same seam wins while both are in place; the restore function removes only its own binding,
+    in whatever order the restores are called, and a second call does nothing.
 
     Raises:
         TypeError: a name is not a seam.
     """
     global _bound
-    previous = _bound
-    _bound = replace(previous, **seams)
+    replace(_NOTHING_KNOWN, **seams)
+    mine = dict(seams)
+    _bindings.append(mine)
+    _bound = _merged_bindings()
 
     def restore() -> None:
         global _bound
-        _bound = previous
+        for index, binding in enumerate(_bindings):
+            if binding is mine:
+                del _bindings[index]
+                _bound = _merged_bindings()
+                return
 
     return restore
 
 
-def ownership_context(repo_root: str) -> OwnerContext:
-    """The ownership table of the toolkit at *repo_root*, with no furthest steps.
+def _merged_bindings() -> Seams:
+    return replace(_NOTHING_KNOWN, **{name: fn for binding in _bindings for name, fn in binding.items()})
 
-    Raises:
-        FindingError: E520 when ``tools/error_ownership.json`` is missing or unreadable.
-    """
-    try:
-        return OwnerContext(rows=load_ownership_table(repo_root))
-    except OwnershipTableError as error:
-        raise FindingError(make_error("E520", f"UNRESOLVED_INPUT ownership_table {error}")) from error
+
+def merge_check(rule: Callable[[GraphCheckContext, Mode], list[SpecError]]) -> CheckFn:
+    """The ``spec-check`` function of *rule*: its findings at ``merge`` mode, or a skip with ``GRAPH_NOT_BUILT`` when no graph could be built."""
+
+    def run(ctx: CheckContext) -> dict[str, Any]:
+        graph_ctx = GraphCheckContext.from_registry(ctx)
+        if graph_ctx is None:
+            return check_registry.skip(GRAPH_NOT_BUILT)
+        return check_registry.check_result(rule(graph_ctx, "merge"))
+
+    return run
 
 
 @dataclass(eq=False)
@@ -130,23 +147,36 @@ class GraphCheckContext:
         )
 
     @classmethod
-    def from_graph(cls, graph: Graph, lock: Lock | None, repo_root: str | None = None) -> GraphCheckContext:
-        """The context of a caller that has a graph and a lock but no registry context (the replay gap provider, a test); *repo_root* defaults to the toolkit this package belongs to.
+    def from_graph(
+        cls, graph: Graph, lock: Lock | None, repo_root: str | None = None, *, git_root: str | None = None, spec_root: str | None = None,
+    ) -> GraphCheckContext:
+        """The context of a caller that has a graph and a lock but no registry context (the replay gap provider, a gate, a test); *repo_root* defaults to the toolkit this package belongs to.
+
+        *git_root* and *spec_root* are the host repository and its spec folder; without *git_root* the context has no seed
+        texts and the scaffold check has nothing to read.
 
         Raises:
             FindingError: E520 when the ownership table of the toolkit cannot be read.
         """
         root = repo_root or resolve_effective_toolkit_root(None)
-        return cls(graph=graph, lock=lock, owner_context=cls._with_furthest_steps(ownership_context(root), graph), repo_root=root)
+        return cls(
+            graph=graph, lock=lock, owner_context=cls._with_furthest_steps(load_owner_context(root), graph), repo_root=root,
+            git_root=git_root, spec_root=spec_root,
+        )
 
     @staticmethod
     def _with_furthest_steps(owner_context: OwnerContext, graph: Graph) -> OwnerContext:
         return replace(owner_context, furthest_step=furthest_steps(graph.decls, graph.shape))
 
     @cached_property
-    def closed_milestones(self) -> set[str]:
-        """Ids of the milestones whose anchor row says ``done``."""
-        return done_milestones(self.graph)
+    def historical(self) -> set[str]:
+        """Ids of the closed work: each milestone whose anchor row says ``done``, what it contains and the nodes its plans name (``trace.history.historical_node_ids``), computed once per context."""
+        return historical_node_ids(self.graph)
+
+    @cached_property
+    def slots(self) -> SchemaSlots:
+        """The schema slots of the nodes' files (``SchemaSlots``), read from the toolkit at ``repo_root``; each file's schema is loaded once per context."""
+        return SchemaSlots(self.repo_root)
 
     @cached_property
     def manifest(self) -> Mapping[str, Any]:
@@ -160,11 +190,6 @@ class GraphCheckContext:
             return {}
         read = read_seed_texts if self.quiet else read_seed_texts_noting
         return read(self.graph, self.git_root)
-
-    @staticmethod
-    def in_scope(node: Node) -> bool:
-        """Whether *node* is in scope: ``scope`` is ``in`` or omitted (the builder keeps an omitted or wrong-typed scope as ``None``)."""
-        return node.scope is None or node.scope in IN_SCOPES
 
     def retired_bindings(self, node: Node) -> set[str]:
         """The seam ``Seams.retired_bindings``."""
@@ -185,10 +210,11 @@ class GraphCheckContext:
     def in_play(self, node: Node) -> bool:
         """Whether the checks read *node*.
 
-        Out of play: lifecycle ``not_applicable``, scope ``later`` or ``out``, or a verifier whose bindings are all
-        retired.  A ``deprecated`` node stays in play (it is still binding and fully gated).
+        Out of play: what ``trace.coverage.exemption`` leaves out of every denominator (lifecycle ``not_applicable``,
+        scope ``later`` or ``out``), or a verifier whose bindings are all retired.  A ``deprecated`` node stays in play
+        (it is still binding and fully gated).
         """
-        if node.lifecycle == NOT_APPLICABLE or node.scope in OUT_OF_PLAY_SCOPES:
+        if exemption(node) is not None:
             return False
         return not (node.role == VERIFIER_ROLE and self.retired_bindings(node))
 
@@ -198,14 +224,15 @@ class GraphCheckContext:
 
     def finding(
         self, code: str, node: Node, message: str, *, target: str | None = None, owner: str | None = None,
-        route: tuple[str, str] | None = None,
+        route: tuple[str, str] | None = None, file: str | None = None, jq_path: str | None = None,
     ) -> SpecError:
         """The finding *code* about *node*: it carries the node's file, jq path and id, and the owner the ownership table gives for *code* and *node* (``None`` when the table has none).
 
-        *target* names the one link a finding is about; *owner*, when given, wins over the table's; *route* is the
-        ``(seed id, step)`` of a seed-route finding (``SpecError.route``).
+        *target* names the one link a finding is about; *owner*, *file* and *jq_path*, when given, win over the table's
+        and the node's; *route* is the ``(seed id, step)`` of a seed-route finding (``SpecError.route``).
         """
         return make_error(
-            code, message, file=node.file, jq_path=node.jq_path or None, node_id=node.id,
+            code, message, file=file if file is not None else node.file,
+            jq_path=jq_path if jq_path is not None else (node.jq_path or None), node_id=node.id,
             owner=owner if owner is not None else owner_for(code, node, self.owner_context), target=target, route=route,
         )

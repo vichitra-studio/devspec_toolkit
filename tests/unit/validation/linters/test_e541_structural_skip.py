@@ -53,7 +53,7 @@ from specdev_tools.validation.hallucination_lint import (
     _is_structurally_unbindable,
     _extract_slot_kinds,
     _term_kinds_from_cids,
-    _SchemaResolverCtx,
+    SchemaResolverCtx,
     lint_hallucinations,
 )
 from specdev_tools.core.schema_nav import effective_schema as _nav_effective_schema
@@ -106,7 +106,7 @@ class TestSchemaResolverCtx:
 
     def test_09_impl_plan_milestones_item_is_structurally_unbindable(self):
         """09_impl_plan.schema.json milestones items: ap:false, no ref slot → unbindable."""
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         # Synthesise a minimal data dict with the correct $schema URI
         data: dict[str, Any] = {"$schema": "vc:09-impl-plan", "milestones": []}
         eff_root, resolve_fn = ctx.load_file_schema(data)
@@ -139,7 +139,7 @@ class TestSchemaResolverCtx:
         The milestone's ``fr_refs`` and ``capability_refs`` were removed (computed from what its task criteria
         refine), so the near-twin of 09_impl_plan is now structurally unbindable too.
         """
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         data: dict[str, Any] = {"$schema": "vc:14-roadmap", "milestones": []}
         eff_root, resolve_fn = ctx.load_file_schema(data)
         assert eff_root is not None, (
@@ -168,7 +168,7 @@ class TestMilestonesNameStructuralRule:
     """Both-directions guard for surface 3 (milestones[].name in 09_impl_plan)."""
 
     def _ctx_and_terms(self):
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         canonical_terms = {"ghost": {"cn:project:term:ghost"}}
         return ctx, canonical_terms
 
@@ -222,7 +222,7 @@ class TestMilestonesNameStructuralRule:
         when the slot is absent or bound to the wrong id), plus the real-schema
         unit test
         ``TestRound4GuardrailRealSchemaStillFires::test_glossary_term_ref_slot_unbound_fires``
-        (which drives ``vc:03-glossary`` through ``_SchemaResolverCtx`` and
+        (which drives ``vc:03-glossary`` through ``SchemaResolverCtx`` and
         confirms E541 fires for an unbound mention with ``term_ref`` available
         in the schema).
         Note: ``14_roadmap.schema.json`` has NO ``term_ref`` slot, so a
@@ -266,7 +266,7 @@ class TestPlanSubtreesStructuralRule:
 
     def test_ambiguities_description_suppressed(self):
         """(a) plan.ambiguities[].description must NOT fire E541 (structural rule)."""
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         canonical_terms = {"ghost": {"cn:project:term:ghost"}}
         data = {
             "$schema": "vc:16-impl-context",
@@ -293,7 +293,7 @@ class TestPlanSubtreesStructuralRule:
 
     def test_docs_impact_rationale_suppressed(self):
         """(a) plan.docs_impact.rationale must NOT fire E541 (structural rule)."""
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         canonical_terms = {"ghost": {"cn:project:term:ghost"}}
         data = {
             "$schema": "vc:16-impl-context",
@@ -954,11 +954,11 @@ class TestGlossaryDefinitionSemanticSkip:
 # ---------------------------------------------------------------------------
 
 class TestRound4GuardrailRealSchemaStillFires:
-    """Guardrail: real vc:03-glossary schema via _SchemaResolverCtx confirms E541 still fires.
+    """Guardrail: real vc:03-glossary schema via SchemaResolverCtx confirms E541 still fires.
 
     ``TestRound4GuardrailNamespaceMatchingStillFires`` uses a synthetic schema to
     isolate the mechanism-2 ref-value check.  This companion class exercises the
-    REAL ``vc:03-glossary`` schema through ``_SchemaResolverCtx`` to ensure the
+    REAL ``vc:03-glossary`` schema through ``SchemaResolverCtx`` to ensure the
     schema-nav path itself does not introduce a regression.
 
     ``03_glossary.json`` is the only production schema with a ``term_ref`` slot on
@@ -983,7 +983,7 @@ class TestRound4GuardrailRealSchemaStillFires:
         which uses a synthetic schema).  It ensures that schema-nav failures
         cannot silently suppress E541 through this path.
         """
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         data = {
             "$schema": "vc:03-glossary",
             "terms": [
@@ -1016,7 +1016,7 @@ class TestRound4GuardrailRealSchemaStillFires:
         contains a term_ref binding matching the mentioned term's canonical ID,
         E541 is correctly suppressed by mechanism-2.
         """
-        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        ctx = SchemaResolverCtx(_TOOLKIT_ROOT)
         data = {
             "$schema": "vc:03-glossary",
             "terms": [

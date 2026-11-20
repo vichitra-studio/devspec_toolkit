@@ -10,6 +10,7 @@ by the discovery layer before schema_nav is called.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -170,3 +171,29 @@ def effective_schema(
     base["required"] = required
 
     return base
+
+
+def child_schema(effective: dict, step: str | int, *, additional: bool = False) -> dict | None:
+    """The schema of the member *step* of a value described by the already effective node *effective* (see ``effective_schema``).
+
+    An index gives ``items``; a key gives its ``properties`` entry, else the entry of the first ``patternProperties``
+    pattern that matches it (a pattern that is not a valid regular expression matches nothing) and, with *additional*,
+    else a schema ``additionalProperties``.  ``None`` when there is none or it is not an object schema.
+    """
+    found: Any
+    if isinstance(step, int):
+        found = effective.get("items")
+    else:
+        found = effective.get("properties", {}).get(step)
+        if found is None:
+            found = next((sub for pattern, sub in effective.get("patternProperties", {}).items() if _matches(pattern, step)), None)
+        if found is None and additional:
+            found = effective.get("additionalProperties")
+    return found if isinstance(found, dict) else None
+
+
+def _matches(pattern: str, text: str) -> bool:
+    try:
+        return re.search(pattern, text) is not None
+    except re.error:
+        return False

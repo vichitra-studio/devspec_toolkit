@@ -5,8 +5,8 @@ unused or missing), grouped by the step that owns the node.  The toolkit compute
 decide what a gap is register a *provider* (``register_gap_provider``), and ``coverage_gaps`` concatenates what the
 registered providers report.  With no provider registered there are no gaps.
 
-The registered providers are module state (``_providers``): they live as long as the process.  M6b registers its
-provider here.  A test that registers one uses the ``gap_providers`` fixture of ``tests/unit/trace/_lock_support.py``,
+The registered providers are module state (``_providers``): they live as long as the process.  M6b's provider is
+installed by ``validation.graph_checks.install_gap_provider()``, which the CLI calls.  A test that registers one uses the ``gap_providers`` fixture of ``tests/unit/trace/_lock_support.py``,
 which puts the list back when the test ends.
 """
 from __future__ import annotations
@@ -44,6 +44,11 @@ def register_gap_provider(provider: GapProvider) -> Callable[[], None]:
         _providers.remove(provider)
 
     return unregister
+
+
+def has_gap_provider(provider: GapProvider) -> bool:
+    """Whether *provider* is registered."""
+    return provider in _providers
 
 
 def coverage_gaps(graph: Graph, lock: Lock) -> list[CoverageGap]:

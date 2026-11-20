@@ -20,6 +20,7 @@ from specdev_tools.core import ambiguity_items
 from specdev_tools.core.ambiguity_items import AmbiguityItem
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.git_base import BaselineResult, BaseResolution
+from specdev_tools.graph import ownership
 from specdev_tools.graph.ownership import OwnershipTableError
 from specdev_tools.validation import check_registry
 from specdev_tools.validation.check_registry import CheckContext, register_check, unregister_check
@@ -225,7 +226,7 @@ def test_an_unreadable_ownership_table_is_one_e520_line_and_exit_1(
     def unreadable(_repo_root: str) -> None:
         raise OwnershipTableError(f"{table}: unreadable or not a JSON object")
 
-    monkeypatch.setattr(check_registry, "load_ownership_table", unreadable)
+    monkeypatch.setattr(ownership, "load_ownership_table", unreadable)
     host = step_gate_host(tmp_path / "host")
     flags = ["--repo-root", str(ROOT), "--git-root", str(host), *scope, *(["--json"] if json_output else [])]
     code, out, err = run_split(capsys, "spec-check", str(host / "spec"), *flags)

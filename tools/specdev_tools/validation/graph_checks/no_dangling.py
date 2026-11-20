@@ -8,19 +8,16 @@ holder does not.  The computed link of a 09 milestone is not read: a 09 mileston
 """
 from __future__ import annotations
 
-from typing import Any
-
 from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.model import NOT_APPLICABLE, Node
-from specdev_tools.validation import check_registry
-from specdev_tools.validation.check_registry import CheckContext
 
 from .codes import NODE_DANGLING
-from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
-from .use_table import VERIFIER_ROLE, Use, use_pairs
+from .context import GraphCheckContext, Mode
+from .names import SCAFFOLD_ROW, VERIFIER_ROLE
+from .use_table import Use, step_of, use_pairs
 
 CHECKED_ROLES = frozenset({"obligation-system", "obligation-delivery", "context"})
-SCAFFOLD_ROW = "scaffold-row"
+SCOPE = "scope"
 SCOPE_OUT = "out"
 MAX_LISTED_USES = 5
 """How many ways to use a kind a message names before it says how many more there are."""
@@ -77,9 +74,9 @@ def _what_would_use(ctx: GraphCheckContext, pairs: frozenset[Use]) -> str:
     shape = ctx.graph.shape
     ways: list[tuple[tuple[int, str], str, str]] = []
     for use in pairs:
-        steps = shape.kind_steps.get(use.holder_kind, ())
-        if steps:
-            ways.append((shape.step_key(max(steps, key=shape.step_key)), use.holder_kind, use.verb))
+        step = step_of(use.holder_kind, shape)
+        if step is not None:
+            ways.append((shape.step_key(step), use.holder_kind, use.verb))
     listed = [f"{kind} {verb} (step {key[1]})" for key, kind, verb in sorted(ways)[:MAX_LISTED_USES]]
     more = len(ways) - len(listed)
     return ", ".join(listed) + (f" and {more} more" if more > 0 else "")
@@ -92,24 +89,16 @@ def _is_checked(node: Node, search: _UseSearch) -> bool:
 def check_no_dangling(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
     """E740 for each in-play node of a checked role that no holder uses and none of whose contained nodes is used, in step then id order.
 
-    The owner is the furthest step that can use the kind (the ownership table); ``mode`` is not read, the rule is the
-    same at merge, close and release.
+    The owner is the furthest step that can use the kind (the ownership table).
     """
     search = _UseSearch(ctx)
     findings: list[SpecError] = []
     for node in ctx.in_play_nodes():
         if _is_checked(node, search) and not search.is_used(node):
+            parking = ", or set scope later or out with a scope_reason" if ctx.slots.has_property(ctx.graph, node, SCOPE) else ""
             message = (
                 f"{node.kind} {node.id} is not used by any node; a node of this kind is used by {_what_would_use(ctx, search.pairs(node.kind))}: "
-                f"link it, schedule it, or set scope later or out"
+                f"link it, schedule it{parking}"
             )
             findings.append(ctx.finding(NODE_DANGLING, node, message))
     return findings
-
-
-def run_no_dangling(ctx: CheckContext) -> dict[str, Any]:
-    """The registered function: E740 findings of ``check_no_dangling`` at merge, or a skip when no graph could be built."""
-    gctx = GraphCheckContext.from_registry(ctx)
-    if gctx is None:
-        return check_registry.skip(GRAPH_NOT_BUILT)
-    return check_registry.check_result(check_no_dangling(gctx, "merge"))

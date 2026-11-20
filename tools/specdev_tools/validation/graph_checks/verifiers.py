@@ -15,20 +15,13 @@ criterion ``removes``.  The owner is the one the ownership table gives (step 14 
 """
 from __future__ import annotations
 
-from typing import Any
-
 from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.validation import check_registry
-from specdev_tools.validation.check_registry import CheckContext
 
 from .codes import MISSING_VERIFIER, UNUSED_VERIFIER
-from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
-from .refinement import REALISES, VERIFIED_BY, VERIFIES, link_targets
-from .use_table import VERIFIER_ROLE
+from .context import GraphCheckContext, Mode
+from .names import FIXTURE, REALISES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
 
-FIXTURE = "fixture"
 REMOVES = "removes"
 
 
@@ -77,7 +70,7 @@ def missing_verifiers(ctx: GraphCheckContext) -> list[Node]:
     if not kinds:
         return []
     verified = _verified_ids(ctx)
-    historical = historical_node_ids(ctx.graph)
+    historical = ctx.historical
     return [
         node for node in ctx.in_play_nodes()
         if node.kind in kinds and node.id not in verified and not _removed_by_closed_milestone(ctx, node, historical)
@@ -113,11 +106,3 @@ def check_verifier_rules(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
         for node in missing_verifiers(ctx)
     ]
     return unused + missing
-
-
-def run_verifier_rules(ctx: CheckContext) -> dict[str, Any]:
-    """The registered function: E742 and E743 findings of ``check_verifier_rules`` at merge, or a skip when no graph could be built."""
-    gctx = GraphCheckContext.from_registry(ctx)
-    if gctx is None:
-        return check_registry.skip(GRAPH_NOT_BUILT)
-    return check_registry.check_result(check_verifier_rules(gctx, "merge"))

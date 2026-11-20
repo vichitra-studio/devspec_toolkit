@@ -19,24 +19,17 @@ from dataclasses import dataclass
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import Link, Node
 from specdev_tools.trace.hashing import compute_all
-from specdev_tools.trace.history import historical_node_ids
 
 from .context import GraphCheckContext
+from .names import API, COMPONENT, DERIVES_FROM, REFINES
 
 OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", "rule", "threat", "edge-case"})
 """Kinds proved by evidence (step 02a deliveries, step-10 rules, step-11 threats and edge cases): ``PENDING_EVIDENCE`` by default."""
 COARSE_KINDS = frozenset({"scope-item", "risk", "capability"})
 CONSTRAINT_KIND = "constraint"
-API_KIND = "api"
-COMPONENT_KIND = "component"
 CONNECTION_KIND = "connection"
 THIRD_PARTY_KIND = "third-party"
-DESIGN_MILESTONE_KIND = "design-milestone"
-TASK_CRITERION_KIND = "task-criterion"
-REFINES = "refines"
-SCHEDULES = "schedules"
-DERIVES_FROM = "derives_from"
 COMPONENT_USE_FIELDS = frozenset({"provided_by", "constrains"})
 RELIES_ON = frozenset({"relies_on"})
 PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
@@ -63,7 +56,8 @@ class BuiltResult:
     via: tuple[str, ...] = ()
 
 
-BuiltProvider = Callable[[GraphCheckContext, Node], BuiltResult]
+BuiltProvider = Callable[["BuiltComputation", Node], BuiltResult]
+"""``fn(computation, node)``: the state of *node*.  The running ``BuiltComputation`` gives the context (``computation.ctx``) and the state of any other node (``computation.result_of(other)``) through the memo and the cycle guard of the same run."""
 KindPredicate = Callable[[Node], bool]
 
 
@@ -79,16 +73,17 @@ _providers: tuple[_Provider, ...] = ()
 def register_built_provider(kind_predicate: KindPredicate, fn: BuiltProvider) -> Callable[[], None]:
     """Decide the built state of every in-play node *kind_predicate* matches with *fn* instead of the default branches.
 
-    Providers are consulted in registration order and the first match decides; an out-of-play node is ``IGNORED``
-    before any provider is asked.  Returns the function that restores the providers as they were before this call.
+    Providers are consulted in registration order and the first one whose predicate matches decides (a later one that
+    also matches is not asked); an out-of-play node is ``IGNORED`` before any provider is asked.  Returns the function that removes this provider; it removes only its own, in
+    whatever order the restores are called, and a second call does nothing.
     """
     global _providers
-    previous = _providers
-    _providers = (*previous, _Provider(kind_predicate, fn))
+    mine = _Provider(kind_predicate, fn)
+    _providers = (*_providers, mine)
 
     def restore() -> None:
         global _providers
-        _providers = previous
+        _providers = tuple(provider for provider in _providers if provider is not mine)
 
     return restore
 
@@ -136,17 +131,20 @@ def _combine(members: list[tuple[str, BuiltResult]], what: str) -> BuiltResult:
     return BuiltResult(BuiltState.BUILT, f"every {what} is built", tuple(sorted(member_id for member_id, _result in members)))
 
 
-class _Computation:
-    """One run of ``compute_built``: the memo, the derivation guard and the hashes (computed once, when first needed)."""
+class BuiltComputation:
+    """One run of ``compute_built``: the memo, the derivation guard and the hashes (computed once, when first needed).
+
+    A provider is handed the run: ``ctx`` is the context and ``result_of(node)`` the state of any node, computed once per run;
+    a node reached again while it is being computed reads NOT_BUILT (a cycle ends there, not in recursion).
+    """
 
     def __init__(self, ctx: GraphCheckContext) -> None:
         self.ctx = ctx
         self._memo: dict[str, BuiltResult] = {}
         self._active: set[str] = set()
         self._hashes: dict[str, tuple[str, str]] | None = None
-        self._historical: set[str] | None = None
 
-    def result(self, node: Node) -> BuiltResult:
+    def result_of(self, node: Node) -> BuiltResult:
         """The state of *node*, computed once; a node reached again while it is being computed (a derivation cycle) reads NOT_BUILT."""
         if node.id in self._memo:
             return self._memo[node.id]
@@ -165,7 +163,7 @@ class _Computation:
             return BuiltResult(BuiltState.IGNORED, "out of play")
         for provider in _providers:
             if provider.matches(node):
-                return provider.compute(self.ctx, node)
+                return provider.compute(self, node)
         if node.role not in OBLIGATION_ROLES:
             return BuiltResult(BuiltState.IGNORED, f"a {node.role or 'node'} is not built")
         if node.kind in EVIDENCE_KINDS:
@@ -174,7 +172,7 @@ class _Computation:
             return self._constraint(node)
         if node.kind in COARSE_KINDS:
             return self._coarse(node)
-        if node.kind == API_KIND:
+        if node.kind == API:
             return self._refined(node) or BuiltResult(BuiltState.NOT_BUILT, "no counting refinement")
         return self._refined(node) or self._parent(node)
 
@@ -186,16 +184,11 @@ class _Computation:
         return BuiltResult(BuiltState.BUILT, "refined by a closed milestone at its current content", criteria) if criteria else None
 
     def _counts(self, criterion: Node, link: Link, target: Node) -> bool:
-        if criterion.id not in self._closed_work() or self._task_paused(criterion):
+        if criterion.id not in self.ctx.historical or self._task_paused(criterion):
             return False
         lock = self.ctx.lock
         entry = lock.get(criterion.id, link.field, link.target) if lock is not None else None
         return entry is not None and entry.content_hash == self._content_hash(target)
-
-    def _closed_work(self) -> set[str]:
-        if self._historical is None:
-            self._historical = historical_node_ids(self.ctx.graph)
-        return self._historical
 
     def _task_paused(self, criterion: Node) -> bool:
         task = self.ctx.graph.by_id.get(criterion.parent) if criterion.parent else None
@@ -238,7 +231,7 @@ class _Computation:
         found: dict[str, BuiltResult] = {}
         for node in nodes:
             if node is not None and node.role in OBLIGATION_ROLES and node.id not in found:
-                result = self.result(node)
+                result = self.result_of(node)
                 if result.state is not BuiltState.IGNORED:
                     found[node.id] = result
         return list(found.items())
@@ -247,7 +240,7 @@ class _Computation:
         built = BuiltResult(BuiltState.BUILT, "used by a built obligation")
         return [
             (source.id, built) for source, _link in inbound_sources(self.ctx, constraint, (DERIVES_FROM,))
-            if source.kind == COMPONENT_KIND and self._component_used(source)
+            if source.kind == COMPONENT and self._component_used(source)
         ]
 
     def _component_used(self, component: Node) -> bool:
@@ -273,7 +266,7 @@ class _Computation:
         """The ids of the built obligations that link to *target* through *verbs*."""
         return [
             source.id for source, _link in inbound_sources(self.ctx, target, verbs)
-            if source.role in OBLIGATION_ROLES and self.result(source).state is BuiltState.BUILT
+            if source.role in OBLIGATION_ROLES and self.result_of(source).state is BuiltState.BUILT
         ]
 
 
@@ -286,32 +279,13 @@ def compute_built(ctx: GraphCheckContext, node_id: str | None = None) -> dict[st
     Raises:
         KeyError: *node_id* names no node of the graph.
     """
-    run = _Computation(ctx)
+    run = BuiltComputation(ctx)
     graph = ctx.graph
     if node_id is not None:
         node = graph.find(node_id)
         if node is None:
             raise KeyError(node_id)
-        return {node.id: run.result(node)}
+        return {node.id: run.result_of(node)}
     nodes = sorted((node for node in graph.gated_nodes() if graph.by_id.get(node.id) is node), key=graph.shape.order_key)
-    return {node.id: run.result(node) for node in nodes}
+    return {node.id: run.result_of(node) for node in nodes}
 
-
-def unrealised_design_milestones(ctx: GraphCheckContext) -> list[Node]:
-    """The in-play step-09 milestones that no step-14 milestone computes: no task criterion refines anything they schedule.
-
-    Read at release (M9); nothing here raises an error.
-    """
-    graph = ctx.graph
-    refined = {
-        graph.canonical_id(link.target)
-        for criterion in graph.by_kind.get(TASK_CRITERION_KIND, ())
-        if ctx.in_play(criterion)
-        for link in criterion.links
-        if link.field == REFINES
-    }
-    return [
-        milestone for milestone in ctx.in_play_nodes()
-        if milestone.kind == DESIGN_MILESTONE_KIND
-        and not any(graph.canonical_id(link.target) in refined for link in milestone.links if link.field == SCHEDULES)
-    ]

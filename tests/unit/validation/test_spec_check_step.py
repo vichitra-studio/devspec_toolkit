@@ -27,6 +27,7 @@ from specdev_tools.core.step_order import load_step_order
 from specdev_tools.graph.build import build_graph
 from specdev_tools.validation import check_registry
 from specdev_tools.validation.check_registry import CHECK_REGISTRY, CheckContext, check_result, register_check, run_registered_checks
+from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
 from specdev_tools.validation.spec_check import run_checks, run_spec_check_json
 from specdev_tools.validation.spec_check import run_spec_check as run_plain_spec_check
 from specdev_tools.validation.step_gate import waiting_map
@@ -90,15 +91,20 @@ def test_an_empty_registry_is_refused_not_clear(tmp_path: Path, monkeypatch: pyt
 
 
 def _registered_names_of_the_block() -> list[str]:
-    """The names ``validation/spec_check.py`` registers: the first argument of each module-level ``register_check`` call, read from the source."""
-    from specdev_tools.validation import spec_check
+    """The names ``validation/spec_check.py`` registers, read from the source: the first argument of each module-level ``register_check`` call, and the rules of ``BUILTIN_GRAPH_CHECKS`` at the module-level call of ``publish_graph_checks``."""
+    from specdev_tools.validation import graph_checks, spec_check
 
-    tree = ast.parse(Path(spec_check.__file__).read_text(encoding="utf-8"))
-    calls = [
-        node.value for node in tree.body
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and getattr(node.value.func, "id", "") == "register_check"
-    ]
-    return [arg.value if isinstance(arg, ast.Constant) else getattr(spec_check, arg.id) for arg in (call.args[0] for call in calls)]
+    names: list[str] = []
+    for node in ast.parse(Path(spec_check.__file__).read_text(encoding="utf-8")).body:
+        if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)):
+            continue
+        func = node.value.func
+        if getattr(func, "id", "") == "register_check":
+            arg = node.value.args[0]
+            names.append(arg.value if isinstance(arg, ast.Constant) else getattr(spec_check, arg.id))
+        elif getattr(func, "attr", "") == "publish_graph_checks":
+            names.extend(name for name, _rule, _check in graph_checks.BUILTIN_GRAPH_CHECKS)
+    return names
 
 
 def test_a_fresh_cli_process_runs_every_check_of_the_registration_block(tmp_path: Path) -> None:
@@ -162,11 +168,18 @@ def test_baseline_run_prints_no_seed_note(tmp_path: Path, capsys: pytest.Capture
 
 # --- the gate ---------------------------------------------------------------------------------------------------
 
-def test_step_04_exits_zero_when_only_later_errors_exist_and_lists_them_pending(tmp_path: Path) -> None:
+def test_step_04_exits_zero_when_only_later_errors_exist_and_lists_them_pending(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     host = step_gate_host(tmp_path / "host", ["broken_link_in_step_05"])
     code, out = run_spec_check(host, "--step", "04")
     assert code == 0, out
-    assert re.search(r"PENDING \(\d+\)", out) and "05: 1" in out  # the total moves with the checks of later steps
+    assert re.search(r"PENDING \(\d+\)", out) and "05: 1" in out
+    # the delta's own pending part is exactly one finding at step 05; the rest is the example's own W583 at step 11 (what the
+    # total was before the graph checks) and the findings of the graph checks (the total moves with those)
+    _code, report = _gate_json(host, capsys, "--step", "04")
+    pending = report["step_gate"]["pending"]
+    assert [(finding["code"], finding["node_id"]) for finding in pending["05"]] == [("E700", "api-broken-link")]
+    others = [(owner, finding["code"]) for owner, found in pending.items() if owner != "05" for finding in found if finding["code"] not in GRAPH_CHECK_CODES]
+    assert others == [("11", "W583")]
     assert "api-broken-link" not in out
     assert "api-broken-link" in run_spec_check(host, "--step", "04", "--detail", "all")[1]
 

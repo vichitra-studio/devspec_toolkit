@@ -56,7 +56,7 @@ def done_milestones(graph: Graph) -> set[str]:
     return done
 
 
-def _contained(graph: Graph, root: str) -> set[str]:
+def contained(graph: Graph, root: str) -> set[str]:
     """*root* and every node below it through containment."""
     found: set[str] = set()
     pending = [root]
@@ -80,7 +80,7 @@ def historical_node_ids(graph: Graph) -> set[str]:
         return set()
     historical: set[str] = set()
     for milestone in milestones:
-        historical |= _contained(graph, milestone)
+        historical |= contained(graph, milestone)
     historical |= {node.id for node in graph.nodes if node.milestone is not None and graph.canonical_id(node.milestone) in milestones}
     return historical & {node.id for node in graph.gated_nodes()}
 

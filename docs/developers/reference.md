@@ -310,16 +310,16 @@ Eight more checks of `spec-check` read the nodes by role (codes in [Graph Role C
 
 | Check | Code | Reports |
 |-------|------|---------|
-| `no-dangling` | E740 | A node of a requirement, delivery or context kind that no other node uses: link it, schedule it, or set `scope` to `later` or `out` |
+| `no-dangling` | E740 | A node of a requirement, delivery or context kind that no other node uses: link it, schedule it, or, where the kind has a `scope` field, set `scope` to `later` or `out` and give a `scope_reason` |
 | `term-use` | E741 | A glossary term whose label no node of steps 04 to 15 mentions |
-| `verifier-rules` | E742, E743 | A fixture or job that no task criterion lists in `verified_by` (E742); a criterion, API, invariant or NFR that no fixture verifies (E743, and for an NFR a job counts too) |
+| `verifier-rules` | E742, E743 | A fixture that no task criterion lists in `verified_by`, or a job that none lists and that realises and verifies nothing (E742); a criterion, API, invariant or NFR that no fixture verifies (E743, and for an NFR a job counts too) |
 | `cross-cutting` | E744 | A task that an invariant or NFR applies to, when no criterion of the task refines it |
-| `refinement` | E745 | A task criterion whose `verified_by` verifiers do not verify what the criterion refines |
-| `scaffold-paths` | E746 | A step 15 scaffold row, for a built API, whose file git does not track |
-| `seed-routes` | E747, E748, E749 | A seed no route names (E747); a route no node of its step uses (E748); a node that links a seed the manifest does not route to the node's step (E749) |
-| `prose-ids` | E752 | A node id written in the text of a node, where a link belongs |
+| `refinement` | E745 | A task criterion whose `verified_by` verifiers do not verify what the criterion refines (a threat or an edge case is verified through its mitigations) |
+| `scaffold-paths` | E746 | A step 15 scaffold row, for a built API, whose file git does not track (skipped outside a git repository, and when every row to check is under a submodule that is not checked out) |
+| `seed-routes` | E747, E748, E749 | A seed no route names (E747, and only that finding for such a seed); a route no node of its step uses (E748); a link from a node to a seed the manifest does not route to the node's step (E749, one finding for each link) |
+| `prose-ids` | E752 | A node id written in the text of a node, where a link belongs (nodes parked with `scope: later` or `out` are read; fields whose schema fixes the value are not) |
 
-E740, E742 and E743 are coverage gaps (see `stale`, `coverage` and `step ready` below); E743 is owned by step 08, and a finding is shown as pending by the step gate until its owner step is gated. A spec that has only some of its steps written fails these checks until its nodes are linked, or marked `scope: later` or `out` where the kind has that field.
+E740, E742 and E743 are coverage gaps (see `stale`, `coverage` and `step ready` below); E743 is owned by step 08, and a finding is shown as pending by the step gate until its owner step is gated. A spec that has only some of its steps written fails these checks until its nodes are linked, or marked `scope: later` or `out` with a `scope_reason` where the kind has that field. A child keeps its own `scope`: an FR set to `scope: later` does not park its criteria.
 
 **A spec that has not been migrated.** The checks run on every spec; none is skipped because the files look like 1.1.1. Run on a small 1.1.1-shaped spec (steps 01, 04, 05, 08 and 14, with `trace`, `targets` and `fr_refs` fields), `spec-check` ran all eight checks (none printed `[SKIP]`) and reported, besides the schema errors (E520) that the old shape causes: E740 (`capability cap-legacy-signin is not used by any node ...`), E742, E743 (`api api-legacy-signin has no verifier: add a fixture at step 08 that verifies it`) and E752 for the old link fields (`fr fr-legacy-signin mentions the id cap-legacy-signin in its text at trace: ...`). Such a spec fails `spec-check` until it is migrated; the migration of a later step of this release maps the old shape.
 

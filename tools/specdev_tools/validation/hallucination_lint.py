@@ -11,6 +11,7 @@ from ..canonical.registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.json_utils import find_schema_dir, build_id_index, resolve_ref as _resolve_urn_ref
 from ..core.registry import derive_allowed_upstream
+from ..core.schema_nav import child_schema as _nav_child_schema
 from ..core.schema_nav import effective_schema as _nav_effective_schema
 from ..core.trace_types import is_valid_trace_type
 from .linter_utils import (
@@ -89,7 +90,7 @@ def lint_hallucinations(
     # D13: Build canonical term index for free-text scanning
     canonical_terms = _build_canonical_term_index(canon)
     # Build schema resolver context once per invocation (id_index scan is ~O(schema-dir))
-    _schema_ctx = _SchemaResolverCtx(root)
+    _schema_ctx = SchemaResolverCtx(root)
     nfr_ids = _load_nfr_ids(spec_dir)
     if nfr_ids is None:
         errors.append(make_error("W570", "GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent"))
@@ -256,7 +257,7 @@ def _is_valid_unit(value: str, canon: CanonicalRegistry) -> bool:
 # not per file, to avoid repeated directory scans.
 # ---------------------------------------------------------------------------
 
-class _SchemaResolverCtx:
+class SchemaResolverCtx:
     """Lightweight schema resolution context for structural E541 suppression.
 
     Holds the built id_index and a per-invocation ref cache; provides a
@@ -908,19 +909,7 @@ def _check_free_text_terms(
             # (match the first pattern whose regex matches the key).
             child_schema: dict | None = None
             if effective_node is not None and resolve_fn is not None:
-                props = effective_node.get("properties", {})
-                if key in props:
-                    child_schema = props[key]
-                else:
-                    # patternProperties: find the first pattern that matches key
-                    pattern_props = effective_node.get("patternProperties", {})
-                    for pattern, p_schema in pattern_props.items():
-                        try:
-                            if re.search(pattern, key) is not None:
-                                child_schema = p_schema
-                                break
-                        except re.error:
-                            pass
+                child_schema = _nav_child_schema(effective_node, key)
 
             if key in _FREE_TEXT_FIELDS and isinstance(value, str) and len(value) >= 3:
                 # Skip if the schema says this object structurally cannot carry

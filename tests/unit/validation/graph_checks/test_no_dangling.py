@@ -5,20 +5,23 @@ import json
 import os
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.kinds import LinkDecl
-from specdev_tools.graph.model import Graph, Link, Node
+from specdev_tools.graph.model import Node
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.no_dangling import check_no_dangling
 from specdev_tools.validation.graph_checks.use_table import EXCLUDED_VERBS, USE_TABLE, Use, use_pairs
 from unit.graph._synth import EXAMPLE_SPEC, ROOT, run_specdev
 from unit.trace._lock_support import git_copy_of_example
+
+from ._built_support import context_of, graph_of
+from ._built_support import node as make_node
 
 # The rows of the design's "Who uses what" table that name holders (DOC L610-L634); segment and metric ("a later
 # node's link") and "every other kind" have no row and take any link that is not excluded.
@@ -63,6 +66,12 @@ def test_use_matches_doc_rows() -> None:
     assert undeclared == []
 
 
+def test_the_kinds_that_use_an_assumption_are_the_kinds_the_registry_gives_an_assumes_link() -> None:
+    """The row of ``assumption`` lists its holders by hand: it holds every kind whose declaration has an ``assumes`` link, and no other."""
+    declared = {kind for kind, decl in _EXAMPLE.decls.items() if any(link.field == "assumes" for link in decl.links)}
+    assert {use.holder_kind for use in USE_TABLE["assumption"] if use.verb == "assumes"} == declared
+
+
 def test_a_kind_without_a_row_is_used_by_any_link_that_is_not_excluded() -> None:
     decls = build_graph(str(EXAMPLE_SPEC), str(ROOT)).decls
     pairs = use_pairs("capability", decls)
@@ -74,26 +83,15 @@ def test_a_kind_without_a_row_is_used_by_any_link_that_is_not_excluded() -> None
 # --- the check ----------------------------------------------------------------------------------------------------------
 
 _EXAMPLE = build_graph(str(EXAMPLE_SPEC), str(ROOT))
-_LINK = LinkDecl("derives_from", (), False, False, ())
 
 
 def _node(node_id: str, kind: str, *, parent: str | None = None, lifecycle: str = "active", scope: str | None = None, **links: list[str]) -> Node:
     """A node of the real *kind* (role and step as the registry gives them) holding the given link fields."""
-    decl = _EXAMPLE.decls[kind]
-    step = _EXAMPLE.shape.kind_steps[kind][0]
-    made = tuple(Link(node_id, field, target, _LINK) for field, targets in links.items() for target in targets)
-    return Node(node_id, kind, step, decl.role, f"{node_id}.json", ".item", parent, (), lifecycle, scope, made, node_id)
+    return make_node(node_id, kind, _EXAMPLE.decls[kind].role, step=_EXAMPLE.shape.kind_steps[kind][0], parent=parent, lifecycle=lifecycle, scope=scope, **links)
 
 
 def _context(*nodes: Node) -> GraphCheckContext:
-    children: dict[str, list[str]] = defaultdict(list)
-    for node in nodes:
-        if node.parent:
-            children[node.parent].append(node.id)
-    placed = [replace(node, children=tuple(children[node.id])) for node in nodes]
-    graph = Graph.from_nodes(placed, shape=_EXAMPLE.shape)
-    graph.decls = _EXAMPLE.decls
-    return GraphCheckContext.from_graph(graph, None, str(ROOT))
+    return context_of(graph_of(nodes, shape=_EXAMPLE.shape, decls=_EXAMPLE.decls), real_owners=True)
 
 
 def _dangling(*nodes: Node) -> list[str]:
@@ -177,6 +175,13 @@ def test_a_child_that_is_out_of_play_does_not_use_its_container() -> None:
     assert _dangling(*nodes) == ["fr-a"]
 
 
+def test_a_used_child_that_is_parked_does_not_use_its_container() -> None:
+    """A child with scope later is out of play: a link into it does not make its container used."""
+    nodes = [_node("fr-a", "fr"), _node("ac-a", "criterion", parent="fr-a", scope="later"), _node("tc-a", "task-criterion", refines=["ac-a"])]
+    assert _dangling(*nodes) == ["fr-a"]
+    assert _dangling(*[replace(node, scope=None) if node.id == "ac-a" else node for node in nodes]) == []
+
+
 def test_a_containment_cycle_ends() -> None:
     assert _dangling(_node("fr-a", "fr", parent="fr-b"), _node("fr-b", "fr", parent="fr-a")) == ["fr-a", "fr-b"]
 
@@ -216,7 +221,7 @@ def test_e740_owner_is_the_furthest_usable_step(kind: str, owner: str) -> None:
 def test_e740_message_names_the_kind_the_way_to_use_it_and_the_way_out() -> None:
     [finding] = check_no_dangling(_context(_node("nfr-a", "nfr")), "merge")
     assert "nfr nfr-a" in finding.message and "task-criterion refines (step 14)" in finding.message
-    assert finding.message.endswith("link it, schedule it, or set scope later or out")
+    assert "link it, schedule it" in finding.message and "scope" not in finding.message.split("link it")[-1]  # no schema to read: no advice to park
 
 
 def test_e740_findings_are_listed_in_step_order_and_carry_a_node_id() -> None:
@@ -256,15 +261,57 @@ def _example_host_with_an_unused_capability(destination: Path) -> Path:
 
 @pytest.mark.parametrize("command", [("stale",), ("coverage",)], ids=["stale", "coverage"])
 def test_a_fresh_process_counts_the_role_gap_of_a_node(command: tuple[str, ...], tmp_path: Path) -> None:
-    """``specdev stale`` and ``specdev coverage`` import the graph checks themselves: the E740 gap of the unused capability is in their output."""
+    """``specdev stale`` and ``specdev coverage`` install the gap provider themselves: the E740 gap of the unused capability is in their output."""
     host = _example_host_with_an_unused_capability(tmp_path / "host")
     done = run_specdev(*command, "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
     assert done.returncode == 0, done.stderr
     assert f'"{_PROBE_CAPABILITY}"' in done.stdout and '"E740"' in done.stdout
 
 
-def test_building_the_command_line_parser_registers_the_gap_provider_once() -> None:
-    """``stale``, ``coverage`` and ``step ready`` all run after the parser is built: that is where the provider is registered, in a process that imported nothing else."""
-    code = "from specdev_tools import cli; cli.build_parser(); from specdev_tools.trace import gaps; print(len(gaps._providers))"
+EXAMPLE_GAPS = {"07": {"E740": 1}, "08": {"E743": 5}, "12": {"E740": 5}, "14": {"E740": 11}}
+"""The role gaps of the unchanged worked example by owner step and code: 17 E740 and 5 E743."""
+
+
+def _gaps_by_step(command: str, report: dict[str, Any]) -> dict[str, dict[str, int]]:
+    steps = report["steps"] if command == "stale" else report["role_findings"]["by_step"]
+    rows = {entry["step"]: [gap["code"] for gap in entry["coverage_gaps" if command == "stale" else "findings"]] for entry in steps}
+    return {step: dict(Counter(codes)) for step, codes in rows.items() if codes}
+
+
+@pytest.mark.parametrize("command", ["stale", "coverage"])
+def test_the_unchanged_example_has_its_role_gaps_per_step_and_code_in_a_fresh_process(command: str, tmp_path: Path) -> None:
+    """The real provider on the unchanged example: 17 E740 and 5 E743, at the steps that own them (the tally of ``spec-check``)."""
+    host = git_copy_of_example(tmp_path / "host")
+    done = run_specdev(command, "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert done.returncode == 0, done.stderr
+    report = json.loads(done.stdout)
+    assert _gaps_by_step(command, report) == EXAMPLE_GAPS
+    if command == "coverage":
+        assert report["role_findings"]["counts"] == {"E740": 17, "E743": 5}
+
+
+def test_a_fresh_process_names_the_role_gaps_that_block_step_ready(tmp_path: Path) -> None:
+    """``specdev step ready 14`` on the worked example: step 08 holds five E743 gaps, so step 14 is not ready."""
+    host = git_copy_of_example(tmp_path / "host")
+    done = run_specdev("step", "ready", "14", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert "step 08 (5 blockers)" in done.stdout + done.stderr
+    assert done.stdout.count("step 08: coverage gap E743: ") == 5
+
+
+def test_building_the_command_line_parser_installs_the_gap_provider_once() -> None:
+    """``stale``, ``coverage`` and ``step ready`` all run after the parser is built: that is where the provider is installed, in a process that imported nothing else; building it again adds none."""
+    code = (
+        "from specdev_tools import cli; cli.build_parser(); cli.build_parser(); "
+        "from specdev_tools.trace import gaps; print(len(gaps._providers))"
+    )
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(ROOT / "tools")}, check=True)
     assert done.stdout.strip() == "1"
+
+
+def test_e740_advises_parking_only_for_a_kind_whose_schema_has_a_scope_field() -> None:
+    """A charter metric has no ``scope``: setting one is a schema error, so only a link clears it.  A requirement has one."""
+    context = GraphCheckContext.from_graph(build_graph(str(EXAMPLE_SPEC), str(ROOT)), None)
+    messages = {finding.node_id: finding.message for finding in check_no_dangling(context, "merge")}
+    assert "scope" not in messages["metric-reset-completion-rate"] and "link it" in messages["metric-reset-completion-rate"]
+    parked = [message for node_id, message in messages.items() if node_id != "metric-reset-completion-rate"]
+    assert parked and all("link it" in message and "scope later or out" in message and "scope_reason" in message for message in parked)

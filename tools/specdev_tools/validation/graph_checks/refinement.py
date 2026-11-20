@@ -2,34 +2,21 @@
 
 A verifier ``V`` of a criterion covers an obligation ``O`` when ``V`` names ``O``, a container of ``O`` or a node
 ``O`` contains in ``verifies`` (or in the ``extra_verifiers`` seam), when ``V`` is a job that ``realises`` ``O``, or
-when ``V`` is the rule ``O`` itself (an enforcer covers the rule it enforces).  Criteria of closed milestones are
-history and are skipped.
+when ``V`` is the rule ``O`` itself (an enforcer covers the rule it enforces).  A node that lists ``mitigated_by`` (a
+threat, an edge case) is proven through its mitigations: ``V`` also covers it when ``V`` is one of them or covers one.
+Criteria of closed milestones are history and are skipped.
 """
 from __future__ import annotations
 
-from typing import Any
-
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.validation import check_registry
-from specdev_tools.validation.check_registry import CheckContext
+from specdev_tools.trace.history import contained
 
 from .codes import VERIFIER_DOES_NOT_VERIFY_REFINED
-from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
+from .context import GraphCheckContext, Mode
+from .names import JOB, REALISES, REFINES, RULE, TASK_CRITERION, VERIFIED_BY, VERIFIES, link_targets
 
-TASK_CRITERION = "task-criterion"
-REFINES = "refines"
-VERIFIED_BY = "verified_by"
-VERIFIES = "verifies"
-REALISES = "realises"
-RULE = "rule"
-JOB = "job"
-
-
-def link_targets(graph: Graph, node: Node, field: str) -> list[str]:
-    """The ids of the nodes *node* links to through *field*, written as ids and resolved by alias to the current id, in link order; a target no node has is kept as written."""
-    return [graph.canonical_id(link.target) for link in node.links if link.field == field]
+MITIGATED_BY = "mitigated_by"
 
 
 def _ancestors(graph: Graph, node: Node) -> set[str]:
@@ -41,30 +28,30 @@ def _ancestors(graph: Graph, node: Node) -> set[str]:
     return found
 
 
-def _descendants(graph: Graph, node_id: str) -> set[str]:
-    found: set[str] = set()
-    pending = list(graph.children.get(node_id, ()))
-    while pending:
-        child = pending.pop()
-        if child not in found:
-            found.add(child)
-            pending.extend(graph.children.get(child, ()))
-    return found
-
-
 def _named_by(ctx: GraphCheckContext, verifier: Node) -> set[str]:
     return set(link_targets(ctx.graph, verifier, VERIFIES)) | {ctx.graph.canonical_id(name) for name in ctx.extra_verifiers(verifier)}
 
 
-def covers(ctx: GraphCheckContext, verifier: Node, obligation: Node) -> bool:
-    """Whether *verifier* covers *obligation*: it is the rule *obligation* itself, it is a job that realises it, or what it verifies is the obligation, a container of it or something it contains."""
+def mitigations(graph: Graph, node: Node) -> list[Node]:
+    """The nodes *node* lists in ``mitigated_by``, in link order; empty for a kind without the field."""
+    return [graph.by_id[target] for target in link_targets(graph, node, MITIGATED_BY) if target in graph.by_id]
+
+
+def _covers_directly(ctx: GraphCheckContext, verifier: Node, obligation: Node) -> bool:
     if verifier.kind == RULE:
         return verifier.id == obligation.id
     if verifier.kind == JOB and obligation.id in link_targets(ctx.graph, verifier, REALISES):
         return True
     named = _named_by(ctx, verifier)
-    related = {obligation.id} | _ancestors(ctx.graph, obligation) | _descendants(ctx.graph, obligation.id)
+    related = contained(ctx.graph, obligation.id) | _ancestors(ctx.graph, obligation)
     return bool(named & related)
+
+
+def covers(ctx: GraphCheckContext, verifier: Node, obligation: Node) -> bool:
+    """Whether *verifier* covers *obligation*: it is the rule *obligation* itself, it is a job that realises it, or what it verifies is the obligation, a container of it or something it contains; for an obligation with ``mitigated_by``, it is one of the mitigations or covers one (a threat is proven through all of them)."""
+    if _covers_directly(ctx, verifier, obligation):
+        return True
+    return any(verifier.id == mitigation.id or _covers_directly(ctx, verifier, mitigation) for mitigation in mitigations(ctx.graph, obligation))
 
 
 def covering_verifiers(ctx: GraphCheckContext, criterion: Node, obligation: Node) -> list[Node]:
@@ -88,7 +75,7 @@ def check_refinement(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
 
     The finding carries the criterion as ``node_id`` and ``refines->O`` as ``target``, so each pair counts apart.
     """
-    historical = historical_node_ids(ctx.graph)
+    historical = ctx.historical
     findings: list[SpecError] = []
     for criterion in ctx.in_play_nodes():
         if criterion.kind != TASK_CRITERION or criterion.id in historical:
@@ -96,7 +83,7 @@ def check_refinement(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
         for target, obligation in _refined_unverified(ctx, criterion):
             message = (
                 f"task criterion {criterion.id} refines {obligation.id} but none of its verifiers ({_listed(ctx.graph, criterion)}) "
-                f"verifies {obligation.id}, a node that contains it or a node it contains; add a verifier that does"
+                f"verifies {obligation.id}, a node that contains it or a node it contains (for a threat or an edge case: one of its mitigations or a verifier of one); add a verifier that does"
             )
             findings.append(ctx.finding(VERIFIER_DOES_NOT_VERIFY_REFINED, criterion, message, target=link_target(REFINES, target)))
     return findings
@@ -104,11 +91,3 @@ def check_refinement(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
 
 def _listed(graph: Graph, criterion: Node) -> str:
     return ", ".join(link_targets(graph, criterion, VERIFIED_BY)) or "none listed"
-
-
-def run_refinement(ctx: CheckContext) -> dict[str, Any]:
-    """The registered function: E745 findings of ``check_refinement`` at merge, or a skip when no graph could be built."""
-    gctx = GraphCheckContext.from_registry(ctx)
-    if gctx is None:
-        return check_registry.skip(GRAPH_NOT_BUILT)
-    return check_registry.check_result(check_refinement(gctx, "merge"))

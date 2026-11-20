@@ -11,9 +11,10 @@ import pytest
 
 from specdev_tools.validation.graph_checks import scaffold
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
-from specdev_tools.validation.graph_checks.scaffold import _scan, check_scaffold_paths, scaffold_rows_untracked
-from unit.graph._synth import HASH_SEEDS, run_python_seeded
+from specdev_tools.validation.graph_checks.scaffold import _scan, check_scaffold_paths, run_scaffold_paths, scaffold_rows_untracked
+from unit.graph._synth import HASH_SEEDS
 
+from ._order_support import seeded
 from ._git_support import SUBMODULE, clone_without_submodules, git, make_host_with_submodule, make_repo
 from ._scaffold_support import SCAFFOLD_FILE
 from ._scaffold_support import scaffold_context as _context
@@ -52,12 +53,40 @@ def test_plain_ls_files_would_report_submodule_rows_so_recurse_is_used(tmp_path:
     assert _paths(_context({"row-in": (f"{SUBMODULE}/a.txt", ["api-1"])}, host)) == []
 
 
+def test_a_folder_that_only_shares_the_prefix_of_an_unchecked_submodule_is_checked(tmp_path: Path) -> None:
+    host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a"})
+    clone = clone_without_submodules(host, tmp_path / "clone")
+    rows = {"row-in": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-near": (f"{SUBMODULE}s/none.ts", ["api-1"])}
+    scan = _scan(_context(rows, clone), None, "close")
+    assert [error.node_id for error in scan.findings] == ["row-near"]
+    assert len(scan.notes) == 1 and "row-in" in scan.notes[0]
+
+
 def test_uninitialised_submodule_rows_skip_not_e746(tmp_path: Path) -> None:
     host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a"})
     clone = clone_without_submodules(host, tmp_path / "clone")
     scan = _scan(_context({"row-in": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-gone": ("src/none.ts", ["api-1"])}, clone), None, "close")
     assert [error.node_id for error in scan.findings] == ["row-gone"]
     assert len(scan.notes) == 1 and "row-in" in scan.notes[0] and SUBMODULE in scan.notes[0]
+
+
+def test_every_row_under_an_unchecked_submodule_skips_the_whole_check(tmp_path: Path) -> None:
+    """Nothing was judged: the registered check reports SKIP with the reason (the summary and ``--json`` show it); with one row elsewhere it runs and only notes the others."""
+    host = make_host_with_submodule(tmp_path, {"h.txt": "h"}, {"a.txt": "a", "b.txt": "b"})
+    clone = clone_without_submodules(host, tmp_path / "clone")
+    everything = _context({"row-a": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-b": (f"{SUBMODULE}/b.txt", ["api-1"])}, clone, built=["api-1"])
+    scan = _scan(everything, None, "merge")
+    assert scan.findings == [] and len(scan.notes) == 2
+    assert scan.skip_reason is not None and SUBMODULE in scan.skip_reason and "every scaffold row" in scan.skip_reason
+    with patch.object(GraphCheckContext, "from_registry", return_value=everything):
+        result = run_scaffold_paths(object())  # type: ignore[arg-type]
+    assert result["status"] == "SKIP" and result["reason"] == scan.skip_reason
+
+    some = _context({"row-a": (f"{SUBMODULE}/a.txt", ["api-1"]), "row-h": ("h.txt", ["api-1"])}, clone, built=["api-1"])
+    scan = _scan(some, None, "merge")
+    assert scan.skip_reason is None and len(scan.notes) == 1
+    with patch.object(GraphCheckContext, "from_registry", return_value=some):
+        assert run_scaffold_paths(object())["status"] == "PASS"  # type: ignore[arg-type]
 
 
 def test_non_git_host_skips(tmp_path: Path) -> None:
@@ -126,14 +155,7 @@ def _scenario(reverse: bool) -> list[str | None]:
         return _paths(_context(ordered, host))
 
 
-_ORDER_CODE = """
-import json
-from unit.validation.graph_checks.test_scaffold_paths import _scenario
-print(json.dumps(_scenario(True)))
-"""
-
-
 @pytest.mark.parametrize("seed", HASH_SEEDS)
 def test_scaffold_paths_report_in_the_same_order_whatever_the_hash_seed(seed: int) -> None:
     expected = _scenario(False)
-    assert expected == ["row-a", "row-k", "row-m", "row-z"] == json.loads(run_python_seeded(seed, _ORDER_CODE))
+    assert expected == ["row-a", "row-k", "row-m", "row-z"] == seeded(seed, __name__, "_scenario", True)

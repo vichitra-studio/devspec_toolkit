@@ -5,7 +5,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
-from specdev_tools.validation.graph_checks.context import GraphCheckContext, ownership_context
+from specdev_tools.graph.ownership import load_owner_context
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from unit.graph._synth import ROOT
 
 from ._built_support import closed_work, context_of, current_lock, graph_of, node
@@ -26,6 +27,6 @@ def scaffold_context(rows: Mapping[str, Row], git_root: Path | str | None, *, bu
     documents[SCAFFOLD_FILE] = {"rows": [{"path": path} for path, _ in rows.values()]}
     graph = graph_of([*(node(api, "api") for api in apis), *row_nodes, *work], documents)
     context = context_of(graph, current_lock(graph))
-    return replace(context, git_root=None if git_root is None else str(git_root), owner_context=ownership_context(str(ROOT)))
+    return replace(context, git_root=None if git_root is None else str(git_root), owner_context=load_owner_context(str(ROOT)))
 
 

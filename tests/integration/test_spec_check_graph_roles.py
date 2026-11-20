@@ -11,7 +11,7 @@ import pytest
 from integration._step_gate_support import run_split
 from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import make_error
-from specdev_tools.validation.graph_checks import no_dangling
+from specdev_tools.validation.graph_checks import register_graph_check, unregister_graph_check
 from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
 from specdev_tools.validation.spec_check import run_spec_check as run_plain_spec_check
 from unit.graph._synth import git
@@ -136,16 +136,19 @@ def promotion_env(monkeypatch: pytest.MonkeyPatch) -> Any:
 def test_promotion_applies_to_a_new_check_result(
     env: tuple[str, str], promotion_env: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A promotable warning (W615, made up for the test) from the no-dangling rule is WARN as it is and FAIL with the code E615 under either promotion variable: the entry builds its result through ``check_result``."""
+    """A promotable warning (W615, made up for the test) from a registered graph check is WARN as it is and FAIL with the code E615 under either promotion variable: the entry builds its result through ``check_result``."""
     warning = make_error("W615", "stand-in warning from the rule", node_id="fr-password-reset", owner="step:14")
-    promotion_env.setattr(no_dangling, "check_no_dangling", lambda _ctx, _mode: [warning])
+    register_graph_check("probe-warning", lambda _ctx, _mode: [warning])
     host = git_copy_of_example(tmp_path / "host")
 
-    reset_config()
-    _code, plain, _err = _spec_check_json(capsys, host)
-    assert [(plain["checks"]["no-dangling"]["status"], f["code"]) for f in plain["checks"]["no-dangling"]["findings"]] == [("WARN", "W615")]
+    try:
+        reset_config()
+        _code, plain, _err = _spec_check_json(capsys, host)
+        assert [(plain["checks"]["probe-warning"]["status"], f["code"]) for f in plain["checks"]["probe-warning"]["findings"]] == [("WARN", "W615")]
 
-    promotion_env.setenv(*env)
-    reset_config()
-    _code, promoted, _err = _spec_check_json(capsys, host)
-    assert [(promoted["checks"]["no-dangling"]["status"], f["code"]) for f in promoted["checks"]["no-dangling"]["findings"]] == [("FAIL", "E615")]
+        promotion_env.setenv(*env)
+        reset_config()
+        _code, promoted, _err = _spec_check_json(capsys, host)
+    finally:
+        unregister_graph_check("probe-warning")
+    assert [(promoted["checks"]["probe-warning"]["status"], f["code"]) for f in promoted["checks"]["probe-warning"]["findings"]] == [("FAIL", "E615")]

@@ -6,25 +6,18 @@ to the same capability or component.  Tasks of closed milestones are history and
 """
 from __future__ import annotations
 
-from typing import Any
-
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.trace.history import historical_node_ids
-from specdev_tools.validation import check_registry
-from specdev_tools.validation.check_registry import CheckContext
 
 from .codes import CROSS_CUTTING_NOT_REFINED
-from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
-from .refinement import REFINES, link_targets
+from .context import GraphCheckContext, Mode
+from .names import API, COMPONENT, DERIVES_FROM, REFINES, link_targets
 
 CONSTRAINS = "constrains"
 TASK = "task"
 CAPABILITY = "capability"
-COMPONENT = "component"
 FR = "fr"
 CRITERION = "criterion"
-DERIVES_FROM = "derives_from"
 PROVIDED_BY = "provided_by"
 
 
@@ -47,7 +40,7 @@ def lineage(graph: Graph, node: Node) -> set[str]:
         return {target.id for target in _linked(graph, node, DERIVES_FROM, CAPABILITY)}
     if kind == CRITERION:
         return _lineage_of(graph, [graph.by_id[node.parent]] if node.parent in graph.by_id else [])
-    if kind == "api":
+    if kind == API:
         return _lineage_of(graph, _linked(graph, node, DERIVES_FROM, FR)) | {target.id for target in _linked(graph, node, PROVIDED_BY, COMPONENT)}
     if kind == "api-error":
         return _lineage_of(graph, _linked(graph, node, DERIVES_FROM, CRITERION))
@@ -82,7 +75,7 @@ def check_cross_cutting(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
     The finding carries the task as ``node_id`` and ``refines->O`` as ``target``.
     """
     obligations = [(node, lineage(ctx.graph, node)) for node in ctx.in_play_nodes() if _constrains(node)]
-    historical = historical_node_ids(ctx.graph)
+    historical = ctx.historical
     findings: list[SpecError] = []
     for task in ctx.in_play_nodes():
         if task.kind != TASK or task.id in historical:
@@ -98,11 +91,3 @@ def check_cross_cutting(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
                 )
                 findings.append(ctx.finding(CROSS_CUTTING_NOT_REFINED, task, message, target=link_target(REFINES, obligation.id)))
     return findings
-
-
-def run_cross_cutting(ctx: CheckContext) -> dict[str, Any]:
-    """The registered function: E744 findings of ``check_cross_cutting`` at merge, or a skip when no graph could be built."""
-    gctx = GraphCheckContext.from_registry(ctx)
-    if gctx is None:
-        return check_registry.skip(GRAPH_NOT_BUILT)
-    return check_registry.check_result(check_cross_cutting(gctx, "merge"))

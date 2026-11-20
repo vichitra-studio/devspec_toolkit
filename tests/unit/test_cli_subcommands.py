@@ -21,6 +21,7 @@ from specdev_tools import cli
 from specdev_tools.core.toolkit_root import detect_toolkit_root
 from specdev_tools.trace import gaps
 from specdev_tools.trace.lockfile import Lock, LockEntry, serialise_lock
+from specdev_tools.validation import graph_checks
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -406,8 +407,8 @@ class TestTraceCommands(_CliMixin, unittest.TestCase):
         self.assertEqual((defaults.step, defaults.diff, defaults.json_output), (None, False, False))
 
     def test_stale_dispatches_to_its_handler(self):
-        # The example reports role gaps under the real graph checks (E740, E743); this test shows the clean state, so no gap provider is registered.
-        with patch.object(gaps, "_providers", []):
+        # The example reports role gaps under the real graph checks (E740, E743); this test shows the clean state, so no gap provider is registered (the CLI installs it on every parser it builds, so the install is turned off too).
+        with patch.object(gaps, "_providers", []), patch.object(graph_checks, "install_gap_provider", lambda: None):
             code, out, err = self._run_cli(["stale", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
         self.assertEqual(code, 0, err)
         self.assertEqual(out.strip(), "stale: no pending replay")

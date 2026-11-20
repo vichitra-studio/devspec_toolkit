@@ -13,7 +13,7 @@ import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
-from specdev_tools.core.errors import SpecError
+from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.scope_helpers import as_str, dict_items, str_items
 from specdev_tools.core.step_paths import get_step_from_path, refine_impl_context_substep
@@ -69,6 +69,18 @@ def load_ownership_table(repo_root: str) -> tuple[OwnershipRow, ...]:
         )
         for row in dict_items(data.get("rows"))
     )
+
+
+def load_owner_context(repo_root: str) -> OwnerContext:
+    """The ownership table of the toolkit at *repo_root* as an ``OwnerContext`` (no furthest steps).
+
+    Raises:
+        FindingError: E520 when ``tools/error_ownership.json`` is missing or unreadable (the run is refused).
+    """
+    try:
+        return OwnerContext(rows=load_ownership_table(repo_root))
+    except OwnershipTableError as error:
+        raise FindingError(make_error("E520", f"UNRESOLVED_INPUT ownership_table {error}")) from error
 
 
 def step_owner(node: Node) -> str | None:

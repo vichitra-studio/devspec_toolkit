@@ -17,10 +17,10 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from ..core.ambiguity_items import ItemsRead, read_ambiguity_items
-from ..core.errors import FindingError, SpecError, make_error
+from ..core.errors import SpecError
 from ..graph.gitview import host_root_of
 from ..graph.model import Graph
-from ..graph.ownership import OwnerContext, OwnershipTableError, load_ownership_table, owner_for
+from ..graph.ownership import OwnerContext, load_owner_context, owner_for
 from ..trace.lockfile import MERGE_CHECK_OWNER, Lock, LockError, read_lock
 from .linter_utils import build_lint_graph
 
@@ -119,10 +119,7 @@ class CheckContext:
         Raises:
             FindingError: E520 when ``tools/error_ownership.json`` is missing or unreadable (the run is refused).
         """
-        try:
-            return OwnerContext(rows=load_ownership_table(self.repo_root))
-        except OwnershipTableError as error:
-            raise FindingError(make_error("E520", f"UNRESOLVED_INPUT ownership_table {error}")) from error
+        return load_owner_context(self.repo_root)
 
     @cached_property
     def lint_graph(self) -> Graph | None:

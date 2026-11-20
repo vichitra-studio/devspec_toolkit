@@ -1,10 +1,17 @@
-"""Small hand-built graphs for the built-state tests: nodes, the closed milestone that refines them, a lock at their current hashes."""
+"""Small hand-built graphs for the tests of the graph checks: nodes, a context on them, the closed milestone that refines them, a lock at their current hashes.
+
+``node`` is the one node builder and ``context_of`` the one context builder of the folder; ``graph_of`` places each
+node under its ``parent`` (containment in both directions) and ``spec`` is the context on the toolkit's real
+ownership table that the checks of links and containment use.
+"""
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from dataclasses import replace
 from typing import Any
 
-from specdev_tools.graph.kinds import LinkDecl
+from specdev_tools.graph.kinds import KindDecl, LinkDecl
 from specdev_tools.graph.model import Graph, Link, Node, SpecShape
 from specdev_tools.graph.ownership import OwnerContext
 from specdev_tools.trace.hashing import compute_all
@@ -13,7 +20,11 @@ from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from unit.graph._synth import ROOT
 
 BUILT_FIELDS = frozenset({"refines", "derives_from", "mitigated_by", "realises"})
-STEP_RANKS = {"00": 0, "01": 1, "02": 2, "04": 3, "05": 4, "06": 5, "07": 6, "09": 7, "10": 8, "14": 9, "16": 10}
+STEP_STEPS = ("00", "01", "02", "04", "05", "06", "07", "08", "09", "10", "14", "16")
+STEP_RANKS = {step: rank for rank, step in enumerate(STEP_STEPS)}
+VERIFIER_KINDS = ("fixture", "job")
+PLAN_KINDS = ("task", "task-criterion", "roadmap-milestone", "anchor-row")
+MILESTONE_ANCHOR_FILE = "anchors.json"
 STALE_HASH = "sha256:" + "0" * 64
 TASK_FILE, ANCHOR_FILE = "14_roadmap.json", "16_impl_context.json"
 
@@ -24,14 +35,28 @@ def link(source: str, field: str, target: str, *, built: bool | None = None) -> 
     return Link(source, field, target, LinkDecl(field, (), False, flag, ()))
 
 
+def role_of(kind: str) -> str:
+    """The role a hand-built node of *kind* has unless the test says otherwise: a verifier, a plan node, or an obligation."""
+    return "verifier" if kind in VERIFIER_KINDS else "plan" if kind in PLAN_KINDS else "obligation-system"
+
+
 def node(
-    node_id: str, kind: str, role: str | None = "obligation-system", *, step: str = "04", parent: str | None = None,
+    node_id: str, kind: str, role: str | None = "", *, step: str | None = None, parent: str | None = None,
     children: Iterable[str] = (), scope: str | None = None, lifecycle: str = "active",
-    links: Iterable[tuple[str, str]] = (), file: str = "spec.json", jq_path: str = "",
+    links: Iterable[tuple[str, str]] = (), file: str | None = None, jq_path: str | None = None, **link_fields: list[str],
 ) -> Node:
-    """A node; *links* are ``(field, target)`` pairs."""
-    made = tuple(link(node_id, field, target) for field, target in links)
-    return Node(node_id, kind, step, role, file, jq_path, parent, tuple(children), lifecycle, scope, made, node_id)
+    """A node; *links* are ``(field, target)`` pairs and each keyword that is a link field gives that field its target ids.
+
+    The role is ``role_of(kind)`` unless given (``None`` is a role of its own); the step is ``14`` for a plan node and
+    ``04`` for any other; the file is ``<id>.json`` and the path ``.item``.  A ``parent`` is placed by ``graph_of``.
+    """
+    made = tuple(link(node_id, field, target) for field, target in (*links, *((f, t) for f, targets in link_fields.items() for t in targets)))
+    role = role_of(kind) if role == "" else role
+    step = step if step is not None else "14" if role == "plan" else "04"
+    return Node(
+        node_id, kind, step, role, f"{node_id}.json" if file is None else file, ".item" if jq_path is None else jq_path,
+        parent, tuple(children), lifecycle, scope, made, node_id,
+    )
 
 
 def closed_work(
@@ -53,9 +78,20 @@ def closed_work(
     return nodes, documents
 
 
-def graph_of(nodes: Iterable[Node], documents: Mapping[str, Any] | None = None) -> Graph:
-    graph = Graph.from_nodes(list(nodes), shape=SpecShape(step_ranks=STEP_RANKS))
+def graph_of(
+    nodes: Iterable[Node], documents: Mapping[str, Any] | None = None, *, shape: SpecShape | None = None, decls: Mapping[str, KindDecl] | None = None,
+) -> Graph:
+    """A graph of *nodes*, each also listed as a child of its ``parent`` (the order given kept)."""
+    children: dict[str, list[str]] = defaultdict(list)
+    placed = list(nodes)
+    for item in placed:
+        if item.parent:
+            children[item.parent].append(item.id)
+    placed = [replace(item, children=(*item.children, *(child for child in children[item.id] if child not in item.children))) for item in placed]
+    graph = Graph.from_nodes(placed, shape=shape or SpecShape(step_ranks=STEP_RANKS))
     graph.documents = dict(documents or {})
+    if decls is not None:
+        graph.decls = dict(decls)
     return graph
 
 
@@ -71,8 +107,23 @@ def current_lock(graph: Graph, *, stale: Iterable[str] = (), skip: Iterable[str]
     return Lock(entries=tuple(entries))
 
 
-def context_of(graph: Graph, lock: Lock | None) -> GraphCheckContext:
+def context_of(graph: Graph, lock: Lock | None = None, *, real_owners: bool = False) -> GraphCheckContext:
+    """The context on *graph*: no ownership rows, or with *real_owners* the toolkit's own table (the owner of a finding)."""
+    if real_owners:
+        return GraphCheckContext.from_graph(graph, lock, str(ROOT))
     return GraphCheckContext(graph=graph, lock=lock, owner_context=OwnerContext(rows=()), repo_root=str(ROOT))
+
+
+def spec(*nodes: Node, **graph_options: Any) -> GraphCheckContext:
+    """A context on the real ownership table over *nodes* (see ``graph_of``) and the anchor document of ``closed_milestone``."""
+    graph = graph_of(nodes, {MILESTONE_ANCHOR_FILE: {"rows": [{"status": "done"}]}}, **graph_options)
+    return context_of(graph, real_owners=True)
+
+
+def closed_milestone(milestone_id: str) -> list[Node]:
+    """The milestone *milestone_id* and the anchor row, with status ``done``, that closes it (``spec`` holds the anchor document)."""
+    anchor = node(f"anchor-{milestone_id}", "anchor-row", about=[milestone_id], file=MILESTONE_ANCHOR_FILE, jq_path=".rows[0]")
+    return [node(milestone_id, "roadmap-milestone"), anchor]
 
 
 def built_context(nodes: Iterable[Node], refines: Mapping[str, str] | None = None, **closed: Any) -> GraphCheckContext:

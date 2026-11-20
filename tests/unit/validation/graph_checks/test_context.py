@@ -10,8 +10,8 @@ import pytest
 from specdev_tools.core.errors import ERROR_CODES, SpecError
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.gitview import run_git
-from specdev_tools.graph.model import Graph, Node, SpecShape
-from specdev_tools.graph.ownership import OwnerContext
+from specdev_tools.graph.model import Node
+from specdev_tools.trace.coverage import exemption
 from specdev_tools.validation.check_registry import CheckContext
 from specdev_tools.validation.graph_checks import GRAPH_CHECKS, run_graph_checks
 from specdev_tools.validation.graph_checks.codes import (
@@ -31,6 +31,10 @@ from specdev_tools.validation.graph_checks.context import GRAPH_NOT_BUILT, Graph
 from unit.graph._synth import EXAMPLE_SPEC, ROOT
 from unit.trace._lock_support import git_copy_of_example
 
+from ._bindings_support import Bindings
+from ._built_support import closed_milestone, context_of, graph_of, spec
+from ._built_support import node as make_node
+
 M6B_CODES = (
     NODE_DANGLING, TERM_NOT_USED_BY_LABEL, UNUSED_VERIFIER, MISSING_VERIFIER, CROSS_CUTTING_NOT_REFINED,
     VERIFIER_DOES_NOT_VERIFY_REFINED, SCAFFOLD_PATH_NOT_TRACKED, SEED_NOT_ROUTED, SEED_ROUTE_UNUSED, SEED_LINK_NOT_ROUTED,
@@ -46,12 +50,11 @@ def _node(
     node_id: str = "n-1", *, kind: str = "fr", role: str | None = "obligation-system", step: str | None = "04",
     lifecycle: str = "active", scope: str | None = None,
 ) -> Node:
-    return Node(node_id, kind, step, role, f"{step}.json", ".items[0]", None, (), lifecycle, scope, (), node_id)
+    return make_node(node_id, kind, role, step=step, lifecycle=lifecycle, scope=scope, file=f"{step}.json", jq_path=".items[0]")
 
 
 def _context(*nodes: Node) -> GraphCheckContext:
-    graph = Graph.from_nodes(list(nodes), shape=SpecShape(step_ranks={"04": 0, "08": 1}))
-    return GraphCheckContext(graph=graph, lock=None, owner_context=OwnerContext(rows=()), repo_root=str(ROOT))
+    return context_of(graph_of(nodes))
 
 
 @pytest.fixture(scope="module")
@@ -93,39 +96,38 @@ def test_deprecated_node_stays_in_play() -> None:
     assert node in context.in_play_nodes()
 
 
-@pytest.mark.parametrize(("scope", "in_scope"), [(None, True), ("in", True), ("later", False), ("out", False)])
-def test_omitted_scope_reads_as_in_scope(scope: str | None, in_scope: bool) -> None:
-    assert GraphCheckContext.in_scope(_node(scope=scope)) is in_scope
+@pytest.mark.parametrize("lifecycle", ["active", "deprecated", "not_applicable"])
+@pytest.mark.parametrize("scope", [None, "in", "later", "out"])
+def test_play_state_is_what_coverage_leaves_inside_its_denominators(lifecycle: str, scope: str | None) -> None:
+    """One definition of "outside every denominator": ``trace.coverage.exemption``; the checks add only the retired-verifier clause."""
+    node = _node(lifecycle=lifecycle, scope=scope)
+    assert _context(node).in_play(node) is (exemption(node) is None)
 
 
-def test_retired_bindings_seam_stub_changes_play_state() -> None:
+def test_retired_bindings_seam_stub_changes_play_state(bindings: Bindings) -> None:
     verifier = _node("fx-1", kind="fixture", role="verifier", step="08")
     obligation = _node("fr-1")
     context = _context(verifier, obligation)
     assert context.in_play(verifier)
-    restore = bind_seams(retired_bindings=lambda node: {"binding-1"} if node.id == "fx-1" else set())
-    try:
-        built_after = _context(verifier, obligation)
-        assert not built_after.in_play(verifier)
-        assert built_after.in_play(obligation)
-        assert context.in_play(verifier), "a context built before the binding keeps the seams it was built with"
-    finally:
-        restore()
+    restore = bindings.seams(retired_bindings=lambda node: {"binding-1"} if node.id == "fx-1" else set())
+    built_after = _context(verifier, obligation)
+    assert not built_after.in_play(verifier)
+    assert built_after.in_play(obligation)
+    assert context.in_play(verifier), "a context built before the binding keeps the seams it was built with"
+    restore()
     assert _context(verifier).in_play(verifier)
 
 
-def test_record_users_extra_verifiers_and_pin_matches_seams_have_stubs() -> None:
+def test_record_users_extra_verifiers_and_pin_matches_seams_have_stubs(bindings: Bindings) -> None:
     node = _node("tp-1", kind="third-party", step="04")
     context = _context(node)
     assert (context.record_users(node), context.extra_verifiers(node), context.pin_matches(node)) == (set(), set(), "UNKNOWN")
-    restore = bind_seams(
+    restore = bindings.seams(
         record_users=lambda _node: {"rec-1"}, extra_verifiers=lambda _node: {"fr-9"}, pin_matches=lambda _node: "OK",
     )
-    try:
-        bound = _context(node)
-        assert (bound.record_users(node), bound.extra_verifiers(node), bound.pin_matches(node)) == ({"rec-1"}, {"fr-9"}, "OK")
-    finally:
-        restore()
+    bound = _context(node)
+    assert (bound.record_users(node), bound.extra_verifiers(node), bound.pin_matches(node)) == ({"rec-1"}, {"fr-9"}, "OK")
+    restore()
     assert _context(node).pin_matches(node) == "UNKNOWN"
 
 
@@ -240,5 +242,30 @@ def test_seed_texts_are_empty_without_a_host_root(example: GraphCheckContext) ->
     assert example.git_root is None and example.seed_texts == {}
 
 
-def test_closed_milestones_are_the_milestones_of_done_anchor_rows(example: GraphCheckContext) -> None:
-    assert example.closed_milestones == set()
+def test_historical_is_the_closed_work_computed_once(example: GraphCheckContext) -> None:
+    assert example.historical == set()
+    closed = spec(*closed_milestone("ms-1"), make_node("task-1", "task", parent="ms-1"), make_node("task-2", "task"))
+    assert closed.historical == {"ms-1", "task-1"}
+    assert closed.historical is closed.historical
+
+
+def test_an_out_of_order_restore_removes_only_its_own_binding() -> None:
+    node = _node("tp-1", kind="third-party", step="04")
+    restore_pin = bind_seams(pin_matches=lambda _node: "OK")
+    restore_users = bind_seams(record_users=lambda _node: {"rec-1"})
+    restore_pin()
+    both_gone_but_one = _context(node)
+    assert (both_gone_but_one.pin_matches(node), both_gone_but_one.record_users(node)) == ("UNKNOWN", {"rec-1"})
+    restore_users()
+    restore_users()
+    assert (_context(node).pin_matches(node), _context(node).record_users(node)) == ("UNKNOWN", set())
+
+
+def test_a_later_binding_of_the_same_seam_wins_until_it_is_removed() -> None:
+    node = _node("tp-1", kind="third-party", step="04")
+    restore_first = bind_seams(pin_matches=lambda _node: "OK")
+    restore_second = bind_seams(pin_matches=lambda _node: "MISMATCH")
+    restore_first()
+    assert _context(node).pin_matches(node) == "MISMATCH"
+    restore_second()
+    assert _context(node).pin_matches(node) == "UNKNOWN"

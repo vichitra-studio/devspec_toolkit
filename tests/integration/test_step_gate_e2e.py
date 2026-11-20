@@ -26,10 +26,8 @@ from integration._step_gate_support import (
     start_branch,
     step_gate_host,
 )
-from specdev_tools.core.errors import make_error
 from specdev_tools.validation.open_items import check_open_items
 from specdev_tools.validation.touched_steps import SEED_EDIT_NOTE
-from specdev_tools.validation.check_registry import check_result, register_check
 from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
 from unit.graph._synth import git
 from unit.trace._lock_support import ROOT, run_on_example
@@ -133,18 +131,15 @@ def test_clarify_round_trip(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
 
 # --- DOC 13.9: pending and new upstream ---------------------------------------------------------------------------
 
-def test_doc_13_9_rows_3_4_pending_with_stub_and_new_upstream_blocks(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], registered_checks: None
-) -> None:
-    # Row 3: no-dangling error of a requirement that no later step uses yet; the owned error is a stub until M6b.
-    stub = make_error("E520", "stub: nothing uses fr-account-export yet", owner="step:08", node_id="fr-account-export")
-    register_check("stub-no-dangling", lambda ctx: check_result([stub]))
+def test_doc_13_9_rows_3_4_pending_until_the_owner_and_new_upstream_blocks(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Row 3: no-dangling error of a requirement that no later step uses yet: E740, owned by the furthest step that can use an FR.
     host = step_gate_host(tmp_path / "host", ["fr_nothing_uses"])
     code, gate = _gate(capsys, host, "--step", "04")
     assert code == 0 and gate["blocking"] == []
-    assert {owner: _pairs(_not_graph_check(found)) for owner, found in gate["pending"].items() if owner == "08"} == {
-        "08": [("E520", "fr-account-export")]
-    }
+    found = {owner: [f for f in findings if f.get("node_id") == "fr-account-export"] for owner, findings in gate["pending"].items()}
+    assert {owner: _pairs(findings) for owner, findings in found.items() if findings} == {"14": [("E740", "fr-account-export")]}
+    code, gate = _gate(capsys, host, "--step", "14")
+    assert code == 1 and ("E740", "fr-account-export") in _pairs(gate["blocking"])
 
     # Row 4: an error added on a branch whose merge-base was clean blocks the next step as new upstream.
     branch = host_on_branch(tmp_path / "branch", on_branch=["broken_link_in_step_04"])

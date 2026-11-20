@@ -1,15 +1,17 @@
 """The built computation: the hash-based branches, the lifecycle gate and the order of its result (WI-M6b-04)."""
 from __future__ import annotations
 
-import json
 from dataclasses import replace
+from typing import Any
 
 import pytest
 
-from specdev_tools.validation.graph_checks.built import BuiltState, compute_built, unrealised_design_milestones
-from unit.graph._synth import HASH_SEEDS, run_python_seeded
+from specdev_tools.validation.graph_checks.built import BuiltState, compute_built
+from specdev_tools.validation.graph_checks.design_milestones import unrealised_design_milestones
+from unit.graph._synth import HASH_SEEDS
 
-from ._built_support import closed_work, context_of, current_lock, graph_of, built_context, node
+from ._built_support import built_context, closed_work, context_of, current_lock, graph_of, node
+from ._order_support import seeded
 
 LEAF_KINDS = ("invariant", "nfr", "api-error", "criterion")
 
@@ -163,16 +165,6 @@ def test_unrealised_design_milestones() -> None:
     assert [milestone.id for milestone in unrealised_design_milestones(ctx)] == ["dm-nothing", "dm-open"]
 
 
-_ORDER_CODE = """
-import json
-from specdev_tools.validation.graph_checks.built import compute_built
-from unit.validation.graph_checks._built_support import built_context
-from unit.validation.graph_checks.test_built import _order_nodes
-ctx = built_context(list(reversed(_order_nodes())), {"tc-2": "ac-2", "tc-1": "inv-1"})
-print(json.dumps([[i, r.state.value, r.reason, list(r.via)] for i, r in compute_built(ctx).items()]))
-"""
-
-
 def _order_nodes():
     return [
         node("cap-1", "capability", step="01"), node("fr-1", "fr", children=["ac-1", "ac-2"]),
@@ -181,9 +173,16 @@ def _order_nodes():
     ]
 
 
+def _scenario(reverse: bool) -> list[list[Any]]:
+    """The built state of every node of ``_order_nodes`` (listed in reverse, its criteria refining in reverse, when *reverse*)."""
+    nodes, refines = _order_nodes(), {"tc-1": "inv-1", "tc-2": "ac-2"}
+    ctx = built_context(list(reversed(nodes)) if reverse else nodes, dict(reversed(list(refines.items()))) if reverse else refines)
+    return [[i, r.state.value, r.reason, list(r.via)] for i, r in compute_built(ctx).items()]
+
+
 @pytest.mark.parametrize("seed", HASH_SEEDS)
 def test_built_reports_in_the_same_order_whatever_the_hash_seed(seed: int) -> None:
     ctx = built_context(_order_nodes(), {"tc-1": "inv-1", "tc-2": "ac-2"})
-    expected = [[i, r.state.value, r.reason, list(r.via)] for i, r in compute_built(ctx).items()]
-    assert json.loads(run_python_seeded(seed, _ORDER_CODE)) == expected
+    expected = _scenario(False)
+    assert seeded(seed, __name__, "_scenario", True) == expected
     assert [row[0] for row in expected] == sorted((row[0] for row in expected), key=lambda i: (ctx.graph.shape.step_key(ctx.graph.by_id[i].step), i))

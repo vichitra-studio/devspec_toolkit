@@ -2,8 +2,9 @@
 
 *Tracked* is read once per run with ``git ls-files -s -z --recurse-submodules`` at the host root, so the files of a
 checked-out submodule count.  A submodule that is not checked out is listed as one entry of mode 160000 (a gitlink):
-a row under it cannot be judged and is skipped with a note, never reported.  Without git or outside a repository the
-whole check skips with the reason.
+a row under it cannot be judged and is skipped with a note, never reported; when every row to check lies under such a
+submodule the whole check skips with that reason.  Without git or outside a repository the whole check skips with the
+reason.
 
 ``merge`` checks a row only when one of the APIs it ``realises`` is built (a built API needs its file); ``close`` and
 ``release`` check every row.  ``scaffold_rows_untracked`` is the single rule the close and release gates call.
@@ -26,9 +27,8 @@ from specdev_tools.validation.check_registry import CheckContext
 from .built import BuiltState, compute_built
 from .codes import SCAFFOLD_PATH_NOT_TRACKED
 from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
-from .refinement import REALISES, link_targets
+from .names import REALISES, SCAFFOLD_ROW, link_targets
 
-SCAFFOLD_ROW = "scaffold-row"
 PATH_FIELD = "path"
 GITLINK_MODE = "160000"
 NO_HOST_ROOT = "no host repository root to read tracked files from"
@@ -52,7 +52,7 @@ class TrackedFiles:
 
 @dataclass
 class ScaffoldScan:
-    """The outcome of one scan: the findings, a note for each row that was not judged, and why the whole check was skipped (``None`` when it ran)."""
+    """The outcome of one scan: the findings, a note for each row under a submodule that is not checked out, and why the whole check was skipped (``None`` when it ran)."""
 
     findings: list[SpecError] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -111,18 +111,23 @@ def _scan(ctx: GraphCheckContext, api_ids: Collection[str] | None, mode: Mode) -
     except TrackedFilesUnavailable as error:
         return ScaffoldScan(skip_reason=str(error))
     scan = ScaffoldScan()
-    for row in _rows_to_check(ctx, api_ids, mode):
+    rows = _rows_to_check(ctx, api_ids, mode)
+    modules: set[str] = set()
+    for row in rows:
         path = _row_path(ctx, row)
         if path is None or path in tracked.files:
             continue
         module = tracked.submodule_of(path)
         if module is not None:
             scan.notes.append(f"scaffold row {row.id} path {path} is under submodule {module}, which is not checked out: not checked")
+            modules.add(module)
             continue
         scan.findings.append(ctx.finding(
             SCAFFOLD_PATH_NOT_TRACKED, row,
             f"scaffold row {row.id} names {path}, which is not a tracked file ({mode} mode); add and commit the file, or correct the row's path",
         ))
+    if rows and len(scan.notes) == len(rows):
+        scan.skip_reason = f"every scaffold row to check is under a submodule that is not checked out ({', '.join(sorted(modules))})"
     return scan
 
 
@@ -141,7 +146,7 @@ def check_scaffold_paths(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
 
 
 def run_scaffold_paths(ctx: CheckContext) -> dict[str, Any]:
-    """The registered function: E746 findings at merge; a skip when no graph could be built or git cannot be read; rows under a submodule that is not checked out are noted on stderr."""
+    """The registered function: E746 findings at merge; a skip when no graph could be built or git cannot be read; some rows under a submodule that is not checked out are noted on stderr; all of them: a skip."""
     gctx = GraphCheckContext.from_registry(ctx)
     if gctx is None:
         return check_registry.skip(GRAPH_NOT_BUILT)

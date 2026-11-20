@@ -914,8 +914,7 @@ changes:
       New error codes W630 (OPEN_ITEM), E631 (OPEN_ITEM_AT_MERGE), E632
       (OPEN_ITEM_IN_PLAN) and W633 (OPEN_ITEM_LEGACY_TRIAGE), in the catalogue
       docs/developers/error-codes.md and registered in
-      tools/specdev_tools/core/errors.py. spec-check has a new check, open-items
-      (19 checks), which reports W630: one warning for each open item of the
+      tools/specdev_tools/core/errors.py. spec-check has a new check, open-items, which reports W630: one warning for each open item of the
       1.2.0 shape and one summary for each artifact, step and array for items of
       the 1.1.1 shape; the summary names its array (3 legacy open items in
       <file> (ambiguities); see upstream-backlog, or (plan.ambiguities),
@@ -931,7 +930,8 @@ changes:
       before open-items: no-dangling (E740: a node of a requirement, delivery
       or context kind that no node uses), term-use (E741: a glossary term
       whose label no node of steps 04 to 15 mentions), verifier-rules (E742: a
-      fixture or job that no task criterion lists in verified_by; E743: a
+      fixture that no task criterion lists in verified_by, or a job that none
+      lists and that realises and verifies nothing; E743: a
       criterion, API, invariant or NFR that no fixture verifies, where a job
       also counts for an NFR), cross-cutting (E744: a task that an invariant
       or NFR applies to, when no criterion of the task refines it), refinement
@@ -948,7 +948,15 @@ changes:
       E740 the latest step whose nodes can use the kind. None is promotable.
       The checks run on every spec: none is skipped because the files look
       like 1.1.1, so a spec that has not been migrated gets them too (E752
-      reports its old link fields trace and targets).
+      reports its old link fields trace and targets). A child keeps its own
+      scope: an FR set to scope: later does not park its criteria. E740 tells
+      the author to set scope to later or out, with a scope_reason, only for a
+      kind whose schema has a scope field. E745 reads a threat or an edge case
+      through its mitigations. E752 reads nodes parked with scope: later or
+      out, and the description of a task. E747 is the only finding for a seed
+      that no route names; E749 is one finding for each link. scaffold-paths
+      is skipped when every row to check lies under a submodule that is not
+      checked out.
     migration:
       action: none
 
@@ -957,8 +965,8 @@ changes:
       Every finding in spec-check --json has an owner: the one the finding carries,
       else the row of tools/error_ownership.json for its code, else the default owner
       of its check (merge-check for most checks). A finding that had no owner now
-      shows its row's owner or merge-check. Plain spec-check prints the same text as
-      before except for the open-items row and the check count.
+      shows its row's owner or merge-check. Plain spec-check does not print the
+      owner: read it with --json (the step gate shows it too).
     migration:
       action: none
 
@@ -1007,7 +1015,7 @@ changes:
     description: >
       A spec that has only some of its steps written fails spec-check on the
       role checks until its nodes are linked, or marked scope: later or out
-      where the kind has that field: the worked example, which is a partial
+      with a scope_reason where the kind has that field: the worked example, which is a partial
       spec, reports 17 E740, 5 E743 and 1 E744 and exits 1. The step gate
       lists a finding as pending (PENDING) until the step that owns it is
       gated, so spec-check --step 05 on the worked example now prints a

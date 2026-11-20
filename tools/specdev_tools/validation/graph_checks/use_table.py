@@ -14,11 +14,12 @@ from typing import NamedTuple
 from specdev_tools.graph.kinds import RECORD_ROLE, KindDecl
 from specdev_tools.graph.model import SpecShape
 
-VERIFIER_ROLE = "verifier"
+from .names import REALISES, VERIFIER_ROLE
+
 EXCLUDED_VERBS = frozenset({"about", "replaces", "removes", "verifies", "verified_by"})
 """Verbs that are never a use: a record's ``about``, the id-history links, and the verifier verbs (a fixture that verifies a node does not use it)."""
 NON_HOLDER_ROLES = frozenset({RECORD_ROLE, VERIFIER_ROLE})
-VERIFIER_USE_VERB = "realises"
+VERIFIER_USE_VERB = REALISES
 """The one verb through which a verifier is a use: a job that ``realises`` a rule uses it (DOC: a job is used through what it realises)."""
 
 
@@ -89,15 +90,20 @@ def use_pairs(kind: str, decls: Mapping[str, KindDecl]) -> frozenset[Use]:
     )
 
 
+def step_of(kind: str, shape: SpecShape) -> str | None:
+    """The step of *kind*: the latest (by the waterfall rank of *shape*) of the steps whose files declare it; ``None`` for a kind no step declares."""
+    steps = shape.kind_steps.get(kind, ())
+    return max(steps, key=shape.step_key) if steps else None
+
+
 def furthest_steps(decls: Mapping[str, KindDecl], shape: SpecShape) -> dict[str, str]:
     """For each kind with a way to be used, the furthest step among the holder kinds of ``use_pairs``: the owner step of its E740.
 
-    The step of a kind is the latest (by the waterfall rank of *shape*) of the steps whose files declare it.  A kind
-    with no holder kind that has a step is left out, so ``owner_for`` answers ``None`` for it.
+    A kind with no holder kind that has a step is left out, so ``owner_for`` answers ``None`` for it.
     """
     furthest: dict[str, str] = {}
     for kind in decls:
-        steps = [step for use in use_pairs(kind, decls) for step in shape.kind_steps.get(use.holder_kind, ())]
+        steps = [step for use in use_pairs(kind, decls) if (step := step_of(use.holder_kind, shape)) is not None]
         if steps:
             furthest[kind] = max(steps, key=shape.step_key)
     return furthest

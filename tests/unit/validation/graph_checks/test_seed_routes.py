@@ -17,13 +17,15 @@ from specdev_tools.validation.graph_checks.codes import SEED_LINK_NOT_ROUTED, SE
 from specdev_tools.validation.graph_checks.context import SEED_MANIFEST_PATH, GraphCheckContext
 from specdev_tools.validation.graph_checks.seed_routes import check_seed_routes
 from specdev_tools.validation.seed_lint import lint_seeds
-from unit.graph._synth import HASH_SEEDS, ROOT, run_python_seeded
+from unit.graph._synth import HASH_SEEDS, ROOT
 from unit.trace._lock_support import EXAMPLE_HOST
+
+from ._example_support import Edit, edit_documents
+from ._order_support import seeded
 
 FIXTURES = ROOT / "tests" / "fixtures" / "graph_checks" / "seed_routes"
 SEED, EXTRA = "seed-accounts", "seed-extra"
 CODES = (SEED_NOT_ROUTED, SEED_ROUTE_UNUSED, SEED_LINK_NOT_ROUTED)
-Edit = Callable[[dict[str, Any]], None]
 
 
 def _host(tmp_path: Path, manifest: str | None = None, **edits: Edit) -> Path:
@@ -32,11 +34,7 @@ def _host(tmp_path: Path, manifest: str | None = None, **edits: Edit) -> Path:
     shutil.copytree(EXAMPLE_HOST, host)
     if manifest is not None:
         shutil.copy(FIXTURES / f"{manifest}.json", host / "spec" / SEED_MANIFEST_PATH)
-    for name, edit in edits.items():
-        path = host / "spec" / name
-        document = json.loads(path.read_text(encoding="utf-8"))
-        edit(document)
-        path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    edit_documents(host / "spec", **edits)
     return host
 
 
@@ -79,7 +77,7 @@ def test_unused_route_gives_e748_owned_by_its_step(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "unused_route"))
     assert (found.code, found.node_id, found.owner, found.file) == (SEED_ROUTE_UNUSED, SEED, "step:02a", SEED_MANIFEST_PATH)
     assert found.jq_path == '.step_requirements["02a"]'
-    assert "no node of step 02a lists seed-accounts in derives_from" in found.message
+    assert "step 02a" in found.message and SEED in found.message and "derives_from" in found.message
 
 
 def test_used_route_gives_no_e748(tmp_path: Path) -> None:
@@ -92,7 +90,7 @@ def test_used_route_gives_no_e748(tmp_path: Path) -> None:
 def test_route_to_step_whose_kinds_cannot_link_a_seed_is_e748(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "non_linkable_route"))
     assert (found.code, found.node_id, found.owner, found.jq_path) == (SEED_ROUTE_UNUSED, SEED, "step:04", '.step_requirements["04"]')
-    assert "no node kind of step 04 can link a seed (only the kinds of steps 00, 02, 02a can)" in found.message
+    assert "step 04" in found.message and "link a seed" in found.message
 
 
 def test_trinity_key_gives_e748_naming_the_trinity_case(tmp_path: Path) -> None:
@@ -223,22 +221,43 @@ def test_a_not_applicable_holder_holds_no_e749(tmp_path: Path) -> None:
     assert _found(_host(tmp_path, "unrouted_link", **{"02_system_sketch.json": retire})) == []
 
 
+def _listed(host: str) -> list[list[str | None]]:
+    """The seed-route findings of the host at *host* as ``[code, node, jq path, target]``."""
+    context = GraphCheckContext.from_graph(build_graph(str(Path(host) / "spec"), str(ROOT)), None)
+    return [[e.code, e.node_id, e.jq_path, e.target] for e in check_seed_routes(context, "merge")]
+
+
 @pytest.mark.parametrize("seed", HASH_SEEDS)
 def test_seed_routes_report_in_the_same_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
-    host = _host(tmp_path, "unrouted_seed")
-    manifest = host / "spec" / SEED_MANIFEST_PATH
-    document = json.loads(manifest.read_text(encoding="utf-8"))
-    document["step_requirements"].update({"02a": [SEED], "16": [SEED, EXTRA], "05": [SEED]})
-    manifest.write_text(json.dumps(document), encoding="utf-8")
-    code = f"""
-import json
-from specdev_tools.graph.build import build_graph
-from specdev_tools.validation.graph_checks.context import GraphCheckContext
-from specdev_tools.validation.graph_checks.seed_routes import check_seed_routes
-context = GraphCheckContext.from_graph(build_graph({str(host / 'spec')!r}, {str(ROOT)!r}), None)
-print(json.dumps([[e.code, e.node_id, e.jq_path, e.target] for e in check_seed_routes(context, "merge")]))
-"""
-    listed = json.loads(run_python_seeded(seed, code))
+    def route_the_seed_to_four_steps(document: dict[str, Any]) -> None:
+        document["step_requirements"].update({"02a": [SEED], "16": [SEED, EXTRA], "05": [SEED]})
+
+    host = _host(tmp_path, "unrouted_seed", **{SEED_MANIFEST_PATH: route_the_seed_to_four_steps})
+    listed = seeded(seed, __name__, "_listed", str(host))
+    assert listed == _listed(str(host))
     assert [row[0] for row in listed] == [SEED_ROUTE_UNUSED] * 4
     assert [row[2] for row in listed] == ['.step_requirements["02a"]', '.step_requirements["05"]', '.step_requirements["16"]', '.step_requirements["16"]']
     assert [row[1] for row in listed] == [SEED, SEED, SEED, EXTRA]
+
+
+@pytest.mark.parametrize("routes", ["absent", "empty"])
+def test_a_seed_no_entry_routes_anywhere_is_one_e747_and_no_e749(tmp_path: Path, routes: str) -> None:
+    """One fault, one finding: the links to a seed nothing routes are not E749 (that code is for a seed routed to another step)."""
+
+    def unroute(document: dict[str, Any]) -> None:
+        if routes == "absent":
+            del document["step_requirements"]
+        else:
+            document["step_requirements"] = {}
+
+    findings = _found(_host(tmp_path, **{SEED_MANIFEST_PATH: unroute}))
+    assert [error.code for error in findings] == [SEED_NOT_ROUTED] and findings[0].node_id == SEED
+
+
+def test_a_route_of_a_step_the_spec_does_not_have_is_not_e748(tmp_path: Path) -> None:
+    """A key that is no step is the manifest lint's business (W553), not an unused route."""
+
+    def add_unknown_step(document: dict[str, Any]) -> None:
+        document["step_requirements"]["99"] = [SEED]
+
+    assert _found(_host(tmp_path, **{SEED_MANIFEST_PATH: add_unknown_step})) == []

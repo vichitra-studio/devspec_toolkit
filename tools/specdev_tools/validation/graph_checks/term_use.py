@@ -11,17 +11,13 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any
-
 from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph
 from specdev_tools.trace.label_rename import LABEL_KEY, TERM_KIND, label_users, own_leaves
-from specdev_tools.validation import check_registry
-from specdev_tools.validation.check_registry import CheckContext
 
 from .codes import TERM_NOT_USED_BY_LABEL
-from .context import GRAPH_NOT_BUILT, GraphCheckContext, Mode
+from .context import GraphCheckContext, Mode
 
 _SEPARATORS = re.compile(r"[-_/\s]+")
 
@@ -67,11 +63,3 @@ def check_term_use(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
             f"requirement, contract, invariant, task or other non-record node, or mark the term not_applicable",
         ))
     return findings
-
-
-def run_term_use(ctx: CheckContext) -> dict[str, Any]:
-    """The registered function: E741 for each term whose label no user mentions."""
-    gctx = GraphCheckContext.from_registry(ctx)
-    if gctx is None:
-        return check_registry.skip(GRAPH_NOT_BUILT)
-    return check_registry.check_result(check_term_use(gctx, "merge"))
