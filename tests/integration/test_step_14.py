@@ -6,8 +6,6 @@ import unittest
 from pathlib import Path
 from typing import Any, Callable
 
-import pytest
-
 from specdev_tools.validation.validate import validate_file
 from unit.graph._synth import accept_links, graph_check
 
@@ -286,7 +284,6 @@ def test_design_milestone_without_a_matching_roadmap_milestone_gives_no_e567(tmp
     assert _found(findings, "E567") == []
 
 
-@pytest.mark.xfail(strict=True, reason="unrefined_scheduled in-play guard: M6b round 4 fix")
 def test_a_scheduled_node_with_scope_later_gives_no_e567(tmp_path: Path) -> None:
     def park(document: dict[str, Any]) -> None:
         fr = next(f for f in document["functional_requirements"] if f["fr_id"] == FR_REQUEST)

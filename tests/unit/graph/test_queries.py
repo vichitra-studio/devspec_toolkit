@@ -345,3 +345,13 @@ def test_milestone_of_reads_a_plan_files_milestone_then_the_containing_roadmap_m
     criterion = example.by_id["tc-confirm-expired-token"]
     assert milestone_of(example, criterion) == "ms-account-recovery" == milestone_of(example, example.by_id["ms-account-recovery"])
     assert milestone_of(example, example.by_id["fr-password-reset"]) is None
+
+
+def test_milestone_of_resolves_a_plan_files_milestone_written_with_a_retired_name() -> None:
+    from dataclasses import replace
+
+    from unit.validation.graph_checks._built_support import graph_of, node
+
+    renamed = replace(node("ms-new", "roadmap-milestone", "plan", step="14"), aliases=("ms-old",))
+    task = replace(node("task-t", "task", "plan", step="14"), milestone="ms-old")
+    assert milestone_of(graph_of([renamed, task]), task) == "ms-new"

@@ -16,6 +16,7 @@ from collections.abc import Mapping
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.core.schema_validate import jq_path_of
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
+from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.ownership import STEP_PREFIX
 
@@ -24,8 +25,8 @@ from .context import SEED_MANIFEST_PATH, GraphCheckContext, Mode
 from .names import DERIVES_FROM
 from .removal import links_clause
 
-SEED_KIND = "seed"
 STEP_REQUIREMENTS = "step_requirements"
+GLOBAL_SEED_ORDER = "global_seed_order"
 TRINITY_KEYS = frozenset({"16", "16a", "16b", "16c"})
 Routes = dict[str, list[str]]
 
@@ -76,31 +77,17 @@ def _linking_steps(ctx: GraphCheckContext) -> dict[str, list[str]]:
     return {seed: sorted(found, key=ctx.graph.shape.step_key) for seed, found in steps.items()}
 
 
-GLOBAL_SEED_ORDER = "global_seed_order"
-
-
-def _list_entry(label: str, entries: list[object], seed: str) -> str:
-    """The entry of *seed* in a list of the manifest, with a note when it is the only one: the list is required to hold one, so another seed must be listed first."""
-    return label + (" (which then needs another seed)" if all(entry == seed for entry in entries) else "")
-
-
 def _seed_parts(ctx: GraphCheckContext, seed: str, *, route: bool = False) -> str:
     """What removing *seed* from the manifest takes, as the text in the brackets of the advice: its ``seeds[]`` entry, its route when asked for, its ``global_seed_order`` entry when it has one, and its document."""
     order = ctx.manifest.get(GLOBAL_SEED_ORDER)
-    seeds = ctx.manifest.get("seeds")
-    declared = [item.get("seed_id") for item in seeds if isinstance(item, Mapping)] if isinstance(seeds, list) else []
-    parts = [
-        _list_entry("its seeds[] entry", declared, seed), *(["this route"] if route else []),
-        *([_list_entry(f"its {GLOBAL_SEED_ORDER} entry", order, seed)] if isinstance(order, list) and seed in order else []), "its document",
-    ]
+    parts = ["its seeds[] entry", *(["this route"] if route else []), *([f"its {GLOBAL_SEED_ORDER} entry"] if isinstance(order, list) and seed in order else []), "its document"]
     return f"{', '.join(parts[:-1])} and {parts[-1]}"
 
 
 def _remove_links(ctx: GraphCheckContext, seed: str) -> str:
-    """`` and the links to it (N nodes, ...)`` for the nodes that link *seed* in any step, whether in play or not; ``""`` when none does (the clause says what removing the seed leaves behind)."""
+    """`` and the links to it (N nodes: ...)`` when some node links *seed*; ``""`` when none does."""
     clause = links_clause(ctx.graph, seed)
-    fields = {link.field for link in ctx.graph.incoming.get(seed, ())}
-    return f" and the {DERIVES_FROM + ' ' if fields == {DERIVES_FROM} else ''}links to it {clause}" if clause else ""
+    return f" and the links to it {clause}" if clause else ""
 
 
 def _unrouted_message(seed: str, linking: list[str], parts: str, remove_links: str) -> str:
@@ -146,8 +133,7 @@ def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str 
         remove = "remove the route"
     else:
         remove = (
-            f"remove the seed from the manifest ({parts}){remove_links}, as this is its only route and a seed with no route is E747"
-            + ("; then run specdev attest --prune" if remove_links else "")
+            f"remove the seed from the manifest ({parts}){remove_links}" + (", then run specdev attest --prune" if remove_links else "")
         )
     if can_distil:
         advice = f"distil the seed in that step (a node of {where} lists {seed} in derives_from), or {remove}"

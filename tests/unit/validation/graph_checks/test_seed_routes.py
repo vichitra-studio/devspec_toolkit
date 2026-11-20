@@ -282,17 +282,23 @@ def test_e748_of_a_seeds_only_route_says_to_remove_the_seed_with_it(tmp_path: Pa
     """Removing the only route of a seed starts E747: the advice names what clears both."""
     message = _messages(_host(tmp_path, **{SEED_MANIFEST_PATH: _extra_seed({"02": [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
     assert "distil the seed in that step (a node of step 02 lists seed-extra in derives_from)" in message
-    assert message.endswith("remove the seed from the manifest (its seeds[] entry, this route and its document), as this is its only route and a seed with no route is E747")
+    assert message.endswith("remove the seed from the manifest (its seeds[] entry, this route and its document)")
 
 
 def test_e748_of_a_seeds_only_route_names_the_links_to_the_seed_in_other_steps(tmp_path: Path) -> None:
-    """Removing the seed alone leaves the links of a node of another step (E700): the advice names them, and a node left with no other entry."""
+    """Removing the seed alone leaves the links of a node of another step (E700): the advice says how many nodes link it and the command that lists them."""
     edits = {SEED_MANIFEST_PATH: _extra_seed({"02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
     message = _messages(_host(tmp_path, **edits), SEED_ROUTE_UNUSED)[EXTRA]
-    assert message.endswith(
-        "remove the seed from the manifest (its seeds[] entry, this route and its document) and the derives_from links to it "
-        "(1 node, in step 02; it holds no other entry and needs one first), as this is its only route and a seed with no route is E747; then run specdev attest --prune"
-    )
+    assert message.endswith(f"remove the seed from the manifest (its seeds[] entry, this route and its document) and the links to it {_links(1)}, then run specdev attest --prune")
+    assert "needs one first" not in message and "its only route" not in message
+
+
+def test_e748_of_a_seed_with_two_routes_one_of_them_unused_says_to_remove_the_route_only(tmp_path: Path) -> None:
+    """Two routes are not an only route, however the count is written: the unused one is removed alone and the seed stays."""
+    edits = {SEED_MANIFEST_PATH: _extra_seed({"02": [EXTRA], "02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
+    message = _messages(_host(tmp_path, **edits), SEED_ROUTE_UNUSED)[EXTRA]
+    assert message.endswith("distil the seed in that step (a node of step 02a lists seed-extra in derives_from), or remove the route")
+
 
 def test_e748_of_a_route_that_is_not_the_seeds_only_one_says_to_remove_the_route_whoever_links_the_seed(tmp_path: Path) -> None:
     """The route is the thing removed: the links of the nodes of other steps (here all of steps 00 and 02) stay and are not named."""
@@ -314,6 +320,11 @@ def test_e747_of_a_seed_no_node_links_says_to_route_it_and_have_a_node_list_it(t
     assert message.endswith("route it to the step that distils it and list it in derives_from of a node of that step, or remove the seed (its seeds[] entry and its document)")
 
 
+def _links(count: int) -> str:
+    """The clause of the advice "remove it" for *count* nodes that link ``EXTRA``."""
+    return f"({count} node: specdev trace {EXTRA} --down --depth 1 lists it)" if count == 1 else f"({count} nodes: specdev trace {EXTRA} --down --depth 1 lists them)"
+
+
 def _tp_derives_from(*entries: str, index: int = 0) -> Edit:
     return lambda doc: doc["third_parties"][index].update(derives_from=list(entries))
 
@@ -326,18 +337,17 @@ _REMOVE = "or remove the seed (its seeds[] entry and its document)"
 
 
 def test_e747_of_a_seed_a_node_links_names_the_step_of_that_node_and_what_removing_the_seed_takes(tmp_path: Path) -> None:
-    """The route clears it at once; removing the seed leaves the link, which the message says to remove (how many nodes, in which steps) and prune."""
+    """The route clears it at once; removing the seed leaves the link, which the message says to remove (how many nodes, and the command that lists them) and prune."""
     message = _e747(tmp_path, **{"02_system_sketch.json": _tp_derives_from(SEED, EXTRA)})
-    assert f"route it to step 02 (where a node lists it in derives_from), {_REMOVE} and the derives_from links to it (1 node, in step 02), then run specdev attest --prune" in message
+    assert f"route it to step 02 (where a node lists it in derives_from), {_REMOVE} and the links to it {_links(1)}, then run specdev attest --prune" in message
 
 
-def test_e747_says_that_a_node_whose_only_entry_the_seed_is_needs_another_entry_first(tmp_path: Path) -> None:
-    message = _e747(tmp_path, **{"02_system_sketch.json": _tp_derives_from(EXTRA)})
-    assert message.endswith("and the derives_from links to it (1 node, in step 02; it holds no other entry and needs one first), then run specdev attest --prune")
+def test_e747_counts_the_nodes_and_says_nothing_of_the_entries_they_would_be_left_without(tmp_path: Path) -> None:
+    """A node whose only entry the seed is needs another one first (E520 names it when the loop of the catalogue reaches it): the message does not say so, for one node or for two."""
+    one = _e747(tmp_path / "one", **{"02_system_sketch.json": _tp_derives_from(EXTRA)})
+    assert one.endswith(f"and the links to it {_links(1)}, then run specdev attest --prune") and "needs one first" not in one
     both = _e747(tmp_path / "two", **{"02_system_sketch.json": lambda doc: [_tp_derives_from(EXTRA, index=i)(doc) for i in (0, 1)]})
-    assert "(2 nodes, in step 02; 2 of them hold no other entry and need one first)" in both
-    one_of_two = _e747(tmp_path / "one-of-two", **{"02_system_sketch.json": lambda doc: [_tp_derives_from(EXTRA)(doc), _tp_derives_from(SEED, EXTRA, index=1)(doc)]})
-    assert "(2 nodes, in step 02; 1 of them holds no other entry and needs one first)" in one_of_two
+    assert f"and the links to it {_links(2)}, then run" in both and "of them" not in both
 
 
 def test_e747_of_a_seed_linked_in_two_steps_names_both_steps_in_the_route_and_in_the_links(tmp_path: Path) -> None:
@@ -346,7 +356,7 @@ def test_e747_of_a_seed_linked_in_two_steps_names_both_steps_in_the_route_and_in
 
     message = _e747(tmp_path, **{"02_system_sketch.json": _tp_derives_from(SEED, EXTRA), "00_charter.json": link_in_charter})
     assert "route it to steps 00, 02 (where a node lists it in derives_from)" in message
-    assert "and the derives_from links to it (2 nodes, in steps 00, 02), then run specdev attest --prune" in message
+    assert f"and the links to it {_links(2)}, then run specdev attest --prune" in message
 
 
 def test_e747_names_a_parked_node_in_the_links_but_not_in_the_steps_to_route_to(tmp_path: Path) -> None:
@@ -357,7 +367,7 @@ def test_e747_names_a_parked_node_in_the_links_but_not_in_the_steps_to_route_to(
 
     message = _e747(tmp_path, **{"02_system_sketch.json": park})
     assert "route it to the step that distils it and list it in derives_from of a node of that step" in message
-    assert "and the derives_from links to it (1 node, in step 02), then run specdev attest --prune" in message
+    assert f"and the links to it {_links(1)}, then run specdev attest --prune" in message
 
 
 def test_e747_names_the_global_seed_order_entry_when_the_seed_has_one(tmp_path: Path) -> None:
@@ -365,11 +375,8 @@ def test_e747_names_the_global_seed_order_entry_when_the_seed_has_one(tmp_path: 
         document["global_seed_order"].append(EXTRA)
 
     assert "(its seeds[] entry, its global_seed_order entry and its document)" in _e747(tmp_path / "listed", **{SEED_MANIFEST_PATH: order})
-    alone = _e747(tmp_path / "alone", **{SEED_MANIFEST_PATH: lambda doc: doc.update(global_seed_order=[EXTRA])})
-    assert "(its seeds[] entry, its global_seed_order entry (which then needs another seed) and its document)" in alone
-    assert "(which then needs another seed)" not in _e747(tmp_path / "with-other", **{SEED_MANIFEST_PATH: order})
     sole = _messages(_host(tmp_path / "sole", **{SEED_MANIFEST_PATH: lambda doc: doc.update(step_requirements={})}), SEED_NOT_ROUTED)[SEED]
-    assert "(its seeds[] entry (which then needs another seed), its global_seed_order entry (which then needs another seed) and its document)" in sole
+    assert "(its seeds[] entry, its global_seed_order entry and its document)" in sole and "needs another seed" not in sole
 
 
 def test_e749_says_to_prune_after_removing_the_link(tmp_path: Path) -> None:

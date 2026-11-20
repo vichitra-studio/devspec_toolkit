@@ -27,11 +27,11 @@ from specdev_tools.graph.gitview import (
 )
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.queries import ROADMAP_MILESTONE
 from specdev_tools.trace.hashing import content_hash
 from specdev_tools.trace.lockfile import LockEntry
 
 ANCHOR_ROW_KIND = "anchor-row"
-MILESTONE_KIND = "roadmap-milestone"
 ABOUT_FIELD = "about"
 DONE_STATUS = "done"
 _DEFAULT_STATUS = "pending"
@@ -51,7 +51,7 @@ def done_milestones(graph: Graph) -> set[str]:
             continue
         for link in anchor.links:
             milestone = graph.find(link.target) if link.field == ABOUT_FIELD else None
-            if milestone is not None and milestone.kind == MILESTONE_KIND:
+            if milestone is not None and milestone.kind == ROADMAP_MILESTONE:
                 done.add(milestone.id)
     return done
 

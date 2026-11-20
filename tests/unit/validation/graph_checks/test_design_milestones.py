@@ -173,3 +173,36 @@ def test_matching_milestones_pairs_a_design_milestone_with_the_roadmap_milestone
 def test_a_design_milestone_no_criterion_refines_has_no_pair() -> None:
     ctx = built_context([node("fr-1", "fr"), node("fr-2", "fr"), _schedule("dm-1", "fr-1")], {"tc-1": "fr-2"})
     assert _pairs(ctx) == []
+
+
+def test_a_scheduled_node_out_of_play_is_not_given_but_a_deprecated_one_is() -> None:
+    """A node of ``scope`` later or out, or ``not_applicable``, is not planned, so no criterion is owed for it; a deprecated node is in play."""
+    nodes = [
+        node("fr-1", "fr"), node("fr-2", "fr", scope="later"), node("fr-3", "fr", lifecycle="not_applicable"), node("fr-4", "fr", lifecycle="deprecated"),
+        node("fr-5", "fr", scope="out"), _schedule("dm-1", "fr-1", "fr-2", "fr-3", "fr-4", "fr-5"),
+    ]
+    assert _unrefined(built_context(nodes, {"tc-1": "fr-1"}, decls=_DECLS)) == [("dm-1", "fr-4")]
+
+
+def test_a_schedules_link_to_no_node_gives_nothing_and_does_not_raise() -> None:
+    nodes = [node("fr-1", "fr"), node("fr-2", "fr"), _schedule("dm-1", "fr-1", "fr-nowhere", "fr-2")]
+    assert _unrefined(built_context(nodes, {"tc-1": "fr-1"}, decls=_DECLS)) == [("dm-1", "fr-2")]
+
+
+def test_a_design_milestone_in_two_pairs_gives_each_unrefined_node_once() -> None:
+    """``dm-1`` is computed by ``ms-m`` (through ``fr-1``) and by ``ms-2`` (through ``fr-2``): its one unrefined node, ``fr-3``, is given once."""
+    nodes = [
+        node("fr-1", "fr"), node("fr-2", "fr"), node("fr-3", "fr"), _schedule("dm-1", "fr-1", "fr-2", "fr-3"),
+        node("ms-2", "roadmap-milestone", "plan", step="14", children=["task-2"]),
+        node("task-2", "task", "plan", step="14", parent="ms-2", children=["tc-2"]),
+        node("tc-2", "task-criterion", "plan", step="14", parent="task-2", links=[("refines", "fr-2")]),
+    ]
+    ctx = built_context(nodes, {"tc-1": "fr-1"}, decls=_DECLS)
+    assert len(_pairs(ctx)) == 2 and _unrefined(ctx) == [("dm-1", "fr-3")]
+
+
+def test_a_criterion_whose_plan_file_names_a_node_that_is_no_roadmap_milestone_makes_no_pair() -> None:
+    """``milestone_of`` gives the id a plan file names as it is written; only a roadmap milestone can pair with a design milestone."""
+    odd = replace(_plan_criterion("tc-odd", "fr-1"), milestone="fr-2")
+    ctx = built_context([node("fr-1", "fr"), node("fr-2", "fr"), _schedule("dm-1", "fr-1"), odd])
+    assert _pairs(ctx) == [] and [item.id for item in unrealised_design_milestones(ctx)] == ["dm-1"]

@@ -280,16 +280,20 @@ def _e742_message(context: GraphCheckContext, verifier: str) -> str:
     return next(error.message for error in check_verifier_rules(context, "merge") if error.code == "E742" and error.node_id == verifier)
 
 
-def test_unused_verifier_message_names_the_links_that_go_with_it() -> None:
-    """Removing a verifier that a node of another step still links leaves E700 on that node: the advice names the links (how many nodes, in which steps), and a node left with an empty required list."""
+def _links(verifier: str, count: int) -> str:
+    return f"({count} node: specdev trace {verifier} --down --depth 1 lists it)" if count == 1 else f"({count} nodes: specdev trace {verifier} --down --depth 1 lists them)"
+
+
+def test_unused_verifier_message_says_how_many_nodes_link_it_and_the_command_that_lists_them() -> None:
+    """Removing a verifier that a node still links leaves E700 on that node: the advice says how many nodes link it and the command that lists them, and nothing of steps or lists."""
     mitigates = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), node("threat-1", "threat", step="11", mitigated_by=["fix-spare"])))
-    assert _e742_message(mitigates, "fix-spare").endswith("list it in a criterion's verified_by, or remove it and the links to it (1 node, in step 11) and run specdev attest --prune")
+    assert _e742_message(mitigates, "fix-spare").endswith(f"list it in a criterion's verified_by, or remove it and the links to it {_links('fix-spare', 1)} and run specdev attest --prune")
     only_entry = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), declared(node("ec-1", "edge-case", step="11", mitigated_by=["fix-spare"]), _real_decls())))
-    assert _e742_message(only_entry, "fix-spare").endswith("or remove it and the links to it (1 node, in step 11; it holds no other entry and needs one first) and run specdev attest --prune")
-    with_other = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), declared(node("ec-1", "edge-case", step="11", mitigated_by=["fix-spare", "fix-ac"]), _real_decls())))
-    assert "(1 node, in step 11)" in _e742_message(with_other, "fix-spare")
+    assert _e742_message(only_entry, "fix-spare").endswith(f"or remove it and the links to it {_links('fix-spare', 1)} and run specdev attest --prune")
+    two = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]), node("threat-1", "threat", step="11", mitigated_by=["fix-spare"]), node("ec-1", "edge-case", step="11", mitigated_by=["fix-spare", "fix-ac"])))
+    assert _links("fix-spare", 2) in _e742_message(two, "fix-spare") and "needs one first" not in _e742_message(two, "fix-spare")
     job = _spec(*_base(node("job-1", "job", step="12"), node("job-2", "job", step="12", depends_on=["job-1"])))
-    assert _e742_message(job, "job-1").endswith("list it in a criterion's verified_by, or remove it and the links to it (1 node, in step 12) and run specdev attest --prune")
+    assert _e742_message(job, "job-1").endswith(f"list it in a criterion's verified_by, or remove it and the links to it {_links('job-1', 1)} and run specdev attest --prune")
 
 
 def test_a_verifier_that_names_a_retired_id_still_verifies_the_renamed_node() -> None:

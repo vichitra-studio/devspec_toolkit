@@ -67,7 +67,8 @@ def unrefined_scheduled(ctx: GraphCheckContext) -> list[tuple[Node, Node]]:
     """The pairs ``(design milestone, scheduled node)`` that a design milestone computed by some roadmap milestone leaves unrefined (the finding of E567).
 
     For each in-play design milestone that is in a pair of ``matching_milestones``, each node it ``schedules`` that
-    (a) is of a kind a task criterion can refine (the use table: a ``refines`` use by a task criterion; a scheduled
+    (a) is in play (``scope`` later or out, or lifecycle ``not_applicable``, is not planned; a deprecated node is in
+    play) and of a kind a task criterion can refine (the use table: a ``refines`` use by a task criterion; a scheduled
     risk, component or environment is never here, ruling R18, as nothing could clear a finding on it) and (b) that no
     in-play task criterion under a roadmap milestone refines, itself or through a node it contains (ruling R17).  A
     design milestone in no pair gives nothing (it is ``unrealised``).  Ordered as ``matching_milestones`` is by design
@@ -80,7 +81,7 @@ def unrefined_scheduled(ctx: GraphCheckContext) -> list[tuple[Node, Node]]:
     for design in dict.fromkeys(design for design, _ in _matching(ctx, index)):
         for target in dict.fromkeys(link_targets(graph, design, SCHEDULES)):
             scheduled = graph.by_id.get(target)
-            if scheduled is None:
+            if scheduled is None or not ctx.in_play(scheduled):
                 continue
             if scheduled.kind not in refinable:
                 refinable[scheduled.kind] = Use(TASK_CRITERION, REFINES) in use_pairs(scheduled.kind, graph.decls)
