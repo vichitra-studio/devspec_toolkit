@@ -160,6 +160,26 @@ def test_two_broken_links_of_one_node_the_new_one_blocks() -> None:
     assert result.upstream_debt == (old,) and result.blocking.new_upstream == (new,)
 
 
+def test_a_reworded_finding_and_a_new_one_under_one_key_make_exactly_one_new() -> None:
+    """The baseline had one finding at the key: it places ONE of the two current findings (the reworded one), the other is new."""
+    old = err("E500", "step:04", "fr-a", message="A")
+    reworded = err("E500", "step:04", "fr-a", message="A, reworded")
+    added = err("E500", "step:04", "fr-a", message="B")
+    result = gate([reworded, added], "05", baseline_of(old))
+    assert result.upstream_debt == (reworded,) and result.blocking.new_upstream == (added,)
+
+
+def test_a_link_target_renamed_with_an_alias_keeps_its_error_old() -> None:
+    """``specdev node rename`` maps the old target id to the new one: the key of the link error follows it."""
+    old = err("E701", "step:04", "fr-a", target=link_target("derives_from", "fr-b"))
+    now = err("E701", "step:04", "fr-a", target=link_target("derives_from", "fr-b-x"))
+    renames = {"fr-b": "fr-b-x"}
+    mapped = gate([now], "05", baseline_of(old), canonical_id=lambda name: renames.get(name, name))
+    assert mapped.upstream_debt == (now,) and mapped.clear
+    unmapped = gate([now], "05", baseline_of(old))
+    assert unmapped.blocking.new_upstream == (now,)
+
+
 def test_two_findings_located_only_by_path_the_new_one_blocks() -> None:
     old = SpecError("E500", "old text", "04_fr_list.json", owner="step:04")
     new = SpecError("E500", "new text", "03_glossary.json", owner="step:04")

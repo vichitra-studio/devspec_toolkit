@@ -904,7 +904,10 @@ changes:
       note for it gives the advice to pass --git-root only when --git-root was
       not given. A relative path after --paths is taken from the repository top:
       --git-root, else the top of the git working tree that holds the spec
-      folder, else the folder that holds the spec folder. See
+      folder, else the folder that holds the spec folder. A step that a listed
+      path maps to but that has no artifact in the spec folder is not gated,
+      unlike with --step; when no step is left, stderr says no step gated: no
+      listed path maps to a step that has an artifact. See
       docs/developers/reference.md, section "Step gate".
     migration:
       action: none

@@ -555,9 +555,10 @@ def _detect_git_root(repo_root: Path) -> Path:
 
     In a submodule layout, ``repo_root`` points to the toolkit directory
     (e.g. ``host_repo/devspec_toolkit/``) but git operations must run from
-    the host repo root.  This function walks up looking for a non-bare
-    ``.git`` directory (or file, as submodules use ``.git`` files).
-    Falls back to *repo_root* if detection fails.
+    the host repo root.  This function asks git for the top of the working
+    tree that holds *repo_root* (``gitview.git_top_level``, which also
+    resolves the ``.git`` file a submodule has).
+    Falls back to *repo_root* when git does not answer or names no folder.
     """
     try:
         top = git_top_level(str(repo_root))

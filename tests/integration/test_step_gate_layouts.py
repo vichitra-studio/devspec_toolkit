@@ -270,6 +270,14 @@ def _layout_spec_folder_is_the_git_root(tmp_path: Path) -> tuple[Path, str, list
     return top, ".", ["--spec-root", ".", "--git-root", "."]
 
 
+def _layout_spec_folder_is_the_git_root_subfolder(tmp_path: Path) -> tuple[Path, str, list[str]]:
+    """The spec folder IS ``--git-root`` and both are a subfolder (``host``) of the repository, present at the base."""
+    top = tmp_path / "repo"
+    _example_with_spec_at(top, "host")
+    _on_a_branch_after_committing_the_error(top, "host")
+    return top / "host", ".", ["--spec-root", ".", "--git-root", "."]
+
+
 def _layout_spec_folder_named_through_a_symlink(tmp_path: Path) -> tuple[Path, str, list[str]]:
     top = tmp_path / "host"
     _example_with_spec_at(top, SPEC)
@@ -283,6 +291,7 @@ BASELINE_LAYOUTS = {
     "nested-spec-git-root-at-top": _layout_nested_spec_with_git_root_at_the_top,
     "git-root-is-a-subfolder": _layout_git_root_is_a_subfolder_of_the_repository,
     "spec-folder-is-the-git-root": _layout_spec_folder_is_the_git_root,
+    "spec-folder-is-the-git-root-subfolder": _layout_spec_folder_is_the_git_root_subfolder,
     "spec-folder-through-a-symlink": _layout_spec_folder_named_through_a_symlink,
 }
 
@@ -297,6 +306,29 @@ def test_the_baseline_resolves_in_every_layout_and_an_error_committed_at_the_bas
     code, out, err = run_split(capsys, "spec-check", spec, "--repo-root", str(ROOT), *flags, "--step", "05")
     assert out.splitlines()[0].endswith(f"base: main {base[:12]} (merge-base)"), (out, err)
     assert "UPSTREAM DEBT" in out and "[04 new upstream]" not in out and code == 0, (out, err)
+
+
+def test_a_spec_folder_that_is_the_git_root_subfolder_and_absent_at_the_base_is_a_first_adoption(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The base commit has no ``host`` folder: the note is the first-adoption sentence, not a git error from ``git archive``."""
+    top = tmp_path / "repo"
+    top.mkdir()
+    git(top, "init", "-q", "-b", "main")
+    (top / "README.md").write_text("readme", encoding="utf-8")
+    commit_all(top, "readme only")
+    base = git(top, "rev-parse", "main")
+    git(top, "checkout", "-q", "-b", "adopt")
+    shutil.copytree(EXAMPLE_HOST / SPEC, top / "host")
+    commit_all(top, "adopt the spec folder")
+    monkeypatch.chdir(top / "host")
+    code, out, err = run_split(
+        capsys, "spec-check", ".", "--repo-root", str(ROOT), "--spec-root", ".", "--git-root", ".", "--step", "05"
+    )
+    assert out.splitlines()[0].endswith("base: unavailable"), (out, err)
+    assert f"the spec folder is not in the base commit {base[:12]}: every error of an earlier step counts as new" in err, err
+    assert "GitViewError" not in err and "untracked" not in err, err
+
 
 
 def test_a_spec_folder_outside_the_git_root_has_no_baseline_and_says_why(

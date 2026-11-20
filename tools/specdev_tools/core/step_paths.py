@@ -43,7 +43,7 @@ def get_step_from_path(path: str) -> str:
     # Check this before the generic STEP_FILE_RE so the specific filename
     # takes priority over the numeric-prefix pattern.
     dirname_full = os.path.dirname(path)
-    if filename == "16_impl_context.json" and os.path.basename(dirname_full) != "impl_context":
+    if filename == "16_impl_context.json" and os.path.basename(dirname_full) != PLAN_DIR_NAME:
         return "16"
 
     match = STEP_FILE_RE.match(filename)

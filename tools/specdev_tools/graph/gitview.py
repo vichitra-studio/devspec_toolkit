@@ -136,7 +136,7 @@ def spec_path_in_repo(spec_root: str, git_root: str) -> str:
 def git_top_level(folder: str) -> str | None:
     """The top folder of the git working tree that holds *folder* (``git rev-parse --show-toplevel``); ``None`` outside a repository.
 
-    The one home of this lookup: ``touched_steps`` and the lock merge driver call it.
+    The one home of this lookup: ``touched_steps``, ``validate._detect_git_root`` and the lock merge driver (through its own wrapper) call it.
 
     Raises:
         GitViewError: E708 when git is missing or does not answer in time.
@@ -146,10 +146,13 @@ def git_top_level(folder: str) -> str | None:
     return top if process.returncode == 0 and top else None
 
 
-def _tree_entry(ref: str, git_root: str, path: str) -> str:
-    """The ``git ls-tree`` line of *path* at *ref* (``<mode> <type> <object>\t<path>``), empty when the path is absent."""
+def _tree_entry(ref: str, git_root: str, path: str, *, from_top: bool = False) -> str:
+    """The ``git ls-tree`` line of *path* at *ref* (``<mode> <type> <object>\t<path>``), empty when the path is absent.
+
+    *path* is relative to *git_root*, or to the repository top with *from_top*.
+    """
     commit = resolve_ref(ref, git_root)
-    process = run_git(git_root, ["ls-tree", commit, "--", path])
+    process = run_git(git_root, ["ls-tree", *(["--full-tree"] if from_top else []), commit, "--", path])
     if process.returncode != 0:
         raise _fail("E708", f"{path} cannot be looked up at ref '{ref}': {git_reason(process)}")
     return process.stdout.decode("utf-8", errors="replace").strip()
@@ -164,6 +167,18 @@ def path_exists_at(ref: str, git_root: str, path: str) -> bool:
     return bool(_tree_entry(ref, git_root, path))
 
 
+def _prefix_in_repository(git_root: str) -> str:
+    """The path of *git_root* inside its repository, ``/``-separated without the trailing slash; empty at the repository top.
+
+    Raises:
+        GitViewError: E708 when git fails.
+    """
+    process = run_git(git_root, ["rev-parse", "--show-prefix"])
+    if process.returncode != 0:
+        raise _fail("E708", f"{git_root} is not inside a git repository: {git_reason(process)}")
+    return process.stdout.decode("utf-8", errors="replace").strip().rstrip("/")
+
+
 def folder_exists_at(ref: str, git_root: str, path: str) -> bool:
     """Whether *path* (relative to *git_root*) is a folder at *ref*; a file, a link or nothing there is ``False``.
 
@@ -172,8 +187,12 @@ def folder_exists_at(ref: str, git_root: str, path: str) -> bool:
     """
     path = os.path.normpath(path)
     if path == ".":
-        resolve_ref(ref, git_root)  # the root of a commit is always a folder; ls-tree would list its content, not one tree line
-        return True
+        # ls-tree of "." lists the content of the folder, not one tree line: ask about the folder itself, as git sees it
+        prefix = _prefix_in_repository(git_root)
+        if not prefix:
+            resolve_ref(ref, git_root)  # the top of a repository is a folder at every commit
+            return True
+        return _tree_entry(ref, git_root, prefix, from_top=True).startswith(_TREE_ENTRY)
     return _tree_entry(ref, git_root, path).startswith(_TREE_ENTRY)
 
 

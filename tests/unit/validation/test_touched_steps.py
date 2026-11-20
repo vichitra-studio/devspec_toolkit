@@ -110,6 +110,11 @@ def test_seed_manifest_maps_to_step_00_and_every_routed_step(host: Path, manifes
     assert not touched.seed_edited
 
 
+def test_seed_manifest_maps_to_step_00_even_when_no_step_requirement_names_it(host: Path, manifest: dict[str, Any]) -> None:
+    manifest["step_requirements"] = {"02": ["seed-accounts"]}
+    assert _touched(host, ["spec/common/seed_manifest.json"], manifest).steps == ("00", "02")
+
+
 @pytest.mark.parametrize(
     "path",
     [

@@ -35,7 +35,7 @@ from .touched_steps import (
     steps_without_artifact,
 )
 
-NO_STEP_NOTE = "no step gated: no listed path maps to a step"
+NO_STEP_NOTE = "no step gated: no listed path maps to a step that has an artifact"
 FORWARD_REPLAY_USAGE = (
     "spec-check: --include-forward-replay cannot be combined with --step or --paths (id regressions are suspects there)"
 )

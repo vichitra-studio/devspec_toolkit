@@ -300,6 +300,31 @@ def test_waiting_item_explains_an_error_of_its_step(tmp_path: Path, registered_c
     assert "amb-reset-seed" in payload["step_gate"]["waiting"][0]["waiting_on"]
 
 
+def test_an_unreadable_ambiguity_file_switches_waiting_off_and_the_finding_blocks(
+    tmp_path: Path, registered_checks: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Same setup as the test above, plus a plan file the item reader cannot parse: the items read before it explain nothing."""
+    host = step_gate_host(tmp_path / "host", ["open_items"])
+    spec = str(host / "spec")
+    below = sorted(waiting_map(build_graph(spec, str(ROOT)), list(iter_ambiguity_items(spec)))["amb-reset-seed"])
+    _register_finding("synthetic", make_error("E520", "synthetic finding", owner="step:05", node_id=below[0]))
+    (host / "spec" / "impl_context").mkdir(exist_ok=True)
+    (host / "spec" / "impl_context" / "ms_broken_plan.json").write_text("{not json", encoding="utf-8")
+    code, out, _err = run_split(capsys, "spec-check", spec, *_flags(host), "--step", "05", "--detail", "all")
+    assert code == 1 and "WAITING" not in out and "BLOCKING" in out and "synthetic finding" in out, out
+    assert "ms_broken_plan.json" in out, out
+
+
+def test_a_promote_code_that_cannot_promote_is_warned_about_on_stderr_under_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """W630 is a valid code with no error counterpart: ``--step`` says it is ignored, as ``spec-check`` does."""
+    monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W630")
+    host = step_gate_host(tmp_path / "host")
+    _code, _out, err = run_split(capsys, "spec-check", str(host / "spec"), *_flags(host), "--step", "05")
+    assert "W630" in err and "not a promotable code" in err, err
+
+
 def test_step_05_exits_0_and_lists_w630_also_with_warnings_as_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     host = step_gate_host(tmp_path / "host", ["open_items"])
     for environment in ({}, {"SPECDEV_WARNINGS_AS_ERRORS": "1"}):
@@ -351,10 +376,23 @@ def test_paths_with_no_mapped_path_exits_0_without_running_a_check(
     register_check("forbidden", forbidden)
     host = step_gate_host(tmp_path / "host")
     monkeypatch.chdir(host)
-    note = "no step gated: no listed path maps to a step\n"
+    note = "no step gated: no listed path maps to a step that has an artifact\n"
     for paths in ([], ["README.md"], ["extras/anything.json"]):
         code, out = run_spec_check(host, "--paths", *paths)
         assert (code, out) == (0, note if paths else ""), (paths, out)
+
+
+def test_a_path_that_maps_to_a_step_whose_file_is_gone_is_not_gated_and_the_note_says_why(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registered_checks: None
+) -> None:
+    """``--step`` gates a step with no artifact (and notes it); ``--paths`` drops it, and the note is true: the path DID map."""
+    host = step_gate_host(tmp_path / "host")
+    (host / "spec" / "06_invariants.json").unlink()
+    monkeypatch.chdir(host)
+    code, out = run_spec_check(host, "--paths", "spec/06_invariants.json")
+    assert (code, out) == (0, "no step gated: no listed path maps to a step that has an artifact\n"), out
+    code, out = run_spec_check(host, "--step", "06")
+    assert code == 0 and "step 06 has no artifact in" in out and "RESULT: CLEAR" in out, out
 
 
 def test_paths_gate_the_steps_of_the_touched_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

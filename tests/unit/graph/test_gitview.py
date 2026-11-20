@@ -183,3 +183,18 @@ def test_folder_exists_at_the_root_still_raises_for_a_ref_that_does_not_resolve(
     git(tmp_path, "init", "-q", "-b", "main")
     with pytest.raises(GitViewError):
         folder_exists_at("no-such-ref", str(tmp_path), ".")
+
+
+def test_folder_exists_at_dot_asks_about_the_git_root_folder_when_it_is_a_subfolder_of_the_repository(tmp_path: Path) -> None:
+    """``.`` is the repository top only when *git_root* is the top: a subfolder is a folder at a commit only if the commit holds it."""
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "README.md").write_text("r", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "readme")
+    (tmp_path / "host").mkdir()
+    (tmp_path / "host" / "a.md").write_text("a", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "host")
+    assert folder_exists_at("HEAD", str(tmp_path / "host"), ".") is True
+    assert folder_exists_at("HEAD~1", str(tmp_path / "host"), ".") is False
+    assert folder_exists_at("HEAD~1", str(tmp_path), ".") is True
