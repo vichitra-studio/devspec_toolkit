@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any
 
 from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
+from specdev_tools.core.step_paths import PLAN_FILE_KEY
 from specdev_tools.registry.annotation_scan import AnnotationScan, HostScan, scan_annotations
 from specdev_tools.registry.annotations import (
     AnnotationDecls,
@@ -111,7 +112,7 @@ STEP_EXTRA_HOSTS: dict[str, tuple[str, ...]] = {
 #: path relative to the toolkit root.  (``16_impl_context.schema.json`` is the plan-file schema;
 #: the anchor file ``16_impl_context.json`` is ``16_anchor.schema.json``.)
 PLAN_FILE_HOSTS: dict[str, tuple[str, str]] = {
-    "schema/16_impl_context.schema.json": ("16a", "impl_context/ms_*_plan.json"),
+    "schema/16_impl_context.schema.json": ("16a", PLAN_FILE_KEY),
 }
 
 #: Steps whose entries live in per-milestone files, not spec/NN_*.json, and no annotation registers.

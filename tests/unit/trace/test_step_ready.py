@@ -28,6 +28,14 @@ def test_present_steps_are_the_steps_with_a_spec_file(example: Example) -> None:
     assert "13a" in present_steps(example.graph(), str(example.spec))
 
 
+def test_a_file_that_is_not_json_does_not_make_its_step_present(tmp_path: Path) -> None:
+    spec = tmp_path / "spec"
+    spec.mkdir()
+    (spec / "05_notes.txt").write_text("not a spec file", encoding="utf-8")
+    graph = Example(tmp_path).graph()
+    assert present_steps(graph, str(spec)) == frozenset()
+
+
 def test_a_file_of_step_02a_is_not_a_file_of_step_02(tmp_path: Path) -> None:
     spec = tmp_path / "spec"
     spec.mkdir()

@@ -170,6 +170,10 @@ def folder_exists_at(ref: str, git_root: str, path: str) -> bool:
     Raises:
         GitViewError: E708 when the ref does not resolve or git fails.
     """
+    path = os.path.normpath(path)
+    if path == ".":
+        resolve_ref(ref, git_root)  # the root of a commit is always a folder; ls-tree would list its content, not one tree line
+        return True
     return _tree_entry(ref, git_root, path).startswith(_TREE_ENTRY)
 
 

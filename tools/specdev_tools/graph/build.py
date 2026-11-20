@@ -17,6 +17,7 @@ from specdev_tools.core.errors import make_error
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.scope_helpers import as_str, str_in, str_items
 from specdev_tools.core.step_order import load_step_order
+from specdev_tools.core.step_paths import PLAN_FILE_KEY
 from specdev_tools.graph.kinds import (
     EXTRAS_STEP,
     SEED_KIND,
@@ -40,7 +41,6 @@ from specdev_tools.graph.model import (
     rank,
 )
 
-PLAN_FILE_KEY = "impl_context/ms_*_plan.json"
 SEED_PATH_FIELD = "path"
 ALIASES_FIELD = "aliases"
 UNREADABLE_MESSAGE = "unreadable or not a JSON object"

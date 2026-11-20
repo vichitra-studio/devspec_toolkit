@@ -9,16 +9,17 @@ import pytest
 
 from specdev_tools.core.ambiguity_items import (
     LOCATIONS,
-    PLAN_FILE_GLOB,
     PLAN_FILE_RE,
     PLAN_ITEM_STEPS,
     AmbiguityItem,
     AmbiguityReadError,
+    _step_of_file,
     about_targets,
     iter_ambiguity_items,
     is_open,
     shape_of,
 )
+from specdev_tools.core.step_paths import PLAN_FILE_GLOB
 
 from .._ambiguity_support import unified_item
 from ..graph._synth import write_json
@@ -229,3 +230,7 @@ def test_the_plan_constants_are_derived_from_one_another() -> None:
     assert all(PLAN_FILE_RE.match(name) for name in ("ms_a_plan.json", "ms_1-b_plan.json"))
     assert not any(PLAN_FILE_RE.match(name) for name in ("ms_a_plan.json.bak", "x_ms_a_plan.json", "ms_a_plan.jsonx", "notes.json"))
     assert PLAN_ITEM_STEPS == {loc.step for loc in LOCATIONS if loc.in_plan_file} == {"16a", "16b"}
+
+
+def test_a_root_spec_file_name_gives_its_step_only_when_it_is_json() -> None:
+    assert _step_of_file("05_x.json") == "05" and _step_of_file("05_x.txt") is None

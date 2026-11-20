@@ -13,6 +13,10 @@ STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_")
 STEP_JSON_RE = re.compile(r"^(\d{2}[a-z]?)_[^/]*\.json$")
 """A root spec file name (``05_interface_contracts.json``): group 1 is its step."""
 PLAN_DIR_NAME = "impl_context"
+PLAN_FILE_GLOB = "ms_*_plan.json"
+"""The one spelling of "a milestone plan file": the name pattern inside ``PLAN_DIR_NAME``."""
+PLAN_FILE_KEY = f"{PLAN_DIR_NAME}/{PLAN_FILE_GLOB}"
+"""The same rule as an entry-key registry key (``impl_context/ms_*_plan.json``)."""
 STEP_DIR_RE = re.compile(r"^step_(\d{2}[a-z]?)$")
 IMPL_CONTEXT_DIR_RE = re.compile(r"^impl_context$")
 

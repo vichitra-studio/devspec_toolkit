@@ -39,6 +39,7 @@ from specdev_tools.core.ambiguity_items import (
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import delete_text, json_write_atomic
 from specdev_tools.graph.ownership import STEP_PREFIX, step_for_file
+from specdev_tools.graph.queries import plural
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 from specdev_tools.trace.writing import writing_graph
 
@@ -184,10 +185,9 @@ def _step_findings(items: list[AmbiguityItem], root: str, frozen: FrozenProvider
 def _legacy_summary(path: str, step: str, location: str, count: int, root: str) -> SpecError:
     """The one W630 of the legacy items of one array; it names the array, so the two arrays of a plan give two different findings."""
     artifact = _relative(root, path)
-    noun = "legacy open item" if count == 1 else "legacy open items"
     return make_error(
         "W630",
-        f"{count} {noun} in {artifact} ({location.removeprefix('.')}); see `upstream-backlog`",
+        f"{plural(count, 'legacy open item')} in {artifact} ({location.removeprefix('.')}); see `upstream-backlog`",
         file=artifact,
         owner=STEP_PREFIX + step,
     )

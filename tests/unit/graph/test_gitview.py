@@ -123,6 +123,13 @@ def test_relative_inside_follows_symlinks(tmp_path: Path) -> None:
     assert relative_inside(str(tmp_path / "root"), str(tmp_path / "link")) == "real"
 
 
+def test_relative_inside_follows_a_symlinked_root(tmp_path: Path) -> None:
+    (tmp_path / "real" / "spec").mkdir(parents=True)
+    (tmp_path / "link").symlink_to(tmp_path / "real", target_is_directory=True)
+    assert relative_inside(str(tmp_path / "link"), str(tmp_path / "real" / "spec")) == "spec"
+    assert relative_inside(str(tmp_path / "real"), str(tmp_path / "link" / "spec")) == "spec"
+
+
 def test_spec_path_in_repo_raises_where_relative_inside_is_none(tmp_path: Path) -> None:
     (tmp_path / "host").mkdir()
     with pytest.raises(GitViewError, match="not inside the git root"):
@@ -153,3 +160,26 @@ def test_folder_exists_at_is_true_for_a_folder_only(tmp_path: Path) -> None:
     assert folder_exists_at("HEAD", str(tmp_path), "spec") is False
     assert folder_exists_at("HEAD", str(tmp_path), "nope") is False
     assert path_exists_at("HEAD", str(tmp_path), "spec") is True
+
+
+@pytest.mark.parametrize(("path", "expected"), [
+    (".", True), ("./", True), ("", True), ("docs/..", True),
+    ("docs", True), ("docs/", True), ("./docs", True),
+    ("docs/a.md", False), ("spec", False), ("nope", False),
+])
+def test_folder_exists_at_answers_the_root_of_a_commit_and_normalises_the_path(tmp_path: Path, path: str, expected: bool) -> None:
+    """``git ls-tree <commit> -- .`` lists the root's content, not a tree line: the root is a folder by definition."""
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("a", encoding="utf-8")
+    (tmp_path / "spec").write_text("a file", encoding="utf-8")
+    (tmp_path / "0.txt").write_text("sorts first: ls-tree of the root lists this line, not a tree", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "a")
+    assert folder_exists_at("HEAD", str(tmp_path), path) is expected
+
+
+def test_folder_exists_at_the_root_still_raises_for_a_ref_that_does_not_resolve(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    with pytest.raises(GitViewError):
+        folder_exists_at("no-such-ref", str(tmp_path), ".")

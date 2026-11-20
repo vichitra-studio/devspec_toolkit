@@ -22,11 +22,10 @@ from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple
 
 from .loaders import load_json_artifact
-from .step_paths import PLAN_DIR_NAME, STEP_JSON_RE
+from .step_paths import PLAN_DIR_NAME, PLAN_FILE_GLOB, STEP_JSON_RE
 
 Shape = Literal["unified", "legacy"]
 
-PLAN_FILE_GLOB = "ms_*_plan.json"
 PLAN_FILE_RE = re.compile(fnmatch.translate(PLAN_FILE_GLOB))
 """The plan file pattern as a regex, derived from ``PLAN_FILE_GLOB`` (match a bare file name with ``.match``)."""
 ANCHOR_STEP = "16"

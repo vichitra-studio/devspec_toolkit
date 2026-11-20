@@ -40,6 +40,7 @@ from ..core.ambiguity_items import (
 from ..core.errors import ERROR_CODES, FindingError
 from ..graph.build import build_graph
 from ..graph.model import Graph
+from ..graph.queries import plural
 from ..graph.kinds import SEED_STEP
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -355,8 +356,7 @@ def render_plain(records: list[Record], summary: Summary, graph: Graph) -> str:
         if group == UNPLACED and summary.warnings:
             header += f"  [{len(summary.warnings)} x W613 - see stderr]"
         sections.append("\n".join([header, *(line for r in groups[group] for line in _record_lines(r))]))
-    noun = "item" if summary.items == 1 else "items"
-    totals = f"Totals: {summary.items} {noun} / {summary.with_answer} with answer / {summary.needing_answer} needing answer."
+    totals = f"Totals: {plural(summary.items, 'item')} / {summary.with_answer} with answer / {summary.needing_answer} needing answer."
     return "\n\n".join([*sections, totals])
 
 

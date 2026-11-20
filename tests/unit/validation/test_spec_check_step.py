@@ -215,6 +215,11 @@ def test_step_with_paths_is_a_usage_error(tmp_path: Path) -> None:
     assert code == 2 and "not allowed with" in out
 
 
+def test_detail_accepts_summary_and_all_only(tmp_path: Path) -> None:
+    code, out = run_spec_check(step_gate_host(tmp_path / "host"), "--step", "04", "--detail", "bogus")
+    assert code == 2 and "invalid choice: 'bogus'" in out and "summary, all" in out
+
+
 @pytest.mark.parametrize("flags", [["--detail", "all"], ["--base-ref", "main"]], ids=["detail", "base-ref"])
 def test_gate_options_without_a_gate_are_a_usage_error(tmp_path: Path, flags: list[str]) -> None:
     code, out = run_spec_check(step_gate_host(tmp_path / "host"), *flags)
