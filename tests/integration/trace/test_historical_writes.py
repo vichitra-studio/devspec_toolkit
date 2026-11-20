@@ -1,7 +1,8 @@
-"""A closed milestone's frozen links resolve the same way in the check and in the id-keyed write paths (M7 WI-09, the historical set).
+"""A closed milestone's frozen links in the graph check and in the id-keyed write paths (M7 WI-09, the historical set).
 
-A closed criterion's ``verified_by`` or ``refines`` target may be deleted (E700 is not raised for it); a LIVE criterion's
-may not.  ``run_graph_check``, ``specdev json patch --id`` and ``specdev node rename`` judge the same graph the same way.
+A closed criterion's ``verified_by`` or ``refines`` target may be deleted: the graph check raises no E700 for it, and an
+id-keyed write is judged by the findings it adds, so the link that already dangles never blocks one.  A write that would
+put a NEW dangling link into a closed criterion is refused: the write paths resolve without the historical set.
 """
 from __future__ import annotations
 
@@ -45,7 +46,13 @@ def test_check_ignores_a_deleted_target_of_a_closed_criterion(tmp_path: Path) ->
     host = closed_example(tmp_path)
     _delete_fixture(host)
     assert FROZEN_HOLDER not in _check_e700(host)
-    assert FROZEN_HOLDER not in _e700(build_graph(str(host / "spec"), str(ROOT)))
+
+
+def test_writing_a_dangling_verified_by_into_a_closed_criterion_by_id_is_refused(tmp_path: Path) -> None:
+    host = closed_example(tmp_path)
+    status, out = run_cli("json", "patch", "--id", FROZEN_HOLDER, ".verified_by", json.dumps(["fix-does-not-exist"]), *_flags(host))
+    assert status == 1 and "E767" in out and "E700" in out and "fix-does-not-exist" in out
+    assert FROZEN_HOLDER not in _check_e700(host)
 
 
 def test_an_id_keyed_write_of_an_unrelated_node_succeeds_after_that_deletion(tmp_path: Path) -> None:

@@ -91,7 +91,7 @@ def test_job_with_neither_realises_nor_verifies_gives_e742() -> None:
 def test_record_users_seam_counts_a_record_as_use(bindings: Bindings) -> None:
     context = _spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"])))
     assert ("E742", "fix-spare") in _found(context)
-    bindings.seams(record_users=lambda verifier: {"rec-1"} if verifier.id == "fix-spare" else set())
+    bindings.seams(record_users=lambda _ctx, verifier: {"rec-1"} if verifier.id == "fix-spare" else set())
     assert ("E742", "fix-spare") not in _found(_spec(*_base(node("fix-spare", "fixture", verifies=["ac-a-1"]))))
 
 
@@ -99,7 +99,7 @@ def test_extra_verifiers_seam_counts_as_naming_a_node_in_e743(bindings: Bindings
     """The proof verifiers of M7 name nodes through the seam; a node they name is not missing a verifier."""
     nodes = [node("ac-a-1", "criterion"), node("fix-1", "fixture")]
     assert [node.id for node in missing_verifiers(_spec(*nodes))] == ["ac-a-1"]
-    bindings.seams(extra_verifiers=lambda verifier: {"ac-a-1"} if verifier.id == "fix-1" else set())
+    bindings.seams(extra_verifiers=lambda _ctx, verifier: {"ac-a-1"} if verifier.id == "fix-1" else set())
     assert missing_verifiers(_spec(*nodes)) == []
 
 

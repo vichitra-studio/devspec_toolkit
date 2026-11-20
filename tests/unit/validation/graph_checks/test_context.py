@@ -110,7 +110,7 @@ def test_retired_bindings_seam_stub_changes_play_state(bindings: Bindings) -> No
     obligation = _node("fr-1")
     context = _context(verifier, obligation)
     assert context.in_play(verifier)
-    restore = bindings.seams(retired_bindings=lambda node: {"binding-1"} if node.id == "fx-1" else set())
+    restore = bindings.seams(retired_bindings=lambda _ctx, node: {"binding-1"} if node.id == "fx-1" else set())
     built_after = _context(verifier, obligation)
     assert not built_after.in_play(verifier)
     assert built_after.in_play(obligation)
@@ -124,7 +124,7 @@ def test_record_users_extra_verifiers_and_pin_matches_seams_have_stubs(bindings:
     context = _context(node)
     assert (context.record_users(node), context.extra_verifiers(node), context.pin_matches(node)) == (set(), set(), "UNKNOWN")
     restore = bindings.seams(
-        record_users=lambda _node: {"rec-1"}, extra_verifiers=lambda _node: {"fr-9"}, pin_matches=lambda _node: "OK",
+        record_users=lambda _ctx, _node: {"rec-1"}, extra_verifiers=lambda _ctx, _node: {"fr-9"}, pin_matches=lambda _ctx, _node: "OK",
     )
     bound = _context(node)
     assert (bound.record_users(node), bound.extra_verifiers(node), bound.pin_matches(node)) == ({"rec-1"}, {"fr-9"}, "OK")
@@ -139,7 +139,7 @@ def test_a_seam_that_does_not_exist_is_refused() -> None:
 
 def test_seams_can_be_given_to_one_context_without_binding_them() -> None:
     node = _node("fx-1", kind="fixture", role="verifier", step="08")
-    context = replace(_context(node), seams=Seams(retired_bindings=lambda _node: {"b"}))
+    context = replace(_context(node), seams=Seams(retired_bindings=lambda _ctx, _node: {"b"}))
     assert not context.in_play(node)
     assert _context(node).in_play(node)
 
@@ -252,8 +252,8 @@ def test_historical_is_the_closed_work_computed_once(example: GraphCheckContext)
 
 def test_an_out_of_order_restore_removes_only_its_own_binding() -> None:
     node = _node("tp-1", kind="third-party", step="04")
-    restore_pin = bind_seams(pin_matches=lambda _node: "OK")
-    restore_users = bind_seams(record_users=lambda _node: {"rec-1"})
+    restore_pin = bind_seams(pin_matches=lambda _ctx, _node: "OK")
+    restore_users = bind_seams(record_users=lambda _ctx, _node: {"rec-1"})
     restore_pin()
     both_gone_but_one = _context(node)
     assert (both_gone_but_one.pin_matches(node), both_gone_but_one.record_users(node)) == ("UNKNOWN", {"rec-1"})
@@ -264,8 +264,8 @@ def test_an_out_of_order_restore_removes_only_its_own_binding() -> None:
 
 def test_a_later_binding_of_the_same_seam_wins_until_it_is_removed() -> None:
     node = _node("tp-1", kind="third-party", step="04")
-    restore_first = bind_seams(pin_matches=lambda _node: "OK")
-    restore_second = bind_seams(pin_matches=lambda _node: "MISMATCH")
+    restore_first = bind_seams(pin_matches=lambda _ctx, _node: "OK")
+    restore_second = bind_seams(pin_matches=lambda _ctx, _node: "MISMATCH")
     restore_first()
     assert _context(node).pin_matches(node) == "MISMATCH"
     restore_second()
@@ -274,8 +274,8 @@ def test_a_later_binding_of_the_same_seam_wins_until_it_is_removed() -> None:
 
 def test_the_later_binding_wins_while_both_are_in_place_and_the_earlier_one_is_back_when_it_is_removed(bindings: Bindings) -> None:
     node = _node("tp-1", kind="third-party", step="04")
-    bindings.seams(pin_matches=lambda _node: "OK")
-    restore_second = bindings.seams(pin_matches=lambda _node: "MISMATCH")
+    bindings.seams(pin_matches=lambda _ctx, _node: "OK")
+    restore_second = bindings.seams(pin_matches=lambda _ctx, _node: "MISMATCH")
     assert _context(node).pin_matches(node) == "MISMATCH"
     restore_second()
     assert _context(node).pin_matches(node) == "OK"

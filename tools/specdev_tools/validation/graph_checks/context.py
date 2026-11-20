@@ -4,8 +4,10 @@
 graph checks read from one, built once through ``GraphCheckContext.from_registry``.  The replay gap provider has no
 registry context and builds one from a graph and a lock (``GraphCheckContext.from_graph``).
 
-Four seams are left for the proof milestone (M7).  Each has a default that says "nothing known" and is replaced
-through ``bind_seams``, which returns the function that removes that binding.
+Four seams carry what the proof package (``specdev_tools.proof``) knows.  Each is a function of the context and the
+node, has a default that says "nothing known" and is replaced through ``bind_seams``, which returns the function that
+removes that binding; the proof package binds its implementations when it is imported, which
+``validation/graph_checks/__init__.py`` does, so every path that builds a context has them.
 """
 from __future__ import annotations
 
@@ -38,28 +40,28 @@ SEED_MANIFEST_PATH = "common/seed_manifest.json"
 PIN_UNKNOWN = "UNKNOWN"
 
 
-def _no_ids(_node: Node) -> set[str]:
+def _no_ids(_ctx: GraphCheckContext, _node: Node) -> set[str]:
     return set()
 
 
-def _pin_unknown(_third_party: Node) -> str:
+def _pin_unknown(_ctx: GraphCheckContext, _third_party: Node) -> str:
     return PIN_UNKNOWN
 
 
 @dataclass(frozen=True)
 class Seams:
-    """The four answers the proof milestone supplies; each default says that nothing is known.
+    """The four answers the proof package supplies, each a function of the context and the node; each default says that nothing is known.
 
-    ``retired_bindings(verifier)``: the retired bindings of a verifier whose bindings are all retired, else empty.
-    ``record_users(verifier)``: the verification or evidence records that name the verifier.
-    ``extra_verifiers(verifier)``: the ids the verifier covers beyond its ``verifies``.
-    ``pin_matches(third_party)``: ``OK``, ``MISMATCH`` or ``UNKNOWN`` for the pin of a third party.
+    ``retired_bindings(ctx, verifier)``: the retired bindings of a verifier whose bindings are all retired, else empty.
+    ``record_users(ctx, verifier)``: the verification or evidence records that name the verifier.
+    ``extra_verifiers(ctx, verifier)``: the ids the verifier covers beyond its ``verifies``.
+    ``pin_matches(ctx, third_party)``: ``OK``, ``MISMATCH`` or ``UNKNOWN`` for the pin of a third party.
     """
 
-    retired_bindings: Callable[[Node], set[str]] = _no_ids
-    record_users: Callable[[Node], set[str]] = _no_ids
-    extra_verifiers: Callable[[Node], set[str]] = _no_ids
-    pin_matches: Callable[[Node], str] = _pin_unknown
+    retired_bindings: Callable[[GraphCheckContext, Node], set[str]] = _no_ids
+    record_users: Callable[[GraphCheckContext, Node], set[str]] = _no_ids
+    extra_verifiers: Callable[[GraphCheckContext, Node], set[str]] = _no_ids
+    pin_matches: Callable[[GraphCheckContext, Node], str] = _pin_unknown
 
 
 _NOTHING_KNOWN = Seams()
@@ -125,6 +127,8 @@ class GraphCheckContext:
     spec_root: str | None = None
     quiet: bool = False
     seams: Seams = field(default_factory=lambda: _bound)
+    memo: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    """What a seam computes once for this context, by key (the proof package keeps its proof context and the pin results here); a copy made with ``replace`` starts empty."""
 
     @classmethod
     def from_registry(cls, ctx: CheckContext) -> GraphCheckContext | None:
@@ -193,19 +197,19 @@ class GraphCheckContext:
 
     def retired_bindings(self, node: Node) -> set[str]:
         """The seam ``Seams.retired_bindings``."""
-        return self.seams.retired_bindings(node)
+        return self.seams.retired_bindings(self, node)
 
     def record_users(self, node: Node) -> set[str]:
         """The seam ``Seams.record_users``."""
-        return self.seams.record_users(node)
+        return self.seams.record_users(self, node)
 
     def extra_verifiers(self, node: Node) -> set[str]:
         """The seam ``Seams.extra_verifiers``."""
-        return self.seams.extra_verifiers(node)
+        return self.seams.extra_verifiers(self, node)
 
     def pin_matches(self, third_party: Node) -> str:
         """The seam ``Seams.pin_matches``."""
-        return self.seams.pin_matches(third_party)
+        return self.seams.pin_matches(self, third_party)
 
     def in_play(self, node: Node) -> bool:
         """Whether the checks read *node*.

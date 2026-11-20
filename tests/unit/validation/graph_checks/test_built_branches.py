@@ -141,7 +141,7 @@ def test_constraint_third_party_with_a_stub_pin_provider_ok_and_mismatch(pin: st
         node("tp-1", "third-party", "context", step="02", links=[("derives_from", "con-1")]),
         node("nfr-1", "nfr", step="07", links=[("relies_on", "tp-1")]),
     ]
-    bindings.seams(pin_matches=lambda _third_party: pin)
+    bindings.seams(pin_matches=lambda _ctx, _third_party: pin)
     result = compute_built(built_context(nodes, {"tc-1": "nfr-1"}))
     assert result["con-1"].state is state and result["con-1"].via == ("tp-1",)
 

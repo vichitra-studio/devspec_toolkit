@@ -26,6 +26,7 @@ from ..graph.check import run_graph_check
 from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
+from ..proof.built_evidence import bind_proof_seams
 from ..proof.removal import check_removal_rules
 from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import Lock, lock_path
@@ -339,6 +340,7 @@ register_check("registry-check", _check_registry)
 register_check("hardcoded-seed-check", _check_hardcoded_seed)
 register_check("glossary-drift-check", _check_glossary_drift, default_owner=STEP_PREFIX + "03")
 register_check("trace-lock", _check_trace_lock)
+bind_proof_seams()
 graph_checks.publish_graph_checks()
 graph_checks.register_graph_check("milestone-numbers", check_milestone_numbers)
 graph_checks.register_graph_check("removal-rules", check_removal_rules)

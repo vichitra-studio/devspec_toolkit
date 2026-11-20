@@ -253,7 +253,7 @@ def resolve_graph(
 
     With *steps*, only links held by nodes of those steps (and cycles in those steps) are reported.  *historical* is the ids
     of the nodes of closed milestones (``trace.history.historical_node_ids``): a ``verified_by`` or ``refines`` link of such a
-    node that names no node, or one the field does not allow, raises nothing; every caller that reports findings passes it.  Each finding is
+    node that names no node, or one the field does not allow, raises nothing.  The graph check passes it; the write paths do not (they compare the findings before and after an edit).  Each finding is
     owned by the step of the node that holds the link and carries that node's id.  A node whose ``lifecycle`` is
     ``not_applicable`` is skipped as a holder; a ``replaces`` or ``removes`` link is skipped.  Nothing is raised for a
     wrong-typed value: the graph holds only what the builder could read.

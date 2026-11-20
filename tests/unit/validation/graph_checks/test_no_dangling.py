@@ -281,7 +281,7 @@ def test_a_verifier_with_all_bindings_retired_is_not_a_use() -> None:
     job = _node("job-a", "job", realises=["gate-a"])
     context = _context(gate, job)
     assert check_no_dangling(context, "merge") == []
-    context.seams = replace(context.seams, retired_bindings=lambda node: {"x"} if node.id == "job-a" else set())
+    context.seams = replace(context.seams, retired_bindings=lambda _ctx, node: {"x"} if node.id == "job-a" else set())
     assert [error.node_id for error in check_no_dangling(context, "merge")] == ["gate-a"]
 
 

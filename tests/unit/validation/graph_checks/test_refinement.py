@@ -82,7 +82,7 @@ def test_rule_named_in_verified_by_covers_itself() -> None:
 def test_extra_verifiers_seam_stub_covers_an_obligation(bindings: Bindings) -> None:
     context = spec(*_base(node("fix-1", "fixture"), _criterion(["fr-a"], ["fix-1"])))
     assert _e745(context) != []
-    bindings.seams(extra_verifiers=lambda verifier: {"fr-a"})
+    bindings.seams(extra_verifiers=lambda _ctx, verifier: {"fr-a"})
     assert _e745(spec(*_base(node("fix-1", "fixture"), _criterion(["fr-a"], ["fix-1"])))) == []
 
 

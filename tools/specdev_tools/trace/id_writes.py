@@ -47,7 +47,7 @@ from specdev_tools.graph.queries import require_known_step, unknown_node_error
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
-from specdev_tools.trace.history import contract_lines, historical_node_ids
+from specdev_tools.trace.history import contract_lines
 from specdev_tools.trace.lockfile import Lock, LockEntry, containers_of, read_lock, replace_file_atomically, write_lock
 from specdev_tools.trace.writing import seed_texts_for_write, writing_graph
 from specdev_tools.trace.suspects import find_suspects, lock_links, orphan_entries
@@ -426,8 +426,13 @@ def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: Wri
 # --- judging the candidate graph ------------------------------------------------------------------------------------
 
 def _finding_keys(graph: Graph) -> dict[tuple[str, str | None, str], SpecError]:
-    """The link-resolution, duplicate-id and alias-space findings of *graph* by (code, node id, message)."""
-    errors = (*resolve_graph(graph, historical=historical_node_ids(graph)), *check_unique_ids(graph), *check_alias_space(graph))
+    """The link-resolution, duplicate-id and alias-space findings of *graph* by (code, node id, message).
+
+    The resolver runs WITHOUT the historical set the graph check passes: a write is judged by the findings it adds, so a
+    link of a closed criterion that already dangles never blocks one, and a write that would put a new dangling link
+    into a closed criterion is refused.
+    """
+    errors = (*resolve_graph(graph), *check_unique_ids(graph), *check_alias_space(graph))
     return {(error.code, error.node_id, error.message): error for error in errors}
 
 

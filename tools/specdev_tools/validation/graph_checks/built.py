@@ -3,7 +3,8 @@
 An obligation is BUILT when work of a closed milestone refines it at its current content (a task criterion of a
 ``done`` milestone whose lock entry holds the hash the obligation has now), or, for a parent, when its in-scope
 children are; a coarse node is built through the obligations derived from it.  A kind whose proof is evidence (a gate,
-a rule, a threat) is ``PENDING_EVIDENCE`` until the proof milestones register a provider (``register_built_provider``).
+a rule, a threat) is ``PENDING_EVIDENCE`` until a provider is registered (``register_built_provider``); ``proof.built_evidence``
+supplies one for a given gate cap (``built_at_cap``), and a node whose proof waits only for a later stage is ``RELIEVED``.
 
 ``compute_built`` is a library function: no command shows it and no error is raised for "not built" here.  The close
 gate reads it for the closing milestone and the release gate for every in-scope obligation; the scaffold path check
@@ -41,16 +42,22 @@ class BuiltState(str, enum.Enum):
     BUILT = "BUILT"
     NOT_BUILT = "NOT_BUILT"
     PENDING_EVIDENCE = "PENDING_EVIDENCE"
+    RELIEVED = "RELIEVED"
     IGNORED = "IGNORED"
+
+
+SATISFIED = frozenset({BuiltState.BUILT, BuiltState.RELIEVED})
+"""The states that count as built for an ancestor and for the node itself: a relieved node waits only for proof at a stage above the gate (DOC 5.3, \"at the tag\")."""
 
 
 @dataclass(frozen=True)
 class BuiltResult:
-    """The state of one node, why, and the ids (refining criteria, children, derived nodes) that decided it."""
+    """The state of one node, why, and the ids (refining criteria, children, derived nodes) that decided it; ``waits_for`` is the stage a ``RELIEVED`` node waits for."""
 
     state: BuiltState
     reason: str
     via: tuple[str, ...] = ()
+    waits_for: str | None = None
 
 
 BuiltProvider = Callable[["BuiltComputation", Node], BuiltResult]
@@ -119,8 +126,8 @@ def walk_derivations(ctx: GraphCheckContext, node: Node, verbs: Iterable[str]) -
     return sorted(reached.values(), key=ctx.graph.shape.order_key)
 
 
-def _combine(members: list[tuple[str, BuiltResult]], what: str) -> BuiltResult:
-    """One state for *members* (id and result of each): any NOT_BUILT, else any PENDING_EVIDENCE, else BUILT; ``via`` names the members that decided it."""
+def combine(members: list[tuple[str, BuiltResult]], what: str) -> BuiltResult:
+    """One state for the *members* of a node (id and result of each, *what* names them in the reason): any NOT_BUILT, else any PENDING_EVIDENCE, else BUILT (a RELIEVED member counts as built); ``via`` names the members that decided it."""
     for state, text in ((BuiltState.NOT_BUILT, "is not built"), (BuiltState.PENDING_EVIDENCE, "waits for evidence")):
         deciding = tuple(sorted(member_id for member_id, result in members if result.state is state))
         if deciding:
@@ -161,6 +168,10 @@ class BuiltComputation:
         for provider in _providers:
             if provider.matches(node):
                 return provider.compute(self, node)
+        return self.by_default(node)
+
+    def by_default(self, node: Node) -> BuiltResult:
+        """The state of the in-play *node* by the branches of this module alone, as if no provider matched it (a provider that refines the default asks for it)."""
         if node.role not in OBLIGATION_ROLES:
             return BuiltResult(BuiltState.IGNORED, f"a {node.role or 'node'} is not built")
         if node.kind in EVIDENCE_KINDS:
@@ -206,14 +217,14 @@ class BuiltComputation:
         children = self._members(self.ctx.graph.by_id.get(child) for child in self.ctx.graph.children.get(node.id, ()))
         if not children:
             return BuiltResult(BuiltState.NOT_BUILT, "no counting refinement" + (" and no in-scope child" if node.children else ""))
-        return _combine(children, "child")
+        return combine(children, "child")
 
     def _coarse(self, node: Node) -> BuiltResult:
         """A coarse node is built when something is derived from it and everything derived from it is built (none: not built)."""
         derived = self._members(source for source, _link in inbound_sources(self.ctx, node))
         if not derived:
             return BuiltResult(BuiltState.NOT_BUILT, "no obligation derives from it")
-        return _combine(derived, "derived obligation")
+        return combine(derived, "derived obligation")
 
     def _constraint(self, node: Node) -> BuiltResult:
         """The coarse branch, plus the components and third parties that derive from the constraint once a built obligation uses them."""
@@ -221,7 +232,7 @@ class BuiltComputation:
         derived += self._components(node) + self._third_parties(node)
         if not derived:
             return BuiltResult(BuiltState.NOT_BUILT, "nothing derives from it that is built or waits for evidence")
-        return _combine(derived, "derived node")
+        return combine(derived, "derived node")
 
     def _members(self, nodes: Iterable[Node | None]) -> list[tuple[str, BuiltResult]]:
         """The (id, result) of each obligation of *nodes* that takes part: an ignored or non-obligation node is left out of the count."""
@@ -263,7 +274,7 @@ class BuiltComputation:
         """The ids of the built obligations that link to *target* through *verbs*."""
         return [
             source.id for source, _link in inbound_sources(self.ctx, target, verbs)
-            if source.role in OBLIGATION_ROLES and self.result_of(source).state is BuiltState.BUILT
+            if source.role in OBLIGATION_ROLES and self.result_of(source).state in SATISFIED
         ]
 
 

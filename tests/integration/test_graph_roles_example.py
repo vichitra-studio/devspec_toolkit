@@ -185,7 +185,8 @@ def test_dangling_owners_are_unchanged_without_the_step_14_artifact_and_pending_
     assert pending["12"] == {node for node, (owner, _p) in DANGLING.items() if owner == "step:12"}
     assert pending["14"] == {node for node, (owner, _p) in DANGLING.items() if owner == "step:14"}
     assert {f["node_id"] for f in gate["upstream_debt"] if f["code"] == "E740"} == {"metric-reset-completion-rate"}  # owner 07, before the gate
-    assert {f["node_id"] for f in gate["pending"]["14"] if f["code"] == "E742"} == {FX1, FX2}  # the criteria that used the fixtures are gone
+    # the criteria that used the fixtures are gone; FX1 is still used through its binding record (the record_users seam, WI-M7-08), FX2 has none
+    assert {f["node_id"] for f in gate["pending"]["14"] if f["code"] == "E742"} == {FX2}
 
 
 def test_scope_out_holder_produces_no_error_and_does_not_count_as_use(tmp_path: Path, example_checks: dict[str, Any]) -> None:
@@ -220,9 +221,12 @@ def test_editing_the_criterion_text_makes_it_not_built(tmp_path: Path) -> None:
 
 
 def test_no_unused_verifier_in_the_example(tmp_path: Path, example_checks: dict[str, Any]) -> None:
-    """FX1, FX2 and the job are all used (no E742); delta tc1_without_fixture leaves FX1 unused: E742 on it alone."""
+    """FX1, FX2 and the job are all used (no E742); delta tc1_without_fixture leaves FX1 used through its binding record (``record_users``); with the record gone too, FX1 is unused: E742 on it alone."""
     assert _ids(example_checks, "verifier-rules", "E742") == set()
-    variant = _checks(_host(tmp_path / "v", "tc1_without_fixture"))
+    host = _host(tmp_path / "v", "tc1_without_fixture")
+    assert _ids(_checks(host), "verifier-rules", "E742") == set()
+    (host / "spec" / "extras" / "verification" / "ver-password-reset-expired-token.json").unlink()
+    variant = _checks(host)
     assert _triples(variant, "verifier-rules")[0] == ("E742", FX1, "step:14")
     assert _ids(variant, "verifier-rules", "E742") == {FX1}
 
