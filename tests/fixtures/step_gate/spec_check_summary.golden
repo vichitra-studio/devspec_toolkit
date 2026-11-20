@@ -19,5 +19,13 @@ spec-check: 19 checks run, 1 errors, 8 warnings
   [PASS] glossary-drift-check           0 errors  0 warnings
   [SKIP] forward-replay-check           (use --include-forward-replay to check id regressions (E555) against the base ref)
   [PASS] trace-lock                     0 errors  0 warnings
+  [SKIP] no-dangling                    (not built yet)
+  [SKIP] term-use                       (not built yet)
+  [SKIP] verifier-rules                 (not built yet)
+  [SKIP] cross-cutting                  (not built yet)
+  [SKIP] refinement                     (not built yet)
+  [SKIP] scaffold-paths                 (not built yet)
+  [SKIP] seed-routes                    (not built yet)
+  [SKIP] prose-ids                      (not built yet)
   [PASS] open-items                     0 errors  0 warnings
 

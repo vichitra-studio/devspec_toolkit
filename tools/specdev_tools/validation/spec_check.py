@@ -39,6 +39,14 @@ from .check_registry import (
     register_check,
     run_registered_checks,
 )
+from .graph_checks.cross_cutting import run_cross_cutting
+from .graph_checks.no_dangling import run_no_dangling
+from .graph_checks.prose_ids import run_prose_ids
+from .graph_checks.refinement import run_refinement
+from .graph_checks.scaffold import run_scaffold_paths
+from .graph_checks.seed_routes import run_seed_routes
+from .graph_checks.term_use import run_term_use
+from .graph_checks.verifiers import run_verifier_rules
 from .open_items import check_open_items
 
 
@@ -373,6 +381,14 @@ register_check("hardcoded-seed-check", _check_hardcoded_seed)
 register_check("glossary-drift-check", _check_glossary_drift, default_owner=STEP_PREFIX + "03")
 register_check("forward-replay-check", _check_forward_replay)
 register_check("trace-lock", _check_trace_lock)
+register_check("no-dangling", run_no_dangling)
+register_check("term-use", run_term_use)
+register_check("verifier-rules", run_verifier_rules)
+register_check("cross-cutting", run_cross_cutting)
+register_check("refinement", run_refinement)
+register_check("scaffold-paths", run_scaffold_paths)
+register_check("seed-routes", run_seed_routes)
+register_check("prose-ids", run_prose_ids)
 register_check("open-items", _check_open_items)
 
 

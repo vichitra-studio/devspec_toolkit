@@ -24,6 +24,7 @@ from specdev_tools.trace.id_writes import broken_holders
 from specdev_tools.trace.lockfile import Lock, LockEntry
 from specdev_tools.trace.rename import live_holders
 from specdev_tools.trace.suspects import find_suspects, lock_links, missing_entries, orphan_entries
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
 
 from ._synth import EXAMPLE_SPEC, ROOT, load_doc, make_toolkit, write_json
 
@@ -75,7 +76,7 @@ def _holders_a_rename_rewrites(graph: Graph) -> set[str]:
     return set(live_holders(renamed, target))
 
 
-# Each consumer of the graph, as the ids of the nodes it reads or reports on; later work items add their rows.
+# Each consumer of the graph, as the ids of the nodes it reads or reports on.
 CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     "resolver": lambda graph: {error.node_id for error in resolve_graph(graph) if error.node_id},
     "trace": lambda graph: {node.id for node in trace_node(graph, "ac-probe-1", ("up",)).reached},
@@ -92,6 +93,8 @@ CONSUMERS: dict[str, Callable[[Graph], set[str]]] = {
     # An id write reports the live nodes whose links point at a deleted id; the probe links to a target that is gone.
     "broken_holders": lambda graph: {link.holder for link in broken_holders(graph, ["cap-missing"])},
     "rename": _holders_a_rename_rewrites,
+    # The in-play gate every graph check starts from; each check lists its own lifecycle test in its own test file.
+    "graph_checks_in_play": lambda graph: {node.id for node in GraphCheckContext.from_graph(graph, None).in_play_nodes()},
 }
 
 

@@ -1,0 +1,17 @@
+"""The error codes of the graph checks, by name; the one place a check takes its code from."""
+from __future__ import annotations
+
+NODE_DANGLING = "E740"
+TERM_NOT_USED_BY_LABEL = "E741"
+UNUSED_VERIFIER = "E742"
+MISSING_VERIFIER = "E743"
+CROSS_CUTTING_NOT_REFINED = "E744"
+VERIFIER_DOES_NOT_VERIFY_REFINED = "E745"
+SCAFFOLD_PATH_NOT_TRACKED = "E746"
+SEED_NOT_ROUTED = "E747"
+SEED_ROUTE_UNUSED = "E748"
+SEED_LINK_NOT_ROUTED = "E749"
+NODE_ID_IN_PROSE = "E752"
+
+ROLE_GAP_CODES = frozenset({NODE_DANGLING, UNUSED_VERIFIER, MISSING_VERIFIER})
+"""The codes that are coverage gaps of a node (reported by ``specdev stale`` and ``step ready``)."""

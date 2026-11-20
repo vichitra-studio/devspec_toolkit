@@ -23,7 +23,9 @@
     {
       "class": "dangling-node",
       "owner": "furthest_usable_step",
-      "codes": [],
+      "codes": [
+        "E740"
+      ],
       "authority": "DOC L824-840 row 3; DS L420"
     },
     {
@@ -34,38 +36,50 @@
     },
     {
       "class": "missing-verifier",
-      "owner": "binding_step",
-      "codes": [],
+      "owner": "fixed_step:08",
+      "codes": [
+        "E743"
+      ],
       "authority": "DOC L824-840 row 5; DS L420"
     },
     {
       "class": "unused-verifier",
       "owner": "fixed_step:14",
-      "codes": [],
+      "codes": [
+        "E742"
+      ],
       "authority": "DOC L824-840 row 6; DS L420"
     },
     {
       "class": "scaffold-row-path-not-tracked",
       "owner": "fixed_step:15",
-      "codes": [],
+      "codes": [
+        "E746"
+      ],
       "authority": "DOC L824-840 row 7; DS L420"
     },
     {
       "class": "node-id-in-prose",
       "owner": "node_step",
-      "codes": [],
+      "codes": [
+        "E752"
+      ],
       "authority": "DOC L824-840 row 8; DS L420"
     },
     {
       "class": "derives-from-seed-not-routed",
       "owner": "node_step",
-      "codes": [],
+      "codes": [
+        "E749"
+      ],
       "authority": "DOC L824-840 row 9; DS L420"
     },
     {
       "class": "listed-seed-routed-nowhere",
       "owner": "fixed_step:00",
-      "codes": [],
+      "codes": [
+        "E747"
+      ],
       "authority": "DOC L824-840 row 10; DS L402; DS L420"
     },
     {
@@ -77,7 +91,9 @@
     {
       "class": "cross-cutting-obligation-not-refined",
       "owner": "fixed_step:14",
-      "codes": [],
+      "codes": [
+        "E744"
+      ],
       "authority": "DOC L824-840 row 12; DS L420"
     },
     {
@@ -151,6 +167,30 @@
         "W550"
       ],
       "authority": "M6a PD"
+    },
+    {
+      "class": "term-not-used-by-label",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E741"
+      ],
+      "authority": "M6b PD"
+    },
+    {
+      "class": "verifier-does-not-verify-refined",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E745"
+      ],
+      "authority": "M6b PD"
+    },
+    {
+      "class": "seed-route-unused",
+      "owner": "node_step",
+      "codes": [
+        "E748"
+      ],
+      "authority": "M6b PD"
     }
   ]
 }

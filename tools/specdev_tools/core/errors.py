@@ -19,6 +19,8 @@ class SpecError:
     node_id: Optional[str] = None
     target: Optional[str] = None
     """The link a finding is about, as ``<field>-><target id>``; part of the identity of a link finding, never printed."""
+    route: Optional[tuple[str, str]] = None
+    """The seed route a finding is about, as ``(seed id, step)``; the step gate reads it to tell whether an open item about the seed makes the finding wait."""
 
     def render(self) -> str:
         if self.path:
@@ -272,6 +274,19 @@ ERROR_CODES = {
     "E773": "STEP_NOT_READY",
     "E774": "RECORD_INVALID",
     "E778": "STALE_ALIAS_USE",
+    # Graph role checks (74x): findings about the spec, each with an owner and a node id (E743 and E747 owned by a fixed
+    # step).  E750, E751 and E753 are unassigned; E754..E759 are reserved.
+    "E740": "NODE_DANGLING",
+    "E741": "TERM_NOT_USED_BY_LABEL",
+    "E742": "UNUSED_VERIFIER",
+    "E743": "MISSING_VERIFIER",
+    "E744": "CROSS_CUTTING_NOT_REFINED",
+    "E745": "VERIFIER_DOES_NOT_VERIFY_REFINED",
+    "E746": "SCAFFOLD_PATH_NOT_TRACKED",
+    "E747": "SEED_NOT_ROUTED",
+    "E748": "SEED_ROUTE_UNUSED",
+    "E749": "SEED_LINK_NOT_ROUTED",
+    "E752": "NODE_ID_IN_PROSE",
     "E882": "MIGRATION_BASELINE_NOT_REATTESTED",
     "W720": "LINK_TO_DEPRECATED_NODE",
 }
@@ -361,13 +376,14 @@ def make_error(
     owner: Optional[str] = None,
     node_id: Optional[str] = None,
     target: Optional[str] = None,
+    route: Optional[tuple[str, str]] = None,
 ) -> SpecError:
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
     return SpecError(
         code=code, message=message, path=path,
         subcode=subcode, file=file, jq_path=jq_path, value=value,
-        owner=owner, node_id=node_id, target=target,
+        owner=owner, node_id=node_id, target=target, route=route,
     )
 
 

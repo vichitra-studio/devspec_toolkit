@@ -36,6 +36,8 @@ from specdev_tools.graph.model import Graph
 from specdev_tools.graph.ownership import step_for_file
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.validation import _legacy_shim
+from specdev_tools.validation.graph_checks import run_graph_checks
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.traceability_closure import check_traceability_closure, uncomputed_dimensions
 from specdev_tools.validation.spec_check import run_spec_check_json
@@ -544,6 +546,21 @@ def test_resolve_graph_does_not_raise_on_a_wrong_value() -> None:
             f"{base.name} {name} = {mutated!r:.80}",
             lambda: _checked(base, documents, name, mutated),
         )
+    assert failures == []
+
+
+def _graph_checks_on(base: Path, documents: dict[str, Any], name: str, mutated: Any) -> list[Any]:
+    """The play state of every node and the findings of the graph checks at each mode, over the graph built with *mutated* in place of *name*."""
+    graph = build_graph(str(base), str(_ROOT), overrides={**documents, name: mutated})
+    context = GraphCheckContext.from_graph(graph, None, str(_ROOT))
+    return [context.in_play_nodes(), *(run_graph_checks(context, mode) for mode in ("merge", "close", "release"))]
+
+
+def test_graph_checks_do_not_raise_on_a_wrong_value() -> None:
+    """The same mutations over the whole graph: the graph checks give findings or none, never a traceback, at each of the three modes."""
+    failures: list[str] = []
+    for base, name, documents, mutated in _mutated_graph_cases():
+        failures += _raise_of(f"{base.name} {name} = {mutated!r:.80}", lambda: _graph_checks_on(base, documents, name, mutated))
     assert failures == []
 
 
