@@ -557,7 +557,7 @@ def test_attest_prune_removes_the_orphan_entry_and_dry_run_only_lists_it(full_ho
     orphan = replace(lock.entries[0], source=_NFR, field="relies_on", target="tp-gone")
     write_lock(str(full_host / "spec"), Lock((*lock.entries, orphan)))
     listed = json.loads(run_cli("attest", "--prune", "--dry-run", *_flags(full_host / "spec", full_host), "--json")[1])
-    assert listed == {"written": False, "pruned": [{"source": _NFR, "field": "relies_on", "target": "tp-gone"}]}
+    assert listed == {"written": False, "pruned": [{"source": _NFR, "field": "relies_on", "target": "tp-gone"}], "pruned_records": []}
     assert orphan in read_lock(str(full_host / "spec")).entries
     done = json.loads(run_cli("attest", "--prune", *_flags(full_host / "spec", full_host), "--json")[1])
     assert done["written"] is True and orphan not in read_lock(str(full_host / "spec")).entries

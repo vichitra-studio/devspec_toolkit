@@ -18,7 +18,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E301", "E302", "E303", "E304", "E305", "E306", "E307",
             "E308", "E309",
             "E310", "E311", "E320",
-            "E330", "E331", "E332", "E333", "E334", "W350", "W351",
+            "E330", "E331", "E332", "E333", "E334", "E336", "E337", "E338", "E339", "W350", "W351",
             # Canonical registry (4xx)
             "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)

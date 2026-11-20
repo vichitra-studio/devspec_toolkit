@@ -85,7 +85,11 @@
     {
       "class": "pin-differs-from-repo-sources",
       "owner": "fixed_step:02",
-      "codes": [],
+      "codes": [
+        "E336",
+        "E337",
+        "E338"
+      ],
       "authority": "DOC L824-840 row 11; DS L420"
     },
     {

@@ -4,7 +4,7 @@ A record file is ``{"$schema": <the record schema>, "records": [<one record>]}``
 record id.  Each kind owns the files whose name starts with its id prefix (``ver-``, ``evd-``): the registry gives one
 glob per kind, so the builder reads a file as exactly one kind.  ``check_records`` finds a file that is not a record of
 the kind its name declares, and a file that holds more than one record.  The links of a record are resolved by the
-``graph`` check (E700 to E702), not here.  No command here writes a record.
+``graph`` check (E700 to E702), not here.  No command here writes a record; the stage and ``proves`` lint of the bindings is ``verify/lint.py``.
 """
 from __future__ import annotations
 

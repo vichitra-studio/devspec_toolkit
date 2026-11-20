@@ -377,11 +377,20 @@ def _admitted(graph: Graph, node: Node, hop: Hop) -> list[Node]:
     ]
 
 
+def _names_record_kind(graph: Graph, hop: Hop) -> bool:
+    """Whether *hop* admits a record-role kind (the evidence of a run names a verification record in ``about``)."""
+    return any((decl := graph.decls.get(kind)) is not None and decl.role == RECORD_ROLE for kind in hop.kinds)
+
+
 def _apply(graph: Graph, hop: Hop, frontier: Iterable[Node], known: dict[str, Node], reached: dict[str, Reached]) -> list[Node]:
-    """Apply *hop* to *frontier* (records are not expanded); return the nodes new to *known*."""
+    """Apply *hop* to *frontier*; return the nodes new to *known*.
+
+    A record node is expanded only by a hop whose kinds name a record kind, and a seed never is.
+    """
+    expands_records = _names_record_kind(graph, hop)
     added: list[Node] = []
     for node in frontier:
-        if node.role == RECORD_ROLE or node.kind == SEED_KIND:
+        if node.kind == SEED_KIND or (node.role == RECORD_ROLE and not expands_records):
             continue
         for other in _admitted(graph, node, hop):
             reached.setdefault(other.id, _reached(hop, node, other))

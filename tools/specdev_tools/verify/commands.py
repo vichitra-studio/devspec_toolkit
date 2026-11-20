@@ -124,7 +124,7 @@ def run_verify_bind(args: argparse.Namespace) -> int:
     return run_on_graph("verify bind", args, lambda _graph: _bind(args))
 
 
-def _installed_overrides(pairs: Sequence[str]) -> dict[str, str] | None:
+def installed_overrides(pairs: Sequence[str]) -> dict[str, str] | None:
     """``{third party: version}`` from ``TP=VERSION`` items; ``None`` when one is not of that form."""
     overrides: dict[str, str] = {}
     for pair in pairs:
@@ -172,7 +172,7 @@ def _binding_ids(args: argparse.Namespace, graph: Graph) -> list[str] | None:
 
 def _run(args: argparse.Namespace, graph: Graph) -> int:
     ids = _binding_ids(args, graph)
-    overrides = _installed_overrides(args.installed or ())
+    overrides = installed_overrides(args.installed or ())
     if ids is None:
         return usage_error("verify run", "name bindings, or give exactly one of --all and --milestone")
     if overrides is None:

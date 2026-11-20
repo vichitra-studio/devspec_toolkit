@@ -308,16 +308,22 @@ def plan_to_dict(plan: AttestPlan, *, written: bool, diffs: Sequence[RootDiff] |
     return document
 
 
-def prune_text(dropped: Sequence[LockEntry], *, written: bool) -> str:
-    """The entries ``--prune`` removes (or would remove), one per line."""
-    if not dropped:
+def prune_text(dropped: Sequence[LockEntry], *, written: bool, records: Sequence[str] = ()) -> str:
+    """The entries ``--prune`` removes (or would remove), one per line, then the record files (*records*, spec-relative) it removes."""
+    if not dropped and not records:
         return "attest --prune: no orphan entries"
     head = "removed" if written else "would remove"
-    lines = [f"attest --prune: {head} {plural(len(dropped), 'orphan entry', 'orphan entries')}"]
-    lines.extend(f"  {entry.source}: {entry.field} -> {entry.target}" for entry in dropped)
+    lines: list[str] = []
+    if dropped:
+        lines.append(f"attest --prune: {head} {plural(len(dropped), 'orphan entry', 'orphan entries')}")
+        lines.extend(f"  {entry.source}: {entry.field} -> {entry.target}" for entry in dropped)
+    if records:
+        lines.append(f"attest --prune: {head} {plural(len(records), 'orphan record', 'orphan records')}")
+        lines.extend(f"  {record}" for record in records)
     return "\n".join(lines)
 
 
-def prune_to_dict(dropped: Sequence[LockEntry], *, written: bool) -> dict[str, Any]:
-    """The pruned entries as a JSON-able dict: ``written`` and ``pruned`` (source, field, target of each)."""
-    return {"written": written, "pruned": [{"source": entry.source, "field": entry.field, "target": entry.target} for entry in dropped]}
+def prune_to_dict(dropped: Sequence[LockEntry], *, written: bool, records: Sequence[str] = ()) -> dict[str, Any]:
+    """The pruned entries as a JSON-able dict: ``written`` and ``pruned`` (source, field, target of each); ``pruned_records`` (spec-relative files; empty when none)."""
+    document: dict[str, Any] = {"written": written, "pruned": [{"source": entry.source, "field": entry.field, "target": entry.target} for entry in dropped], "pruned_records": list(records)}
+    return document

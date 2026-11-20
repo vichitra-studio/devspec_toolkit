@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from specdev_tools.trace.attest import plan_node_attest, plan_step_attest
+from specdev_tools.trace.attest import plan_node_attest, plan_step_attest, prune_text, prune_to_dict
 from specdev_tools.trace.lockfile import Lock, LockEntry, lock_path, serialise_lock
 from specdev_tools.trace.suspects import check_lock_orphans, missing_entries
 
@@ -240,6 +240,16 @@ def test_prune_removes_orphans_and_ci_check_reports_them(example: Example) -> No
     assert code == 0 and "removed 1 orphan entry" in out
     assert check_lock_orphans(example.graph(), example.lock()) == [] and _lock_text(example) == original
     assert _attest(example, "--prune")[1].strip() == "attest --prune: no orphan entries"
+
+
+def test_prune_text_and_dict_give_the_records_after_the_entries_and_an_empty_list_without_records(example: Example) -> None:
+    orphan = _add_orphan(example)
+    records = ["extras/verification/ver-x.json"]
+    assert prune_text((), written=False, records=records) == "attest --prune: would remove 1 orphan record\n  extras/verification/ver-x.json"
+    assert prune_text((orphan,), written=True, records=records).splitlines()[-2:] == ["attest --prune: removed 1 orphan record", "  extras/verification/ver-x.json"]
+    assert prune_text((orphan,), written=True).count("attest --prune:") == 1 and prune_text((), written=True) == "attest --prune: no orphan entries"
+    assert prune_to_dict((), written=False) == {"written": False, "pruned": [], "pruned_records": []}
+    assert prune_to_dict((orphan,), written=True, records=records)["pruned_records"] == records
 
 
 def test_crash_during_delete_leaves_orphan_entry_that_prune_repairs(example: Example) -> None:

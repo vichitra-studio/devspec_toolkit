@@ -205,6 +205,15 @@
       "path": "step ready"
     },
     {
+      "path": "third-party"
+    },
+    {
+      "path": "third-party check"
+    },
+    {
+      "path": "third-party pin"
+    },
+    {
       "path": "trace"
     },
     {

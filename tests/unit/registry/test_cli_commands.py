@@ -35,7 +35,7 @@ def _top_level() -> list[str]:
 
 def test_counts_match_the_parsers():
     paths = _paths()
-    assert len(_top_level()) == 43
+    assert len(_top_level()) == 44
     assert len([p for p in paths if p.startswith("context ")]) == 6
     assert len([p for p in paths if p.startswith("json ")]) == 9
     assert len([p for p in paths if p.startswith("node ")]) == 4
@@ -43,6 +43,7 @@ def test_counts_match_the_parsers():
     assert len([p for p in paths if p.startswith("lock ")]) == 2
     assert len([p for p in paths if p.startswith("step ")]) == 2
     assert len([p for p in paths if p.startswith("verify ")]) == 2
+    assert len([p for p in paths if p.startswith("third-party ")]) == 2
     assert paths == sorted(paths)
 
 

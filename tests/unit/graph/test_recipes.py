@@ -20,9 +20,11 @@ from specdev_tools.graph.recipes import (
     DEPENDENCY,
     DependencyReport,
     GitContext,
+    Hop,
     Pack,
     RecipeError,
     RecipeTable,
+    _apply,
     build_pack,
     compare_dependencies,
     load_recipes,
@@ -118,6 +120,34 @@ def test_verifier_section_places_the_verification_and_evidence_kinds(example: Gr
     assert VERIFICATION_RECORD in verifiers["16a"] and VERIFICATION_RECORD in verifiers["16b"]
     assert EVIDENCE_RECORD not in verifiers["16a"] | verifiers["16b"]
     assert {VERIFICATION_RECORD, EVIDENCE_RECORD} <= verifiers["16c"]
+
+
+def _binding_evidence(binding_id: str) -> dict[str, Any]:
+    return {
+        "$schema": "vc:extras:evidence-record",
+        "records": [{"evidence_id": EVIDENCE_RECORD, "type": "attestation", "about": [binding_id], "tested_tree": "9a41c7e2"}],
+    }
+
+
+def test_apply_expands_a_record_node_for_a_record_kind_hop(example: Graph, table: RecipeTable) -> None:
+    graph = _with_docs(example, {EVIDENCE_FILE: lambda document: document.update(_binding_evidence(VERIFICATION_RECORD))})
+    binding = graph.by_id[VERIFICATION_RECORD]
+    hop = Hop("about", "in", frozenset({"evidence-record"}))
+    known = {binding.id: binding}
+    reached: dict[str, Any] = {}
+    added = _apply(graph, hop, [binding], known, reached)
+    assert [node.id for node in added] == [EVIDENCE_RECORD]
+    assert reached[EVIDENCE_RECORD].source_id == VERIFICATION_RECORD
+    assert EVIDENCE_RECORD in _sections(build_pack(graph, table, "16c", START_16C))["verifiers"]
+
+
+@pytest.mark.parametrize("kinds", [frozenset({"fixture"}), frozenset()], ids=["non-record kind", "any kind"])
+def test_apply_does_not_expand_a_record_node_for_other_hops(example: Graph, kinds: frozenset[str]) -> None:
+    graph = _with_docs(example, {EVIDENCE_FILE: lambda document: document.update(_binding_evidence(VERIFICATION_RECORD))})
+    binding = graph.by_id[VERIFICATION_RECORD]
+    known = {binding.id: binding}
+    assert _apply(graph, Hop("about", "in", kinds), [binding], known, {}) == []
+    assert list(known) == [VERIFICATION_RECORD]
 
 
 def test_pack_16b_has_neither_needs_nor_segments(example: Graph, table: RecipeTable) -> None:

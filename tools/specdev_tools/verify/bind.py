@@ -78,7 +78,7 @@ def _verifier_of(graph: Graph, verifier_id: str) -> Node:
     return node
 
 
-def _targets(verifier: Node, graph: Graph) -> tuple[str, ...]:
+def targets_of(verifier: Node, graph: Graph) -> tuple[str, ...]:
     """The ids the verifier can prove, in link order: a fixture's ``verifies``; a job's ``realises`` and the NFRs it ``verifies``; a rule has none."""
     fields = _TARGET_FIELDS[verifier.kind]
     found = dict.fromkeys(graph.canonical_id(link.target) for link in verifier.links if link.field in fields)
@@ -87,7 +87,7 @@ def _targets(verifier: Node, graph: Graph) -> tuple[str, ...]:
 
 def _proved(request: BindRequest, verifier: Node, graph: Graph) -> tuple[str, ...]:
     """The nodes the binding proves: the request's (each must be a target of the verifier), else every target."""
-    targets = _targets(verifier, graph)
+    targets = targets_of(verifier, graph)
     if not request.proves:
         return targets
     wanted = tuple(dict.fromkeys(graph.canonical_id(node_id) for node_id in request.proves))
@@ -116,7 +116,7 @@ def _refuse_mixed_stages(verifier: Node, stages: Mapping[str, str]) -> None:
         raise refusal("E767", f"'{verifier.id}' proves nodes of different stages ({listed}); one binding per stage: run `verify bind` again with `--proves ...`")
 
 
-def _computed_stage(proves: tuple[str, ...], verifier: Node, graph: Graph) -> str:
+def computed_stage(proves: tuple[str, ...], verifier: Node, graph: Graph) -> str:
     """The highest stage the proved nodes need; a rule that proves nothing needs the stage of the rule itself."""
     if not proves and verifier.kind == RULE:
         return required_stage(verifier, graph)
@@ -124,7 +124,7 @@ def _computed_stage(proves: tuple[str, ...], verifier: Node, graph: Graph) -> st
 
 
 def _stage_of(request: BindRequest, proves: tuple[str, ...], stages: Mapping[str, str], verifier: Node, graph: Graph) -> str:
-    computed = _computed_stage(proves, verifier, graph)
+    computed = computed_stage(proves, verifier, graph)
     if request.stage is not None and request.stage != computed:
         needing = [node_id for node_id, stage in stages.items() if stage == computed]
         why = f" ({', '.join(needing)} need{'s' if len(needing) == 1 else ''} it)" if needing else ""

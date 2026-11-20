@@ -29,6 +29,7 @@ from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
 from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import Lock, lock_path
 from ..trace.records import check_records, record_files
+from ..verify.lint import lint_verification_records
 from ..trace.suspects import check_lock
 from . import graph_checks
 from .check_registry import (
@@ -124,12 +125,12 @@ def _trace_lock_result(
 
 
 def _records_result(graph: Graph | None, repo_root: str, records_dir: str) -> dict[str, Any]:
-    """The ``records`` check: E774 for the record files under ``extras/verification/``; SKIP with no graph or no record file."""
+    """The ``records`` check: E774 for the record files under ``extras/verification/``, then the lint of the bindings (E330, E334, a ``proves`` id that names no node); SKIP with no graph or no record file."""
     if graph is None:
         return {"status": "SKIP", "reason": "no spec graph"}
     if not record_files(records_dir):
         return {"status": "SKIP", "reason": "no record files"}
-    return check_result(check_records(records_dir, repo_root, graph))
+    return check_result(check_records(records_dir, repo_root, graph) + lint_verification_records(graph))
 
 
 _LOCK_LINK_CODES = frozenset({"E761", "W720", "E778"})

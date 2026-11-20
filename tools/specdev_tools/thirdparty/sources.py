@@ -38,8 +38,10 @@ def read_source(source: PinSource, git_root: str | Path) -> str:
 def _read_text(path: Path, name: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise SourceError(f"{name}: cannot be read ({exc})") from exc
+    except OSError as exc:
+        raise SourceError(f"{name}: cannot be read ({exc.strerror or type(exc).__name__})") from exc
+    except UnicodeDecodeError as exc:
+        raise SourceError(f"{name}: cannot be read (not UTF-8 text)") from exc
 
 
 def _pointer_value(text: str, source: PinSource) -> str:

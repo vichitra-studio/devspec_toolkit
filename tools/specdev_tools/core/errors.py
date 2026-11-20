@@ -89,6 +89,12 @@ ERROR_CODES = {
     "E332": "BINDING_GUARD_INVALID",
     "E333": "BINDING_DUPLICATE_TARGET",
     "E334": "UNKNOWN_STAGE_FOR_ENVIRONMENT",
+    # Third-party pins: E336 to E338 are findings of ``third-party check`` and refusals of ``third-party pin`` (owner
+    # step 02); E339 stops a deploy and has no owner.
+    "E336": "THIRD_PARTY_PIN_NOT_EXACT",
+    "E337": "THIRD_PARTY_PIN_MISMATCH",
+    "E338": "THIRD_PARTY_SOURCE_UNRESOLVED",
+    "E339": "THIRD_PARTY_INSTALLED_MISMATCH",
     "W350": "SUBMODULE_DIRTY_NOT_COVERED",
     "W351": "RUN_CHANGED_CODE_TREE",
     # Canonical registry (4xx)

@@ -28,6 +28,7 @@ from specdev_tools.trace.writing import locked_graph, refuse_unreadable, seed_te
 from specdev_tools.trace.merge_driver import git_top_level, install_driver, merge_files
 from specdev_tools.trace.step_create import StepCreateRequest, create_step
 from specdev_tools.trace.write_report import render_text as render_write, result_to_dict as write_to_dict
+from specdev_tools.verify.lint import prune_orphan_records
 
 STALE_DESCRIPTION = (
     "Show what is still to be re-read after an upstream change: the suspect links (links whose target changed after "
@@ -51,7 +52,8 @@ ATTEST_DESCRIPTION = (
     "  attest <node-id>      the suspect links the node holds, and its links that have no lock entry yet (the entry is\n"
     "                        created) or still carry the migration baseline marker; --field and --target narrow it\n"
     "  attest --step NN      every node of step NN that holds a suspect link, upward first in one run\n"
-    "  attest --prune        remove the lock entries whose link no longer exists\n\n"
+    "  attest --prune        remove the lock entries whose link no longer exists, and the verification and evidence\n"
+    "                        records whose every target (verifies, about) is gone\n\n"
     "Without --yes the command only prints what it would write (and, per suspect link, what changed above it) and exits "
     "0; --yes writes; --dry-run never writes, with or without --yes. --prune writes at once, without --yes.\n\n"
     "A node can be attested only when none of the nodes it links to is itself a suspect node: attest those first. "
@@ -116,13 +118,13 @@ def add_trace_parsers(sub: Any) -> None:
     stale.set_defaults(handler=run_stale)
 
     attest_p = sub.add_parser(
-        "attest", help="Accept the suspect links of a node, or prune lock entries without a link", description=ATTEST_DESCRIPTION,
+        "attest", help="Accept the suspect links of a node, or prune lock entries and records without a target", description=ATTEST_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     what = attest_p.add_mutually_exclusive_group(required=True)
     what.add_argument("node_id", nargs="?", metavar="node-id", help="Node whose links are attested (an id or an alias)")
     what.add_argument("--step", metavar="NN", help="Attest every node of this step that holds a suspect link, upward first")
-    what.add_argument("--prune", action="store_true", help="Remove the lock entries that have no link any more (writes at once)")
+    what.add_argument("--prune", action="store_true", help="Remove the lock entries that have no link any more, and the records whose target is gone (writes at once)")
     attest_p.add_argument("--field", help="Only the links of this field")
     attest_p.add_argument("--target", help="Only the links to this target (id or alias)")
     attest_p.add_argument("--yes", action="store_true", help="Write the lock; without it the command only prints")
@@ -242,10 +244,11 @@ def _attest_prune(args: argparse.Namespace, graph: Graph) -> int:
         lock, dropped = attest.prune_orphans(view.graph, view.lock)
         if write and dropped:
             write_lock(view.spec_root, lock)
+        records = [path.relative_to(view.spec_root).as_posix() for path in prune_orphan_records(view.spec_root, view.graph, dry_run=not write)]
     if args.json_output:
-        print_json(attest.prune_to_dict(dropped, written=write and bool(dropped)))
+        print_json(attest.prune_to_dict(dropped, written=write and bool(dropped or records), records=records))
     else:
-        print(attest.prune_text(dropped, written=write))
+        print(attest.prune_text(dropped, written=write, records=records))
     return 0
 
 
