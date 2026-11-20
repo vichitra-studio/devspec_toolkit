@@ -360,7 +360,7 @@ Step 13a (the completeness assessment, `spec/13a_completeness_assessment.json`) 
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-Address the blockers `step ready 14` lists (the gaps owned by steps below 14) before proceeding to Step 14. The gaps Step 14 owns (E566, E742, E744, E745 and the E740 of the nodes a task criterion uses) are not blockers: writing Step 14 clears them.
+Address the blockers `step ready 14` lists (the gaps owned by steps below 14) before proceeding to Step 14. The gaps Step 14 owns (E566, E742, E744, E745 and the E740 of the nodes a task criterion uses) are not blockers: the task criteria of Step 14 clear them.
 
 ### Step 5.3: Roadmap — `spec/14_roadmap.json`
 

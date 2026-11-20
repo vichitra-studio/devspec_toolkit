@@ -20,7 +20,7 @@
       "output_contract": {
         "type": "json_artifact",
         "restrictions": [
-          "Write the JSON artifact to disk at the configured step artifact path",
+          "Write a new step as a draft outside spec/ and create it with `specdev step create NN --from <draft>`; edit an existing step with `specdev json patch|insert|delete --id`",
           "Do not return fenced JSON as primary output"
         ],
         "write_to_disk": true,

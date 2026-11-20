@@ -27,7 +27,7 @@ specdev changelog --validate 0.1.0 --repo-root ./devspec_toolkit
 
 ```python
 from pathlib import Path
-from specdev_tools.changelog_parser import (
+from specdev_tools.core.changelog_parser import (
     load_format,
     load_version,
     list_versions,

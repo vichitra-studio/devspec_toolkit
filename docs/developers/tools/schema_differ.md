@@ -6,7 +6,7 @@ The `schema_differ` module is the core engine behind the migration system. It co
 ## Usage
 
 ```python
-from specdev_tools.schema_differ import (
+from specdev_tools.generation.schema_differ import (
     diff_spec_directory,
     validate_pre_migration,
     apply_auto_fixes,

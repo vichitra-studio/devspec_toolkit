@@ -95,7 +95,7 @@ Each prompt's Coverage Closure section contains step-specific rules. In addition
 
 When several steps change in one pass, run the steps in order and handle only the slice that reaches the step you are on:
 
-1. Run the steps in waterfall order. Before step NN, `specdev step ready NN` says whether the steps NN links to are present and have no pending replay (exit 1 with E773 and the blockers when not).
+1. Run the steps in waterfall order. Before step NN, `specdev step ready NN` says whether the steps above NN (its declared inputs while NN has no file yet; the steps its nodes link to once it has one) are present and have no pending replay (exit 1 with E773 and the blockers when not).
 2. For step NN, only the suspect links its own nodes hold count: `specdev stale --step NN`. Read each, edit the holder if the change affects it, then `specdev attest --step NN --yes` (it works upward first and writes nothing without `--yes`).
 3. Suspect links held by later steps show in plain `specdev stale`. Leave them: they are fixed when the pass reaches those steps.
 4. The end-of-pass gate is `specdev spec-check`: it reports no suspect link (E763) and no link without an entry (E761).

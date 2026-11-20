@@ -13,7 +13,7 @@ Define the measurable performance, reliability, security, and operational target
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Success metrics with quantitative targets, scope constraints, and SLA commitments to encode each measurable business goal as one or more NFR entries with numeric targets and canonical units
-- **01_capabilities.json**: Capability IDs and priority classifications to determine which capabilities require performance, availability, or security NFRs and to set appropriate measurement stages
+- **01_capabilities.json**: Capability IDs to determine which capabilities require performance, availability, or security NFRs and to set appropriate measurement stages
 - **02_system_sketch.json**: Component IDs, service boundaries, data store types, infrastructure topology, and `third_parties` (language/framework runtime characteristics that inform baseline performance expectations — e.g., async Python frameworks have different latency profiles than JVM-based services) to assign NFR ownership to specific components and to derive availability, durability, and latency targets for each service tier
 - **02a_delivery_baseline.json**: Environment definitions, monitoring tooling, and infrastructure capabilities to validate that each measurement_method is feasible within the declared infrastructure and to set stage-appropriate targets
 - **03_glossary.json**: Canonical term IDs, unit definitions, and domain vocabulary to align all NFR metric names and unit values with the shared glossary and prevent invented or inconsistent units

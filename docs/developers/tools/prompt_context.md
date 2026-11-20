@@ -60,5 +60,5 @@ $ specdev prompt-context 04 --repo-root ./devspec_toolkit
 ## See Also
 
 - [`specdev align`](./align.md) — Toolkit alignment CLI for managing version migrations
-- [`specdev schema-differ`](./schema_differ.md) — Library for detecting schema changes
+- [`schema_differ`](./schema_differ.md) — Library for detecting schema changes
 - [Workflow Guides](../workflows/) — Using prompt-context results in spec authoring

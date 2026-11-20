@@ -1065,7 +1065,7 @@ changes:
       step ready 14, which lists the blockers owned by the steps below 14 (on a copy
       of the worked example with steps 14 to 16 removed: 11 blockers at steps 07, 08
       and 12); the gaps that step 14 owns (E566, E742, E744, E745 and the E740 of the
-      nodes a task criterion uses) are not blockers, and writing step 14 clears them.
+      nodes a task criterion uses) are not blockers, and the task criteria of step 14 clear them.
       A host must delete its
       spec/13a_completeness_assessment.json: left in place it gives E520
       schema_not_found uri=vc:13a-completeness-assessment from spec-check and
