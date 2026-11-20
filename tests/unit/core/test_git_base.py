@@ -263,6 +263,10 @@ def test_spec_folder_absent_at_base_gives_unavailable(repo: Path) -> None:
 
     assert result.mode == "unavailable"
     assert seen == []
+    assert result.resolution is not None and result.resolution.commit is not None
+    assert result.resolution.note == (
+        f"the spec folder is not in the base commit {result.resolution.commit[:12]}: every error of an earlier step counts as new"
+    )
     with pytest.raises(GitViewError):
         materialise_baseline(str(repo), git(repo, "rev-parse", "HEAD~1"), repo / SPEC, [])
 
@@ -399,3 +403,16 @@ def test_the_baseline_errors_come_back_with_the_names_of_the_current_tree(repo: 
         f"{repo / SPEC}/01_x.json:a/0: bad", f"{repo / SPEC}/01_x.json:a/1: bad", f"seed {repo}/{SEED} not found",
     ]
     assert result.errors[1].file == f"{repo / SPEC}/01_x.json" and result.errors[2].path == f"{repo}/{SEED}"
+
+
+def test_a_spec_folder_named_through_a_symlink_keeps_its_own_name_in_the_baseline_paths(repo: Path, tmp_path: Path) -> None:
+    """The spec folder as the caller names it is replaced first: the host root inside it must not turn it into the real path."""
+    commit = _base_files(repo)
+    link = tmp_path / "link"
+    link.symlink_to(repo, target_is_directory=True)
+    with materialise_baseline(str(repo), commit, link / SPEC, []) as tree:
+        pairs = git_base._tree_replacements(tree, link / SPEC, str(repo))
+        assert pairs[0][1] == str(link / SPEC) and pairs[-1][1] == str(repo)
+        error = SpecError(code="E520", message=f"bad {tree.spec_dir}/01_x.json", path=f"{tree.spec_dir}/01_x.json")
+        (found,) = host_paths_in([error], pairs)
+    assert found.path == f"{link / SPEC}/01_x.json" and found.message == f"bad {link / SPEC}/01_x.json"

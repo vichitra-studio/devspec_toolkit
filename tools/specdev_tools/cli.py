@@ -342,8 +342,10 @@ def build_parser() -> _SpecdevParser:
     sc_scope = sc.add_mutually_exclusive_group()
     sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
     sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
-    sc.add_argument("--base-ref", default=None, help="With --step or --paths: the branch whose merge-base counts as 'before' (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master)")
-    sc.add_argument("--detail", choices=("summary", "all"), default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
+    from .validation.step_gate_report import DETAIL_CHOICES
+
+    sc.add_argument("--base-ref", default=None, help="With --step or --paths: the base ref; the baseline is its merge-base with HEAD (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master)")
+    sc.add_argument("--detail", choices=DETAIL_CHOICES, default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
 
     rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
     rc.add_argument("--spec-root", required=True, help="Project spec directory (used for R003 drift check against live spec files)")

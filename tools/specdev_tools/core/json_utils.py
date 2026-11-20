@@ -36,6 +36,7 @@ from specdev_tools.core.schema_validate import (
     SchemaRuntimeError,
     SchemaValidationError,
     SchemaViolation,
+    jq_path_of,
     schema_violations,
     violation_text,
 )
@@ -402,20 +403,6 @@ def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
     return os.path.normpath(os.path.join(this_dir, "..", "..", ".."))
 
 
-def _path_tuple_to_jq(path_tuple: tuple) -> str:
-    """Convert a jsonschema path tuple to a jq-style path string.
-
-    Example: ('plan', 'spec_alignment', 'checklist', 1, 'status') → '.plan.spec_alignment.checklist[1].status'
-    """
-    parts = []
-    for segment in path_tuple:
-        if isinstance(segment, int):
-            parts.append(f"[{segment}]")
-        else:
-            parts.append(f".{segment}")
-    return "".join(parts) if parts else "."
-
-
 def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> List[SchemaViolation]:
     """Run schema_violations, mapping every schema-validation failure
     to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
@@ -509,7 +496,7 @@ def _ws1_differential_check(
     added = _added_violations(errors_before, errors_after)
     if added:
         lines = [
-            f"  path {_path_tuple_to_jq(violation.path)}: {violation_text(violation)}"
+            f"  path {jq_path_of(violation.path)}: {violation_text(violation)}"
             for violation in added
         ]
         raise JsonUtilsError(

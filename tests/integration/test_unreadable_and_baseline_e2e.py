@@ -149,6 +149,24 @@ def test_a_baseline_the_checks_cannot_read_is_unavailable_with_its_reason(
     assert "note: the checks could not run on the baseline tree: " in err
 
 
+def test_a_branch_that_adds_the_spec_folder_says_so(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A host's first adoption branch: the base commit holds no spec folder, one plain note, no exception text."""
+    host = step_gate_host(tmp_path / "h")
+    first = git(host, "rev-parse", "HEAD")
+    git(host, "rm", "-rq", "spec")
+    git(host, "commit", "-q", "-m", "no spec yet")
+    base = git(host, "rev-parse", "HEAD")
+    start_branch(host)
+    git(host, "checkout", "-q", first, "--", "spec")
+    git(host, "commit", "-q", "-m", "adopt the spec")
+    code, out, err = _spec_check(capsys, host, "--step", "05")
+    assert code in (0, 1) and "Traceback" not in err
+    assert "base: unavailable" in out
+    assert _lines_with(err, "note:") == [
+        f"note: the spec folder is not in the base commit {base[:12]}: every error of an earlier step counts as new"
+    ]
+
+
 def _lines_with(text: str, word: str) -> list[str]:
     return [line for line in text.splitlines() if word in line]
 

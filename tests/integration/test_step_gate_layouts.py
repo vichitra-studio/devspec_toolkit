@@ -192,6 +192,14 @@ def test_paths_gate_nested_layout_with_git_root(
     _assert_decided(found, {**STEP_04, "steps": ["00", "02", "04"]})
 
 
+def test_paths_outside_the_host_root_with_git_root_leave_the_git_root_advice_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    spec, flags, prefix = _nested_with_git_root(tmp_path, monkeypatch)
+    _code, _found, err = _run_gate(capsys, spec, flags, "--paths", f"{prefix}/{STEP_04_FILE}", "../README.md")
+    assert "1 path lies outside the host root and maps to no step" in err and "--git-root" not in err, err
+
+
 def test_paths_gate_nested_layout_without_git_root_counts_the_paths_that_leave_the_host_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

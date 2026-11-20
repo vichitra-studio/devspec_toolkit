@@ -116,8 +116,12 @@ def test_step_order_that_is_not_an_object_is_e520(toolkit: Path, spec: Path, ord
         path.write_text(order_text, encoding="utf-8")
     with pytest.raises(KindRegistryError) as raised:
         build_graph(str(spec), str(toolkit))
-    assert raised.value.error.code == "E520"
-    assert "step_order.json" in raised.value.error.message
+    error = raised.value.error
+    assert error.code == "E520"
+    assert error.path is not None and error.path.endswith("step_order.json")
+    assert error.message.startswith("step order is unreadable: ")
+    if order_text is not None:  # the reason of a missing file is the system's own text, which names the file
+        assert "step_order.json" not in error.message
 
 
 def test_registry_regenerated_in_place_is_read_again(toolkit: Path) -> None:

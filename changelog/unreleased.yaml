@@ -859,10 +859,10 @@ changes:
       and on errors of earlier steps that are new since the baseline; --paths
       FILE... (every word up to the next option; zero or more files; write
       spec_dir before it) gates the steps of the files you list; --base-ref REF
-      names the base ref, and the baseline is its merge-base with HEAD (default:
-      SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main, origin/master, main,
-      master); --detail {summary,all} lists upstream debt, pending and
-      gate-owned findings in full. The report goes to stdout and notes to
+      (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main,
+      origin/master, main, master) names the base ref, and the baseline is its
+      merge-base with HEAD; --detail {summary,all} lists upstream debt, pending
+      and gate-owned findings in full. The report goes to stdout and notes to
       stderr, and the exit code is 1 only when the result is BLOCKED, with
       --json too. A new error is told from an old one by the key (code, owner,
       node id, link target, file, location, subcode, path; the location is the
@@ -876,23 +876,34 @@ changes:
       yet, reports every error. An error fixed in one file or place does not
       offset a new error in another. A schema error (E520) of spec-check --json
       now carries file (relative to the spec folder) and jq_path, and validate
-      and validate-all --json give jq_path on E520; the where column of the step
-      gate text shows that file name where it showed -. With several steps each
-      bucket of the --json report is the union over the steps. When no baseline
-      can be used the report says base: unavailable, every upstream error counts
-      as new, and stderr gives the reason. With --step or --paths, a spec folder
-      that does not exist, and a toolkit with no readable
-      tools/error_ownership.json, give one E520 and exit 1; plain spec-check on
-      a missing spec folder prints every check with that E520 among the findings
-      and exits 1. A spec file that cannot be read (no permission, or a folder
-      named like a step file) gives one E520 from the open-items check and a
-      stderr note specdev spec-check: could not read <file>; the answer may be
-      incomplete, and the run goes on. --step with --paths, an empty --base-ref,
-      --include-forward-replay with either, and --base-ref or --detail without a
-      gate are usage errors (exit 2). A relative path after --paths is taken
-      from the repository top: --git-root, else the top of the git working tree
-      that holds the spec folder, else the folder that holds the spec folder.
-      See docs/developers/reference.md, section "Step gate".
+      and validate-all --json give jq_path on E520 (a key that is not a name in
+      jq is written in brackets: .step_requirements["00"]); the where column of
+      the step gate text shows that file name where it showed -. With several
+      steps each bucket of the --json report is the union over the steps. When
+      no baseline can be used the report says base: unavailable, every upstream
+      error counts as new, and stderr gives the reason; a branch that adds the
+      spec folder, such as a host's first adoption branch, gets the spec folder
+      is not in the base commit <12-char sha>: every error of an earlier step
+      counts as new. With --step or --paths, a spec folder that does not exist,
+      a toolkit with no readable tools/error_ownership.json, and a toolkit whose
+      tools/step_order.json is unreadable (E520 <path> step order is unreadable:
+      <reason>) give one E520 and exit 1, an unknown step with --step gives one
+      E706 and exit 1, and a spec folder that is not inside --git-root with
+      --paths gives one E708 and exit 1 (with --step the report says base:
+      unavailable); plain spec-check on a missing spec folder prints every check
+      with that E520 among the findings and exits 1. A spec file that cannot be
+      read (no permission, or a folder named like a step file) gives one E520
+      from the open-items check, and the run goes on; with --step or --paths
+      stderr also has the note specdev spec-check: could not read <file>; the
+      answer may be incomplete (plain spec-check has the E520 only). --step with
+      --paths, an empty --base-ref, --include-forward-replay with either, and
+      --base-ref or --detail without a gate are usage errors (exit 2). A path
+      listed on --paths that lies outside the host root maps to no step, and the
+      note for it gives the advice to pass --git-root only when --git-root was
+      not given. A relative path after --paths is taken from the repository top:
+      --git-root, else the top of the git working tree that holds the spec
+      folder, else the folder that holds the spec folder. See
+      docs/developers/reference.md, section "Step gate".
     migration:
       action: none
 

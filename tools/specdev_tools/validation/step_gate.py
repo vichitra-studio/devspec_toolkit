@@ -128,7 +128,8 @@ def new_since_baseline(
     has ``b`` findings and the current tree ``c`` (exact duplicates, the same key and message, count once).  A current
     finding whose message equals a baseline message of its key is old.  Of the other current findings of that key, the
     first ``b - matched`` in the order given are old (their text changed, or the tree they were found in has other
-    paths), and the rest are new.  So a reworded message, a shifted array index or a renamed node is never new, and a
+    paths), and the rest are new.  So a reworded message, a shifted array index is never new (a node renamed with ``specdev node rename`` keeps its old error old through its
+    alias; a node renamed by hand, or an error in a file that was renamed, counts as new), and a
     second schema error in a file that already had one is new.  An exact duplicate gets the answer of its first copy.
 
     The one known limit: a finding fixed and another of the same key added on the branch is a count that did not grow,

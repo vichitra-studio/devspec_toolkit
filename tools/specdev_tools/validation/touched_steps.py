@@ -56,16 +56,17 @@ class TouchedSteps:
     seed_edited: bool
 
 
-def outside_root_note(touched: TouchedSteps) -> str | None:
-    """The one stderr line for paths outside the host root, or ``None`` when there are none."""
+def outside_root_note(touched: TouchedSteps, git_root_given: bool = False) -> str | None:
+    """The one stderr line for paths outside the host root, or ``None`` when there are none.
+
+    The advice to pass ``--git-root`` is left out when it was passed (*git_root_given*).
+    """
     count = len(touched.outside_root)
     if not count:
         return None
     verbs = "path lies outside the host root and maps" if count == 1 else "paths lie outside the host root and map"
-    return (
-        f"{count} {verbs} to no step; "
-        "pass --git-root <repository root> when the spec folder is nested"
-    )
+    note = f"{count} {verbs} to no step"
+    return note if git_root_given else f"{note}; pass --git-root <repository root> when the spec folder is nested"
 
 
 def steps_for_paths(

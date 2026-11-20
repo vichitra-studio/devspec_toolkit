@@ -9,7 +9,7 @@ gate does with them.
 Gate    Finding                                           Owner
 ======  ================================================  ====================================
 step    W630 per unified item, one summary W630 per        ``step:<step of the array>``
-        (artifact, step) for items of the legacy shape
+        (artifact, step, array) for legacy items
 merge   E631 per live item, W633 per item of a frozen      ``merge-check``
         plan (listed for triage, does not fail)
 close   E632 per item of the given milestone plan          ``close-gate``

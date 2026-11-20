@@ -74,7 +74,7 @@ def gate_usage_error(
     return None
 
 
-def touched_steps_of(
+def _touched_steps_of(
     repo_root: str,
     spec_dir: str,
     paths: Sequence[str],
@@ -204,15 +204,16 @@ def gate_run(
 
     Raises:
         FindingError: E520 when *spec_dir* does not exist or the toolkit's ownership table cannot be read; E706 when a
-            step is not a step of ``tools/step_order.json``; E708 when the spec folder is outside the host root.
+            step is not a step of ``tools/step_order.json``; E708 when the spec folder is outside the host root, under
+            ``--paths`` only (under ``--step`` that layout gives ``base: unavailable`` and its note).
     """
     if not os.path.isdir(spec_dir):
         raise FindingError(make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir}"))
     ranks = step_order_ranks(repo_root)
     notes: list[str] = []
     if steps is None:
-        touched = touched_steps_of(repo_root, spec_dir, paths or (), git_root, spec_root, ranks)
-        notes.extend(note for note in (outside_root_note(touched), SEED_EDIT_NOTE if touched.seed_edited else None) if note)
+        touched = _touched_steps_of(repo_root, spec_dir, paths or (), git_root, spec_root, ranks)
+        notes.extend(note for note in (outside_root_note(touched, git_root is not None), SEED_EDIT_NOTE if touched.seed_edited else None) if note)
         gated = list(touched.steps)
         if paths and not gated:
             notes.append(NO_STEP_NOTE)

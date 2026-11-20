@@ -192,7 +192,7 @@ CHECK_REGISTRY: list[CheckSpec] = []
 
 
 def unregister_check(name: str) -> None:
-    """Remove the check *name* from ``CHECK_REGISTRY`` (a test undoes its registration with it).
+    """Remove the check *name* from ``CHECK_REGISTRY`` (for tests: a test undoes its registration with it).
 
     Raises:
         ValueError: no check of that name is registered.

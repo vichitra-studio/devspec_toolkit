@@ -226,7 +226,7 @@ def host_paths_in(errors: Sequence[SpecError], replacements: Sequence[tuple[str,
     """*errors* with every *replacements* ``(old, new)`` applied, in the order given, to their ``message``, ``path`` and ``file``.
 
     A finding with no ``old`` in any of the three fields is returned as the same object.  List the longer ``old`` first
-    (the spec folder before the root that holds it).
+    (the spec folder before the root that holds it).  No path boundary is checked, because the baseline folder's name is unique.
     """
     out: list[SpecError] = []
     for error in errors:
@@ -270,6 +270,9 @@ def merge_base_provider(
         if resolution.commit is None:
             return BaselineResult("unavailable", resolution=resolution)
         try:
+            if not path_exists_at(resolution.commit, git_root, spec_path_in_repo(str(spec_dir), git_root)):
+                reason = f"the spec folder is not in the base commit {resolution.commit[:12]}: every error of an earlier step counts as new"
+                return BaselineResult("unavailable", resolution=replace(resolution, note=reason))
             with materialise_baseline(git_root, resolution.commit, spec_dir, seed_paths(spec_dir)) as tree:
                 errors = host_paths_in(compute_errors(tree.root, tree.spec_dir), _tree_replacements(tree, spec_dir, git_root))
         except Exception as error:  # noqa: BLE001 - the baseline tree is old data: whatever breaks on it makes it unavailable

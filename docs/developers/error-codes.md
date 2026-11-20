@@ -939,13 +939,13 @@ File-level forward replay is retired. `specdev forward-replay-check` is a deprec
 
 ## Open Items (63x)
 
-An open item is an entry of an `ambiguities` array (the step files 00 to 15, the anchor's `plan.ambiguities`, a milestone plan's `plan.ambiguities` and `execution.emergent_ambiguities`) that has not been answered and deleted: a question the spec cannot answer yet. An item of the 1.2.0 shape has `about` (the ids of the nodes it is about, or a node kind with `missing_kind`) and, once the operator has answered, a non-empty `decision`. An item of the 1.1.1 shape has `severity` and `status` and is open until `status` is `resolved`. The check is `check_open_items` (`validation/open_items.py`) at one of three gates.
+An open item is an entry of an `ambiguities` array (the step files 00 to 15, the anchor's `plan.ambiguities`, a milestone plan's `plan.ambiguities` and `execution.emergent_ambiguities`) that has not been answered and deleted: a question the spec cannot answer yet. An item of the 1.2.0 shape has `about` (the ids of the nodes it is about, or a node kind with `missing_kind`) and, once the operator has answered, a non-empty `decision`. An item of the 1.1.1 shape has `severity` and `status` and is open until `status` is `resolved`. The check is `open-items` (`validation/open_items.py`), at one of three gates.
 
-Today one command reports these codes. `spec-check` runs `check_open_items` at the step gate: W630 appears in plain `spec-check` (check `open-items`) and in `spec-check --step` and `--paths`. No command runs the merge gate or the close gate yet, so no command reports E631, E632 or W633.
+Today one command reports these codes. `spec-check` reports W630 (check `open-items`): in plain `spec-check` and in `spec-check --step` and `--paths`. No command runs the merge gate or the close gate yet, so no command reports E631, E632 or W633.
 
 ### W630 OPEN_ITEM
 
-**Trigger**: An open item exists. The step gate reports one W630 for each item of the 1.2.0 shape, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; answer known: apply in the batch pass` (the item has a `decision`) or `... answer needed from the operator` (it has none). For items of the 1.1.1 shape it reports one summary for each artifact and step, for example `3 legacy open items in 05_interface_contracts.json (ambiguities); see `upstream-backlog``. The parenthesis names the array that holds them: `(ambiguities)` for a step file, `(plan.ambiguities)` or `(execution.emergent_ambiguities)` for a milestone plan, so a plan with legacy items in both arrays gets two summaries. The owner is the step of the array that holds the item: `step:<step of the file>` for a step file, `step:16a` for `plan.ambiguities` and `step:16b` for `execution.emergent_ambiguities` of a milestone plan. For one item the finding carries its `node_id`. An item with no id is named `(no id)`: `open item (no id) in <file>: ...`. An item of a frozen milestone plan is skipped; today no plan is frozen. A spec file that cannot be read (no permission, or a folder named like a step file) ends the check with one E520, `cannot read <path>: <reason>`, owned by the step of that file (`step:04` for `04_fr_list.json` in `spec-check --json`); the other checks of the run go on.
+**Trigger**: An open item exists. The step gate reports one W630 for each item of the 1.2.0 shape, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; answer known: apply in the batch pass` (the item has a `decision`) or `... answer needed from the operator` (it has none). For items of the 1.1.1 shape it reports one summary for each artifact and step, for example `3 legacy open items in 05_interface_contracts.json (ambiguities); see `upstream-backlog``. The parenthesis names the array that holds them, and the owner is the step of that array: a step file `00` to `15` gives `(ambiguities)` and `step:<step of the file>`; the anchor `16_impl_context.json` gives `(plan.ambiguities)` and `step:16`; a milestone plan gives `(plan.ambiguities)` with `step:16a` and `(execution.emergent_ambiguities)` with `step:16b`, so a plan with legacy items in both arrays gets two summaries. For one item the finding carries its `node_id`. An item with no id is named `(no id)`: `open item (no id) in <file>: ...`. An item of a frozen milestone plan is skipped; today no plan is frozen. A spec file that cannot be read (no permission, or a folder named like a step file) ends the check with one E520, `cannot read <path>: <reason>`, owned by the step of that file (`step:04` for `04_fr_list.json` in `spec-check --json`); the other checks of the run go on.
 
 **Resolution**: Warning only; it never blocks. `specdev upstream-backlog` lists the items by the step they are about. Apply a known answer in the batch pass and delete the item; ask the operator for an answer that is needed.
 
@@ -953,7 +953,7 @@ Today one command reports these codes. `spec-check` runs `check_open_items` at t
 
 ### E631 OPEN_ITEM_AT_MERGE
 
-**Trigger**: The merge gate finds an open item that is not in a frozen plan, one E631 for each item, owner `merge-check`, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; apply the answer (known: apply in the batch pass), then delete the item`. No command runs the merge gate yet: `check_open_items(spec_dir, gate="merge")` has no caller outside the tests.
+**Trigger**: The merge gate finds an open item that is not in a frozen plan, one E631 for each item, owner `merge-check`, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; apply the answer (known: apply in the batch pass), then delete the item`. No command runs the merge gate yet.
 
 **Resolution**: Apply the answer to the spec, then delete the item.
 
@@ -961,7 +961,7 @@ Today one command reports these codes. `spec-check` runs `check_open_items` at t
 
 ### E632 OPEN_ITEM_IN_PLAN
 
-**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan named by `plan_path` only. No command runs the close gate yet: `check_open_items(spec_dir, gate="close", plan_path=...)` has no caller outside the tests.
+**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan named by `plan_path` only. No command runs the close gate yet.
 
 **Resolution**: Answer the item and delete it before the milestone closes.
 

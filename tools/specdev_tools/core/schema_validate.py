@@ -47,6 +47,7 @@ message)`` pairs, hint-agnostic.  The hint-enhancement loop stays in
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, NamedTuple
 
 from jsonschema.exceptions import ValidationError, _WrappedReferencingError  # type: ignore[attr-defined]
@@ -149,9 +150,23 @@ class SchemaViolation(NamedTuple):
     message: str
 
 
+_JQ_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
 def jq_path_of(path: tuple[Any, ...]) -> str:
-    """The jq path of a violation's place: ``('frs', 1, 'scope')`` gives ``.frs[1].scope``; the document itself is ``.``."""
-    return "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in path) or "."
+    """The jq path of a violation's place: ``('frs', 1, 'scope')`` gives ``.frs[1].scope``; the document itself is ``.``.
+
+    A key that is not a jq identifier is written ``["00"]`` (JSON-quoted); as the first segment it is ``.["00"]``.
+    """
+    out = ""
+    for part in path:
+        if isinstance(part, int):
+            out += f"[{part}]"
+        elif _JQ_IDENTIFIER.fullmatch(part):
+            out += f".{part}"
+        else:
+            out += ("." if not out else "") + f"[{json.dumps(part)}]"
+    return out or "."
 
 
 _SHORT_MESSAGES = {"maxItems": "has more items than the schema allows", "minItems": "has fewer items than the schema requires"}

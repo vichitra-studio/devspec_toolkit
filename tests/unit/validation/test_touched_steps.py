@@ -219,6 +219,14 @@ def test_paths_outside_the_host_root_are_counted_as_unmapped(host: Path, manifes
     assert note is not None and note.startswith("2 paths lie outside the host root") and "--git-root" in note
 
 
+def test_outside_root_note_leaves_the_advice_out_when_git_root_was_given(host: Path, manifest: dict[str, Any]) -> None:
+    _nest(host)
+    touched = _touched(host, ["../README.md"], manifest, spec="sub/spec")
+    given = outside_root_note(touched, git_root_given=True)
+    assert given == "1 path lies outside the host root and maps to no step"
+    assert "--git-root" in (outside_root_note(touched) or "")
+
+
 def test_outside_root_note_is_absent_without_such_paths(host: Path, manifest: dict[str, Any]) -> None:
     assert outside_root_note(_touched(host, ["spec/04_fr_list.json"], manifest)) is None
 
