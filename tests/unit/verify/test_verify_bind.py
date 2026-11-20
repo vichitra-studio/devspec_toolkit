@@ -106,7 +106,7 @@ def test_empty_matching_guard_is_accepted_with_a_note(host: Path) -> None:
 def test_manual_fixture_is_refused_with_the_attest_pointer(host: Path) -> None:
     _add_fixture(host, fixture_id="fix-manual-review", verifies=[CRITERION], mode="manual", manual_reason="a person looks")
     error = _refusal(host, "fix-manual-review")
-    assert error.error.code == "E767" and "verify attest" in error.error.message
+    assert error.error.code == "E767" and "a person attests it" in error.error.message and "verify attest" not in error.error.message
 
 
 def test_removal_fixture_is_accepted_at_dev_only(host: Path) -> None:
@@ -133,9 +133,15 @@ def test_proves_outside_the_verifier_targets_is_e331(host: Path) -> None:
 
 
 def test_second_binding_id_for_a_claimed_pair_is_e333(host: Path) -> None:
+    _bind(host, proves=(API,))  # the example's record, which stated no proves, now states the API only
     _bind(host, proves=(CRITERION,), record_id="ver-claims-the-criterion")
-    error = _refusal(host, proves=(CRITERION, API), record_id="ver-claims-it-too")
+    error = _refusal(host, proves=(CRITERION,), record_id="ver-claims-it-too")
     assert error.error.code == "E333" and "ver-claims-the-criterion" in error.error.message
+
+
+def test_a_record_that_states_no_proves_claims_every_target_of_its_verifier(host: Path) -> None:
+    error = _refusal(host, proves=(CRITERION,), record_id="ver-claims-the-criterion")
+    assert error.error.code == "E333" and EXAMPLE_RECORD in error.error.message
 
 
 def test_unknown_environment_stage_is_e334(host: Path) -> None:

@@ -14,7 +14,7 @@ from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.proof.stages import UnknownStageForEnvironment, is_retired_binding
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
-from specdev_tools.verify.bind import computed_stage, targets_of
+from specdev_tools.verify.bind import computed_stage, proved_ids
 from specdev_tools.verify.records import BINDING_KIND, Binding, binding_of
 
 PROVES_UNKNOWN_CODE = "E774"  # the plan gives no code for a record that speaks about a node that no longer exists
@@ -33,7 +33,7 @@ def _unknown_proves(node: Node, binding: Binding, graph: Graph) -> list[SpecErro
 
 def _stage_findings(node: Node, binding: Binding, verifier: Node, graph: Graph) -> list[SpecError]:
     """E334 when a node it proves involves an environment that is not a stage; E330 when the stored stage is not the one its nodes need."""
-    proves = binding.proves or targets_of(verifier, graph)
+    proves = proved_ids(binding, graph)
     try:
         needed = computed_stage(proves, verifier, graph)
     except UnknownStageForEnvironment as exc:

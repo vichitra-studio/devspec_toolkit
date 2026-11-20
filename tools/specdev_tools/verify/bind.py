@@ -74,7 +74,7 @@ def _verifier_of(graph: Graph, verifier_id: str) -> Node:
         raise refusal("E767", f"'{node.id}' is not_applicable and takes no binding; set it active first or bind another verifier")
     item = item_of(graph, node) or {}
     if node.kind == FIXTURE and item.get("mode") == _MANUAL_MODE:
-        raise refusal("E767", f"fixture '{node.id}' is manual and is not run; a person attests it with `specdev verify attest`")
+        raise refusal("E767", f"fixture '{node.id}' is manual and is not run, so it takes no binding; a person attests it")
     return node
 
 
@@ -83,6 +83,15 @@ def targets_of(verifier: Node, graph: Graph) -> tuple[str, ...]:
     fields = _TARGET_FIELDS[verifier.kind]
     found = dict.fromkeys(graph.canonical_id(link.target) for link in verifier.links if link.field in fields)
     return tuple(found)
+
+
+def proved_ids(binding: Binding, graph: Graph) -> tuple[str, ...]:
+    """The ids *binding* proves: those it states, else every id its verifier can prove (a record that states none, as the worked example's).
+
+    The one reading of an empty ``proves``: the bind check for a second binding (E333), the record lint and the proof read it here.
+    """
+    verifier = graph.find(binding.verifier)
+    return binding.proves or (targets_of(verifier, graph) if verifier is not None else ())
 
 
 def _proved(request: BindRequest, verifier: Node, graph: Graph) -> tuple[str, ...]:
@@ -179,7 +188,7 @@ def _record_id(request: BindRequest, verifier: Node, stage: str, proves: tuple[s
 def _refuse_duplicates(verifier: Node, record_id: str, proves: tuple[str, ...], graph: Graph) -> None:
     """E333 when another binding of the verifier already proves one of *proves*."""
     for other in _own_bindings(verifier, graph):
-        shared = [node_id for node_id in proves if node_id in other.proves]
+        shared = [node_id for node_id in proves if node_id in proved_ids(other, graph)]
         if other.id != record_id and shared:
             raise refusal("E333", f"'{', '.join(shared)}' is already proved by '{other.id}' for '{verifier.id}'; change that binding with `--id {other.id}` or leave the node out of --proves")
 

@@ -41,9 +41,13 @@ def test_bind_cli_json_envelope(host: Path) -> None:
 
 
 def test_bind_writes_only_the_record_file(host: Path) -> None:
+    code, out = _bind(host, "--proves", "api-password-reset-confirm")
+    assert code == 0, out
+    assert [line.split()[-1] for line in git(host, "status", "--porcelain").splitlines()] == [f"spec/extras/verification/{RECORD}.json"]
     code, out = _bind(host, "--id", "ver-a-second-binding", "--proves", "ac-password-reset-3")
     assert code == 0, out
-    assert git(host, "status", "--porcelain") == "?? spec/extras/verification/ver-a-second-binding.json"
+    changed = [line.split()[-1] for line in git(host, "status", "--porcelain").splitlines()]
+    assert changed == [f"spec/extras/verification/{RECORD}.json", "spec/extras/verification/ver-a-second-binding.json"]
 
 
 def test_a_refused_bind_exits_one_and_writes_nothing(host: Path) -> None:

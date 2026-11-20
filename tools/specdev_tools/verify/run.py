@@ -25,6 +25,7 @@ from specdev_tools.proof.stages import stage_rank
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.lockfile import with_write_lock
 from specdev_tools.trace.writing import seed_texts_for_write
+from specdev_tools.verify.bind import proved_ids
 from specdev_tools.verify.code_tree import code_tree_for_host, declarations_of
 from specdev_tools.verify.guard import GuardError, guard_matches
 from specdev_tools.verify.installed_versions import installed_versions
@@ -161,9 +162,10 @@ class _Context:
 
 
 def _evidence_for(binding: Binding, execution: _Execution, context: _Context) -> Evidence:
-    proved = [node for node_id in binding.proves if (node := context.graph.find(node_id)) is not None]
+    proves = proved_ids(binding, context.graph)
+    proved = [node for node_id in proves if (node := context.graph.find(node_id)) is not None]
     versions, notes = installed_versions(proved, context.graph, context.declarations, context.git_root, context.overrides)
-    hashed = {node_id: context.hashes[node_id][0] for node_id in (binding.verifier, *binding.proves) if node_id in context.hashes}
+    hashed = {node_id: context.hashes[node_id][0] for node_id in (binding.verifier, *proves) if node_id in context.hashes}
     return Evidence(
         evidence_id=evidence_id(binding.id, context.stage),
         about=(binding.id,),

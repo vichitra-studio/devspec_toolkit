@@ -77,6 +77,19 @@ def test_edited_fixture_is_stale_hash(host: Path) -> None:
     assert _valid(host) == (False, STALE_HASH)
 
 
+def test_a_binding_that_states_no_proves_goes_stale_when_a_node_its_verifier_proves_is_edited(tmp_path: Path) -> None:
+    """A record with no ``proves`` proves every target of its verifier (the worked example's record): a run records their hashes too."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=()))
+    [evidence] = run(host, [ALPHA])
+    assert {"ac-password-reset-3", "api-password-reset-confirm"} <= set(evidence.recorded_hashes)
+    graph, ctx = graph_of(host), context(host)
+    assert evidence_valid(evidence_for(binding_of(graph.by_id[ALPHA], graph), ctx)[0], binding_of(graph.by_id[ALPHA], graph), graph, ctx) == (True, None)
+    edit_doc(host, "04_fr_list.json", lambda doc: doc["functional_requirements"][0]["acceptance_criteria"][2].update(text="A reset link older than 31 minutes is refused with HTTP 410."))
+    graph, ctx = graph_of(host), context(host)
+    binding = binding_of(graph.by_id[ALPHA], graph)
+    assert evidence_valid(evidence_for(binding, ctx)[0], binding, graph, ctx) == (False, STALE_HASH)
+
+
 def test_edited_proved_criterion_is_stale_hash(host: Path) -> None:
     edit_doc(host, "04_fr_list.json", lambda doc: doc["functional_requirements"][0]["acceptance_criteria"][2].update(text="A reset link older than 31 minutes is refused with HTTP 410."))
     assert _valid(host) == (False, STALE_HASH)

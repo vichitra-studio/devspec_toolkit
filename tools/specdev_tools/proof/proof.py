@@ -27,7 +27,7 @@ from specdev_tools.proof.stages import (
     DEFAULT_STAGE, UnknownStageForEnvironment, bindings_of, is_retired_binding, is_retired_verifier, required_stage, stage_rank,
 )
 from specdev_tools.proof.validity import (
-    NO_EVIDENCE, STAGE_TOO_LOW, ProofContext, Validity, attestation_valid, effective_stage, evidence_for, evidence_valid, same_run, targets_stated,
+    NO_EVIDENCE, STAGE_TOO_LOW, ProofContext, Validity, attestation_valid, effective_stage, evidence_for, evidence_valid, same_run,
 )
 from specdev_tools.trace.coverage import exemption
 from specdev_tools.trace.history import contained
@@ -35,6 +35,7 @@ from specdev_tools.trace.lockfile import containers_of
 from specdev_tools.validation.graph_checks.names import (
     API_ERROR, DERIVES_FROM, FIXTURE, JOB, MITIGATED_BY, REALISES, REFINES, RULE, TASK_CRITERION, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets,
 )
+from specdev_tools.verify.bind import proved_ids
 from specdev_tools.verify.records import Binding, Evidence, attestations_about, binding_of
 
 PROVEN = "proven"
@@ -153,7 +154,7 @@ class _Prover:
         if obligation is None or obligation.id == binding.verifier:
             return True
         related = contained(self.graph, obligation.id) | set(containers_of(self.graph, obligation))
-        return bool(set(targets_stated(binding, self.graph)) & related)
+        return bool(set(proved_ids(binding, self.graph)) & related)
 
     def _bindings_for(self, verifier: Node, obligation: Node | None) -> list[Binding]:
         needed = stage_rank(_needed_stage(self.graph, obligation, verifier))

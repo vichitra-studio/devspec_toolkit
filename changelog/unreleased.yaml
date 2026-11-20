@@ -1209,3 +1209,154 @@ changes:
       allow-list changed.
     migration:
       action: none
+
+  - type: add_module
+    description: >
+      specdev verify bind <verifier-id> --command CMD [--command CMD ...] --guard
+      REGEX [--proves ID ...] [--stage dev|ci|staging|prod] [--id ver-ID] writes
+      the verification record spec/extras/verification/<id>.json of a fixture, a
+      job or a rule (never a spec file), and specdev verify run [ver-ID ...]
+      [--all | --milestone ms-ID] [--stage S] [--only-stage] [--no-record]
+      [--installed TP=VERSION ...] [--timeout SEC] runs the commands of bindings
+      and writes one evidence record evd-<binding>-<stage>.json for each, with the
+      code-tree id of the run and the version that each declared source reads for
+      the third parties the proved nodes rely on (those reached through the
+      providing component's connections included). verify run exits 1 when a
+      binding fails and warns W350 (a submodule with uncommitted content) and W351
+      (the run changed the code tree). Shown by specdev verify bind --help,
+      specdev verify run --help and specdev verify run --all, which prints one
+      PASS or FAIL line for each binding and then N run, N passed, N failed.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev third-party pin <tp-id> <version> writes the pin of a third-party
+      node through the id-keyed write path (the links into the node become
+      suspect; E336 for a pin that is not exact: empty, latest, *, an x-wildcard
+      or a range). specdev third-party check compares the pin of each third party
+      that declares pin_sources with the version its sources read (E336, E337,
+      E338; every pin matches its declared sources and exit 0, or exit 1); with
+      --installed TP=VERSION [TP=VERSION ...] --env ENV [--tag TAG] it compares
+      what a deploy installed with the pins (E339 and exit 1, which stops the
+      deploy) and, when all match, writes one install-check evidence record for
+      each third party. Shown by specdev third-party check.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      The optional host file spec/common/host_declarations.json ($schema
+      vc:host-declarations, schema schema/host_declarations.schema.json, template
+      templates/host_declarations.host.json, page
+      docs/developers/host_declarations.md) holds release_tag_pattern,
+      setup_command, code_tree_exclusions and pin_sources. specdev verify run
+      reads code_tree_exclusions and pin_sources and specdev third-party check
+      reads pin_sources; no command reads the other two keys in this release.
+      spec-check reports a file that breaks its schema as E520. A host that does
+      not use the file has nothing to do, and no command installs the template yet
+      (copy it by hand).
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      New fields of the records: a verification record has an optional proves (a
+      list of node ids; plain data and not a link, and an id that names no node is
+      E774); an evidence record has the type install-check beside run and
+      attestation, and the fields recorded_hashes, git_author (required on an
+      attestation), env and tag; a lock entry has an optional target_containers,
+      which specdev attest writes for a node. Shown by specdev verify run --json
+      and by spec-check (check records).
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      specdev spec-check runs a new check, removal-rules (owner step 14, listed
+      after milestone-numbers; 27 checks on the worked example): E341
+      REMOVAL_FIXTURE_MISMATCH (the removes of a removal criterion and of its
+      removal fixture differ, or a removal fixture removes an id that no criterion
+      listing it removes) and E342 REMOVES_TARGET_PRESENT (a criterion or a
+      fixture that is not closed removes an id the spec still has). The criteria
+      of a closed milestone are not checked. Shown by specdev spec-check.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      New error codes E330 BINDING_STAGE_MISMATCH, E331
+      BINDING_TARGET_NOT_VERIFIED, E332 BINDING_GUARD_INVALID, E333
+      BINDING_DUPLICATE_TARGET, E334 UNKNOWN_STAGE_FOR_ENVIRONMENT, E336
+      THIRD_PARTY_PIN_NOT_EXACT, E337 THIRD_PARTY_PIN_MISMATCH, E338
+      THIRD_PARTY_SOURCE_UNRESOLVED, E339 THIRD_PARTY_INSTALLED_MISMATCH, E341
+      REMOVAL_FIXTURE_MISMATCH, E342 REMOVES_TARGET_PRESENT, E343
+      REALISATION_OUTDATED, E344 REALISATION_REMOVED, E347
+      VERIFIER_NO_VALID_EVIDENCE, E348 OBLIGATION_NOT_PROVEN, and the warnings
+      W350 SUBMODULE_DIRTY_NOT_COVERED and W351 RUN_CHANGED_CODE_TREE, in the
+      catalogue docs/developers/error-codes.md and registered in
+      tools/specdev_tools/core/errors.py. E343 and E344 (unresolved_realisations,
+      for the release gate) and E347 and E348 (proof_errors, for the close and
+      release gates) are returned by library functions that no command runs in
+      this release. tools/cli_commands.json lists verify, verify bind, verify run,
+      third-party, third-party pin and third-party check.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev attest --prune also removes the verification and evidence records
+      whose every verifies or about target is gone, repeated until none dangles
+      (the evidence of a removed binding goes with it); --dry-run lists and
+      deletes nothing; the text adds attest --prune: removed N orphan records and
+      one file per line, and --json carries pruned_records. Shown by specdev
+      attest --prune --dry-run after a fixture that has a binding was deleted.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The records check of spec-check also runs the record lint: E330 for a stored
+      binding whose stage no longer matches the nodes it proves, E334 for a
+      binding that proves an environment that is not a stage, and E774 for a
+      proves id that names no node. Shown by specdev spec-check.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      E752 (prose-ids) no longer reads a field whose schema is a choice between
+      forms (anyOf or oneOf) when every form is fixed, such as a node id in
+      kebab-case or SCREAMING_SNAKE_CASE: the proves of a verification record
+      gives no finding. Shown by specdev spec-check after specdev verify bind.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The graph check does not resolve the verified_by and refines links of the
+      task criteria of a closed milestone: a deleted fixture or obligation gives
+      no E700 on them. The id-keyed writes still resolve what a write adds
+      (specdev json patch --id <closed criterion> .verified_by ... to an id that
+      does not exist is E767). Shown by specdev spec-check after the milestone was
+      closed and a fixture its criterion lists was deleted.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      A verifier named by a verification record (verifies) or an evidence record
+      (about) is used, so it gets no E742, and a verifier whose bindings are all
+      retired (the environment of their stage has scope: out) verifies nothing, so
+      the nodes it alone verified get E743. Shown by specdev spec-check, specdev
+      stale, specdev coverage and specdev step ready.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev trace <milestone-id> --recipe 16c lists the verification records and
+      the evidence records of a run among the verifiers of the milestone. Shown by
+      specdev trace <milestone-id> --recipe 16c after specdev verify run.
+    migration:
+      action: none
