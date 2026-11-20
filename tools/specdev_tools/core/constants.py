@@ -30,7 +30,6 @@ STEP_TO_TEMPLATE: dict[str, str] = {
     "11": "template_redteam.md",
     "12": "template_ci_gates.md",
     "13": "template_extension_manifest.md",
-    "13a": "template_completeness_assessment.md",
     "14": "template_roadmap.md",
     "15": "template_scaffold.md",
     "16": "template_impl_context.md",
@@ -68,7 +67,6 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
     ("name", "tech_stack_ref", "tech_stack"),
     ("id", "dependency_ref", "dependency"),
     ("category", "risk_category_ref", "risk_category"),
-    ("category", "completeness_dimension_ref", "completeness_dimension"),
     ("risk_category", "risk_category_ref", "risk_category"),
     ("tag", "tag_ref", "tag"),
 )

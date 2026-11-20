@@ -6,7 +6,6 @@ EXPECTED_TEMPLATES = [
     "template_capabilities.md",
     "template_charter.md",
     "template_ci_gates.md",
-    "template_completeness_assessment.md",
     "template_delivery_baseline.md",
     "template_extension_manifest.md",
     "template_fixtures.md",
@@ -45,7 +44,7 @@ class TestAllTemplatesExist:
         assert missing == [], f"Missing template files: {missing}"
 
     def test_expected_count(self):
-        assert len(EXPECTED_TEMPLATES) == 22
+        assert len(EXPECTED_TEMPLATES) == 21
 
 
 class TestTemplatesReadable:

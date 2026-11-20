@@ -163,3 +163,13 @@ def test_a_node_scheduled_by_two_milestones_is_given_for_each_in_the_order_of_th
     nodes = [node("fr-1", "fr"), node("fr-2", "fr"), node("fr-3", "fr"), _schedule("dm-b", "fr-3", "fr-2", "fr-1"), _schedule("dm-a", "fr-2", "fr-1", "fr-2")]
     ctx = built_context(list(reversed(nodes)), {"tc-1": "fr-1"}, decls=_DECLS)
     assert _unrefined(ctx) == [("dm-a", "fr-2"), ("dm-b", "fr-3"), ("dm-b", "fr-2")]
+
+
+def test_matching_milestones_pairs_a_design_milestone_with_the_roadmap_milestone_of_its_refining_criterion() -> None:
+    ctx = built_context([node("fr-1", "fr"), _schedule("dm-1", "fr-1")], {"tc-1": "fr-1"})
+    assert _pairs(ctx) == [("dm-1", "ms-m")]
+
+
+def test_a_design_milestone_no_criterion_refines_has_no_pair() -> None:
+    ctx = built_context([node("fr-1", "fr"), node("fr-2", "fr"), _schedule("dm-1", "fr-1")], {"tc-1": "fr-2"})
+    assert _pairs(ctx) == []

@@ -112,7 +112,7 @@
 
    For artifacts with no resolvable `$schema` (where structural suppression and namespace-aware slot-kind suppression are inactive), two mechanisms remain active: the key-name skip (mechanism 4) and the term-specific runtime `bound_ref_ids` suppression (mechanism 3). Mechanism 3 — the `bound_ref_ids` collection in `_check_free_text_terms` of `hallucination_lint.py` — is unconditional and has no guard on `schema_node`; the check `if cids & bound_ref_ids: continue` fires regardless of whether `$schema` resolved. A sibling `*_ref` binding the mentioned term therefore suppresses E541 for that specific term even in a schema-free artifact.
 
-**Note on the closure codes** (E535, E536, E560, W561, W562, W563, W564, W565, W566, W567, W568, W569, W575, W576): their Trigger and Resolution texts below describe the 1.1.1 shape. Each reads fields that 1.2.0 removed (`trace`, `targets`, `out_of_scope`, `fr_refs`, `spec_ref`, `deliverables`, `critical_evidence`, `pr_rules`) and runs only when the files it reads carry those fields, or hold no entries to read. A 1.2.0-shaped spec gets none of them until a later 1.2.0 change replaces them with graph coverage; the one live part is the empty-milestone half of W567 (a milestone with no tasks), which fires only on a file the schema already rejects, since `tasks` must not be empty. A new-shape anchor has no `plan.milestone_index[].context_path`, so the closure checks load no milestone plans from it. Where a text below says to add a removed field to a 1.1.1 file, a 1.2.0 spec marks a node that needs no API or fixture with `scope: out` and `scope_reason`.
+**Note on the closure codes** (E535, E536, E560, W562, W563, W564, W565, W568, W569, W575, W576): their Trigger and Resolution texts below describe the 1.1.1 shape. Each reads fields that 1.2.0 removed (`trace`, `targets`, `out_of_scope`, `fr_refs`, `spec_ref`, `deliverables`, `critical_evidence`, `pr_rules`) and runs only when the files it reads carry those fields, or hold no entries to read. A 1.2.0-shaped spec gets none of them until a later 1.2.0 change replaces them with graph coverage. The two milestone numbers of this list have been replaced already: E566 and E567 (check `milestone-numbers`) read the graph. A new-shape anchor has no `plan.milestone_index[].context_path`, so the closure checks load no milestone plans from it. Where a text below says to add a removed field to a 1.1.1 file, a 1.2.0 spec marks a node that needs no API or fixture with `scope: out` and `scope_reason`.
 
 ### E560 TRACEABILITY_GAP
 
@@ -123,12 +123,6 @@
 **Promotable**: No (error only).
 
 **See also**: E568 (capability → FR coverage — the check E560 formerly performed).
-
-### E561 / W561 UNCOVERED_FR
-
-**Trigger**: A functional requirement defined in step 04 is not assigned to any milestone in step 14 (`fr_refs`).
-
-**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`. If the FR has no implementation surface (e.g. an infra or ops constraint), add it to `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that exempts it from W561, W564, and W566.
 
 ### E562 / W562 ORPHAN_MILESTONE
 
@@ -158,21 +152,21 @@
 
 **Promotable**: W565 → E565.
 
-### E566 / W566 UNCOVERED_FR_MILESTONE
+### E566 UNCOVERED_FR_MILESTONE
 
-**Trigger**: A functional requirement defined in step 04 is not referenced in any step 14 milestone `fr_refs`.
+**Trigger**: A functional requirement that is in scope (its `scope` is not `later` or `out` and its lifecycle is not `not_applicable`) and that no task criterion of step 14 reaches. A task criterion reaches an FR when it refines the FR, a node the FR contains (an acceptance criterion) or a node derived from either: the check follows the links `refines`, `realises`, `derives_from` and `mitigated_by` that point at the FR and at its acceptance criteria, then those that point at the nodes it found, until none is left; it reads no hash and no milestone state. So an API that lists the FR in `derives_from` covers it when a task criterion refines the API. Reported by `spec-check` and by the step gate (check `milestone-numbers`), not by `validate` of one file; with no graph the check is skipped (`graph could not be built (see the `graph` check)`). An FR that is `later` or `out` is not checked and stays listed by `specdev coverage` as exempt. Example, from the worked example, which is a partial spec: `E566 fr fr-password-reset-request is in scope but no task criterion reaches it: add a task criterion that refines it, one of its acceptance criteria or a node derived from it, or set its scope to later or out with a scope_reason`.
 
-**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`. If the FR has no implementation surface, use `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that exempts it from W566, W564, and W561.
+**Resolution**: Owner `step:14`. Two ways, both run on a copy of the worked example; the code E566 of the FR cleared and no finding came that was not there before. Add a task criterion that refines the FR, one of its acceptance criteria or a node derived from it, and list in its `verified_by` a verifier that verifies what it refines (a task criterion that refined `ac-password-reset-request-1` with a new fixture that verifies it): the new links need the attest step (the fixture and the criterion; see "The attest step" under [Graph Role Checks (74x)](#graph-role-checks-74x)), and the criterion also cleared the E740 of the acceptance criterion and of the FR and the E743 of the acceptance criterion. Or set the FR to `later` or `out` with a `scope_reason` (`scope: later` on the FR cleared its E566 and its E740 and needed no attest step; its acceptance criteria keep their own scope).
 
-**Promotable**: W566 → E566.
+**Promotable**: No (error only).
 
-### E567 / W567 INCOMPLETE_MILESTONE_DECOMPOSITION
+### E567 INCOMPLETE_MILESTONE_DECOMPOSITION
 
-**Trigger**: A milestone in step 14 has no tasks, or the milestone's `fr_refs` are not covered by any task's `fr_refs`.
+**Trigger**: A step 09 milestone that a step 14 milestone computes schedules a node that no task criterion refines. A step 14 milestone computes a step 09 milestone when one of its task criteria refines a node the step 09 milestone schedules, or a node that node contains (a criterion that refines an acceptance criterion of a scheduled FR counts for the FR). For such a step 09 milestone, each node in its `schedules` that a task criterion could refine (an FR, an acceptance criterion, an API, an invariant, an NFR and so on) and that no task criterion refines, itself or through a node it contains, is one finding, reported on the step 09 milestone. A scheduled risk, component or environment is never reported (no task criterion can refine one). A step 09 milestone that no step 14 milestone computes is not reported here (the release check reads it), and neither is a step 14 milestone with no tasks. Reported by `spec-check` and by the step gate (check `milestone-numbers`), not by `validate` of one file. The unchanged worked example has none. Example, after `fr-password-reset-request` was added to `schedules` of `milestone-account-recovery`: `E567 fr fr-password-reset-request is scheduled by milestone-account-recovery but no task criterion refines it: add a task criterion that refines it or a node it contains, or remove it from the schedules of milestone-account-recovery`.
 
-**Resolution**: Add tasks to the milestone, or ensure task `fr_refs` collectively cover the milestone's `fr_refs`.
+**Resolution**: Owner `step:14`. Two ways, both run on a copy of the worked example, E567 cleared and no finding came that was not there before. Add a task criterion that refines the node or a node it contains, with a verifier, then the attest step (see [Graph Role Checks (74x)](#graph-role-checks-74x); the run attested the fixture, the criterion and the milestone, whose new `schedules` link had E761). Or remove the node from `schedules` of the step 09 milestone: the E761 of the milestone went with the link, the attest step found nothing to write and `attest --prune` found no entry, but the node is then unscheduled again and gets back the E740 it had before it was scheduled.
 
-**Promotable**: W567 → E567.
+**Promotable**: No (error only).
 
 ### E568 / W568 UNCOVERED_CAPABILITY
 

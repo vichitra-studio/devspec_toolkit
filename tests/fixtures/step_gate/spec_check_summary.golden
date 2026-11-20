@@ -1,11 +1,11 @@
-spec-check: 27 checks run, 24 errors, 8 warnings
+spec-check: 28 checks run, 25 errors, 7 warnings
 
   [PASS] schema-validation              0 errors  0 warnings
   [FAIL] toolkit-version                1 errors  0 warnings
   [PASS] spec-quality-lint              0 errors  0 warnings
   [PASS] canonical-lint                 0 errors  0 warnings
   [PASS] canonical-integrity            0 errors  0 warnings
-  [WARN] hallucination-lint             0 errors  7 warnings
+  [WARN] hallucination-lint             0 errors  6 warnings
   [PASS] traceability-closure           0 errors  0 warnings
   [PASS] completeness-check             0 errors  0 warnings
   [WARN] seed-lint                      0 errors  1 warnings
@@ -26,5 +26,6 @@ spec-check: 27 checks run, 24 errors, 8 warnings
   [PASS] scaffold-paths                 0 errors  0 warnings
   [PASS] seed-routes                    0 errors  0 warnings
   [PASS] prose-ids                      0 errors  0 warnings
+  [FAIL] milestone-numbers              1 errors  0 warnings
   [PASS] open-items                     0 errors  0 warnings
 

@@ -192,8 +192,10 @@ def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
     errors, context = run_spec_check_json(
         str(_ROOT), spec_dir, spec_root=spec_dir, project_canon_dir=str(stamped_example / "spec" / "canon")
     )
-    other = [e.render() for e in errors if not e.code.startswith("W") and e.code not in GRAPH_CHECK_CODES]
+    other = [e.render() for e in errors if not e.code.startswith("W") and e.code not in GRAPH_CHECK_CODES | {"E566", "E567"}]
     assert other == []  # the graph checks' findings on the example are pinned in test_graph_roles_example.py
+    # the milestone numbers (M6c): the example is a partial spec, one FR has no task criterion (ruling C15)
+    assert [(e.code, e.node_id, e.owner) for e in errors if e.code in ("E566", "E567")] == [("E566", "fr-password-reset-request", "step:14")]
     about_00_05 = [e for e in errors if _is_about_00_05(e.render())]
     assert Counter(e.code for e in about_00_05) == _PINNED_WARNINGS
     subjects = Counter(

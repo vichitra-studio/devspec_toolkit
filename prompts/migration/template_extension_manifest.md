@@ -57,9 +57,8 @@ Each extension produces an `ext_NN_*.json` file that must conform to the
 `extension_id` values still adhere to their strict regex pattern —
 re-number them if the ordering has changed. File names are derived from extension_id (hyphens → underscores + `.json`). The `governance_label_ref` must
 resolve in the canonical registry; check that the referenced label still exists
-in the target toolkit version. Extensions are consumed by the completeness
-assessment (Step 13a) so extension IDs should not change after that step has
-been generated.
+in the target toolkit version. Extension IDs should not change after the
+extension manifest (Step 13) has been generated.
 
 
 ## Full Generation Reference

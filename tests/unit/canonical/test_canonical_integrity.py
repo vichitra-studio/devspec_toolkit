@@ -3,7 +3,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from specdev_tools.canonical import integrity
 from specdev_tools.canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
+from specdev_tools.core.constants import INFERENCE_RULES
+
+_TOOLKIT = Path(__file__).resolve().parents[3]
 
 
 class CanonicalIntegrityTests(unittest.TestCase):
@@ -834,6 +838,15 @@ class StructuredFieldTests(unittest.TestCase):
             # and multiple fields; no single authoritative path exists.
             self.assertIsNone(err.file, f"E211 file should be None (cross-file), got: {err.file!r}")
             self.assertIsNone(err.jq_path, f"E211 jq_path should be None (cross-file), got: {err.jq_path!r}")
+
+
+def test_completeness_dimension_kind_is_retired() -> None:
+    """The kind went with step 13a: no kind file, no manifest entry, no autofix rule, no direct-field fallback."""
+    assert not (_TOOLKIT / "canon" / "kinds" / "completeness_dimension.json").exists()
+    manifest = json.loads((_TOOLKIT / "canon" / "manifest.json").read_text(encoding="utf-8"))
+    assert [entry["id"] for entry in manifest["entries"] if entry["kind"] == "completeness_dimension"] == []
+    assert "completeness_dimension" not in {kind for _, _, kind in INFERENCE_RULES}
+    assert "completeness_dimension" not in integrity._FALLBACK_DIRECT_FIELDS
 
 
 if __name__ == "__main__":

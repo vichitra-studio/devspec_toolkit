@@ -13,7 +13,7 @@ from specdev_tools.graph.gitview import run_git
 from specdev_tools.graph.model import Node
 from specdev_tools.trace.coverage import exemption
 from specdev_tools.validation.check_registry import CheckContext
-from specdev_tools.validation.graph_checks import GRAPH_CHECKS, run_graph_checks
+from specdev_tools.validation.graph_checks import BUILTIN_GRAPH_CHECKS, run_graph_checks
 from specdev_tools.validation.graph_checks.codes import (
     CROSS_CUTTING_NOT_REFINED,
     MISSING_VERIFIER,
@@ -187,7 +187,7 @@ def test_no_finding_of_the_eight_checks_is_owned_by_merge_check(example: GraphCh
     }
     assert None not in owners and "merge-check" not in owners
     assert [error.owner for error in run_graph_checks(example, "merge") if error.owner in (None, "merge-check")] == []
-    assert len(GRAPH_CHECKS) == 8
+    assert len(BUILTIN_GRAPH_CHECKS) == 8  # the rule list of a run also holds milestone-numbers, which spec_check registers (M6c)
 
 
 def test_every_code_of_the_checks_is_registered() -> None:

@@ -327,7 +327,7 @@ def test_write_report_lists_targets_and_newly_suspect_steps_in_step_then_id_orde
 
 # --- trace/step_create.py, trace/step_ready.py  the targets of a created step and the blockers of `step ready` ------------------------
 
-_STEP_READY_BLOCKER_STEPS = ["06", "08", "13a"]
+_STEP_READY_BLOCKER_STEPS = ["06", "08"]
 
 
 @pytest.mark.parametrize("seed", HASH_SEEDS)
@@ -349,7 +349,7 @@ def test_step_create_lists_targets_in_step_then_id_order_whatever_the_hash_seed(
 
 @pytest.mark.parametrize("seed", HASH_SEEDS)
 def test_step_ready_blockers_are_listed_in_step_then_id_order_whatever_the_hash_seed(seed: int, tmp_path: Path) -> None:
-    """Step 14 links into 06 and 08, which hold suspects after a criterion edit, and lists input 13a, which has no file."""
+    """Step 14 links into 06 and 08, which hold suspects after a criterion edit."""
     host = tmp_path / "host"
     shutil.copytree(EXAMPLE_SPEC.parent, host)
     criteria = host / "spec" / "04_fr_list.json"

@@ -82,7 +82,7 @@ STEP_DESCRIPTION = (
     "                           sub-items may be left out and are minted). The draft is checked against the step's\n"
     "                           schema, every link must resolve, and the lock gets an entry for every link. Prints each\n"
     "                           link target with its contract text. Refused (E767, exit 1) when the step already has a\n"
-    "                           file (edit it with `specdev json patch|insert|delete --id`) or is 13a or 16 to 16c. Writes\n"
+    "                           file (edit it with `specdev json patch|insert|delete --id`) or is 16 to 16c. Writes\n"
     "                           nothing with --dry-run.\n"
     "  ready NN                 Exit 0 when step NN may start; exit 1 (E773) when a step above it is missing or has\n"
     "                           pending replay (a suspect link or a coverage gap), listing each blocker and the step to\n"

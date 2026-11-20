@@ -196,7 +196,7 @@ def test_unannotated_files_are_byte_identical_to_pre_m1():
         e for e in pre["steps_with_deferred_registration"] if e["step"] not in annotated_deferred
     ]
     ambiguity_only = set(reg["registry"]) - set(view)
-    annotated_steps = {k.split("_")[0] for k in annotated | ambiguity_only}
+    annotated_steps = {k.split("_")[0] for k in annotated | ambiguity_only} | {"13a"}  # 13a: retired by M6c
     for key in ("steps_without_entry_arrays",):
         assert [e for e in reg[key] if e["step"] not in annotated_steps] == [
             e for e in pre[key] if e["step"] not in annotated_steps

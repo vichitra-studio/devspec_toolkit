@@ -40,6 +40,7 @@ from .check_registry import (
     run_registered_checks,
 )
 from .open_items import check_open_items
+from .validators.step_14_milestones import check_milestone_numbers
 
 
 def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
@@ -244,8 +245,8 @@ def _check_traceability_closure(ctx: CheckContext) -> dict[str, Any]:
 
 _COMPLETENESS_CHECK = "completeness-check"
 _COMPLETENESS_CODES = frozenset({
-    "W564", "W565", "W566", "W567", "W568",
-    "E564", "E565", "E566", "E567", "E568",
+    "W564", "W565", "W568",
+    "E564", "E565", "E568",
 })
 
 
@@ -354,6 +355,7 @@ register_check("hardcoded-seed-check", _check_hardcoded_seed)
 register_check("glossary-drift-check", _check_glossary_drift, default_owner=STEP_PREFIX + "03")
 register_check("trace-lock", _check_trace_lock)
 graph_checks.publish_graph_checks()
+graph_checks.register_graph_check("milestone-numbers", check_milestone_numbers)
 register_check("open-items", _check_open_items)
 
 

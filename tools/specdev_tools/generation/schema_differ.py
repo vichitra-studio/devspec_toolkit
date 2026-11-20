@@ -388,8 +388,7 @@ def compare_step_inventories(
             # Per docs/developers/extension_schemas.md, extensions use ext_NN_<topic>.json
             # naming. This branch catches user-created specs with a numeric step prefix
             # (e.g., 02b_custom) that have no corresponding toolkit schema.
-            # Note: Some extensions like 13a_completeness_assessment ARE in toolkit_ids
-            # and are handled in the first loop above.
+            # Note: Extensions whose schema is in toolkit_ids are handled in the first loop above.
             if re.match(r"^\d{2}[a-z]_", step_id):
                 diffs.append(StepDiff(
                     step_id=step_id,

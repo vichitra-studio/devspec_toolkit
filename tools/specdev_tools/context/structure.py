@@ -47,7 +47,7 @@ def _find_spec_file(step_id: str, spec_dir: str) -> str | None:
     """Find the spec JSON file for *step_id* inside *spec_dir*.
 
     Convention: files are named ``{step_id}_{name}.json``.
-    Step IDs with letters (e.g. "02a", "13a", "16b") map to files like
+    Step IDs with letters (e.g. "02a", "16a", "16b") map to files like
     ``02a_delivery_baseline.json``.  We match any file whose stem starts
     with ``{step_id}_``.
     """

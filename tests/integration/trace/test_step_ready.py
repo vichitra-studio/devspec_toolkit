@@ -124,13 +124,12 @@ def test_ready_blocked_by_coverage_gap_in_upstream_step(host: Example, gap_provi
 def test_ready_ignores_historical(host: Example) -> None:
     """The suspect links of a closed milestone's nodes (the step 14 test cases) do not block the step after them.
 
-    The example has no step 13a file, which 16a lists as an input, so 16a stays blocked by that; only suspects are compared.
+    Once the milestone is closed nothing blocks 16a: the step 13a file it used to wait for is gone with the step.
     """
     host.edit_criterion()
     assert _blocker_steps(_ready_json(host, "16a", code=1), "suspect") == ["14"]
     host.close_milestone()
-    document = _ready_json(host, "16a", code=1)
-    assert _blocker_steps(document, "suspect") == [] and [(b["step"], b["reason"]) for b in document["blockers"]] == [("13a", "missing")]
+    assert _ready_json(host, "16a", code=0)["blockers"] == []
 
 
 @pytest.mark.parametrize("step", ["99", "6", "seed"])

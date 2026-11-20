@@ -177,8 +177,8 @@ def _legacy_unlinked(spec_dir: Path) -> dict[str, set[str]]:
     return {name: {message.split()[1] for message in findings if message.startswith(label)} for name, label in LEGACY_LABELS.items()}
 
 
-def test_three_dimensions_match_13a_on_legacy_equivalent_fixture(tmp_path: Path) -> None:
-    """The legacy side is 1.1.1-shaped (``trace``, ``targets``): on a graph-shaped spec 13a lists the dimension as not computed."""
+def test_three_dimensions_match_the_legacy_completeness_check_on_the_equivalent_fixture(tmp_path: Path) -> None:
+    """The legacy side is 1.1.1-shaped (``trace``, ``targets``): on a graph-shaped spec the dimension is listed as not computed."""
     spec_dir = tmp_path / "legacy"
     spec_dir.mkdir()
     for name, document in LEGACY_DOCS.items():

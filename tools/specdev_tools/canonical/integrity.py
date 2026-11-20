@@ -322,7 +322,6 @@ _FALLBACK_DIRECT_FIELDS: set[str] = {
     "risk_category",
     "governance_label",
     "id_pattern",
-    "completeness_dimension",
 }
 
 

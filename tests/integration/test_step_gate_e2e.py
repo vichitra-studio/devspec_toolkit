@@ -137,7 +137,7 @@ def test_doc_13_9_rows_3_4_pending_until_the_owner_and_new_upstream_blocks(tmp_p
     code, gate = _gate(capsys, host, "--step", "04")
     assert code == 0 and gate["blocking"] == []
     found = {owner: [f for f in findings if f.get("node_id") == "fr-account-export"] for owner, findings in gate["pending"].items()}
-    assert {owner: _pairs(findings) for owner, findings in found.items() if findings} == {"14": [("E740", "fr-account-export")]}
+    assert {owner: _pairs(findings) for owner, findings in found.items() if findings} == {"14": [("E566", "fr-account-export"), ("E740", "fr-account-export")]}
     code, gate = _gate(capsys, host, "--step", "14")
     assert code == 1 and ("E740", "fr-account-export") in _pairs(gate["blocking"])
 
@@ -218,7 +218,8 @@ def test_e608_is_gate_owned_in_step_00_and_step_14(tmp_path: Path, capsys: pytes
     host = step_gate_host(tmp_path / "host")
     code, gate = _gate(capsys, host, "--step", step)
     blocking = [f["code"] for f in gate["blocking"]]  # step 14 owns the example's graph-check findings; E608 is never among them
-    assert code == (1 if blocking else 0) and set(blocking) <= GRAPH_CHECK_CODES
+    assert code == (1 if blocking else 0) and set(blocking) <= GRAPH_CHECK_CODES | {"E566"}
+    assert blocking.count("E566") == (1 if step == "14" else 0)  # the example's one FR without a task criterion (ruling C15)
     assert [(f["code"], f["owner"]) for f in gate["gate_owned"] if f["code"] == "E608"] == [("E608", "merge-check")]
 
 

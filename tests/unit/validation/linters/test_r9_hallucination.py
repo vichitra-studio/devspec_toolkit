@@ -454,7 +454,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             self.assertEqual(errs, [])
 
     def test_step_with_suffix_letter_recognized(self):
-        """Steps like 02a, 13a, 16c are correctly parsed and checked."""
+        """Steps like 02a, 16c are correctly parsed and checked."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             spec_dir = root / "spec"

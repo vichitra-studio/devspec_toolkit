@@ -211,7 +211,7 @@ def _fixture_reader_on(data: dict[str, Any]) -> bool:
 
 
 def _milestone_reader_on(data: dict[str, Any]) -> bool:
-    """W561 / W566 read the `fr_refs` of the roadmap milestones."""
+    """The `fr_milestone_coverage` dimension reads the `fr_refs` of the roadmap milestones (no code reads them any more; E566 reads the graph)."""
     return fr_milestone_reader_on(dict_items(data["roadmap"].get("milestones")))
 
 
@@ -366,17 +366,15 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             # Exclude `wont-have` FRs from downstream coverage checks — they
             # are explicitly out-of-scope (parked for a later phase) and have
             # no APIs, fixtures, or milestones by design. Including them
-            # produces false-positive W561/W564/W565/W566 warnings.
+            # produces false-positive W564/W565 warnings.
             if is_parked_any_shape(fr):
                 continue
             if isinstance(fr.get("fr_id"), str):
                 fr_ids.add(fr["fr_id"])
 
-    # Compute FR IDs exempted by Step 05 out_of_scope[] from W564 (API coverage),
-    # W561, and W566 (milestone coverage). An FR listed in Step 05 out_of_scope[]
-    # with a non-empty rationale is acknowledged as having no HTTP API surface;
-    # the same exemption extends to milestone coverage because infra/ops FRs with
-    # no API surface may also legitimately lack milestone placement (DEVSPEC-2).
+    # Compute FR IDs exempted by Step 05 out_of_scope[] from W564 (API coverage).
+    # An FR listed in Step 05 out_of_scope[] with a non-empty rationale is
+    # acknowledged as having no HTTP API surface.
     step05_oos_fr_ids: set[str] = out_of_scope_fr_ids(data["apis"]) if "apis" in data else set()
 
     # Compute FR IDs exempted by Step 08 out_of_scope[] from W565 (fixture coverage).
@@ -387,11 +385,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # here would silently suppress legitimate W565 warnings.
     step08_oos_fr_ids: set[str] = out_of_scope_fr_ids(data["fixtures"]) if "fixtures" in data else set()
 
-    milestone_fr_refs: set[str] = set()
     milestone_ids: set[str] = set()
     milestone_task_ids: dict[str, list[str]] = {}
-    milestone_fr_set: dict[str, set[str]] = {}
-    milestone_task_fr_refs: dict[str, set[str]] = {}
     if "roadmap" in data:
         for ms in dict_items(data["roadmap"].get("milestones")):
             ms_id = ms.get("milestone_id")
@@ -399,9 +394,6 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             if isinstance(ms_id, str) and ms_id:
                 milestone_ids.add(ms_id)
                 milestone_task_ids[ms_id] = [t["task_id"] for t in tasks if isinstance(t.get("task_id"), str) and t["task_id"]]
-                milestone_fr_set[ms_id] = set(str_items(ms.get("fr_refs")))
-                milestone_task_fr_refs[ms_id] = {fr for t in tasks for fr in str_items(t.get("fr_refs"))}
-            milestone_fr_refs.update(str_items(ms.get("fr_refs")))
 
     checklist_milestone_refs: set[str] = set()
     checklist_task_refs: set[str] = set()
@@ -417,12 +409,6 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         for ms_id, tasks in milestone_task_ids.items():
             if any(t_id in checklist_task_refs for t_id in tasks):
                 checklist_milestone_refs.add(ms_id)
-
-    # Legacy-guarded (M6c deletes): W561 and W566 read the `fr_refs` of the roadmap.
-    milestone_reader_on = "frs" in data and "roadmap" in data and _milestone_reader_on(data)
-    if milestone_reader_on:
-        for fr_id in sorted(fr_ids - milestone_fr_refs - step05_oos_fr_ids):
-            errors.append(make_error("W561", f"UNCOVERED_FR {fr_id}"))
 
     if "roadmap" in data and "impl_planner" in data and checklist_reader_on:
         for ms_id in sorted(milestone_ids - checklist_milestone_refs):
@@ -472,37 +458,6 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             errors.append(make_error("E536", f"CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE {fr_id} appears in out_of_scope[] but is also referenced by a fixture target"))
         for fr_id in sorted(fr_ids - fixture_fr_refs - step08_oos_fr_ids):
             errors.append(make_error("W565", f"UNCOVERED_FR_FIXTURE {fr_id}"))
-
-    # W566: FR→milestone coverage (same dimension as W561 but as a pairwise completeness code).
-    # Fires only when both frs and roadmap are present; W561 fires earlier in the same conditions.
-    # W566 provides a consistently-coded pairwise completeness signal for filtering and promotion.
-    #
-    # Design intent: W561 and W566 intentionally fire for the same FR IDs under the same guard
-    # condition. W561 is the legacy informational signal (kept for backward compatibility).
-    # W566 is the designated pairwise completeness code used for filtering and error promotion.
-    # W561 is NOT in PROMOTABLE_PAIRS (see errors.py) to prevent double-promotion: without this
-    # exclusion, SPECDEV_WARNINGS_AS_ERRORS=1 would emit both E561 and E566 for a single FR gap.
-    if milestone_reader_on:
-        for fr_id in sorted(fr_ids - milestone_fr_refs - step05_oos_fr_ids):
-            errors.append(make_error("W566", f"UNCOVERED_FR_MILESTONE {fr_id}"))
-
-    # W567: Milestone decomposition completeness — milestones without any tasks.
-    if "roadmap" in data:
-        for ms_id, tasks in sorted(milestone_task_ids.items()):
-            if not tasks:
-                errors.append(make_error("W567", f"INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}"))
-
-    # W567: also check that milestone fr_refs are covered by at least one task's fr_refs.
-    # Guard with `if tasks` so this only fires when the milestone HAS tasks; a milestone
-    # with no tasks is already covered by the empty-tasks W567 above and firing both would
-    # double-count the same milestone in completeness-check ratio calculations.
-    if "roadmap" in data:
-        for ms_id, ms_fr in sorted(milestone_fr_set.items()):
-            if not milestone_task_ids.get(ms_id):
-                continue  # empty-tasks W567 already fired above
-            task_fr = milestone_task_fr_refs.get(ms_id, set())
-            for fr_ref in sorted(ms_fr - task_fr):
-                errors.append(make_error("W567", f"INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}: fr_ref {fr_ref} not covered by any task fr_refs"))
 
     # W568: Capability coverage — each capability should be traced by at least one FR.
     # Mirrors the E560 capability_without_fr check but as a promotable warning.

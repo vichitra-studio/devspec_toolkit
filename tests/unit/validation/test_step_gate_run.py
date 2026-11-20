@@ -89,9 +89,10 @@ def test_the_notes_come_in_order_paths_then_missing_artifacts_then_the_run(tmp_p
 
 def test_a_step_with_no_artifact_is_noted_before_the_notes_of_the_run_and_the_gate_still_runs(tmp_path: Path) -> None:
     host = step_gate_host(tmp_path / "host")
-    run = _gate(host, steps=["13a"], provider=_unavailable)
-    assert run.notes == (f"step 13a has no artifact in {host / 'spec'}", f"note: {REASON}")
-    assert [result.step for result in run.results] == ["13a"]
+    (host / "spec" / "13_extension_manifest.json").unlink()
+    run = _gate(host, steps=["13"], provider=_unavailable)
+    assert run.notes == (f"step 13 has no artifact in {host / 'spec'}", f"note: {REASON}")
+    assert [result.step for result in run.results] == ["13"]
 
 
 def test_a_step_given_twice_is_gated_once(tmp_path: Path) -> None:

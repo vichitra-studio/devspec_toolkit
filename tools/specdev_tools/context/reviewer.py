@@ -39,8 +39,7 @@ _STOPWORDS: frozenset[str] = frozenset([
 # checklists).  Running it on invariants, NFRs, etc. produces noise because
 # those artifacts use constraint language rather than Given/When/Then vocabulary.
 #
-# Step 13a produces a completeness-assessment (dimension counts), not a
-# checklist — it is NOT in this set.  Step 16 is the Trinity Anchor
+# Step 16 is the Trinity Anchor
 # (vc:16-anchor) — a scope/ownership/drift declaration with no checklist — so
 # it is NOT in this set either. Steps 16a/16b/16c share the vc:16-impl-context
 # schema and carry the implementation checklist, so they ARE in this set.

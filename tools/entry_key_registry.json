@@ -2179,10 +2179,5 @@
       "step": "16c"
     }
   ],
-  "steps_without_entry_arrays": [
-    {
-      "rationale": "no top-level array properties with id fields",
-      "step": "13a"
-    }
-  ]
+  "steps_without_entry_arrays": []
 }

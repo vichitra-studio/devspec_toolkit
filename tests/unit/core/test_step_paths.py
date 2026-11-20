@@ -6,7 +6,7 @@ import pytest
 from specdev_tools.core.step_paths import STEP_JSON_RE
 
 
-@pytest.mark.parametrize(("name", "step"), [("05_x.json", "05"), ("13a_x.json", "13a"), ("05_.json", "05")])
+@pytest.mark.parametrize(("name", "step"), [("05_x.json", "05"), ("02a_x.json", "02a"), ("05_.json", "05")])
 def test_a_root_spec_file_name_gives_its_step(name: str, step: str) -> None:
     match = STEP_JSON_RE.match(name)
     assert match is not None and match.group(1) == step

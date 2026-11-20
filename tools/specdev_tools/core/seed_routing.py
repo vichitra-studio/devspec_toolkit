@@ -62,7 +62,7 @@ def resolve_seeds_for_step(
     Any other step_id
         Raw set = ``step_requirements[step_id]`` only.  The umbrella semantics
         are **16-family-only** and are NOT generalised to steps like ``"02a"``
-        or ``"13a"``.
+        or ``"04"``.
 
     Ordering of *step_seed_ids*
         Seeds in ``global_seed_order`` appear first (in global order).  Any

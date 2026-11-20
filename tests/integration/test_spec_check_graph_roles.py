@@ -62,16 +62,17 @@ def _spec_check_json(capsys: pytest.CaptureFixture[str], host: Path, *flags: str
 
 
 def test_new_check_entries_appear_on_the_example(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """The eight entries come after trace-lock and before open-items, none skips, and the counts are the example's (17, 0, 5, 1, 0, 0, 0, 0)."""
+    """The eight entries come after trace-lock, then ``milestone-numbers`` (M6c, its count is not pinned here), then open-items; none skips, and the counts of the eight are the example's (17, 0, 5, 1, 0, 0, 0, 0)."""
     code, report, _err = _spec_check_json(capsys, git_copy_of_example(tmp_path / "host"))
     names = list(report["checks"])
-    assert names[names.index("trace-lock") + 1 : -1] == list(GRAPH_CHECKS) and names[-1] == "open-items"
+    assert names[names.index("trace-lock") + 1 : -1] == [*GRAPH_CHECKS, "milestone-numbers"] and names[-1] == "open-items"
+    assert report["checks"]["milestone-numbers"]["status"] != "SKIP"
     assert {name: report["checks"][name]["status"] for name in GRAPH_CHECKS} == {
         "no-dangling": "FAIL", "term-use": "PASS", "verifier-rules": "FAIL", "cross-cutting": "FAIL",
         "refinement": "PASS", "scaffold-paths": "PASS", "seed-routes": "PASS", "prose-ids": "PASS",
     }
     assert [report["checks"][name]["error_count"] for name in GRAPH_CHECKS] == [17, 0, 5, 1, 0, 0, 0, 0]
-    assert code == 1 and report["error_count"] == 24  # the eight checks are the 23 findings; the other is E608 (no specdev_version)
+    assert code == 1 and report["error_count"] == 24 + report["checks"]["milestone-numbers"]["error_count"]  # the eight checks are the 23 findings; the other is E608 (no specdev_version)
 
 
 def test_plain_spec_check_summary_matches_golden_with_the_new_entries(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

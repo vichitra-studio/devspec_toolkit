@@ -91,7 +91,7 @@ def test_an_empty_registry_is_refused_not_clear(tmp_path: Path, monkeypatch: pyt
 
 
 def _registered_names_of_the_block() -> list[str]:
-    """The names ``validation/spec_check.py`` registers, read from the source: the first argument of each module-level ``register_check`` call, and the rules of ``BUILTIN_GRAPH_CHECKS`` at the module-level call of ``publish_graph_checks``."""
+    """The names ``validation/spec_check.py`` registers, read from the source: the first argument of each module-level ``register_check`` call, the rules of ``BUILTIN_GRAPH_CHECKS`` at the module-level call of ``publish_graph_checks``, and the name of each module-level ``register_graph_check`` call."""
     from specdev_tools.validation import graph_checks, spec_check
 
     names: list[str] = []
@@ -104,6 +104,8 @@ def _registered_names_of_the_block() -> list[str]:
             names.append(arg.value if isinstance(arg, ast.Constant) else getattr(spec_check, arg.id))
         elif getattr(func, "attr", "") == "publish_graph_checks":
             names.extend(name for name, _rule, _check in graph_checks.BUILTIN_GRAPH_CHECKS)
+        elif getattr(func, "attr", "") == "register_graph_check":
+            names.append(node.value.args[0].value)
     return names
 
 
@@ -179,7 +181,7 @@ def test_step_04_exits_zero_when_only_later_errors_exist_and_lists_them_pending(
     pending = report["step_gate"]["pending"]
     assert [(finding["code"], finding["node_id"]) for finding in pending["05"]] == [("E700", "api-broken-link")]
     others = [(owner, finding["code"]) for owner, found in pending.items() if owner != "05" for finding in found if finding["code"] not in GRAPH_CHECK_CODES]
-    assert others == [("11", "W583")]
+    assert others == [("11", "W583"), ("14", "E566")]  # E566: the example's one FR without a task criterion (ruling C15)
     assert "api-broken-link" not in out
     assert "api-broken-link" in run_spec_check(host, "--step", "04", "--detail", "all")[1]
 

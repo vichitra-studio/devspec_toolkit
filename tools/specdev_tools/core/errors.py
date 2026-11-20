@@ -96,7 +96,6 @@ ERROR_CODES = {
     "E553": "MISSING_ENUM_PATH",
     "E554": "CANON_ENUM_DRIFT",
     "E560": "TRACEABILITY_GAP",
-    "E561": "UNCOVERED_FR",
     "E562": "ORPHAN_MILESTONE",
     "E563": "CHECKLIST_ROADMAP_MISMATCH",
     "E564": "UNCOVERED_FR_API",
@@ -119,13 +118,10 @@ ERROR_CODES = {
     # W555 is intentionally excluded from PROMOTABLE_PAIRS so neither
     # SPECDEV_WARNINGS_AS_ERRORS nor SPECDEV_PROMOTE_CODES can escalate it.
     "W555": "STEP00_SEED_OUT_OF_SCOPE_THIN",
-    "W561": "UNCOVERED_FR",
     "W562": "ORPHAN_MILESTONE",
     "W563": "CHECKLIST_ROADMAP_MISMATCH",
     "W564": "UNCOVERED_FR_API",
     "W565": "UNCOVERED_FR_FIXTURE",
-    "W566": "UNCOVERED_FR_MILESTONE",
-    "W567": "INCOMPLETE_MILESTONE_DECOMPOSITION",
     "W568": "UNCOVERED_CAPABILITY",
     "W569": "GOVERNANCE_PR_RULE_UNCOVERED",
     "W570": "GRACEFUL_SKIP",
@@ -295,18 +291,10 @@ ERROR_CODES = {
 # W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
 # W630 (OPEN_ITEM) and W633 (OPEN_ITEM_LEGACY_TRIAGE) likewise have none (no E630 or E633 exists).
 PROMOTABLE_PAIRS = {
-    # W561 (UNCOVERED_FR) is intentionally NOT in PROMOTABLE_PAIRS.
-    # W561 is a legacy informational signal that co-fires with W566 for the
-    # same condition (FR not covered by any milestone fr_refs). W566 is the
-    # designated pairwise completeness code that is promoted. Including W561
-    # here would cause double-promotion: one FR gap would generate both E561
-    # and E566 under SPECDEV_WARNINGS_AS_ERRORS=1.
     "W562": "E562",
     "W563": "E563",
     "W564": "E564",
     "W565": "E565",
-    "W566": "E566",
-    "W567": "E567",
     "W568": "E568",
     "W569": "E569",
     "W571": "E571",

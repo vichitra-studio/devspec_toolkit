@@ -133,11 +133,11 @@ def test_step_base_has_no_ingested_fields() -> None:
 
 
 def _step_schema_files() -> list[str]:
-    """Step schemas that carry a top-level `ambiguities`: 00 to 15 except 13a (a declared exception), not step 16."""
+    """Step schemas that carry a top-level `ambiguities`: 00 to 15, not step 16."""
     names = []
     for path in _SCHEMA_DIR.glob("*.schema.json"):
         match = _STEP_FILE_RE.match(path.name)
-        if match and match.group(1) not in ("13a", "16"):
+        if match and match.group(1) not in ("16",):
             names.append(path.name)
     return sorted(names)
 
@@ -169,7 +169,7 @@ def test_ambiguities_declared_on_every_step_schema_and_trinity_location(schema_f
 def test_ambiguity_locations_are_every_step_schema_and_the_trinity_locations() -> None:
     assert len(_LOCATIONS) == len(_step_schema_files()) + len(_TRINITY_LOCATIONS)
     assert len({name for name, _ in _LOCATIONS[:-len(_TRINITY_LOCATIONS)]}) == len(_step_schema_files())
-    assert not any(name.startswith(("13a", "16")) for name, _ in _LOCATIONS[:-len(_TRINITY_LOCATIONS)])
+    assert not any(name.startswith("16") for name, _ in _LOCATIONS[:-len(_TRINITY_LOCATIONS)])
 
 
 @pytest.mark.parametrize("schema_file", ["16_anchor.schema.json", "16_impl_context.schema.json"])

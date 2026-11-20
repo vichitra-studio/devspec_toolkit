@@ -27,7 +27,7 @@ def _step_locations() -> list[tuple[str, tuple[str, ...]]]:
     names = sorted(
         path.name
         for path in _SCHEMA_DIR.glob("*.schema.json")
-        if (match := _STEP_FILE_RE.match(path.name)) and match.group(1) not in ("13a", "16")
+        if (match := _STEP_FILE_RE.match(path.name)) and match.group(1) not in ("16",)
     )
     return [(name, ("ambiguities",)) for name in names]
 

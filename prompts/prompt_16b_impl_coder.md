@@ -336,7 +336,6 @@ You must **READ** and **ACT** on these fields to ensure high-fidelity implementa
 - **11_redteam.json**: Threat model findings used to ensure security-sensitive code paths have appropriate hardening and no known threat goes unaddressed
 - **12_ci_gates.json**: CI gate definitions and lint/type-check requirements that code changes must satisfy before the gate passes
 - **13_extension_manifest.json**: Extension point declarations used to verify implemented extension hooks match declared extension interfaces
-- **13a_completeness_assessment.json**: Coverage gap findings used to prioritize which missing implementations to address first in the current cycle
 - **14_roadmap.json**: Milestone scope and task decomposition used to verify that implementation stays within the current milestone's boundaries
 - **15_scaffold.json**: existing scaffold structure to build on; directory layout and stub files that provide the starting point for implementation
 

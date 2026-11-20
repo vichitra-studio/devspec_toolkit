@@ -235,11 +235,6 @@ class TestListEntriesKnownFiles:
 class TestListEntriesNoArraySteps:
     """Steps registered with empty arrays return [] (known file) not None (unknown)."""
 
-    def test_13a_returns_empty_list(self) -> None:
-        """13a_completeness_assessment.json is registered with arrays:[] — returns []."""
-        entries = list_entries("13a_completeness_assessment.json", _FIXTURE_DIR)
-        assert entries == []
-
     def test_16_impl_context_returns_empty_list(self) -> None:
         """16_impl_context.json is registered with arrays:[] — returns []."""
         entries = list_entries("16_impl_context.json", _FIXTURE_DIR)
@@ -557,10 +552,10 @@ class TestCollectIdsWithRegistry:
         assert jq_path == ".milestones[0].tasks[0].acceptance_criteria[1]"
 
     def test_registered_empty_file_returns_no_ids(self) -> None:
-        """Files registered with arrays:[] (e.g. 13a) return empty ids and map."""
+        """Files registered with arrays:[] (e.g. 16) return empty ids and map."""
         all_ids, id_map = _collect_ids_from_file(
-            {"dimensions": {"completeness": {"score": 1.0}}},
-            spec_file="13a_completeness_assessment.json",
+            {"scope": {"anchor": "x"}},
+            spec_file="16_impl_context.json",
             repo_root=_FIXTURE_DIR,
         )
         assert all_ids == []

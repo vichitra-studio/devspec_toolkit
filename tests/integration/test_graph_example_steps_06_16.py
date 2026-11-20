@@ -110,8 +110,6 @@ _PINNED_FINDINGS = Counter(
     {
         # The seed has no out-of-scope section (only a prose line): the lint counts 0 of the 3 it expects.
         ("W555", "STEP00_SEED_OUT_OF_SCOPE_THIN"): 1,
-        # Step 13a (completeness assessment) is not part of the example: the derivation check of 14 skips it.
-        ("W590", "13a"): 1,
         # The example restates its upstream in few words, so the token overlap stays under the threshold of 5.
         ("W594", "01_capabilities.json"): 1,
         ("W594", "03_glossary.json"): 1,
@@ -232,11 +230,13 @@ def test_spec_check_finding_set_is_pinned(stamped_example: Path) -> None:
     errors, context = run_spec_check_json(
         str(_ROOT), spec_dir, spec_root=spec_dir, project_canon_dir=str(stamped_example / "spec" / "canon")
     )
-    other = [e.render() for e in errors if not e.code.startswith("W") and e.code not in GRAPH_CHECK_CODES]
+    other = [e.render() for e in errors if not e.code.startswith("W") and e.code not in GRAPH_CHECK_CODES | {"E566", "E567"}]
     assert other == []  # the graph checks' findings on the example are pinned in test_graph_roles_example.py
+    # the milestone numbers (M6c): the example is a partial spec, one FR has no task criterion (ruling C15)
+    assert [(e.code, e.node_id, e.owner) for e in errors if e.code in ("E566", "E567")] == [("E566", "fr-password-reset-request", "step:14")]
     needles = [subject for _code, subject in _PINNED_FINDINGS]
     found = Counter(
-        (e.code, next((n for n in needles if n in e.render()), "?")) for e in errors if e.code not in GRAPH_CHECK_CODES
+        (e.code, next((n for n in needles if n in e.render()), "?")) for e in errors if e.code not in GRAPH_CHECK_CODES | {"E566", "E567"}
     )
     assert found == _PINNED_FINDINGS, [e.render() for e in errors]
     assert context["checks"]["schema-validation"]["status"] == "PASS"

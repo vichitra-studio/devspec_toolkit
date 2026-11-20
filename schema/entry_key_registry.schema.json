@@ -256,7 +256,7 @@
       "properties": {
         "step": {
           "type": "string",
-          "description": "Step ID, e.g. '13a' or '16a'.",
+          "description": "Step ID, e.g. '02a' or '16a'.",
           "pattern": "^[0-9]{2}[a-z]?$"
         },
         "rationale": {

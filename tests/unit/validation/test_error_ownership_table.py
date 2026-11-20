@@ -44,3 +44,9 @@ def test_every_m6b_code_has_a_class_row() -> None:
 def test_no_class_row_uses_the_binding_step_rule() -> None:
     """E743 is owned by step 08 (the fixture is the binding): the rule stays known to the gate but no row uses it."""
     assert "binding_step" not in {row.owner_rule for row in load_ownership_table(str(ROOT))}
+
+
+def test_e566_and_e567_are_owned_by_step_14() -> None:
+    """The check ``milestone-numbers`` (M6c) has one class row; both codes answer ``fixed_step:14``."""
+    rows = [row for row in load_ownership_table(str(ROOT)) if "E566" in row.codes or "E567" in row.codes]
+    assert [(row.owner_rule, sorted(row.codes)) for row in rows] == [("fixed_step:14", ["E566", "E567"])]

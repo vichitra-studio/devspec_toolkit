@@ -351,7 +351,6 @@ def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
     }
     spec_dir = _write_spec(tmp_path, files)
     messages = [e.message for e in check_traceability_closure(spec_dir)]
-    assert any("UNCOVERED_FR_MILESTONE fr-a" in m for m in messages)
     assert not any("fr-later" in m for m in messages)
     assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
 
@@ -390,7 +389,6 @@ def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
     }
     spec_dir = _write_spec(tmp_path, files)
     messages = [e.message for e in check_traceability_closure(spec_dir)]
-    assert any("UNCOVERED_FR_MILESTONE fr-a" in m for m in messages)
     assert not any("fr-legacy-export" in m for m in messages)
     assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
     artifact = str(Path(spec_dir) / "11_adversarial.json")
@@ -587,7 +585,7 @@ _LEGACY_CLOSURE_FILES = {
 
 def test_closure_reports_every_reader_on_legacy_06_16(tmp_path):
     codes = {e.code for e in check_traceability_closure(_write_spec(tmp_path, _LEGACY_CLOSURE_FILES))}
-    assert {"W561", "W564", "W565", "W566", "W567", "W568", "W569", "W575"} <= codes
+    assert {"W564", "W565", "W568", "W569", "W575"} <= codes
 
 
 def _plan_spec(root: Path, checklist_item: dict) -> str:
@@ -671,7 +669,6 @@ def test_completeness_check_reports_every_dimension_on_legacy_shape(tmp_path):
     assert payload["not_computed"] == []
     assert payload["coverage"]["fr_api_coverage"]["uncovered_ids"] == ["fr-a", "fr-b"]
     assert payload["coverage"]["fr_fixture_coverage"]["uncovered_ids"] == ["fr-a", "fr-b"]
-    assert payload["coverage"]["fr_milestone_coverage"]["uncovered_ids"] == ["fr-a"]
 
 
 def test_step_14_w604_skipped_on_new_shape(tmp_path):

@@ -80,7 +80,7 @@ class TestCreatePlanFromDiff:
             status="needs_update",
             field_diffs=[field1, field2],
         )
-        step_missing = _make_step_diff("13a_extension", status="missing")
+        step_missing = _make_step_diff("16b_extension", status="missing")
 
         diff = _make_diff(steps=[step_diff, step_missing])
         plan = create_migration_plan(diff)
@@ -140,17 +140,17 @@ class TestExecutionOrderRespectsStepDependencies:
 
         # Create steps in reverse pipeline order
         steps = [
-            MigrationStep(step_id="13a_extension", action=MigrationAction.AI_ASSISTED),
+            MigrationStep(step_id="16b_extension", action=MigrationAction.AI_ASSISTED),
             MigrationStep(step_id="04_frs", action=MigrationAction.AUTO),
             MigrationStep(step_id="00_charter", action=MigrationAction.AUTO),
         ]
 
         result = order_migration_steps(steps, step_order_path)
 
-        # Verify order: 00 before 04, 04 before 13a
+        # Verify order: 00 before 04, 04 before 16b
         ids = [s.step_id for s in result]
         assert ids.index("00_charter") < ids.index("04_frs")
-        assert ids.index("04_frs") < ids.index("13a_extension")
+        assert ids.index("04_frs") < ids.index("16b_extension")
 
 
 class TestEmptyDiffProducesEmptyPlan:

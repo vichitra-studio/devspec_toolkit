@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from typing import Any, Callable
 
+import pytest
+
 from specdev_tools.validation.validate import validate_file
 from unit.graph._synth import accept_links, graph_check
 
@@ -182,6 +184,153 @@ class Step14IntegrationTests(unittest.TestCase):
         """No sibling artifact is read: a roadmap whose criteria refine unknown ids and sit beside no 09/04/01 passes."""
         errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "valid_roadmap.json"))
         self.assertEqual([], [e for e in errors if e.code in {"E590", "W590", "E142"}])
+
+
+
+# --- the milestone numbers (E566, E567): the graph check ``milestone-numbers`` ---------------------------------------------
+
+
+FR_REQUEST = "fr-password-reset-request"
+AC_REQUEST = "ac-password-reset-request-1"
+DESIGN_MILESTONE = "milestone-account-recovery"
+
+
+def _milestone_numbers(spec: Path) -> list[Any]:
+    from specdev_tools.validation.graph_checks.context import MERGE
+    from specdev_tools.validation.validators.step_14_milestones import check_milestone_numbers
+    from unit.validation.graph_checks._example_support import context_of_spec
+
+    return check_milestone_numbers(context_of_spec(spec), MERGE)
+
+
+def _found(findings: list[Any], code: str) -> list[str]:
+    return [finding.node_id for finding in findings if finding.code == code]
+
+
+def _example(tmp_path: Path, **edits: Any) -> Path:
+    from unit.validation.graph_checks._example_support import edited_example
+
+    return edited_example(tmp_path / "spec", **edits)
+
+
+def _add_fr(document: dict[str, Any]) -> None:
+    fr = copy.deepcopy(document["functional_requirements"][1])
+    fr["fr_id"] = "fr-extra"
+    fr["acceptance_criteria"] = [{"criterion_id": "ac-extra-1", "scope": "in", "text": "Given an extra requirement, then something is done."}]
+    document["functional_requirements"].append(fr)
+
+
+def _schedule_request(document: dict[str, Any]) -> None:
+    document["milestones"][0]["schedules"].append(FR_REQUEST)
+
+
+def _refine_request(document: dict[str, Any]) -> None:
+    document["milestones"][0]["tasks"][0]["acceptance_criteria"].append(
+        {"criterion_id": "tc-request-sends-link", "text": "A reset request sends one email.", "refines": [AC_REQUEST], "verified_by": ["fix-password-reset-expired-token"]}
+    )
+
+
+def test_in_scope_fr_without_a_reachable_criterion_gives_e566(tmp_path: Path) -> None:
+    findings = _milestone_numbers(_example(tmp_path, **{"04_fr_list.json": _add_fr}))
+    assert "fr-extra" in _found(findings, "E566")
+    finding = next(f for f in findings if f.node_id == "fr-extra")
+    assert (finding.owner, finding.file) == ("step:14", "04_fr_list.json")
+    assert "fr-password-reset" not in _found(findings, "E566")  # refined through its acceptance criterion
+
+
+def test_fr_covered_through_an_api_that_derives_from_it_gives_no_e566(tmp_path: Path) -> None:
+    def derive(document: dict[str, Any]) -> None:
+        api = next(a for a in document["apis"] if a.get("api_id") == "api-password-reset-confirm")
+        api.setdefault("derives_from", []).append(FR_REQUEST)
+
+    def refine_api(document: dict[str, Any]) -> None:
+        document["milestones"][0]["tasks"][0]["acceptance_criteria"][0]["refines"].append("api-password-reset-confirm")
+
+    spec = _example(tmp_path)
+    assert FR_REQUEST in _found(_milestone_numbers(spec), "E566")
+    from unit.validation.graph_checks._example_support import edit_documents
+
+    edit_documents(spec, **{"05_interface_contracts.json": derive, "14_roadmap.json": refine_api})
+    assert FR_REQUEST not in _found(_milestone_numbers(spec), "E566")
+
+
+def test_fr_with_scope_later_gives_no_e566(tmp_path: Path) -> None:
+    def park(document: dict[str, Any]) -> None:
+        _add_fr(document)
+        document["functional_requirements"][-1].update(scope="later", scope_reason="Deferred to the next release.")
+
+    findings = _milestone_numbers(_example(tmp_path, **{"04_fr_list.json": park}))
+    assert "fr-extra" not in _found(findings, "E566")
+
+
+def test_scheduled_obligation_no_criterion_refines_gives_e567(tmp_path: Path) -> None:
+    findings = _milestone_numbers(_example(tmp_path, **{"09_impl_plan.json": _schedule_request}))
+    e567 = [f for f in findings if f.code == "E567"]
+    assert [(f.node_id, f.target, f.owner, f.file) for f in e567] == [(DESIGN_MILESTONE, FR_REQUEST, "step:14", "09_impl_plan.json")]
+    assert "add a task criterion that refines it" in e567[0].message and f"remove it from the schedules of {DESIGN_MILESTONE}" in e567[0].message
+
+
+def test_every_scheduled_obligation_refined_gives_no_e567(tmp_path: Path) -> None:
+    """The unchanged example has none; a scheduled FR whose acceptance criterion a task criterion refines gives none either."""
+    assert _found(_milestone_numbers(_example(tmp_path)), "E567") == []
+    spec = _example(tmp_path / "refined", **{"09_impl_plan.json": _schedule_request, "14_roadmap.json": _refine_request})
+    findings = _milestone_numbers(spec)
+    assert _found(findings, "E567") == [] and FR_REQUEST not in _found(findings, "E566")
+
+
+def test_design_milestone_without_a_matching_roadmap_milestone_gives_no_e567(tmp_path: Path) -> None:
+    def second_milestone(document: dict[str, Any]) -> None:
+        document["milestones"].append({"milestone_id": "milestone-nothing-built", "name": "Nothing built", "schedules": [FR_REQUEST]})
+
+    findings = _milestone_numbers(_example(tmp_path, **{"09_impl_plan.json": second_milestone}))
+    assert _found(findings, "E567") == []
+
+
+@pytest.mark.xfail(strict=True, reason="unrefined_scheduled in-play guard: M6b round 4 fix")
+def test_a_scheduled_node_with_scope_later_gives_no_e567(tmp_path: Path) -> None:
+    def park(document: dict[str, Any]) -> None:
+        fr = next(f for f in document["functional_requirements"] if f["fr_id"] == FR_REQUEST)
+        fr.update(scope="later", scope_reason="Deferred to the next release.")
+
+    findings = _milestone_numbers(_example(tmp_path, **{"04_fr_list.json": park, "09_impl_plan.json": _schedule_request}))
+    assert _found(findings, "E567") == []
+
+
+def test_milestone_with_no_tasks_gives_neither(tmp_path: Path) -> None:
+    def empty_milestone(document: dict[str, Any]) -> None:
+        document["milestones"].append({"milestone_id": "ms-empty", "name": "Empty", "target_date": "2027-01-15", "user_story": "As a member, nothing yet.", "tasks": []})
+
+    before = [(f.code, f.node_id) for f in _milestone_numbers(_example(tmp_path / "a"))]
+    after = [(f.code, f.node_id) for f in _milestone_numbers(_example(tmp_path / "b", **{"14_roadmap.json": empty_milestone}))]
+    assert after == before
+
+
+def test_milestone_checks_skip_without_graph() -> None:
+    """``spec-check`` runs the check under its registered name and the check skips, with the reason of every graph check, when no graph could be built."""
+    from types import SimpleNamespace
+
+    from specdev_tools.validation.check_registry import CHECK_REGISTRY
+    from specdev_tools.validation.graph_checks.context import GRAPH_NOT_BUILT
+    from specdev_tools.validation.spec_check import run_spec_check_json  # noqa: F401  (importing it fills CHECK_REGISTRY)
+
+    registered = {spec.name: spec.fn for spec in CHECK_REGISTRY}
+    result = registered["milestone-numbers"](SimpleNamespace(check_graph=None))
+    assert result["status"] == "SKIP" and GRAPH_NOT_BUILT in json.dumps(result)
+
+
+def test_milestone_count_in_step_09_changes_the_result_and_in_another_step_does_not(tmp_path: Path) -> None:
+    """Adding a step 09 milestone that a task criterion computes and that schedules something unrefined adds E567; adding a step 14 milestone without tasks changes nothing."""
+    def unrefined_milestone(document: dict[str, Any]) -> None:
+        document["milestones"].append({"milestone_id": "milestone-second", "name": "Second", "schedules": ["fr-password-reset", FR_REQUEST]})
+
+    def empty_milestone(document: dict[str, Any]) -> None:
+        document["milestones"].append({"milestone_id": "ms-empty", "name": "Empty", "target_date": "2027-01-15", "user_story": "As a member, nothing yet.", "tasks": []})
+
+    base = [(f.code, f.node_id, f.target) for f in _milestone_numbers(_example(tmp_path / "base"))]
+    in_09 = [(f.code, f.node_id, f.target) for f in _milestone_numbers(_example(tmp_path / "s09", **{"09_impl_plan.json": unrefined_milestone}))]
+    in_14 = [(f.code, f.node_id, f.target) for f in _milestone_numbers(_example(tmp_path / "s14", **{"14_roadmap.json": empty_milestone}))]
+    assert in_09 == [*base, ("E567", "milestone-second", FR_REQUEST)]
+    assert in_14 == base
 
 
 if __name__ == "__main__":

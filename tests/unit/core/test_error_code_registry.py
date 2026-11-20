@@ -19,7 +19,7 @@ REMOVED_CODES = (
 # edits this list in the same commit as its code change.
 EXPECTED_PROMOTABLE_PAIRS = {
     "W562": "E562", "W563": "E563",
-    "W564": "E564", "W565": "E565", "W566": "E566", "W567": "E567",
+    "W564": "E564", "W565": "E565",
     "W568": "E568", "W569": "E569", "W571": "E571", "W572": "E572",
     "W573": "E573", "W575": "E575", "W576": "E576", "W580": "E580",
     "W150": "E150", "W591": "E591", "W592": "E592", "W593": "E593",
@@ -31,7 +31,7 @@ EXPECTED_PROMOTABLE_PAIRS = {
 # A code that a work item registers before the code that writes it exists stays here until that work item writes it
 # as a literal.
 REGISTERED_WITHOUT_EMITTER = {
-    "E422", "E561", "E604", "E620", "W150", "W591",
+    "E422", "E604", "E620", "W150", "W591",
     # W595 is emitted, but only inside longer message strings (context freshness in cli.py, context/seed_indexer.py),
     # which the literal pattern above does not match; file-level forward replay, which wrote it as a literal, is gone.
     "W595",
@@ -84,10 +84,10 @@ class TestR9ErrorCodes(unittest.TestCase):
             self.assertIn(code, ERROR_CODES, f"{code} not registered in ERROR_CODES")
 
     def test_promotable_pairs_match_expected_list(self):
-        """PROMOTABLE_PAIRS equals the explicit W->E list above (21 pairs)."""
+        """PROMOTABLE_PAIRS equals the explicit W->E list above (19 pairs)."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
         self.assertEqual(PROMOTABLE_PAIRS, EXPECTED_PROMOTABLE_PAIRS)
-        self.assertEqual(len(PROMOTABLE_PAIRS), 21)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 19)
 
     def test_removed_codes_not_registered(self):
         """The codes whose input fields were removed are gone from ERROR_CODES and PROMOTABLE_PAIRS."""

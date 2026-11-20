@@ -27,7 +27,7 @@ list_entries(spec_file, repo_root)
     Return the registered (array_path, id_field, kind) tuples for a file,
     including nested array entries with their full dot-notation path.
     Returns an empty list if the file has no entry arrays in the registry
-    (e.g. 13a, 16).  Returns None for **unknown** files (callers fall back
+    (e.g. 16).  Returns None for **unknown** files (callers fall back
     to legacy broad scan).
 
 find_entry(spec_file, id_value, repo_root)
@@ -51,7 +51,7 @@ Design constraints
 - No global feature list, no plugins, no extension points.
 - Fallback to ``None`` (not empty list) for unknown filenames so callers can
   distinguish "known file with no arrays" from "unknown file".
-- Steps registered with ``arrays: []`` (e.g. 13a, 16) return an empty list
+- Steps registered with ``arrays: []`` (e.g. 16) return an empty list
   rather than None — callers skip the legacy broad scan for those files.
 """
 
@@ -152,7 +152,7 @@ def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]
 
     Returns:
         - ``list`` (possibly empty) if the file is **known** to the registry.
-          Empty list means the step's file has no entry arrays (e.g. 13a, 16).
+          Empty list means the step's file has no entry arrays (e.g. 16).
         - ``None`` if the file is **unknown** — caller should fall back to the
           legacy broad ``_ID_CANDIDATE_FIELDS`` scan.
 

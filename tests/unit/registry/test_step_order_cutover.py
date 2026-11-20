@@ -51,7 +51,10 @@ _ADDED_EDGES = {
 # (consumer, input) pairs of the 1.1.1 hand file that no stored x-link carries: context reads
 # of the prompts (03 reads 00-02 by label; 07 reads 02a and 03; every later step reads the
 # steps whose artifacts it only cites).  The pairs of 16a are carried by declared_edges until M8.
+# The ten pairs that name step 13a go with the step (M6c retires it).
 _REMOVED_EDGES = {
+    ("13a", "00"), ("13a", "01"), ("13a", "04"), ("13a", "05"), ("13a", "08"), ("13a", "12"), ("13a", "13"),
+    ("14", "13a"), ("16a", "13a"), ("16b", "13a"),
     ("03", "00"), ("03", "01"), ("03", "02"),
     ("04", "03"), ("05", "03"),
     ("07", "02a"), ("07", "03"),
@@ -66,17 +69,19 @@ _REMOVED_EDGES = {
 
 # W595 staleness reads ``downstream_consumers``: producer -> consumers that lose the context read.
 _LOST_CONSUMERS = {
-    "00": ["03"],
-    "01": ["03", "09", "11"],
+    "00": ["03", "13a"],
+    "01": ["03", "09", "11", "13a"],
     "02": ["03", "08", "10", "14", "15"],
     "02a": ["07", "08", "15"],
     "03": ["04", "05", "07"],
-    "04": ["15", "16"],
-    "05": ["16"],
-    "08": ["09", "15", "16"],
+    "04": ["13a", "15", "16"],
+    "05": ["13a", "16"],
+    "08": ["09", "13a", "15", "16"],
     "09": ["10", "16"],
     "11": ["15", "16"],
-    "12": ["16"],
+    "12": ["13a", "16"],
+    "13": ["13a"],
+    "13a": ["14", "16a", "16b"],
     "14": ["15"],
     "15": ["16"],
 }
@@ -137,7 +142,7 @@ def test_expected_diff_list_is_pinned():
     removed = {(d.consumer, d.input) for d in diff if d.kind == "extra_in_hand"}
     assert added == set(_ADDED_EDGES)
     assert removed == _REMOVED_EDGES
-    assert (len(added), len(removed), len(diff)) == (15, 28, 43)
+    assert (len(added), len(removed), len(diff)) == (15, 38, 53)
 
 
 def test_w595_narrowing_lists_consumers_that_lose_a_context_read():

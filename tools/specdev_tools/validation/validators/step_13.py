@@ -7,7 +7,7 @@ from ...core.scope_helpers import as_list, dict_items
 from ...core.errors import make_error, SpecError
 
 
-# Valid section name patterns: numeric step prefix (00_*, 13a_*) OR any
+# Valid section name patterns: numeric step prefix (00_*, 16a_*) OR any
 # domain-style identifier (tables, indexes, my-section, etc.).  The original
 # strict pattern r"^[0-9]{2}[a-z]?_" incorrectly rejected non-numeric section
 # names used by domain-specific schemas.

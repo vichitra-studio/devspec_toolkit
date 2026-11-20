@@ -1,6 +1,7 @@
 """The pieces of ``step ready`` that need no command line: which steps have a file, the required inputs, and the verdict from values."""
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -24,9 +25,9 @@ def example(tmp_path: Path) -> Example:
 
 def test_present_steps_are_the_steps_with_a_spec_file(example: Example) -> None:
     present = present_steps(example.graph(), str(example.spec))
-    assert {"00", "02", "02a", "04", "16"} <= present and "13a" not in present
-    (example.spec / "13a_extra.json").write_text("{}", encoding="utf-8")
-    assert "13a" in present_steps(example.graph(), str(example.spec))
+    assert {"00", "02", "02a", "04", "16"} <= present and "16b" not in present
+    (example.spec / "16b_extra.json").write_text("{}", encoding="utf-8")
+    assert "16b" in present_steps(example.graph(), str(example.spec))
 
 
 def test_a_file_that_is_not_json_does_not_make_its_step_present(tmp_path: Path) -> None:
@@ -46,8 +47,17 @@ def test_a_file_of_step_02a_is_not_a_file_of_step_02(tmp_path: Path) -> None:
 
 
 def test_required_spec_inputs_come_from_the_step_order_file() -> None:
-    assert "13a" in required_spec_inputs(str(ROOT), "14")
+    assert "13" in required_spec_inputs(str(ROOT), "14")
     assert required_spec_inputs(str(ROOT), "no-such-step") == []
+
+
+def test_step_14_no_longer_requires_13a() -> None:
+    assert "13a" not in required_spec_inputs(str(ROOT), "14")
+
+
+def test_13a_is_not_a_step() -> None:
+    steps = json.loads((Path(ROOT) / "tools" / "step_order.json").read_text(encoding="utf-8"))["steps"]
+    assert "13a" not in steps and required_spec_inputs(str(ROOT), "13a") == []
 
 
 def test_check_ready_takes_the_present_steps_as_values(example: Example) -> None:

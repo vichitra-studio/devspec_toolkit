@@ -63,16 +63,16 @@ class TestPlainStep:
         assert step_ids == ["s-a"]
         assert "s-umbrella" not in step_ids
 
-    def test_13a_no_umbrella(self):
-        """Umbrella semantics must NOT apply to "13a"."""
+    def test_04_no_umbrella(self):
+        """Umbrella semantics must NOT apply to "04"."""
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={
-                "13a": ["s-impl"],
+                "04": ["s-impl"],
                 "16": ["s-umbrella"],
             },
         )
-        _, step_ids = resolve_seeds_for_step("13a", manifest)
+        _, step_ids = resolve_seeds_for_step("04", manifest)
         assert step_ids == ["s-impl"]
         assert "s-umbrella" not in step_ids
 
@@ -408,13 +408,13 @@ class TestUmbrellaIsolation:
         _, step_ids = resolve_seeds_for_step("00", manifest)
         assert "s-umbrella" not in step_ids
 
-    def test_16_bare_does_not_leak_into_13a(self):
+    def test_16_bare_does_not_leak_into_02a(self):
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={
-                "13a": ["s-ext"],
+                "02a": ["s-ext"],
                 "16": ["s-umbrella"],
             },
         )
-        _, step_ids = resolve_seeds_for_step("13a", manifest)
+        _, step_ids = resolve_seeds_for_step("02a", manifest)
         assert "s-umbrella" not in step_ids

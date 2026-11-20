@@ -40,7 +40,7 @@ CHECK_NAMES = [name for name, _rule, _check in BUILTIN_GRAPH_CHECKS]
 def test_registered_graph_checks_come_before_open_items() -> None:
     names = [spec.name for spec in CHECK_REGISTRY]
     start = names.index("no-dangling")
-    assert names[start : start + len(CHECK_NAMES) + 1] == [*CHECK_NAMES, "open-items"]
+    assert names[start : start + len(CHECK_NAMES) + 2] == [*CHECK_NAMES, "milestone-numbers", "open-items"]
     assert {spec.default_owner for spec in CHECK_REGISTRY if spec.name in CHECK_NAMES} == {"merge-check"}
 
 

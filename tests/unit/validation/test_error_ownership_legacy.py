@@ -18,7 +18,7 @@ ROOT = Path(__file__).parents[3]
 MERGE_CHECK = "merge-check"
 SCHEMA_URI_MISSING = "missing_schema_uri"
 DEAD_CLOSURE_CODES = (
-    "E560", "W561", "W562", "W563", "W564", "W565", "W566", "W568", "W569", "W575", "W576", "E535", "E536",
+    "E560", "W562", "W563", "W564", "W565", "W568", "W569", "W575", "W576", "E535", "E536",
 )
 
 

@@ -39,7 +39,6 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 - **spec/11_redteam.json**: threat identifiers, attack surface mappings, and severity ratings that drive security checklist items and new_fixtures planning in plan.security
 - **spec/12_ci_gates.json**: CI pipeline stage definitions, required gate checks, and failure thresholds that inform test_commands in review_requirements and verification expectations
 - **spec/13_extension_manifest.json**: extension point declarations and plugin contract definitions used to identify additional files requiring modification for extensibility support
-- **spec/13a_completeness_assessment.json**: coverage gap findings, missing requirement identification, and completeness scores used to validate that the plan addresses all known specification gaps
 
 # Operating Flow: Context Review → Synthesize → Clarify → Drift Check → Emit
 1.  **Context Review**: Determine which upstream spec artifacts and docs are required (root README map, tooling docs, architecture notes, ops runbooks). Ingest all required upstream structured specs before proceeding.

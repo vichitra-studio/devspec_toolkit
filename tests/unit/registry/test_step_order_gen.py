@@ -150,7 +150,7 @@ def test_two_step_cycle_annot_20_names_edges(tmp_path):
     assert "schema/05_api.schema.json field 'derives_from' kind 'fr'" in issue
 
 
-@pytest.mark.parametrize("a,b", [("02a", "03"), ("13", "13a"), ("16", "16a")])
+@pytest.mark.parametrize("a,b", [("02a", "03"), ("02", "02a"), ("16", "16a")])
 def test_substep_pairs_cycle(tmp_path, a, b):
     root = _toolkit(tmp_path, [
         _N(a, "ka", [("derives_from", ["kb"], None)]),
@@ -209,11 +209,11 @@ def test_plan_holder_realises_edge_but_record_about_none(tmp_path):
 
 
 def test_deterministic_and_ties_by_step_id(tmp_path):
-    nodes = [_N("13a", "x"), _N("13", "y"), _N("02a", "z"), _N("02", "w"), _N("16", "v")]
+    nodes = [_N("16a", "x"), _N("13", "y"), _N("02a", "z"), _N("02", "w"), _N("16", "v")]
     root = _toolkit(tmp_path, nodes)
     d1, d2 = _derive(root), _derive(root)
     assert d1 == d2
-    assert d1["steps"] == ["02", "02a", "13", "13a", "16"]
+    assert d1["steps"] == ["02", "02a", "13", "16", "16a"]
     assert json.dumps(d1, sort_keys=True) == json.dumps(d2, sort_keys=True)
 
 

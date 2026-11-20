@@ -102,7 +102,10 @@ def test_step_gate_from_the_host_root(tmp_path: Path, monkeypatch: pytest.Monkey
         code, found, err = _run_gate(capsys, spec, flags, "--step", step)
         assert code == 1 and SEED_NOTE not in err, err
         _assert_decided(found, expected)
-    assert {code for findings in found["pending"].values() for code, *_rest in findings} <= GRAPH_CHECK_CODES
+    pending_codes = [code for findings in found["pending"].values() for code, *_rest in findings]
+    e566 = sorted(node for findings in found["pending"].values() for code, _owner, node, *_rest in findings if code == "E566")
+    # ruling C15: the example's one FR without a task criterion, and the FR the delta adds
+    assert set(pending_codes) <= GRAPH_CHECK_CODES | {"E566"} and e566 == ["fr-broken-link", "fr-password-reset-request"]
 
 
 def test_step_gate_from_the_folder_above_without_git_root(

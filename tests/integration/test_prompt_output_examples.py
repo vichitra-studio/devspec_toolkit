@@ -3,7 +3,7 @@
 Each example is read out of its prompt (``prompt_schema_sync._extract_output_contract``) and checked alone, with no
 neighbours: (a) against the step schema, (b) by the step's deep validator, (c) by ``spec-check`` for E752 (a node id
 written in prose).  Run alone, the examples' illustrative ids raise only isolation findings (W590, E740 ...), which
-are not asserted on.  The anchor prompt and 16a to 16c are M8's and are not in the set; 13a is retired by M6c.
+are not asserted on.  The anchor prompt and 16a to 16c are M8's and are not in the set.
 
 ``KNOWN_FAILING`` lists the checks a prompt fails today, with the bundle of ``preflight/M6c.md`` that rewrites the
 prompt; each such case is ``xfail(strict=True)`` so that the bundle must remove its line when the example is fixed.
@@ -97,7 +97,7 @@ def _cases(check: str) -> list[Any]:
 
 def test_prompt_set_is_the_seventeen_in_scope_prompts() -> None:
     names = sorted(Path(p).name for p in glob.glob(str(PROMPTS / "prompt_*.md")))
-    in_scope = [n for n in names if re.match(r"prompt_(0\d|1[0-5])[a-z]?_", n) and not n.startswith("prompt_13a_")]
+    in_scope = [n for n in names if re.match(r"prompt_(0\d|1[0-5])[a-z]?_", n)]
     assert [sync._step_from_prompt_name(n) for n in in_scope] == list(STEPS)
     assert not [n for n in in_scope if n.startswith("prompt_16")]
     assert len(in_scope) == 17

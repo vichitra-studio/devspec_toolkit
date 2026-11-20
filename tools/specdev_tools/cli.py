@@ -339,7 +339,7 @@ def build_parser() -> _SpecdevParser:
     sc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
     sc_scope = sc.add_mutually_exclusive_group()
-    sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N (written as in the file name: 05, 13a, 16) instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
+    sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N (written as in the file name: 05, 02a, 16) instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
     sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
     from .validation.step_gate_report import DETAIL_CHOICES
 
@@ -1096,11 +1096,9 @@ def main():
         all_errs = check_traceability_closure(spec_dir, repo_root)
 
         # Filter for pairwise completeness codes W564–W568 (and E-code counterparts).
-        # W561 (UNCOVERED_FR legacy co-fire) is intentionally excluded — W566 covers the same FRs
-        # and is the promotable pairwise code for completeness reporting.
         _completeness_codes = frozenset({
-            "W564", "W565", "W566", "W567", "W568",
-            "E564", "E565", "E566", "E567", "E568",
+            "W564", "W565", "W568",
+            "E564", "E565", "E568",
         })
         from .core.errors import SpecError
         completeness_errs = [
@@ -1115,12 +1113,9 @@ def main():
         # Message forms:
         #   W564: "UNCOVERED_FR_API {fr_id}"
         #   W565: "UNCOVERED_FR_FIXTURE {fr_id}"
-        #   W566: "UNCOVERED_FR_MILESTONE {fr_id}"
-        #   W567: "INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}" or
-        #          "INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}: fr_ref {fr_id} not covered ..."
         #   W568: "UNCOVERED_CAPABILITY {cap_id}"
-        _PAIRWISE_CODES = frozenset({"W564", "W565", "W566", "W567", "W568",
-                                     "E564", "E565", "E566", "E567", "E568"})
+        _PAIRWISE_CODES = frozenset({"W564", "W565", "W568",
+                                     "E564", "E565", "E568"})
 
         def _extract_ids_for_code(code: str) -> list[str]:
             result = []
@@ -1134,9 +1129,7 @@ def main():
                     parts = msg.split()
                     if len(parts) >= 2 and code in _PAIRWISE_CODES:
                         # ID is always the second token for W564–W568.
-                        # Strip trailing colon: the fr_ref W567 variant emits
-                        # "INCOMPLETE_MILESTONE_DECOMPOSITION ms-id: fr_ref ..."
-                        # so parts[1] is "ms-id:" — normalise to "ms-id".
+                        # Strip a trailing colon from the id.
                         result.append(parts[1].rstrip(':'))
                     elif parts:
                         result.append(parts[1] if len(parts) >= 2 else parts[-1])
@@ -1162,8 +1155,8 @@ def main():
             return loaded if isinstance(loaded, dict) else {}
 
         # Exclude parked FRs (scope later/out; the 1.1.1 priority:"wont-have" too) from
-        # every FR-based denominator below. W564 (API coverage) and W566
-        # (milestone coverage) additionally exempt FRs listed in Step 05's
+        # every FR-based denominator below. W564 (API coverage)
+        # additionally exempts FRs listed in Step 05's
         # apis.out_of_scope[]; W565 (fixture coverage) exempts a *different*
         # set -- FRs listed in Step 08's fixtures.out_of_scope[] -- per
         # traceability_closure.py's deliberate separation (DEVSPEC-122: "no
@@ -1206,8 +1199,8 @@ def main():
 
         uncovered_w564 = _extract_ids_for_code("W564")
         uncovered_w565 = _extract_ids_for_code("W565")
-        uncovered_w566 = _extract_ids_for_code("W566")
-        uncovered_w567 = _extract_ids_for_code("W567")
+        uncovered_w566: list[str] = []  # E566 and E567 are the graph check `milestone-numbers` now (M6c)
+        uncovered_w567: list[str] = []
         uncovered_w568 = _extract_ids_for_code("W568")
 
         # A dimension whose closure reader is skipped on this spec shape is written in the 13a schema's

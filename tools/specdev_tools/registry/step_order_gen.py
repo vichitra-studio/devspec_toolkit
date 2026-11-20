@@ -47,10 +47,10 @@ _NOTES = {
         "'dag-lint' and 'dependency-order-lint'."
     ),
     "declared_edges": (
-        "Hand-carried [producer, consumer] pairs. Steps 13, 13a, 16a, 16b and 16c keep their 1.1.1 "
-        "context reads (the Trinity steps have no stored links to them yet): M6c retires 13a and M8 "
-        "gives 16a-16c records with links, and both remove their pairs. Step 14 keeps its 1.1.1 reads of "
-        "steps 13 and 13a. [09, 14] and [14, 16] are computed links no annotation carries."
+        "Hand-carried [producer, consumer] pairs. Steps 13, 16a, 16b and 16c keep their 1.1.1 "
+        "context reads (the Trinity steps have no stored links to them yet): M8 gives 16a-16c "
+        "records with links and removes their pairs. Step 14 keeps its 1.1.1 read of step 13. "
+        "[09, 14] and [14, 16] are computed links no annotation carries."
     ),
     "step_metadata": (
         "Per-step declarative metadata. required_spec_inputs is the inverse of downstream_consumers "

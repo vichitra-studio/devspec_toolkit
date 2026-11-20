@@ -173,9 +173,9 @@ class TestInventoryUserSteps:
         assert inventory_user_steps(tmp_path / "nope") == {}
 
     def test_substep_files(self, tmp_path):
-        (tmp_path / "13a_completeness.json").write_text("{}")
+        (tmp_path / "02a_baseline.json").write_text("{}")
         result = inventory_user_steps(tmp_path)
-        assert "13a_completeness" in result
+        assert "02a_baseline" in result
 
 
 # ---------------------------------------------------------------------------

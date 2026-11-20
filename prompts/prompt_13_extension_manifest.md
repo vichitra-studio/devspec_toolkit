@@ -20,15 +20,15 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Project scope boundaries and high-level domain context used to constrain which extension domains are in-scope versus out-of-scope
 - **01_capabilities.json**: Capability IDs and descriptions identifying complex functional areas that may require dedicated extension specifications beyond core step coverage
-- **02_system_sketch.json**: Component IDs, subsystem boundaries, architectural patterns (event sourcing, CQRS, multi-tenancy), and `tech_stack` technology decisions evaluated for extension spec necessity; technology choices directly determine which extension domains are warranted (e.g., a PostgreSQL choice may require a migrations extension; an ML framework choice may require a model-serving extension)
+- **02_system_sketch.json**: Component IDs, subsystem boundaries, architectural patterns (event sourcing, CQRS, multi-tenancy), and `third_parties` (pinned technology decisions) evaluated for extension spec necessity; technology choices directly determine which extension domains are warranted (e.g., a PostgreSQL choice may require a migrations extension; an ML framework choice may require a model-serving extension)
 - **02a_delivery_baseline.json**: Deployment topology and environment constraints that influence whether infrastructure-specific extensions are warranted
 - **03_glossary.json**: Domain-specific terminology and bounded-context definitions used to identify domain verticals requiring dedicated specification treatment
 - **04_fr_list.json**: Functional requirement IDs and complexity indicators that signal domains with sufficient depth to justify a standalone extension specification
 - **05_interface_contracts.json**: API endpoint definitions used to verify that proposed extensions do not duplicate routes already covered by core interface contracts
 - **06_invariants.json**: System invariant rules that may require dedicated extension specifications when they span complex cross-cutting concerns like data consistency or transactional guarantees
 - **07_nfrs.json**: Non-functional requirement IDs, categories (security, compliance, performance), and thresholds evaluated for extension necessity when complexity exceeds core NFR coverage
-- **08_fixtures.json**: Test fixture targets and coverage patterns used to confirm that proposed extensions have testable surface area and are not purely theoretical
-- **09_impl_plan.json**: Refined technology stack decisions (superset of Step 02's tech_stack) and milestone structure consulted to ensure proposed extensions align with chosen frameworks and implementation sequencing; Step 02 is the authoritative origin, Step 09 may add version pins or spike-discovered tools
+- **08_fixtures.json**: Test fixture definitions, the nodes they verify, and coverage patterns used to confirm that proposed extensions have testable surface area and are not purely theoretical
+- **09_impl_plan.json**: Milestones, their target dates and what each schedules, consulted to ensure proposed extensions align with implementation sequencing; technology decisions come from the `third_parties` of Step 02, the only place they are recorded
 - **10_governance.json**: Governance label definitions (context only; `governance_label_ref` resolves through `canon/manifest.json`, not through this file)
 - **11_redteam.json**: Threat model findings and attack surface analysis evaluated for security or compliance domains that warrant dedicated extension specifications
 - **12_ci_gates.json**: CI gate definitions and quality thresholds reviewed to confirm that proposed extensions can be validated within the existing continuous integration pipeline
@@ -46,8 +46,8 @@ For each upstream artifact ingested, extract the following:
 ## Heuristics For Completeness
 - **Explicit > Implicit**: If a system has a Vector Database, do not leave it as an "implementation detail". Assign it `extension_id: ext-01-vectordb` — the output filename `ext_01_vectordb.json` is derived automatically (hyphens → underscores + `.json`).
 - **Don't Over-Splice**: Only create extensions for truly complex domains. A simple CRUD app might not need a dedicated Database Spec if the Interface Contracts (Step 05) are sufficient.
-- **Traceability**: Extensions MUST link back to Functional Requirements or NFRs that justify their existence.
-- **Justification**: Explaining *why* an extension is needed helps the Roadmap (Step 14) prioritize it correctly.
+- **Justification**: Extensions carry no link fields, so each `justification` MUST name the functional requirement, NFR or component that justifies the extension, by its name or metric rather than its id.
+- **Roadmap**: Explaining *why* an extension is needed helps the Roadmap (Step 14) prioritize it correctly.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -66,8 +66,9 @@ For each upstream artifact ingested, extract the following:
 Before emitting, verify:
 - Every complex domain identified in `spec/02_system_sketch.json` components (event sourcing, CQRS, multi-tenancy, etc.) has been evaluated for whether an extension spec is needed.
 - Every compliance/security constraint in `spec/07_nfrs.json` with `category: security` or `category: compliance` has been evaluated for extension need.
-- Each `extension_id` has a `justification` that references a specific `component_id` or `nfr_id` from upstream specs.
-- No identified architectural gap is silently dropped without explicit `out_of_scope` rationale.
+- Each `extension_id` has a `justification` that names a specific component or NFR from upstream specs.
+- No identified architectural gap is silently dropped: record the decision in `extension_decision.rationale` or ask a gap question.
+- No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any domain complexity is unclear: add a gap question (Clarify mode) rather than generating a speculative extension.
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
@@ -90,7 +91,7 @@ Before emitting, verify:
 Authoritative values: resolve governance_label IDs from `canon/manifest.json` (kind: `governance_label`). Do not enumerate inline — the registry is the source of truth and validated by canonical-integrity lint (E110).
 
 ## Cross-Step Synthesis Notes
-- extensions[*].justification: MUST reference a specific `component_id` from `spec/02_system_sketch.json` or `nfr_id` from `spec/07_nfrs.json` that necessitates the extension.
+- extensions[*].justification: MUST name a specific component from `spec/02_system_sketch.json` or NFR from `spec/07_nfrs.json` (by its name or metric, not its id) that necessitates the extension.
 - extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) with `kind: "governance_label"`. The `id` must resolve in `canon/manifest.json` (see Governance Label Resolution above); it is not listed in step 10. If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
 - extension_decision: **REQUIRED**. The cardinality constraints between `status` and `extensions` are machine-enforced by schema `vc:13-extension-manifest` allOf conditionals — consult the schema as the authoritative source.
 - **Optional per-extension fields** (omit when not applicable): `tag_ref` (kind: `"tag"` — for cross-cutting concern tags like `critical-path`), `policy_ref` (kind: `"policy"` — when the extension is governed by a specific policy), `id_pattern_ref` (kind: `"id_pattern"` — only when extension IDs follow a non-standard pattern).
@@ -147,7 +148,7 @@ Authoritative values: resolve governance_label IDs from `canon/manifest.json` (k
   "created_at": "2025-01-01T00:00:00Z",
   "extension_decision": {
     "status": "none-required",
-    "rationale": "Evaluated components ghost-cms, vc-collective-theme, ghost-sqlite-db, zoho-mail-smtp, youtube-oembed, github-scm from 02_system_sketch.json. NFR categories cover latency, usability, availability, durability, maintainability, portability, throughput — zero in security or compliance. No domain requires ≥3 dedicated schema sections beyond core steps."
+    "rationale": "Evaluated the CMS, theme, SQLite database, mail relay, oEmbed and source-control components from 02_system_sketch.json. NFR categories cover latency, usability, availability, durability, maintainability, portability, throughput — zero in security or compliance. No domain requires ≥3 dedicated schema sections beyond core steps."
   },
   "extensions": [],
   "canonical_refs_used": []

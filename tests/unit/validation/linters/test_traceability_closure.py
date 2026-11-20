@@ -47,7 +47,6 @@ FRS_FULL = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type":
 FRS_NO_TRACE = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
 FRS_MISSING_MS = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
 ROADMAP_FULL = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": ["fr-login"], "tasks": [{"task_id": "task-1", "fr_refs": ["fr-login"]}]}]}
-ROADMAP_EMPTY = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-1"}]}]}
 IMPL_FULL = {"id": "ms-v1", "plan": {"spec_alignment": {"checklist": [{"spec_ref": {"id": "task-1"}}]}}}
 IMPL_EMPTY = {"id": "ms-v1", "plan": {"spec_alignment": {"checklist": []}}}
 IMPL_UNRELATED_TASK = {"id": "ms-v1", "plan": {"spec_alignment": {"checklist": [{"spec_ref": {"id": "task-UNRELATED"}}]}}}
@@ -125,12 +124,6 @@ class TestTraceabilityClosure(unittest.TestCase):
                 any("UNCOVERED_CAPABILITY" in e for e in rendered)
                 or any("capability_without_fr" in e for e in rendered)
             )
-
-    def test_fr_without_milestone(self):
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, roadmap=ROADMAP_EMPTY)
-            errs = check_traceability_closure(d)
-            self.assertTrue(any("W561" in e and "UNCOVERED_FR" in e for e in render_errors(errs)))
 
     def test_milestone_without_checklist(self):
         with tempfile.TemporaryDirectory() as d:
@@ -521,52 +514,6 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Did not expect E536 when FR is only in Step 08 out_of_scope (no fixture target). Got: {rendered}"
             )
 
-    def test_w561_w566_suppressed_by_step05_out_of_scope(self):
-        """W561/W566 are suppressed when FR is listed in Step 05 out_of_scope[] with rationale.
-
-        Step 05 out_of_scope[] exemption propagates to W561 (UNCOVERED_FR) and W566
-        (UNCOVERED_FR_MILESTONE) per DEVSPEC-2: infra/ops FRs with no HTTP API surface
-        may also legitimately lack milestone coverage. W565 (UNCOVERED_FR_FIXTURE) is
-        deliberately NOT suppressed by Step 05's out_of_scope[] (DEVSPEC-122): "no API
-        surface" and "no fixture" are independent scoping decisions — an FR with no API
-        can still need a fixture (e.g. a background job). W565 has its own, separate
-        out_of_scope[] in Step 08 — see test_w565_suppressed_by_step08_out_of_scope.
-        """
-        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
-        roadmap_missing = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-1"}]}]}
-        apis_oos = {
-            "apis": [],
-            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
-        }
-
-        # W561 and W566 should not fire when FR is in Step 05 out_of_scope
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, frs=frs, roadmap=roadmap_missing)
-            _write(d, "05_interface_contracts.json", apis_oos)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            self.assertFalse(
-                any("W561" in e and "fr-infra" in e for e in rendered),
-                f"Did not expect W561 for fr-infra in Step 05 out_of_scope. Got: {rendered}"
-            )
-            self.assertFalse(
-                any("W566" in e and "fr-infra" in e for e in rendered),
-                f"Did not expect W566 for fr-infra in Step 05 out_of_scope. Got: {rendered}"
-            )
-
-        # W565 (fixture coverage) is NOT suppressed by Step 05's out_of_scope[] alone —
-        # the two exemptions are deliberately independent (DEVSPEC-122).
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, frs=frs)
-            _write(d, "05_interface_contracts.json", apis_oos)
-            _write(d, "08_fixtures.json", {"fixtures": []})
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            self.assertTrue(
-                any("W565" in e and "fr-infra" in e for e in rendered),
-                f"Expected W565 for fr-infra — Step 05 out_of_scope does not exempt fixture coverage. Got: {rendered}"
-            )
-
     def test_w565_suppressed_by_step08_out_of_scope_with_rationale(self):
         """W565 is suppressed when FR is listed in fixtures.out_of_scope[] with a non-empty rationale.
 
@@ -651,57 +598,6 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Did not expect W565 for fr-login. Got: {rendered}"
             )
 
-    def test_w566_fires_when_fr_not_in_milestone(self):
-        """W566 fires when an FR is not listed in any milestone fr_refs; clears when added."""
-        frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
-        roadmap_missing = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-1"}]}]}
-        roadmap_covered = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": ["fr-login"], "tasks": [{"task_id": "task-1", "fr_refs": ["fr-login"]}]}]}
-
-        # W566 should fire when fr-login is not in any milestone
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, frs=frs, roadmap=roadmap_missing)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            self.assertTrue(
-                any("W566" in e and "fr-login" in e for e in rendered),
-                f"Expected W566 for fr-login. Got: {rendered}"
-            )
-
-        # W566 should NOT fire when fr-login is in a milestone
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, frs=frs, roadmap=roadmap_covered)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            self.assertFalse(
-                any("W566" in e and "fr-login" in e for e in rendered),
-                f"Did not expect W566 for fr-login. Got: {rendered}"
-            )
-
-    def test_w567_fires_when_milestone_has_no_tasks(self):
-        """W567 fires when a milestone has an empty tasks list; clears when tasks are added."""
-        roadmap_empty_tasks = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": []}]}
-        roadmap_with_tasks = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": ["fr-login"], "tasks": [{"task_id": "task-1", "fr_refs": ["fr-login"]}]}]}
-
-        # W567 should fire when ms-v1 has empty tasks
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, roadmap=roadmap_empty_tasks)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            self.assertTrue(
-                any("W567" in e and "ms-v1" in e for e in rendered),
-                f"Expected W567 for ms-v1. Got: {rendered}"
-            )
-
-        # W567 should NOT fire when ms-v1 has tasks
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, roadmap=roadmap_with_tasks)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            w567_msgs = [e for e in rendered if "W567" in e]
-            self.assertEqual([], [e for e in w567_msgs if "ms-v1" in e and "fr_ref" not in e],
-                f"Did not expect W567 empty-tasks for ms-v1. Got: {rendered}"
-            )
-
     def test_w568_fires_when_capability_has_no_fr(self):
         """W568 fires when a capability has no FR tracing to it; clears when an FR covers it."""
         caps = {"capabilities": [{"capability_id": "cap-auth"}]}
@@ -776,31 +672,6 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Expected W568 for scope:in capability cap-auth with no FR. Got: {rendered}"
             )
 
-    def test_w567_fires_when_milestone_fr_not_covered_by_task_fr_refs(self):
-        """W567 fires when a milestone fr_ref is not present in any task's fr_refs."""
-        # ms-v1 declares fr_refs: [fr-login], but the only task covers fr-other
-        roadmap_partial_task = {
-            "milestones": [{
-                "milestone_id": "ms-v1",
-                "fr_refs": ["fr-login"],
-                "tasks": [{"task_id": "task-1", "fr_refs": ["fr-other"]}]
-            }]
-        }
-        frs = {"functional_requirements": [
-            {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
-            {"fr_id": "fr-other", "trace": [{"type": "capability", "id": "cap-auth"}]},
-        ]}
-
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, frs=frs, roadmap=roadmap_partial_task)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            matching = [e for e in rendered if "W567" in e and "fr-login" in e and "not covered" in e]
-            self.assertTrue(
-                len(matching) > 0,
-                f"Expected W567 mentioning 'fr-login not covered'. Got: {rendered}"
-            )
-
 
     def test_w568_not_suppressed_by_step05_out_of_scope(self):
         """W568 (capability coverage) is NOT suppressed by Step 05 out_of_scope[].
@@ -826,35 +697,6 @@ class TestTraceabilityClosure(unittest.TestCase):
             self.assertTrue(
                 any("W568" in e and "cap-ops" in e for e in rendered),
                 f"Expected W568 for cap-ops — Step 05 out_of_scope does not suppress capability coverage. Got: {rendered}"
-            )
-
-    def test_w561_and_w566_co_fire_for_same_fr_id(self):
-        """W561 and W566 both fire for the same FR ID when no milestone covers it.
-
-        This verifies the co-fire invariant: W561 (legacy UNCOVERED_FR signal) and
-        W566 (pairwise UNCOVERED_FR_MILESTONE) must both fire for the same uncovered
-        FR ID. W561 is excluded from PROMOTABLE_PAIRS to prevent double-promotion,
-        but the co-fire is required for completeness reporting accuracy.
-        """
-        frs = {"functional_requirements": [
-            {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
-        ]}
-        # Roadmap exists but fr-login is NOT in any milestone's fr_refs
-        roadmap = {"milestones": [
-            {"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "t-1"}]}
-        ]}
-        with tempfile.TemporaryDirectory() as d:
-            self._write_all(d, frs=frs, roadmap=roadmap)
-            errs = check_traceability_closure(d)
-            rendered = render_errors(errs)
-            # Both W561 and W566 must fire for fr-login
-            self.assertTrue(
-                any("W561" in e and "fr-login" in e for e in rendered),
-                f"Expected W561 for fr-login. Got: {rendered}"
-            )
-            self.assertTrue(
-                any("W566" in e and "fr-login" in e for e in rendered),
-                f"Expected W566 for fr-login. Got: {rendered}"
             )
 
 

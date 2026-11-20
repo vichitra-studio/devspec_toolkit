@@ -1,8 +1,8 @@
 """``specdev step create NN --from <draft>``: write the artifact of a step from a draft, with its lock entries.
 
 The draft is the whole artifact as JSON; ids of sub-items may be left out and are minted.  The file name is the step's
-key in ``tools/entry_key_registry.json`` (``04_fr_list.json``); step 16 (the anchor and the plans of the trinity) and
-13a (no file of its own) cannot be created this way.  The draft is checked against the schema of the step, the candidate
+key in ``tools/entry_key_registry.json`` (``04_fr_list.json``); step 16 (the anchor and the plans of the trinity)
+cannot be created this way.  The draft is checked against the schema of the step, the candidate
 graph (the spec with the draft in it) must resolve every link, and the file and the lock entries of all its links are
 written under the write lock of the spec folder by ``id_writes.write_new_file``, the writer the id-keyed writes use.
 Edits to an artifact that exists go through ``specdev json patch|insert|delete --id``.
@@ -40,7 +40,7 @@ def _refuse(message: str) -> WriteRefusedError:
 
 
 def creatable_files(graph: Graph, repo_root: str) -> dict[str, FileDecl]:
-    """The registry file of every step ``step create`` writes, by step, in waterfall order (not 13a, not step 16 or its plans)."""
+    """The registry file of every step ``step create`` writes, by step, in waterfall order (not step 16 or its plans)."""
     declared = {file.step: file for file in load_kind_registry(repo_root).files if not file.is_glob and file.step != ANCHOR_STEP}
     return {step: declared[step] for step in sorted(declared, key=graph.shape.step_key)}
 

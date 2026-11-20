@@ -105,10 +105,6 @@ class TestChecklistSteps:
     def test_step_07_not_in_checklist_steps(self):
         assert "07" not in _CHECKLIST_STEPS
 
-    def test_step_13a_not_in_checklist_steps(self):
-        # 13a produces a completeness-assessment, not a checklist.
-        assert "13a" not in _CHECKLIST_STEPS
-
     def test_step_16a_in_checklist_steps(self):
         # 16a uses vc:16-impl-context and authors the checklist.
         assert "16a" in _CHECKLIST_STEPS

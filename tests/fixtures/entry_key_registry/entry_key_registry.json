@@ -94,10 +94,6 @@
                 }
             ]
         },
-        "13a_completeness_assessment.json": {
-            "step": "13a",
-            "arrays": []
-        },
         "16_impl_context.json": {
             "step": "16",
             "arrays": []

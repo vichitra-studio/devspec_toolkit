@@ -846,7 +846,7 @@ class CliTests(unittest.TestCase):
             payload = json.loads(artifact.read_text(encoding="utf-8"))
             self.assertNotIn("dependency_ref", payload)
 
-    def test_canonical_autofix_infers_acronym_and_completeness_dimension_refs(self):
+    def test_canonical_autofix_infers_acronym_refs(self):
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
             spec_dir = repo_root / "spec"
@@ -881,17 +881,6 @@ class CliTests(unittest.TestCase):
                                     },
                                 },
                             },
-                            "missing_elements": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "category": {"type": "string"},
-                                        "completeness_dimension_ref": {"type": "object"},
-                                    },
-                                },
-                            },
                         },
                     }
                 ),
@@ -910,14 +899,6 @@ class CliTests(unittest.TestCase):
                                 "status": "active",
                                 "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
                             },
-                            {
-                                "id": "cn:core:completeness_dimension:traceability",
-                                "kind": "completeness_dimension",
-                                "preferred_label": "traceability",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
                         ],
                         "aliases": [],
                     }
@@ -930,10 +911,6 @@ class CliTests(unittest.TestCase):
                     {
                         "$schema": "vc:test",
                         "terms": [{"acronym": "JWT"}, {"acronym": "XYZ"}],
-                        "missing_elements": [
-                            {"category": "traceability"},
-                            {"category": "unknown-dimension"},
-                        ],
                         "canonical_refs_used": [],
                     }
                 ),
@@ -952,11 +929,6 @@ class CliTests(unittest.TestCase):
                 payload["terms"][0].get("acronym_ref"),
             )
             self.assertNotIn("acronym_ref", payload["terms"][1])
-            self.assertEqual(
-                {"id": "cn:core:completeness_dimension:traceability", "kind": "completeness_dimension"},
-                payload["missing_elements"][0].get("completeness_dimension_ref"),
-            )
-            self.assertNotIn("completeness_dimension_ref", payload["missing_elements"][1])
 
     def test_canonical_autofix_reports_invalid_json_deterministically(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1650,15 +1622,15 @@ class CliTests(unittest.TestCase):
                 "version": "1.0.0",
                 "steps": [
                     "00", "01", "02", "02a", "03", "04", "05", "06", "07",
-                    "08", "09", "10", "11", "12", "13", "13a", "14", "15",
+                    "08", "09", "10", "11", "12", "13", "14", "15",
                     "16", "16a", "16b", "16c"
                 ],
                 "downstream_consumers": {
-                    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"],
-                    "01": ["02", "03", "04", "09", "13", "13a"],
+                    "00": ["01", "03", "04", "07", "09", "10", "13", "14"],
+                    "01": ["02", "03", "04", "09", "13"],
                     "02": ["02a", "05", "09", "11", "13", "15"],
                     "03": ["04", "05", "07"],
-                    "04": ["05", "06", "07", "08", "09", "11", "13", "13a", "14", "15", "16", "16a", "16c"]
+                    "04": ["05", "06", "07", "08", "09", "11", "13", "14", "15", "16", "16a", "16b", "16c"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1688,11 +1660,11 @@ class CliTests(unittest.TestCase):
                 "version": "1.0.0",
                 "steps": [
                     "00", "01", "02", "02a", "03", "04", "05", "06", "07",
-                    "08", "09", "10", "11", "12", "13", "13a", "14", "15",
+                    "08", "09", "10", "11", "12", "13", "14", "15",
                     "16", "16a", "16b", "16c"
                 ],
                 "downstream_consumers": {
-                    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"]
+                    "00": ["01", "03", "04", "07", "09", "10", "13", "14"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")

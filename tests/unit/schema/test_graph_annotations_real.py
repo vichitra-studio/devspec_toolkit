@@ -25,7 +25,7 @@ _ROOT = Path(__file__).parents[3]
 _SCHEMA_DIR = _ROOT / "schema"
 _FIXTURES = _ROOT / "tests" / "fixtures"
 _NEW_SHAPE_SPEC = _FIXTURES / "graph_example" / "spec"
-_UNANNOTATED_STEPS = frozenset({"13_extension_manifest.schema.json", "13a_completeness_assessment.schema.json"})
+_UNANNOTATED_STEPS = frozenset({"13_extension_manifest.schema.json"})
 _OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 _STAR_VERBS = frozenset({"replaces", "removes", "about"})
 _LINK_VERBS = frozenset(
@@ -126,7 +126,7 @@ def test_task_criterion_refines_kinds_equal_obligation_kinds(registry: dict[str,
     assert len(refines["kinds"]) == len(obligation_kinds)
 
 
-def test_exactly_13_and_13a_have_no_x_node() -> None:
+def test_exactly_13_has_no_x_node() -> None:
     real = sorted(p for p in _SCHEMA_DIR.glob("[0-9][0-9]*_*.schema.json"))
     assert {p.name for p in real if '"x-node"' not in p.read_text()} == _UNANNOTATED_STEPS
 

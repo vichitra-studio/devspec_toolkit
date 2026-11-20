@@ -177,7 +177,7 @@ def _check_drift(
 
         arrays = entry.get("arrays", [])
         if not arrays:
-            # Registered with arrays:[] — no drift to check (e.g. 13a, 16)
+            # Registered with arrays:[] — no drift to check (e.g. 16)
             continue
 
         for live_name, spec_file_path in _live_files(spec_root, basename):

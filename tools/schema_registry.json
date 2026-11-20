@@ -21,7 +21,6 @@
   "vc:10-governance": "schema/10_governance.schema.json",
   "vc:11-redteam": "schema/11_redteam.schema.json",
   "vc:12-ci-gates": "schema/12_ci_gates.schema.json",
-  "vc:13a-completeness-assessment": "schema/13a_completeness_assessment.schema.json",
   "vc:13-extension-manifest": "schema/13_extension_manifest.schema.json",
   "vc:14-roadmap": "schema/14_roadmap.schema.json",
   "vc:15-scaffold": "schema/15_scaffold.schema.json",

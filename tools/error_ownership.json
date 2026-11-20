@@ -173,6 +173,15 @@
         "E748"
       ],
       "authority": "M6b PD"
+    },
+    {
+      "class": "milestone-numbers",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E566",
+        "E567"
+      ],
+      "authority": "M6c WI-04"
     }
   ]
 }

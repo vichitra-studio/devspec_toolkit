@@ -484,11 +484,11 @@ class TestIntentEntryRegex(unittest.TestCase):
         self.assertIsNone(m)
 
     def test_step_with_letter_suffix_matches(self):
-        """Step numbers with letter suffixes like 02a, 13a, 16b match."""
-        line = "- **13a_completeness_assessment.json**: Extract completeness scores and gap analysis for roadmap planning"
+        """Step numbers with letter suffixes like 02a, 16a, 16b match."""
+        line = "- **02a_delivery_baseline.json**: Extract delivery baseline gates for roadmap planning"
         m = _INTENT_ENTRY_RE.match(line)
         assert m is not None
-        self.assertEqual(m.group(1), "13a_completeness_assessment.json")
+        self.assertEqual(m.group(1), "02a_delivery_baseline.json")
 
     def test_non_intent_line_does_not_match(self):
         """A regular markdown bullet without bold artifact name does not match."""

@@ -96,12 +96,6 @@
       "docs/developers/workflows/workflow_feature_extension.md",
       "docs/architecture/governance_architecture.md"
     ],
-    "13a": [
-      "docs/developers/workflows/spec_to_impl.md",
-      "docs/developers/tooling/gap_hunter_checklist.md",
-      "docs/developers/tooling/coverage_matrix.md",
-      "docs/architecture/governance_architecture.md"
-    ],
     "14": [
       "docs/developers/workflows/spec_to_impl.md",
       "docs/developers/workflows/workflow_feature_extension.md",

@@ -231,17 +231,11 @@ class TestStepCoverageCompleteness:
 
 
 class TestNoArraysSteps:
-    """Steps 13a and 16 must appear in steps_without_entry_arrays with non-empty rationale."""
+    """Every step in steps_without_entry_arrays has a non-empty rationale; step 16 registers its arrays."""
 
-    def test_13a_in_steps_without_entry_arrays(self) -> None:
+    def test_every_step_without_entry_arrays_has_a_rationale(self) -> None:
         reg_doc, _ = _run_generator()
-        without_steps = {item["step"]: item for item in reg_doc["steps_without_entry_arrays"]}
-        assert "13a" in without_steps, (
-            "Step '13a' not found in steps_without_entry_arrays."
-        )
-        assert without_steps["13a"]["rationale"], (
-            "Step '13a' in steps_without_entry_arrays has empty rationale."
-        )
+        assert all(item["rationale"] for item in reg_doc["steps_without_entry_arrays"])
 
     def test_16_registers_its_ambiguity_arrays(self) -> None:
         reg_doc, _ = _run_generator()
@@ -340,7 +334,7 @@ class TestRegistryCutover:
     def test_steps_without_entry_arrays_loses_10_15_16(self) -> None:
         reg_doc, _ = _run_generator()
         without = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
-        assert without == {"13a"}
+        assert without == set()
 
     def test_steps_with_deferred_registration_loses_16a(self) -> None:
         reg_doc, _ = _run_generator()

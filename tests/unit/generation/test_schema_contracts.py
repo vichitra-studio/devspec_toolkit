@@ -78,7 +78,6 @@ class SchemaContractsTests(unittest.TestCase):
         # collections.schema.json — so schemas that delegate all their canonical
         # references through shared $defs would otherwise fail this guard.
         no_step_specific_refs = {
-            "13a_completeness_assessment.schema.json",
             # vc:16-anchor has zero step-specific canonical-ref slots after
             # DEVSPEC-38 removed `status_ref` from `crossCycleAmbiguityItem`
             # in vc:core:collections.  The inline counter (which does not

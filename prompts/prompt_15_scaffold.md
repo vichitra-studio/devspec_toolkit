@@ -33,7 +33,6 @@ After generating the JSON artifact, implement the scaffold manually or using you
 - **10_governance.json**: Governance labels and commit conventions used to configure scaffold CI integration and ensure generated code follows the project's declared governance workflow
 - **11_redteam.json**: Threat model findings used to ensure scaffold includes security-hardened route handlers and middleware for endpoints identified as high-risk attack surfaces
 - **13_extension_manifest.json**: Extension manifest entries used to verify that extension-specific domains have corresponding scaffold modules and route bindings when applicable
-- **13a_completeness_assessment.json**: Gap findings and completeness ratings used to identify specification holes that may require scaffold placeholder stubs or deferred route markers
 - **14_roadmap.json**: Milestone sequencing and task decomposition used to prioritize which scaffold routes and modules are generated first based on implementation phase ordering
 
 ## Operating Flow: Inventory → Map → Validate → Emit

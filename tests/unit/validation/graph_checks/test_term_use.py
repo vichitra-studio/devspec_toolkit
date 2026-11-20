@@ -131,7 +131,7 @@ def test_user_set_is_steps_04_to_15_non_record_in_play(tmp_path: Path) -> None:
     spec = edited_example(tmp_path / "spec", **{GLOSSARY: _relabel})
     graph = build_graph(str(spec), str(ROOT))
     users = label_users(graph)
-    assert users and {node.step for node in users} <= {"04", "05", "06", "07", "08", "09", "10", "11", "12", "13a", "14", "15"}
+    assert users and {node.step for node in users} <= {"04", "05", "06", "07", "08", "09", "10", "11", "12", "14", "15"}
     assert all(node.role != "record" and node.lifecycle != "not_applicable" for node in users)
     assert {"00", "03", "16", "16a"}.isdisjoint({node.step for node in users})
 

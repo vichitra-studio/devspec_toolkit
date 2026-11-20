@@ -184,14 +184,18 @@ def test_step_create_of_section12_steps_in_order_reproduces_lock_example(tmp_pat
         assert json.loads((host.spec / name).read_text(encoding="utf-8")) == json.loads((EXAMPLE_HOST / "spec" / name).read_text(encoding="utf-8")), step
 
 
-@pytest.mark.parametrize(("step", "needle"), [("13a", "creates steps 00, 01"), ("16", "creates steps 00, 01")])
-def test_step_create_refuses_13a_and_an_unknown_step(host: Host, step: str, needle: str) -> None:
-    document = host.create_json(step, draft=host.draft(FR_STEP), code=1)
+def test_step_create_refuses_step_16_as_a_step_with_no_file_it_writes(host: Host) -> None:
+    document = host.create_json("16", draft=host.draft(FR_STEP), code=1)
     (error,) = document["errors"]
-    assert error["code"] == "E767" and f"step {step} has no spec file that step create writes" in error["message"] and needle in error["message"]
-    status, out = run_cli("step", "create", "99", "--from", str(host.draft(FR_STEP)), *host.flags())
-    assert status == 1 and out.startswith("E706") and "no step '99'" in out and "known steps: 00, 01" in out
-    status, out = run_cli("step", "create", "99", "--from", str(host.draft(FR_STEP)), *host.flags(), "--json")
+    assert error["code"] == "E767" and "step 16 has no spec file that step create writes" in error["message"] and "creates steps 00, 01" in error["message"]
+    assert not (host.spec / STEP_FILES[FR_STEP]).exists()
+
+
+@pytest.mark.parametrize("step", ["13a", "99"])
+def test_step_create_refuses_the_retired_step_13a_as_unknown(host: Host, step: str) -> None:
+    status, out = run_cli("step", "create", step, "--from", str(host.draft(FR_STEP)), *host.flags())
+    assert status == 1 and out.startswith("E706") and f"no step '{step}'" in out and "known steps: 00, 01" in out and "13a," not in out
+    status, out = run_cli("step", "create", step, "--from", str(host.draft(FR_STEP)), *host.flags(), "--json")
     assert status == 1 and json.loads(out)["errors"][0]["code"] == "E706"
     assert not (host.spec / STEP_FILES[FR_STEP]).exists()
 

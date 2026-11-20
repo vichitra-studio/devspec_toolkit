@@ -24,7 +24,7 @@ class ValidateIntegrationTests(unittest.TestCase):
         self.assertEqual(set(), {e.code for e in errs} & {"E550", "E555", "W550", "W598"})
 
     def test_get_step_from_path_supports_lettered_steps(self):
-        self.assertEqual("13a", get_step_from_path("13a_completeness_assessment.json"))
+        self.assertEqual("02a", get_step_from_path("02a_delivery_baseline.json"))
         self.assertEqual("16c", get_step_from_path("tests/fixtures/step_16c/something.json"))
 
     def test_validate_dir_runs_b2_repo_level_checks(self):
@@ -225,7 +225,6 @@ class ValidateIntegrationTests(unittest.TestCase):
             "11",
             "12",
             "13",
-            "13a",
             "14",
             "15",
             "16",

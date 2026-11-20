@@ -336,7 +336,7 @@ def test_a_fresh_process_names_the_role_gaps_that_block_step_ready(tmp_path: Pat
     done = run_specdev("step", "ready", "14", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
     assert "step 08 (5 blockers)" in done.stdout + done.stderr
     assert done.stdout.count("step 08: coverage gap E743: ") == 5
-    assert "E773 step 14 is not ready: step 08 (5 blockers); step 13a (1 blocker); fix the coverage gaps of step 08 first" in done.stdout + done.stderr
+    assert "E773 step 14 is not ready: step 08 (5 blockers); fix the coverage gaps of step 08 first" in done.stdout + done.stderr
     assert "replay step" not in done.stdout + done.stderr  # no replay or attest clears a coverage gap
     assert done.returncode == 1
 
