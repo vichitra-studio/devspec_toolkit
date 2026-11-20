@@ -22,11 +22,11 @@ Detailed breakdowns of the spec lifecycle phases:
 - **[Feature Extension](developers/workflows/workflow_feature_extension.md)**: Adding new spec extensions.
 
 ### Tooling & Deep Dives
-- **[Coverage Matrix](developers/tooling/coverage_matrix.md)**: Understanding valid links between artifacts.
+- **Coverage**: the coverage matrix page and `specdev matrix` were removed in 1.2.0; `specdev coverage` and `specdev trace` answer the same questions (see [Reference](developers/reference.md)).
 - **[Gap Hunter Checklist](developers/tooling/gap_hunter_checklist.md)**: How to manually audit specs for quality.
 - **[Error Codes](developers/error-codes.md)**: Full reference for all E/W validation error codes.
 - **[Path Conventions](developers/path_conventions.md)**: File and directory naming rules.
-- **Strict mode checks**: quality and hallucination gates (`spec-quality-lint`, `hallucination-lint`) plus replay/dependency checks are documented in [Reference](developers/reference.md).
+- **Strict mode checks**: quality and hallucination gates (`spec-quality-lint`, `hallucination-lint`) plus the trace-lock and dependency checks are documented in [Reference](developers/reference.md).
 - **[Align Tool](developers/tools/align.md)**: How the `align` subcommand works for spec migration.
 - **[Changelog Parser](developers/tools/changelog_parser.md)**: How the changelog is parsed and validated.
 - **[Prompt Context Tool](developers/tools/prompt_context.md)**: How `prompt-context` resolves downstream consumers per step.

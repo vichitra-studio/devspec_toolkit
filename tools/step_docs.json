@@ -35,34 +35,29 @@
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
       "docs/developers/workflows/workflow_bootstrap_legacy.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/developers/tooling/gap_hunter_checklist.md",
       "docs/architecture/governance_architecture.md"
     ],
     "05": [
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/developers/tooling/gap_hunter_checklist.md",
       "docs/architecture/governance_architecture.md"
     ],
     "06": [
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/architecture/governance_architecture.md"
     ],
     "07": [
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/developers/tooling/gap_hunter_checklist.md",
       "docs/architecture/governance_architecture.md"
     ],
     "08": [
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/developers/tooling/gap_hunter_checklist.md",
       "docs/architecture/governance_architecture.md"
     ],
@@ -81,7 +76,6 @@
     "11": [
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/architecture/governance_architecture.md"
     ],
     "12": [
@@ -109,12 +103,10 @@
     ],
     "16": [
       "docs/developers/workflows/spec_to_impl.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/architecture/governance_architecture.md"
     ],
     "16a": [
       "docs/developers/workflows/spec_to_impl.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/developers/tooling/gap_hunter_checklist.md",
       "docs/agents/agents.md",
       "docs/architecture/governance_architecture.md"
@@ -126,7 +118,6 @@
     ],
     "16c": [
       "docs/developers/workflows/spec_to_impl.md",
-      "docs/developers/tooling/coverage_matrix.md",
       "docs/developers/tooling/gap_hunter_checklist.md",
       "docs/agents/agents.md",
       "docs/architecture/governance_architecture.md"

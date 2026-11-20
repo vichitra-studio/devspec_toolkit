@@ -48,15 +48,14 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | Step | Artifact | Required Follow-Up |
 |------|----------|-------------------|
 | 00–03 | `spec/0*_*.json` | Validate-only |
-| 04 | `spec/04_fr_list.json` | Recompute trace matrix |
-| 05 | `spec/05_interface_contracts.json` | Recompute trace matrix + fixtures lint |
+| 04 | `spec/04_fr_list.json` | Gate with `spec-check --step 04`; then `specdev stale` for the links it makes suspect |
+| 05 | `spec/05_interface_contracts.json` | Gate with `spec-check --step 05`; then `specdev stale`, and fixtures lint |
 | 06 | `spec/06_invariants.json` | Re-run invariants check |
 | 07 | `spec/07_nfrs.json` | Ensure `16_delivery_monitoring.json` links remain valid |
 | 08 | `spec/08_fixtures.json` | Run `fixtures-lint` |
 | 09–12 | `spec/09*_*.json` | Validate-only unless trace references change |
 | 13 | `spec/13_extension_manifest.json` | Review proposed extension schemas |
-| 13a | `spec/13a_completeness_assessment.json` | Check for gaps before Roadmap |
-| 14 | `spec/14_roadmap.json` | Initiate JIT implementation loop |
+| 14 | `spec/14_roadmap.json` | Run `specdev step ready 14` first (it lists what blocks the step); gate with `spec-check --step 14`; then initiate the JIT implementation loop |
 | 15 | `spec/15_scaffold.json` | Implement scaffold manually |
 | 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Tasks, Security, Delivery, Drift |
 | 16b | `spec/impl_context/{step_id}.json` | Trinity Build: Code, Configs, Docs |
@@ -66,7 +65,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 - Schema validation fails after two retries → request human clarification.
 - Phase A repeated twice without sufficient answers → summarize blockers and request escalation/decisions.
 - A referenced ID is missing from expected step → highlight the missing ID and halt.
-- `fixtures-lint` or `matrix` produce new warnings → include the command output in your response and stop.
+- `fixtures-lint` produces new warnings, or `spec-check --step NN` reports BLOCKED → include the command output in your response and stop.
 - Unrecognized command or missing tool → inform the user; do not attempt to install packages without approval.
 
 ## 6. Commit & Governance

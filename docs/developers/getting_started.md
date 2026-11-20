@@ -135,6 +135,6 @@ Run the [core validation commands](reference.md#core-validation-commands) whenev
 
 ## 8. Where To Go Next
 - Need a conceptual model? See [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md).
-- Looking for troubleshooting tactics? Review [tooling/gap_hunter_checklist.md](tooling/gap_hunter_checklist.md) and [tooling/coverage_matrix.md](tooling/coverage_matrix.md).
+- Looking for troubleshooting tactics? Review [tooling/gap_hunter_checklist.md](tooling/gap_hunter_checklist.md).
 
 By following this single guide, developers share the same source of truth and can collaborate with AI agents without duplicating knowledge across multiple documents.

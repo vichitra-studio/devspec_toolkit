@@ -4,76 +4,9 @@ Developer reference for the enforcement and traceability subsystems that keep sp
 
 ---
 
-## Canon-Backed Trace Types
+## Removed in 1.2.0: trace types, the trace matrix and the cross-artifact checks
 
-`tools/specdev_tools/core/trace_types.py` provides the single source of truth for valid trace type labels used across the toolkit.
-
-**Loading path:** `_load_from_canon()` resolves the toolkit root via `Path(__file__).resolve().parents[3]`, instantiates `CanonicalRegistry.load(toolkit_root)`, and iterates all entries where `entry.kind == "trace_type"`. It collects each entry's `preferred_label` into the `TRACE_TYPES` tuple and builds a `CANONICAL_TRACE_TYPE` alias map from each entry's `aliases` list.
-
-**Canonical source:** `canon/kinds/trace_type.json` -- 11 registered types:
-
-| preferred_label | aliases |
-|---|---|
-| `fr` | -- |
-| `api` | -- |
-| `nfr` | -- |
-| `invariant` | `inv` |
-| `fixture` | -- |
-| `doc` | -- |
-| `capability` | -- |
-| `component` | -- |
-| `threat` | -- |
-| `charter-goal` | -- |
-| `glossary` | -- |
-
-**Fallback behavior:** If the import of `CanonicalRegistry` fails or `canon/kinds/trace_type.json` is missing/corrupt, `_load_from_canon()` catches any `Exception` and returns `_FALLBACK_TYPES` (a hardcoded 11-tuple) and `_FALLBACK_ALIASES` (`{"inv": "invariant"}`). This guarantees offline validation never crashes.
-
-**Alias resolution:** `normalize_trace_type(value)` strips whitespace and checks `CANONICAL_TRACE_TYPE`; if the value is a known alias (e.g., `"inv"`), it returns the canonical label (`"invariant"`). `is_valid_trace_type(value)` normalizes first, then checks membership in `TRACE_TYPES`.
-
-**Consumers (5 modules):**
-
-| Module | Imports used |
-|---|---|
-| `validation/matrix.py` | `normalize_trace_type`, `is_valid_trace_type` |
-| `validation/cross_artifact_checks.py` | `normalize_trace_type`, `is_valid_trace_type` |
-| `validation/hallucination_lint.py` | `is_valid_trace_type` |
-| `validation/traceability_closure.py` | `normalize_trace_type`, `is_valid_trace_type` |
-| `core/__init__.py` | re-exports `normalize_trace_type`, `is_valid_trace_type` |
-
-**Business-rule constant pattern (OPT-003):** Each validation module that depends on specific trace types declares them as module-level constants (e.g., `_TRACE_TYPE_FR = "fr"`). These constants are guarded by a `warnings.warn()` call at import time that fires if the value is not present in the canon registry, providing early detection of canon drift without crashing at runtime.
-
-All paths route through `core/trace_types.py` -- there is a single loading path and a single module-level cache (`TRACE_TYPES`, `CANONICAL_TRACE_TYPE` are computed once at import time).
-
----
-
-## Dynamic Entity Indexing
-
-`tools/specdev_tools/validation/matrix.py` (`_legacy_scan_data`) implements schema-agnostic entity discovery for the trace matrix. It is the fallback, used when `tools/entry_key_registry.json` is absent and for a file the registry does not know; for every other file the matrix lists entities from the registry's entry keys.
-
-**Algorithm:**
-
-1. Walk every loaded artifact's top-level keys. For each key whose value is a `list`, iterate the items.
-2. For each `dict` item, scan its fields for any field ending in `_id` whose value is a `str`.
-3. Strip the `_id` suffix from the field name (e.g., `fr_id` -> `fr`, `api_id` -> `api`).
-4. Normalize the prefix via `normalize_trace_type()` (resolves aliases).
-5. Validate via `is_valid_trace_type()` -- only canon-registered types are indexed.
-6. Append the item to `entity_index[normalized_type]`. Break after the first matching `_id` field per object (one entity type per object).
-
-**Result:** `entity_index` is a `defaultdict(list)` keyed by canonical trace type. The matrix builder then bridges to named variables (`frs = entity_index.get("fr", [])`, etc.) for backward compatibility with the link-building logic.
-
-**What this replaced:** Prior versions hardcoded schema-path checks like `if "04_fr_list" in schema` to decide which entities to extract. The dynamic approach discovers entities from any spec file -- including extension artifacts -- without code changes when new entity types are added to the canon.
-
-### Cross-Artifact Checks (OPT-002)
-
-`tools/specdev_tools/validation/cross_artifact_checks.py` contains step-specific integrity checks extracted from `validate_trace_integrity()` in `matrix.py`. This module exports:
-
-- `collect_capability_ids(artifacts)` -- gathers capability IDs from step 01
-- `collect_glossary_term_ids(artifacts)` -- gathers glossary term IDs from step 03
-- `check_step_02_integrity(artifacts, capability_ids)` -- validates step 02 cross-references
-- `check_step_03_integrity(artifacts)` -- validates step 03 cross-references
-- `check_step_04_integrity(artifacts, glossary_term_ids, capability_ids)` -- validates step 04 cross-references
-
-`validate_trace_integrity()` in `matrix.py` now delegates to these functions for step-specific logic while retaining generic broken-reference scanning (`collect_definitions_and_references()`) in matrix.py itself.
+The canon kind `trace_type` (`canon/kinds/trace_type.json`), the module `core/trace_types.py`, the trace matrix builder `validation/matrix.py` (with its entity index), `validation/cross_artifact_checks.py` and `validation/traceability_closure.py` are removed. A link between two nodes is now a link field in the node (`derives_from`, `verifies`, `refines`, and so on) that the graph resolver reads: a link to an id no node has is E700, and `specdev trace`, `specdev coverage` and `specdev stale` read the same graph. See [reference.md](../developers/reference.md).
 
 ---
 
@@ -83,7 +16,7 @@ Defined in `tools/step_order.json`.
 
 **Structure:**
 
-- `steps`: ordered list of 22 step IDs: `00 01 02 02a 03 04 05 06 07 08 09 10 11 12 13 13a 14 15 16 16a 16b 16c`
+- `steps`: ordered list of 21 step IDs: `00 01 02 02a 03 04 05 06 07 08 09 10 11 12 13 14 15 16 16a 16b 16c`
 - `step_metadata[<step>].required_spec_inputs`: the steps whose artifacts this step reads.
 - `downstream_consumers`: declared on the **provider** side. Each step lists which later steps directly consume its output.
 
@@ -93,14 +26,13 @@ Defined in `tools/step_order.json`.
 {
   "mode": "strict_waterfall",
   "allow_self_dependency": false,
-  "allow_forward_dependency": false,
-  "require_full_forward_replay_on_change": true
+  "allow_forward_dependency": false
 }
 ```
 
-`require_full_forward_replay_on_change` no longer decides whether replay is required. Replay is the set of suspect links in the trace lock (`spec/extras/trace.lock.json`, E763); `spec-check` and `validate-all` report them whatever this flag says (checked on the worked example with the flag set to `false`: 21 E763 findings from each). `validate-all` still reads the flag: only while it is true does it run the base-ref check for id regressions (E555, W598, W550). That check reads the base ref from the repository of `--repo-root`, so in a host, where `--repo-root` is the toolkit, `validate-all` does not report an id regression of the host's spec. `specdev forward-replay-check --repo-root <toolkit> --spec-root ./spec --git-root . --base-ref <ref>` run from the host does, and so does `spec-check --include-forward-replay` with `--git-root .` and the base ref in `SPECDEV_REPLAY_BASE_REF`; neither reads the flag (run on a git copy of the worked example whose last commit removed the criterion `ac-password-reset-3`: one E555 from each of the two, none from `validate-all`). File-level forward replay (the old requirement that every step after a changed step has a changed file) is retired; see [reference.md](../developers/reference.md#trace-lock-replay-and-attest).
+Replay is the set of suspect links in the trace lock (`spec/extras/trace.lock.json`, E763); `spec-check` and `validate-all` report them. The command `forward-replay-check` and the keys `policy.require_full_forward_replay_on_change` and `policy.status_write_exemptions` were removed in 1.2.0; the schema `schema/step_order.schema.json` allows no other key in `policy` (`additionalProperties: false`). File-level forward replay (the old requirement that every step after a changed step has a changed file) is removed; see [reference.md](../developers/reference.md#trace-lock-replay-and-attest).
 
-**Generated, not hand-kept:** `specdev registry-generate` derives `step_metadata` and `downstream_consumers` from the `x-link` declarations of the step schemas and from the hand-kept `declared_edges` pairs; the two keys are each other's inverse (E543 otherwise). Only `version`, `steps`, `policy`, `coverage_thresholds` and `declared_edges` are edited by hand.
+**Generated, not hand-kept:** `specdev registry-generate` derives `step_metadata` and `downstream_consumers` from the `x-link` declarations of the step schemas and from the hand-kept `declared_edges` pairs; the two keys are each other's inverse (E543 otherwise). Only `version`, `steps`, `policy` and `declared_edges` are edited by hand.
 
 **Reading the inputs of a step:** `step_metadata["05"].required_spec_inputs` is `["00", "02", "04"]`, and `downstream_consumers["00"]`, `["02"]` and `["04"]` each contain `"05"`. `specdev prompt-context <step>` prints the consumers of a step.
 
@@ -139,9 +71,9 @@ Validation operates at three levels of dynamism:
 
 ### Tier 2: Hallucination Lint (Dynamic)
 
-- `hallucination_lint.py` loads the canon registry at runtime via `is_valid_trace_type()`.
-- Detects fabricated trace types, unknown entity references, and invalid enum values that JSON Schema cannot catch because the allowed set is externally managed.
-- Falls back to `_FALLBACK_TYPES` if canon is unavailable.
+- `hallucination_lint.py` loads the canon registry at runtime (`CanonicalRegistry.load`).
+- Detects unknown entity references and invalid enum values that JSON Schema cannot catch because the allowed set is externally managed.
+- Falls back to the built-in stage set (`KNOWN_STAGES`) when the canon has no stages.
 
 ### Tier 3: Canonical Integrity (Fully Dynamic)
 
@@ -159,7 +91,7 @@ The required sequence after any spec edit:
 ```
 1. validate          -- JSON Schema validation of the changed artifact
 2. seed-lint         -- verify seed usage matches seed_manifest step_requirements
-3. matrix            -- regenerate spec/extras/trace_matrix.json (if traceability changed)
+3. spec-check        -- the graph, role-rule and trace-lock checks
 4. fixtures-lint     -- check that each fixture has input and expected (see the note below)
 ```
 
@@ -170,9 +102,9 @@ The required sequence after any spec edit:
 | Trigger | Required checks |
 |---|---|
 | Any spec file edit | `validate`, `seed-lint` |
-| Trace field changed on a 1.1.1-shaped spec (`trace`, `targets`, `_ref`) | Add `matrix` |
+| A link field changed (`derives_from`, `verifies`, `refines`, ...) | Add `spec-check`, then `attest` for each node it names (E761, E763) |
 | Fixture `input` or `expected` changed | Add `fixtures-lint` (reads no `vc:08-fixtures` file, see the note above) |
 | New canon entry added | `canonical-lint`, `canonical-integrity` |
 | Commit | `governance-check` against commit message |
-| Upstream step changed | `stale` to list the suspect links, `attest` once each is read, then `spec-check` (`forward-replay-check` is a deprecated alias) |
+| Upstream step changed | `stale` to list the suspect links, `attest` once each is read, then `spec-check` |
 | Schema enum modified | `hallucination-lint` to verify specs still conform |

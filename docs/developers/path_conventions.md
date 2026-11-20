@@ -8,7 +8,7 @@ When the toolkit is vendored as a git submodule at `<host-repo>/devspec_toolkit/
 |------|-----------|----------|
 | `--repo-root` | `devspec_toolkit/` | Schema registry, step_order.json, canon/ |
 | `--spec-root` | `<host-repo>/spec/` | Spec artifact discovery, step existence checks |
-| `--git-root` | `<host-repo>/` | Git diff operations, forward replay checks |
+| `--git-root` | `<host-repo>/` | Git base and diff operations (the step gate, `specdev diff`, the trace lock), governance checks |
 
 ### Why This Matters
 
@@ -20,14 +20,13 @@ Without explicit flags, the toolkit auto-detects:
 1. `git_root`: Runs `git rev-parse --show-toplevel` from `repo_root`
 2. `spec_root`: Falls back to `repo_root/spec`
 
-### Base Ref Resolution (for forward-replay)
+### Base Ref Resolution (step gate and `specdev diff`)
 
-The base ref for diff comparison is resolved in this order:
-1. `SPECDEV_REPLAY_BASE_REF` environment variable
-2. Current branch's upstream tracking branch (`@{upstream}`)
-3. `origin/main` → `origin/master` → `main` → `master`
-4. Current branch name (self-diff)
-5. Fallback: `origin/main`
+The base ref for diff comparison is resolved in this order (the first that exists; the current branch's upstream tracking branch is never used):
+1. The `--base-ref` flag
+2. `SPECDEV_REPLAY_BASE_REF` environment variable
+3. `origin/HEAD`
+4. `origin/main` → `origin/master` → `main` → `master`
 
 ---
 

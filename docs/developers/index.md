@@ -15,7 +15,7 @@ Use this index to locate the developer-facing material while working through the
 - [`workflows/workflow_feature_extension.md`](workflows/workflow_feature_extension.md) — adding new features to existing specs.
 
 ## Tooling & Diagnostics
-- [`tooling/coverage_matrix.md`](tooling/coverage_matrix.md) — traceability mechanics and enforcement.
+- The coverage matrix page was removed in 1.2.0: use `specdev coverage` and `specdev trace` ([`reference.md`](reference.md)).
 - [`tooling/gap_hunter_checklist.md`](tooling/gap_hunter_checklist.md) — repeatable gap-hunting process.
 
 ### Tools

@@ -4,7 +4,7 @@
 
 
 This guide describes the **Standard Operating Procedure (SOP)** for adding new capabilities to a specced project.
-It strictly follows the **Numerical Spec Sequence**: You must check every file from `00` to `16c` (steps: `00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 13a, 14, 15, 16, 16a, 16b, 16c`) before you execute the Trinity Loop in `16a`.
+It strictly follows the **Numerical Spec Sequence**: You must check every file from `00` to `16c` (steps: `00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 16a, 16b, 16c`) before you execute the Trinity Loop in `16a`.
 
 ## The Golden Rule: "Spec First, Code Second"
 We never skip steps. If a feature is too small for a step, we explicitly acknowledge it (Step Skipped).
@@ -96,20 +96,15 @@ Before starting, ensure your current specs are clean and valid.
 
 ---
 
-## Phase 3.5: Completeness Assessment (Gate)
-*Files: 13a*
+## Phase 3.5: Completeness Gate
+Before scheduling, confirm that all upstream specs are complete and internally consistent. Step 13a (the completeness assessment) was removed in 1.2.0; the checks below replace it.
 
-Before scheduling, confirm that all upstream specs are complete and internally consistent.
-
-**Step 13a: Completeness Assessment**
-*Reference*: `prompts/prompt_13a_completeness_assessment.md`.
-
-*   **Action**: Run Step 13a to evaluate coverage gaps, missing requirement links, and completeness scores across Phases 1–3.
-*   Target artifact: `spec/13a_completeness_assessment.json`
-*   If coverage gaps are found, return to the relevant upstream step and address them **before** proceeding to Phase 4.
+*   **Action**: Run `specdev coverage` to see the FRs, criteria and capabilities that are not linked, and `specdev spec-check` for the role findings (E740 to E745) and broken links (E700, E701).
+*   If gaps are found, return to the relevant upstream step and address them **before** proceeding to Phase 4. `specdev step ready 14` lists what still blocks step 14.
 
 ```bash
-./tools/run_specdev.sh validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh step ready 14 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ---
@@ -204,9 +199,9 @@ Supply the executed artifact path. The reviewer validates execution against the 
 
 ## Completion
 
-1.  **Regenerate Traceability Matrix**: Run the matrix command to rebuild cross-artifact trace links. Do not manually edit spec files for traceability.
+1.  **Replay the links**: Run `specdev stale` and read each suspect link: edit the node that holds it, or accept it with `specdev attest`. `specdev matrix` (which rebuilt the trace matrix) was removed in 1.2.0.
     ```bash
-    mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+    ./tools/run_specdev.sh stale --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ```
 2.  **Final Validation** (or substitute the unified `spec-check` gate for `validate-all`):
     ```bash
@@ -214,7 +209,6 @@ Supply the executed artifact path. The reviewer validates execution against the 
     ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-    ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit

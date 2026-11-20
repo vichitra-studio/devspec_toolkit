@@ -11,10 +11,11 @@ Where prompts apply in this phase (e.g., Scaffold updates, Trinity Plan/Review, 
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; pause emission until those answers are provided.
 
 ## Step Progression
+Step 13a (the completeness assessment) was removed in 1.2.0. Before step 14, run `specdev step ready 14` and `specdev coverage`.
+
 | Step | Purpose | Key Activities |
 |------|---------|----------------|
 | 13 — Extensions | Define domain-specific schemas | Identify missing domains (AI, DB) and generate `spec/13_extension_manifest.json`. |
-| 13a — Completeness | Gate implementation on quality | Verify all specs are complete and actionable via `spec/13a_completeness_assessment.json`. |
 | 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
 | 15 — Scaffold | Generate compile-clean skeleton | Implement manually or via framework CLI. |
 | 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Define tasks, security fixtures, dashboards, docs impact, and drift checks in `spec/impl_context/{step_id}.json`. |

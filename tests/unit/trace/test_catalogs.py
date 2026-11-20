@@ -158,7 +158,7 @@ def test_shared_expectations_describes_the_forward_pass_and_the_id_form_flags():
     assert "accept all three flags" in text
 
 
-def test_governance_architecture_marks_forward_replay_superseded():
+def test_governance_architecture_marks_forward_replay_removed():
     text = _GOVERNANCE_MD.read_text(encoding="utf-8")
-    assert "no longer decides whether replay is required" in text
+    assert "The command `forward-replay-check` and the keys" in text and "were removed in 1.2.0" in text
     assert "to verify all downstream steps are replayed" not in text

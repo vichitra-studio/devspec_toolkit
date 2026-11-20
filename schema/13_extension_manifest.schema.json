@@ -41,7 +41,7 @@
           },
           "title": {
             "type": "string",
-            "description": "Short, human-readable name for this extension displayed in reports and the trace matrix. Should be title-cased and describe the domain concern clearly (e.g. 'Database Layer Extension', 'Authentication Provider Extension'). Avoid abbreviations."
+            "description": "Short, human-readable name for this extension displayed in reports. Should be title-cased and describe the domain concern clearly (e.g. 'Database Layer Extension', 'Authentication Provider Extension'). Avoid abbreviations."
           },
           "area_of_concern": {
             "type": "string",

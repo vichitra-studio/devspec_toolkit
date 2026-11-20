@@ -3,9 +3,9 @@
 ## Submodule-Aware Flags
 
 The following flags are available on most spec-operating commands, including
-`validate`, `validate-all`, `spec-check`, `matrix`, `seed-lint`, `fixtures-lint`,
+`validate`, `validate-all`, `spec-check`, `seed-lint`, `fixtures-lint`,
 `invariants-check`, `governance-check`, `canonical-lint`, `canonical-integrity`,
-`spec-quality-lint`, `hallucination-lint`, `forward-replay-check` (deprecated),
+`spec-quality-lint`, `hallucination-lint`,
 `milestone-state`, and `canon-schema-alignment`; the trace commands `stale`,
 `attest`, `coverage`, `step create`, `step ready`, `node rename` and
 `lock install-driver` take all three (and `--json`). Per-command exceptions (per
@@ -32,7 +32,7 @@ Run `<command> --help` to confirm the supported flags for any subcommand:
 The default of the two flags, for the commands that were run from the folder above a copy of a host with `--spec-root host/spec` and no `--git-root`:
 
 - `node`, `trace`, `diff`, `stale`, `attest`, `step`, `lock install-driver`, `json patch|insert|delete --id` and `json insert --step`: `--spec-root` is `./spec` (with no `--spec-root` they read `./spec` of the current folder; when that folder has no `spec`, `node`, `trace`, `stale`, `attest`, `step` and the `json` forms print `E520 UNRESOLVED_INPUT missing_spec_dir <current folder>/spec`, and `diff` and `lock install-driver` report what git says); `--git-root` is the folder that holds the spec folder (`host`), where the seed documents and the git history are read. `coverage` was run with the same defaults for `--git-root`.
-- `spec-check` and `validate-all` (the spec folder is the positional argument) and `forward-replay-check` (no positional argument, so `--spec-root` is `<repo-root>/spec` when it is absent): the seed documents are read from the folder that holds the spec folder when `--git-root` is absent. The id-regression check against the base ref (E555, W598, W550) is not decided by that default: `forward-replay-check` reads the git history of `<repo-root>` when `--git-root` is absent and of `--git-root` when it is given, and `validate-all` with the toolkit as `--repo-root` reported none of them in a run made with `--git-root .` as well (see [governance_architecture.md](../architecture/governance_architecture.md)).
+- `spec-check` and `validate-all` (the spec folder is the positional argument): the seed documents are read from the folder that holds the spec folder when `--git-root` is absent.
 - Every other command: `<command> --help`; this table does not say.
 
 A spec folder that is not directly below the repository root (spec at `h/sub/spec`, seed documents at `h/docs/seed`) needs `--git-root .` from `h`: without it the folder that holds the spec folder is `h/sub`, the seed documents are not found there, `validate-all` and `spec-check` report their links as suspect (E763), and the commands that write hashes into the trace lock are refused with E520 (see `specdev attest` below).
@@ -66,7 +66,7 @@ This reference collects recurring facts that developers need while authoring or 
 ## Terminology
 | Term       | Definition                                              |
 |------------|----------------------------------------------------------|
-| Step       | Numbered phase of the spec lifecycle (00–16c, 02a, 13a)   |
+| Step       | Numbered phase of the spec lifecycle (00–16c, 02a)        |
 | Artifact   | Machine-checked JSON file for a step (`spec/NN_name.json`) |
 | Guide      | Human playbook describing a step (`spec/NN_name.guide.md`) |
 | Prompt     | AI instruction file (`prompts/prompt_NN_name.md`)         |
@@ -115,15 +115,13 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
-# Traceability & fixtures
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+# Coverage and fixtures. `matrix`, `completeness-check` and `traceability-check` were removed in 1.2.0:
+# `specdev coverage` shows the link counts and the ids that are not linked, `specdev coverage --by fr`
+# the per-FR view, `specdev trace` the lineage of one node, and the role-rule findings (E740 to E745)
+# are checks of `spec-check`.
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh coverage --by fr --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-
-# Traceability closure — the 1.1.1-shape coverage checks (E535, E536, E560, W561 to W569,
-# W575, W576). They read 1.1.1 fields and report nothing on a 1.2.0-shaped spec for now,
-# except the empty-milestone half of W567 (a milestone with no tasks, which the schema also rejects);
-# add --json for a machine-readable report; accepts --repo-root, --spec-root, and --git-root
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -147,10 +145,8 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
 
 # Replay after an upstream change: see "Trace lock, replay and attest" below.
-# forward-replay-check is a deprecated alias: one line on stderr, the id-regression check (E555)
-# against --base-ref, and the trace-lock findings of spec-check
+# forward-replay-check was removed in 1.2.0: stale lists the suspect links, spec-check the broken links.
 ./tools/run_specdev.sh stale --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --base-ref origin/main
 
 # DAG completeness lint (validates downstream_consumers consistency)
 ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
@@ -194,12 +190,12 @@ Plain `spec-check` lists every finding of every check. With `--step` or `--paths
 
 | Flag | Meaning |
 |------|---------|
-| `--step N` | Gate step `N`, written as in the file name: `05`, `13a`, `16`. `5` and `13A` are unknown steps (`E706 no step '5'; known steps: 00, 01, ... 16c`, exit 1). Repeat it for several steps: one block per step, in the order given; a step given twice is gated once. An unknown step gives E706 and exit 1. A step that has no artifact in the spec folder (step `13a` in the worked example) is still gated, and stderr says `step 13a has no artifact in <spec dir>`. |
+| `--step N` | Gate step `N`, written as in the file name: `05`, `02a`, `16`. `5`, `13A` and `13a` (step 13a was removed in 1.2.0) are unknown steps (`E706 no step '5'; known steps: 00, 01, ... 16c`, exit 1). Repeat it for several steps: one block per step, in the order given; a step given twice is gated once. An unknown step gives E706 and exit 1. A step that has no artifact in the spec folder (step `15` once `15_scaffold.json` is removed from the worked example) is still gated, and stderr says `step 15 has no artifact in <spec dir>`. |
 | `--paths FILE...` | Gate the steps that the listed files belong to. It takes every word after it up to the next option, zero or more files, so write `spec_dir` before it (`spec-check --paths FILE spec` reads `spec` as a file and exits 2: `spec_dir` is required). It cannot be combined with `--step`. A file `<spec>/NN_*.json` maps to step `NN` (`<spec>/16_impl_context.json` to `16`), a milestone plan `<spec>/impl_context/ms_*_plan.json` to `16a`, `16b` and `16c`, a seed document listed in the seed manifest to the steps whose nodes derive from it and the steps the manifest routes it to (step `00` when there are none), and the manifest `<spec>/common/seed_manifest.json` itself to step `00` and every step of its `step_requirements` (`00` and `02` in the worked example). Any other file, such as one under `<spec>/extras/` or `<spec>/canon/`, or one outside the repository, maps to no step. A step with no artifact in the spec folder (its file is not there, for example because a commit deleted it) is dropped, not gated, unlike under `--step`, which gates it. When no file maps to a step the command exits 0 without running a check; when files were listed it says so on stderr (`no step gated: no listed path maps to a step that has an artifact`), so a mistyped path is seen (with `--json` it prints a `step_gate` with no steps and `"result": "clear"`). |
 | `--base-ref REF` | The base ref. The baseline is the merge-base of `HEAD` with it (the commit where your branch left it), and what changed since then is new. The default is `SPECDEV_REPLAY_BASE_REF`, then `origin/HEAD`, then `origin/main`, `origin/master`, `main` and `master`, the first that exists. The baseline is `HEAD` itself (mode `head`: only edits you have not committed count as new) when `HEAD` has no commit that the base ref lacks. A commit that is on `HEAD` and not on the base ref counts as new: with `origin/HEAD` set and an unpushed commit on `main`, the baseline is `origin/main` (mode `merge-base`) and an error of that commit blocks; with no remote the base ref is `main` itself, so an error committed on `main` is not new. When the baseline is `HEAD` on a branch other than the base ref's, stderr says `note: the baseline is HEAD itself: only uncommitted changes count as new`. When no baseline can be used, the report says `base: unavailable`, every upstream error counts as new, and stderr gives one `note:` line with the reason: `no base ref found (origin/main, origin/master, main, master); pass --base-ref`, `<ref> does not name a commit`, `no common history with <ref> (a shallow clone?)`, `not a git repository`, `no commit yet`, `the spec folder is not in the base commit <12-char sha>: every error of an earlier step counts as new` (a branch that adds the spec folder, such as a host's first adoption branch: the base commit has no spec folder to compare with; a base commit that holds a file named like the spec folder is the same case), or `the checks could not run on the baseline tree: <ErrorType>: <its text>` (the checks raised an error on the baseline tree; a baseline whose `07_nfrs.json` holds `[]` instead of an object gives `AttributeError: 'list' object has no attribute 'get'`). An empty `--base-ref ""` is a usage error (exit 2). |
 | `--detail {summary,all}` | `summary` (the default) prints a count for upstream debt, pending (owned by a later step) and gate-owned findings; `all` lists them. |
 
-`--base-ref` and `--detail` need `--step` or `--paths`; `--include-forward-replay` cannot be combined with either. Each misuse is a usage error with exit 2. The report goes to stdout, with or without `--json`; notes go to stderr (the reason a baseline is unavailable, a step with no artifact, a seed document listed on `--paths`, a path that lies outside the host root, seed documents not found, a file that could not be read). A seed document listed on `--paths` gives `seed document edited: run specdev stale to see what became suspect`, whether or not the file changed: the note follows the list, not an edit. The exit code is 1 when the result is `BLOCKED` and 0 when it is `CLEAR`, with `--json` too. A refusal prints one finding and exits 1, to stderr in text mode and as JSON on stdout with `--json`. `--step` and `--paths` have these refusals: a spec folder that does not exist (`E520 UNRESOLVED_INPUT missing_spec_dir <dir>`; plain `spec-check` on it runs every check and prints that E520 among other findings, exit 1), a toolkit whose `tools/error_ownership.json` is missing or unreadable (`E520 UNRESOLVED_INPUT ownership_table <path>: unreadable or not a JSON object`; plain `spec-check` refuses the same way), a toolkit whose `tools/step_order.json` is unreadable (`E520 <path> step order is unreadable: <reason>`, for a missing file `No such file or directory`), and, with `--step` only, a step that does not exist (`E706 no step '99'; known steps: 00, 01, ... 16c`). With `--paths` only, a spec folder that is not inside `--git-root` is a refusal too: it gives `E708 the spec folder <dir> is not inside the git root <root>, so it cannot be found in the repository`. `--step` is not refused in that layout: the report says `base: unavailable` and stderr gives the note `the spec folder <dir> is not inside the git root <root>, so it cannot be found in the repository`. A spec file that cannot be read (no permission, or a folder named like a step file) does not stop the run: stderr says `specdev spec-check: could not read <file>; the answer may be incomplete`, the `open-items` check reports one E520 `cannot read <path>: <reason>`, owned by the step of the file, and the other checks go on; they may report errors of their own for the same file.
+`--base-ref` and `--detail` need `--step` or `--paths`. Each misuse is a usage error with exit 2. The report goes to stdout, with or without `--json`; notes go to stderr (the reason a baseline is unavailable, a step with no artifact, a seed document listed on `--paths`, a path that lies outside the host root, seed documents not found, a file that could not be read). A seed document listed on `--paths` gives `seed document edited: run specdev stale to see what became suspect`, whether or not the file changed: the note follows the list, not an edit. The exit code is 1 when the result is `BLOCKED` and 0 when it is `CLEAR`, with `--json` too. A refusal prints one finding and exits 1, to stderr in text mode and as JSON on stdout with `--json`. `--step` and `--paths` have these refusals: a spec folder that does not exist (`E520 UNRESOLVED_INPUT missing_spec_dir <dir>`; plain `spec-check` on it runs every check and prints that E520 among other findings, exit 1), a toolkit whose `tools/error_ownership.json` is missing or unreadable (`E520 UNRESOLVED_INPUT ownership_table <path>: unreadable or not a JSON object`; plain `spec-check` refuses the same way), a toolkit whose `tools/step_order.json` is unreadable (`E520 <path> step order is unreadable: <reason>`, for a missing file `No such file or directory`), and, with `--step` only, a step that does not exist (`E706 no step '99'; known steps: 00, 01, ... 16c`). With `--paths` only, a spec folder that is not inside `--git-root` is a refusal too: it gives `E708 the spec folder <dir> is not inside the git root <root>, so it cannot be found in the repository`. `--step` is not refused in that layout: the report says `base: unavailable` and stderr gives the note `the spec folder <dir> is not inside the git root <root>, so it cannot be found in the repository`. A spec file that cannot be read (no permission, or a folder named like a step file) does not stop the run: stderr says `specdev spec-check: could not read <file>; the answer may be incomplete`, the `open-items` check reports one E520 `cannot read <path>: <reason>`, owned by the step of the file, and the other checks go on; they may report errors of their own for the same file.
 
 Run on the worked example with a broken link in step 04, `spec-check spec ... --step 05` prints (`<sha>` is the commit id of the baseline; the numbers in `PENDING (N)` and `GATE-OWNED (N)` are written `N` here because they move when a check or warning is added). The `PENDING` line is there because the worked example is a partial spec: the role checks (E740, E743) report nodes that steps 07, 08, 12 and 14 own:
 
@@ -274,7 +270,7 @@ that feed targeted `specdev json` calls, rather than reading `spec/*.json` direc
 | Subcommand | Required flags | Purpose |
 |------------|-----------------|---------|
 | `specdev context structure <spec_dir> --step STEP` | `--step` | Print the artifact shape (keys/types) scoped to one step, for Orientation reads |
-| `specdev context scope <spec_dir> --entry ENTRY` | `--entry` | **Deprecated alias of `specdev trace`.** Prints JSON (`entry`, `resolved_ids` grouped by node kind, `source_files`) for the nodes a trace of the entry reaches up and down, and one deprecation line on stderr. It does not write `spec/extras/trace_matrix.json`; `specdev matrix` does |
+| `specdev context scope <spec_dir> --entry ENTRY` | `--entry` | **Deprecated alias of `specdev trace`.** Prints JSON (`entry`, `resolved_ids` grouped by node kind, `source_files`) for the nodes a trace of the entry reaches up and down, and one deprecation line on stderr. It writes no file (the 1.1.1 command wrote `spec/extras/trace_matrix.json`; `specdev matrix` was removed in 1.2.0) |
 | `specdev context canon --step STEP [--spec-root SPEC_ROOT]` | `--step` | List canon entries relevant to a step; `--spec-root` optionally includes project-tier canon alongside toolkit canon |
 | `specdev context freshness <spec_dir> [--git-root GIT_ROOT]` | none | Report staleness of loaded context relative to upstream step edits |
 | `specdev context review <artifact_path> --step STEP [--entry ENTRY] [--spec-dir SPEC_DIR] [--git-root GIT_ROOT]` | `--step` | Prepare review context for one artifact ahead of a review pass |
@@ -306,7 +302,7 @@ These commands read the spec as a graph: a node is an entry with an id (an FR, a
 
 `spec-check` also runs a `graph` check over these links: E700 to E704 (a link to an id no node has, to a node of a kind the field does not accept, to a node of a later step; a cycle within one step; an id defined twice), and, with the trace lock below, E761 (a link with no lock entry), W720 (a new link to a deprecated node), E771 and E772 (aliases, `replaces`) and E778 (a live node that uses an old id). A single-file `validate` does not report a link cycle, an unknown job in `depends_on` or an id defined in two files; `spec-check` does. Codes: [Spec Graph (70x / 72x)](error-codes.md#spec-graph-70x--72x).
 
-Eight more checks of `spec-check` read the nodes by role (codes in [Graph Role Checks (74x)](error-codes.md#graph-role-checks-74x)). On the worked example, which is a partial spec, they report role findings and `spec-check` exits 1 (the counts are in the catalogue section):
+Nine more checks of `spec-check` read the nodes by role (codes in [Graph Role Checks (74x)](error-codes.md#graph-role-checks-74x)). On the worked example, which is a partial spec, they report role findings and `spec-check` exits 1 (the counts are in the catalogue section):
 
 | Check | Code | Reports |
 |-------|------|---------|
@@ -318,10 +314,11 @@ Eight more checks of `spec-check` read the nodes by role (codes in [Graph Role C
 | `scaffold-paths` | E746 | A step 15 scaffold row whose file git does not track, once an API the row realises is built (merge mode; skipped outside a git repository, and when every row to check is under a submodule that is not checked out; a row under such a submodule among others is noted on stderr and not checked) |
 | `seed-routes` | E747, E748, E749 | A seed no route names (E747, and only that finding for such a seed); a route no node of its step uses (E748); a link from a node to a seed the manifest does not route to the node's step (E749, one finding for each link) |
 | `prose-ids` | E752 | A node id written in the text of a node, where a link belongs (nodes parked with `scope: later` or `out` are read; fields whose schema fixes the value are not) |
+| `milestone-numbers` | E566, E567 | Step 14 (it replaces the 1.1.1 warnings W566 and W567, which `fr_refs` fed): an FR in scope that no task criterion reaches (E566: the task criterion refines the FR, one of its acceptance criteria or a node derived from them), and a step 09 milestone that a step 14 milestone computes and that schedules a node no task criterion refines (E567). The step gate (`spec-check --step 14`) blocks on them; `validate` and `validate-all` do not run them |
 
 E740, E742 and E743 are coverage gaps (see `stale`, `coverage` and `step ready` below); E743 is owned by step 08, and the step gate shows a finding under PENDING (owned by a later step) until its owner step is gated. Most fixes add, change or remove a link and end with `specdev attest <node> --yes` for each node an E761 or E763 names (after a removed link, `specdev attest --prune`): the Resolutions of the catalogue say how, and which advice each message gives for which kind. A spec that has only some of its steps written fails these checks until its nodes are linked, or marked `scope: later` or `out` with a `scope_reason` where the kind has that field. A child keeps its own `scope`: an FR set to `scope: later` does not park its criteria.
 
-**A spec that has not been migrated.** The checks run on every spec; none is skipped because the files look like 1.1.1. Run on a small 1.1.1-shaped spec (steps 01, 04, 05, 08 and 14, with `trace`, `targets` and `fr_refs` fields), `spec-check` ran all eight checks (none printed `[SKIP]`) and reported, besides the schema errors (E520) that the old shape causes: E740 (`capability cap-legacy-signin is not used by any node ...`), E742, E743 (`api api-legacy-signin has no verifier: add a fixture at step 08 that verifies it and that a task criterion lists in verified_by`) and E752 for the old link fields (`fr fr-legacy-signin mentions the id cap-legacy-signin in its text at trace: ...`). Such a spec fails `spec-check` until it is migrated; the migration of a later step of this release maps the old shape.
+**A spec that has not been migrated.** The checks run on every spec; none is skipped because the files look like 1.1.1. Run on the 1.1.1-shaped files of `tests/fixtures/spec_corpus` (steps 04, 05, 07, 08, 11 and 14, with `trace`, `targets` and `fr_refs` fields), `spec-check` ran the nine checks (none printed `[SKIP]`) and reported, besides the schema errors (E520) that the old shape causes: E740 (`criterion AC-CORPUS-001 is not used by any node; ...`), E742 (`fixture FIX-CORPUS-001 is not used: no task criterion lists it in verified_by; ...`), E743 (`api API-CORPUS-001 has no verifier: add a fixture at step 08 that verifies it and that a task criterion lists in verified_by`) and E566 (`fr FR-CORPUS-001 is in scope but no task criterion reaches it: ...`). Such a spec fails `spec-check` until it is migrated; the migration of a later step of this release maps the old shape.
 
 ### Trace lock, replay and attest
 
@@ -337,7 +334,7 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 | `specdev attest --prune [--dry-run]` | Remove the lock entries whose link no longer exists (E762). It writes at once, without `--yes`; E520 while a spec file cannot be read, with `--dry-run` as well |
 | `specdev lock merge BASE OURS THEIRS PATH` | The git merge driver of the lock: merges the three versions entry by entry and writes the result over OURS. Git runs it with `%O %A %B %P`; it takes no root flags. When both sides changed one entry in different ways, the entry the common ancestor had is kept, or, when it had none, the entry with the smaller chain stamp (string order); the link is suspect again when its target changed after the kept entry. E760 for an input that is not a valid lock, E520 for a file that cannot be read |
 | `specdev lock install-driver --driver-command CMD` | Set up the merge driver in the clone at the git root (`--git-root`, or the folder that holds `--spec-root`): add the line `<path of the lock relative to the git top level> merge=specdev-trace-lock` (`spec/extras/trace.lock.json merge=specdev-trace-lock` when the spec folder is `spec/` at the top level, `sub/spec/extras/trace.lock.json merge=specdev-trace-lock` for a spec folder `sub/spec`) to the file `git rev-parse --git-path info/attributes` names (`<top>/.git/info/attributes`; in the nested layout `git check-attr merge -- sub/spec/extras/trace.lock.json` then says `specdev-trace-lock`), and set `merge.specdev-trace-lock.driver` to `CMD %O %A %B %P`. Running it again changes nothing. Quote what a shell needs quoted in `CMD`, for example `'<venv>/bin/specdev lock merge'` |
-| `specdev step create NN --from DRAFT [--dry-run]` | Write the file of step NN from a JSON draft that holds the whole artifact (ids of sub-items may be left out; they are minted). The draft is checked against the step's schema, every link must resolve, and the lock entries of its links are written. E767 when the step already has its file (use `json ... --id`), for steps 13a and 16 to 16c, for a draft that cannot be read or whose `$schema` is not the step's; `step create` has no `--full` |
+| `specdev step create NN --from DRAFT [--dry-run]` | Write the file of step NN from a JSON draft that holds the whole artifact (ids of sub-items may be left out; they are minted). The draft is checked against the step's schema, every link must resolve, and the lock entries of its links are written. E767 when the step already has its file (use `json ... --id`), for steps 16 to 16c (E767 `step 16 has no spec file that step create writes`), for a draft that cannot be read or whose `$schema` is not the step's; `step create` has no `--full`. The skills write the draft outside `spec/`, at `.specdev/drafts/step_<NN>.json`, then run `step create NN --from` on it and gate the step with `spec-check --step NN` |
 | `specdev step ready NN` | Exit 0 and `step NN: ready` when every step NN links to has a spec file and no pending replay (a suspect link, or a coverage gap: E740, E742 or E743); otherwise E773 with the blockers, exit 1, and a last line by the blockers of the first step: `write step NN first` for a missing file, `replay step NN first` for suspect links, `fix the coverage gaps of step NN first` for coverage gaps only, `replay step NN first and fix its coverage gaps` for both; E520, exit 1, when a spec file cannot be read. `--json` adds `ready`, `upstream`, `replay_first` and `blockers`. The step's own file is not required |
 | `specdev coverage [--by fr]` | Information, no gate: exit 0 when it shows the counts and unlinked ids; a spec file that cannot be read is a warning on stderr, a lock that cannot be read is E760, exit 1. How many FRs have an API, how many have a fixture and how many capabilities have an FR, with the ids that are not linked; the criteria that have a current refinement; and the exempt FRs, capabilities and criteria (lifecycle `not_applicable`, scope `later` or `out`), which no count includes. A `Role findings` section lists the coverage gaps (E740, E742, E743) by owner step, with a count of each code (`E740: N`, `E743: N`). `--by fr` prints, per FR and criterion, the nodes that link to it directly, each with `current`, `suspect` and `historical` in `--json` (the text prints `[not current, suspect]` for a suspect link). No rule requires an FR to have an API |
 
@@ -348,7 +345,7 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 ./tools/run_specdev.sh step ready 06 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-`spec-check` reports the lock in two checks: `graph` (E761 for a link with no entry, W720) and `trace-lock` (E760 for a lock that cannot be read, E762 for an entry with no link, E763 for a suspect link, E882 for a baseline marker that was not re-attested). `validate-all` reports E760 to E763, E778, E882 and W720 (it does not run the `graph`, `computed-fields` or `records` checks of `spec-check`) and no longer reads file-level forward replay, so a change in step N that leaves step N+1 untouched is not reported by it; `forward-replay-check` stays as a deprecated alias (one line on stderr; it runs the id-regression check and reports the trace-lock findings). Two more `spec-check` checks belong to this family: `computed-fields` (E768 for a stored computed field such as `content_hash`) and `records` (E774 for an invalid record file). The `open-items` check reports the open items of the spec (W630); see `specdev upstream-backlog` below.
+`spec-check` reports the lock in two checks: `graph` (E761 for a link with no entry, W720) and `trace-lock` (E760 for a lock that cannot be read, E762 for an entry with no link, E763 for a suspect link, E882 for a baseline marker that was not re-attested). `validate-all` reports E760 to E763, E778, E882 and W720 (it does not run the `graph`, `computed-fields` or `records` checks of `spec-check`). `forward-replay-check` was removed in 1.2.0 (it exits 2 and points to `specdev stale` and `specdev spec-check`). Two more `spec-check` checks belong to this family: `computed-fields` (E768 for a stored computed field such as `content_hash`) and `records` (E774 for an invalid record file). The `open-items` check reports the open items of the spec (W630); see `specdev upstream-backlog` below.
 
 **Verification and evidence records** are the files `spec/extras/verification/ver-<id>.json` and `evd-<id>.json`. Each is `{"$schema": "vc:extras:verification-record" | "vc:extras:evidence-record", "records": [one record]}`, and the file name is the record id. The worked example has `ver-password-reset-expired-token.json`. A record is a node of role `record`: its `verifies` (or `about`) link is resolved by the `graph` check (E700 for an id no node has) and needs no lock entry; `records` reports E774 for a file that is not valid.
 
@@ -362,7 +359,6 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 | `specdev prompt-sync [spec_dir] [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Check prompt files are in sync with their canonical templates |
 | `specdev canonical-autofix spec_dir [--canon-dir CANON_DIR] [--write \| --dry-run] [--json]` | Auto-fix canonical-reference issues; defaults to reporting only — pass `--write` to persist |
 | `specdev glossary-drift-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Validate definition parity across glossary terms, canonical proposals, and the canon registry |
-| `specdev completeness-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Run pairwise completeness checks (W564–W568) and report coverage ratios; a dimension whose reader finds no 1.1.1 field on a 1.2.0-shaped spec is reported as vacuous (`covered_count` 0, `total_count` 0, `ratio` 1.0), listed in `not_computed` of the `--json` output and printed as `[SKIP]` in text |
 | `specdev registry-check --spec-root SPEC_ROOT [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Validate `entry_key_registry.json`: coverage, phantom basenames, and drift against live spec files (R003) |
 | `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH] [--cli-commands-out PATH] [--step-order-out PATH] [--checklist-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` + `step_order.json` + `cli_commands.json` and `docs/developers/schema-change-checklist.md` from toolkit schemas, annotations and the CLI parser (byte-deterministic; run after any schema, annotation or parser change — see CLAUDE.md). `--step-order-out`, `--cli-commands-out` and `--checklist-out` each default to their file (`tools/step_order.json`, `tools/cli_commands.json`, `docs/developers/schema-change-checklist.md`) only when `--out` is absent. With no annotated step, when the annotation lint finds issues, or when `tools/schema_changes.json` is malformed, the command exits 1 and prints `registry-generate: failed:` with the reason. Annotation reference: [schema-annotations.md](schema-annotations.md) |
 | `specdev guide <CODE> [--json]` | Show the remediation playbook for an error/warning code, e.g. `specdev guide E110` or `specdev guide E530-INVENTED_ENUM_OR_ID` |
@@ -403,7 +399,7 @@ Read-only diagnostic that prints the active validation configuration. Modifies n
 **What it displays:**
 - All active `SPECDEV_*` environment variables and their values.
 - W→E promotion status: ALL (every registered pair via `SPECDEV_WARNINGS_AS_ERRORS=1`), SELECTIVE (per-code via `SPECDEV_PROMOTE_CODES`), or OFF. The live pair count is printed from `PROMOTABLE_PAIRS`.
-- Forward-replay base ref resolution (explicit, upstream tracking, or fallback).
+- The replay base ref: the value of `SPECDEV_REPLAY_BASE_REF`, or `(auto-resolved)` when it is not set (the step gate and `specdev diff` then resolve it as described under `--base-ref`).
 - Spec directory and step_order.json paths.
 
 **When to run:** When troubleshooting CI failures related to W→E promotion, replay base ref, or configuration issues.
@@ -525,18 +521,13 @@ The toolkit's own step tests run with `pytest`. Most of the step test files are 
 (cd devspec_toolkit && python tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json)
 ```
 
-For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
-```bash
-./tools/run_specdev.sh validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
-```
-
 Invoke commands from the root of your host repository so relative paths to `spec/` and [./devspec_toolkit/](../../) resolve cleanly.
 
 ## Strict Execution Policy
 - Workflow is forward-only.
 - There is no refinement mode.
 - Any accepted upstream change is replayed through the steps below it before merge. The replay is the set of suspect links of the trace lock (`specdev stale`): each is read and either the holder is edited or the link is accepted with `specdev attest`, upward first. `spec-check` reports a suspect link as E763 and a link with no lock entry as E761, both as errors.
-- File-level forward replay (a changed step N requires a changed file for every later step) is retired. `forward-replay-check` is a deprecated alias that stays for now, and `SPECDEV_STALENESS_THRESHOLD` has no effect.
+- File-level forward replay (a changed step N requires a changed file for every later step) was removed in 1.2.0, with `forward-replay-check`, `spec-check --include-forward-replay` and `SPECDEV_REPLAY_DIFF_ERROR_MODE`. The trace lock replaces it.
 - In strict mode, host-repo CI should run quality, hallucination, dependency-order, and `spec-check` (which includes the trace-lock checks) as blocking gates.
 
 ## Two-Phase AI Runner Mode
@@ -549,7 +540,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 1. Edit the JSON artifact.
 2. Run `validate`.
 3. Run `seed-lint` to ensure required seed context is referenced and current.
-4. If any traceability changed, regenerate the matrix and lint fixtures.
+4. If any link changed, run `spec-check` (the role rules E740 to E745 report what is not linked) and lint fixtures.
 5. Update governance-compliant commit messages per `spec/10_governance.json`.
 
 ## Troubleshooting Checklist
@@ -578,11 +569,8 @@ Invoke commands from the root of your host repository so relative paths to `spec
 
 ## Architecture Notes
 
-### `trace_types.py` (dynamic loading)
-`trace_types.py` now loads valid trace types from `canon/kinds/trace_type.json` via `CanonicalRegistry` at import time. If canon loading fails for any reason, it falls back to a hardcoded set of types and aliases. This keeps the canonical registry as the single source of truth while maintaining resilience.
-
 ### `step_order.json` schema changes
-- `tools/step_order.json` is generated by `specdev registry-generate`; do not edit it by hand. The hand-carried keys are `version`, `steps`, `policy`, `coverage_thresholds` and `declared_edges` (`[producer, consumer]` pairs for context reads no stored link carries).
+- `tools/step_order.json` is generated by `specdev registry-generate`; do not edit it by hand. The hand-carried keys are `version`, `steps`, `policy` and `declared_edges` (`[producer, consumer]` pairs for context reads no stored link carries).
 - `downstream_consumers` maps each step ID to the list of step IDs that consume its output (e.g., `"04": ["05", "06", ...]`), derived from the `x-link` declarations of the step schemas plus `declared_edges`. `prompt-context` and `context` read it.
 
 ### `prompt-context` output format
@@ -592,6 +580,5 @@ The `prompt-context` command now outputs a 2-column table (`Step`, `Name`) inste
 - [index.md](index.md) — Navigational overview of every document set.
 - [getting_started.md](getting_started.md) — Single-path onboarding for new team members.
 - [workflows/discovery.md](workflows/discovery.md) & [workflows/spec_to_impl.md](workflows/spec_to_impl.md) — Conceptual phase breakdowns.
-- [tooling/coverage_matrix.md](tooling/coverage_matrix.md) — How traceability is enforced.
 - [../agents/agents.md](../agents/agents.md) — Automation contract used by AI assistants.
 - [schema-annotations.md](schema-annotations.md) — Graph annotation language (`x-node`, `x-link`, link verbs, lifecycle and scope fields) defined by `schema/core/graph.schema.json`.

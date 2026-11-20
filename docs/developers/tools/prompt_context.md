@@ -18,7 +18,7 @@ specdev prompt-context 04 --repo-root ./devspec_toolkit
 ## Arguments
 
 ### `<step>` (required)
-The step ID to query, as listed in `steps` of `tools/step_order.json` (`04`, `13a`, `16b`). Examples:
+The step ID to query, as listed in `steps` of `tools/step_order.json` (`04`, `02a`, `16b`). Examples:
 - `00` — Project Charter
 - `04` — Functional Requirements
 - `16c` — Implementation Review
@@ -46,7 +46,6 @@ $ specdev prompt-context 04 --repo-root ./devspec_toolkit
 | 09 | Impl Plan |
 | 11 | Redteam |
 | 13 | Extension Manifest |
-| 13a | Completeness Assessment |
 | 14 | Roadmap |
 | 16a | Step 16a |
 | 16b | Step 16b |

@@ -31,7 +31,7 @@
 - `docs_impact` content validation — the step-16 validator (`step_16.py`) emits `E520` when a milestone plan has code-change actions (non-doc `file_create`/`file_edit` targets) but `plan.docs_impact` is missing, its `status` is not `"required"`, `docs_touched` is empty, or a `docs_touched` entry does not match a `doc_paths` pattern from `seed_manifest.json`.
 - A write that plans from the graph (`specdev json patch|insert|delete --id`, `json insert --step`, `step create`, `node rename`, `node rename --label`, `attest --prune`, `attest --yes`, and `step ready`; a `--dry-run` of the writers is refused as well, an `attest` preview is not) refused because a spec file cannot be read, so the links it holds are not in the graph: `E520 json patch --id refused: 04_fr_list.json cannot be read, so the links it holds are not in the graph and the lock cannot be checked against them; repair the file, then run the command again` (the command is named at the start, with its flags for `attest`: `E520 attest --yes --dry-run refused: ...`, `E520 attest --prune --dry-run refused: ...`; exit 1, nothing written; it follows the line `specdev json: could not read 04_fr_list.json; the answer may be incomplete` on stderr). `step ready` prints `E520 step ready refused: 04_fr_list.json cannot be read, ...` in the same form. `stale`, `coverage`, `node` and an `attest` preview (no `--yes`, bare or with `--dry-run`, exit 0) print the same kind of warning and then an answer that may be incomplete. `specdev lock merge` reports E520 for a version file it cannot read (`E520 cannot read the base version nope.json of p: [Errno 2] No such file or directory: 'nope.json'`).
 - `spec-check --step` and `spec-check --paths` refuse with one finding and exit 1 (on stderr in text mode, as JSON on stdout with `--json`) when the spec folder does not exist (`E520 UNRESOLVED_INPUT missing_spec_dir <dir>`), when the toolkit's `tools/error_ownership.json` is missing or unreadable (`E520 UNRESOLVED_INPUT ownership_table <path>: unreadable or not a JSON object`), or when its `tools/step_order.json` is unreadable (`E520 <path> step order is unreadable: No such file or directory`; for a file that is not JSON the reason is the parser's, such as `Expecting property name enclosed in double quotes: line 1 column 2 (char 1)`). A schema E520 that the gate reports is owned by the step of the file (`step:04`) and carries `file` and `jq_path` in `--json`: `04_fr_list.json` and `.functional_requirements[0].scope`, or `.` for an error of the whole file.
-- A write that puts a hash into the trace lock (`specdev json patch|insert|delete --id`, `json insert --step`, `step create`, each with or without `--dry-run`, `attest <node-id> --yes` and `attest --step NN --yes`, each with or without `--dry-run`) refused because a seed document that the spec names is not found under the host root: the hash would be the hash of a missing file. The root is `--git-root`, or the folder that holds the spec folder. Nothing is written; exit 1. Example, on a copy whose spec folder is `h/sub/spec` and whose seed documents are at `h/docs/seed`, run from `h` with no `--git-root`: `E520 seed document docs/seed/seed_accounts.md (seed-accounts) was not found under <h>/sub; if the repository root is another folder pass --git-root`; several seeds read `seed documents A (id), B (id) were not found under ...`. With `--git-root .` the same commands ran. `node rename`, `node rename --label`, `node status` and `attest --prune` were run in that layout and were not refused. The reads that report on the lock (`stale`, `coverage`, `step ready`, an `attest` preview, `attest --prune`) print one line on stderr and then their answer: `note: seed documents not found under <h>/sub: docs/seed/seed_accounts.md (seed-accounts); their links count as suspect; if the repository root is another folder pass --git-root`; `spec-check`, `validate-all` and `forward-replay-check` print the same line on stderr and report the links as E763.
+- A write that puts a hash into the trace lock (`specdev json patch|insert|delete --id`, `json insert --step`, `step create`, each with or without `--dry-run`, `attest <node-id> --yes` and `attest --step NN --yes`, each with or without `--dry-run`) refused because a seed document that the spec names is not found under the host root: the hash would be the hash of a missing file. The root is `--git-root`, or the folder that holds the spec folder. Nothing is written; exit 1. Example, on a copy whose spec folder is `h/sub/spec` and whose seed documents are at `h/docs/seed`, run from `h` with no `--git-root`: `E520 seed document docs/seed/seed_accounts.md (seed-accounts) was not found under <h>/sub; if the repository root is another folder pass --git-root`; several seeds read `seed documents A (id), B (id) were not found under ...`. With `--git-root .` the same commands ran. `node rename`, `node rename --label`, `node status` and `attest --prune` were run in that layout and were not refused. The reads that report on the lock (`stale`, `coverage`, `step ready`, an `attest` preview, `attest --prune`) print one line on stderr and then their answer: `note: seed documents not found under <h>/sub: docs/seed/seed_accounts.md (seed-accounts); their links count as suspect; if the repository root is another folder pass --git-root`; `spec-check` and `validate-all` print the same line on stderr and report the links as E763.
 - `changelog_parser.py` structural validation — `validate_changelog()` in `tools/specdev_tools/core/changelog_parser.py` emits `E520` for unloadable/malformed YAML (missing file, parse error, empty or non-mapping content), plus four raw-dict structural checks run before the changelog is parsed into a dataclass: **Check 1** — `breaking` is present but not a `bool`; **Check 2** — a top-level key is not in the format's `required_fields`/`optional_fields`; **Check 3** — `version` is not valid semver or does not match the filename's version, except that a `version: "unreleased"` value in `unreleased.yaml` is exempted via an explicit unreleased-sentinel bypass; **Check 4** — a declared `source_of_truth`/`render_target` path is not a non-empty string, does not exist on disk, exists but points to a non-file path (e.g. a directory), or exists but is empty. It also emits `E520` for invalid `change.type` / `change.migration.action` values found after parsing.
 
 **Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable. For `docs_impact` failures, set `plan.docs_impact.status` to `"required"` and list the touched doc paths in `docs_touched`, matching a pattern in `seed_manifest.json`'s `doc_paths`. For `changelog_parser.py` failures, fix the offending YAML field per the check that fired (correct `breaking`'s type, remove/rename the unknown key, fix `version` to match the filename or use the `unreleased` sentinel only in `unreleased.yaml`, or fix the `source_of_truth`/`render_target` path).
@@ -55,10 +55,6 @@
 **Trigger**: The same term maps to different canonical IDs across different spec artifacts (N-1 updated, 1 stale).
 
 **Resolution**: Update the stale artifact(s) to use the current canonical ID. The error message includes per-artifact paths showing which file uses which canonical ID.
-
-### E511 PLACEHOLDER_SCAN_MISMATCH
-
-**Removed prior to 1.0.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The associated sub-field has been removed.
 
 ### E541 UNBOUND_CANONICAL_TERM
 
@@ -162,15 +158,11 @@
 
 **Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and an API id of step 05 is not named in the `threatens` of any threat in the artifact (`threatens` accepts api, component, connection and third-party ids). Each API should be threatened by at least one threat. The check only runs when Step 05 is present.
 
-**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted.
+**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted.
 
 **Resolution**: Add a threat in Step 11 whose `threatens` includes the uncovered API id, or confirm the API is intentionally outside threat scope.
 
 **Warning-only and non-promotable**: W583 has no E-counterpart and is excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate it to an error.
-
-### E604 / W604 TRACE_MATRIX_STALE (removed)
-
-Removed in 1.2.0, see E763: no command writes `extras/trace_matrix.json` and no check compares the age of a stored file with `14_roadmap.json`. An edit to a roadmap node shows in `spec-check` (check `trace-lock`) as E763 on each link whose target, or something above its target, was edited, and `specdev stale` lists those nodes as suspect.
 
 ### E210 CROSS_ARTIFACT_DRIFT
 
@@ -251,10 +243,6 @@ Removed in 1.2.0, see E763: no command writes `extras/trace_matrix.json` and no 
 **Resolution**: Add extraction intent entries listing each upstream artifact and what to extract from it.
 
 **Promotable**: W591 → E591.
-
-### E592 / W592 COVERAGE_THRESHOLD_BREACH / COVERAGE_THRESHOLD_WARN (removed)
-
-Removed in 1.2.0: no percentage threshold is set or checked, and `coverage_thresholds` is gone from `tools/step_order.json`. `specdev coverage` prints the link counts with the ids that are not linked (for example `fr_api_coverage: 1/2 (50%)  unlinked: fr-password-reset-request`; information only), `specdev coverage --by fr` lists each FR with the nodes that link it, and `spec-check` reports the nodes a role rule leaves unlinked as E740 to E745.
 
 ### E593 / W593 VAGUE_LANGUAGE_FREE_TEXT
 
@@ -365,7 +353,7 @@ Removed in 1.2.0: no percentage threshold is set or checked, and `coverage_thres
 
 ### W570 GRACEFUL_SKIP
 
-**Trigger**: A validator cannot resolve an optional upstream input needed for a cross-reference check, so it skips that check rather than emitting a false unresolved-reference error. W570 is a general graceful-skip signal emitted from several validators (`hallucination_lint`, `seed_lint`, `canonical/autofix`, and the step-16 validator) whenever a dependency they would cross-check is absent. The representative case is the NFR-ref check in `hallucination_lint`: when `spec/07_nfrs.json` is absent, `nfr_refs` in downstream artifacts (e.g. `13_impl.json`) cannot be validated, so the linter records `W570 GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent` and proceeds without flagging any `nfr-*` reference as unresolved. Each emitter's message payload names the specific check and the missing input.
+**Trigger**: A validator cannot resolve an optional upstream input needed for a cross-reference check, so it skips that check rather than emitting a false unresolved-reference error. W570 is a general graceful-skip signal emitted from several validators (`hallucination_lint`, `seed_lint`, `canonical/autofix`, and the step-16 validator) whenever a dependency they would cross-check is absent. The representative case is the NFR-ref check in `hallucination_lint`: when `spec/07_nfrs.json` is absent, `nfr_refs` in downstream artifacts (e.g. `13_extension_manifest.json`) cannot be validated, so the linter records `W570 GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent` and proceeds without flagging any `nfr-*` reference as unresolved. Each emitter's message payload names the specific check and the missing input.
 
 **Resolution**: None required — the skip is intentional and informational. To make the skipped check actually run, provide the missing upstream artifact named in the message (e.g. `spec/07_nfrs.json` via the step-07 NFR prompt) and re-run the validator.
 
@@ -395,7 +383,7 @@ Removed in 1.2.0: no percentage threshold is set or checked, and `coverage_thres
 
 Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
 
-**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted.
+**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted.
 
 **Resolution**: Either add the flagged `inv_id` to the `mitigated_by` of a threat in `11_redteam.json`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 
@@ -591,10 +579,6 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only).
 
-### E141 TASK_DEPENDENCY_CYCLE (removed)
-
-Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by the link check (`spec-check`, check `graph`) as E703.
-
 ## Prompt / Schema / Dependency-Order Drift (31x / 54x)
 
 ### E310 PROMPT_SCHEMA_DRIFT
@@ -615,7 +599,7 @@ Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by 
 
 ### E320 STEP13_EXTENSION_ERROR
 
-**Trigger**: Fired by `step_13.py` for a malformed extension entry in `13_impl.json`: either a `required_schema_sections[]` item that is not a valid identifier (must start alphanumeric; only alphanumeric/underscore/hyphen allowed), or a missing/empty `justification` field on the extension.
+**Trigger**: Fired by `step_13.py` for a malformed extension entry in `13_extension_manifest.json`: either a `required_schema_sections[]` item that is not a valid identifier (must start alphanumeric; only alphanumeric/underscore/hyphen allowed), or a missing/empty `justification` field on the extension.
 
 **Resolution**: Fix the malformed `required_schema_sections[]` entry to a valid identifier, or supply a non-empty `justification` for the extension.
 
@@ -885,7 +869,7 @@ A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-
 
 ### E706 GRAPH_COMMAND_TARGET_UNKNOWN
 
-**Trigger**: A command was given an id, step, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace`, a `--recipe` role that is not `16a`, `16b` or `16c`, or, from the graph and trace commands, an unknown node id, step or link. An unknown step prints `E706 no step '99'; known steps: 00, 01, ...` (`spec-check --step`, `stale --step`, `attest --step`, `step ready`, `json insert --step`, `step create`). `spec-check --step` takes the step as in the file name: `--step 5` and `--step 13A` print `E706 no step '5'; known steps: 00, 01, 02, 02a, ... 16c` and exit 1. An unknown node id prints `E706 no node with the id 'fr-nope'; nearest: fr-password-reset, prod, term-reset-token` from `node`, `node show`, `node candidates --for`, `node rename`, `attest <id>` and `json patch|insert|delete --id`; `trace` prints `E706 no node has the id 'fr-nope'` and names no nearest ids; `node status` prints `E705 no node has the id 'fr-nope'`. `attest <id> --field F` and `--target T` name only the flags given, for a node that holds no such link: `E706 'api-password-reset-confirm' holds no link with target nope`, `E706 'api-password-reset-confirm' holds no link with field nope`, `E706 'api-password-reset-confirm' holds no link with field derives_from and target nope`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints a line on stderr first, for example `specdev trace: could not read <files>; the answer may be incomplete`, where `<files>` are the unreadable files joined by ", ".
+**Trigger**: A command was given an id, step, field, kind or role the graph does not know, for example an unknown `--kinds` or `--verbs` name of `trace`, a `--recipe` role that is not `16a`, `16b` or `16c`, or, from the graph and trace commands, an unknown node id, step or link. An unknown step prints `E706 no step '99'; known steps: 00, 01, ...` (`spec-check --step`, `stale --step`, `attest --step`, `step ready`, `json insert --step`, `step create`). `spec-check --step` takes the step as in the file name: `--step 5` prints `E706 no step '5'; known steps: 00, 01, 02, 02a, ... 16c` and `--step 13A` and `--step 13a` print the same with their own text (step 13a no longer exists); each exits 1. An unknown node id prints `E706 no node with the id 'fr-nope'; nearest: fr-password-reset, prod, term-reset-token` from `node`, `node show`, `node candidates --for`, `node rename`, `attest <id>` and `json patch|insert|delete --id`; `trace` prints `E706 no node has the id 'fr-nope'` and names no nearest ids; `node status` prints `E705 no node has the id 'fr-nope'`. `attest <id> --field F` and `--target T` name only the flags given, for a node that holds no such link: `E706 'api-password-reset-confirm' holds no link with target nope`, `E706 'api-password-reset-confirm' holds no link with field nope`, `E706 'api-password-reset-confirm' holds no link with field derives_from and target nope`. When a spec file could not be read, the message of an unknown id adds that the node may be in one of the files named, and the command prints a line on stderr first, for example `specdev trace: could not read <files>; the answer may be incomplete`, where `<files>` are the unreadable files joined by ", ".
 
 **Resolution**: Command usage error: no owner, no node id. Correct the command arguments.
 
@@ -1039,7 +1023,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E760 TRACE_LOCK_MALFORMED
 
-**Trigger**: The trace lock cannot be read. The file is not valid JSON, is not an object of the lock format (a missing or unknown key, a `version` other than 1, a hash that is not `sha256:` and 64 lower-case hex digits, a `baseline` that is not `true`), names the same (source, field, target) triple twice, or holds git merge conflict markers (`<<<<<<<`). The marker case is checked before the JSON is parsed, and the message names the repair. Reported, in runs on a worked-example copy whose lock held `{"version": 2}`, by `spec-check` (check `trace-lock`), `validate-all`, `forward-replay-check`, `stale`, `coverage`, `attest` (a preview, `--yes` and `--prune`), `step ready`, `json patch --id` and `node rename` (the commands that read the lock before they write refuse with exit 1 and write nothing); `node status`, `node <id>` and `trace <id>` were run on the same copy and printed their answer, exit 0. `specdev lock merge` reports it for an input version that is not a valid lock. Examples: `specdev lock merge bad.json bad.json bad.json bad.json` on a lock cut off after 14 bytes: `E760 trace lock bad.json: not valid JSON (Unterminated string starting at: line 1 column 13 (char 12))`; a file that holds `{"version": 2}`: `E760 trace lock <host>/spec/extras/trace.lock.json: $schema must be vc:extras:trace-lock`; a lock path that is a folder: `E760 trace lock <host>/spec/extras/trace.lock.json: cannot be read (Is a directory)`; conflict markers: `E760 trace lock <host>/spec/extras/trace.lock.json: holds git merge conflict markers (<<<<<<<). Repair, from the repository root, with three commands in this order: `specdev lock install-driver --driver-command "<path to specdev> lock merge" --spec-root <host>/spec` (routes the lock to the merge driver and sets the driver; safe to run again), `git checkout -m -- <host>/spec/extras/trace.lock.json` (merges again with the driver and writes the merged file, but git still lists the path as unmerged), `git add <host>/spec/extras/trace.lock.json``.
+**Trigger**: The trace lock cannot be read. The file is not valid JSON, is not an object of the lock format (a missing or unknown key, a `version` other than 1, a hash that is not `sha256:` and 64 lower-case hex digits, a `baseline` that is not `true`), names the same (source, field, target) triple twice, or holds git merge conflict markers (`<<<<<<<`). The marker case is checked before the JSON is parsed, and the message names the repair. Reported, in runs on a worked-example copy whose lock held `{"version": 2}`, by `spec-check` (check `trace-lock`), `validate-all`, `stale`, `coverage`, `attest` (a preview, `--yes` and `--prune`), `step ready`, `json patch --id` and `node rename` (the commands that read the lock before they write refuse with exit 1 and write nothing); `node status`, `node <id>` and `trace <id>` were run on the same copy and printed their answer, exit 0. `specdev lock merge` reports it for an input version that is not a valid lock. Examples: `specdev lock merge bad.json bad.json bad.json bad.json` on a lock cut off after 14 bytes: `E760 trace lock bad.json: not valid JSON (Unterminated string starting at: line 1 column 13 (char 12))`; a file that holds `{"version": 2}`: `E760 trace lock <host>/spec/extras/trace.lock.json: $schema must be vc:extras:trace-lock`; a lock path that is a folder: `E760 trace lock <host>/spec/extras/trace.lock.json: cannot be read (Is a directory)`; conflict markers: `E760 trace lock <host>/spec/extras/trace.lock.json: holds git merge conflict markers (<<<<<<<). Repair, from the repository root, with three commands in this order: `specdev lock install-driver --driver-command "<path to specdev> lock merge" --spec-root <host>/spec` (routes the lock to the merge driver and sets the driver; safe to run again), `git checkout -m -- <host>/spec/extras/trace.lock.json` (merges again with the driver and writes the merged file, but git still lists the path as unmerged), `git add <host>/spec/extras/trace.lock.json``.
 
 **Resolution**: Owner `merge-check`, no node id. For conflict markers, run the three commands the message prints, in that order: `specdev lock install-driver --driver-command '<path to specdev> lock merge'` (it sets the driver and adds the `merge=specdev-trace-lock` line to `.git/info/attributes`), `git checkout -m -- spec/extras/trace.lock.json` (it re-runs the driver and writes the merged file, but git still lists the path as unmerged), then `git add spec/extras/trace.lock.json`. For any other cause, restore the file from git or fix the entry the message names.
 
@@ -1047,7 +1031,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E761 LINK_LOCK_ENTRY_MISSING
 
-**Trigger**: A link that the resolver accepts has no entry in the trace lock. Reported by `spec-check` (check `graph`), by `validate-all` and by `forward-replay-check`, once per link, in the same resolver run as E700-E703; `stale` does not list it. Links of a record and `replaces` links need no entry. Links of historical nodes (a milestone whose anchor row is `done`) still need one. Example (a hand edit through `specdev json patch <file> <path> <value>` added the link): `E761 api-password-reset-confirm, field derives_from, target 'fr-password-reset-request': the trace lock has no entry for this link; once the target is checked, `specdev attest api-password-reset-confirm` shows what would be written, `specdev attest api-password-reset-confirm --yes` writes it`.
+**Trigger**: A link that the resolver accepts has no entry in the trace lock. Reported by `spec-check` (check `graph`) and by `validate-all`, once per link, in the same resolver run as E700-E703; `stale` does not list it. Links of a record and `replaces` links need no entry. Links of historical nodes (a milestone whose anchor row is `done`) still need one. Example (a hand edit through `specdev json patch <file> <path> <value>` added the link): `E761 api-password-reset-confirm, field derives_from, target 'fr-password-reset-request': the trace lock has no entry for this link; once the target is checked, `specdev attest api-password-reset-confirm` shows what would be written, `specdev attest api-password-reset-confirm --yes` writes it`.
 
 **Resolution**: Owner `step:<holder step>`. Check the target, then run `specdev attest <holder id> --yes`; for a link with no entry it creates the entry. A link written through `specdev json patch|insert|delete --id`, `specdev json insert --step` or `specdev step create` gets its entry at once; `specdev node rename` re-keys the entries it touches. The path form of `specdev json` (`json patch <file> <path> <value>`) writes no entry, which is what the example shows.
 
@@ -1063,7 +1047,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E763 SUSPECT_LINK
 
-**Trigger**: The target of a link has changed since the holder accepted it: the chain stamp stored in the lock differs from the one the target has now. The message gives the cause (the target itself was edited, or something above it changed) and up to three nearest changed nodes above it. Reported by `spec-check` (check `trace-lock`), by `validate-all` and by `forward-replay-check` for links held by nodes that are not historical and not `not_applicable`. When the seed documents are not under the folder that holds the spec folder (spec at `h/sub/spec`, seeds at `h/docs/seed`), `spec-check`, `validate-all` and `forward-replay-check` run from `h` with no `--git-root` report the links to a seed as suspect (64 E763 on the worked example in that layout) and print one line on stderr that names the folder searched: `note: seed documents not found under <h>/sub: docs/seed/seed_accounts.md (seed-accounts); their links count as suspect; if the repository root is another folder pass --git-root`; with `--git-root .` they print neither. Example, after the text of a criterion was edited: `E763 api-password-reset-confirm, field derives_from, target 'fr-password-reset': suspect link, the target itself was edited; changed above: ac-password-reset-3. Review the change, then edit api-password-reset-confirm or accept it: `specdev attest api-password-reset-confirm` shows what would be written, `specdev attest api-password-reset-confirm --yes` writes it`.
+**Trigger**: The target of a link has changed since the holder accepted it: the chain stamp stored in the lock differs from the one the target has now. The message gives the cause (the target itself was edited, or something above it changed) and up to three nearest changed nodes above it. Reported by `spec-check` (check `trace-lock`) and by `validate-all` for links held by nodes that are not historical and not `not_applicable`. When the seed documents are not under the folder that holds the spec folder (spec at `h/sub/spec`, seeds at `h/docs/seed`), `spec-check` and `validate-all` run from `h` with no `--git-root` report the links to a seed as suspect (64 E763 on the worked example in that layout) and print one line on stderr that names the folder searched: `note: seed documents not found under <h>/sub: docs/seed/seed_accounts.md (seed-accounts); their links count as suspect; if the repository root is another folder pass --git-root`; with `--git-root .` they print neither. Example, after the text of a criterion was edited: `E763 api-password-reset-confirm, field derives_from, target 'fr-password-reset': suspect link, the target itself was edited; changed above: ac-password-reset-3. Review the change, then edit api-password-reset-confirm or accept it: `specdev attest api-password-reset-confirm` shows what would be written, `specdev attest api-password-reset-confirm --yes` writes it`.
 
 **Resolution**: Owner `merge-check`. `specdev stale` lists the suspect links by step, and `specdev stale --diff` shows the change; `step ready` reports a step with suspect links above it as not ready. Read the change, then edit the holder or run `specdev attest <holder id> --yes`. Replay works upward first: `specdev attest --step NN --yes` does it for a step.
 
@@ -1087,7 +1071,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E767 WRITE_REFUSED
 
-**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>`, `specdev json insert --step NN` and `specdev step create NN --from DRAFT`. The reasons include: the node is a seed; the field path names the node's id; the edit adds a schema violation; the edit would leave a link that does not resolve (for example E700) or an alias collision (E771); for `insert --id`, a field the node does not have when its schema does not declare that field as an array (a field it does declare as an array is created with the one item), or a field the node has that holds a string, an object, a number or a boolean instead of an array (a field that already holds an array takes the insert); for `insert --step`, a path that is not a node collection of the step, or one that is a map keyed by id; for `step create`, a step that already has its file, a step from 16 to 16c, a draft that cannot be read, or a draft whose `$schema` is not the step's own. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written. Examples: `E767 .fr_id is the id of 'fr-password-reset'; an id is changed with `specdev node rename``; `E767 'seed-accounts' is a seed; a seed is edited as a file, not by id`; `E767 step 07 already has a spec file (07_nfrs.json); edit it with `specdev json patch|insert|delete --id``; `E767 .environments is a map keyed by id, and `specdev json insert --step` does not add to a map` (`json insert --step 02a .environments '{...}'`); `E767 step 02a has no node collection .nope; its collections: .ambiguities (ambiguity-item), .ci_gates (gate), .environments (environment, map: not added by this command), .secrets (secret)` (`json insert --step 02a .nope '{}'`); `E767 'fr-password-reset' has no nope and its schema does not declare .nope as an array, so there is nothing to insert into; set the field with `specdev json patch --id`` (`json insert --id fr-password-reset .nope '"x"'`); `E767 .statement of 'fr-password-reset' is a string, not an array, so nothing can be inserted into it; set it with `specdev json patch --id fr-password-reset .statement <value>`` (`json insert --id fr-password-reset .statement '"x"'`); `E767 .interface_ref of 'api-password-reset-confirm' is an object, not an array, so nothing can be inserted into it; set it with `specdev json patch --id api-password-reset-confirm .interface_ref <value>`` (`json insert --id api-password-reset-confirm .interface_ref '"x"'`); `E767 step 13a has no spec file that step create writes; it creates steps 00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15`.
+**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>`, `specdev json insert --step NN` and `specdev step create NN --from DRAFT`. The reasons include: the node is a seed; the field path names the node's id; the edit adds a schema violation; the edit would leave a link that does not resolve (for example E700) or an alias collision (E771); for `insert --id`, a field the node does not have when its schema does not declare that field as an array (a field it does declare as an array is created with the one item), or a field the node has that holds a string, an object, a number or a boolean instead of an array (a field that already holds an array takes the insert); for `insert --step`, a path that is not a node collection of the step, or one that is a map keyed by id; for `step create`, a step that already has its file, a step from 16 to 16c, a draft that cannot be read, or a draft whose `$schema` is not the step's own. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written. Examples: `E767 .fr_id is the id of 'fr-password-reset'; an id is changed with `specdev node rename``; `E767 'seed-accounts' is a seed; a seed is edited as a file, not by id`; `E767 step 07 already has a spec file (07_nfrs.json); edit it with `specdev json patch|insert|delete --id``; `E767 .environments is a map keyed by id, and `specdev json insert --step` does not add to a map` (`json insert --step 02a .environments '{...}'`); `E767 step 02a has no node collection .nope; its collections: .ambiguities (ambiguity-item), .ci_gates (gate), .environments (environment, map: not added by this command), .secrets (secret)` (`json insert --step 02a .nope '{}'`); `E767 'fr-password-reset' has no nope and its schema does not declare .nope as an array, so there is nothing to insert into; set the field with `specdev json patch --id`` (`json insert --id fr-password-reset .nope '"x"'`); `E767 .statement of 'fr-password-reset' is a string, not an array, so nothing can be inserted into it; set it with `specdev json patch --id fr-password-reset .statement <value>`` (`json insert --id fr-password-reset .statement '"x"'`); `E767 .interface_ref of 'api-password-reset-confirm' is an object, not an array, so nothing can be inserted into it; set it with `specdev json patch --id api-password-reset-confirm .interface_ref <value>`` (`json insert --id api-password-reset-confirm .interface_ref '"x"'`); `E767 step 16 has no spec file that step create writes; it creates steps 00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15` (`step create 16 --from draft.json`; step 13a no longer exists, so `step create 13a` is E706).
 
 **Resolution**: Command refusal: no owner. With `--json` the error names the node in `node_id`. The message names the reason.
 
@@ -1151,7 +1135,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E778 STALE_ALIAS_USE
 
-**Trigger**: A live node's link names an alias of a node instead of the node's current id. Reported by `spec-check` (check `graph`), `validate-all` and `forward-replay-check`; a link of a historical node (a closed milestone) or of a record keeps the old id and is not reported. `specdev node rename` rewrites the links of live nodes itself, so this appears after a hand edit. Example: `E778 api-password-reset-confirm, field derives_from, target 'fr-password-reset': 'fr-password-reset' is an old id of 'fr-reset-password'; use the current id 'fr-reset-password'`.
+**Trigger**: A live node's link names an alias of a node instead of the node's current id. Reported by `spec-check` (check `graph`) and `validate-all`; a link of a historical node (a closed milestone) or of a record keeps the old id and is not reported. `specdev node rename` rewrites the links of live nodes itself, so this appears after a hand edit. Example: `E778 api-password-reset-confirm, field derives_from, target 'fr-password-reset': 'fr-password-reset' is an old id of 'fr-reset-password'; use the current id 'fr-reset-password'`.
 
 **Resolution**: Owner `step:<holder step>`. Rewrite the link to the current id.
 
@@ -1164,6 +1148,98 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 **Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id> --yes`: it writes the current stored hashes and clears the marker.
 
 **Promotable**: No (error only).
+
+## Removed Codes
+
+A removed code has no registry entry and no emitter, and its number is not reused. Each entry says what replaced it (`tests/unit/core/test_error_code_registry.py` lists the codes of `REMOVED_CODES` and fails if one is registered or emitted again).
+
+### W140 SEED_CONTENT_OVERLAP_LOW (removed)
+
+Removed in 1.2.0: `seed-lint` no longer reports it. A seed that no step routes is E747, a route no node uses is E748 and a link to a seed the manifest does not route to the step is E749. (E140 AMBIGUOUS_ALIAS stays.)
+
+### E141 TASK_DEPENDENCY_CYCLE (removed)
+
+Removed in 1.2.0, see E703: a job or task `depends_on` cycle is now reported by the link check (`spec-check`, check `graph`) as E703.
+
+### E511 PLACEHOLDER_SCAN_MISMATCH (removed)
+
+Removed prior to 1.0.0: E511 was redundant with the independent placeholder scan of E510, and the sub-field it read has been removed.
+
+### E535 CONTRADICTORY_OUT_OF_SCOPE_FR (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `out_of_scope` of step 05, a field the schema no longer has. An API that no node uses is E740.
+
+### E536 CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `targets` and `out_of_scope` of the fixtures, fields the schema no longer has (a fixture names what it proves in `verifies`). A criterion, API, invariant or NFR with no verifier is E743.
+
+### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP (removed)
+
+Removed in 1.2.0 with `specdev forward-replay-check`, the only command that wrote them. The replacement for drift is the trace lock: `specdev stale` lists the suspect links and `spec-check` reports them as E763.
+
+### W551 UNDECLARED_SEED (removed)
+
+Removed in 1.2.0: `seed-lint` no longer reports it; seed routing is E747, E748 and E749. (E551 SCHEMA_ENUM_EXTRA stays.)
+
+### E555 SEMANTIC_COVERAGE_REGRESSION (removed)
+
+Removed in 1.2.0 with `specdev forward-replay-check`. A node that was deleted leaves a broken link at each node that held it: E700 from `spec-check` (check `graph`), owned by the step of the holder. (W555 is a different code and stays.)
+
+### E560 / W560 TRACEABILITY_GAP (removed)
+
+Removed in 1.2.0 with the traceability closure check, which read the goals and success metrics of the charter. A charter metric that no node uses is E740; the goals have no check of their own.
+
+### E561 / W561 UNCOVERED_FR (removed)
+
+Removed in 1.2.0 with the traceability closure check. An FR that no task criterion reaches is E566 (owner `step:14`), an FR that no node uses is E740, and `specdev coverage --by fr` lists each FR with the nodes that link it.
+
+### E562 / W562 ORPHAN_MILESTONE (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `context_path` of the anchor, a field the 1.2.0 anchor row does not have. A milestone plan whose `milestone` names no roadmap milestone is E304.
+
+### E563 / W563 CHECKLIST_ROADMAP_MISMATCH (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `spec_ref.id` of the checklist items, a field a 1.2.0 plan item does not have. A roadmap task that no plan item realises is E304.
+
+### E564 / W564 UNCOVERED_FR_API (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `trace` of an API, a field the schema no longer has. An API or an FR that no node uses is E740; `specdev coverage --by fr` lists each FR with the nodes that link it.
+
+### E565 / W565 UNCOVERED_FR_FIXTURE (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `targets` of the fixtures, a field the schema no longer has. A node that no fixture or job verifies is E743; a fixture that nothing uses is E742.
+
+### W566 / W567 UNCOVERED_FR_MILESTONE / INCOMPLETE_MILESTONE_DECOMPOSITION (removed)
+
+Removed in 1.2.0: the warnings are gone and E566 and E567 remain, now errors computed from the graph (see E566 and E567 above). Their numbers are not reused as W codes.
+
+### E568 / W568 UNCOVERED_CAPABILITY (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `trace` of a capability, a field the schema no longer has. A capability that no node uses is E740.
+
+### E569 / W569 GOVERNANCE_PR_RULE_UNCOVERED (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `pr_rules` of step 10, which the rule objects replaced. A rule that no node uses is E740.
+
+### E575 / W575 IMPL_PLAN_DELIVERABLE_UNCOVERED (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `deliverables` of step 09 and `fr_refs` of step 14, fields the schemas no longer have. A step 09 milestone schedules the nodes it delivers (`schedules`), and E567 reports a scheduled node that no task criterion refines.
+
+### E576 / W576 TASK_EXECUTION_MISSING (removed)
+
+Removed in 1.2.0 with the traceability closure check: it read `fr_refs` of the step 14 tasks and the step 16b executions, which the 1.2.0 shape no longer has. A roadmap task that no plan item realises is E304.
+
+### E592 / W592 COVERAGE_THRESHOLD_BREACH / COVERAGE_THRESHOLD_WARN (removed)
+
+Removed in 1.2.0: no percentage threshold is set or checked, and `coverage_thresholds` is gone from `tools/step_order.json`. `specdev coverage` prints the link counts with the ids that are not linked (for example `fr_api_coverage: 1/2 (50%)  unlinked: fr-password-reset-request`; information only), `specdev coverage --by fr` lists each FR with the nodes that link it, and `spec-check` reports the nodes a role rule leaves unlinked as E740 to E745.
+
+### W598 ID_STABILITY_REMOVAL (removed)
+
+Removed in 1.2.0 with `specdev forward-replay-check`. A node that was deleted leaves a broken link at each node that held it: E700 from `spec-check`.
+
+### E604 / W604 TRACE_MATRIX_STALE (removed)
+
+Removed in 1.2.0, see E763: no command writes `extras/trace_matrix.json` and no check compares the age of a stored file with `14_roadmap.json`. An edit to a roadmap node shows in `spec-check` (check `trace-lock`) as E763 on each link whose target, or something above its target, was edited, and `specdev stale` lists those nodes as suspect.
 
 ## Exception Classes
 

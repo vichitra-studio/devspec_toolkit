@@ -182,7 +182,7 @@ After emitting, promote project-specific terms to the canon registry:
 ```bash
 ./tools/run_specdev.sh validate spec/04_fr_list.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -208,7 +208,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/05_interface_contracts.json --repo-root ./devspec_toolkit
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 # Run after Step 08 is complete
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
@@ -318,7 +318,6 @@ Add potential security threats for the project. Every threat requires `threatens
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
 ```
 
@@ -328,7 +327,7 @@ Add potential security threats for the project. Every threat requires `threatens
 
 ## Phase 5: The Transition (Extension & Roadmap)
 
-*Targets: `13`, `13a`, `14`*
+*Targets: `13`, `14`*
 
 These steps bridge Phase I Discovery into Phase II Implementation. They must be completed before running the Trinity Loop (Steps 16a–16c).
 
@@ -350,24 +349,18 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 ./tools/run_specdev.sh validate spec/13_extension_manifest.json --repo-root ./devspec_toolkit
 ```
 
-### Step 5.2: Completeness Assessment — `spec/13a_completeness_assessment.json`
+### Step 5.2: Completeness Check (no artifact)
 
-*Prompt: `prompts/prompt_13a_completeness_assessment.md`*
+Step 13a (the completeness assessment, `spec/13a_completeness_assessment.json`) was removed in 1.2.0. No prompt and no file remain. Check completeness with commands before Step 14:
 
-**User Action:**
-> Open `prompts/prompt_13a_completeness_assessment.md` in your AI assistant.
->
-> **Context to supply**:
-> - All completed Phase I specs (Steps 00–13)
-> - `docs/seed/seed_overview.md`
->
-> The AI performs a pairwise completeness check across the entire spec suite and emits `spec/13a_completeness_assessment.json`. Address any gaps surfaced before proceeding to Step 14.
-
-**Validation ritual:**
 ```bash
-./tools/run_specdev.sh validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh step ready 14 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
+
+Address the gaps they list before proceeding to Step 14.
 
 ### Step 5.3: Roadmap — `spec/14_roadmap.json`
 
@@ -377,7 +370,7 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 > Open `prompts/prompt_14_roadmap.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/09_impl_plan.json`, `spec/04_fr_list.json`, `spec/13a_completeness_assessment.json`
+> - `spec/09_impl_plan.json`, `spec/04_fr_list.json`
 > - `docs/seed/seed_overview.md`
 >
 > The AI schedules milestones and roadmap items, emitting `spec/14_roadmap.json`.
@@ -493,7 +486,7 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 **Validation ritual after each Trinity Loop iteration:**
 ```bash
 ./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -507,11 +500,10 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
    ```bash
    ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-   ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
    ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ```
 2. Commit with a governance-compliant message (see `spec/10_governance.json` for the required pattern).
-3. **You are now fully bootstrapped through implementation.** Steps 13, 13a, and 14 are covered in Phase 5; Steps 15–16c are covered in Phase 6.
+3. **You are now fully bootstrapped through implementation.** Steps 13 and 14 are covered in Phase 5; Steps 15–16c are covered in Phase 6.
 4. To add a new feature or begin a new implementation cycle, proceed to the **[Feature Extension Workflow](./workflow_feature_extension.md)**.

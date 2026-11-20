@@ -60,7 +60,7 @@ If you vend the toolkit elsewhere, substitute that path in the commands above an
 
 ## CLI Overview
 
-The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `seed-lint`, `invariants-check`, `governance-check`, `spec-quality-lint`, `hallucination-lint`, `canonical-lint`, `canonical-integrity`, `dependency-order-lint`, and `forward-replay-check`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
+The CLI exposes subcommands such as `validate`, `validate-all`, `spec-check`, `fixtures-lint`, `seed-lint`, `invariants-check`, `governance-check`, `spec-quality-lint`, `hallucination-lint`, `canonical-lint`, `canonical-integrity`, `dependency-order-lint`, and the graph commands `trace`, `coverage`, `stale` and `attest`. `matrix`, `completeness-check`, `traceability-check` and `forward-replay-check` were removed in 1.2.0 (each exits 2 and names its replacement). The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
 
 From any location, run:
 ```bash
@@ -69,12 +69,7 @@ From any location, run:
 
 Pass `--repo-root <toolkit-root>` whenever you execute commands from outside the toolkit directory so schema resolution goes through [tools/schema_registry.json](schema_registry.json).
 
-### Completeness assessment (Step 13a)
-After running `prompts/prompt_13a_completeness_assessment.md`, validate the resulting `spec/13a_completeness_assessment.json` the same way as any other artifact:
-
-```bash
-./tools/run_specdev.sh validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
-```
+Step 13a (the completeness assessment) was removed in 1.2.0. Use `specdev coverage` and `specdev spec-check` to find what is not linked.
 
 ---
 
@@ -90,7 +85,7 @@ After running `prompts/prompt_13a_completeness_assessment.md`, validate the resu
 
 Generate a starter workflow using the yaml template in prompts, or see [docs/developers/reference.md#validation-workflow](../docs/developers/reference.md#validation-workflow) for the authoritative list of validation commands enforced in CI.
 
-In strict mode, quality and hallucination checks are blocking (`spec-quality-lint`, `hallucination-lint`) alongside canonical and replay integrity gates.
+In strict mode, quality and hallucination checks are blocking (`spec-quality-lint`, `hallucination-lint`) alongside the canonical gates and the `spec-check` trace-lock checks.
 
 ---
 

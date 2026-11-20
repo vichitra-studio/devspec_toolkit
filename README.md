@@ -33,10 +33,10 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 └─ tools/                    # CLI package + schema registry
    └─ specdev_tools/         # Python CLI package
       ├─ cli.py              # entry point
-      ├─ core/               # errors, registry, trace_types, changelog_parser
+      ├─ core/               # errors, registry, git_base, changelog_parser
       ├─ validation/         # validate, validators/, linters (fixtures, seed, docs,
-      │                      #   quality, hallucination, dependency, forward-replay,
-      │                      #   traceability, invariants, governance, matrix)
+      │                      #   quality, hallucination, dependency, invariants, governance,
+      │                      #   graph_checks, step gate)
       ├─ generation/         # prompt_generator, prompt_schema_sync, schema_differ
       ├─ canonical/          # autofix, integrity, lint, registry
       ├─ registry/           # registry-generate: annotations, entry-key registry, step order, checklist

@@ -25,10 +25,9 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 | 11 — Red Team | Enumerate threats and mitigations | `spec/11_redteam.json` |
 | 12 — CI Gates | Wire automated enforcement | `spec/12_ci_gates.json` |
 
-## Transition: Extensions & Completeness
+## Transition: Extensions
 1.  **Step 13 (Extension Generator)**: Identify if you need specialized extensions (e.g., `ext_01_database.json`) for complex domains found in System Sketch.
-2.  **Step 13a (Completeness)**: Run `spec/13a_completeness_assessment.json` to identify unresolved tracing or definitions.
-3.  **Step 14 (Roadmap)**: Only once 13/13a are clear, proceed to the Roadmap phase.
+2.  **Step 14 (Roadmap)**: Run `specdev step ready 14`. It exits 0 and prints `step 14: ready` when every step 14 links to has a file and has no pending replay or coverage gap; otherwise it lists the blockers. Step 13a (the completeness assessment) was removed in 1.2.0: `specdev coverage` and the role findings of `specdev spec-check` (E740 to E745) answer the same question.
 
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.
 
@@ -115,5 +114,5 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 
 ## Outputs
 - Validated JSON artifacts under `spec/00*` through `spec/12*`.
-- Updated trace matrix (FR ↔ API coverage is not computed for steps 00-05 in the new shape until graph coverage lands; the matrix omits `fr_with_api` and the `apis` of each row and names them in its top-level `not_computed` list; on a spec whose later steps have the new shape as well, the list also names `fr_with_fixture`, `fixtures`, `fr_with_nfr`, `nfrs`, `fr_with_threat`, `threats`, `milestone_coverage` and `invariant_threat_coverage`).
+- Links between the nodes of the steps, which `specdev coverage` counts (FRs with an API, FRs with a fixture, capabilities with an FR) and `specdev trace` follows. `specdev matrix` and the stored trace matrix were removed in 1.2.0.
 - Governance rules embedded in CI to keep the spec authoritative.

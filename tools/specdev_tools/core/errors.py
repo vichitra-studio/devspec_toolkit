@@ -47,6 +47,13 @@ class FindingError(Exception):
         self.unknown_id = unknown_id
 
 
+# Codes removed in 1.2.0 (numbers are not reused; `docs/developers/error-codes.md`, "Removed Codes", says what replaced each):
+#   forward replay and the seed overlap check: E550, W550, E555, W598, W140, W551;
+#   the traceability closure and completeness checks: E535, E536, E560, E561, E562, E563, E564, E565, E568, E569, E575, E576
+#   and their warnings W560, W561, W562, W563, W564, W565, W568, W569, W575, W576 (W566 and W567 are gone too: E566 and E567
+#   stay, as errors computed from the graph);
+#   the trace matrix and the coverage thresholds: E592, W592, E604, W604.
+# `tests/unit/core/test_error_code_registry.py` (REMOVED_CODES) fails if one of them is registered or written as a code literal again.
 ERROR_CODES = {
     # Canonical integrity (1xx)
     "E110": "UNKNOWN_CANONICAL_ID",
@@ -259,9 +266,10 @@ ERROR_CODES = {
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes are excluded: W110/W120/W130/W552/W553/W554/W555/W590/
-# W596/W597/W606 have E-counterparts with different semantics; W570
-# (GRACEFUL_SKIP) has no E-counterpart at all; W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
+# Non-promotable codes are excluded: W110/W120/W130/W552/W553/W554/W590/
+# W596/W597/W606 have E-counterparts with different semantics; W555
+# (STEP00_SEED_OUT_OF_SCOPE_THIN) and W570
+# (GRACEFUL_SKIP) have no E-counterpart at all; W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
 # E-counterpart at all -- it is an informational nudge, not a hard failure.
 # W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
 # W630 (OPEN_ITEM) and W633 (OPEN_ITEM_LEGACY_TRIAGE) likewise have none (no E630 or E633 exists).
