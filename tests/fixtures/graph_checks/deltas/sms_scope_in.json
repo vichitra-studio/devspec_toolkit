@@ -1,0 +1,15 @@
+{
+  "description": "The item scope-sms-reset is in scope.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/00_charter.json",
+      "path": [
+        "scope_items",
+        1,
+        "scope"
+      ],
+      "value": "in"
+    }
+  ]
+}

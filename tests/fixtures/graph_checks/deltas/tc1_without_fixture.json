@@ -1,0 +1,18 @@
+{
+  "description": "The task criterion tc-confirm-expired-token no longer names its fixture.",
+  "ops": [
+    {
+      "op": "remove",
+      "file": "spec/14_roadmap.json",
+      "path": [
+        "milestones",
+        0,
+        "tasks",
+        0,
+        "acceptance_criteria",
+        0,
+        "verified_by"
+      ]
+    }
+  ]
+}

@@ -702,8 +702,7 @@ changes:
       step), E704 (an id defined twice). specdev coverage [--by fr] prints how many
       FRs have an API or a fixture and how many capabilities have an FR, the criteria
       that have a current refinement and the exempt nodes (not_applicable, scope later
-      or out); it prints information and exits 0 when it shows the counts and gaps, because no rule requires those links; a spec file that cannot be read is a warning on stderr and a lock that cannot be read is E760, exit 1. The role-rule findings of coverage and the coverage gaps of stale stay
-      empty until a later 1.2.0 change registers the rules.
+      or out); it prints information and exits 0 when it shows the counts and gaps, because no rule requires those links; a spec file that cannot be read is a warning on stderr and a lock that cannot be read is E760, exit 1. The coverage gaps are the findings E740, E742 and E743 of the role checks of spec-check: stale counts them under the step that owns each, coverage lists them under Role findings, and step ready counts them as blockers.
     migration:
       action: none
 
@@ -926,6 +925,33 @@ changes:
     migration:
       action: none
 
+  - type: add_module
+    description: >
+      specdev spec-check runs eight new checks over the whole spec, each
+      before open-items: no-dangling (E740: a node of a requirement, delivery
+      or context kind that no node uses), term-use (E741: a glossary term
+      whose label no node of steps 04 to 15 mentions), verifier-rules (E742: a
+      fixture or job that no task criterion lists in verified_by; E743: a
+      criterion, API, invariant or NFR that no fixture verifies, where a job
+      also counts for an NFR), cross-cutting (E744: a task that an invariant
+      or NFR applies to, when no criterion of the task refines it), refinement
+      (E745: a task criterion whose verifiers do not verify what it refines),
+      scaffold-paths (E746: the file of a scaffold row of a built API is not
+      tracked by git; the check is skipped outside a git repository),
+      seed-routes (E747: a seed no route names; E748: a route no node of its
+      step uses; E749: a node links a seed that the manifest does not route to
+      its step) and prose-ids (E752: a node id written in the text of a node).
+      The new codes are E740 to E749 and E752 (E750 and E751 do not exist); each has an entry in docs/developers/error-codes.md
+      and an owner in tools/error_ownership.json: step 14 for E741, E742, E744
+      and E745, step 08 for E743, step 15 for E746, step 00 for E747, the step
+      of the route for E748, the step of the node for E749 and E752, and for
+      E740 the latest step whose nodes can use the kind. None is promotable.
+      The checks run on every spec: none is skipped because the files look
+      like 1.1.1, so a spec that has not been migrated gets them too (E752
+      reports its old link fields trace and targets).
+    migration:
+      action: none
+
   - type: change_config
     description: >
       Every finding in spec-check --json has an owner: the one the finding carries,
@@ -974,5 +1000,18 @@ changes:
       scripts/init_project.py writes the template into a new host. A host that already
       has a .pre-commit-config.yaml keeps it, with its old hook that checks the whole
       spec on every commit, until its owner copies the new hook by hand.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      A spec that has only some of its steps written fails spec-check on the
+      role checks until its nodes are linked, or marked scope: later or out
+      where the kind has that field: the worked example, which is a partial
+      spec, reports 17 E740, 5 E743 and 1 E744 and exits 1. The step gate
+      lists a finding as pending (PENDING) until the step that owns it is
+      gated, so spec-check --step 05 on the worked example now prints a
+      PENDING line, and step ready 14 on it reports E773 with the five E743
+      gaps of step 08 and step 13a as blockers.
     migration:
       action: none

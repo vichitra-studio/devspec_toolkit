@@ -29,6 +29,7 @@ from unit.graph._synth import git
 from unit.trace._lock_support import EXAMPLE_HOST, ROOT, git_copy_of_example, lock_for, run_on_example
 
 DELTAS = ROOT / "tests" / "fixtures" / "step_gate" / "deltas"
+GRAPH_CHECK_DELTAS = ROOT / "tests" / "fixtures" / "graph_checks" / "deltas"
 SPEC = "spec"
 NESTED_SPEC = "sub/spec"
 
@@ -46,16 +47,16 @@ def _write(path: Path, document: Any) -> None:
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
-def _array_at(document: Any, keys: list[str], *, create: bool) -> list[Any]:
+def _array_at(document: Any, keys: list[str | int], *, create: bool) -> list[Any]:
     """The array at the object path *keys* of *document*; with *create*, the last key is made an empty array when absent."""
     node = document
     for key in keys[:-1]:
         node = node[key]
-    if keys[-1] not in node and create:
+    if isinstance(keys[-1], str) and keys[-1] not in node and create:
         node[keys[-1]] = []
     array = node[keys[-1]]
     if not isinstance(array, list):
-        raise DeltaError(f"{'.'.join(keys)} is not an array")
+        raise DeltaError(f"{'.'.join(map(str, keys))} is not an array")
     return array
 
 
@@ -69,19 +70,46 @@ def _apply_op(host: Path, op: dict[str, Any], spec_prefix: str) -> None:
         document = _read(target)
         _array_at(document, op["path"], create=op.get("create", False)).append(op["value"])
         _write(target, document)
+    elif op["op"] in ("set", "remove"):
+        if not target.is_file():
+            raise DeltaError(f"{op['file']}: no such file in the host copy")
+        document = _read(target)
+        holder = _holder_of(document, op["path"])
+        if op["op"] == "set":
+            holder[op["path"][-1]] = op["value"]
+        else:
+            del holder[op["path"][-1]]
+        _write(target, document)
     else:
         raise DeltaError(f"unknown op '{op['op']}'")
 
 
-def apply_delta(host: Path, name: str, spec_prefix: str = SPEC) -> None:
-    """Apply the delta ``tests/fixtures/step_gate/deltas/<name>.json`` to the host copy *host*.
+def _holder_of(document: Any, keys: list[str | int]) -> Any:
+    """The object or array that holds the last step of *keys* (object keys are strings, array positions integers).
+
+    Raises ``DeltaError`` when a step of the path is not in the document.
+    """
+    node = document
+    for key in keys[:-1]:
+        try:
+            node = node[key]
+        except (KeyError, IndexError, TypeError) as error:
+            raise DeltaError(f"no {key!r} on the path {keys}") from error
+    last = keys[-1]
+    if isinstance(node, list) != isinstance(last, int) or (isinstance(node, list) and not -len(node) <= last < len(node)):
+        raise DeltaError(f"the path {keys} does not end at an array position or an object key of the document")
+    return node
+
+
+def apply_delta(host: Path, name: str, spec_prefix: str = SPEC, *, folder: Path = DELTAS) -> None:
+    """Apply the delta ``<folder>/<name>.json`` (default ``tests/fixtures/step_gate/deltas``) to the host copy *host*.
 
     The files of a delta are named under ``spec/``; *spec_prefix* says where the spec folder is in *host* (``sub/spec``
-    in a nested layout).
+    in a nested layout).  The graph check variants live in ``GRAPH_CHECK_DELTAS``.
 
     Raises ``DeltaError`` for an unknown op, a missing file or a path that is not an array.
     """
-    for op in _read(DELTAS / f"{name}.json")["ops"]:
+    for op in _read(folder / f"{name}.json")["ops"]:
         _apply_op(host, op, spec_prefix)
 
 

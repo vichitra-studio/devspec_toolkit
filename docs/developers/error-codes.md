@@ -978,7 +978,7 @@ Today one command reports these codes. `spec-check` reports W630 (check `open-it
 
 ## Spec Graph (70x / 72x)
 
-A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and, when a node is involved, a `node_id`. `spec-check --json` prints both, and every finding in it has an `owner`: the one the finding carries, else the row of `tools/error_ownership.json` for its code, else the default owner of its check (`merge-check` for most checks). The codes of the spec graph that do this are E700 to E704, W720, E761 to E763, E768, E771, E772, E774, E778 and E882 (E760 carries an owner and no node id), and the open-item codes W630, E631, E632 and W633 (owners `step:<id>`, `merge-check`, `close-gate` and `merge-check`). The rows of `tools/error_ownership.json` give the owner of some of them (the others set it when they are raised): the owner of a link finding is the step of the node that holds the link, and E762 and E763 are for the merge check. The codes that refuse a command (E705 to E709, E764, E765, E767, E769, E770, E773) carry no owner.
+A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-gate` or `release-gate`) and, when a node is involved, a `node_id`. `spec-check --json` prints both, and every finding in it has an `owner`: the one the finding carries, else the row of `tools/error_ownership.json` for its code, else the default owner of its check (`merge-check` for most checks). The codes of the spec graph that do this are E700 to E704, W720, E740 to E749, E752, E761 to E763, E768, E771, E772, E774, E778 and E882 (E760 carries an owner and no node id), and the open-item codes W630, E631, E632 and W633 (owners `step:<id>`, `merge-check`, `close-gate` and `merge-check`). The rows of `tools/error_ownership.json` give the owner of some of them (the others set it when they are raised): the owner of a link finding is the step of the node that holds the link, and E762 and E763 are for the merge check. The codes that refuse a command (E705 to E709, E764, E765, E767, E769, E770, E773) carry no owner.
 
 ### E700 LINK_TARGET_NOT_FOUND
 
@@ -1065,6 +1065,100 @@ A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-
 **Trigger**: A link names a node whose lifecycle is `deprecated` and the trace lock has no entry for that link yet, so the link is new. Reported by `spec-check` (check `graph`), together with the missing entry (E761), and by `validate-all`. A link that already has a lock entry raises nothing. Example, after `specdev node status fr-password-reset-request deprecated` and a hand edit that makes `api-password-reset-confirm` link to it: `W720 api-password-reset-confirm, field derives_from, target 'fr-password-reset-request': 'fr-password-reset-request' is deprecated; point the link at the node that replaces it`.
 
 **Resolution**: Owner `step:<holder step>`. Point the link at the node that replaces the deprecated one. Not promotable (no E counterpart).
+
+## Graph Role Checks (74x)
+
+Eight checks of `spec-check` read the nodes of the spec by role: `no-dangling` (E740), `term-use` (E741), `verifier-rules` (E742, E743), `cross-cutting` (E744), `refinement` (E745), `scaffold-paths` (E746), `seed-routes` (E747, E748, E749) and `prose-ids` (E752). They run on every spec, whatever shape its files have: a check is not skipped because a spec looks like 1.1.1. Each finding has an `owner` and a `node_id` (for E747 and E748 the node is the seed); plain `spec-check` prints the message only, `spec-check --json` prints the owner. The step gate (`spec-check --step N`) lists a finding that a later step owns as PENDING and does not block on it; it blocks on a finding of step N itself. A **verifier** is a fixture (step 08) or a job (step 12). An **obligation** is a node that says what must be true or built, such as an acceptance criterion, an API, an invariant or an NFR.
+
+E740, E742 and E743 are **coverage gaps**: a node, or a missing node, that the spec should have linked. `specdev stale` counts them under the step that owns them (`step 08: 0 suspect nodes, 0 suspect links, 5 coverage gaps`), `specdev coverage` prints them under `Role findings`, and `specdev step ready` counts them as blockers of the steps that link to that step. The other codes of this section are not coverage gaps; only `spec-check` reports them. The messages below are copied from runs on copies of the worked example (`tests/fixtures/graph_example`); the unchanged example is a partial spec and reports 17 E740, 5 E743 and 1 E744, and none of the others.
+
+### E740 NODE_DANGLING
+
+**Trigger**: A node of a requirement, delivery or context kind (for example a criterion, an API error, an NFR, a rule, a threat, an environment, a secret or a metric) is used by no other node, and none of the nodes it contains is used. A node is used when a node that is not out of scope links to it with one of the verbs the message lists, or when a node it contains is used (an FR is used when one of its criteria is). Reported by `spec-check` (check `no-dangling`). A node is not checked when its lifecycle is `not_applicable` or its scope is `later` or `out`. Example, from the worked example: `E740 edge-case ec-token-at-expiry-second is not used by any node; a node of this kind is used by task-criterion refines (step 14): link it, schedule it, or set scope later or out`. The message lists at most five ways to use the kind and then says how many more there are (`... and 4 more`).
+
+**Resolution**: Owner `step:<the latest step whose nodes can use this kind>`: `step:07` for a metric (a capability or an NFR can use it), `step:12` for an environment or a secret (a job), `step:14` for a criterion or an edge case (a task criterion). A coverage gap: the step gate shows it as pending until that step is gated. Fix it one of three ways: link it from a node that can use it (the message names the kinds and verbs; on the worked example a task criterion that `refines` the criterion clears it), schedule it (add the FR to `schedules` of a step 09 milestone: this cleared `fr-password-reset-request`), or set `scope` to `later` or `out` (this cleared `ac-password-reset-1`). Not every kind has a `scope` field: on a charter metric the schema refuses it (`E520 ... success_metrics/1: Additional properties are not allowed ('scope' was unexpected)`), so link the metric from an NFR instead.
+
+**Promotable**: No (error only).
+
+### E741 TERM_NOT_USED_BY_LABEL
+
+**Trigger**: A glossary term whose current label no node uses. A term stores no link, so it is used when its label appears in the text of a node of steps 04 to 15 (a requirement, contract, invariant, task or other node that is not a record). The match ignores case, reads `-`, `_` and `/` as a space, needs whole words and allows `s` or `es` after the last word: with the label `recovery code`, `A Recovery-Code is single use.` and `Recovery codes expire.` match, `The recovery codex is long.` and `Recoverycode is one word.` do not. Only the current label matches. A term is not checked when its lifecycle is `not_applicable`. Reported by `spec-check` (check `term-use`). Example, after the label of `term-reset-token` was changed to `recovery code` and no text was changed: `E741 term 'term-reset-token' ('recovery code') is not used: no node of steps 04 to 15 mentions its label; use it in the text of a requirement, contract, invariant, task or other non-record node, or mark the term not_applicable`.
+
+**Resolution**: Owner `step:14`. Use the label in the text of a node of steps 04 to 15, or mark the term `not_applicable` (`specdev node status term-reset-token not_applicable` cleared it). Not a coverage gap: `stale` does not count it.
+
+**Promotable**: No (error only).
+
+### E742 UNUSED_VERIFIER
+
+**Trigger**: A verifier that nothing uses. A fixture is used when a task criterion lists it in `verified_by`; a job is used in that way too, or when it `realises` or `verifies` a node. A fixture that verifies something but that no task criterion lists is still unused. Reported by `spec-check` (check `verifier-rules`). The unchanged worked example has none. Examples, after a second fixture was added and no criterion listed it: `E742 fixture fix-password-reset-spare is not used: no task criterion lists it in verified_by; list it in a criterion's verified_by or remove it`; for a job with an empty `realises`: `E742 job job-idle is not used: no task criterion lists it in verified_by, and it neither realises nor verifies a node; list it in a criterion's verified_by or remove it`.
+
+**Resolution**: Owner `step:14`. A coverage gap. List the verifier in the `verified_by` of a task criterion that refines what it verifies, or remove it. Listing a fixture in one criterion and not in another can make the other fixture unused: after `verified_by` of `tc-confirm-expired-token` was changed from `fix-password-reset-expired-token` to `fix-password-reset-reused-token`, the first fixture got this error.
+
+**Promotable**: No (error only).
+
+### E743 MISSING_VERIFIER
+
+**Trigger**: A node that a verifier should prove has none. The kinds a fixture's `verifies` may name are checked: an acceptance criterion, an API, an invariant and an NFR. An API error is not checked (it is proven with its API), and neither are a threat, an edge case or a rule. A node is not checked when its lifecycle is `not_applicable` or its scope is `later` or `out`: `scope: later` on `ac-password-reset-2` cleared its E743. Reported by `spec-check` (check `verifier-rules`). Examples, from the worked example: `E743 criterion ac-password-reset-1 has no verifier: add a fixture at step 08 that verifies it`; `E743 nfr nfr-latency-reset-email has no verifier: add a fixture at step 08 or a job at step 12 that verifies it`.
+
+**Resolution**: Owner `step:08`, the step that writes the fixtures. A coverage gap: the step gate shows it as pending until step 08 is gated (at `--step 07` the five findings of the worked example are in the pending count, `08: 5`). Add a fixture whose `verifies` names the node. An NFR can be proven the other way, with a job whose `verifies` names it (step 12); a job's `realises` does not accept an NFR (E701). A new fixture is itself unused (E742) until a task criterion lists it in `verified_by`.
+
+**Promotable**: No (error only).
+
+### E744 CROSS_CUTTING_NOT_REFINED
+
+**Trigger**: An invariant or an NFR that constrains something applies to a task, and no criterion of the task refines it. The invariant or NFR applies to a task when the task refines something that leads to the same capability or component that the invariant or NFR constrains. The tasks of a closed milestone are not checked: with the milestone of the worked example marked done, `cross-cutting` passes. Reported by `spec-check` (check `cross-cutting`). Example, from the worked example: `E744 task task-implement-password-reset-confirm falls under nfr-latency-reset-email through cap-account-recovery but no criterion of the task refines it; add a task criterion that refines nfr-latency-reset-email`.
+
+**Resolution**: Owner `step:14`. Add a criterion to the task whose `refines` names the invariant or NFR. That clears E744 and starts E745 until a verifier of the criterion verifies the same node: a criterion that refined `nfr-latency-reset-email` with `verified_by` of `fix-password-reset-latency` (a fixture whose `verifies` names the NFR) gave no finding; with `verified_by` of `fix-password-reset-expired-token` it gave E745 and E743.
+
+**Promotable**: No (error only).
+
+### E745 VERIFIER_DOES_NOT_VERIFY_REFINED
+
+**Trigger**: A criterion of a task refines a node, and no verifier in its `verified_by` proves that node. A verifier proves it when its `verifies` names the node, a node that contains it or a node it contains. A criterion that lists no verifier gets the finding too, with `(none listed)` in the place of the verifiers. The criteria of a closed milestone are not checked: with the milestone of the worked example marked done, `refinement` passes. Reported by `spec-check` (check `refinement`). Example, after `verified_by` of `tc-confirm-expired-token` (which refines `ac-password-reset-3`) was changed to `fix-password-reset-reused-token`: `E745 task criterion tc-confirm-expired-token refines ac-password-reset-3 but none of its verifiers (fix-password-reset-reused-token) verifies ac-password-reset-3, a node that contains it or a node it contains; add a verifier that does`. The unchanged worked example has none.
+
+**Resolution**: Owner `step:14`. List a verifier that proves the refined node in `verified_by` (listing both fixtures cleared it), or change what the criterion refines. Not a coverage gap.
+
+**Promotable**: No (error only).
+
+### E746 SCAFFOLD_PATH_NOT_TRACKED
+
+**Trigger**: A scaffold row (step 15) names a file that git does not track, for an API that is built. An API is built when a task criterion of a closed milestone refines it (the run added a criterion that refines `api-password-reset-confirm`, attested it, and set the milestone to `done`). `spec-check` checks only the rows of built APIs; with no API built, as on the unchanged worked example, it reports nothing. A file that exists but was never added to git is not tracked; one that is added to the index is. Outside a git repository the check is skipped and the summary says why: `[SKIP] scaffold-paths (git ls-files failed: fatal: not a git repository (or any of the parent directories): .git)`. Reported by `spec-check` (check `scaffold-paths`). Example, after a done milestone made `api-password-reset-confirm` built: `E746 scaffold row scaffold-password-reset-confirm names src/routes/password-resets/confirm.ts, which is not a tracked file (merge mode); add and commit the file, or correct the row's path`.
+
+**Resolution**: Owner `step:15`. Add the file to git (`git add` cleared it, with the file in place), or correct the `path` of the row.
+
+**Promotable**: No (error only).
+
+### E747 SEED_NOT_ROUTED
+
+**Trigger**: A seed in `seeds[]` of the seed manifest that no `step_requirements` entry names. The finding points at the manifest. Reported by `spec-check` (check `seed-routes`). Example, after `seed-extra` was added to `seeds[]` with no route: `E747 seed seed-extra is listed in the seed manifest but no step_requirements entry routes it to a step; route it to the step that distils it, or remove it`.
+
+**Resolution**: Owner `step:00`. Route the seed to the step that distils it, and write a node of that step that links it (a route that no node uses is E748), or remove the seed from `seeds[]` (and its file: a seed file that the manifest no longer lists is W551).
+
+**Promotable**: No (error only).
+
+### E748 SEED_ROUTE_UNUSED
+
+**Trigger**: The manifest routes a seed to a step, and no node of that step links the seed with `derives_from`. A step whose node kinds cannot link a seed at all is named in the message. Reported by `spec-check` (check `seed-routes`); the finding points at the step's key in `step_requirements`. Examples: a route of `seed-accounts` to step `02a` where no node links it: `E748 the seed manifest routes seed-accounts to step 02a but no node of step 02a lists seed-accounts in derives_from; distil the seed in that step, or remove the route`; a route to step `05`: `E748 the seed manifest routes seed-accounts to step 05 but no node kind of step 05 can link a seed (only the kinds of steps 00, 02, 02a can); distil the seed in that step, or remove the route`; a route to step `16`: `E748 the seed manifest routes seed-accounts to step 16 but the trinity key 16 cannot be used: no node of the trinity steps links a seed; distil the seed in that step, or remove the route`.
+
+**Resolution**: Owner `step:<the step of the route>`. Either use the seed in a node of that step (add its id to the node's `derives_from`: this cleared a route of `seed-extra` to step `02`), or remove the route from `step_requirements`.
+
+**Promotable**: No (error only).
+
+### E749 SEED_LINK_NOT_ROUTED
+
+**Trigger**: A node links a seed with `derives_from`, and the manifest does not route that seed to the node's step. Reported by `spec-check` (check `seed-routes`). Example, after the route of `seed-accounts` to step `02` was removed: `E749 tp-argon2 derives from seed seed-accounts, which the seed manifest does not route to step 02; add seed-accounts to step_requirements["02"] or remove the link`. One finding for each node.
+
+**Resolution**: Owner `step:<the step of the node that holds the link>`. Add the seed to `step_requirements` for that step (this cleared both findings), or remove the link.
+
+**Promotable**: No (error only).
+
+### E752 NODE_ID_IN_PROSE
+
+**Trigger**: The text of a node names the id of another node, an old id of a renamed node, or a seed id. A mention in text is not a link: the graph never sees it, so the trace lock, the suspect check and the use rules miss the relation it states. The check reads the string fields of every node, but not the id and link fields, and not a field whose schema fixes the value (an enum, a constant, a pattern or a format: the `description` of a task is one, because its schema has a pattern). It matches whole ids that contain a `-`; a single-word id such as `dev` is an ordinary word and is not matched, and a token that looks like an id but names nothing is not reported. Reported by `spec-check` (check `prose-ids`). Example, after the `statement` of `fr-password-reset` was given the sentence `The system shall serve cap-account-recovery, as agreed.`: `E752 fr fr-password-reset mentions the id cap-account-recovery in its text at statement: a prose mention is not a link and the resolver never sees it; turn a mention that states a relation into the link, or reword it`. A retired name is reported with it (`mentions the id fr-password-reset-request (a retired name of fr-pw-request)`). On a spec of the 1.1.1 shape that has not been migrated, the old link fields (`trace`, `targets`) are such text and give E752.
+
+**Resolution**: Owner `step:<the step of the node that holds the text>`. If the mention states a relation, write it as a link; otherwise reword it (removing the sentence cleared it).
+
+**Promotable**: No (error only).
 
 ## Trace Lock (76x)
 
@@ -1168,7 +1262,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E773 STEP_NOT_READY
 
-**Trigger**: `specdev step ready NN` found that step NN may not start: a step above it has no spec file, or holds pending replay (a suspect link, or a coverage gap as counted by `specdev stale`). The steps checked are the steps NN's nodes link to, plus (for the presence check only) the `required_spec_inputs` of NN in `tools/step_order.json`; the file of NN itself is not required (`step ready 07` with no 07 file reports `step 07: ready` on the worked example). Exit 1; the report lists each blocker (node, link, roots) and the step to write first (the first blocker is a step with no file) or to replay first. Example, after the text of `ac-password-reset-3` was edited: `E773 step 06 is not ready: step 05 (2 blockers); replay step 05 first`. On the worked example `step ready 14` reports `E773 step 14 is not ready: step 13a (1 blocker); write step 13a first`, because `tools/step_order.json` still lists 13a as an input of 14 and the example has no 13a file; that lasts until a later 1.2.0 change retires step 13a.
+**Trigger**: `specdev step ready NN` found that step NN may not start: a step above it has no spec file, or holds pending replay (a suspect link, or a coverage gap as counted by `specdev stale`). The steps checked are the steps NN's nodes link to, plus (for the presence check only) the `required_spec_inputs` of NN in `tools/step_order.json`; the file of NN itself is not required (`step ready 07` with no 07 file reports `step 07: ready` on the worked example). Exit 1; the report lists each blocker (node, link, roots) and the step to write first (the first blocker is a step with no file) or to replay first. Example, after the text of `ac-password-reset-3` was edited: `E773 step 06 is not ready: step 05 (2 blockers); replay step 05 first`. On the worked example `step ready 14` reports `E773 step 14 is not ready: step 08 (5 blockers); step 13a (1 blocker); replay step 08 first` and lists the blockers: `step 08: coverage gap E743: ac-password-reset-1` (and four more E743) and `step 13a: no spec file yet`. The five are the missing verifiers of the partial example (E743, owner step 08); step 13a is a blocker because `tools/step_order.json` still lists 13a as an input of 14 and the example has no 13a file, which lasts until a later 1.2.0 change retires step 13a.
 
 **Resolution**: Command refusal: no owner, no node id. Write the step the message says to write, or finish the replay of the steps it names, earliest step first (`specdev stale`, then `specdev attest`).
 

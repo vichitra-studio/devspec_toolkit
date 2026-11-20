@@ -1,0 +1,15 @@
+{
+  "description": "A requirement of step 04 derives from the seed (the wrong kind of link for a 04 node).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/04_fr_list.json",
+      "path": [
+        "functional_requirements",
+        0,
+        "derives_from"
+      ],
+      "value": "seed-accounts"
+    }
+  ]
+}

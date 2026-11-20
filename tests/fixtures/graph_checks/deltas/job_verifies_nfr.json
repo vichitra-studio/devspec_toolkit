@@ -1,0 +1,16 @@
+{
+  "description": "The job job-contract-tests of step 12 verifies nfr-latency-reset-email (CD-22).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/12_ci_gates.json",
+      "path": [
+        "jobs",
+        0,
+        "verifies"
+      ],
+      "create": true,
+      "value": "nfr-latency-reset-email"
+    }
+  ]
+}

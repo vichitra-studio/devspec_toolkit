@@ -1,0 +1,56 @@
+{
+  "description": "A fixture that verifies nfr-latency-reset-email and a criterion of the confirm task that refines it and names the fixture.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/08_fixtures.json",
+      "path": [
+        "fixtures"
+      ],
+      "value": {
+        "fixture_id": "fix-reset-email-delivery-time",
+        "mode": "contract",
+        "description": "A reset email reaches a test inbox within 60 seconds at the 95th percentile.",
+        "verifies": [
+          "nfr-latency-reset-email"
+        ],
+        "input": {
+          "method": "POST",
+          "path": "/v1/password-resets",
+          "body": {
+            "email": "member@example.com"
+          }
+        },
+        "expected": {
+          "status": 202
+        },
+        "tag_ref": {
+          "id": "cn:core:tag:critical-path",
+          "kind": "tag",
+          "version": "1.0.0"
+        }
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/14_roadmap.json",
+      "path": [
+        "milestones",
+        0,
+        "tasks",
+        0,
+        "acceptance_criteria"
+      ],
+      "value": {
+        "criterion_id": "tc-reset-email-delivery-time",
+        "text": "The reset email reaches a test inbox within 60 seconds at the 95th percentile in staging.",
+        "refines": [
+          "nfr-latency-reset-email"
+        ],
+        "verified_by": [
+          "fix-reset-email-delivery-time"
+        ]
+      }
+    }
+  ]
+}

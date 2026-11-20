@@ -1,0 +1,29 @@
+{
+  "description": "The anchor row of ms-account-recovery says done, so the milestone is closed and Built is read.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/16_impl_context.json",
+      "path": [
+        "plan",
+        "milestone_index",
+        0,
+        "status"
+      ],
+      "value": "done"
+    },
+    {
+      "op": "set",
+      "file": "spec/16_impl_context.json",
+      "path": [
+        "plan",
+        "milestone_index",
+        0,
+        "close"
+      ],
+      "value": {
+        "signed_off_by": "test-reviewer"
+      }
+    }
+  ]
+}

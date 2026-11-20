@@ -1,0 +1,31 @@
+{
+  "description": "A new need that only the out-of-scope item scope-sms-reset derives from.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/00_charter.json",
+      "path": [
+        "stakeholders",
+        0,
+        "needs"
+      ],
+      "value": {
+        "need_id": "need-sms-reset",
+        "text": "Reset by text message",
+        "derives_from": [
+          "seed-accounts"
+        ]
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/00_charter.json",
+      "path": [
+        "scope_items",
+        1,
+        "derives_from"
+      ],
+      "value": "need-sms-reset"
+    }
+  ]
+}
