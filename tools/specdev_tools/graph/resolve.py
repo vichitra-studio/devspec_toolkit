@@ -8,7 +8,7 @@ whose lifecycle is ``not_applicable`` is not checked as a source.  Deprecated ta
 """
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -18,6 +18,8 @@ from specdev_tools.graph.model import UNRANKED, Graph, Link, Node, SpecShape, ar
 from specdev_tools.graph.ownership import step_owner
 
 HISTORY_FIELDS = frozenset({"replaces", "removes"})
+FROZEN_FIELDS = frozenset({"verified_by", "refines"})
+"""The links of closed work that are not resolved against what exists now: a closed criterion keeps naming the fixture and the obligation it had, whether or not they are still in the spec."""
 
 
 class ResolverHooks(Protocol):
@@ -143,8 +145,12 @@ def _direction_error(holder: Node, link: Link, target: Node, shape: SpecShape) -
     )
 
 
-def _link_errors(graph: Graph, holder: Node, link: Link, edges: _SameStepEdges, hooks: ResolverHooks) -> list[SpecError]:
+def _link_errors(
+    graph: Graph, holder: Node, link: Link, edges: _SameStepEdges, hooks: ResolverHooks, *, frozen: bool = False,
+) -> list[SpecError]:
     target = graph.find(link.target)
+    if frozen and (target is None or not link_target_allowed(link.decl, holder.step, target, graph.shape)):
+        return []
     if target is None:
         return [_missing_target_error(holder, link, graph)]
     if not link.decl.accepts(target.kind):
@@ -241,11 +247,13 @@ def _cycle_errors(edges: _SameStepEdges) -> list[SpecError]:
 
 
 def resolve_graph(
-    graph: Graph, *, hooks: ResolverHooks = NULL_HOOKS, steps: Iterable[str] | None = None
+    graph: Graph, *, hooks: ResolverHooks = NULL_HOOKS, steps: Iterable[str] | None = None, historical: Collection[str] = frozenset(),
 ) -> list[SpecError]:
     """Check every link of *graph*: E700 to E703 plus whatever *hooks* report.
 
-    With *steps*, only links held by nodes of those steps (and cycles in those steps) are reported.  Each finding is
+    With *steps*, only links held by nodes of those steps (and cycles in those steps) are reported.  *historical* is the ids
+    of the nodes of closed milestones (``trace.history.historical_node_ids``): a ``verified_by`` or ``refines`` link of such a
+    node that names no node, or one the field does not allow, raises nothing; every caller that reports findings passes it.  Each finding is
     owned by the step of the node that holds the link and carries that node's id.  A node whose ``lifecycle`` is
     ``not_applicable`` is skipped as a holder; a ``replaces`` or ``removes`` link is skipped.  Nothing is raised for a
     wrong-typed value: the graph holds only what the builder could read.
@@ -258,6 +266,6 @@ def resolve_graph(
             continue
         for link in holder.links:
             if link.field not in HISTORY_FIELDS:
-                errors.extend(_link_errors(graph, holder, link, edges, hooks))
+                errors.extend(_link_errors(graph, holder, link, edges, hooks, frozen=link.field in FROZEN_FIELDS and holder.id in historical))
     errors.extend(_cycle_errors(edges))
     return errors

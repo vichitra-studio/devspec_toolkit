@@ -31,7 +31,10 @@
     {
       "class": "obligation-not-built-or-verifier-without-evidence",
       "owner": "consumer_step",
-      "codes": [],
+      "codes": [
+        "E347",
+        "E348"
+      ],
       "authority": "DOC L824-840 row 4; DS L420"
     },
     {
@@ -117,7 +120,10 @@
     {
       "class": "release-gate-failure",
       "owner": "release-gate",
-      "codes": [],
+      "codes": [
+        "E343",
+        "E344"
+      ],
       "authority": "DOC L824-840 row 15; DS L402; DS L420"
     },
     {
@@ -195,6 +201,15 @@
         "E567"
       ],
       "authority": "M6c WI-04"
+    },
+    {
+      "class": "removal-rules",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E341",
+        "E342"
+      ],
+      "authority": "M7 WI-09"
     }
   ]
 }

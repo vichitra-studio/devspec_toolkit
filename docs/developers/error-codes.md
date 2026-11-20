@@ -679,6 +679,54 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only).
 
+### E341 REMOVAL_FIXTURE_MISMATCH
+
+**Trigger**: The check `removal-rules` (`spec-check` and the step gate). A removal criterion is a task criterion with `removes`; a removal fixture is a fixture with `removes` (it needs no `verifies`). Two findings. The `removes` of a criterion differ from the `removes` of a removal fixture in its `verified_by`; and a removal fixture removes an id that no task criterion listing it removes. Criteria of a closed milestone are not checked, and a fixture that only closed criteria list is closed with them. Example, a criterion `tc-retire-feature` with `removes: [fr-retired-feature]` and a fixture `fix-feature-gone` that removes `fr-retired-feature` and `fr-retired-extra`: `E341 task criterion tc-retire-feature removes fr-retired-feature but its removal fixture fix-feature-gone removes fr-retired-extra, fr-retired-feature: make the removes of tc-retire-feature and fix-feature-gone the same list` (node: the criterion, link `verified_by->fix-feature-gone`) and `E341 removal fixture fix-feature-gone removes fr-retired-extra but no task criterion that lists it in verified_by removes it: add a task criterion with those ids in removes and fix-feature-gone in verified_by` (node: the fixture).
+
+**Resolution**: Owner `step:14`. Make the two lists the same, or add the criterion the second message asks for. Run: `specdev json patch spec/08_fixtures.json '.fixtures[2].removes' '["fr-retired-feature"]'` cleared both findings and left E763 on `tc-retire-feature` (the fixture changed, so the link `verified_by -> fix-feature-gone` is suspect); `specdev attest tc-retire-feature --yes` cleared it; `spec-check` then showed the 25 errors of the unchanged example and nothing of this code.
+
+**Promotable**: No (error only).
+
+### E342 REMOVES_TARGET_PRESENT
+
+**Trigger**: The check `removal-rules`. A task criterion or a fixture that is not closed lists in `removes` an id that a node (or an old id of a node) has now: the thing it says is gone is still in the spec. The same rule as E772 for `replaces`. A closed criterion is never checked, so an id removed long ago can be used again. Example, a criterion `tc-retire-ec` and a fixture `fix-ec-gone` that remove `ec-token-at-expiry-second`: `E342 task-criterion tc-retire-ec removes ec-token-at-expiry-second, which is still in the spec: delete ec-token-at-expiry-second, or take it out of removes` and the same for `fixture fix-ec-gone` (link `removes->ec-token-at-expiry-second`).
+
+**Resolution**: Owner `step:14`. Delete the node, or take the id out of `removes` of the criterion and the fixture (the two lists stay equal, E341). Run, deleting: `specdev json delete spec/11_redteam.json '.edge_cases[0]'` left E762 for three lock entries of the deleted node and E763 on `tc-retire-ec` (the fixture it lists changed); `specdev attest --prune` (`removed 3 orphan entries`) and `specdev attest tc-retire-ec --yes` cleared them, and `spec-check` ended with one error fewer than the unchanged example (the E740 of the deleted edge case) and one more warning (W594 on `11_redteam.json`, content overlap). A node that other nodes link is removed by the loop of Removing a node above. Run, taking the id out: with `removes` listing a second id that is gone, the id was taken out of the fixture and the criterion, `specdev attest tc-retire-ec --yes` cleared the E763 that the edit left, and `spec-check` showed the 25 errors of the example.
+
+**Promotable**: No (error only).
+
+### E343 REALISATION_OUTDATED
+
+**Trigger**: Raised by the release gate (not by any command in this release): a `refines` link of a task criterion of a closed milestone points at a node whose content changed since the link was accepted, and no closed milestone has a criterion that refines the current version. `proof.realisation.unresolved_realisations(graph, lock, seed_texts)` computes it; each entry carries `code` `E343`, `kind` `outdated`, the milestone, the target, the current hash and the milestone that already carries the answer but is not closed (`existing_milestone`, else `None`). Run on a copy of the worked example with `ms-account-recovery` done and `ac-password-reset-3` reworded: `UnresolvedRealisation(code='E343', kind='outdated', milestone='ms-account-recovery', target='ac-password-reset-3', current_hash='sha256:3295...2ce3', existing_milestone=None)`. `spec-check` never reports it.
+
+**Resolution**: Owner `release-gate`. Add a change milestone: a milestone with a task criterion that refines the changed node (so its link is accepted at the new content) and close it; the target is then `superseded` and the entry is gone. Run: milestone `ms-token-ttl` with `tc-ttl-31` refining `ac-password-reset-3`, open: the entry named it in `existing_milestone`; set to done: the list was empty. No command prints this finding yet.
+
+**Promotable**: No (error only).
+
+### E344 REALISATION_REMOVED
+
+**Trigger**: Raised by the release gate (not by any command in this release): a `refines` link of a task criterion of a closed milestone points at a node that is gone, and no closed milestone has a criterion whose `removes` names that node or a node that contained it (the containers are recorded in the lock entry, so the removal of the FR `fr-password-reset` answers the removal of its criterion `ac-password-reset-3`). Computed by `unresolved_realisations`; each entry carries `code` `E344`, `kind` `removed`, `current_hash` `None`. Run, with `fr-password-reset` deleted from the example: `UnresolvedRealisation(code='E344', kind='removed', milestone='ms-account-recovery', target='ac-password-reset-3', current_hash=None, existing_milestone=None)`. A removed link never becomes superseded.
+
+**Resolution**: Owner `release-gate`. Add a closed milestone with a removal criterion (`removes: [fr-password-reset]`) that lists a removal fixture with the same `removes` (E341). Run: `ms-retire-reset` with `tc-retire-reset` and `fix-reset-gone` done: the list was empty. No command prints this finding yet.
+
+**Promotable**: No (error only).
+
+### E347 VERIFIER_NO_VALID_EVIDENCE
+
+**Trigger**: Returned by `proof.proof.proof_errors(graph, ctx, scope, cap, ...)` for the gate that calls it (the close gate, the release check); no `spec-check` check and no command runs it in this release. A binding that a verifier of the node needs, at a stage up to the gate's cap, has no valid passing evidence. The `subcode` is the reason: `NO_EVIDENCE` (no run wrote a file), `NONZERO_EXIT`, `GUARD_NOT_MATCHED`, `STALE_TREE` (the code changed since the run), `STALE_HASH` (the verifier or a node it proves changed or is gone), `STALE_TP_VERSION` (a third party the proved nodes rely on is at another version than the pin), `STAGE_TOO_LOW` (the run was at a lower stage than the binding). Owner: the step of the node. Run on a copy of the worked example with `ver-password-reset-expired-token` bound and never run, then run, then the code edited: `E347 criterion ac-password-reset-3: binding ver-password-reset-expired-token has no valid evidence (NO_EVIDENCE): no run has written evidence for it; run `specdev verify run ver-password-reset-expired-token --stage dev``; after the edit `... (STALE_TREE): the code changed since the run; run `specdev verify run ver-password-reset-expired-token --stage dev``. A manual fixture or a rule enforced by `review` has no binding: its finding says `verifier <id> has no valid evidence (NO_EVIDENCE): a person attests it: it needs a valid attestation record` (not run: the command that writes the attestation is not in this release).
+
+**Resolution**: Owner `step:<the step of the node>`. Run the binding the message names. Run: `specdev verify run ver-password-reset-expired-token --stage dev` printed `PASS ver-password-reset-expired-token at dev` and the next `proof_errors` for the criterion and the API returned nothing. For `NONZERO_EXIT` and `GUARD_NOT_MATCHED` fix the test or the guard first. Spec, seed, plan, anchor, lock and record edits do not make evidence stale.
+
+**Promotable**: No (error only).
+
+### E348 OBLIGATION_NOT_PROVEN
+
+**Trigger**: Returned by `proof_errors` (as E347; no command runs it in this release). Two subcodes. `UNBOUND`: a verifier of the node has no binding for it. `NO_VERIFIER`: nothing verifies the node (a task criterion with no `verified_by` too). Examples, on the worked example: `E348 invariant inv-reset-token-single-use: its verifier fix-password-reset-reused-token has no binding; bind it with `specdev verify bind fix-password-reset-reused-token --command "<command>" --guard "<regex>"`` and `E348 criterion ac-password-reset-1 has no verifier to prove it: add a fixture or a job that verifies it`. A binding above the cap of the gate gives nothing (it is pending), and with the close gate's keywords a `staging` or `prod` binding is ignored. Missing verifiers are found earlier, at spec time, by E743.
+
+**Resolution**: Owner `step:<the step of the node>`. Bind the verifier, or add one. Run: `verify bind fix-password-reset-reused-token --command "python3 src/reused_token_test.py" --guard "reused token .*passed"` then `verify run ver-password-reset-reused-token` (`PASS ... at dev`): the invariant no longer appeared. For `NO_VERIFIER`: a fixture `fix-reset-link-sent` that verifies `ac-password-reset-1` was added (E743 asks for the same fixture); `proof_errors` then returned E347 `NO_EVIDENCE` until `verify bind fix-reset-link-sent --command "python3 src/link_test.py" --guard "link sent .*passed"` and `verify run ver-reset-link-sent` (`PASS ver-reset-link-sent at dev`), after which it returned nothing.
+
+**Promotable**: No (error only).
+
 ### W350 SUBMODULE_DIRTY_NOT_COVERED
 
 **Trigger**: `specdev verify run` found a submodule of the host with uncommitted content. The code tree holds a submodule as the commit it has checked out, so uncommitted edits inside it are not in the tree id and a run on them would be recorded against the committed code. The run goes on (warning only). Example: `W350 submodule 'theme' has uncommitted content that the code tree does not see; commit it in the submodule and update the pointer here`, printed on stderr before the run's result.
@@ -911,7 +959,7 @@ A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-
 
 ### E700 LINK_TARGET_NOT_FOUND
 
-**Trigger**: A link field names an id that no node has. Reported by `spec-check` (check `graph`). When no file of any step that holds a kind the field accepts exists in the spec, the message says that no file of those steps exists, instead of "no node has that id"; when such a file exists but could not be read (for example, it is not valid JSON, or its top level is not an object), the message says that the file could not be read, so the target cannot be checked. This replaces the step 12 E590 check of a job's `depends_on`.
+**Trigger**: A link field names an id that no node has. Reported by `spec-check` (check `graph`). A `verified_by` or `refines` link of a task criterion of a closed milestone (and of its tasks) is not checked: it keeps naming the fixture or the obligation it had, even after that node is deleted (run: with `fix-password-reset-expired-token` deleted and the milestone `done`, the E700 on `tc-confirm-expired-token` was gone and the ones on the threat, the edge case and the verification record stayed; with the milestone open all four were reported). When no file of any step that holds a kind the field accepts exists in the spec, the message says that no file of those steps exists, instead of "no node has that id"; when such a file exists but could not be read (for example, it is not valid JSON, or its top level is not an object), the message says that the file could not be read, so the target cannot be checked. This replaces the step 12 E590 check of a job's `depends_on`.
 
 **Resolution**: Owner `step:<holder step>`. Fix the id, or define the node it names.
 

@@ -8,6 +8,7 @@ from specdev_tools.graph.kinds import KindRegistryError
 from specdev_tools.graph.model import Graph, Link, Node, article
 from specdev_tools.graph.ownership import step_owner
 from specdev_tools.graph.resolve import NULL_HOOKS, resolve_graph
+from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import Lock
 from specdev_tools.trace.suspects import LockHook
 
@@ -76,4 +77,4 @@ def run_graph_check(
         except KindRegistryError as exc:
             return [exc.error]
     hooks = NULL_HOOKS if lock is None else LockHook(graph, lock)
-    return [*check_unique_ids(graph), *check_alias_space(graph), *check_replaces(graph), *resolve_graph(graph, hooks=hooks)]
+    return [*check_unique_ids(graph), *check_alias_space(graph), *check_replaces(graph), *resolve_graph(graph, hooks=hooks, historical=historical_node_ids(graph))]

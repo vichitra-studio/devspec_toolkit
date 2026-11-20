@@ -95,6 +95,14 @@ ERROR_CODES = {
     "E337": "THIRD_PARTY_PIN_MISMATCH",
     "E338": "THIRD_PARTY_SOURCE_UNRESOLVED",
     "E339": "THIRD_PARTY_INSTALLED_MISMATCH",
+    # Removal and proof: E341 and E342 are findings of the ``removal-rules`` check (owner step 14); E343 and E344 are the release
+    # gate's (owner release-gate, computed by ``proof.realisation``); E347 and E348 are the findings of ``proof_errors`` (owner: the step of the node).
+    "E341": "REMOVAL_FIXTURE_MISMATCH",
+    "E342": "REMOVES_TARGET_PRESENT",
+    "E343": "REALISATION_OUTDATED",
+    "E344": "REALISATION_REMOVED",
+    "E347": "VERIFIER_NO_VALID_EVIDENCE",
+    "E348": "OBLIGATION_NOT_PROVEN",
     "W350": "SUBMODULE_DIRTY_NOT_COVERED",
     "W351": "RUN_CHANGED_CODE_TREE",
     # Canonical registry (4xx)

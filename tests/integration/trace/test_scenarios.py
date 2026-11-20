@@ -139,7 +139,8 @@ def test_scenario_retire_and_replace_leaves_resolver_errors_until_the_holders_re
 
 # --- scenario 3: DOC 13.4, a closed milestone whose built node changes or is deleted --------------------------------------------
 
-def test_scenario_closed_milestone_is_outdated_not_suspect_and_a_deleted_node_is_a_resolver_error(host: Example) -> None:
+def test_scenario_closed_milestone_is_outdated_not_suspect_and_a_deleted_refines_target_is_no_error(host: Example) -> None:
+    """Since M7 (WI-M7-09) a deleted target of a closed criterion's `refines` is no E700: the resolver leaves a closed criterion's links alone."""
     _add_successor_fr(host)
     host.close_milestone()
     _run(host, "json", "patch", "--id", CRITERION, ".text", json.dumps(EDITED_TEXT))
@@ -159,8 +160,7 @@ def test_scenario_closed_milestone_is_outdated_not_suspect_and_a_deleted_node_is
 
     _run(host, "json", "delete", "--id", FR)
     graph_findings = _findings(host, "graph")
-    (broken,) = [finding for finding in graph_findings if finding["code"] == "E700" and finding["node_id"] == "tc-confirm-expired-token"]
-    assert broken["owner"] == "step:14"
+    assert [finding for finding in graph_findings if finding["code"] == "E700" and finding["node_id"] == "tc-confirm-expired-token"] == []
     assert not {finding["code"] for finding in _findings(host, "trace-lock") if finding.get("node_id") == "tc-confirm-expired-token"}
     entry = ("tc-confirm-expired-token", "refines", CRITERION)
     assert entry in {item.key for item in read_lock(str(host.spec)).entries}

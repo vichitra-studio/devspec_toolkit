@@ -16,14 +16,18 @@ from typing import Any
 
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.core.json_utils import JQ_INDENT
+from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.schema_validate import schema_violations, violation_text
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.proof.stages import binding_stage
+from specdev_tools.proof.stages import STAGES, binding_stage
 from specdev_tools.trace.lockfile import replace_file_atomically
 from specdev_tools.trace.records import RECORD_FILE_SUFFIX, RECORDS_DIR
 
 BINDING_KIND = "verification-record"
+EVIDENCE_KIND = "evidence-record"
+ATTESTATION_TYPE = "attestation"
+RUN_TYPE = "run"
 VERIFICATION_SCHEMA = "vc:extras:verification-record"
 EVIDENCE_SCHEMA = "vc:extras:evidence-record"
 BINDING_PREFIX = "ver-"
@@ -95,7 +99,7 @@ class Evidence:
         item: dict[str, Any] = {
             "evidence_id": self.evidence_id,
             "about": list(self.about),
-            "type": "run",
+            "type": RUN_TYPE,
             "stage": self.stage,
             "tested_tree": self.tested_tree,
             "exit_code": self.exit_code,
@@ -106,6 +110,65 @@ class Evidence:
         if self.recorded_hashes:
             item["recorded_hashes"] = dict(self.recorded_hashes)
         return item
+
+
+def _hash_map(value: object) -> dict[str, str]:
+    return {key: text for key, text in value.items() if isinstance(key, str) and isinstance(text, str)} if isinstance(value, Mapping) else {}
+
+
+def _about(item: Mapping[str, Any]) -> tuple[str, ...] | None:
+    about = item.get("about")
+    return tuple(about) if isinstance(about, list) and about and all(isinstance(name, str) for name in about) else None
+
+
+def evidence_from_item(item: Mapping[str, Any]) -> Evidence | None:
+    """The run evidence a stored evidence record *item* states; ``None`` when it is another type or is not shaped as the evidence schema says (the record check reports that)."""
+    about, stage, tree = _about(item), item.get("stage", "dev"), item.get("tested_tree")
+    code, matched, digest = item.get("exit_code"), item.get("guard_matched"), item.get("output_hash")
+    if item.get("type", RUN_TYPE) != RUN_TYPE or about is None or stage not in STAGES or not isinstance(tree, str):
+        return None
+    if not (isinstance(code, int) and isinstance(matched, bool) and isinstance(digest, str) and isinstance(item.get("evidence_id"), str)):
+        return None
+    return Evidence(
+        evidence_id=item["evidence_id"], about=about, stage=stage, tested_tree=tree, exit_code=code, guard_matched=matched,
+        output_hash=digest, installed_versions=_hash_map(item.get("installed_versions")), recorded_hashes=_hash_map(item.get("recorded_hashes")),
+    )
+
+
+def read_evidence(folder: str, evidence_id: str) -> Evidence | None:
+    """The run evidence stored as ``<evidence_id>.json`` in *folder*; ``None`` when there is no such file, it is unreadable or it is not a run record."""
+    document = read_json_object(os.path.join(folder, record_file(evidence_id)))
+    records = document.get("records") if document is not None else None
+    item = records[0] if isinstance(records, list) and len(records) == 1 and isinstance(records[0], dict) else None
+    return evidence_from_item(item) if item is not None else None
+
+
+@dataclass(frozen=True)
+class Attestation:
+    """An attestation record as the graph holds it: a person states that the nodes in ``about`` hold, on the code tree ``tested_tree``.
+
+    ``recorded_hashes`` maps each attested node to its content hash when the attestation was made.
+    """
+
+    evidence_id: str
+    about: tuple[str, ...]
+    stage: str
+    tested_tree: str
+    recorded_hashes: Mapping[str, str]
+
+
+def attestations_about(graph: Graph, node_id: str) -> list[Attestation]:
+    """The attestation records of *graph* that are about *node_id* (by its id or an old id), in graph order."""
+    wanted = graph.canonical_id(node_id)
+    found: list[Attestation] = []
+    for node in graph.by_kind.get(EVIDENCE_KIND, ()):
+        item = item_of(graph, node) or {}
+        about, stage, tree = _about(item), item.get("stage", "dev"), item.get("tested_tree")
+        if item.get("type") != ATTESTATION_TYPE or about is None or stage not in STAGES or not isinstance(tree, str):
+            continue
+        if wanted in (graph.canonical_id(name) for name in about):
+            found.append(Attestation(node.id, tuple(graph.canonical_id(name) for name in about), stage, tree, _hash_map(item.get("recorded_hashes"))))
+    return found
 
 
 def records_folder(spec_root: str) -> str:

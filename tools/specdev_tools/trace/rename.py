@@ -260,7 +260,7 @@ def _rekeyed_lock(graph: Graph, lock: Lock, node: Node, new_id: str, holder_ids:
 
 def _finding_keys(graph: Graph) -> Counter[tuple[str, str | None]]:
     """The findings of *graph* that a rename could add, counted by (code, node id)."""
-    errors: Iterable[SpecError] = (*resolve_graph(graph), *check_unique_ids(graph), *check_alias_space(graph))
+    errors: Iterable[SpecError] = (*resolve_graph(graph, historical=historical_node_ids(graph)), *check_unique_ids(graph), *check_alias_space(graph))
     return Counter((error.code, error.node_id) for error in errors)
 
 

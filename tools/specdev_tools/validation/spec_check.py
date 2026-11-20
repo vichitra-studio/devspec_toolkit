@@ -26,6 +26,7 @@ from ..graph.check import run_graph_check
 from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
+from ..proof.removal import check_removal_rules
 from ..trace.computed_fields import check_stored_computed
 from ..trace.lockfile import Lock, lock_path
 from ..trace.records import check_records, record_files
@@ -340,6 +341,7 @@ register_check("glossary-drift-check", _check_glossary_drift, default_owner=STEP
 register_check("trace-lock", _check_trace_lock)
 graph_checks.publish_graph_checks()
 graph_checks.register_graph_check("milestone-numbers", check_milestone_numbers)
+graph_checks.register_graph_check("removal-rules", check_removal_rules)
 register_check("open-items", _check_open_items)
 
 

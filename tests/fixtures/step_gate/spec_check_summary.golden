@@ -1,4 +1,4 @@
-spec-check: 26 checks run, 25 errors, 7 warnings
+spec-check: 27 checks run, 25 errors, 7 warnings
 
   [PASS] schema-validation              0 errors  0 warnings
   [FAIL] toolkit-version                1 errors  0 warnings
@@ -25,5 +25,6 @@ spec-check: 26 checks run, 25 errors, 7 warnings
   [PASS] seed-routes                    0 errors  0 warnings
   [PASS] prose-ids                      0 errors  0 warnings
   [FAIL] milestone-numbers              1 errors  0 warnings
+  [PASS] removal-rules                  0 errors  0 warnings
   [PASS] open-items                     0 errors  0 warnings
 

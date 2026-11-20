@@ -78,7 +78,8 @@ def test_a_conflicted_lock_is_e760(host: Path) -> None:
     assert path.name == TRACE_LOCK_FILENAME
 
 
-def test_deleted_target_on_historical_holder_is_resolver_error_not_orphan_or_suspect(host: Path) -> None:
+def test_deleted_target_on_historical_holder_is_not_an_error_orphan_or_suspect(host: Path) -> None:
+    """Since M7 (WI-M7-09) the resolver does not resolve a closed criterion's `refines` link, so a deleted target is no E700 either: the link is `removed` in the realisation status."""
     spec = host / "spec"
     toolkit = str(ROOT)
     _close_milestone(spec)
@@ -89,7 +90,7 @@ def test_deleted_target_on_historical_holder_is_resolver_error_not_orphan_or_sus
 
     checks = _checks(host)
     held = [finding for name in ("graph", "trace-lock") for finding in checks[name]["findings"] if finding.get("node_id") == CLOSED_HOLDER]
-    assert [(finding["code"], finding["owner"]) for finding in held] == [("E700", "step:14")]
+    assert held == []
     assert not [
         finding for finding in checks["trace-lock"]["findings"]
         if finding["code"] == "E763" and finding.get("node_id") == CLOSED_HOLDER
