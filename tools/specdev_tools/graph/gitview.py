@@ -54,12 +54,15 @@ def git_reason(process: subprocess.CompletedProcess[bytes]) -> str:
     return text if len(text) <= _MAX_REASON_CHARS else text[:_MAX_REASON_CHARS].rstrip() + "..."
 
 
-def run_git(git_root: str, args: Sequence[str]) -> subprocess.CompletedProcess[bytes]:
+def run_git(git_root: str, args: Sequence[str], *, env: Mapping[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
     """Run ``git -C <git_root> <args>`` (bytes out); E708 when git is missing or does not answer in time.
+
+    *env* is the whole environment of the process (a caller that sets one variable, such as ``GIT_INDEX_FILE``, passes
+    ``{**os.environ, ...}``); ``None`` leaves the environment as it is.
 
     The one place that starts git for the toolkit: ``trace.merge_driver`` uses it too and re-wraps the error."""
     try:
-        return subprocess.run(["git", "-C", git_root, *args], capture_output=True, check=False, timeout=GIT_TIMEOUT_SECONDS)
+        return subprocess.run(["git", "-C", git_root, *args], capture_output=True, check=False, timeout=GIT_TIMEOUT_SECONDS, env=env)
     except FileNotFoundError:
         raise _fail("E708", "git is not installed or not on PATH") from None
     except subprocess.TimeoutExpired:

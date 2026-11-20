@@ -218,6 +218,15 @@
     },
     {
       "path": "validate-all"
+    },
+    {
+      "path": "verify"
+    },
+    {
+      "path": "verify bind"
+    },
+    {
+      "path": "verify run"
     }
   ]
 }

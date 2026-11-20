@@ -53,6 +53,29 @@ def _step_schemas() -> list[Path]:
     return [p for p in _all_top_level_schemas() if _STEP_SCHEMA_RE.match(p.name)]
 
 
+def _every_schema_file() -> list[Path]:
+    """Every JSON file under schema/, at any depth (core/, extras/, infra/ and the rest)."""
+    return sorted(_SCHEMA_DIR.rglob("*.json"))
+
+
+def _duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """``object_pairs_hook`` that refuses an object that holds one key twice (``json.load`` keeps the last copy and drops the first without a word)."""
+    keys = [key for key, _ in pairs]
+    repeated = sorted({key for key in keys if keys.count(key) > 1})
+    if repeated:
+        raise ValueError(f"duplicate key {repeated}")
+    return dict(pairs)
+
+
+@pytest.mark.parametrize("schema_path", _every_schema_file(), ids=lambda p: str(p.relative_to(_SCHEMA_DIR)))
+def test_no_schema_file_holds_a_duplicate_key(schema_path: Path) -> None:
+    """A repeated key in one object is read as the last copy only, so a declaration above it (an ``x-link``) is silently lost."""
+    try:
+        json.loads(schema_path.read_text(encoding="utf-8"), object_pairs_hook=_duplicate_keys)
+    except ValueError as exc:
+        pytest.fail(f"{schema_path.relative_to(_SCHEMA_DIR)}: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # T-schema-wellformed: JSON parse + required top-level fields
 # ---------------------------------------------------------------------------

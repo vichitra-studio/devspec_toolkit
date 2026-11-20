@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -23,9 +24,10 @@ from specdev_tools.graph.queries import (
     node_json,
     node_text,
     node_view,
+    relied_on_third_parties,
 )
 
-from ._synth import EXAMPLE_SPEC, ROOT, docs_graph
+from ._synth import EXAMPLE_SPEC, ROOT, copy_example, docs_graph, load_doc, write_json
 
 _CAPS = "01_capabilities.json"
 _FRS = "04_fr_list.json"
@@ -355,3 +357,45 @@ def test_milestone_of_resolves_a_plan_files_milestone_written_with_a_retired_nam
     renamed = replace(node("ms-new", "roadmap-milestone", "plan", step="14"), aliases=("ms-old",))
     task = replace(node("task-t", "task", "plan", step="14"), milestone="ms-old")
     assert milestone_of(graph_of([renamed, task]), task) == "ms-new"
+
+
+_SKETCH = "02_system_sketch.json"
+_API = "api-password-reset-confirm"
+
+
+def _reliance(spec: Any, *ids: str) -> list[str]:
+    graph = build_graph(str(spec), str(ROOT))
+    return relied_on_third_parties(graph, [graph.by_id[node_id] for node_id in ids])
+
+
+def test_reliance_of_an_api_is_its_direct_relies_on_then_the_third_parties_its_components_connections_connect_to() -> None:
+    """The worked example: the API relies on tp-argon2 itself, and identity-service (its component) connects to tp-mailrelay."""
+    assert _reliance(EXAMPLE_SPEC, _API) == ["tp-argon2", "tp-mailrelay"]
+
+
+def test_a_node_with_no_relies_on_and_no_providing_component_has_no_reliance() -> None:
+    assert _reliance(EXAMPLE_SPEC, "fr-password-reset", "cap-account-recovery") == []
+
+
+def test_a_third_party_reached_directly_and_through_a_connection_is_listed_once(tmp_path: Path) -> None:
+    spec = copy_example(tmp_path / "spec")
+    document = load_doc(spec, _SKETCH)
+    document["connections"][0]["connects_to"].append("tp-argon2")
+    write_json(spec, _SKETCH, document)
+    assert _reliance(spec, _API) == ["tp-argon2", "tp-mailrelay"]
+
+
+def test_the_computed_reliance_alone_names_the_third_party_a_connection_reaches(tmp_path: Path) -> None:
+    spec = copy_example(tmp_path / "spec")
+    document = load_doc(spec, _APIS)
+    del document["apis"][0]["relies_on"]
+    write_json(spec, _APIS, document)
+    assert _reliance(spec, _API) == ["tp-mailrelay"]
+
+
+def test_a_connection_to_a_component_is_not_a_third_party(tmp_path: Path) -> None:
+    spec = copy_example(tmp_path / "spec")
+    document = load_doc(spec, _SKETCH)
+    document["connections"][0]["connects_to"] = ["identity-service"]
+    write_json(spec, _SKETCH, document)
+    assert _reliance(spec, _API) == ["tp-argon2"]

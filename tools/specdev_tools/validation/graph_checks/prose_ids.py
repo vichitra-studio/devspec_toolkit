@@ -53,10 +53,14 @@ def _is_fixed(slot: dict[str, Any]) -> bool:
         return True
 
 
+def _all_fixed(alternatives: list[dict[str, Any]]) -> bool:
+    """Whether every one of *alternatives* (the branches a slot may take) fixes its value: a slot that is a union fixes it only when each branch does, so one free-string branch makes it prose.  No alternative is not fixed."""
+    return bool(alternatives) and all(_is_fixed(alternative) for alternative in alternatives)
+
+
 def _is_fixed_leaf(ctx: GraphCheckContext, node: Node, leaf_path: str) -> bool:
-    """Whether the schema slot of the leaf at *leaf_path* of *node* fixes its value (``_is_fixed``); ``False`` when the slot cannot be resolved (a leaf with no schema slot, such as the free-form ``input`` of a fixture, is read as prose)."""
-    slot = ctx.slots.slot(ctx.graph, node, leaf_path)
-    return slot is not None and _is_fixed(slot)
+    """Whether the schema slot of the leaf at *leaf_path* of *node* fixes its value (``_is_fixed`` on every branch of an ``anyOf`` or ``oneOf``, ``$ref`` resolved); ``False`` when the slot cannot be resolved (a leaf with no schema slot, such as the free-form ``input`` of a fixture, is read as prose)."""
+    return _all_fixed(ctx.slots.alternatives(ctx.graph, node, leaf_path))
 
 
 def _mentions(text: str, tokens: dict[str, str]) -> list[str]:

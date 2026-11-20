@@ -66,19 +66,6 @@
             "type": "array",
             "uniqueItems": true,
             "default": [],
-            "items": {
-              "$ref": "vc:core:graph#nodeId"
-            },
-            "x-link": {
-              "kinds": "*",
-              "required": false
-            }
-          },
-          "proves": {
-            "description": "Ids of the nodes this binding proves: the targets of the fixture, or what the job realises. Empty (the default) for a removal fixture or a rule, which prove no node. The stage of the binding is the highest stage these nodes need.",
-            "type": "array",
-            "uniqueItems": true,
-            "default": [],
             "items": {"$ref": "vc:core:graph#nodeId"}
           },
           "stage": {

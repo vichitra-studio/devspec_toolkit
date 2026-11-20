@@ -1,6 +1,7 @@
 """Tests for the seed reader of ``graph.gitview`` (WI-M5-02)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from specdev_tools.graph.gitview import (
     read_seed_texts,
     read_seed_texts_at,
     relative_inside,
+    run_git,
     spec_path_in_repo,
 )
 from specdev_tools.graph.kinds import SEED_KIND
@@ -53,6 +55,14 @@ def _commit_file(repo: Path, rel: str, text: str) -> str:
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", f"{rel} {text}")
     return git(repo, "rev-parse", "HEAD")
+
+
+def test_run_git_without_env_reads_the_repository_index_and_with_env_the_index_file_named(repo: Path, tmp_path_factory: pytest.TempPathFactory) -> None:
+    (repo / "a.txt").write_text("a", encoding="utf-8")
+    git(repo, "add", "a.txt")
+    assert run_git(str(repo), ["ls-files"]).stdout == b"a.txt\n"
+    other_index = str(tmp_path_factory.mktemp("index") / "index")
+    assert run_git(str(repo), ["ls-files"], env={**os.environ, "GIT_INDEX_FILE": other_index}).stdout == b""
 
 
 def test_commits_touching_lists_only_commits_of_the_path_newest_first_and_capped(repo: Path) -> None:

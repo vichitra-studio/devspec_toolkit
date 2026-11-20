@@ -603,6 +603,9 @@ def build_parser() -> _SpecdevParser:
     # --- trace commands (stale, ...): each parser names its handler ---
     from .trace.commands import add_trace_parsers
     add_trace_parsers(sub)
+    # --- verify commands (bind, run) ---
+    from .verify.commands import add_verify_parsers
+    add_verify_parsers(sub)
     # `stale`, `coverage` and `step ready` read the coverage gaps; the role gap provider they ask is installed by a call.
     from .validation.graph_checks import install_gap_provider
     install_gap_provider()

@@ -24,6 +24,13 @@ from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
 NEAREST_COUNT = 3
 ROADMAP_MILESTONE = "roadmap-milestone"
+THIRD_PARTY = "third-party"
+COMPONENT = "component"
+CONNECTION = "connection"
+RELIES_ON = "relies_on"
+PROVIDED_BY = "provided_by"
+CONNECTS_TO = "connects_to"
+DERIVES_FROM = "derives_from"
 _NO_VALUE = "-"
 
 
@@ -41,6 +48,34 @@ def milestone_of(graph: Graph, node: Node) -> str | None:
             return current.id
         current = graph.by_id.get(current.parent) if current.parent else None
     return None
+
+
+def relied_on_third_parties(graph: Graph, nodes: Iterable[Node]) -> list[str]:
+    """The ids of the third parties the *nodes* rely on, each once: first what a node links to with ``relies_on``, then the reliance of the components it is ``provided_by``.
+
+    A component has no ``relies_on``; its reliance is computed from its connections: the third parties its connections
+    (the connection nodes that ``derives_from`` the component) ``connects_to`` (design: "A component's reliance is
+    computed from its connections").  Aliases resolve to the current node.
+    """
+    found: list[str] = []
+    for node in nodes:
+        found.extend(graph.canonical_id(link.target) for link in node.links if link.field == RELIES_ON)
+        for link in node.links:
+            if link.field == PROVIDED_BY:
+                found.extend(_component_reliance(graph, graph.canonical_id(link.target)))
+    return list(dict.fromkeys(target for target in found if (third := graph.by_id.get(target)) is not None and third.kind == THIRD_PARTY))
+
+
+def _component_reliance(graph: Graph, component_id: str) -> list[str]:
+    """The ids the connections of the component *component_id* connect to, in listing order (a connection is a node that ``derives_from`` the component)."""
+    component = graph.by_id.get(component_id)
+    if component is None or component.kind != COMPONENT:
+        return []
+    connections = [
+        source for link in graph.incoming.get(component_id, ()) if link.field == DERIVES_FROM
+        if (source := graph.by_id.get(link.source)) is not None and source.kind == CONNECTION
+    ]
+    return [graph.canonical_id(link.target) for connection in connections for link in connection.links if link.field == CONNECTS_TO]
 
 
 def _unknown(message: str, *, unknown_id: bool = False) -> QueryTargetError:

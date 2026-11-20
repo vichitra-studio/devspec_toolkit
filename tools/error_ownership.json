@@ -175,6 +175,15 @@
       "authority": "M6b PD"
     },
     {
+      "class": "binding-stage",
+      "owner": "merge-check",
+      "codes": [
+        "E330",
+        "E334"
+      ],
+      "authority": "M7 WI-14"
+    },
+    {
       "class": "milestone-numbers",
       "owner": "fixed_step:14",
       "codes": [

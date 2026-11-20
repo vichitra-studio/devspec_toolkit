@@ -82,6 +82,15 @@ ERROR_CODES = {
     "E310": "PROMPT_SCHEMA_DRIFT",
     "E311": "MISSING_ENUM_PROVENANCE",
     "E320": "STEP13_EXTENSION_ERROR",
+    # Bindings and runs (33x, 35x): E330 to E334 are refusals of ``verify bind`` (E330 and E334 are also findings of the
+    # record check, owner merge-check); W350 and W351 are warnings of ``verify run``.
+    "E330": "BINDING_STAGE_MISMATCH",
+    "E331": "BINDING_TARGET_NOT_VERIFIED",
+    "E332": "BINDING_GUARD_INVALID",
+    "E333": "BINDING_DUPLICATE_TARGET",
+    "E334": "UNKNOWN_STAGE_FOR_ENVIRONMENT",
+    "W350": "SUBMODULE_DIRTY_NOT_COVERED",
+    "W351": "RUN_CHANGED_CODE_TREE",
     # Canonical registry (4xx)
     "E410": "CANONICAL_ALIAS_COLLISION",
     "E420": "INVALID_DEPRECATION_LIFECYCLE",

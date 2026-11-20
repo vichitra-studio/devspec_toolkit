@@ -9,7 +9,8 @@ from typing import Any
 import pytest
 
 from specdev_tools.core.errors import SpecError, link_target
-from specdev_tools.validation.graph_checks.prose_ids import _is_fixed, check_prose_ids
+from specdev_tools.validation.graph_checks.prose_ids import _all_fixed, _is_fixed, check_prose_ids
+from specdev_tools.validation.graph_checks.schema_slots import alternatives_of
 from unit.graph._synth import HASH_SEEDS, load_doc
 
 from ._example_support import Edit, context_of_spec, edited_example
@@ -227,3 +228,58 @@ def test_a_nodes_own_id_in_its_text_is_not_a_finding(tmp_path: Path) -> None:
     assert _findings(own) == []
     both = edited_example(tmp_path / "both" / "spec", **{FR_FILE: _statement("This is fr-password-reset and not fr-password-reset-request.")})
     assert _found(both) == [("fr-password-reset", link_target("statement", "fr-password-reset-request"))]
+
+
+KEBAB = {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}
+SNAKE = {"type": "string", "pattern": "^[A-Z0-9]+(?:_[A-Z0-9]+)*$"}
+FREE = {"type": "string"}
+DEFS = {"vc:test#kebab": KEBAB, "vc:test#snake": SNAKE, "vc:test#node": {"anyOf": [{"$ref": "vc:test#kebab"}, {"$ref": "vc:test#snake"}]}}
+
+
+def _resolve(node: dict[str, Any]) -> dict[str, Any] | None:
+    return DEFS.get(node["$ref"])
+
+
+@pytest.mark.parametrize(
+    ("slot", "fixed"),
+    [
+        ({"anyOf": [KEBAB, FREE]}, False),
+        ({"anyOf": [KEBAB, SNAKE]}, True),
+        ({"oneOf": [KEBAB, SNAKE]}, True),
+        ({"$ref": "vc:test#kebab"}, True),
+        ({"$ref": "vc:test#node"}, True),
+        ({"anyOf": [{"$ref": "vc:test#kebab"}, {"$ref": "vc:test#missing"}]}, False),
+        ({"anyOf": [{"$ref": "vc:test#node"}, FREE]}, False),
+        ({"type": "string", "enum": ["a", "b"], "anyOf": [KEBAB, FREE]}, True),
+    ],
+)
+def test_a_union_slot_is_fixed_only_when_every_branch_is(slot: dict[str, Any], fixed: bool) -> None:
+    assert _all_fixed(alternatives_of(slot, _resolve)) is fixed
+
+
+def test_a_slot_with_no_alternative_is_not_fixed() -> None:
+    assert _all_fixed([]) is False
+
+
+def _record_text(edit: Any) -> Edit:
+    def apply(doc: dict[str, Any]) -> None:
+        edit(doc["records"][0])
+
+    return apply
+
+
+RECORD_FILE = "extras/verification/ver-password-reset-expired-token.json"
+
+
+def test_the_node_ids_of_a_records_proves_are_not_prose(tmp_path: Path) -> None:
+    spec = edited_example(tmp_path / "spec", **{RECORD_FILE: _record_text(lambda record: record.__setitem__("proves", ["ac-password-reset-3", "api-password-reset-confirm"]))})
+    assert _findings(spec) == []
+
+
+def test_a_node_id_in_a_records_free_text_still_gives_e752(tmp_path: Path) -> None:
+    def edit(record: dict[str, Any]) -> None:
+        record["proves"] = ["ac-password-reset-3"]
+        record["output_guard"] = "ac-password-reset-3 passed"
+
+    (error,) = _findings(edited_example(tmp_path / "spec", **{RECORD_FILE: _record_text(edit)}))
+    assert (error.code, error.node_id, error.target) == ("E752", "ver-password-reset-expired-token", link_target("output_guard", "ac-password-reset-3"))
