@@ -18,26 +18,22 @@ description: >
 Main orchestrator for the review-fix loop. Three subagents handle all the work. This skill
 stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdict.
 
-**Source spec:** K_agentification.md §3, §5.2, §5.2.1, §5.4, §5.6.
-
 ---
 
 ## Arguments
 
 ```
-/specdev-review <scope> [--with-replay] [--with-backlog]
+/specdev-review <scope> [--with-backlog]
 ```
 
 - `<scope>`: step number (e.g. `04`), step range (e.g. `04-07`), a file path, or `all`.
-- `--with-replay`: wire `specdev forward-replay-check --json` output into a
-  `cross_step_relational` reviewer. Surfaces `regression` and `drift` findings caused by
-  upstream changes not yet propagated downstream.
-- `--with-backlog`: wire `specdev upstream-backlog --json` output into a
-  `cross_step_relational` reviewer. Surfaces `assumption` and `coverage` findings tied to
-  unresolved upstream items.
+- `--with-backlog`: wire `specdev upstream-backlog --json` and `specdev stale --json` output
+  into a `cross_step_relational` reviewer. Surfaces `assumption` and `coverage` findings tied
+  to unresolved upstream items, and `regression` and `drift` findings caused by changes above a
+  step that its links have not yet been re-read against (suspect links).
 
-When either flag is set, `specdev-scope` always adds at least one `cross_step_relational`
-reviewer to the fan-out plan, alongside any per-step reviewers (K_agentification.md §5.2.1).
+When the flag is set, `specdev-scope` always adds at least one `cross_step_relational`
+reviewer to the fan-out plan, alongside any per-step reviewers.
 Per-step reviewers receive only their step's slice of the relational output to avoid
 context bloat.
 
@@ -56,7 +52,7 @@ Dispatch `specdev-scope` (Haiku agent) with:
 }
 ```
 
-If `--with-replay` or `--with-backlog` is set, include the flag in the dispatch input so
+If `--with-backlog` is set, include the flag in the dispatch input so
 specdev-scope includes a `cross_step_relational` reviewer.
 
 Wait for the fan-out plan JSON:
@@ -106,7 +102,6 @@ Each reviewer receives its cluster slice from the fan-out plan:
   "round": <current_round>,
   "scope": "<scope-identifier>",
   "flags": {
-    "with_replay": <bool>,
     "with_backlog": <bool>
   }
 }
@@ -115,19 +110,22 @@ Each reviewer receives its cluster slice from the fan-out plan:
 For `cross_step_relational` reviewers: pre-run the relational commands and pass their
 output inline in the dispatch (do not have the reviewer re-run them):
 ```bash
-specdev forward-replay-check --json \
+specdev stale --json \
   --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 specdev upstream-backlog spec --json \
   --repo-root ./devspec_toolkit
 ```
+`specdev stale --json` prints `{"steps": [{"step", "suspect_nodes", "coverage_gaps": [{"code",
+"node", "owner_step"}]}]}`, one entry per step with something pending; a per-step reviewer gets
+only the entry for its step (`specdev stale --step <NN> --json` prints that one).
 
 Each reviewer writes its own file:
 `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
 
 (Ensure the directory exists once per loop: `mkdir -p .specdev/findings`.)
 
-**2b. Merge findings with the jq one-liner (K_agentification.md §5.4, paths per §11.7):**
+**2b. Merge findings with the jq one-liner:**
 
 ```bash
 jq -s '{round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
@@ -137,7 +135,8 @@ jq -s '{round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findi
 This is the ONLY merge mechanism. Do not use `specdev findings emit/merge/dedup` — no such
 CLI exists. The jq one-liner is skill-side; it keeps the main thread thin.
 
-Dedup key is the tuple `(kind, location, signature)` as specified in K_agentification.md §5.4.
+Dedup key is the tuple `(kind, location, signature)`: the same finding raised by two reviewers is
+kept once.
 
 **2c. Check convergence:**
 
@@ -183,6 +182,11 @@ After Agent returns (blocker handling — canonical contract: `specdev-impl.md` 
       - PLUS a `## User answers (from blocker bridge)` section listing each
         `{id, question, selected_label, selected_description, user_notes_if_any}`.
       - PLUS a `## Context from prior dispatch` section quoting the agent's `context` field.
+      - PLUS, for an answer whose question has an `owner` other than `this-step` (a step id or
+        `seed`): record it as an open item with `specdev json insert --step <NN> .ambiguities '<item>'`
+        (`description`, `about` = the question's `about` ids, `decision` = the chosen label; `<NN>` is
+        the step of the finding the question came from) and do not apply it. An item whose decision
+        a fix applies is deleted with `specdev json delete --id <item-id>`.
    e. Increment `blocker_round` counter (per-dispatch-site, scoped to a single subagent
       dispatch chain; starts at 0 on first dispatch; cap = 2 re-dispatches (counter values 0,
       1, 2); does not persist across skill invocations; resets to 0 at the start of each new
@@ -224,11 +228,10 @@ Do not silently accept partial convergence. HALT is a first-class verdict.
 After the human hand-edits and re-invokes `/specdev-review <scope>`, always start fresh
 at round 1. Prior findings files are NOT consulted — the reviewer sees the artifact's
 current state and emits fresh findings. This keeps the loop deterministic and avoids
-state drift across runs (K_agentification.md §5.6).
+state drift across runs.
 
 Prior blocker audit files under `.specdev/blockers/` are also NOT consulted on resume —
-the fresh-state invariant applies to both findings and blocker artifacts (K_agentification.md
-§5.6). They exist for human inspection of past blocker rounds only. If a prior blocker is
+the fresh-state invariant applies to both findings and blocker artifacts. They exist for human inspection of past blocker rounds only. If a prior blocker is
 still relevant, the re-dispatched specdev-impl will re-emit it and AskUserQuestion will fire
 again.
 
@@ -237,9 +240,10 @@ again.
 ## Flag-stripping reminder
 
 When running specdev commands from this skill:
-- `specdev json` read/shape/edit subcommands: pass `--repo-root` only.
-- Exception: `specdev json resolve-pointers` accepts `--git-root` (anchors relative paths).
-- `spec-check`, `forward-replay-check`, `governance-check`:
+- `specdev json` read/shape subcommands and `json patch|insert|delete` on a file path: pass `--repo-root` only.
+- Exceptions: `specdev json resolve-pointers` accepts `--git-root` (anchors relative paths); the id forms
+  (`json patch|insert|delete --id`, `json insert --step`) take all three flags.
+- `spec-check`, `stale`, `governance-check`:
   pass all three flags `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
 - `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
 - `canon-accept`: pass `--git-root`, NOT `--spec-root`.
@@ -253,9 +257,9 @@ Never read `spec/*.json` directly. All spec reads go through `specdev json read`
 - Does not author new spec artifacts. That is `/specdev-step`'s job (author mode).
 - Does not manage trinity-plan human gating. That is `/specdev-trinity --phase plan`'s job.
 - Does not handle 16b/16c code-write or code-review. Plan-phase and spec-phase only
-  (see K_agentification.md §9 — 16b/16c are covered by K2 (WIP/toolkit_proposals/K_agentification.md §11+)).
+  (16b/16c belong to `/specdev-trinity`).
 - Does not commit changes. User authorizes commits separately.
-- Does not use `specdev findings emit/merge/dedup`. No such CLI exists (K §5.4).
+- Does not use `specdev findings emit/merge/dedup`. No such CLI exists.
 - Does not run reviewers sequentially in a single round. Parallel dispatch is required.
 - Does not skip AskUserQuestion on a blocker payload. Blocker questions must be presented
   to the user via the harness before re-dispatching.
