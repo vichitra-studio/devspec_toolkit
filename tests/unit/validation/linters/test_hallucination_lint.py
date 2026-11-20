@@ -11,22 +11,18 @@ from specdev_tools.core.errors import render_errors
 
 
 class HallucinationLintTests(unittest.TestCase):
-    def test_detects_invalid_stage_and_trace_type(self):
+    def test_detects_invalid_stage(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "spec").mkdir()
             (root / "spec" / "07_nfrs.json").write_text(
                 json.dumps(
-                    {
-                        "stage": "preprod",
-                        "trace": [{"type": "unknown-type", "id": "x"}]
-                    }
+                    {"stage": "preprod"}
                 ),
                 encoding="utf-8",
             )
             errs = lint_hallucinations(str(root / "spec"))
             self.assertTrue(any("preprod" in e for e in render_errors(errs)))
-            self.assertTrue(any("unknown-type" in e for e in render_errors(errs)))
 
     def test_detects_invalid_command_and_unknown_ref(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1041,11 +1037,6 @@ class StructuredFieldTests(unittest.TestCase):
         self.assertIsNotNone(err.value, "E530 value must be set")
         if value:
             self.assertEqual(err.value, value)
-
-    def test_trace_type_invented_has_structured_fields(self):
-        """INVENTED_ENUM_OR_ID on trace .type field must carry all four structured fields."""
-        errs = self._lint({"trace": [{"type": "invented_trace_type", "id": "t-01"}]})
-        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="type", value="invented_trace_type")
 
     def test_stage_invented_has_structured_fields(self):
         """INVENTED_ENUM_OR_ID on .stage field must carry all four structured fields."""

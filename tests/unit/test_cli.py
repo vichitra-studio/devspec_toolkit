@@ -1419,6 +1419,14 @@ class CliTests(unittest.TestCase):
         self.assertIn("forward-replay-check was removed in 1.2.0", err)
         self.assertIn("specdev stale", err)
 
+    def test_matrix_command_hard_fails_with_pointer(self):
+        code, out, err = self._run_cli(["matrix", "spec", "--repo-root", "."])
+        self.assertEqual(2, code)
+        self.assertEqual("", out)
+        self.assertIn("matrix was removed in 1.2.0", err)
+        self.assertIn("specdev coverage --by fr", err)
+        self.assertIn("specdev trace", err)
+
     def test_retired_closure_commands_hard_fail_with_pointer(self):
         for command, pointer in (("completeness-check", "specdev coverage"), ("traceability-check", "specdev spec-check")):
             with self.subTest(command=command):
@@ -1473,65 +1481,6 @@ class CliTests(unittest.TestCase):
             self.assertEqual(1, code)
             self.assertEqual("", out.strip())
             self.assertIn("missing_spec_dir", err)
-
-    def test_matrix_non_strict_writes_output_with_integrity_errors(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            out_file = repo_root / "matrix.json"
-
-            payload = {
-                "matrix": [],
-                "coverage": {"fr_total": 0},
-                "integrity_errors": ["Broken Trace in probe.json: Reference to 'fr-missing' not found."],
-            }
-            with patch("specdev_tools.validation.matrix.build_trace_matrix", return_value=payload), patch.dict(
-                os.environ,
-                {"SPECDEV_MATRIX_STRICT": "0"},
-                clear=False,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--out", str(out_file), "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(0, code, msg=err)
-            self.assertIn(str(out_file), out)
-            self.assertEqual("", err.strip())
-            self.assertTrue(out_file.exists())
-            written = json.loads(out_file.read_text(encoding="utf-8"))
-            self.assertIn("integrity_errors", written)
-            self.assertEqual(payload["integrity_errors"], written["integrity_errors"])
-
-    def test_matrix_strict_writes_output_and_fails_on_integrity_errors(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            out_file = repo_root / "matrix.json"
-
-            payload = {
-                "matrix": [],
-                "coverage": {"fr_total": 0},
-                "integrity_errors": ["Broken Trace in probe.json: Reference to 'fr-missing' not found."],
-            }
-            with patch("specdev_tools.validation.matrix.build_trace_matrix", return_value=payload), patch.dict(
-                os.environ,
-                {"SPECDEV_MATRIX_STRICT": "1"},
-                clear=False,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--out", str(out_file), "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(1, code)
-            self.assertIn(str(out_file), out)
-            self.assertIn("E210 TRACE_INTEGRITY matrix_failed count=1", err)
-            self.assertIn(payload["integrity_errors"][0], err)
-            self.assertTrue(out_file.exists())
-            written = json.loads(out_file.read_text(encoding="utf-8"))
-            self.assertIn("integrity_errors", written)
-            self.assertEqual(payload["integrity_errors"], written["integrity_errors"])
 
     def test_strict_canonical_manifest_schema_registration_is_enforced_across_commands(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1904,55 +1853,6 @@ class CliTests(unittest.TestCase):
              "--spec-root", "./spec",
              "--git-root", "."],
         )
-
-    # ------------------------------------------------------------------
-    # H.B — `matrix` writes to <spec_dir>/extras/trace_matrix.json when
-    # --out is omitted. Explicit --out and --out - still work.
-    # ------------------------------------------------------------------
-
-    def test_matrix_default_out_writes_to_canonical_extras_path(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            expected_path = spec_dir.resolve() / "extras" / "trace_matrix.json"
-
-            payload = {"matrix": [], "coverage": {"fr_total": 0}}
-            with patch(
-                "specdev_tools.validation.matrix.build_trace_matrix",
-                return_value=payload,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(0, code, msg=err)
-            self.assertTrue(expected_path.exists())
-            self.assertIn(str(expected_path), out)
-            written = json.loads(expected_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["coverage"], written["coverage"])
-
-    def test_matrix_explicit_dash_still_streams_to_stdout(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-
-            payload = {"matrix": [], "coverage": {"fr_total": 7}}
-            with patch(
-                "specdev_tools.validation.matrix.build_trace_matrix",
-                return_value=payload,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--out", "-", "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(0, code, msg=err)
-            # stdout should contain serialized JSON, not a file path.
-            written = json.loads(out)
-            self.assertEqual(payload["coverage"], written["coverage"])
-            # And no extras dir created.
-            self.assertFalse((spec_dir / "extras").exists())
 
 
 if __name__ == "__main__":

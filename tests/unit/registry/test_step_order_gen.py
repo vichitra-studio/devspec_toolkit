@@ -272,7 +272,7 @@ def test_step_order_out_validates_against_schema_and_copies_policy(tmp_path):
     hand = json.loads(before)
     assert doc["steps"] == hand["steps"]
     assert doc["step_metadata"]["04"]["required_spec_inputs"] == ["01"]
-    assert doc["policy"] == hand["policy"] and doc["coverage_thresholds"] == hand["coverage_thresholds"]
+    assert doc["policy"] == hand["policy"] and "coverage_thresholds" not in doc
     reg = SchemaRegistry(str(_ROOT))
     schema = json.loads((_ROOT / "schema" / "step_order.schema.json").read_text())
     Draft202012Validator(schema, registry=reg.to_referencing_registry()).validate(doc)
@@ -320,7 +320,7 @@ def _without(key: str):
 
 @pytest.mark.parametrize(
     "edit, fragment",
-    [(_without(key), key) for key in ("version", "steps", "policy", "coverage_thresholds")]
+    [(_without(key), key) for key in ("version", "steps", "policy")]
     + [
         (lambda hand: {**hand, "steps": None}, "steps"),
         (lambda hand: {**hand, "steps": 5}, "steps"),

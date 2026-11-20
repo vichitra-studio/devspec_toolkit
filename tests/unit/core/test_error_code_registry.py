@@ -13,6 +13,7 @@ CODE_LITERAL_RE = re.compile(r'["\']([EW]\d{3})["\']')
 REMOVED_CODES = (
     "E142", "W574", "W581", "W582", "E581", "E582",
     "W602", "W605", "W607", "W612", "W616", "E141",
+    "E592", "W592", "E604", "W604",
 )
 
 # The W->E pairs of PROMOTABLE_PAIRS. A later change that adds or removes a pair
@@ -20,7 +21,7 @@ REMOVED_CODES = (
 EXPECTED_PROMOTABLE_PAIRS = {
     "W571": "E571", "W572": "E572",
     "W573": "E573", "W580": "E580",
-    "W150": "E150", "W591": "E591", "W592": "E592", "W593": "E593",
+    "W150": "E150", "W591": "E591", "W593": "E593",
     "W594": "E594", "W595": "E595", "W615": "E615",
 }
 
@@ -29,7 +30,7 @@ EXPECTED_PROMOTABLE_PAIRS = {
 # A code that a work item registers before the code that writes it exists stays here until that work item writes it
 # as a literal.
 REGISTERED_WITHOUT_EMITTER = {
-    "E422", "E604", "E620", "W150", "W591",
+    "E422", "E620", "W150", "W591",
     # W595 is emitted, but only inside longer message strings (context/seed_indexer.py), which the literal pattern
     # above does not match; file-level forward replay and the freshness stderr lines, which wrote it, are gone.
     "W595",
@@ -51,7 +52,6 @@ CROSS_PREFIX_SEMANTIC_ALLOWLIST = {
     "554",  # E=CANON_ENUM_DRIFT              / W=HARDCODED_SEED_REFERENCE
     "585",  # E=DAG_CIRCULAR_DEPENDENCY       / W=ANCHOR_DRIFT_SKIP
     "590",  # E=CROSS_STEP_ID_NOT_FOUND       / W=CROSS_STEP_UPSTREAM_MISSING
-    "592",  # E=COVERAGE_THRESHOLD_BREACH     / W=COVERAGE_THRESHOLD_WARN
     "596",  # E=DAG_DEAD_END_PRODUCER         / W=UNDECLARED_UPSTREAM_REF
     "597",  # E=EXTRACTION_INTENT_UPSTREAM_GAP/ W=EXTRACTION_INTENT_VAGUE
     "599",  # E=DAG_CONSUMER_INCONSISTENCY    / W=EVIDENCE_TOO_SHORT
@@ -67,11 +67,11 @@ class TestR9ErrorCodes(unittest.TestCase):
     R9_NEW_CODES = {
         "E150", "E551", "E552", "E553", "E554",
         "E571", "E572", "E573", "E580", "E585",
-        "E590", "E591", "E592", "E593", "E594", "E595",
+        "E590", "E591", "E593", "E594", "E595",
         "E596", "E597", "E598", "E599",
         "E615",
         "W552",
-        "W590", "W591", "W592", "W593", "W594", "W595",
+        "W590", "W591", "W593", "W594", "W595",
         "W596", "W597",
         "W615",
     }
@@ -82,10 +82,10 @@ class TestR9ErrorCodes(unittest.TestCase):
             self.assertIn(code, ERROR_CODES, f"{code} not registered in ERROR_CODES")
 
     def test_promotable_pairs_match_expected_list(self):
-        """PROMOTABLE_PAIRS equals the explicit W->E list above (11 pairs)."""
+        """PROMOTABLE_PAIRS equals the explicit W->E list above (10 pairs)."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
         self.assertEqual(PROMOTABLE_PAIRS, EXPECTED_PROMOTABLE_PAIRS)
-        self.assertEqual(len(PROMOTABLE_PAIRS), 11)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 10)
 
     def test_removed_codes_not_registered(self):
         """The codes whose input fields were removed are gone from ERROR_CODES and PROMOTABLE_PAIRS."""

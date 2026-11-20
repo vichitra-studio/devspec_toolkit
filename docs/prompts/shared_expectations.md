@@ -35,7 +35,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ## 5. Default Role & Task Framing
 
-> **Applies to**: Steps 00–10, 12–15. Steps 11, 13, 13a, 16, 16a, 16b, 16c define their own Role/Task and override this default.
+> **Applies to**: Steps 00–10, 12–15. Steps 11, 13, 16, 16a, 16b, 16c define their own Role/Task and override this default.
 
 **Role**: You are a senior specification author and validator. Your job is to emit a single JSON artifact for **{{STEP_NAME}}** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
@@ -48,7 +48,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ## 6. Output Rules (Discovery Phase)
 
-> **Applies to**: Steps 00–15. Steps 16–16c have different output rules defined in their own prompts. Note: Steps 11, 13, 13a define their own Role/Task (see Section 5) but still follow these output rules.
+> **Applies to**: Steps 00–15. Steps 16–16c have different output rules defined in their own prompts. Note: Steps 11, 13 define their own Role/Task (see Section 5) but still follow these output rules.
 
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path). Do not return the artifact as a fenced code block in the response.
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
@@ -58,6 +58,8 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 6. Set `owner` to one of the values defined in `schema/core/atoms.schema.json` owner enum.
 7. If the schema declares link fields (fields marked `x-link`, such as `derives_from`), include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+9. A relation between nodes is a link in a link field, never a node id in prose. A mention of another node's id (or of a retired name of it, or of a seed) in a text field is not a link: the graph never sees it, and `spec-check` reports it as E752. Turn a mention that states a relation into the link and take the id out of the text; reword any other mention.
+10. A glossary term is used by its label: a term of Step 03 that no node of steps 04 to 15 mentions by its label is reported as E741 (use the label in the text of a node, or mark the term `not_applicable`).
 
 ## 7. Seed Order Protocol
 
@@ -81,18 +83,19 @@ Each prompt's Coverage Closure section contains step-specific rules. In addition
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## 9. Step-Order Policy
 
 - Use a forward-only execution model.
 - Use no refinement mode.
-- Any accepted change at step N is replayed through the steps below it before merge. The replay is the list of suspect links in the trace lock (`spec/extras/trace.lock.json`): a link is suspect when its target changed after the node that holds the link accepted it. `specdev stale` lists them by step, upward first. Each is read, and then either the holder is edited or the link is accepted with `specdev attest <node-id> --yes`. File-level replay (a changed file for every later step) is retired; `forward-replay-check` is a deprecated alias.
+- Any accepted change at step N is replayed through the steps below it before merge. The replay is the list of suspect links in the trace lock (`spec/extras/trace.lock.json`): a link is suspect when its target changed after the node that holds the link accepted it. `specdev stale` lists them by step, upward first. Each is read, and then either the holder is edited or the link is accepted with `specdev attest <node-id> --yes`. File-level replay (a changed file for every later step) is retired.
 
 ### 9.1 Forward pass across 00-16
 
 When several steps change in one pass, run the steps in order and handle only the slice that reaches the step you are on:
 
-1. Run the steps in waterfall order. Before step NN, `specdev step ready NN` says whether the steps NN links to are present and have no pending replay (exit 1 with E773 and the blockers when not). Until a later 1.2.0 change retires step 13a, `step ready 14` and `step ready 16a` report step 13a as a missing step (E773) on a spec that has no 13a file, whatever the other steps hold; read the other blockers of the report and go on when step 13a is the only one.
+1. Run the steps in waterfall order. Before step NN, `specdev step ready NN` says whether the steps NN links to are present and have no pending replay (exit 1 with E773 and the blockers when not).
 2. For step NN, only the suspect links its own nodes hold count: `specdev stale --step NN`. Read each, edit the holder if the change affects it, then `specdev attest --step NN --yes` (it works upward first and writes nothing without `--yes`).
 3. Suspect links held by later steps show in plain `specdev stale`. Leave them: they are fixed when the pass reaches those steps.
 4. The end-of-pass gate is `specdev spec-check`: it reports no suspect link (E763) and no link without an entry (E761).
@@ -101,16 +104,22 @@ When several steps change in one pass, run the steps in order and handle only th
 
 All spec reads and edits MUST go through the `/specdev-context` skill (`.claude/skills/specdev-context/SKILL.md`). Do not `Read` spec files directly. Before composing any new `specdev json read` filter, learn the shape via `specdev json structure` / `json keys` / `json schema` — guessing field names is the dominant failure pattern. If a `json read` call fails, do not retry with another guessed path; drop back to a shape probe.
 
-Flag scope: `--spec-root` and `--git-root` apply to validation/governance commands (`spec-check`, `validate`, `matrix`, `governance-check`). `canon-accept` accepts `--git-root` only (not `--spec-root`). Most `specdev json …` subcommands accept `--repo-root` only; the CLI silently strips `--spec-root`/`--git-root` if passed. Exceptions: `specdev json resolve-pointers` legitimately accepts `--git-root` to anchor relative file paths, and the id forms `specdev json patch|insert|delete --id <node-id>` and `specdev json insert --step NN` accept all three flags (and `--json`).
+Flag scope: `--spec-root` and `--git-root` apply to validation/governance commands (`spec-check`, `validate`, `governance-check`). `canon-accept` accepts `--git-root` only (not `--spec-root`). Most `specdev json …` subcommands accept `--repo-root` only; the CLI silently strips `--spec-root`/`--git-root` if passed. Exceptions: `specdev json resolve-pointers` legitimately accepts `--git-root` to anchor relative file paths, and the id forms `specdev json patch|insert|delete --id <node-id>` and `specdev json insert --step NN` accept all three flags (and `--json`).
 
-After generating or modifying a spec artifact, run the unified check command to validate schema conformance, canonical integrity, hallucination detection, traceability, and all applicable lints in one pass:
+After generating or modifying a spec artifact, run the unified check command. It runs schema validation, the toolkit version, quality, canonical and hallucination lints, canonical integrity, seed, fixtures and dependency-order lints, the `graph` check (links), computed fields, records, the registry and hardcoded-seed checks, glossary drift, the trace lock, the eight graph role checks (`no-dangling`, `term-use`, `verifier-rules`, `cross-cutting`, `refinement`, `scaffold-paths`, `seed-routes`, `prose-ids`), the step 14 `milestone-numbers` check and the open-items check:
 ```bash
 specdev spec-check <spec_dir> --repo-root ./devspec_toolkit
 ```
 
+With `--step NN` (written as in the file name: `05`, `02a`) it is the gate of step NN instead: it blocks on the step's own errors and on new errors of earlier steps, lists a finding that a later step owns as PENDING (not blocking), and leaves a finding of the merge or release gate as GATE-OWNED. `specdev coverage` shows how the obligations are linked (`--by fr` for the view per FR) and `specdev trace <id> --up|--down` the lineage of one node; neither is a gate.
+
+To write a new step artifact from a draft file: `specdev step create NN --from <draft>` (ids of sub-items may be left out; `--dry-run` prints the report and writes nothing). It writes the lock entry of every link it writes.
+
 `spec-check` includes the `graph` check: a link that names no node or a node of the wrong kind, a link cycle within one step, and an id defined in two places are reported as E700 to E704. A single-file `validate` does not report a job or task cycle, an unknown job in `depends_on`, or an id defined in two files; run `spec-check` for those.
 
 For submodule deployments, add `--spec-root ./spec --git-root .` to resolve seed paths correctly.
+
+A fix that adds, changes or removes a link ends with the attest step: `specdev attest <node-id> --yes` for each node that E761 or E763 names, `specdev attest --prune` after a link was removed, then `spec-check` again (`docs/developers/error-codes.md`, "The attest step" under "Graph Role Checks").
 
 For single-file quick validation during iterative editing:
 ```bash

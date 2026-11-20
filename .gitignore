@@ -39,7 +39,6 @@ devspec_env/
 .DS_Store
 
 # Generated artifacts
-tools/trace_matrix.json
 **/migration_backups/
 
 # WIP — temp folder for in-flight task plans, never committed

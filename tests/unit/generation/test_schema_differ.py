@@ -5,6 +5,7 @@ Created by FIX-047 (Batch 5).
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,7 @@ from specdev_tools.generation.schema_differ import (
     format_status_report,
     inventory_toolkit_schemas,
     inventory_user_steps,
+    validate_post_migration,
 )
 
 # Real toolkit root (…/tests/unit/generation/test_schema_differ.py → toolkit root)
@@ -517,3 +519,26 @@ class TestStep16DiffEndToEnd:
         assert s16.status == "missing"
         # Still no stray 16_anchor entry.
         assert not any(d.step_id == "16_anchor" for d in diff.steps)
+
+
+# ---------------------------------------------------------------------------
+# Post-migration validation: the link check is the resolver's (the one `spec-check` uses)
+# ---------------------------------------------------------------------------
+
+_GRAPH_EXAMPLE_SPEC = _TOOLKIT_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+
+
+def test_align_validate_uses_resolver(tmp_path):
+    """`align validate` reports a broken link as the resolver does (E700), and the unbroken worked example has none."""
+    spec = tmp_path / "spec"
+    shutil.copytree(_GRAPH_EXAMPLE_SPEC, spec)
+    clean = validate_post_migration(spec, _TOOLKIT_ROOT, "1.2.0")
+    assert not any("E700" in line for line in clean.errors), clean.errors
+
+    path = spec / "05_interface_contracts.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["apis"][0]["derives_from"] = ["fr-does-not-exist"]
+    path.write_text(json.dumps(document), encoding="utf-8")
+    broken = validate_post_migration(spec, _TOOLKIT_ROOT, "1.2.0")
+    assert broken.can_proceed is False
+    assert any("E700" in line and "fr-does-not-exist" in line for line in broken.errors), broken.errors

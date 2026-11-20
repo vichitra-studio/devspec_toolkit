@@ -35,7 +35,7 @@ def _top_level() -> list[str]:
 
 def test_counts_match_the_parsers():
     paths = _paths()
-    assert len(_top_level()) == 43
+    assert len(_top_level()) == 42
     assert len([p for p in paths if p.startswith("context ")]) == 6
     assert len([p for p in paths if p.startswith("json ")]) == 9
     assert len([p for p in paths if p.startswith("node ")]) == 4
@@ -55,6 +55,13 @@ def test_cli_commands_lists_graph_commands():
     expected = {"node", "node show", "node candidates", "node status", "node rename", "trace", "diff"}
     assert expected <= set(_paths())
     assert expected <= committed
+
+
+def test_matrix_not_in_generated_command_list():
+    """`specdev matrix` is refused before argparse (REMOVED_COMMANDS), so the step-10 `cli_command` list never names it."""
+    committed = {entry["path"] for entry in json.loads((_ROOT / "tools" / "cli_commands.json").read_text())["commands"]}
+    assert "matrix" not in committed
+    assert "matrix" not in set(_paths())
 
 
 def test_top_level_commands_equal_specdev_help():

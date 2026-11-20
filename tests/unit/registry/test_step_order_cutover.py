@@ -1,7 +1,7 @@
 """The step-order cutover (WI-M3-16): ``tools/step_order.json`` is generated from the annotations.
 
-The committed file is the output of ``registry-generate``; ``version``, ``steps``, ``policy``,
-``coverage_thresholds`` and ``declared_edges`` are carried by hand inside it.  The differences
+The committed file is the output of ``registry-generate``; ``version``, ``steps``, ``policy``
+and ``declared_edges`` are carried by hand inside it.  The differences
 from the 1.1.1 hand file (``tests/fixtures/step_order/step_order_1.1.1.json``) are pinned here
 edge by edge, so an unplanned annotation change that moves an edge fails a test.
 """

@@ -219,17 +219,6 @@ def build_parser() -> _SpecdevParser:
     va.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     va.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
-    m = sub.add_parser("matrix")
-    m.add_argument("spec_dir")
-    # Default: write to <spec_dir>/extras/trace_matrix.json (resolved at action
-    # time once spec_dir is known). Pass --out - explicitly for stdout, or
-    # --out <path> for a non-canonical location.
-    m.add_argument("--out", default=None)
-    m.add_argument("--repo-root", default=".")
-    m.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    m.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    m.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
     fx = sub.add_parser("fixtures-lint")
     fx.add_argument("spec_dir")
     fx.add_argument("--repo-root", default=".")
@@ -625,6 +614,7 @@ REMOVED_COMMANDS: dict[str, str] = {
     "forward-replay-check": "use `specdev stale` for the pending replay and `specdev spec-check` for broken links",
     "completeness-check": "use `specdev coverage` for the link counts and the ids that are not linked",
     "traceability-check": "use `specdev spec-check` for the role-rule findings (E740 to E745) and broken links",
+    "matrix": "use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage",
 }
 
 
@@ -684,53 +674,6 @@ def main():
             _json_exit(errs, "validate-all", {"spec_dir": spec_dir})
         else:
             _print_and_exit_if_errors(errs)
-    elif args.cmd == "matrix":
-        from .validation.matrix import build_trace_matrix
-        repo_root = os.path.abspath(args.repo_root)
-        spec_dir = os.path.abspath(args.spec_dir)
-        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
-        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
-        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        res = build_trace_matrix(repo_root, spec_dir, project_canon_dir=project_canon_dir)
-        if getattr(args, "json_output", False):
-            cfg = get_config()
-            integrity_errors = res.get("integrity_errors")
-            has_integrity_err = (
-                cfg.matrix_strict
-                and isinstance(integrity_errors, list)
-                and bool(integrity_errors)
-            )
-            envelope = {
-                "status": "FAIL" if has_integrity_err else "PASS",
-                "error_count": len(integrity_errors) if has_integrity_err and integrity_errors is not None else 0,
-                "warning_count": 0,
-                "errors": [],
-                "command": "matrix",
-                "matrix": res,
-            }
-            print(json.dumps(envelope, indent=2))
-            if has_integrity_err:
-                sys.exit(1)
-        else:
-            out = json.dumps(res, indent=2, sort_keys=True) + "\n"
-            if args.out == "-":
-                print(out, end="")
-            else:
-                from .core.constants import resolve_extras_path
-                out_arg = args.out if args.out else resolve_extras_path(spec_dir, "trace_matrix.json")
-                out_path = os.path.abspath(out_arg)
-                os.makedirs(os.path.dirname(out_path), exist_ok=True)
-                with open(out_path, "w", encoding="utf-8") as f:
-                    f.write(out)
-                print(out_arg)
-            cfg = get_config()
-            matrix_strict = cfg.matrix_strict
-            integrity_errors = res.get("integrity_errors")
-            if matrix_strict and isinstance(integrity_errors, list) and integrity_errors:
-                print(f"E210 TRACE_INTEGRITY matrix_failed count={len(integrity_errors)}", file=sys.stderr)
-                for error in integrity_errors:
-                    print(error, file=sys.stderr)
-                sys.exit(1)
     elif args.cmd == "fixtures-lint":
         from .validation.fixtures_lint import lint_fixtures
         spec_dir = os.path.abspath(args.spec_dir)
@@ -1651,14 +1594,6 @@ def main():
             promote_codes_list = sorted(env_cfg.promote_codes) if env_cfg.promote_codes else []
             spec_dir = os.path.join(repo_root, "spec")
             step_order_path = os.path.join(repo_root, "tools", "step_order.json")
-            coverage_thresholds = None
-            if os.path.isfile(step_order_path):
-                try:
-                    with open(step_order_path, "r", encoding="utf-8") as f:
-                        so_data = json.load(f)
-                    coverage_thresholds = so_data.get("coverage_thresholds")
-                except (OSError, json.JSONDecodeError):
-                    pass
             output = {
                 "status": "PASS",
                 "error_count": 0,
@@ -1674,9 +1609,7 @@ def main():
                 "spec_dir_exists": os.path.isdir(spec_dir),
                 "step_order_path": step_order_path,
                 "step_order_exists": os.path.isfile(step_order_path),
-                "coverage_thresholds": coverage_thresholds,
                 "replay_base_ref": env_cfg.replay_base_ref or None,
-                "matrix_strict": env_cfg.matrix_strict,
             }
             print(json.dumps(output, indent=2))
         else:
@@ -1710,22 +1643,8 @@ def main():
             print(f"Spec dir: {spec_dir} ({'exists' if os.path.isdir(spec_dir) else 'NOT FOUND'})")
             step_order_path = os.path.join(repo_root, "tools", "step_order.json")
             print(f"Step order: {step_order_path} ({'exists' if os.path.isfile(step_order_path) else 'NOT FOUND'})")
-            # Coverage thresholds
-            if os.path.isfile(step_order_path):
-                try:
-                    with open(step_order_path, "r", encoding="utf-8") as f:
-                        so_data = json.load(f)
-                    ct = so_data.get("coverage_thresholds")
-                    if ct:
-                        print(f"Coverage thresholds: {json.dumps(ct)}")
-                    else:
-                        print("Coverage thresholds: not configured")
-                except (OSError, json.JSONDecodeError):
-                    print("Coverage thresholds: error reading step_order.json")
             replay_base = env_cfg.replay_base_ref or ""
             print(f"Replay base ref: {replay_base or '(auto-resolved)'}")
-            matrix_strict_val = env_cfg.matrix_strict
-            print(f"Matrix strict mode: {'ON' if matrix_strict_val else 'OFF'}")
             print()
             print("=== End Environment Check ===")
 

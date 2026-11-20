@@ -151,9 +151,6 @@
       "path": "lock merge"
     },
     {
-      "path": "matrix"
-    },
-    {
       "path": "milestone-state"
     },
     {

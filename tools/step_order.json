@@ -4,10 +4,6 @@
     "downstream_consumers": "Records which steps actively consume each step's output. Read by 'specdev prompt-context', the context loaders, 'dag-lint' and 'dependency-order-lint'.",
     "step_metadata": "Per-step declarative metadata. required_spec_inputs is the inverse of downstream_consumers (producers that feed into this step) \u2014 kept redundant for O(1) lookup and consistency validation."
   },
-  "coverage_thresholds": {
-    "fr_coverage": 80,
-    "mode": "warn"
-  },
   "declared_edges": [
     [
       "01",

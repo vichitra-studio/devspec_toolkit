@@ -336,7 +336,7 @@ def is_corpus_excluded(array_key: str, repo_root: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# array_path walking (shared by json_utils, matrix, and any consumer that
+# array_path walking (shared by json_utils and any consumer that
 # resolves a registry array_path against actual spec data)
 # ---------------------------------------------------------------------------
 

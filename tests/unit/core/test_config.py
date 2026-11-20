@@ -24,25 +24,21 @@ class TestSpecdevConfig:
         for var in (
             "SPECDEV_WARNINGS_AS_ERRORS",
             "SPECDEV_PROMOTE_CODES",
-            "SPECDEV_MATRIX_STRICT",
             "SPECDEV_REPLAY_BASE_REF",
         ):
             monkeypatch.delenv(var, raising=False)
         cfg = SpecdevConfig()
         assert cfg.warnings_as_errors is False
         assert cfg.promote_codes == set()
-        assert cfg.matrix_strict is False
         assert cfg.replay_base_ref is None
 
     def test_all_env_vars_set(self, monkeypatch):
         monkeypatch.setenv("SPECDEV_WARNINGS_AS_ERRORS", "1")
         monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W571,W593")
-        monkeypatch.setenv("SPECDEV_MATRIX_STRICT", "true")
         monkeypatch.setenv("SPECDEV_REPLAY_BASE_REF", "origin/develop")
         cfg = SpecdevConfig()
         assert cfg.warnings_as_errors is True
         assert cfg.promote_codes == {"W571", "W593"}
-        assert cfg.matrix_strict is True
         assert cfg.replay_base_ref == "origin/develop"
 
     def test_boolean_true_variants(self, monkeypatch):
@@ -72,6 +68,10 @@ class TestSpecdevConfig:
         cfg = SpecdevConfig()
         assert cfg.promote_codes == set()
 
+    def test_matrix_strict_is_gone(self, monkeypatch):
+        monkeypatch.setenv("SPECDEV_MATRIX_STRICT", "1")
+        assert not hasattr(SpecdevConfig(), "matrix_strict")
+
     def test_staleness_threshold_is_gone(self, monkeypatch):
         monkeypatch.setenv("SPECDEV_STALENESS_THRESHOLD", "5")
         assert not hasattr(SpecdevConfig(), "staleness_threshold")
@@ -84,7 +84,6 @@ class TestSpecdevConfig:
     def test_repr(self, monkeypatch):
         monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
         monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
-        monkeypatch.delenv("SPECDEV_MATRIX_STRICT", raising=False)
         monkeypatch.delenv("SPECDEV_REPLAY_BASE_REF", raising=False)
         cfg = SpecdevConfig()
         r = repr(cfg)

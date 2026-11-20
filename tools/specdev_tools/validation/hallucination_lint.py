@@ -13,7 +13,6 @@ from ..core.json_utils import find_schema_dir, build_id_index, resolve_ref as _r
 from ..core.registry import derive_allowed_upstream
 from ..core.schema_nav import child_schema as _nav_child_schema
 from ..core.schema_nav import effective_schema as _nav_effective_schema
-from ..core.trace_types import is_valid_trace_type
 from .linter_utils import (
     build_lint_graph,
     collect_ids_and_refs,
@@ -151,19 +150,6 @@ def _scan_node(
     active_stages = stages if stages is not None else KNOWN_STAGES
     errs: list[SpecError] = []
     if isinstance(node, dict):
-        in_trace_container = any(token in path for token in ("trace", "targets", "target_ids", "mitigations"))
-        if "type" in node and "id" in node and in_trace_container:
-            t = node.get("type")
-            if isinstance(t, str) and not is_valid_trace_type(t):
-                _type_jq = f".{path}.type" if path else ".type"
-                errs.append(make_error(
-                    "E530",
-                    f"INVENTED_ENUM_OR_ID {rel}:{path}.type={t}",
-                    subcode="INVENTED_ENUM_OR_ID",
-                    file=rel,
-                    jq_path=_type_jq,
-                    value=t,
-                ))
         for key, value in node.items():
             p = f"{path}.{key}" if path else key
             if key in {"stage", "environment"} and isinstance(value, str) and value not in active_stages:

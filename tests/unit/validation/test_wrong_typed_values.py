@@ -5,7 +5,7 @@ and of the 1.1.1 corpus (``tests/fixtures/spec_corpus``) has the value at every 
 ``_WRONG_VALUES``; the step's deep validator (called directly, not through the E521 wrapper of ``validate.py``) must
 return a list.  The same is done for the files a validator READS besides its own (found by recording the opens of a
 run on the unmutated folder): each is mutated on disk while the validator checks its unmutated document.  A validator
-may report its own finding on a wrong type; raising is the failure.  ``build_trace_matrix`` runs over a copy of the
+may report its own finding on a wrong type; raising is the failure.  the graph check (``run_graph_check``) runs over a copy of the
 folder with one file mutated, and ``compute_milestone_state`` over the mutated plan.  A whole file of the wrong kind
 (top level not an object, bytes that are not UTF-8) is read as an unreadable file by the folder reader and gives the deep validators no finding;
 a sibling file replaced by ``{`` or by non-UTF-8 bytes does not make a validator raise, except through the three
@@ -37,7 +37,6 @@ from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.validation import _legacy_shim
 from specdev_tools.validation.graph_checks import run_graph_checks
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
-from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import (
     DEEP_VALIDATORS,
@@ -52,7 +51,7 @@ _CORPUS = _ROOT / "tests" / "fixtures" / "spec_corpus"
 _WRONG_VALUES: tuple[Any, ...] = (
     "x", None, [], {}, 5, [None], ["x"], [[1]], "", True, 1.5, {"id": []}, [{"id": []}],
 )
-# The 1.1.1 readers of the matrix are all off on the example (it is graph-shaped), so its paths are mutated
+# The 1.1.1 readers are all off on the example (it is graph-shaped), so its paths are mutated
 # with four kinds of wrong value (string, null, array, object): this keeps the run short.  The corpus, where the
 # readers run, gets every value.
 _EXAMPLE_FOLDER_VALUES: tuple[Any, ...] = ("x", None, [], {"id": []})
@@ -289,7 +288,7 @@ def test_milestone_state_does_not_raise_on_a_wrong_value_in_the_plan(tmp_path: P
 
 
 def _readers_raise(spec_dir: Path, label: str) -> list[str]:
-    return _raise_of(label, lambda: build_trace_matrix(str(_ROOT), str(spec_dir)))
+    return _raise_of(label, lambda: run_graph_check(str(spec_dir), str(_ROOT)))
 
 
 def _first_entries(document: dict[str, Any], values: tuple[Any, ...]) -> Iterator[tuple[tuple, Any, dict[str, Any]]]:
@@ -316,12 +315,12 @@ def _mutate_folder(
     return failures
 
 
-def test_matrix_does_not_raise_on_the_example(tmp_path: Path) -> None:
+def test_graph_check_does_not_raise_on_the_example(tmp_path: Path) -> None:
     names = tuple(_STEP_OF_FILE) + ("00_charter.json",)
     assert _mutate_folder(_EXAMPLE, tmp_path, names, _EXAMPLE_FOLDER_VALUES) == []
 
 
-def test_matrix_does_not_raise_on_the_1_1_1_corpus(tmp_path: Path) -> None:
+def test_graph_check_does_not_raise_on_the_1_1_1_corpus(tmp_path: Path) -> None:
     names = tuple(sorted(path.name for path in _CORPUS.glob("*.json")))
     assert _mutate_folder(_CORPUS, tmp_path, names, _WRONG_VALUES) == []
 
@@ -397,7 +396,7 @@ def _payload() -> dict[str, Any]:
 
 def _outputs(folder: Path) -> dict[str, Any]:
     return {
-        "matrix": build_trace_matrix(str(_ROOT), str(folder)),
+        "graph": [error.render() for error in run_graph_check(str(folder), str(_ROOT))],
         "scope": resolve_scope("FR-CORPUS-001", str(folder), str(_ROOT)),
     }
 
@@ -421,8 +420,8 @@ def test_a_free_form_payload_with_every_guarded_field_name_leaves_every_reader_o
 
 
 @pytest.mark.parametrize("field", ["trace", "targets", "target_ids"])
-def test_a_link_entry_whose_id_is_a_list_does_not_raise_in_the_matrix(field: str, tmp_path: Path) -> None:
-    """The 1.1.1 readers key a dict by an entry's ``id``; a list id must be skipped, not hashed."""
+def test_a_link_entry_whose_id_is_a_list_does_not_raise_in_the_graph_check(field: str, tmp_path: Path) -> None:
+    """A reader that keys a dict by an entry's ``id`` must skip a list id, not hash it."""
     folder = tmp_path / "spec"
     shutil.copytree(_CORPUS, folder)
     found = 0
@@ -435,7 +434,7 @@ def test_a_link_entry_whose_id_is_a_list_does_not_raise_in_the_matrix(field: str
                 found += 1
         path.write_text(json.dumps(document), encoding="utf-8")
     assert found, f"the corpus has no {field} list"
-    build_trace_matrix(str(_ROOT), str(folder))
+    run_graph_check(str(folder), str(_ROOT))
 
 
 def _walk(value: Any) -> Iterator[dict[str, Any]]:

@@ -4,8 +4,7 @@ Continues ``test_graph_example_steps_00_05.py`` on the same folder, ``tests/fixt
 files of steps 06-16 and the one plan file of ``spec/impl_context/``.  These tests pin that they are valid against
 the real schemas, validators, registry and ``spec-check`` with a known set of warnings, that every link of the whole
 folder (00-16) names an existing id of an allowed kind, and that the readers meant to stay silent on the new shape
-(matrix, milestone state, upstream backlog, scope resolver, reviewer) do,
-as does the W604 staleness check of step 14.
+(milestone state, upstream backlog, scope resolver, reviewer) do.
 
 Two consumers are not run on the folder because they read no 1.1.1 field of a spec artifact: ``extraction-intent-check``
 reads the prompts and ``tools/step_order.json`` only, and seed-lint reads the seed manifest and the seed
@@ -27,7 +26,6 @@ from specdev_tools.context.reviewer import _run_structural_pass
 from specdev_tools.context.scope_resolver import resolve_scope
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.schema_validate import validate_data_against_schema
-from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.spec_check import run_spec_check_json
 from specdev_tools.validation.validate import DEEP_VALIDATORS
 from specdev_tools.validation.graph_checks.codes import GRAPH_CHECK_CODES
@@ -118,13 +116,6 @@ _PINNED_FINDINGS = Counter(
         ("W594", "13_extension_manifest.json"): 1,
     }
 )
-
-# What the readers that stay silent on the new shape return on the full folder.
-_MATRIX_NOT_COMPUTED = [
-    "fr_with_api", "apis", "fr_with_fixture", "fixtures", "fr_with_nfr", "nfrs", "fr_with_threat", "threats",
-    "milestone_coverage", "invariant_threat_coverage",
-]
-_MATRIX_COVERAGE = {"fr_total": 2, "fr_total_fixture": 2, "scaffolds_found": 0}
 
 
 def _validated(name: str) -> list[tuple[tuple, str]]:
@@ -243,26 +234,14 @@ def test_spec_check_finding_set_is_pinned(stamped_example: Path) -> None:
 # --- readers meant to stay silent on the new shape ------------------------------------------------
 
 
-def test_matrix_names_every_value_it_cannot_compute() -> None:
-    result = build_trace_matrix(str(_ROOT), str(_SPEC))
-    assert result["not_computed"] == _MATRIX_NOT_COMPUTED
-    assert result["coverage"] == _MATRIX_COVERAGE
-    assert result["matrix"] == [{"fr_id": "fr-password-reset"}, {"fr_id": "fr-password-reset-request"}]
-    assert "integrity_errors" not in result
-
-
-def test_step_14_skips_the_stale_matrix_warning_on_the_full_folder(stamped_example: Path) -> None:
-    """W604 reads the 1.1.1 ``fr_refs`` / ``source_milestones``: the folder has none, so it does not fire.
-
-    The example is copied outside ``tests`` (the check skips test fixtures) and has no ``extras/trace_matrix.json``,
-    so a reader that ran would report W604; a roadmap that still carries ``fr_refs`` is the control.
-    """
-    artifact_path = stamped_example / "spec" / "14_roadmap.json"
-    roadmap = json.loads(artifact_path.read_text(encoding="utf-8"))
-    context = {"spec_root": str(stamped_example / "spec"), "artifact_path": str(artifact_path)}
-    assert [e.code for e in DEEP_VALIDATORS["14"](roadmap, str(_ROOT), context) if e.code == "W604"] == []
-    roadmap["milestones"][0]["fr_refs"] = ["fr-password-reset"]
-    assert [e.code for e in DEEP_VALIDATORS["14"](roadmap, str(_ROOT), context) if e.code == "W604"] == ["W604"]
+def test_coverage_by_fr_lists_both_frs_of_the_example(tmp_path: Path) -> None:
+    """The FR view that ``specdev matrix`` gave comes from ``coverage --by fr``: both FRs, with their linked nodes."""
+    code, out = _run_cli(
+        "coverage", "--by", "fr", "--repo-root", str(_ROOT), "--spec-root", str(_SPEC), "--git-root", str(tmp_path),
+    )
+    assert code == 0
+    assert [line.split()[0] for line in out.splitlines() if line.startswith("fr-")] == ["fr-password-reset", "fr-password-reset-request"]
+    assert "api-password-reset-confirm (derives_from)" in out
 
 
 def test_milestone_state_reads_the_plan_file(tmp_path: Path) -> None:

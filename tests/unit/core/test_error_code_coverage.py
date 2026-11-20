@@ -30,12 +30,11 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W570", "W571", "W572", "W573",
             "W580", "W583", "W584", "W585", "W586", "W587", "W588", "W589",
             # R9: Cross-step validation (59x)
-            "E590", "E591", "E592", "E593", "E594", "E595",
+            "E590", "E591", "E593", "E594", "E595",
             "E596", "E597", "E598", "E599",
-            "W590", "W591", "W592", "W593", "W594", "W595",
+            "W590", "W591", "W593", "W594", "W595",
             "W596", "W597", "W599", "W600",
             "W601", "W603",
-            "E604", "W604",
             # Glossary parity (6xx)
             "E606", "E607", "W606",
             # Toolkit version gate (6xx)

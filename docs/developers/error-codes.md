@@ -162,19 +162,15 @@
 
 **Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and an API id of step 05 is not named in the `threatens` of any threat in the artifact (`threatens` accepts api, component, connection and third-party ids). Each API should be threatened by at least one threat. The check only runs when Step 05 is present.
 
-**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py` (DEVSPEC-122 follow-up).
+**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted.
 
 **Resolution**: Add a threat in Step 11 whose `threatens` includes the uncovered API id, or confirm the API is intentionally outside threat scope.
 
 **Warning-only and non-promotable**: W583 has no E-counterpart and is excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate it to an error.
 
-### E604 / W604 TRACE_MATRIX_STALE
+### E604 / W604 TRACE_MATRIX_STALE (removed)
 
-**Trigger** (W604): Fired by the Step 14 validator when `extras/trace_matrix.json` is missing, or when its modification time is older than `14_roadmap.json` — an mtime-based freshness heuristic indicating the trace matrix may not reflect the current roadmap. The check runs only when `14_roadmap.json` carries a 1.1.1 `fr_refs` or `source_milestones` field (the matrix is built from them), so it is skipped on a 1.2.0-shaped roadmap. Only W604 is emitted; E604 is registered as the nominal error form but is not currently produced by any code path.
-
-**Resolution**: Regenerate `extras/trace_matrix.json` so it post-dates `14_roadmap.json`, or confirm the staleness is benign (e.g. a checkout reordered file modification times).
-
-**Warning-only and non-promotable**: W604 is excluded from `PROMOTABLE_PAIRS` because matrix staleness is advisory rather than a hard correctness failure; `SPECDEV_WARNINGS_AS_ERRORS` and `SPECDEV_PROMOTE_CODES` therefore do not escalate it. E604 exists in the registry as the same-named error form but is not wired to promotion.
+Removed in 1.2.0, see E763: no command writes `extras/trace_matrix.json` and no check compares the age of a stored file with `14_roadmap.json`. An edit to a roadmap node shows in `spec-check` (check `trace-lock`) as E763 on each link whose target, or something above its target, was edited, and `specdev stale` lists those nodes as suspect.
 
 ### E210 CROSS_ARTIFACT_DRIFT
 
@@ -256,13 +252,9 @@
 
 **Promotable**: W591 → E591.
 
-### E592 / W592 COVERAGE_THRESHOLD_BREACH / COVERAGE_THRESHOLD_WARN
+### E592 / W592 COVERAGE_THRESHOLD_BREACH / COVERAGE_THRESHOLD_WARN (removed)
 
-**Trigger**: The traceability matrix FR coverage percentage falls below the configured threshold in `tools/step_order.json` → `coverage_thresholds.fr_coverage` (default: 80%). The percentage is FR-to-API coverage, read from the 1.1.1 `trace` field of step 05 APIs. When a step 05 file is loaded and its APIs carry no `trace` (a spec whose steps 00 to 05 have the new shape), that coverage is not computed and neither W592 nor E592 is emitted, in either mode, until graph coverage later in this release.
-
-**Resolution**: Increase FR coverage by adding API contracts, fixtures, or NFR bindings for uncovered FRs.
-
-**Promotable**: W592 → E592. Mode controlled by `coverage_thresholds.mode` in step_order.json (`"warn"` or `"error"`).
+Removed in 1.2.0: no percentage threshold is set or checked, and `coverage_thresholds` is gone from `tools/step_order.json`. `specdev coverage` prints the link counts with the ids that are not linked (for example `fr_api_coverage: 1/2 (50%)  unlinked: fr-password-reset-request`; information only), `specdev coverage --by fr` lists each FR with the nodes that link it, and `spec-check` reports the nodes a role rule leaves unlinked as E740 to E745.
 
 ### E593 / W593 VAGUE_LANGUAGE_FREE_TEXT
 
@@ -403,7 +395,7 @@
 
 Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
 
-**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py` (DEVSPEC-122 follow-up).
+**Exemption**: An invariant is skipped if its `constrains` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`; a 1.1.1 FR also parks with `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant whose `constrains` is empty, or holds an id that is not a parked FR (an API, component or connection id), is not exempted.
 
 **Resolution**: Either add the flagged `inv_id` to the `mitigated_by` of a threat in `11_redteam.json`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 

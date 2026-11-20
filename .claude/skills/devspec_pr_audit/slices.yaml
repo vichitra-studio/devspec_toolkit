@@ -171,7 +171,7 @@ slices:
     - "tools/specdev_tools/analysis/**/*.py"
     - "tools/specdev_tools/generation/**/*.py"
     - "tools/specdev_tools/core/**/*.py"          # shared core utilities (loaders, parsers, constants)
-    - "tools/specdev_tools/*.py"                  # top-level lint/validate modules (validate.py, fixtures_lint.py, matrix.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
+    - "tools/specdev_tools/*.py"                  # top-level lint/validate modules (validate.py, fixtures_lint.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
   expansion_rules:
     - target: "schema/{step}_*.json"
       capture: "tools/specdev_tools/validation/step_*.py"

@@ -222,6 +222,6 @@ def test_wrong_typed_scope_gives_schema_error_not_traceback(stamped_example: Pat
     assert "Traceback" not in out and "unhashable" not in out
     assert code == 0
     assert "counts" in json.loads(out)
-    code, out = _run_cli("matrix", spec, "--out", str(work / "matrix.json"), "--repo-root", root)
+    code, out = _run_cli("coverage", "--by", "fr", "--repo-root", root, "--spec-root", spec, "--git-root", str(work))
     assert "Traceback" not in out and "unhashable" not in out
     assert code == 0

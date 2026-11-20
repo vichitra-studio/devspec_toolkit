@@ -28,7 +28,6 @@ from specdev_tools.registry.annotation_scan import (
 from specdev_tools.registry import generate as generate_mod
 from specdev_tools.registry import step_order_gen
 from specdev_tools.registry.generate import _serialize, generate_registry
-from specdev_tools.validation.matrix import _extract_array_items
 from specdev_tools.validation.registry_check import run_registry_check
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -489,7 +488,7 @@ _WIDE_REGISTRY = {
 }
 
 
-def test_json_id_collection_and_matrix_extraction_on_wide_paths(tmp_path):
+def test_json_id_collection_on_wide_paths(tmp_path):
     root = str(_registry_toolkit(tmp_path, _WIDE_REGISTRY))
     envs = {"environments": {"prod": {"url": "p"}, "dev": {"url": "d"}}}
     ids, id_map = _collect_ids_from_file(envs, "02a_delivery_baseline.json", root)
@@ -498,8 +497,6 @@ def test_json_id_collection_and_matrix_extraction_on_wide_paths(tmp_path):
     plan = {"plan": {"items": [{"thing_id": "a"}, {"thing_id": "b"}]}}
     ids, id_map = _collect_ids_from_file(plan, "07_nfrs.json", root)
     assert ids == ["a", "b"] and id_map["b"][:2] == ("plan-thing", ".plan.items[1]")
-    assert _extract_array_items(plan, ".plan.items") == plan["plan"]["items"]
-    assert _extract_array_items(envs, ".environments{}") == list(envs["environments"].values())
 
 
 def test_glob_key_in_list_entries_and_step_lookup(tmp_path):
@@ -547,19 +544,6 @@ def test_registry_check_wide_paths_do_not_misfire(tmp_path):
     assert run_registry_check(str(spec), str(root)) == []
     (spec / "07_nfrs.json").write_text(json.dumps({"plan": {"items": [{"other": "a"}]}}))
     assert [e.code for e in run_registry_check(str(spec), str(root))] == ["E622"]
-
-
-def test_matrix_resolves_glob_keyed_file_through_registry_not_legacy_scan(tmp_path, monkeypatch):
-    import specdev_tools.validation.matrix as matrix_mod
-
-    root = _registry_toolkit(tmp_path, _WIDE_REGISTRY)
-    spec = tmp_path / "spec"
-    (spec / "impl_context").mkdir(parents=True)
-    (spec / "impl_context" / "ms_1_plan.json").write_text(json.dumps({"plan_items": [{"item_id": "x"}]}))
-    legacy_calls: list[dict] = []
-    monkeypatch.setattr(matrix_mod, "_legacy_scan_data", lambda data, *a, **k: legacy_calls.append(data))
-    matrix_mod.build_trace_matrix(str(root), str(spec))
-    assert legacy_calls == []
 
 
 def _wide_check(tmp_path, registry, spec_files):

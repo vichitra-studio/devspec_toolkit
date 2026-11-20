@@ -337,8 +337,8 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
     - ``<spec_dir>/samples/`` — excluded at the **first level only**; a
       hypothetical ``spec/03_glossary/samples/`` would still be scanned.
     - ``<spec_dir>/extras/`` — excluded at the **first level only**; holds
-      generated toolkit artifacts (e.g. ``trace_matrix.json``) that are not
-      spec artifacts and have no ``$schema``.  The trace lock
+      generated toolkit artifacts that are not spec artifacts and have no
+      ``$schema``.  The trace lock
       (``extras/trace.lock.json``) and the records under ``extras/verification/``
       rely on this exclusion; a test pins it.
     - ``migration_backups/`` — excluded at all levels (toolkit convention).

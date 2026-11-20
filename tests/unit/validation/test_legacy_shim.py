@@ -8,12 +8,9 @@ from typing import NamedTuple
 
 import pytest
 
-from specdev_tools.validation.validators.step_14 import validate_step_14
-
 from specdev_tools.analysis.upstream_backlog import run as run_upstream_backlog
 from specdev_tools.context.reviewer import _compute_verdict, _run_structural_pass
 from specdev_tools.context.scope_resolver import resolve_scope
-from specdev_tools.core.errors import render_errors
 from specdev_tools.core.scope_helpers import is_parked
 from specdev_tools.validation._legacy_shim import (
     LEGACY_CAPABILITY_GOAL_FIELDS,
@@ -33,8 +30,6 @@ from specdev_tools.validation._legacy_shim import (
     removed_paths,
 )
 from specdev_tools.validation.validate import validate_file
-from specdev_tools.validation.cross_artifact_checks import check_step_02_integrity, check_step_04_integrity
-from specdev_tools.validation.matrix import build_trace_matrix
 from specdev_tools.validation.validators.step_11 import _load_parked_fr_ids
 
 NEW_SHAPE = {
@@ -95,29 +90,6 @@ class _Spec(NamedTuple):
     files: dict
 
 
-def _silent_matrix_integrity(spec):
-    assert "integrity_errors" not in build_trace_matrix(str(spec.root), spec.spec_dir)
-
-
-def _silent_matrix_fr_to_api(spec):
-    matrix = build_trace_matrix(str(spec.root), spec.spec_dir)
-    assert all("apis" not in row for row in matrix["matrix"])
-    assert "fr_with_api" not in matrix["coverage"]
-    assert matrix["not_computed"][:2] == ["fr_with_api", "apis"]
-
-
-def _silent_step_02_integrity(spec):
-    arts = {f"spec/{name}": data for name, data in spec.files.items()}
-    capability_ids = {c["capability_id"] for c in spec.files["01_capabilities.json"]["capabilities"]}
-    assert check_step_02_integrity(arts, capability_ids=capability_ids) == []
-
-
-def _silent_step_04_integrity(spec):
-    arts = {f"spec/{name}": data for name, data in spec.files.items()}
-    capability_ids = {c["capability_id"] for c in spec.files["01_capabilities.json"]["capabilities"]}
-    assert check_step_04_integrity(arts, set(), capability_ids) == []
-
-
 def _silent_reviewer(spec):
     review = _run_structural_pass(
         spec.files["05_interface_contracts.json"], "", [("", spec.files["04_fr_list.json"])]
@@ -126,10 +98,6 @@ def _silent_reviewer(spec):
 
 
 SILENT_READERS = {
-    "matrix_integrity": _silent_matrix_integrity,
-    "matrix_fr_to_api": _silent_matrix_fr_to_api,
-    "step_02_integrity": _silent_step_02_integrity,
-    "step_04_integrity": _silent_step_04_integrity,
     "reviewer": _silent_reviewer,
 }
 
@@ -152,17 +120,6 @@ def test_guarded_reader_silent_on_graph_example(reader):
 
 
 def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
-    spec_dir = _write_spec(tmp_path, LEGACY_SHAPE)
-    arts = {f"spec/{name}": data for name, data in LEGACY_SHAPE.items()}
-
-    matrix = build_trace_matrix(str(tmp_path), spec_dir)
-    assert matrix["matrix"][0]["apis"] == ["api-a"], "matrix reader"
-    assert any(
-        "not found" in line for line in render_errors(check_step_02_integrity(arts, capability_ids=set()))
-    ), "check_step_02_integrity reader"
-    assert any(
-        "unknown capability" in line for line in render_errors(check_step_04_integrity(arts, set(), {"cap-a"}))
-    ), "check_step_04_integrity reader"
     review = _run_structural_pass(LEGACY_SHAPE["05_interface_contracts.json"], "", [("", {"fr_id": "fr-a"})])
     assert review.upstream_coverage["covered"] == ["fr-a"], "reviewer _run_structural_pass reader"
 
@@ -212,14 +169,10 @@ def test_is_parked_contract(node, expected):
     assert is_parked(node) is expected
 
 
-# --- per-reader guards: a legacy file of a later step never switches a 00-05 reader on -----------
+# --- a copy of the worked example to run the guarded readers on -----------------------------------
 
 EXAMPLE_SPEC = Path(__file__).parents[2] / "fixtures" / "graph_example" / "spec"
 TOOLKIT_ROOT = Path(__file__).parents[3]
-LEGACY_LATER_FILES = {
-    "09_impl_plan.json": {"tasks": [{"id": "x", "trace": [{"type": "fr", "id": "fr-x"}]}]},
-    "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "trace": [{"type": "fr", "id": "x"}]}], "trace": []},
-}
 
 
 def _example_copy(tmp_path: Path, extra: dict | None = None) -> str:
@@ -230,82 +183,6 @@ def _example_copy(tmp_path: Path, extra: dict | None = None) -> str:
     for name, data in (extra or {}).items():
         (spec_dir / name).write_text(json.dumps(data), encoding="utf-8")
     return str(spec_dir)
-
-
-@pytest.mark.parametrize("name", sorted(LEGACY_LATER_FILES))
-def test_legacy_later_file_does_not_switch_on_00_05_readers(tmp_path, name):
-    plain = _example_copy(tmp_path / "plain")
-    mixed = _example_copy(tmp_path / "mixed", {name: LEGACY_LATER_FILES[name]})
-
-    plain_matrix = build_trace_matrix(str(TOOLKIT_ROOT), plain)
-    mixed_matrix = build_trace_matrix(str(TOOLKIT_ROOT), mixed)
-    assert mixed_matrix["coverage"] == plain_matrix["coverage"]
-    # The only integrity line is the added file's own dangling reference. The old tree also
-    # reported a W592 fr_coverage warning here, in the plain and in the mixed spec.
-    assert "integrity_errors" not in plain_matrix
-    assert len(mixed_matrix["integrity_errors"]) == 1
-    assert mixed_matrix["integrity_errors"][0].startswith("E590 ")
-
-
-def test_matrix_reports_no_fr_to_api_threshold_on_new_shape():
-    result = build_trace_matrix(str(TOOLKIT_ROOT), str(EXAMPLE_SPEC))
-    assert result["coverage"]["fr_total"] > 0
-    assert not any("fr_coverage" in line for line in result.get("integrity_errors", []))
-
-
-def _threshold_repo(tmp_path: Path, mode: str) -> str:
-    (tmp_path / "tools").mkdir()
-    (tmp_path / "tools" / "step_order.json").write_text(
-        json.dumps({"coverage_thresholds": {"fr_coverage": 80, "mode": mode}}), encoding="utf-8")
-    return str(tmp_path)
-
-
-def test_matrix_threshold_unchanged_on_legacy_shape(tmp_path):
-    files = {
-        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
-            {"fr_id": "fr-a", "trace": []}, {"fr_id": "fr-b", "trace": []}]},
-        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "trace": [{"type": "fr", "id": "fr-a"}]}]},
-    }
-    root = tmp_path / "repo"
-    root.mkdir()
-    spec_dir = _write_spec(root, files)
-    result = build_trace_matrix(_threshold_repo(root, "error"), spec_dir)
-    assert any("E592" in line and "fr_coverage=50.0%" in line for line in result["integrity_errors"])
-
-
-def test_matrix_threshold_reported_when_there_is_no_05_file(tmp_path):
-    """No API artifact at all: FR-to-API coverage is 0 by definition, as on main."""
-    files = {"04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
-        {"fr_id": "fr-a", "derives_from": ["cap-a"]}]}}
-    root = tmp_path / "repo"
-    root.mkdir()
-    spec_dir = _write_spec(root, files)
-    result = build_trace_matrix(_threshold_repo(root, "warn"), spec_dir)
-    assert any("W592" in line and "fr_coverage=0.0%" in line for line in result["integrity_errors"])
-
-
-def test_matrix_threshold_silent_when_apis_exist_and_none_carries_trace(tmp_path):
-    files = {
-        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
-            {"fr_id": "fr-a", "derives_from": ["cap-a"]}]},
-        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-a"]}]},
-    }
-    root = tmp_path / "repo"
-    root.mkdir()
-    spec_dir = _write_spec(root, files)
-    result = build_trace_matrix(_threshold_repo(root, "warn"), spec_dir)
-    assert not any("fr_coverage" in line for line in result.get("integrity_errors", []))
-
-
-def test_new_shape_scope_later_fr_is_parked_in_matrix(tmp_path):
-    files = {
-        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
-            {"fr_id": "fr-a", "priority": "must-have", "scope": "in", "derives_from": ["cap-a"]},
-            {"fr_id": "fr-later", "priority": "must-have", "scope": "later", "derives_from": ["cap-a"]}]},
-        "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "fr_refs": [], "tasks": []}]},
-    }
-    spec_dir = _write_spec(tmp_path, files)
-    assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
 
 
 # --- one spelling of "parked" for the readers that can meet either shape ------------------------
@@ -332,8 +209,7 @@ def test_legacy_parked_scopes_is_the_1_1_1_value():
 
 
 def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
-    # A legacy FR parked by `priority: wont-have` stays out of every FR denominator of the readers
-    # that can meet a 1.1.1 file: the matrix and the step-11 sibling loader.
+    # A legacy FR parked by `priority: wont-have` stays out of the step-11 sibling loader.
     files = {
         "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
             {"fr_id": "fr-a", "priority": "must-have", "trace": []},
@@ -341,7 +217,6 @@ def test_legacy_shape_fixtures_keep_priority_wont_have_and_stay_green(tmp_path):
         "14_roadmap.json": {"milestones": [{"milestone_id": "m1", "fr_refs": [], "tasks": []}]},
     }
     spec_dir = _write_spec(tmp_path, files)
-    assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
     artifact = str(Path(spec_dir) / "11_adversarial.json")
     assert _load_parked_fr_ids(str(tmp_path), artifact) == {"fr-legacy-export"}
 
@@ -401,98 +276,6 @@ def _graph_spec(root: Path, extra: dict | None = None) -> str:
     """A new-shape spec: the graph example (00-05) plus the inline 06-16 documents."""
     spec_dir = _example_copy(root, {**NEW_SHAPE_06_16, **(extra or {})})
     return spec_dir
-
-
-def test_matrix_silent_on_new_shape_06_16(tmp_path):
-    result = build_trace_matrix(str(TOOLKIT_ROOT), _graph_spec(tmp_path))
-    assert "integrity_errors" not in result
-    assert "milestone_coverage" not in result
-    assert "invariant_threat_coverage" not in result
-    assert result["not_computed"] == [
-        "fr_with_api", "apis", "fr_with_fixture", "fixtures", "fr_with_nfr", "nfrs", "fr_with_threat", "threats",
-        "milestone_coverage", "invariant_threat_coverage",
-    ]
-    assert all(set(row) == {"fr_id"} for row in result["matrix"])
-    assert set(result["coverage"]) == {"fr_total", "fr_total_fixture", "scaffolds_found"}
-
-
-_LEGACY_LINK_FILES = {
-    "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [{"fr_id": "fr-a"}]},
-    "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "trace": [{"type": "fr", "id": "fr-a"}]}]},
-    "07_nfrs.json": {"nfrs": [{"nfr_id": "nfr-a", "trace": [{"type": "fr", "id": "fr-a"}]}]},
-    "08_fixtures.json": {"fixtures": [{"fixture_id": "fx-a", "targets": [{"type": "api", "id": "api-a"}]}]},
-    "11_redteam.json": {"threats": [{"threat_id": "th-a", "target_ids": [{"type": "api", "id": "api-a"}],
-                                     "mitigations": [{"type": "inv", "id": "inv-a"}]}]},
-    "14_roadmap.json": {"$schema": "vc:14-roadmap", "milestones": [{"milestone_id": "m1", "fr_refs": ["fr-a"]}]},
-}
-
-
-def test_matrix_computes_every_link_on_legacy_06_16(tmp_path):
-    root = tmp_path / "repo"
-    root.mkdir()
-    result = build_trace_matrix(str(root), _write_spec(root, _LEGACY_LINK_FILES))
-    assert "not_computed" not in result
-    assert result["matrix"][0] == {"fr_id": "fr-a", "apis": ["api-a"], "fixtures": ["fx-a"], "nfrs": ["nfr-a"],
-                                   "threats": ["th-a"]}
-    assert result["milestone_coverage"] == {"fr-a": ["m1"]}
-    assert result["invariant_threat_coverage"] == {"inv-a": ["th-a"]}
-
-
-# (file, entry list, entry field the reader needs) -> the values omitted and named when the reader is skipped
-_KEY_BY_READER = {
-    ("07_nfrs.json", "nfrs", "trace"): ["fr_with_nfr", "nfrs"],
-    ("08_fixtures.json", "fixtures", "targets"): ["fr_with_fixture", "fixtures"],
-    ("11_redteam.json", "threats", "target_ids"): ["fr_with_threat", "threats"],
-    ("11_redteam.json", "threats", "mitigations"): ["invariant_threat_coverage"],
-    ("14_roadmap.json", "milestones", "fr_refs"): ["milestone_coverage"],
-}
-
-
-@pytest.mark.parametrize("reader", list(_KEY_BY_READER), ids=lambda r: r[2])
-def test_matrix_names_only_the_value_whose_reader_was_skipped(tmp_path, reader):
-    file_name, array, field = reader
-    files = json.loads(json.dumps(_LEGACY_LINK_FILES))
-    for entry in files[file_name][array]:
-        entry.pop(field, None)
-    root = tmp_path / "repo"
-    root.mkdir()
-    result = build_trace_matrix(str(root), _write_spec(root, files))
-    assert result["not_computed"] == _KEY_BY_READER[reader]
-    row = result["matrix"][0]
-    for name in _KEY_BY_READER[reader]:
-        assert name not in row and name not in result["coverage"] and name not in result
-    assert "apis" in row and row["apis"] == ["api-a"]
-
-
-@pytest.mark.parametrize("field", ["trace", "targets", "target_ids", "mitigations", "fr_refs", "milestones"])
-def test_matrix_does_not_raise_on_wrong_typed_link_fields(tmp_path, field):
-    files = {
-        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [{"fr_id": "fr-a"}]},
-        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "trace": "x" if field == "trace" else []}]},
-        "07_nfrs.json": {"nfrs": [{"nfr_id": "nfr-a", "trace": 7 if field == "trace" else []}]},
-        "08_fixtures.json": {"fixtures": [{"fixture_id": "fx-a", "targets": "x" if field == "targets" else []}]},
-        "11_redteam.json": {"threats": [{"threat_id": "th-a", "target_ids": 3 if field == "target_ids" else [],
-                                         "mitigations": "m" if field == "mitigations" else []}]},
-        "14_roadmap.json": {"$schema": "vc:14-roadmap", "milestones": "m" if field == "milestones" else [
-            {"milestone_id": "m1", "fr_refs": 5 if field == "fr_refs" else [], "tasks": "t"}]},
-    }
-    root = tmp_path / "repo"
-    root.mkdir()
-    assert build_trace_matrix(str(root), _write_spec(root, files))["matrix"][0]["fr_id"] == "fr-a"
-
-
-def test_step_14_w604_skipped_on_new_shape(tmp_path):
-    roadmap = tmp_path / "spec" / "14_roadmap.json"
-    roadmap.parent.mkdir()
-    new_shape = NEW_SHAPE_06_16["14_roadmap.json"]
-    legacy = {**new_shape, "milestones": [{**new_shape["milestones"][0], "fr_refs": ["fr-a"]}]}
-    roadmap.write_text(json.dumps(new_shape), encoding="utf-8")
-
-    def codes(instance):
-        return [e.code for e in validate_step_14(instance, str(TOOLKIT_ROOT), str(roadmap))]
-
-    assert codes(new_shape) == []
-    assert codes(legacy) == ["W604"]
 
 
 def test_removed_paths_lists_shim_removals_of_one_step(tmp_path):
@@ -594,15 +377,6 @@ def test_inline_m8_guards_run_on_the_legacy_item_and_skip_the_new_one():
     assert not codes("valid_full.json") & {"E301", "E305", "E307"}
 
 
-def test_legacy_shape_suites_unchanged():
-    corpus = TOOLKIT_ROOT / "tests" / "fixtures" / "spec_corpus"
-    result = build_trace_matrix(str(TOOLKIT_ROOT), str(corpus))
-    assert "not_computed" not in result
-    assert result["coverage"]["fr_with_api"] == 1
-    assert result["matrix"][0]["apis"] == ["API-CORPUS-001"]
-    assert result["milestone_coverage"] == {"FR-CORPUS-001": ["MS-CORPUS-001"]}
-
-
 # --- the guard sites ------------------------------------------------------------------------------
 
 TOOLS_PACKAGE = TOOLKIT_ROOT / "tools" / "specdev_tools"
@@ -612,18 +386,12 @@ SHIM_FILE = "validation/_legacy_shim.py"
 # following this list; a new guard site must be added here.
 GUARD_SITES = {
     ("context/reviewer.py", "_run_structural_pass"): "context/reviewer.py",
-    ("validation/cross_artifact_checks.py", "check_step_02_integrity"): "step-02 capability coverage (M2)",
-    ("validation/matrix.py", "build_trace_matrix"): "validation/matrix.py",
-    ("validation/validators/step_14.py", "validate_step_14"): "validators/step_14.py W604",
 }
 
 # Every module that imports the shim (guard sites and the other shim functions).
 SHIM_CONSUMERS = {
     "context/reviewer.py": "context/reviewer.py",
-    "validation/cross_artifact_checks.py": "step-02 capability coverage (M2)",
-    "validation/matrix.py": "validation/matrix.py",
     "validation/validators/step_11.py": "is_parked_any_shape",
-    "validation/validators/step_14.py": "validators/step_14.py W604",
 }
 
 # Files whose inline guards M8 rewrites. They never call the shim and the table above never names them.
@@ -683,8 +451,3 @@ def test_no_m8_rewrites_site_calls_the_module():
     assert not M8_INLINE_FILES & ({file for file, _ in GUARD_SITES} | set(SHIM_CONSUMERS))
 
 
-def test_step_04_integrity_skips_a_non_dict_fr_trace_entry():
-    arts = {"spec/04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
-        {"fr_id": "fr-a", "trace": ["cap-a", 7, None, {"type": "capability", "id": "cap-missing"}]}]}}
-    errors = render_errors(check_step_04_integrity(arts, set(), {"cap-a"}))
-    assert len(errors) == 1 and "cap-missing" in errors[0]

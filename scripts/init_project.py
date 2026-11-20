@@ -77,14 +77,6 @@ jobs:
         run: ./tools/run_specdev.sh governance-check spec --message "${{ github.event.pull_request.title }}" --repo-root ./devspec_toolkit
       - name: Fixtures lint
         run: ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
-      - name: Build trace matrix
-        run: ./tools/run_specdev.sh matrix spec --out trace_matrix.json --repo-root ./devspec_toolkit
-      - name: Upload matrix
-        uses: actions/upload-artifact@v4
-        with:
-          name: trace-matrix
-          path: trace_matrix.json
-          if-no-files-found: ignore
 """
 
 def _render_ci_workflow(rel_toolkit_root: str, venv_name: str) -> str:

@@ -122,7 +122,6 @@ ERROR_CODES = {
     # R9: Cross-step validation (59x)
     "E590": "CROSS_STEP_ID_NOT_FOUND",
     "E591": "EXTRACTION_INTENT_EMPTY",
-    "E592": "COVERAGE_THRESHOLD_BREACH",
     "E593": "VAGUE_LANGUAGE_FREE_TEXT",
     "E594": "CONTENT_DERIVATION_LOW_OVERLAP",
     "E595": "CONTENT_STALENESS",
@@ -132,7 +131,6 @@ ERROR_CODES = {
     "E599": "DAG_CONSUMER_INCONSISTENCY",
     "W590": "CROSS_STEP_UPSTREAM_MISSING",
     "W591": "EXTRACTION_INTENT_EMPTY",
-    "W592": "COVERAGE_THRESHOLD_WARN",
     "W593": "VAGUE_LANGUAGE_FREE_TEXT",
     "W594": "CONTENT_DERIVATION_LOW_OVERLAP",
     "W595": "CONTENT_STALENESS",
@@ -142,8 +140,6 @@ ERROR_CODES = {
     "W600": "VERIFIED_ACTION_NO_EVIDENCE",
     "W601": "EVIDENCE_NO_ARTIFACT_REF",
     "W603": "FILES_OUTSIDE_TASK_SCOPE",
-    "E604": "TRACE_MATRIX_STALE",
-    "W604": "TRACE_MATRIX_STALE",
     # Glossary parity (6xx)
     "E606": "GLOSSARY_PROPOSAL_DRIFT",
     "E607": "GLOSSARY_CANON_DRIFT",
@@ -265,9 +261,7 @@ ERROR_CODES = {
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
 # Non-promotable codes are excluded: W110/W120/W130/W552/W553/W554/W555/W590/
 # W596/W597/W606 have E-counterparts with different semantics; W570
-# (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
-# its name with the registered-but-unemitted E604 and stays advisory (see the
-# inline W604 note below). W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
+# (GRACEFUL_SKIP) has no E-counterpart at all; W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
 # E-counterpart at all -- it is an informational nudge, not a hard failure.
 # W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
 # W630 (OPEN_ITEM) and W633 (OPEN_ITEM_LEGACY_TRIAGE) likewise have none (no E630 or E633 exists).
@@ -287,7 +281,6 @@ PROMOTABLE_PAIRS = {
     # semantically-correct E-counterpart at this time; a fatal "upstream missing"
     # would need a new dedicated E-code rather than reusing E590.
     "W591": "E591",
-    "W592": "E592",
     "W593": "E593",
     "W594": "E594",
     "W595": "E595",
@@ -298,14 +291,6 @@ PROMOTABLE_PAIRS = {
     # UPSTREAM_GAP code for a present-but-vague entry, mislabelling the defect
     # and pointing users at the wrong fix (add an entry vs. expand its text).
     # W597 has no semantically-correct E-counterpart, so it stays a warning.
-    # W604 (TRACE_MATRIX_STALE) is intentionally NOT in PROMOTABLE_PAIRS.
-    # Only W604 is emitted — by the step_14 staleness check, when
-    # trace_matrix.json is missing or older than 14_roadmap.json (an mtime-based
-    # freshness heuristic that can false-positive on checkout/touch order). E604
-    # is registered under the same name as the nominal error form but is never
-    # emitted by any code path, and staleness is advisory (regenerate the matrix)
-    # rather than a hard correctness failure — so W604 stays a warning and E604
-    # is not wired to promotion.
     # W615 INVARIANT_UNEXERCISED_BY_THREAT → E615: step-06 invariant with a
     # risk_category_ref is not referenced by any step-11 threat mitigation.
     "W615": "E615",

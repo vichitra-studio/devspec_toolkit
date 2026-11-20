@@ -33,8 +33,6 @@ class SpecdevConfig:
         ``SPECDEV_WARNINGS_AS_ERRORS`` — promote all W-codes to E-codes.
     promote_codes : set[str]
         ``SPECDEV_PROMOTE_CODES`` — selective W→E promotion set.
-    matrix_strict : bool
-        ``SPECDEV_MATRIX_STRICT`` — make matrix coverage errors fatal.
     replay_base_ref : str | None
         ``SPECDEV_REPLAY_BASE_REF`` — explicit git base ref override.
     """
@@ -42,14 +40,12 @@ class SpecdevConfig:
     __slots__ = (
         "warnings_as_errors",
         "promote_codes",
-        "matrix_strict",
         "replay_base_ref",
     )
 
     def __init__(self) -> None:
         self.warnings_as_errors: bool = _parse_bool("SPECDEV_WARNINGS_AS_ERRORS")
         self.promote_codes: set[str] = _parse_set("SPECDEV_PROMOTE_CODES")
-        self.matrix_strict: bool = _parse_bool("SPECDEV_MATRIX_STRICT")
 
         raw_base_ref = os.environ.get("SPECDEV_REPLAY_BASE_REF", "").strip()
         self.replay_base_ref: str | None = raw_base_ref if raw_base_ref else None

@@ -266,6 +266,12 @@ class TestCiWorkflowRender:
         assert "--spec-root ./spec" in content
         assert "--git-root ." in content
 
+    def test_init_template_has_no_matrix_step(self):
+        content = _render_ci_workflow(".", "devspec_env")
+        assert "matrix" not in content
+        assert "trace_matrix" not in content
+        assert "upload-artifact" not in content
+
     def test_toolkit_path_substitution(self):
         content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")
         assert "vendor/devspec_toolkit/tools" in content

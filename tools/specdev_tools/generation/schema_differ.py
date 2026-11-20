@@ -1401,10 +1401,10 @@ def validate_post_migration(
         for fail in schema_failures:
             errors.append(f"Schema Validation Failed: {fail}")
 
-    # 2. Trace Integrity
-    from ..validation.matrix import validate_trace_integrity
+    # 2. Trace Integrity: the link errors `spec-check` reports (one resolver run over the spec folder)
+    from ..graph.check import run_graph_check
     from ..core.errors import render_errors as _render_errors
-    trace_errors = validate_trace_integrity(str(toolkit_root), str(spec_dir))
+    trace_errors = run_graph_check(str(spec_dir), str(toolkit_root))
     if trace_errors:
         errors.extend(_render_errors(trace_errors))
     
