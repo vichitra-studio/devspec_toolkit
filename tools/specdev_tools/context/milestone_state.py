@@ -55,13 +55,12 @@ from ..graph.build import build_graph
 from ..graph.contract import item_of
 from ..graph.kinds import KindRegistryError
 from ..graph.model import Graph
-from ..graph.names import REALISES, REFINES, VERIFIED_BY
+from ..graph.names import PAUSED_DISPOSITIONS, REALISES, REFINES, VERIFIED_BY
 from ..graph.queries import task_of
 from ..graph.trace import TraceOptions, trace_node
 from ..lifecycle.anchor_store import read_row
 from ..lifecycle.plans import MILESTONE_KEY
 from ..trace.history import DONE_STATUS
-from ..validation.graph_checks.built import PAUSED_DISPOSITIONS
 
 _CHAIN_VERBS = frozenset({REALISES, REFINES, VERIFIED_BY})
 _WONT_DO = "wont_do"

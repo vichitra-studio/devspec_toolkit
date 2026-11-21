@@ -16,7 +16,7 @@ from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.schema_validate import SchemaValidationError, schema_violations, violation_text
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.names import ABOUT, VERIFIES
+from specdev_tools.graph.names import ABOUT, EXECUTION_RECORD, VERIFIES
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 
 RECORDS_DIR = "extras/verification"
@@ -106,11 +106,13 @@ def orphan_records(graph: Graph) -> list[Node]:
 
 
 def prune_orphan_records(spec_dir: str, graph: Graph, dry_run: bool = False) -> list[Path]:
-    """Delete the orphan records of *graph* from *spec_dir* and return their paths in graph order; with *dry_run*, delete nothing.
+    """Delete the orphan record FILES of *graph* from *spec_dir* and return their paths in graph order; with *dry_run*, delete nothing.
 
-    The caller holds the write lock and built *graph* under it.
+    An execution record is not a file of its own: it is an item of a plan file, which this never deletes
+    (``specdev plan record --prune`` removes such a record from its plan).  The caller holds the write lock and built
+    *graph* under it.
     """
-    paths = [Path(spec_dir) / node.file for node in orphan_records(graph)]
+    paths = [Path(spec_dir) / node.file for node in orphan_records(graph) if node.kind != EXECUTION_RECORD]
     if not dry_run:
         for path in paths:
             path.unlink()

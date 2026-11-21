@@ -32,6 +32,7 @@ ATTESTATION_TYPE = "attestation"
 RUN_TYPE = "run"
 VERIFICATION_SCHEMA = "vc:extras:verification-record"
 EVIDENCE_SCHEMA = "vc:extras:evidence-record"
+AT_DEPLOY_SCHEMA = "vc:extras:at-deploy-record"
 BINDING_PREFIX = "ver-"
 EVIDENCE_PREFIX = "evd-"
 INSTALL_CHECK_SUFFIX = "-install"
@@ -239,3 +240,11 @@ def write_evidence(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
     """
     return _write_record(folder, repo_root, EVIDENCE_SCHEMA, item["evidence_id"], item)
+
+
+def write_at_deploy(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
+    """Write the at-deploy record *item* as ``<deploy_id>.json`` in *folder* (``records_folder``); returns the file name.
+
+    The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
+    """
+    return _write_record(folder, repo_root, AT_DEPLOY_SCHEMA, item["deploy_id"], item)

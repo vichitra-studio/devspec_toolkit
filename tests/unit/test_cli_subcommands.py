@@ -548,5 +548,44 @@ class TestStepCommand(_CliMixin, unittest.TestCase):
         self.assertTrue(err.startswith("E520"), err)
 
 
+class TestLifecycleCommands(_CliMixin, unittest.TestCase):
+    """``plan record`` and ``review record``: the parsers, and the usage errors that need no spec folder."""
+
+    def test_plan_record_takes_the_address_the_outcome_and_the_at_deploy_flags(self):
+        args = cli.build_parser().parse_args(["plan", "record", "ITEM/a01", "--outcome", "done", "--note", "n"])
+        self.assertEqual((args.address, args.outcome, args.note, args.at_deploy, args.prune), ("ITEM/a01", "done", "n", False, None))
+        args = cli.build_parser().parse_args(["plan", "record", "--at-deploy", "ITEM/a01", "--env", "staging", "--tag", "v1"])
+        self.assertEqual((args.address, args.at_deploy, args.env, args.tag), ("ITEM/a01", True, "staging", "v1"))
+        self.assertEqual(cli.build_parser().parse_args(["plan", "record", "--prune", "ms-a"]).prune, "ms-a")
+
+    def test_review_record_takes_the_verdict_and_the_optional_inputs(self):
+        args = cli.build_parser().parse_args(["review", "record", "ms-a", "--verdict", "needs_work", "--findings-file", "f.json", "--ratings-json", "{}"])
+        self.assertEqual((args.milestone, args.verdict, args.findings_file, args.ratings_json), ("ms-a", "needs_work", "f.json", "{}"))
+
+    def test_plan_record_misuse_is_a_usage_error(self):
+        for argv, text in (
+            (["plan", "record", *_ROOT_FLAGS], "give <plan item id>/<action id>"),
+            (["plan", "record", "ITEM", "--outcome", "done", *_ROOT_FLAGS], "is not <plan item id>/<action id>"),
+            (["plan", "record", "ITEM/a01", *_ROOT_FLAGS], "--outcome is required"),
+            (["plan", "record", "ITEM/a01", "--at-deploy", *_ROOT_FLAGS], "needs --env"),
+            (["plan", "record", "ITEM/a01", "--outcome", "done", "--env", "prod", *_ROOT_FLAGS], "go with --at-deploy"),
+            (["plan", "record", "--prune", "ms-a", "ITEM/a01", *_ROOT_FLAGS], "--prune takes a milestone id and nothing else"),
+            (["plan", "record", "ITEM/a01", "--outcome", "done", "--note", "x" * 201, *_ROOT_FLAGS], "at most 200"),
+        ):
+            code, _, err = self._run_cli(argv)
+            self.assertEqual(code, 2, err)
+            self.assertIn(text, err)
+
+    def test_the_groups_need_their_subcommand(self):
+        for group in ("plan", "review"):
+            code, _, _ = self._run_cli([group])
+            self.assertEqual(code, 2)
+
+    def test_review_record_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["review", "record", "ms-a", "--verdict", "verified", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
 if __name__ == "__main__":
     unittest.main()

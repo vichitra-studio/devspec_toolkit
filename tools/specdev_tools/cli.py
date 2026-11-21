@@ -609,6 +609,9 @@ def build_parser() -> _SpecdevParser:
     # --- third-party commands (pin, check) ---
     from .thirdparty.commands import add_thirdparty_parsers
     add_thirdparty_parsers(sub)
+    # --- lifecycle commands (plan record, review record) ---
+    from .lifecycle.commands import add_lifecycle_parsers
+    add_lifecycle_parsers(sub)
     # `stale`, `coverage` and `step ready` read the coverage gaps; the role gap provider they ask is installed by a call.
     from .validation.graph_checks import install_gap_provider
     install_gap_provider()

@@ -75,7 +75,7 @@ def test_register_check_runs_once_and_keeps_order(tmp_path: Path, registered_che
     host = step_gate_host(tmp_path / "host")
     _errors, context = run_spec_check_json(str(ROOT), str(host / "spec"), git_root=str(host), spec_root=str(host / "spec"))
     assert calls == [str(host / "spec")]
-    assert list(context["checks"])[-3:] == ["open-items", "frozen-plans", "probe-check"]
+    assert list(context["checks"])[-4:] == ["open-items", "frozen-plans", "plan-records", "probe-check"]
 
 
 def test_register_check_refuses_a_name_that_is_registered(registered_checks: None) -> None:

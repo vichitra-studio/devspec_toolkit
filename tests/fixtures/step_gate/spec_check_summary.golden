@@ -1,4 +1,4 @@
-spec-check: 28 checks run, 25 errors, 7 warnings
+spec-check: 29 checks run, 25 errors, 7 warnings
 
   [PASS] schema-validation              0 errors  0 warnings
   [FAIL] toolkit-version                1 errors  0 warnings
@@ -28,4 +28,5 @@ spec-check: 28 checks run, 25 errors, 7 warnings
   [PASS] removal-rules                  0 errors  0 warnings
   [PASS] open-items                     0 errors  0 warnings
   [PASS] frozen-plans                   0 errors  0 warnings
+  [PASS] plan-records                   0 errors  0 warnings
 

@@ -23,7 +23,8 @@ from specdev_tools.trace.hashing import compute_all
 
 from .context import GraphCheckContext
 from specdev_tools.graph.names import (
-    API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINT, CONSTRAINS, DERIVES_FROM, OBLIGATION_ROLES, PROVIDED_BY, REFINES, RELIES_ON, RULE, THIRD_PARTY,
+    API, CAPABILITY, COMPONENT, CONNECTION, CONSTRAINS, CONSTRAINT, DERIVES_FROM, OBLIGATION_ROLES, PAUSED_DISPOSITIONS, PROVIDED_BY,
+    REFINES, RELIES_ON, RULE, THIRD_PARTY,
 )
 
 EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", RULE, "threat", "edge-case"})
@@ -31,8 +32,6 @@ EVIDENCE_KINDS = frozenset({"environment", "gate", "secret", RULE, "threat", "ed
 COARSE_KINDS = frozenset({"scope-item", "risk", CAPABILITY})
 COMPONENT_USE_FIELDS = frozenset({PROVIDED_BY, CONSTRAINS})
 RELIES_ON_FIELDS = frozenset({RELIES_ON})
-PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
-"""``disposition.value`` of a task that is postponed or cancelled: its criteria give no coverage (DOC L684)."""
 PIN_OK = "OK"
 PIN_MISMATCH = "MISMATCH"
 

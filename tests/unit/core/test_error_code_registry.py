@@ -45,8 +45,7 @@ REGISTERED_WITHOUT_EMITTER = {
     # Milestone lifecycle (M8): registered once by the lifecycle core; the bundle that writes the emitter deletes its line.
     "E800", "E802",
     "E810", "E811", "E812", "E813", "E814",
-    "E820", "E821", "E822", "E823", "E824", "E830",
-    "W825", "W826",
+    "E824", "E830",
 }
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic

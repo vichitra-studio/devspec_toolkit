@@ -27,6 +27,7 @@ from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
 from ..lifecycle.frozen import check_frozen_plans
+from ..lifecycle.plan_records import check_plan_records
 from ..proof.built_evidence import bind_proof_seams
 from .graph_checks.removal_rules import check_removal_rules
 from ..trace.computed_fields import check_stored_computed
@@ -335,6 +336,16 @@ def _check_frozen_plans(ctx: CheckContext) -> dict[str, Any]:
     return check_result(list(report.errors))
 
 
+def _check_plan_records(ctx: CheckContext) -> dict[str, Any]:
+    """The ``plan-records`` check (W825, W826): SKIP with no graph, or when the spec folder has no trace lock."""
+    if ctx.check_graph is None:
+        return skip("no spec graph")
+    lock, lock_error = ctx.lock_state
+    if lock_error is not None or not os.path.isfile(lock_path(ctx.effective_spec_root)):
+        return skip("no trace lock")
+    return check_result(check_plan_records(ctx.check_graph, lock, ctx.effective_spec_root))
+
+
 register_check("schema-validation", _check_schema_validation)
 register_check("toolkit-version", _check_toolkit_version_result)
 register_check("spec-quality-lint", _check_spec_quality_lint)
@@ -357,6 +368,7 @@ graph_checks.register_graph_check("milestone-numbers", check_milestone_numbers)
 graph_checks.register_graph_check("removal-rules", check_removal_rules)
 register_check("open-items", _check_open_items)
 register_check("frozen-plans", _check_frozen_plans, default_owner=STEP_PREFIX + "16")
+register_check("plan-records", _check_plan_records, default_owner=STEP_PREFIX + "16")
 
 
 def warn_ignored_promotions() -> None:

@@ -44,11 +44,15 @@ ROADMAP_MILESTONE = "roadmap-milestone"
 NFR = "nfr"
 ENVIRONMENT = "environment"
 BINDING_KIND = "verification-record"
+PLAN_ITEM = "plan-item"
+EXECUTION_RECORD = "execution-record"
+AT_DEPLOY_RECORD = "at-deploy-record"
 
 # values of a field
 MERGE: Final = "merge"  # the merge-driver mode
 MANUAL_MODE = "manual"  # ``mode`` of a fixture that a person attests
 REVIEW_ENFORCER = "review"  # ``enforcer`` of a rule that a review enforces
+PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})  # ``disposition.value`` of a roadmap task that is postponed or cancelled: its criteria give no coverage
 
 # roles
 VERIFIER_ROLE = "verifier"

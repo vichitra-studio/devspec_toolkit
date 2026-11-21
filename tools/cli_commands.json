@@ -169,6 +169,12 @@
       "path": "node status"
     },
     {
+      "path": "plan"
+    },
+    {
+      "path": "plan record"
+    },
+    {
       "path": "prompt-context"
     },
     {
@@ -179,6 +185,12 @@
     },
     {
       "path": "registry-generate"
+    },
+    {
+      "path": "review"
+    },
+    {
+      "path": "review record"
     },
     {
       "path": "seed-index"
