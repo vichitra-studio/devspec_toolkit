@@ -17,7 +17,7 @@ from unit.lifecycle._record_support import alpha_binding, author, closed_row, pl
 from unit.lifecycle._support import MILESTONE, PLAN
 from unit.proof._closed import closed_example, reword_criterion
 from unit.proof._support import CRITERION, FIXTURE, run
-from unit.verify._support import edit_doc
+from unit.verify._support import commit_all, edit_doc
 from unit._ambiguity_support import unified_item
 
 pytestmark = pytest.mark.usefixtures("author")
@@ -241,3 +241,40 @@ def test_the_open_items_of_a_closed_plan_are_left_out_by_status_as_by_spec_check
     closed_row(host)
     assert listed() == ({}, [])
     assert _sections(host)["open_items"].lines == ("none",)
+
+
+def test_status_milestone_of_a_done_row_runs_no_close_gate_and_says_nothing_of_the_code_of_now(tmp_path: Path) -> None:
+    """Ruling L33: a closed milestone stays closed; the dry run of the gate is for a milestone that can still close."""
+    host = ready_host(tmp_path)
+    closed_row(host)
+    edit_doc(host, PLAN, lambda document: document["plan"].update(ambiguities=[unified_item("amb-token-store", about=["tc-confirm-expired-token"])]))
+    code, out, err = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0, err
+    assert f"milestone {MILESTONE}: done" in out and "open items: 0" in out and "close gate" not in out and "E632" not in out
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+    document = json.loads(out)
+    assert code == 0 and document["status"] == "done" and document["close_gate"] is None and document["open_items"] == []
+    (host / "src" / "after_the_close.py").write_text("# a later commit\n", encoding="utf-8")
+    commit_all(host, "code after the close")
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0 and "close gate" not in out and "E811" not in out and "STALE_TREE" not in out
+
+
+@pytest.mark.parametrize("status", ["in_progress", "deferred"])
+def test_status_milestone_of_a_row_that_can_still_close_keeps_the_dry_run(tmp_path: Path, status: str) -> None:
+    host = ready_host(tmp_path)
+    if status == "deferred":
+        set_row(host, "deferred", deferral_reason="waits")
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0 and f"milestone {MILESTONE}: {status}" in out and "close gate (dry run):" in out
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+    assert set(json.loads(out)["close_gate"]) == {"passes", "errors", "notes"}
+
+
+def test_a_legacy_item_with_status_resolved_is_not_listed_by_status(tmp_path: Path) -> None:
+    host = ready_host(tmp_path)
+    legacy = {"id": "amb-old-open", "description": "an old question", "severity": "medium", "status": "open", "impact": "none"}
+    edit_doc(host, PLAN, lambda document: document["plan"].update(ambiguities=[legacy, {**legacy, "id": "amb-old-resolved", "status": "resolved"}]))
+    assert _sections(host)["open_items"].data == {"step:16a": ["amb-old-open"]}
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+    assert code == 0 and json.loads(out)["open_items"] == ["amb-old-open"]

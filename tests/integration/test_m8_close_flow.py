@@ -325,7 +325,7 @@ def test_the_life_of_a_milestone_through_the_commands(template: Path, baseline: 
     refused(host, "E801", "milestone", "close", MS)
     assert (host / PLAN).read_bytes() == plan_before and row(host) == closed_row, "step 10: nothing was written"
     out = run(host, "status", "--milestone", MS)
-    assert f"milestone {MS}: done" in out and "close gate (dry run): passes" in out, "step 10: status says the milestone is done"
+    assert f"milestone {MS}: done" in out and "close gate" not in out, "step 10: status says the milestone is done and runs no gate (ruling L33)"
     edit_doc(host, "impl_context/ms_account_recovery_plan.json", lambda document: document["plan"]["summary"].update(functional_summary="Edited after the close."))
     out = run(host, "spec-check", str(host / "spec"), want=1)
     assert "E827" in out and "[FAIL] frozen-plans" in out, "step 10: a hand edit of the frozen plan is E827"

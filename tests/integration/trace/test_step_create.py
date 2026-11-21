@@ -354,3 +354,14 @@ def test_step_create_16a_dry_run_writes_nothing(full: Host) -> None:
     document = json.loads(full.create_step_16("16a", "--dry-run", "--json", batch="second", draft=draft))
     assert document["written"] is False
     assert full.snapshot() == before and not (full.spec / "impl_context" / "ms_second_plan.json").exists()
+
+
+def test_step_create_16a_refuses_a_draft_of_another_schema(full: Host) -> None:
+    document = json.loads(_second_plan_draft(full).read_text(encoding="utf-8"))
+    document["$schema"] = "vc:16-anchor"
+    draft = full.drafts / "anchor_schema.json"
+    draft.write_text(json.dumps(document), encoding="utf-8")
+    before = full.snapshot()
+    (error,) = json.loads(full.create_step_16("16a", "--json", batch="second", draft=draft, code=1))["errors"]
+    assert error["code"] == "E767" and "the draft declares $schema 'vc:16-anchor'; the schema of step 16a is 'vc:16-impl-context'" in error["message"]
+    assert full.snapshot() == before and not (full.spec / "impl_context" / "ms_second_plan.json").exists()

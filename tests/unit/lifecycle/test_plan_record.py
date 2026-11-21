@@ -320,3 +320,26 @@ def test_prune_takes_a_milestone_id_and_nothing_else(tmp_path: Path) -> None:
         code, out, err = cli_run(host, "plan", "record", "--prune", MILESTONE, *extra)
         assert (code, out) == (2, "") and f"specdev plan record: error: --prune takes a milestone id and nothing else (also given: {named})" in err
     assert _plan_bytes(host) == before
+
+
+def test_prune_on_a_batch_id_is_answered_as_milestone_start_answers_it(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    before = _plan_bytes(host)
+    code, _, err = cli_run(host, "plan", "record", "--prune", "account_recovery")
+    assert code == 1 and "E803" in err and "account_recovery is a batch id" in err and "milestone-state --batch-id account_recovery" in err
+    assert "no plan names milestone" not in err and _plan_bytes(host) == before
+    code, _, err = cli_run(host, "plan", "record", "--prune", "ms-nope")
+    assert code == 1 and "E803" in err and "no plan names milestone ms-nope" in err
+    code, out, _ = cli_run(host, "plan", "record", "--prune", MILESTONE)
+    assert code == 0 and "no orphan records in impl_context/ms_account_recovery_plan.json" in out
+
+
+def test_the_record_of_a_deleted_item_is_e700_and_not_a_crash_or_a_w825(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    spec, repo, git = roots(host)
+    record_action(spec, repo, git, A01, "done")
+    edit_doc(host, PLAN, lambda document: document["plan"]["spec_alignment"]["checklist"].clear())
+    findings = check_plan_records(graph_of(host), read_lock(spec), spec)
+    assert [finding.code for finding in findings] == [] and not any(finding.code == "W825" for finding in findings)
+    code, out, err = cli_run(host, "spec-check", str(host / "spec"))
+    assert "fatal error" not in out + err and "E700" in out + err

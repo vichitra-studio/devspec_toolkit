@@ -20,12 +20,12 @@ You do not edit code, specs or the plan. You write a findings file (section 1); 
 - **Output:** the `review` block of the plan, written by `specdev review record` from the findings file and the verdict.
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
 
-Before you record `verified`, check that every task criterion of the milestone is realised by a plan item (`specdev trace --recipe 16c` lists them) and that no item is left unexecuted. A milestone with unrealised or unproven criteria MUST NOT be `verified`.
+Before a `verified` is recorded, check that every task criterion of the milestone is realised by a plan item (`specdev trace --recipe 16c` lists them) and that no item is left unexecuted. A milestone with unrealised or unproven criteria MUST NOT be `verified`.
 
 # Field Definitions & Rules (MANDATORY)
 
 ## 1. The findings file and `specdev review record`
-The reviewer agent writes its findings as a file under `.specdev/findings/` (`findings_<scope>_<round>_r<reviewer_id>.json`); the skill copies the milestone-wide one to `findings_<batch>_review_<round>.json`, the name `specdev milestone-state` reads; in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`). Who runs `specdev review record`: under `/specdev-trinity` the skill records the review from the converged findings file and the reviewer agent writes findings only; a person running 16c by hand, without the skill, runs `specdev review record` themselves:
+The reviewer agent writes its findings as a file under `.specdev/findings/` (`findings_<scope>_<round>_r<reviewer_id>.json`); the skill copies the milestone-wide one to `findings_<batch>_review_<round>.json`, the name `specdev milestone-state` reads; in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`). Who runs `specdev review record`: under `/specdev-trinity` the skill records the review from the converged findings file and the reviewer agent writes findings only; a person running 16c by hand, without the skill, runs `specdev review record` themselves. A findings file:
 
 ```json
 {
@@ -60,7 +60,7 @@ specdev review record <milestone-id> --verdict verified|needs_work|blocked|defer
   --findings-file .specdev/findings/<file>.json \
   [--next-actions TEXT] [--security-status green|red] [--ratings-json '{"spec_completeness":4,...}']
 ```
-It replaces the whole `review` block with this one verdict (no history), adds the time, and prints the plan's size before and after. `--ratings-json` is an object of all five ratings of section 2. It checks the input and not your judgement: it refuses an unknown verdict, a findings file that is invalid or names an unknown plan item (E823) and a closed milestone (E820), and accepts `verified` with a blocking finding. The rules of "Reviewer judgement" below are yours to apply. You never write `execution`, `review`, a time or a hash by hand; `semantic_review` and `delivery_status` are not written by `review record`, so report scope creep and delivery gaps as findings.
+It replaces the whole `review` block with this one verdict (no history), adds the time, and prints the plan's size before and after. `--ratings-json` is an object of all five ratings of section 2. The three optional flags are passed by whoever runs the command: in a manual run you set them as sections 2, 4 and 5 say; the skill passes none of them, so under `/specdev-trinity` the `review` block holds the findings, the verdict and the time, and what the flags would say (a security gap, the rule that held a `verified` back) is a finding in your file. It checks the input and not your judgement: it refuses an unknown verdict, a findings file that is invalid or names an unknown plan item (E823) and a closed milestone (E820), and accepts `verified` with a blocking finding. The rules of "Reviewer judgement" below are yours to apply. You never write `execution`, `review`, a time or a hash by hand; `semantic_review` and `delivery_status` are not written by `review record`, so report scope creep and delivery gaps as findings.
 
 ## 2. Ratings (the rubric)
 *   Provide a 0-5 integer for all five: `spec_completeness` (are all criteria realised? are items verbose and atomic?), `code_quality`, `tests_completeness`, `docs_completeness`, `metadata_usage` (are references and traceability used well? do all links resolve?).
@@ -93,7 +93,7 @@ Allowed verdicts: `verified`, `needs_work`, `blocked`, `deferred` (the `review.v
 | `deferred` | Intentionally postponed; scope moved out of current cycle | 0-3 |
 
 ### Reviewer judgement (the tool does not enforce these)
-`review record` checks input only. Each rule below is reviewer judgement: apply it yourself, and say in `--next-actions` which one held a `verified` back.
+`review record` checks input only. Each rule below is reviewer judgement: apply it yourself, and say which one held a `verified` back: as a finding, and in a manual run also in `--next-actions`.
 1.  **Blocking finding forbids `verified`** — reviewer judgement: with a `blocking` (P0) finding the verdict is not `verified`.
 2.  **Security RED forbids `verified`** — reviewer judgement: with `--security-status red` the verdict is not `verified`.
 3.  **Rating evidence (ENF-140)** — reviewer judgement: a rating of 3 or less cites the evidence that lowers it; a rating above 3 is not given while any evidence is missing, and 5 not without verified security checks.
@@ -164,7 +164,7 @@ Before recording, verify:
 - [ ] Every finding includes a specific `file:line` location (no vague "the code has issues")
 - [ ] The verdict is based on measurable criteria — the criteria's text and the test runs — not subjective quality judgment
 - [ ] Every blocking or major finding has a `suggested_fix` that is specific and actionable (not "fix the issue")
-- [ ] The rules of "Reviewer judgement" held for the verdict you record
+- [ ] The rules of "Reviewer judgement" held for the verdict that is recorded
 
 ## Negative Constraints
 

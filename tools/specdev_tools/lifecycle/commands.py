@@ -170,10 +170,10 @@ def _emit(args: argparse.Namespace, document: dict[str, Any], text: str) -> None
         print(text)
 
 
-def _plan_record(args: argparse.Namespace, address: Address | None) -> None:
+def _plan_record(args: argparse.Namespace, address: Address | None, graph: Graph) -> None:
     spec_root, repo_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
     if address is None:
-        pruned = prune_records(spec_root, repo_root, args.prune)
+        pruned = prune_records(spec_root, repo_root, milestone_id_of(graph, spec_root, args.prune))
         _emit(args, _prune_json(pruned), _prune_text(pruned))
     elif args.at_deploy:
         deployed = record_at_deploy(spec_root, repo_root, git_root, address, args.env, args.outcome or "done", args.tag)
@@ -190,8 +190,8 @@ def run_plan_record(args: argparse.Namespace) -> int:
         return usage_error("plan record", problem)
     address = parse_address(args.address) if args.address else None
 
-    def run(_graph: object) -> int:
-        _plan_record(args, address)
+    def run(graph: Graph) -> int:
+        _plan_record(args, address, graph)
         return 0
 
     return run_on_graph("plan record", args, run)
@@ -206,10 +206,11 @@ def _review_text(result: ReviewResult) -> str:
 
 def run_review_record(args: argparse.Namespace) -> int:
     """Run ``specdev review record`` on the parsed *args*; returns the exit code (0 written, 1 refused)."""
-    def run(_graph: object) -> int:
-        request = ReviewRequest(args.milestone, args.verdict, args.findings_file, args.next_actions, args.security_status, args.ratings_json)
-        result = record_review(os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), request)
-        document = {"command": "review record", "milestone": args.milestone, "plan": result.plan, "review": result.block, "bytes_before": result.bytes_before, "bytes_after": result.bytes_after}
+    def run(graph: Graph) -> int:
+        spec_root = os.path.abspath(args.spec_root)
+        request = ReviewRequest(milestone_id_of(graph, spec_root, args.milestone), args.verdict, args.findings_file, args.next_actions, args.security_status, args.ratings_json)
+        result = record_review(spec_root, os.path.abspath(args.repo_root), request)
+        document = {"command": "review record", "milestone": request.milestone, "plan": result.plan, "review": result.block, "bytes_before": result.bytes_before, "bytes_after": result.bytes_after}
         _emit(args, document, _review_text(result))
         return 0
 

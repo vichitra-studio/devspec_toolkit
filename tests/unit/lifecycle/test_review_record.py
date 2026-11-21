@@ -195,3 +195,15 @@ def test_plan_size_report_is_printed(tmp_path: Path) -> None:
     after = len((host / "spec" / PLAN).read_bytes())
     assert code == 0 and "verdict deferred" in output
     assert f"plan file: {before} bytes before, {after} bytes after" in output
+
+
+def test_review_record_on_a_batch_id_is_answered_as_milestone_start_answers_it(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    before = (host / "spec" / PLAN).read_bytes()
+    code, _, err = cli_run(host, "review", "record", "account_recovery", "--verdict", "verified")
+    assert code == 1 and "E803" in err and "account_recovery is a batch id" in err and "milestone-state --batch-id account_recovery" in err
+    assert "no plan names milestone" not in err and (host / "spec" / PLAN).read_bytes() == before
+    code, _, err = cli_run(host, "review", "record", "ms-nope", "--verdict", "verified")
+    assert code == 1 and "E803" in err and "no plan names milestone ms-nope" in err
+    code, out, _ = cli_run(host, "review", "record", MILESTONE, "--verdict", "verified")
+    assert code == 0 and "verdict verified" in out

@@ -33,7 +33,8 @@ def is_frozen(spec_root: str | Path, milestone_id: str) -> bool:
 def is_frozen_path(spec_root: str | Path, plan_path: Path) -> bool:
     """``is_frozen`` for the plan file *plan_path*, from its ``milestone`` key; a file with no usable key is not frozen.
 
-    The provider ``check_open_items`` takes is ``Callable[[Path], bool]``: pass ``functools.partial(is_frozen_path, spec_root)``.
+    Raises:
+        FindingError: E801 for a row with an unknown status (as ``is_frozen``).
     """
     milestone_id = milestone_key(plan_path)
     return milestone_id is not None and is_frozen(spec_root, milestone_id)

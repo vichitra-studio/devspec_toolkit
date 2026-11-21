@@ -7,7 +7,8 @@ gate (M9) re-registers ``MERGE_RELEASE_SECTION`` and ``PRODUCTION_SECTION``, whi
 then.  A section function gets a ``StatusContext`` and returns a ``Section``.
 
 ``milestone_view`` is the view of one milestone that ``status --milestone`` and ``milestone sign-off`` print: the code tree,
-the proof of each criterion, the manual share, what is deferred or won't-do, what is open, and the close gate as a dry run.
+the proof of each criterion, the manual share, what is deferred or won't-do, what is open, and the close gate as a dry run (not for a ``done`` row: a closed
+milestone stays closed, and what changed after the close is ``spec-check``'s to report).
 Every question about several nodes is asked node by node: a node whose stage cannot be told (E334) is reported as that and the
 others are still answered.
 """
@@ -26,7 +27,7 @@ from ..core.plan_files import find_plan
 from ..core.step_order import load_step_order
 from ..graph.gitview import read_seed_texts
 from ..graph.model import Graph, Node
-from ..graph.names import FIXTURE, ROW_IN_PROGRESS, RULE, VERIFIED_BY, link_targets
+from ..graph.names import FIXTURE, ROW_DONE, ROW_IN_PROGRESS, RULE, VERIFIED_BY, link_targets
 from ..graph.ownership import CLOSE_OWNER
 from ..graph.stages import STAGES
 from ..proof.proof import PROVEN, STAGE_UNKNOWN, UNPROVEN, is_attested_by_person, proof, verifier_proof
@@ -244,7 +245,7 @@ class MilestoneView:
     open_items: tuple[str, ...]
     items_not_executed: tuple[str, ...]
     proof_owed_later: tuple[str, ...]
-    report: close_gate.GateReport
+    report: close_gate.GateReport | None
     warnings: tuple[str, ...]
 
     @property
@@ -306,7 +307,7 @@ def _not_executed(graph: Graph, ctx: ProofContext, lock: Lock | None, items: lis
 
 
 def milestone_view(sc: StatusContext, milestone_id: str) -> MilestoneView:
-    """The view of *milestone_id* (a canonical roadmap milestone id): the close gate is a dry run, nothing is written.
+    """The view of *milestone_id* (a canonical roadmap milestone id): the close gate is a dry run (``report`` is ``None`` for a ``done`` row), nothing is written.
 
     Raises:
         FindingError: E800 when the anchor file has no row about it; E803 when no plan names the milestone; E801 for an unknown status; E520 once for host declarations that cannot be read.
@@ -318,8 +319,8 @@ def milestone_view(sc: StatusContext, milestone_id: str) -> MilestoneView:
     items = close_gate.plan_items(graph, milestone_id)
     in_scope = close_gate.in_scope_items(graph, items, scope)
     criteria = tuple(CriterionLine(node.id, task, _criterion_status(graph, sc.ctx, node)) for node, task in scope.criteria)
-    report = run_gate(graph, sc.ctx, sc.lock, milestone_id, sc.providers)
-    realised_only_paused = tuple(w.node_id for w in report.warnings if w.node_id)
+    report = None if row.status == ROW_DONE else run_gate(graph, sc.ctx, sc.lock, milestone_id, sc.providers)
+    realised_only_paused = tuple(w.node_id for w in report.warnings if w.node_id) if report is not None else ()
     plan_path = os.path.abspath(plan)
     open_items = tuple(item.id or "(no id)" for item in _live_open_items(spec_root, read_ambiguity_items(spec_root).items) if os.path.abspath(item.artifact_path) == plan_path)
     return MilestoneView(
@@ -356,9 +357,10 @@ def view_text(view: MilestoneView) -> str:
     out.append(f"plan items not executed: {len(view.items_not_executed)}" + (f" ({', '.join(view.items_not_executed)})" if view.items_not_executed else ""))
     out.append("proof owed at staging or prod: " + (", ".join(view.proof_owed_later) if view.proof_owed_later else "none"))
     out.extend(view.warnings)
-    out.append(f"close gate (dry run): {'passes' if view.report.passed else f'{len(view.report.errors)} error(s)'}")
-    out.extend(f"  {error.render()}" for error in view.report.errors)
-    out.extend(f"  note: {note}" for note in view.report.notes)
+    if view.report is not None:
+        out.append(f"close gate (dry run): {'passes' if view.report.passed else f'{len(view.report.errors)} error(s)'}")
+        out.extend(f"  {error.render()}" for error in view.report.errors)
+        out.extend(f"  note: {note}" for note in view.report.notes)
     return "\n".join(out)
 
 
@@ -372,7 +374,7 @@ def view_dict(view: MilestoneView) -> dict[str, Any]:
         "paused_tasks": [{"task": t.task_id, "disposition": t.disposition, "reason": t.reason} for t in view.paused],
         "paused_items": list(view.paused_items), "open_items": list(view.open_items), "items_not_executed": list(view.items_not_executed),
         "proof_owed_later": list(view.proof_owed_later), "warnings": list(view.warnings),
-        "close_gate": {"passes": view.report.passed, "errors": [{"code": e.code, "owner": e.owner, "message": e.message, "node": e.node_id} for e in view.report.errors], "notes": list(view.report.notes)},
+        "close_gate": None if view.report is None else {"passes": view.report.passed, "errors": [{"code": e.code, "owner": e.owner, "message": e.message, "node": e.node_id} for e in view.report.errors], "notes": list(view.report.notes)},
     }
 
 

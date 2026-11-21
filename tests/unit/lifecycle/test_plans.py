@@ -215,3 +215,12 @@ def test_a_plan_saved_under_another_name_is_not_a_missing_key(tmp_path: Path) ->
     assert "align" not in error.message and "impl_context/ms_*_plan.json" in error.message and "`milestone` key" in error.message
     named = saved.rename(saved.with_name("ms_a_plan.json"))
     assert plans.require_plan(tmp_path, "ms-a") == named
+
+
+def test_require_plan_with_one_plan_of_another_milestone_and_one_without_a_key_is_the_not_found_e803(tmp_path: Path) -> None:
+    _write_plan(tmp_path, "ms_keyed_plan.json", {"milestone": "ms-other", "plan": {}})
+    _write_plan(tmp_path, "ms_keyless_plan.json", {"plan": {}})
+    with pytest.raises(FindingError) as caught:
+        plans.require_plan(tmp_path, "ms-a")
+    assert caught.value.error.code == "E803" and caught.value.error.subcode == "MILESTONE_NOT_FOUND"
+    assert "no plan names milestone ms-a in its `milestone` key" in caught.value.error.message
