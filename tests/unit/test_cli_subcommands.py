@@ -657,5 +657,48 @@ class TestLifecycleCommandsHelp(_CliMixin, unittest.TestCase):
                 self.assertIn("specdev json patch|insert|delete --id", text)
 
 
+class TestSpecCheckMerge(_CliMixin, unittest.TestCase):
+    """``spec-check --merge``: the flag, ``--base-ref`` beside it, and what it does not combine with (WI-M9-01)."""
+
+    def _spy_run(self, argv: list[str]) -> tuple[int, str, dict[str, object]]:
+        """Run ``spec-check`` with *argv* on a spy for ``run_spec_check``; the exit code, stderr and the keywords the spy got."""
+        seen: dict[str, object] = {}
+
+        def spy(*_args: object, **kwargs: object) -> list[object]:
+            seen.update(kwargs)
+            return []
+
+        with patch("specdev_tools.validation.spec_check.run_spec_check", spy):
+            code, _, err = self._run_cli(["spec-check", "spec", "--repo-root", str(REPO_ROOT), *argv])
+        return code, err, seen
+
+    def test_merge_flag_parsed_and_passed_through(self):
+        parsed = cli.build_parser().parse_args(["spec-check", "spec"])
+        self.assertFalse(parsed.merge)
+        code, err, seen = self._spy_run(["--merge"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual((seen["merge"], seen["base_ref"]), (True, None))
+        _, _, plain = self._spy_run([])
+        self.assertEqual((plain["merge"], plain["base_ref"]), (False, None))
+
+    def test_base_ref_with_merge_is_accepted(self):
+        code, err, seen = self._spy_run(["--merge", "--base-ref", "origin/main"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual((seen["merge"], seen["base_ref"]), (True, "origin/main"))
+
+    def test_merge_with_step_or_paths_is_a_usage_error(self):
+        for flags in (["--step", "04"], ["--paths", "spec/04_fr_list.json"], ["--detail", "all"]):
+            with self.subTest(flags=flags):
+                code, err, seen = self._spy_run(["--merge", *flags])
+                self.assertEqual(code, 2)
+                self.assertIn("--merge cannot be combined with --step, --paths or --detail", err)
+                self.assertEqual(seen, {})
+
+    def test_base_ref_alone_is_still_a_usage_error_and_names_merge(self):
+        code, err, _ = self._spy_run(["--base-ref", "main"])
+        self.assertEqual(code, 2)
+        self.assertIn("apply only with --step or --paths (--base-ref also with --merge)", err)
+
+
 if __name__ == "__main__":
     unittest.main()

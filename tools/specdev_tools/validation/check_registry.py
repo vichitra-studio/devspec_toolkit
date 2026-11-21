@@ -17,10 +17,11 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from ..core.ambiguity_items import ItemsRead, read_ambiguity_items
-from ..core.errors import SpecError
+from ..core.errors import FindingError, SpecError
 from ..graph.gitview import host_root_of
 from ..graph.model import Graph
 from ..graph.ownership import OwnerContext, load_owner_context, owner_for
+from ..lifecycle.frozen import is_frozen_path
 from ..trace.lockfile import MERGE_CHECK_OWNER, Lock, LockError, read_lock
 from .linter_utils import build_lint_graph
 
@@ -100,6 +101,17 @@ class CheckContext:
     def effective_spec_root(self) -> str:
         """``--spec-root`` when given, else the spec folder."""
         return self.spec_root or self.spec_dir
+
+    def is_frozen_plan(self, plan_path: Path) -> bool:
+        """Whether the plan file *plan_path* is frozen: the anchor row of its milestone is ``done``.
+
+        The one frozen provider of the ``open-items`` check and of the merge gate.  A row that cannot be read is not frozen
+        here; the ``frozen-plans`` check reports its E801.
+        """
+        try:
+            return is_frozen_path(self.effective_spec_root, plan_path)
+        except FindingError:
+            return False
 
     @cached_property
     def root(self) -> Path:
@@ -213,7 +225,7 @@ def skip(reason: str) -> dict[str, Any]:
     return {"status": "SKIP", "reason": reason}
 
 
-def _with_default_owner(result: dict[str, Any], owner: str, context: OwnerContext) -> dict[str, Any]:
+def with_default_owner(result: dict[str, Any], owner: str, context: OwnerContext) -> dict[str, Any]:
     """*result* with an owner on each of its findings that has none.
 
     The owner of a finding is the one it carries; else the row of the ownership table for its code (*context*, asked
@@ -242,5 +254,5 @@ def run_registered_checks(ctx: CheckContext) -> OrderedDict[str, dict[str, Any]]
         raise RuntimeError("no check is registered: import specdev_tools.validation.spec_check, whose registration block registers the checks")
     checks: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for spec in CHECK_REGISTRY:
-        checks[spec.name] = _with_default_owner(spec.fn(ctx), spec.default_owner, ctx.owner_context)
+        checks[spec.name] = with_default_owner(spec.fn(ctx), spec.default_owner, ctx.owner_context)
     return checks

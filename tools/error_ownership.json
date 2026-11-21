@@ -33,9 +33,10 @@
       "owner": "consumer_step",
       "codes": [
         "E347",
-        "E348"
+        "E348",
+        "E914"
       ],
-      "authority": "DOC L824-840 row 4; DS L420"
+      "authority": "DOC L824-840 row 4; DS L420; M9 WI-M9-03 (E914: the release gate re-check); DOC L830"
     },
     {
       "class": "missing-verifier",
@@ -119,9 +120,10 @@
         "E811",
         "E812",
         "E813",
-        "E814"
+        "E814",
+        "E913"
       ],
-      "authority": "DOC L824-840 row 14; DS L420"
+      "authority": "DOC L824-840 row 14; DS L420; M9 WI-M9-03 (E913: the release gate re-states E814); DOC L806, L839"
     },
     {
       "class": "release-gate-failure",
@@ -129,9 +131,19 @@
       "codes": [
         "E343",
         "E344",
-        "E830"
+        "E830",
+        "E920",
+        "E921",
+        "E923",
+        "E924",
+        "E928",
+        "W933",
+        "W934",
+        "W936",
+        "W937",
+        "W938"
       ],
-      "authority": "DOC L824-840 row 15; DS L402; DS L420"
+      "authority": "DOC L824-840 row 15; DS L402; DS L420; M9 WI-M9-03, -04, -07; DOC L806-807, L840; E921, E923, E924, E928 and the warnings are reporter-only (plan S-041)"
     },
     {
       "class": "glossary-canon-drift",
@@ -228,6 +240,15 @@
         "W826"
       ],
       "authority": "M8 WI-01"
+    },
+    {
+      "class": "merge-gate-failure",
+      "owner": "merge-check",
+      "codes": [
+        "E900",
+        "E901"
+      ],
+      "authority": "M9 WI-M9-01, WI-M9-02; DOC L804, L838"
     }
   ]
 }

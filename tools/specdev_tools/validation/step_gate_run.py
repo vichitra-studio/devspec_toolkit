@@ -36,7 +36,8 @@ from .touched_steps import (
 )
 
 NO_STEP_NOTE = "no step gated: no listed path maps to a step that has an artifact"
-GATE_ONLY_USAGE = "spec-check: --base-ref and --detail apply only with --step or --paths"
+GATE_ONLY_USAGE = "spec-check: --base-ref and --detail apply only with --step or --paths (--base-ref also with --merge)"
+MERGE_ALONE_USAGE = "spec-check: --merge cannot be combined with --step, --paths or --detail"
 EMPTY_BASE_REF_USAGE = "spec-check: --base-ref needs a ref name, not an empty one"
 
 
@@ -54,15 +55,22 @@ class StepGateRun:
 
 
 def gate_usage_error(
-    *, steps: Sequence[str] | None, paths: Sequence[str] | None, base_ref: str | None, detail: str | None
+    *,
+    steps: Sequence[str] | None,
+    paths: Sequence[str] | None,
+    base_ref: str | None,
+    detail: str | None,
+    merge: bool = False,
 ) -> str | None:
-    """The usage error for a flag combination of ``spec-check`` that the step gate refuses, or ``None``.
+    """The usage error for a flag combination of ``spec-check`` that its modes refuse, or ``None``.
 
-    ``--step`` and ``--paths`` (*steps*, *paths*) start the gate; ``--base-ref`` and ``--detail`` need them, and
-    ``--base-ref`` names a ref.
+    ``--step`` and ``--paths`` (*steps*, *paths*) start the step gate and ``--merge`` (*merge*) the merge gate; the two
+    do not combine.  ``--base-ref`` needs one of the three, ``--detail`` the step gate, and ``--base-ref`` names a ref.
     """
     gating = steps is not None or paths is not None
-    if not gating and (base_ref is not None or detail is not None):
+    if merge and (gating or detail is not None):
+        return MERGE_ALONE_USAGE
+    if not gating and not merge and (base_ref is not None or detail is not None):
         return GATE_ONLY_USAGE
     if base_ref == "":
         return EMPTY_BASE_REF_USAGE

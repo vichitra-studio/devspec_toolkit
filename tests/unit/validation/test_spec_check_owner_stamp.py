@@ -14,9 +14,9 @@ from specdev_tools.validation import check_registry
 from specdev_tools.validation.check_registry import (
     CheckContext,
     CheckSpec,
-    _with_default_owner,
     register_check,
     run_registered_checks,
+    with_default_owner,
 )
 
 from ..trace._lock_support import EXAMPLE_HOST
@@ -34,7 +34,7 @@ def _finding(code: str, owner: str | None = None) -> SpecError:
 
 
 def _owners(errors: list[SpecError], context: OwnerContext) -> list[str | None]:
-    stamped = _with_default_owner({"status": "FAIL", "errors": errors}, DEFAULT, context)
+    stamped = with_default_owner({"status": "FAIL", "errors": errors}, DEFAULT, context)
     return [error.owner for error in stamped["errors"]]
 
 
@@ -61,7 +61,7 @@ def test_a_finding_that_carries_an_owner_keeps_it() -> None:
 
 def test_a_result_with_no_findings_is_returned_as_it_is() -> None:
     result = {"status": "PASS"}
-    assert _with_default_owner(result, DEFAULT, _context("fixed_step:04", "E901")) is result
+    assert with_default_owner(result, DEFAULT, _context("fixed_step:04", "E901")) is result
 
 
 @pytest.mark.parametrize(("rule", "owner"), [("fixed_step:04", "step:04"), ("merge-check", "merge-check")])

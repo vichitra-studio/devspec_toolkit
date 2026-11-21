@@ -20,14 +20,14 @@ from pathlib import Path
 from typing import Any
 
 from ..core.config import reset_config
-from ..core.errors import FindingError, SpecError
+from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.check import run_graph_check
 from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
-from ..lifecycle.frozen import check_frozen_plans, is_frozen_path
+from ..lifecycle.frozen import check_frozen_plans
 from ..lifecycle.plan_records import check_plan_records
 from ..proof.built_evidence import bind_proof_seams
 from .graph_checks.removal_rules import check_removal_rules
@@ -45,6 +45,7 @@ from .check_registry import (
     register_check,
     run_registered_checks,
 )
+from .merge_gate import run_merge_checks
 from .open_items import check_open_items
 from .validators.step_14_milestones import check_milestone_numbers
 
@@ -324,13 +325,7 @@ def _check_trace_lock(ctx: CheckContext) -> dict[str, Any]:
 
 
 def _check_open_items(ctx: CheckContext) -> dict[str, Any]:
-    def frozen(plan_path: Path) -> bool:
-        try:
-            return is_frozen_path(ctx.effective_spec_root, plan_path)
-        except FindingError:
-            return False  # a row that cannot be read is not frozen here; the `frozen-plans` check reports its E801
-
-    return check_result(check_open_items(ctx.spec_dir, gate="step", frozen=frozen, read=ctx.ambiguity_read))
+    return check_result(check_open_items(ctx.spec_dir, gate="step", frozen=ctx.is_frozen_plan, read=ctx.ambiguity_read))
 
 
 def _check_frozen_plans(ctx: CheckContext) -> dict[str, Any]:
@@ -396,8 +391,13 @@ def run_checks(
     project_canon_dir: str | None = None,
     *,
     quiet: bool = False,
+    merge: bool = False,
+    base_ref: str | None = None,
 ) -> OrderedDict[str, dict[str, Any]]:
     """Run all applicable checks and return per-check results.
+
+    With *merge* the three merge checks of ``validation.merge_gate`` follow the registered ones; *base_ref* is the
+    ``--base-ref`` they measure "closed by this branch" from (``merge_gate.resolve_merge_base``).
 
     Each value is either:
     - ``{"status": "SKIP", "reason": "..."}`` for skipped checks, or
@@ -413,7 +413,10 @@ def run_checks(
     )
     if not quiet:
         warn_ignored_promotions()
-    return run_registered_checks(ctx)
+    checks = run_registered_checks(ctx)
+    if merge:
+        checks.update(run_merge_checks(ctx, base_ref))
+    return checks
 
 
 def check_findings(checks: Mapping[str, dict[str, Any]]) -> list[SpecError]:
@@ -439,13 +442,16 @@ def run_spec_check(
     git_root: str | None = None,
     spec_root: str | None = None,
     project_canon_dir: str | None = None,
+    *,
+    merge: bool = False,
+    base_ref: str | None = None,
 ) -> list[SpecError]:
-    """Run all applicable checks and return combined deduplicated errors.
+    """Run all applicable checks and return combined deduplicated errors; *merge* and *base_ref* as in ``run_checks``.
 
     Prints a per-check summary to stderr before returning.
     """
     reset_config()
-    checks = run_checks(repo_root, spec_dir, git_root, spec_root, project_canon_dir=project_canon_dir)
+    checks = run_checks(repo_root, spec_dir, git_root, spec_root, project_canon_dir=project_canon_dir, merge=merge, base_ref=base_ref)
     _print_summary(checks)
     return _collect_errors(checks)
 
@@ -456,10 +462,13 @@ def run_spec_check_json(
     git_root: str | None = None,
     spec_root: str | None = None,
     project_canon_dir: str | None = None,
+    *,
+    merge: bool = False,
+    base_ref: str | None = None,
 ) -> tuple[list[SpecError], dict[str, Any]]:
-    """Run all checks and return (errors, json_context) for ``_json_exit``."""
+    """Run all checks and return (errors, json_context) for ``_json_exit``; *merge* and *base_ref* as in ``run_checks``."""
     reset_config()
-    checks = run_checks(repo_root, spec_dir, git_root, spec_root, project_canon_dir=project_canon_dir)
+    checks = run_checks(repo_root, spec_dir, git_root, spec_root, project_canon_dir=project_canon_dir, merge=merge, base_ref=base_ref)
     checks_summary: dict[str, Any] = {}
     for name, info in checks.items():
         if info.get("status") == "SKIP":

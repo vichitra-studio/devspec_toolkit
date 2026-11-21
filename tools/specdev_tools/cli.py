@@ -317,7 +317,8 @@ def build_parser() -> _SpecdevParser:
     sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
     from .validation.step_gate_report import DETAIL_CHOICES
 
-    sc.add_argument("--base-ref", default=None, help="With --step or --paths: the base ref; the baseline is its merge-base with HEAD (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master)")
+    sc.add_argument("--merge", action="store_true", help="The merge gate: also fail on open items (E631), on a third-party pin that differs from its source and on a failing dev or CI binding of a milestone this branch closes (run now, nothing recorded); not with --step, --paths or --detail")
+    sc.add_argument("--base-ref", default=None, help="With --step or --paths (or --merge): the base ref; the baseline is its merge-base with HEAD (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master); with --merge a commit id this clone lacks (the null id of a first push) means the first parent of HEAD")
     sc.add_argument("--detail", choices=DETAIL_CHOICES, default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
 
     rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
@@ -1997,7 +1998,7 @@ def main():
         from .core.errors import FindingError
         from .validation.step_gate_run import gate_usage_error
         usage = gate_usage_error(
-            steps=args.steps, paths=args.paths, base_ref=args.base_ref, detail=args.detail,
+            steps=args.steps, paths=args.paths, base_ref=args.base_ref, detail=args.detail, merge=args.merge,
         )
         if usage:
             p.error(usage)
@@ -2006,11 +2007,17 @@ def main():
         try:
             if args.json_output:
                 from .validation.spec_check import run_spec_check_json
-                errs, ctx = run_spec_check_json(repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir)
+                errs, ctx = run_spec_check_json(
+                    repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir,
+                    merge=args.merge, base_ref=args.base_ref,
+                )
                 _json_exit(errs, "spec-check", extra_context=ctx)
             else:
                 from .validation.spec_check import run_spec_check
-                errs = run_spec_check(repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir)
+                errs = run_spec_check(
+                    repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir,
+                    merge=args.merge, base_ref=args.base_ref,
+                )
                 _print_and_exit_if_errors(errs)
         except FindingError as exc:
             _refuse_spec_check(exc.error, args.json_output)

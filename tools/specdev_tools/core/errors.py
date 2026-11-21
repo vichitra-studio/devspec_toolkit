@@ -278,7 +278,39 @@ ERROR_CODES = {
     "E749": "SEED_LINK_NOT_ROUTED",
     "E752": "NODE_ID_IN_PROSE",
     "E882": "MIGRATION_BASELINE_NOT_REATTESTED",
+    # Merge gate (900 to 901): findings of ``spec-check --merge`` (owner merge-check).
+    "E900": "MERGE_BASE_UNRESOLVED",
+    "E901": "MERGE_BINDING_FAILED",
+    # Release (910 to 914, 920 to 928): ``specdev release`` and ``release rollback`` refuse with E910 to E912 and E925 to
+    # E927 (command usage errors, no owner).  The release gate reports E913 and E914 (re-checks of the close gate's and
+    # the consumer step's classes: owners close-gate and consumer_step), E920 and E928 (owner release-gate); the
+    # production-deploy gate of ``release check --stage prod`` reports E921, E923 and E924 (owner release-gate).
+    "E910": "RELEASE_REPO_DIRTY",
+    "E911": "RELEASE_TAG_PATTERN_UNDECLARED",
+    "E912": "RELEASE_TAG_INVALID",
+    "E913": "RELEASE_MILESTONE_UNSIGNED",
+    "E914": "RELEASE_OBLIGATION_NOT_BUILT",
+    "E920": "RELEASE_PREVIOUS_UNVERIFIED",
+    "E921": "PROD_TAG_UNRESOLVED",
+    "E923": "PROD_DELIVERY_NOT_BUILT",
+    "E924": "PROD_RELIEVED_NODE_FAILS",
+    "E925": "ROLLBACK_TAG_UNKNOWN",
+    "E926": "ROLLBACK_REASON_EMPTY",
+    "E927": "ROLLBACK_ALREADY_RECORDED",
+    "E928": "RELEASE_UNREALISED_DESIGN_MILESTONE",
     "W720": "LINK_TO_DEPRECATED_NODE",
+    # Host install and release warnings (930 to 938; none is promotable).  W930, W931, W932 and W935 are strings in
+    # ``UpdateResult.warnings`` of ``specdev update`` (no owner); W933, W934 and W936 to W938 are findings of the release
+    # gate and of ``release check --stage prod`` (owner release-gate).
+    "W930": "HOST_TEMPLATE_DRIFT",
+    "W931": "HOST_INSTALL_REFUSED",
+    "W932": "HOST_RETIRED_COMMAND",
+    "W933": "RELEASE_SCOPE_LISTED",
+    "W934": "PROD_STAGING_SKIPPED",
+    "W935": "HOST_SETUP_UNDECLARED",
+    "W936": "RELEASE_STAGE_SKIPPED",
+    "W937": "RELEASE_NO_PREVIOUS",
+    "W938": "RELEASE_PREVIOUS_PREDATES_1_2_0",
     # Milestone lifecycle (8xx). E800 to E803, E820 to E824 are command refusals (no owner, no node; E820 is raised by the
     # plan and review writers, not by a validator).  E810 to E814 are the close gate's (owner close-gate) and E830 the
     # release gate's.  E827 is a finding of the ``frozen-plans`` check (owner step 16); W825 and W826 are findings of the
