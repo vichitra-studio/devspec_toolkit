@@ -48,7 +48,7 @@ ATTESTATION = {
     "git_author": {"name": "A Person", "email": "person@example.org"},
 }
 INSTALL_CHECK = {
-    "evidence_id": "evd-install-argon2-prod",
+    "evidence_id": "evd-argon2-prod-install",
     "type": "install-check",
     "about": ["tp-argon2"],
     "stage": "prod",
@@ -139,13 +139,13 @@ def _codes(spec: Path) -> list[tuple[str, str, str | None]]:
 
 def test_check_records_accepts_an_install_check_about_a_third_party(tmp_path: Path) -> None:
     spec = copy_example(tmp_path / "spec")
-    write_json(spec, "extras/verification/evd-install-argon2-prod.json", _file("vc:extras:evidence-record", INSTALL_CHECK))
+    write_json(spec, "extras/verification/evd-argon2-prod-install.json", _file("vc:extras:evidence-record", INSTALL_CHECK))
     graph = build_graph(str(spec), str(ROOT))
     assert check_records(str(spec), str(ROOT), graph) == []
     assert _codes(spec) == []
     dangling = {**INSTALL_CHECK, "about": ["tp-no-such-party"]}
-    write_json(spec, "extras/verification/evd-install-argon2-prod.json", _file("vc:extras:evidence-record", dangling))
-    assert _codes(spec) == [("graph", "E700", "evd-install-argon2-prod")]
+    write_json(spec, "extras/verification/evd-argon2-prod-install.json", _file("vc:extras:evidence-record", dangling))
+    assert _codes(spec) == [("graph", "E700", "evd-argon2-prod-install")]
 
 
 def test_lock_entry_target_containers_round_trips_and_is_optional() -> None:

@@ -34,7 +34,7 @@ VERIFICATION_SCHEMA = "vc:extras:verification-record"
 EVIDENCE_SCHEMA = "vc:extras:evidence-record"
 BINDING_PREFIX = "ver-"
 EVIDENCE_PREFIX = "evd-"
-INSTALL_CHECK_INFIX = "install-"
+INSTALL_CHECK_SUFFIX = "-install"
 BINDING_ID = re.compile(rf"^{re.escape(BINDING_PREFIX)}[a-z0-9]+(?:-[a-z0-9]+)*$")
 """The form of a binding id: ``ver-`` and a kebab-case name."""
 
@@ -54,7 +54,9 @@ def evidence_id(binding_id: str, stage: str) -> str:
 
 
 def install_check_id(third_party_id: str, env: str) -> str:
-    """The id of the install-check record of *third_party_id* for *env*: ``evd-install-``, the id without its prefix, then the environment.
+    """The id of the install-check record of *third_party_id* for *env*: ``evd-``, the id without its prefix, the environment, then ``-install``.
+
+    A run's evidence id ends in a stage and ``install`` is not a stage, so the two kinds of record never share a file.
 
     Raises:
         FindingError: E767 when *env* has no letter or digit to make an id from.
@@ -63,7 +65,7 @@ def install_check_id(third_party_id: str, env: str) -> str:
         slug = mint_slug(env, ())
     except ValueError as exc:
         raise refusal("E767", f"the environment '{env}' has no letter or digit to name the install-check record from; give --env a name such as prod") from exc
-    return f"{EVIDENCE_PREFIX}{INSTALL_CHECK_INFIX}{id_suffix(THIRD_PARTY, third_party_id)}-{slug}"
+    return f"{EVIDENCE_PREFIX}{id_suffix(THIRD_PARTY, third_party_id)}-{slug}{INSTALL_CHECK_SUFFIX}"
 
 
 @dataclass(frozen=True)
@@ -231,32 +233,9 @@ def write_binding(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     return _write_record(folder, repo_root, VERIFICATION_SCHEMA, item["verification_id"], item)
 
 
-_WAYS_OUT = {
-    RUN_TYPE: "run with another --stage (the file is named from the stage)",
-    "install-check": "give --env another name (the file is named from the environment)",
-}
-"""For the type of a write that meets a record of another type: the one way out that works, found by running both directions."""
-
-
-def _stored_type(path: str) -> str | None:
-    """The ``type`` of the one record of the evidence file at *path*; ``None`` when there is no such record (a file that holds none, or more than one, is overwritten like a corrupt one)."""
-    item = _only_record(path)
-    return item.get("type", RUN_TYPE) if item is not None else None
-
-
 def write_evidence(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     """Write (or replace) the evidence record *item* as ``<id>.json`` in *folder* (``records_folder``); returns the file name.
 
-    A record of another ``type`` than *item*'s is never replaced: a run, an install check and an attestation can share an id.
-    The caller holds the write lock.  Raises ``FindingError`` (E767) for that, and (E774) when *item* breaks the record schema;
-    nothing is written then.
+    The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
     """
-    wanted, stored = item.get("type", RUN_TYPE), _stored_type(os.path.join(folder, record_file(item["evidence_id"])))
-    if stored is not None and stored != wanted:
-        way_out = _WAYS_OUT.get(wanted)
-        raise refusal(
-            "E767",
-            f"{record_file(item['evidence_id'])} holds a record of type '{stored}' and this write has type '{wanted}', which would replace it"
-            + (f"; {way_out}" if way_out else ""),
-        )
     return _write_record(folder, repo_root, EVIDENCE_SCHEMA, item["evidence_id"], item)

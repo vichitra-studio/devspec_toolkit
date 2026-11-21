@@ -105,6 +105,14 @@ def test_constraint_not_built_when_the_pin_differs(tmp_path: Path) -> None:
     assert pin_matches(_ctx(host), graph_of(host).by_id[TP]) == "MISMATCH"
 
 
+def test_a_pin_source_keyed_by_an_older_id_is_read_for_the_renamed_third_party(tmp_path: Path) -> None:
+    host = _pinned_host(tmp_path)
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][1].update(third_party_id="tp-mailrelay-lib", aliases=[TP]))
+    assert pin_matches(_ctx(host), graph_of(host).by_id["tp-mailrelay-lib"]) == "OK"
+    write(host / CLIENT, CLIENT_TEXT.format("api-v9"))
+    assert pin_matches(_ctx(host), graph_of(host).by_id["tp-mailrelay-lib"]) == "MISMATCH"
+
+
 def test_constraint_pending_when_the_third_party_has_no_source(tmp_path: Path) -> None:
     host = _pinned_host(tmp_path, declared=False)
     assert pin_matches(_ctx(host), graph_of(host).by_id[TP]) == "UNKNOWN"

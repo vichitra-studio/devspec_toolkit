@@ -10,8 +10,6 @@ from specdev_tools.core.errors import FindingError
 from specdev_tools.core.host_declarations import HostDeclarations, PinSource
 from specdev_tools.thirdparty.check import check_installed, check_pins, write_install_checks
 from specdev_tools.verify.installed_versions import installed_overrides
-from specdev_tools.verify.records import records_folder, write_binding
-from specdev_tools.verify.run import run_bindings
 from unit.graph._synth import ROOT
 from unit.verify._support import edit_doc, example_host, graph_of, write, write_json
 
@@ -53,6 +51,15 @@ def test_doc_example_tp_argon2_against_a_package_lock(host: Path, code: Path) ->
     assert check_pins(graph, _declare(tp_argon2=(pointer_source(),)), code) == []
     write_json(code / LOCK, {"packages": {"node_modules/argon2": {"version": "0.42.0"}}})
     assert _codes(check_pins(graph, _declare(tp_argon2=(pointer_source(),)), code)) == ["E337"]
+
+
+def test_a_pin_source_keyed_by_an_older_id_is_compared_with_the_pin_of_the_renamed_third_party(host: Path, code: Path) -> None:
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(third_party_id="tp-argon2-lib", aliases=[ARGON]))
+    graph, declarations = graph_of(host), _declare(tp_argon2=(pointer_source(),))
+    assert check_pins(graph, declarations, code) == []
+    write_json(code / LOCK, {"packages": {"node_modules/argon2": {"version": "0.40.0"}}})
+    (finding,) = check_pins(graph, declarations, code)
+    assert (finding.code, finding.node_id) == ("E337", "tp-argon2-lib")
 
 
 def test_mismatch_is_e337_naming_file_and_found_value(host: Path, code: Path) -> None:
@@ -136,16 +143,16 @@ def _record(host: Path, name: str) -> dict:
 
 def test_deploy_mode_match_writes_an_install_check_record(host: Path) -> None:
     files = write_install_checks(str(host / "spec"), str(ROOT), str(host), {ARGON: "0.41.1"}, "prod", None)
-    assert files == ["evd-install-argon2-prod.json"]
+    assert files == ["evd-argon2-prod-install.json"]
     record = _record(host, files[0])
     assert (record["type"], record["about"], record["env"]) == ("install-check", [ARGON], "prod")
 
 
 def test_install_check_record_has_exactly_its_field_set(host: Path) -> None:
     write_install_checks(str(host / "spec"), str(ROOT), str(host), {ARGON: "0.41.1"}, "prod", None)
-    assert set(_record(host, "evd-install-argon2-prod.json")) == {"evidence_id", "about", "type", "tested_tree", "installed_versions", "env"}
+    assert set(_record(host, "evd-argon2-prod-install.json")) == {"evidence_id", "about", "type", "tested_tree", "installed_versions", "env"}
     write_install_checks(str(host / "spec"), str(ROOT), str(host), {RELAY: "api-v3"}, "Staging 2", "v1.2.0")
-    record = _record(host, "evd-install-mailrelay-staging-2.json")
+    record = _record(host, "evd-mailrelay-staging-2-install.json")
     assert set(record) == {"evidence_id", "about", "type", "tested_tree", "installed_versions", "env", "tag"}
     assert record["installed_versions"] == {RELAY: "api-v3"} and record["tag"] == "v1.2.0"
 
@@ -154,21 +161,4 @@ def test_an_environment_with_no_letter_is_refused_and_writes_nothing(host: Path)
     with pytest.raises(FindingError) as caught:
         write_install_checks(str(host / "spec"), str(ROOT), str(host), {ARGON: "0.41.1"}, "!!", None)
     assert caught.value.error.code == "E767"
-    assert not list((host / "spec" / "extras" / "verification").glob("evd-install-*"))
-
-
-def test_an_install_check_never_replaces_the_run_evidence_of_a_binding_that_shares_its_file_name(host: Path) -> None:
-    """A binding ``ver-install-argon2`` run at ``ci`` and the install check of ``tp-argon2`` for ``ci`` name one file: the second write is refused (E767)."""
-    spec = str(host / "spec")
-    write_binding(records_folder(spec), str(ROOT), {"verification_id": "ver-install-argon2", "verifies": ["job-contract-tests"], "stage": "ci", "commands": ["true"], "output_guard": ".*"})
-    run_bindings(["ver-install-argon2"], spec, records_folder(spec), str(host), stage="ci", repo_root=str(ROOT))
-    before = _record(host, "evd-install-argon2-ci.json")
-    with pytest.raises(FindingError) as caught:
-        write_install_checks(spec, str(ROOT), str(host), {ARGON: "0.41.1"}, "ci", None)
-    assert caught.value.error.code == "E767" and "evd-install-argon2-ci.json holds a record of type 'run'" in caught.value.error.message and caught.value.error.message.endswith("give --env another name (the file is named from the environment)")
-    assert _record(host, "evd-install-argon2-ci.json") == before
-    write_install_checks(spec, str(ROOT), str(host), {ARGON: "0.41.1"}, "prod", None)
-    with pytest.raises(FindingError) as again:
-        run_bindings(["ver-install-argon2"], spec, records_folder(spec), str(host), stage="prod", repo_root=str(ROOT))
-    assert again.value.error.code == "E767" and again.value.error.message.endswith("run with another --stage (the file is named from the stage)")
-    assert [evidence.evidence_id for evidence in run_bindings(["ver-install-argon2"], spec, records_folder(spec), str(host), stage="staging", repo_root=str(ROOT))] == ["evd-install-argon2-staging"]
+    assert not list((host / "spec" / "extras" / "verification").glob("evd-*-install.json"))

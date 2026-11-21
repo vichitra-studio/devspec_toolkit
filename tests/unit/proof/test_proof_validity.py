@@ -199,6 +199,18 @@ def test_a_run_after_the_rename_of_a_third_party_records_its_version_and_a_pin_b
     assert _valid(host) == (False, STALE_TP_VERSION)
 
 
+def test_a_rename_of_a_third_party_after_the_run_leaves_the_evidence_valid(tmp_path: Path) -> None:
+    """The run recorded ``tp-argon2``; the renamed third party is read from that key through its alias, so the recorded version still counts."""
+    host = _host_with_lock(tmp_path)
+    _declare_sources(host, "argon2", "mailrelay")
+    [evidence] = run(host, [ALPHA])
+    assert dict(evidence.installed_versions)[TP] == "0.41.1"
+    renamed = "tp-argon2-lib"
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(third_party_id=renamed, aliases=[TP]))
+    edit_doc(host, "05_interface_contracts.json", lambda doc: doc["apis"][0].update(relies_on=[renamed]))
+    assert _valid(host) == (True, None)
+
+
 def test_a_declared_source_of_a_third_party_the_proved_nodes_do_not_rely_on_is_not_asked_for(tmp_path: Path) -> None:
     host = _host_with_lock(tmp_path)
     _declare_sources(host, "argon2", "mailrelay")

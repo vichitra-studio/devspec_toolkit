@@ -127,6 +127,36 @@ def test_a_rebind_with_proved_nodes_that_overlap_a_binding_without_being_its_nod
     assert error.error.code == "E333" and "ver-mixed" in error.error.message
 
 
+RULE = "rule-spec-check-on-every-pr"
+
+
+def test_a_plain_rebind_of_a_rule_replaces_the_default_id_binding_not_the_other_one(host: Path) -> None:
+    """A rule's bindings prove nothing countable, so the nodes of the request say nothing about which binding is meant: the default id is."""
+    first = _bind(host, RULE, commands=("echo ran",), guard="ran")
+    _bind(host, RULE, commands=("echo ran",), guard="ran", record_id="ver-rule-two")
+    again = _bind(host, RULE, commands=("echo changed",), guard="changed")
+    assert (first.plan.record_id, again.plan.record_id, again.plan.replaced) == ("ver-spec-check-on-every-pr", "ver-spec-check-on-every-pr", True)
+    files = _record_files(host)
+    assert '"changed"' in files["ver-spec-check-on-every-pr.json"] and '"ran"' in files["ver-rule-two.json"]
+
+
+def test_a_binding_without_stated_proves_under_another_id_is_not_taken_for_a_request_that_proves_a_node(host: Path) -> None:
+    """The first binding of a fixture is ``ver-late`` (no ``proves`` stated): a request that proves one node of the fixture does not replace it, E333 says it already claims every target."""
+    _add_fixture(host, fixture_id="fix-mixed", verifies=[CRITERION, NFR])
+    _bind(host, "fix-mixed", proves=(CRITERION,), record_id="ver-late")
+    edit_doc(host, "extras/verification/ver-late.json", lambda doc: doc["records"][0].pop("proves"))
+    error = _refusal(host, "fix-mixed", proves=(NFR,))
+    assert error.error.code == "E333" and "ver-late" in error.error.message
+
+
+def test_a_narrower_request_does_not_take_over_the_wider_bindings_id(host: Path) -> None:
+    _add_fixture(host, fixture_id="fix-mixed", verifies=[CRITERION, NFR])
+    _bind(host, "fix-mixed", proves=(CRITERION,), record_id="ver-wide")
+    edit_doc(host, "extras/verification/ver-wide.json", lambda doc: doc["records"][0].update(proves=[CRITERION, NFR]))
+    error = _refusal(host, "fix-mixed", proves=(NFR,))
+    assert error.error.code == "E333" and "ver-wide" in error.error.message
+
+
 @pytest.mark.parametrize("guard", [None, ""])
 def test_missing_guard_is_e332(host: Path, guard: str | None) -> None:
     assert _refusal(host, guard=guard).error.code == "E332"

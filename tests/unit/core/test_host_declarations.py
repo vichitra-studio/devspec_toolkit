@@ -114,3 +114,12 @@ def test_pin_sources_are_keyed_by_current_id_whatever_key_the_author_wrote() -> 
     renames = {"tp-old": "tp-new"}
     keyed = pin_sources_by_id(declarations, lambda name: renames.get(name, name))
     assert set(keyed) == {"tp-new", "tp-current", "tp-nothing"}
+
+
+def test_two_keys_that_resolve_to_one_id_give_it_the_sources_of_both_in_file_order() -> None:
+    """The old and the new id of a renamed third party are both keys: neither one's sources are dropped."""
+    first, second = PinSource(type="regex", file="a.txt", pattern="v(.*)"), PinSource(type="regex", file="b.txt", pattern="v(.*)")
+    for keys in (("tp-old", "tp-new"), ("tp-new", "tp-old")):
+        declarations = HostDeclarations(pin_sources={keys[0]: (first,), keys[1]: (second,)})
+        keyed = pin_sources_by_id(declarations, lambda name: "tp-new" if name == "tp-old" else name)
+        assert keyed == {"tp-new": (first, second)}

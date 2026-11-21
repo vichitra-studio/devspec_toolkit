@@ -64,8 +64,13 @@ def pin_sources_by_id(declarations: HostDeclarations, resolve: Callable[[str], s
 
     The one reading of the keys of ``pin_sources``: every reader of the declared sources of a third party goes through it, so a rename
     that leaves ``host_declarations.json`` as it was changes no answer.  A key that names no third party stays under its own name.
+    Two keys that resolve to one id (the old and the new id of a renamed third party) give that id the sources of both, in file order.
     """
-    return {resolve(name): sources for name, sources in declarations.pin_sources.items()}
+    keyed: dict[str, tuple[PinSource, ...]] = {}
+    for name, sources in declarations.pin_sources.items():
+        current = resolve(name)
+        keyed[current] = (*keyed.get(current, ()), *sources)
+    return keyed
 
 
 def load_host_declarations(spec_root: str | os.PathLike[str]) -> HostDeclarations:

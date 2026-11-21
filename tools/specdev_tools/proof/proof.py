@@ -60,15 +60,15 @@ _CAUSE = {
     GUARD_NOT_MATCHED: "the output did not match the guard",
     STALE_TREE: "the code changed since the run",
     STALE_HASH: "the binding, its verifier or a node it proves changed since the run",
-    STALE_TP_VERSION: "a third party is at another version than the pin",
+    STALE_TP_VERSION: "the run did not record the pinned version of a third party",
     STAGE_TOO_LOW: "the run was at a lower stage than the binding",
     NO_EVIDENCE: "no run has written evidence for it",
 }
 _FIX_FIRST = (NONZERO_EXIT, GUARD_NOT_MATCHED)
 _WAY_OUT = {
-    STALE_TP_VERSION: "make the version the repository declares equal the pin (`specdev third-party check` names the file), then run",
+    STALE_TP_VERSION: "check the pins with `specdev third-party check` and fix what it names, then run",
 }
-"""What to do before the run, for a cause the run itself cannot clear: a run records the version the repository declares, so it says the same until the repository says the pin."""
+"""What to do before the run, for a cause the run may not clear: a run records the version the repository declares, so it records the old one until the repository says the pin; when the pins already match, the check names nothing and the run is all that is left."""
 
 
 @dataclass(frozen=True)

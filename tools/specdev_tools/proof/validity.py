@@ -109,6 +109,7 @@ def _passes(evidence: Evidence) -> str | None:
 
 
 def _recorded(evidence: Evidence, graph: Graph) -> dict[str, str]:
+    """The content hashes *evidence* recorded, keyed by current node id (a recorded id that was renamed is read through its alias)."""
     return {graph.canonical_id(name): digest for name, digest in evidence.recorded_hashes.items()}
 
 

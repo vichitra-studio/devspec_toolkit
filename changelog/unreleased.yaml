@@ -1241,9 +1241,7 @@ changes:
       The guard of a binding is compiled before its commands run, so a guard
       that is no regular expression is E332 and nothing ran. An id of
       --installed that is no third-party node is E706 and a third party named
-      twice is a usage error (exit 2). A write never replaces an evidence file
-      that holds a record of another type: E767, which names the way out
-      (third-party check another --env, verify run another --stage). Shown by
+      twice is a usage error (exit 2). Shown by
       specdev verify bind --help, specdev verify run --help and specdev verify
       run --all, which prints one PASS or FAIL line for each binding and then N
       run, N passed, N failed.
@@ -1262,8 +1260,8 @@ changes:
       compares what a deploy installed with the pins (E339 and exit 1, which
       stops the deploy; E706 for an id that is no third-party node; a third
       party named twice is a usage error) and, when all match, writes one
-      install-check evidence record for each third party (E767 when the file
-      already holds the run evidence of a binding). third-party pin of the pin a
+      install-check evidence record for each third party
+      (evd-<name>-<env>-install.json). third-party pin of the pin a
       node already has writes nothing and prints <id> already has the pin
       <version>; nothing written (exit 0, no reminder), and writes the value
       without surrounding spaces. Shown by specdev third-party check and specdev

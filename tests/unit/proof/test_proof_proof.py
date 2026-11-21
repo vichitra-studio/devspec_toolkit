@@ -217,7 +217,7 @@ def test_the_advice_for_a_stale_third_party_version_names_the_repository_before_
     edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(pin="0.42.0"))
     [error] = proof_errors(graph_of(host), context(host), [API], "dev")
     assert (error.code, error.subcode) == ("E347", "STALE_TP_VERSION")
-    assert "equal the pin" in error.message and "third-party check" in error.message
+    assert "did not record the pinned version" in error.message and "`specdev third-party check` and fix what it names" in error.message
     assert error.message.endswith("then run `specdev verify run ver-alpha --stage dev`")
 
 

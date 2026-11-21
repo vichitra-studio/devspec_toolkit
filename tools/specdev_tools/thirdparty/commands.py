@@ -47,7 +47,7 @@ CHECK_DESCRIPTION = (
     "E338 for a source that gives none; exit 1 on any finding. With --installed TP=VERSION (repeat for more) and --env, "
     "compare what a deploy installed with the pins: a different version is E339 and exit 1, which stops the deploy; when "
     "all match, one install-check evidence record per third party is written to spec/extras/verification/ "
-    "(evd-install-<name>-<env>.json, <name> being the third-party id without its tp- prefix; with --tag when given)."
+    "(evd-<name>-<env>-install.json, <name> being the third-party id without its tp- prefix; with --tag when given)."
 )
 
 
