@@ -25,7 +25,7 @@ from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.names import BINDING_KIND, THIRD_PARTY, VERIFIES
 from specdev_tools.graph.stages import DEFAULT_STAGE, STAGES, binding_stage
 from specdev_tools.trace.lockfile import replace_file_atomically
-from specdev_tools.trace.records import RECORD_FILE_SUFFIX, RECORDS_DIR
+from specdev_tools.trace.records import RECORD_FILE_SUFFIX, RECORDS_DIR, SIGNOFF_DIR
 
 EVIDENCE_KIND = "evidence-record"
 ATTESTATION_TYPE = "attestation"
@@ -35,8 +35,12 @@ EVIDENCE_SCHEMA = "vc:extras:evidence-record"
 AT_DEPLOY_SCHEMA = "vc:extras:at-deploy-record"
 SIGNOFF_SCHEMA = "vc:extras:signoff-record"
 BINDING_PREFIX = "ver-"
+DEPLOY_PREFIX = "dep-"
+SIGNOFF_PREFIX = "so-"
 EVIDENCE_PREFIX = "evd-"
 INSTALL_CHECK_SUFFIX = "-install"
+_DEPLOY_FILE = re.compile(rf"^{re.escape(DEPLOY_PREFIX)}(\d+){re.escape(RECORD_FILE_SUFFIX)}$")
+_SIGNOFF_FILE = re.compile(rf"^{re.escape(SIGNOFF_PREFIX)}.+-(\d+){re.escape(RECORD_FILE_SUFFIX)}$")
 BINDING_ID = re.compile(rf"^{re.escape(BINDING_PREFIX)}[a-z0-9]+(?:-[a-z0-9]+)*$")
 """The form of a binding id: ``ver-`` and a kebab-case name."""
 
@@ -257,3 +261,50 @@ def write_signoff(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
     """
     return _write_record(folder, repo_root, SIGNOFF_SCHEMA, item["signoff_id"], item)
+
+
+@dataclass(frozen=True)
+class SignoffRecord:
+    """A sign-off record of ``extras/signoff/``: its id, the code tree signed off and the git author (``name``, ``email``)."""
+
+    signoff_id: str
+    tree: str
+    git_author: Mapping[str, str]
+
+
+def _numbered_records(folder: str, pattern: re.Pattern[str]) -> list[tuple[int, Mapping[str, Any]]]:
+    """The record of each file of *folder* whose name matches *pattern* (group 1: the number), in number order.
+
+    A file counts through ``_only_record``: one that does not hold exactly one record (two give none) is left out; ``check-records`` reports it (E774).
+    """
+    found: list[tuple[int, Mapping[str, Any]]] = []
+    for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else ():
+        matched = pattern.match(name)
+        record = _only_record(os.path.join(folder, name)) if matched else None
+        if matched and record is not None:
+            found.append((int(matched.group(1)), record))
+    return sorted(found, key=lambda pair: pair[0])
+
+
+def deploy_records(spec_root: str | os.PathLike[str]) -> list[Mapping[str, Any]]:
+    """The ``dep-`` records of the spec folder *spec_root*, in the order of their numbers (the last is the latest)."""
+    return [record for _, record in _numbered_records(records_folder(os.fspath(spec_root)), _DEPLOY_FILE)]
+
+
+def signoff_records(spec_root: str | os.PathLike[str], milestone_id: str) -> list[SignoffRecord]:
+    """The sign-off records of *milestone_id* under ``extras/signoff/``, oldest first (by the number at the end of the id).
+
+    A file that is not a sign-off record about the milestone (unreadable, another shape, another milestone) is left out.
+    """
+    found: list[SignoffRecord] = []
+    for _, record in _numbered_records(os.path.join(os.fspath(spec_root), SIGNOFF_DIR), _SIGNOFF_FILE):
+        if record.get("about") == [milestone_id] and isinstance(record.get("signoff_id"), str):
+            author = record.get("git_author")
+            found.append(SignoffRecord(record["signoff_id"], str(record.get("tree", "")), author if isinstance(author, Mapping) else {}))
+    return found
+
+
+def latest_signoff(spec_root: str | os.PathLike[str], milestone_id: str) -> SignoffRecord | None:
+    """The newest sign-off record of *milestone_id* (the highest number), or ``None`` when there is none."""
+    records = signoff_records(spec_root, milestone_id)
+    return records[-1] if records else None

@@ -38,7 +38,7 @@ from specdev_tools.core.ambiguity_items import (
 )
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import delete_text, json_write_atomic
-from specdev_tools.graph.ownership import STEP_PREFIX, step_for_file
+from specdev_tools.graph.ownership import CLOSE_OWNER, STEP_PREFIX, step_for_file
 from specdev_tools.graph.queries import plural
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
 from specdev_tools.trace.writing import writing_graph
@@ -46,16 +46,16 @@ from specdev_tools.trace.writing import writing_graph
 Gate = Literal["step", "merge", "close"]
 FrozenProvider = Callable[[Path], bool]
 
-CLOSE_OWNER = "close-gate"
 _ANSWER_KNOWN = "known: apply in the batch pass"
 _ANSWER_NEEDED = "needed from the operator"
 
 
 def default_frozen(plan_path: Path) -> bool:
-    """The frozen-plan provider until a close record exists (M8): no plan is frozen.
+    """The provider that says no plan is frozen: the default of ``check_open_items`` for a caller that passes none.
 
-    M8 passes ``functools.partial(frozen.is_frozen_path, spec_root)`` instead; merge and release gates pass that
-    provider, never this one.
+    ``spec-check`` passes ``functools.partial(frozen.is_frozen_path, spec_root)`` instead, so an open item in the plan of a
+    closed milestone is a legacy item there; no merge-gate caller exists at this commit (a merge or release gate must pass
+    that provider, not this one).  Nothing in ``tools/`` uses the default now; tests do.
     """
     return False
 

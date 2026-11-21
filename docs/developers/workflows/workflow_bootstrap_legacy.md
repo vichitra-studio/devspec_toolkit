@@ -466,7 +466,7 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > - `spec/impl_context/ms_<batch>_plan.json` (the Plan from 16a)
 > - The actual codebase files targeted by `plan.summary.target_file_patterns`
 >
-> The AI writes code files and records each carried-out action with `specdev plan record <ITEM>/<action-id> --outcome done` (an action that names a verifier is proven by `specdev verify run <binding>` instead). If ambiguities are found, it writes them into `execution.emergent_ambiguities` and stops — resolve them and re-run 16a.
+> The AI writes code files and records each carried-out action with `specdev plan record <ITEM>/<action-id> --outcome done` (an action that names a verifier is proven by `specdev verify run <binding>` instead). If open items are found, it writes them into `execution.emergent_ambiguities` and stops on the items they concern: each is answered upstream and deleted with `specdev json delete --id <amb-id>` (the close gate refuses a milestone with an open item, E632), and nothing re-runs 16a.
 
 #### Step 6.5: Impl Reviewer — `spec/impl_context/ms_<batch>_plan.json`
 

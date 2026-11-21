@@ -271,6 +271,8 @@ def test_the_findings_file_names_agree_with_the_reviewer_and_with_milestone_stat
     assert ".specdev/findings/findings_<ms-id>_<round>_r1.json" in skill
     assert ".specdev/findings/findings_<batch_id>_review_<round>.json" in skill
     assert ".specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json" in _agent("specdev-trinity-reviewer.md")
+    impl = _agent("specdev-trinity-impl.md")  # milestone_fix reads the milestone-wide file under the one name the skill passes
+    assert ".specdev/findings/findings_<batch_id>_review_<round>.json" in impl and "findings_<milestone_id>_review" not in impl
     state = (ROOT / "tools" / "specdev_tools" / "context" / "milestone_state.py").read_text(encoding="utf-8")
     assert 'f"findings_{batch_id}_review_*"' in state
     assert 'f"findings_{group_id}_*"' in state

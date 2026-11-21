@@ -88,7 +88,7 @@ def records_in(host: Path) -> list[dict[str, Any]]:
     return list(plan_document(host).get("execution", {}).get("records", []))
 
 
-def close_milestone(host: Path) -> None:
+def closed_row(host: Path) -> None:
     """Close the milestone of *host*: its anchor row is ``done`` with a close record that stores the plan hash now."""
     spec = host / "spec"
     anchor_store.write_row_state(spec, MILESTONE, "done", close=closed_record(plan_hash=plans.plan_hash(spec / PLAN)), repo_root=str(ROOT))

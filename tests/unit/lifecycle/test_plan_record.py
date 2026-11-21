@@ -15,10 +15,11 @@ from specdev_tools.lifecycle.plan_records import Address, check_plan_records, pr
 from specdev_tools.trace.records import prune_orphan_records
 from specdev_tools.trace.lockfile import read_lock
 from specdev_tools.verify.code_tree import code_tree_for_host
+from unit.lifecycle._milestone_support import cli_run, set_row
 from unit.lifecycle._record_support import (
-    AUTHOR, ITEM, alpha_binding, action, author, change_lock_hash, close_milestone, lock_path_of, no_identity, plan_document, plan_host, records_in, roots,
+    AUTHOR, ITEM, alpha_binding, action, author, change_lock_hash, closed_row, lock_path_of, no_identity, plan_document, plan_host, records_in, roots,
 )
-from unit.lifecycle._support import MILESTONE, PLAN
+from unit.lifecycle._support import MILESTONE, PLAN, closed_record
 from unit.proof._support import PASSING, context
 from unit.trace._lock_support import run_on_example
 from unit.verify._support import edit_doc, graph_of
@@ -81,7 +82,7 @@ def test_verifier_naming_action_is_refused_e822(tmp_path: Path) -> None:
 
 def test_frozen_plan_is_refused_e820(tmp_path: Path) -> None:
     host = plan_host(tmp_path)
-    close_milestone(host)
+    closed_row(host)
     spec, repo, git = roots(host)
     before = _plan_bytes(host)
     assert _refusal(lambda: record_action(spec, repo, git, A01, "done")).code == "E820"
@@ -212,7 +213,7 @@ def test_at_deploy_stores_the_milestone(tmp_path: Path) -> None:
 
 def test_at_deploy_works_on_a_closed_milestone(tmp_path: Path) -> None:
     host = _at_deploy_host(tmp_path)
-    close_milestone(host)
+    closed_row(host)
     spec, repo, git = roots(host)
     before = _plan_bytes(host)
     record_at_deploy(spec, repo, git, Address(ITEM, "a02"), "staging", "done")
@@ -229,7 +230,7 @@ def test_staleness_is_skipped_for_a_closed_plan_and_without_a_lock(tmp_path: Pat
     assert is_stale(record, lock, frozen_plan=False)
     assert not is_stale(record, lock, frozen_plan=True)
     assert not is_stale(record, None, frozen_plan=False)
-    close_milestone(host)
+    closed_row(host)
     assert check_plan_records(graph_of(host), lock, spec) == []
 
 
@@ -269,3 +270,52 @@ def test_plan_size_is_printed_before_and_after(tmp_path: Path) -> None:
     assert code == 0 and f"recorded rec-0001: {ITEM}/a01 done" in output
     assert f"plan file: {before} bytes before, {after} bytes after" in output
     assert after > before
+
+
+@pytest.mark.parametrize("empty", ["absent", "empty list"])
+def test_an_item_with_no_action_is_told_to_insert_one_and_the_insert_works(tmp_path: Path, empty: str) -> None:
+    host = plan_host(tmp_path)
+
+    def drop(document: dict[str, Any]) -> None:
+        implementation = document["plan"]["spec_alignment"]["checklist"][0]["implementation"]
+        implementation.pop("actions") if empty == "absent" else implementation.update(actions=[])
+
+    edit_doc(host, PLAN, drop)
+    spec, repo, git = roots(host)
+    error = _refusal(lambda: record_action(spec, repo, git, A01, "done"))
+    assert error.code == "E821" and f"{ITEM} has no action;" in error.message
+    assert f"`specdev json insert --id {ITEM} .implementation.actions '<action with an id>'`" in error.message
+    assert "carry no id" not in error.message and "actions[0]" not in error.message
+    code, out, err = cli_run(host, "json", "insert", "--id", ITEM, ".implementation.actions", json.dumps({"id": "a01", "type": "file_edit", "description": "Edit.", "target": "src/hello.txt"}))
+    assert code == 0, out + err
+    assert record_action(spec, repo, git, A01, "done").record["action"] == "a01"
+
+
+def test_an_action_that_names_only_a_retired_binding_names_no_verifier(tmp_path: Path) -> None:
+    host = plan_host(tmp_path, action("a02", "run_command", command=PASSING), bindings=(alpha_binding(stage="staging"),))
+    spec, repo, git = roots(host)
+    error = _refusal(lambda: record_action(spec, repo, git, Address(ITEM, "a02"), "done"))
+    assert error.code == "E822" and "ver-alpha" in error.message
+    edit_doc(host, "02a_delivery_baseline.json", lambda document: document["environments"]["staging"].update(scope="out"))
+    result = record_action(spec, repo, git, Address(ITEM, "a02"), "done")
+    assert result.record["action"] == "a02" and result.record["outcome"] == "done"
+
+
+@pytest.mark.parametrize("status, extra", [("pending", {}), ("deferred", {"deferral_reason": "waiting for the vendor"})])
+def test_a_plan_whose_row_is_not_done_is_not_frozen(tmp_path: Path, status: str, extra: dict[str, str]) -> None:
+    host = plan_host(tmp_path)
+    set_row(host, status, **extra)
+    spec, repo, git = roots(host)
+    assert record_action(spec, repo, git, A01, "done").record["outcome"] == "done"
+    assert prune_records(spec, repo, MILESTONE).removed == ()
+    set_row(host, "done", close=closed_record())
+    assert _refusal(lambda: record_action(spec, repo, git, A01, "done")).code == "E820"
+
+
+def test_prune_takes_a_milestone_id_and_nothing_else(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    before = _plan_bytes(host)
+    for extra, named in ((("PWRESET_CONFIRM_EXPIRED_01/a01",), "an action"), (("--outcome", "done"), "--outcome"), (("--note", "x"), "--note")):
+        code, out, err = cli_run(host, "plan", "record", "--prune", MILESTONE, *extra)
+        assert (code, out) == (2, "") and f"specdev plan record: error: --prune takes a milestone id and nothing else (also given: {named})" in err
+    assert _plan_bytes(host) == before

@@ -100,9 +100,10 @@ specdev json structure spec/impl_context/ms_<batch_id>_plan.json
 If the file exists, read `<ms-id>` (section "The milestone id") and go to Step 2. If it does not:
 
 1. Run `specdev step ready 16a --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`.
-   Exit 1 (E773) means a step upstream of the plan has no file or has pending replay: show the
-   output and stop; the step it names is authored or replayed first (`/specdev-step <NN>`,
-   `/specdev-review <NN>`).
+   Exit 1 (E773) means a step upstream of the plan has no file, has suspect links or has coverage
+   gaps (the output names which: for example `step 14 (11 blockers); fix the coverage gaps of step 14
+   first`): show the output and stop; the step it names is authored or replayed first
+   (`/specdev-step <NN>`, `/specdev-review <NN>`).
 2. Render the 16a pack of each task of the milestone (`specdev trace <ms-id> --down --kinds task --json`
    lists the tasks of the roadmap milestone the operator named; `specdev trace --recipe 16a <task-id>`
    renders one) and follow `prompts/prompt_16a_impl_planner.md`: write the plan as a draft outside
@@ -118,7 +119,9 @@ If the file exists, read `<ms-id>` (section "The milestone id") and go to Step 2
 **Re-plan.** A 16a re-plan edits the existing plan by id (`prompt_16a` Output Rules). Afterwards run
 `specdev attest <item-id> --yes` for each new item and each item whose `realises` changed (E761 names a
 missing lock entry), and `specdev plan record --prune <ms-id>` only when `specdev spec-check` reports a
-record (E700 on a `rec-NNNN`) whose item or action is gone. An upstream edit after approval makes links on
+record (E700 on a `rec-NNNN`) whose item is gone. `--prune` also removes a record whose action is gone
+from an item that still exists; nothing reports that one (no E700), so prune after deleting an action
+that had a record. An upstream edit after approval makes links on
 the plan's chain suspect: `specdev status --milestone <ms-id>` and `specdev milestone start` (E800) list
 them and the close gate blocks on them (E763); the step authors replay what `specdev stale` lists, and
 then the plan's links are attested again.
@@ -267,7 +270,9 @@ real code-phase groups can legitimately need more rounds.
    `<ms-id>` (`milestone`), `groups[]` and `derived_phase_position` from the output.
 2. Run `specdev status --milestone <ms-id>`: its first line must be `milestone <ms-id>: in_progress`.
    Otherwise print `REFUSED: milestone <ms-id> is <status>; approve the plan with /specdev-trinity <batch_id>
-   --phase plan (that starts the milestone)` and exit.
+   --phase plan (that starts the milestone)` and exit; when `status` itself refuses with E800 (the anchor row
+   is missing; exit 1) show that message and stop, it names the row to add; for `done` print instead `REFUSED: milestone
+   <ms-id> is done: it is closed and is not started again` (`milestone start` of a done milestone is E800).
 3. Identify unresolved groups: groups in state `pending`. Groups in `{code_converged, blocked, deferred,
    wont_do}` are skipped; list each `blocked` group with its `blocking_amb_ids` (open items of the plan about a
    node of the item's chain) for the operator.
@@ -445,7 +450,7 @@ repeat:
 
   If findings == [] → CONVERGED; exit loop
     Convergence marker = .specdev/findings/findings_<batch_id>_review_<round>.json
-    (the empty-findings file itself is the convergence signal; `milestone-state` shows `review_complete`)
+    (the empty-findings file of the newest round is the convergence signal; `milestone-state` shows `review_complete`)
 
   If round >= --soft-warn-rounds:
     Write HALT artifact:
@@ -482,7 +487,11 @@ repeat:
 The converged file is `.specdev/findings/findings_<batch_id>_review_<round>.json` of the last round: it carries
 `"$schema": "vc:infra:findings"`, `scope` the milestone id and an empty `findings` list. The tree must not
 change between (1) and (6): a code edit after (1) sends the loop back to (1), because the evidence of
-`verify run` is tied to the code tree (a changed tree is E811 `STALE_TREE`).
+`verify run` is tied to the code tree (a changed tree is E811 `STALE_TREE`). The code tree counts every
+untracked file that git does not ignore (the spec folder and the seed documents are left out), so after (1)
+nothing is written into the repository outside the spec folder before `specdev milestone close` (a findings file written under `.specdev/` after `verify run` moved the tree on
+a host that does not ignore `.specdev/`: `status` then listed both bindings `STALE_TREE`); write the
+findings file first, as the loop above does.
 
 0. The milestone's code must be committed (the close gate reads tracked files: E746). The skill never
    commits: if `git status` shows the milestone's files uncommitted, ask the operator to commit them now.
@@ -519,7 +528,7 @@ refusal is never answered by writing a spec file.
 
 | Code | It means | What clears it |
 |---|---|---|
-| E800 (`milestone start`) | no anchor row for the id, the milestone is done, or suspect links on its chain | add the row (plan phase, Step 1); a done milestone stays done; for suspect links the step authors replay what `specdev stale` lists, then start again |
+| E800 (`milestone start`) | no anchor row for the id, the milestone is done, or suspect links on its chain | add the row with the `specdev json insert --step 16 .plan.milestone_index '<row>'` the message prints (a real prefix and summary in place of its placeholders; plan phase, Step 1; the milestone must be in the roadmap); a done milestone stays done; for suspect links the step authors replay what `specdev stale` lists, then start again |
 | E803 | a batch id was given, or no plan names the milestone | use the `milestone` value of `milestone-state`; a plan with no `milestone` key stops the skill |
 | E810 | a task criterion has no plan item that realises it | a 16a re-plan adds the item, then 16b and 16c again |
 | E811 | a criterion is unproven (`NO_EVIDENCE`, `STALE_TREE`, `STALE_HASH`, or the verifier has no binding) | `specdev verify run <binding> --stage dev` as printed, or step (1); a missing binding is `specdev verify bind <verifier-id> --command CMD --guard REGEX`, an author's decision: ask |
@@ -530,7 +539,7 @@ refusal is never answered by writing a spec file.
 | E632 | an open item is still in the plan | the operator answers it upstream and deletes it: `specdev json delete --id <amb-id>` |
 | E763 | a suspect link on the milestone's chain | the step authors replay what `specdev stale` lists, then `specdev attest <node-id> --yes`; then again from (1) (the attest changes hashes) |
 | E820 | the plan is frozen (the milestone is closed) | nothing; no record can be written |
-| E821 | the address names no item or action | the message lists the item's actions: use one of those ids |
+| E821 | the address names no item or action | the message lists the item's actions: use one of those ids; an item with no action at all is a planner's gap: the message names the `specdev json insert --id <item> .implementation.actions '<action>'` that adds one (a 16a re-plan), then record it |
 | E822 | the action names a verifier | its proof is `specdev verify run <binding>`, not a record |
 | E823 | the findings file is invalid | `specdev validate <file> --repo-root ./devspec_toolkit`, fix the file (`"$schema": "vc:infra:findings"`), record again |
 | E767 | a second plan file for the milestone | edit the plan by id (`specdev json patch\|insert\|delete --id`) |

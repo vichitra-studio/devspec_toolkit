@@ -1,6 +1,6 @@
 """The close gate: whether a milestone may be closed, answered as a list of findings and nothing written.
 
-``check_close_gate`` runs the eight checks of the design's close row, in this order, and reports every finding of every check
+``check_close_gate`` runs the seven checks of the design's close row, in this order, and reports every finding of every check
 (a first failure does not hide the others):
 
 1. every task criterion in play has a plan item that ``realises`` it (E810) and is proven (E811);
@@ -24,7 +24,6 @@ checks live in ``validation``, which this package may not import: the caller pas
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -36,21 +35,20 @@ from ..core.step_paths import PLAN_DIR_NAME
 from ..graph.contract import item_of
 from ..graph.gitview import read_seed_texts
 from ..graph.model import NOT_APPLICABLE, Graph, Node
-from ..graph.names import API, PLAN_ITEM, PAUSED_DISPOSITIONS, REALISES, TASK, TASK_CRITERION, link_targets
-from ..graph.queries import milestone_of
+from ..graph.names import API, PLAN_ITEM, PAUSED_DISPOSITIONS, REALISES, ROW_DONE, TASK, TASK_CRITERION, link_targets
+from ..graph.ownership import CLOSE_OWNER
+from ..graph.queries import milestone_of, task_disposition
 from ..graph.trace import trace_node
 from ..proof.proof import NOT_REQUIRED, PENDING_STAGE, PROVEN, STAGE_UNKNOWN, ProofResult, proof, proof_errors
 from ..proof.validity import ProofContext
 from ..trace.lockfile import Lock
-from ..trace.records import SIGNOFF_DIR
+from ..verify.records import signoff_records
 from . import anchor_store, chain, executed, plan_records, plans
 
-CLOSE_OWNER = "close-gate"
-CLOSE_CAP = executed.CLOSE_CAP
 VERIFIED = "verified"
 _PASSING = frozenset({PROVEN, PENDING_STAGE, NOT_REQUIRED})
-_SIGNOFF_FILE = re.compile(r"^so-.+-(\d+)\.json$")
-_PAUSED_ITEM_WARNING = "W826"
+"""The close-mode statuses that do not stop a close.  A binding never gives ``PENDING_STAGE`` here (the close mode ignores staging and
+prod bindings: ``NOT_REQUIRED``); a person's attestation of an obligation that needs a stage above ``dev`` can, so the status stays."""
 
 
 class ScaffoldReading(Protocol):
@@ -85,7 +83,7 @@ class PausedTask:
 class GateReport:
     """The answer of the close gate: the ``errors`` that stop the close, ``warnings`` (W826), the ``paused`` tasks left out and ``notes`` (what could not be checked).
 
-    ``legacy`` is true for a milestone whose close record is a legacy close: nothing was checked and the report is clean.
+    A milestone whose close record is a legacy close is not checked: the report is clean and its ``notes`` say so.
     """
 
     milestone_id: str
@@ -93,21 +91,11 @@ class GateReport:
     warnings: tuple[SpecError, ...] = ()
     paused: tuple[PausedTask, ...] = ()
     notes: tuple[str, ...] = ()
-    legacy: bool = False
 
     @property
     def passed(self) -> bool:
         """Whether the milestone may be closed: no error."""
         return not self.errors
-
-
-@dataclass(frozen=True)
-class SignoffRecord:
-    """A sign-off record of ``extras/signoff/``: its id, the code tree signed off and the git author (``name``, ``email``)."""
-
-    signoff_id: str
-    tree: str
-    git_author: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -130,16 +118,6 @@ def _stage_finding(node: Node, error: SpecError) -> SpecError:
     return _finding(error.code, f"{node.kind} {node.id}: {error.message}", node)
 
 
-def _disposition(graph: Graph, task: Node) -> tuple[str | None, str]:
-    """The ``disposition`` value of *task* and its reason; ``(None, "")`` for a task that is planned."""
-    content = item_of(graph, task) or {}
-    disposition = content.get("disposition")
-    if not isinstance(disposition, Mapping):
-        return None, ""
-    reason = disposition.get("reason")
-    return disposition.get("value"), reason if isinstance(reason, str) else ""
-
-
 def scope_of(graph: Graph, milestone_id: str) -> Scope:
     """The criteria of the milestone's tasks that are in play, and the tasks left out because they are deferred or wont_do (with their reason)."""
     criteria: list[tuple[Node, str]] = []
@@ -147,7 +125,7 @@ def scope_of(graph: Graph, milestone_id: str) -> Scope:
     for task in graph.by_kind.get(TASK, ()):
         if task.lifecycle == NOT_APPLICABLE or milestone_of(graph, task) != milestone_id:
             continue
-        value, reason = _disposition(graph, task)
+        value, reason = task_disposition(graph, task)
         if value in PAUSED_DISPOSITIONS:
             paused.append(PausedTask(task.id, value, reason))
             continue
@@ -188,7 +166,7 @@ def _unrealised_findings(scope: Scope, realised: Mapping[str, list[Node]], plan_
 def proof_of(graph: Graph, ctx: ProofContext, node: Node) -> ProofResult | SpecError:
     """The close-mode proof of the criterion *node*, or its E334 finding when the stage of one of its verifiers cannot be told."""
     try:
-        return proof(graph, ctx, node.id, CLOSE_CAP, treat_ci_as_dev=True)
+        return proof(graph, ctx, node.id, executed.CLOSE_CAP, treat_ci_as_dev=True)
     except FindingError as error:
         if error.error.code != STAGE_UNKNOWN:
             raise
@@ -197,7 +175,7 @@ def proof_of(graph: Graph, ctx: ProofContext, node: Node) -> ProofResult | SpecE
 
 def _unproven_finding(graph: Graph, ctx: ProofContext, node: Node, result: ProofResult) -> SpecError:
     """E811 for the criterion *node*: what ``proof_errors`` says each verifier lacks (its messages name the node and a way out)."""
-    lacking = "; ".join(error.message for error in proof_errors(graph, ctx, [node.id], CLOSE_CAP, treat_ci_as_dev=True))
+    lacking = "; ".join(error.message for error in proof_errors(graph, ctx, [node.id], executed.CLOSE_CAP, treat_ci_as_dev=True))
     return _finding("E811", lacking or f"task criterion {node.id} is not proven at the close gate ({result.status})", node)
 
 
@@ -240,13 +218,22 @@ def _execution_findings(graph: Graph, ctx: ProofContext, lock: Lock | None, item
     return findings
 
 
-def _review_findings(plan: Path, milestone_id: str, plan_file: str) -> list[SpecError]:
-    """E813 when the ``review`` block of the plan is missing or its verdict is not ``verified``."""
+def review_verdict(plan: Path) -> str | None:
+    """The ``review.verdict`` of the plan file *plan*; ``None`` when the plan has no review block or no string verdict.
+
+    The one reader of a plan's verdict: the gate (E813) and the ``awaiting_signoff`` section of ``status`` both call it.
+    """
     review = (read_json_object(plan) or {}).get("review")
     verdict = review.get("verdict") if isinstance(review, Mapping) else None
+    return verdict if isinstance(verdict, str) else None
+
+
+def _review_findings(plan: Path, milestone_id: str, plan_file: str) -> list[SpecError]:
+    """E813 when the ``review`` block of the plan is missing or its verdict is not ``verified``."""
+    verdict = review_verdict(plan)
     if verdict == VERIFIED:
         return []
-    said = f"the verdict is {verdict}" if isinstance(verdict, str) else "no review is recorded"
+    said = f"the verdict is {verdict}" if verdict is not None else "no review is recorded"
     return [_finding(
         "E813",
         f"{plan_file}: {said}, and the close needs `verified`; run the 16c review, then `specdev review record {milestone_id} --verdict verified --findings-file <file>`",
@@ -289,29 +276,6 @@ def _scaffold_findings(graph: Graph, scope: Scope, scaffold: ScaffoldProvider) -
     return _owned(scan.findings), notes
 
 
-def signoff_records(spec_root: str | os.PathLike[str], milestone_id: str) -> list[SignoffRecord]:
-    """The sign-off records of *milestone_id* under ``extras/signoff/``, oldest first (by the number at the end of the id).
-
-    A file that is not a sign-off record about the milestone (unreadable, another shape, another milestone) is left out.
-    """
-    folder = os.path.join(os.fspath(spec_root), SIGNOFF_DIR)
-    found: list[tuple[int, SignoffRecord]] = []
-    for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else ():
-        matched = _SIGNOFF_FILE.match(name)
-        records = (read_json_object(os.path.join(folder, name)) or {}).get("records")
-        record = records[0] if isinstance(records, list) and records and isinstance(records[0], Mapping) else None
-        if matched and record is not None and record.get("about") == [milestone_id] and isinstance(record.get("signoff_id"), str):
-            author = record.get("git_author")
-            found.append((int(matched.group(1)), SignoffRecord(record["signoff_id"], str(record.get("tree", "")), author if isinstance(author, Mapping) else {})))
-    return [record for _, record in sorted(found, key=lambda pair: pair[0])]
-
-
-def latest_signoff(spec_root: str | os.PathLike[str], milestone_id: str) -> SignoffRecord | None:
-    """The newest sign-off record of *milestone_id* (the highest number), or ``None`` when there is none."""
-    records = signoff_records(spec_root, milestone_id)
-    return records[-1] if records else None
-
-
 def _signoff_findings(spec_root: str, milestone_id: str) -> list[SpecError]:
     """E814 when no sign-off record exists for the milestone."""
     if signoff_records(spec_root, milestone_id):
@@ -326,7 +290,7 @@ def _signoff_findings(spec_root: str, milestone_id: str) -> list[SpecError]:
 def _paused_items_warnings(graph: Graph, lock: Lock | None, spec_root: str, items: list[Node]) -> list[SpecError]:
     """W826 for each of *items* that realises only criteria of deferred or wont_do tasks (the finding of the ``plan-records`` check, kept for this milestone's items)."""
     ids = {item.id for item in items}
-    return [error for error in plan_records.check_plan_records(graph, lock, spec_root) if error.code == _PAUSED_ITEM_WARNING and error.node_id in ids]
+    return [error for error in plan_records.check_plan_records(graph, lock, spec_root) if error.code == plan_records.PAUSED_ITEM_WARNING and error.node_id in ids]
 
 
 def check_close_gate(
@@ -355,7 +319,7 @@ def check_close_gate(
     milestone_id = graph.canonical_id(milestone_id)
     row = anchor_store.read_row(spec_root, milestone_id)
     if row is not None and anchor_store.is_legacy_close(row.close):
-        return GateReport(milestone_id, legacy=True, notes=("legacy close: not re-checked",))
+        return GateReport(milestone_id, notes=("legacy close: not re-checked",))
     plan = plans.require_plan(spec_root, milestone_id)
     plan_file = os.path.join(PLAN_DIR_NAME, plan.name)
     scope = scope_of(graph, milestone_id)
@@ -394,7 +358,7 @@ def verify_close_record(row: anchor_store.AnchorRow | anchor_store.AnchorState) 
     milestone = row.milestone_id if isinstance(row, anchor_store.AnchorRow) else None
     subject = f"milestone {milestone}" if milestone else "a milestone"
     close = state.close
-    if state.status != "done" or close is None:
+    if state.status != ROW_DONE or close is None:
         return [_finding("E814", f"{subject} is not closed with a close record (status {state.status}); close it with `specdev milestone close`", node_id=milestone)]
     if anchor_store.is_legacy_close(close):
         return []

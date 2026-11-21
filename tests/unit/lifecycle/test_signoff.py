@@ -11,13 +11,14 @@ from specdev_tools.core.errors import FindingError
 from specdev_tools.core.loaders import iter_spec_artifacts
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.graph.build import build_graph
-from specdev_tools.lifecycle.close_gate import latest_signoff, signoff_records
+from specdev_tools.verify.records import latest_signoff, signoff_records
 from specdev_tools.lifecycle.signoff import sign_off
 from specdev_tools.trace.records import record_files
 from unit.graph._synth import ROOT
 from unit.lifecycle._milestone_support import cli_run, providers_of, ready_host, set_row
-from unit.lifecycle._record_support import AUTHOR, author, plan_host, roots
-from unit.lifecycle._support import MILESTONE, closed_record
+from unit.lifecycle._record_support import AUTHOR, ITEM, author, plan_host, roots
+from unit.lifecycle._support import MILESTONE, PLAN, closed_record
+from unit.verify._support import edit_doc
 
 pytestmark = pytest.mark.usefixtures("author")
 SIGNOFF_DIR = Path("spec") / "extras" / "signoff"
@@ -82,3 +83,33 @@ def test_signoff_prints_the_view_and_does_not_check_the_review(tmp_path: Path) -
     assert code == 0 and json.loads(out)["record"]["signoff_id"] == "so-ms-account-recovery-0002"
     code, _, err = cli_run(host, "milestone", "sign-off", "account_recovery")
     assert code == 1 and "milestone-state --batch-id account_recovery" in err
+
+
+def _put_open_item(host: Path) -> None:
+    item = {"id": "amb-token-store", "description": "Is the token store per user?", "about": ["tc-confirm-expired-token"]}
+    edit_doc(host, PLAN, lambda document: document.setdefault("execution", {}).update(emergent_ambiguities=[item]))
+
+
+def test_listed_open_items_counts_the_open_items_not_the_items_not_executed(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    _put_open_item(host)
+    code, out, _ = cli_run(host, "milestone", "sign-off", MILESTONE)
+    assert code == 0
+    assert "open items: 1 (amb-token-store)" in out and f"plan items not executed: 1 ({ITEM})" in out
+    document = json.loads((host / SIGNOFF_DIR / "so-ms-account-recovery-0001.json").read_text(encoding="utf-8"))
+    assert document["records"][0]["listed"]["open_items"] == 1
+    # no open item and an unexecuted item: the record holds 0 (it held 1 when it counted the unexecuted items)
+    other = plan_host(tmp_path / "other")
+    assert _sign(other).record["listed"]["open_items"] == 0
+    # an open item and every item executed: 1
+    ready = ready_host(tmp_path / "ready")
+    _put_open_item(ready)
+    assert _sign(ready).record["listed"]["open_items"] == 1
+
+
+@pytest.mark.parametrize("value, deferred, wont_do", [("deferred", ["task-implement-password-reset-confirm"], []), ("wont_do", [], ["task-implement-password-reset-confirm"])])
+def test_listed_keeps_deferred_and_wont_do_tasks_apart(tmp_path: Path, value: str, deferred: list[str], wont_do: list[str]) -> None:
+    host = plan_host(tmp_path)
+    edit_doc(host, "14_roadmap.json", lambda document: document["milestones"][0]["tasks"][0].update(disposition={"value": value, "reason": "Waiting for the vendor sandbox."}))
+    listed = _sign(host).record["listed"]
+    assert (listed["deferred_tasks"], listed["wont_do_tasks"]) == (deferred, wont_do)

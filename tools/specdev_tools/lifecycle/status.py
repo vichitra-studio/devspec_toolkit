@@ -21,25 +21,27 @@ from typing import Any
 
 from ..core.ambiguity_items import is_open, read_ambiguity_items
 from ..core.errors import FindingError, SpecError
-from ..core.loaders import read_json_object
+from ..core.plan_files import find_plan
 from ..core.step_order import load_step_order
 from ..graph.gitview import read_seed_texts
 from ..graph.model import Graph, Node
-from ..graph.names import FIXTURE, RULE, VERIFIED_BY, link_targets
-from ..proof.proof import PENDING_STAGE, PROVEN, STAGE_UNKNOWN, is_attested_by_person, verifier_proof
+from ..graph.names import FIXTURE, ROW_IN_PROGRESS, RULE, VERIFIED_BY, link_targets
+from ..graph.ownership import CLOSE_OWNER
+from ..graph.stages import STAGES
+from ..proof.proof import PROVEN, STAGE_UNKNOWN, UNPROVEN, is_attested_by_person, proof, verifier_proof
 from ..proof.realisation import unresolved_realisations
 from ..proof.validity import ProofContext
 from ..trace import replay, step_ready
 from ..trace.lockfile import Lock
 from ..verify.code_tree import submodule_warnings
+from ..verify.records import signoff_records
 from . import anchor_store, close_gate, executed, plans
-from .milestone import ProviderFactory, gate_context, run_gate
+from .milestone import ProviderFactory, gate_context, require_row, run_gate
 
 RELEASE_NOT_INSTALLED = "release gate not installed"
 MERGE_RELEASE_SECTION = "merge_release_gates"
 PRODUCTION_SECTION = "production_verification"
 _TRINITY_STEPS = frozenset({"16a", "16b", "16c"})
-_VERIFIED = "verified"
 
 
 @dataclass(frozen=True)
@@ -80,14 +82,12 @@ def register_status_section(name: str, fn: SectionFn) -> None:
 
 
 def _in_progress(ctx: StatusContext) -> list[str]:
-    return [milestone for milestone, state in anchor_store.read_statuses(ctx.spec_root).items() if state.status == "in_progress"]
+    return [milestone for milestone, state in anchor_store.read_statuses(ctx.spec_root).items() if state.status == ROW_IN_PROGRESS]
 
 
 def _review_verdict(spec_root: str, milestone_id: str) -> str | None:
-    plan = plans.find_plan(spec_root, milestone_id)
-    review = (read_json_object(plan) or {}).get("review") if plan is not None else None
-    verdict = review.get("verdict") if isinstance(review, dict) else None
-    return verdict if isinstance(verdict, str) else None
+    plan = find_plan(spec_root, milestone_id)
+    return close_gate.review_verdict(plan) if plan is not None else None
 
 
 # --- the sections -----------------------------------------------------------------------------------------------------
@@ -118,7 +118,7 @@ def _open_items(sc: StatusContext) -> Section:
 def _awaiting_signoff(sc: StatusContext) -> Section:
     waiting = [
         milestone for milestone in _in_progress(sc)
-        if _review_verdict(sc.spec_root, milestone) == _VERIFIED and not close_gate.signoff_records(sc.spec_root, milestone)
+        if _review_verdict(sc.spec_root, milestone) == close_gate.VERIFIED and not signoff_records(sc.spec_root, milestone)
     ]
     lines = tuple(f"{milestone}: reviewed `verified`, no sign-off; `specdev milestone sign-off {milestone}`" for milestone in waiting)
     return Section("awaiting_signoff", "Milestones awaiting sign-off", lines or ("none",), waiting)
@@ -165,7 +165,7 @@ def _gate_owned(sc: StatusContext) -> Section:
             notes.append(f"{milestone}: the close gate was not run ({error.error.message})")
             continue
         for found in report.errors:
-            by_owner[found.owner or "close-gate"].append(f"{milestone}: {found.render()}")
+            by_owner[found.owner or CLOSE_OWNER].append(f"{milestone}: {found.render()}")
     warnings = [error.render() for error in submodule_warnings(sc.git_root)]
     lines = [line for owner, found in sorted(by_owner.items()) for line in (f"{owner} ({len(found)}):", *(f"  {text}" for text in found))]
     lines.extend([*notes, *warnings])
@@ -251,7 +251,24 @@ def _criterion_status(graph: Graph, ctx: ProofContext, node: Node) -> str:
     return STAGE_UNKNOWN if isinstance(answer, SpecError) else answer.status
 
 
-def _manual_lines(graph: Graph, ctx: ProofContext, scope: Any) -> tuple[ManualLine, ...]:
+def _owed_later(graph: Graph, ctx: ProofContext, node: Node) -> bool:
+    """Whether the criterion *node* has a binding at ``staging`` or ``prod`` that the proof with the cap ``prod`` does not find proven.
+
+    The close gate ignores those bindings; this asks the proof code as it is (cap ``prod``, no ``treat_ci_as_dev``) and reads
+    the stage of the binding each shortfall names.  A criterion that has a failing binding at a lower stage as well may name only
+    that one (``proof`` stops at the first binding that fails); the gate and the criterion's line say it is unproven then.
+    A stage that cannot be told (E334) is the gate's finding, not an owed proof.
+    """
+    try:
+        answer = proof(graph, ctx, node.id, STAGES[-1])
+    except FindingError as error:
+        if error.error.code != STAGE_UNKNOWN:
+            raise
+        return False
+    return answer.status == UNPROVEN and any(shortfall.stage in STAGES[STAGES.index("staging"):] for shortfall in answer.shortfalls)
+
+
+def _manual_lines(graph: Graph, ctx: ProofContext, scope: close_gate.Scope) -> tuple[ManualLine, ...]:
     """The manual fixtures and review rules the criteria in play are verified by, each once, with whether it is attested now."""
     found: dict[str, ManualLine] = {}
     for criterion, _ in scope.criteria:
@@ -286,10 +303,10 @@ def milestone_view(sc: StatusContext, milestone_id: str) -> MilestoneView:
     """The view of *milestone_id* (a canonical roadmap milestone id): the close gate is a dry run, nothing is written.
 
     Raises:
-        FindingError: E803 when no plan names the milestone; E801 for an unknown status; E520 once for host declarations that cannot be read.
+        FindingError: E800 when the anchor file has no row about it; E803 when no plan names the milestone; E801 for an unknown status; E520 once for host declarations that cannot be read.
     """
     graph, spec_root = sc.graph, sc.spec_root
-    row = anchor_store.read_row(spec_root, milestone_id)
+    row = require_row(spec_root, milestone_id)
     plan = plans.require_plan(spec_root, milestone_id)
     scope = close_gate.scope_of(graph, milestone_id)
     items = close_gate.plan_items(graph, milestone_id)
@@ -301,17 +318,17 @@ def milestone_view(sc: StatusContext, milestone_id: str) -> MilestoneView:
     open_items = tuple(item.id or "(no id)" for item in read_ambiguity_items(spec_root).items if is_open(item) and os.path.abspath(item.artifact_path) == plan_path)
     return MilestoneView(
         milestone=milestone_id,
-        status=row.status if row is not None else "pending",
+        status=row.status,
         plan_file=os.path.relpath(plan, spec_root),
         tree=sc.ctx.code_tree,
-        signoffs=tuple(f"{r.signoff_id} (tree {r.tree})" for r in close_gate.signoff_records(spec_root, milestone_id)),
+        signoffs=tuple(f"{r.signoff_id} (tree {r.tree})" for r in signoff_records(spec_root, milestone_id)),
         criteria=criteria,
         manual=_manual_lines(graph, sc.ctx, scope),
         paused=scope.paused,
         paused_items=realised_only_paused,
         open_items=open_items,
         items_not_executed=_not_executed(graph, sc.ctx, sc.lock, in_scope),
-        proof_owed_later=tuple(line.criterion for line in criteria if line.status == PENDING_STAGE),
+        proof_owed_later=tuple(node.id for node, _ in scope.criteria if _owed_later(graph, sc.ctx, node)),
         report=report,
         warnings=tuple(error.render() for error in submodule_warnings(sc.git_root)),
     )

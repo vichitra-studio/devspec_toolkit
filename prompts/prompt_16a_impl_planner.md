@@ -157,7 +157,7 @@ Field shape is in `vc:core:collections#ambiguityItem` (`schema/core/collections.
 *   List ANY open question that would affect implementation: a decision the spec does not hold, a node that is missing (set `missing_kind` and make `about` name the parent that should contain it), a library nobody chose. Deferring a task is an open item too, not a deferral of yours: the task's `disposition` is the roadmap's to change.
 *   *Rule*: an open item does not stop planning — record it and plan the rest of the milestone.
 *   *Rule*: `proposed_assumption` says on which basis work proceeds while the item is open; it is not a decision and not a substitute for the answer.
-*   `about` names nodes of the steps before 16a: the criterion the question is about, its task, an API. A plan item of the same plan is refused (E702); if it concerns one item, describe the item in words (shared_expectations section 6, rule 9).
+*   `about` names nodes of the steps before 16a: the criterion the question is about, its task, an API. A plan item of the same plan is written and then reported by `spec-check` (E702): delete the item with `specdev json delete --id <amb-id>` and write it again; if it concerns one item, describe the item in words (shared_expectations section 6, rule 9).
 *   Plan-phase ids are `amb-<slug>`; the coder's ids (16b) are `amb-new-<slug>`.
 
 ## 4. `plan.solution` (Architecture)
@@ -259,7 +259,7 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 1.  **Never write a file under `spec/` yourself.** Write the whole plan as a draft outside `spec/` (`.specdev/drafts/plan_<batch>.json`, the shape of the Output Contract; `<batch>` is a short name made of letters, digits, `_` and `-`) and run `specdev step create 16a <batch> --from .specdev/drafts/plan_<batch>.json` (`--dry-run` prints the report and writes nothing). It creates `spec/impl_context/ms_<batch>_plan.json`, shows where every link points and writes the lock entry of every `realises` link. It refuses a draft that breaks the schema or links to a node that does not exist, and a plan file that already exists. The draft carries the ids of its items, actions and open items: they are not minted.
 2.  **Do not dump the JSON in the chat thread.** Respond with a short confirmation that the plan was created and `specdev spec-check` shows no finding on it (or the findings).
 3.  The JSON must validate against `schema/16_impl_context.schema.json`.
-4.  Populate the `plan` object fully. Leave `execution` and `review` out.
+4.  Populate the `plan` object fully. Leave `execution` and `review` out: a draft carries no `review` block and no `execution.records`, and `specdev step create 16a` does not refuse a draft that does (it writes them), so check the draft yourself.
 5.  **An existing plan** is edited by id: `specdev json insert --id <item-id> .implementation.actions '<action>'`, `specdev json patch --id <item-id> .description '"<text>"'`, `specdev json delete --id <id>`. A new item is `specdev json insert spec/impl_context/ms_<batch>_plan.json .plan.spec_alignment.checklist '<item>'` followed by `specdev attest <item-id> --yes` (E761 names the missing lock entry). Re-planning leaves records that point at an item or action that is gone, or that are stale because `realises` changed: tell the caller, who runs `specdev attest` for the changed links and `specdev plan record --prune <milestone-id>` for the orphan records.
 
 # Clarification Questions

@@ -17,8 +17,8 @@ import enum
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import Link, Node
+from specdev_tools.graph.queries import task_disposition
 from specdev_tools.trace.hashing import compute_all
 
 from .context import GraphCheckContext
@@ -200,9 +200,7 @@ class BuiltComputation:
 
     def _task_paused(self, criterion: Node) -> bool:
         task = self.ctx.graph.by_id.get(criterion.parent) if criterion.parent else None
-        item = item_of(self.ctx.graph, task) if task is not None else None
-        disposition = item.get("disposition") if item is not None else None
-        return isinstance(disposition, dict) and disposition.get("value") in PAUSED_DISPOSITIONS
+        return task is not None and task_disposition(self.ctx.graph, task)[0] in PAUSED_DISPOSITIONS
 
     def _content_hash(self, node: Node) -> str | None:
         if self._hashes is None:

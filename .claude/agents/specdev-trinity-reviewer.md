@@ -273,7 +273,9 @@ Write the findings file to:
 .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json
 ```
 
-The `.specdev/findings/` directory is host-gitignored scratch.
+The `.specdev/findings/` directory is scratch that nothing in the toolkit adds to `.gitignore`: write the findings
+file before the skill runs `specdev verify run`, because an untracked file git does not ignore changes the code
+tree and turns the evidence of the run into E811 `STALE_TREE`.
 If it does not exist, create it: `mkdir -p .specdev/findings`.
 
 The file MUST conform to `vc:infra:findings` (schema URI) and carry `"$schema": "vc:infra:findings"`

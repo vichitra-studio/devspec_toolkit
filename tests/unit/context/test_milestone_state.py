@@ -342,6 +342,20 @@ class TestDerivePhasePosition:
         _write_findings(findings_dir, "findings_batch1_review_1.json", [])
         assert self._position(findings_dir, "code_converged") == "review_complete"
 
+    def test_the_newest_round_decides_not_any_empty_round(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_1.json", [])
+        _write_findings(findings_dir, "findings_batch1_review_2.json", [{"kind": "bug", "severity": "P0"}])
+        assert self._position(findings_dir, "code_converged") == "review_pending"
+        _write_findings(findings_dir, "findings_batch1_review_3.json", [])
+        assert self._position(findings_dir, "code_converged") == "review_complete"
+
+    def test_rounds_are_ordered_as_numbers_and_a_halt_archive_belongs_to_its_round(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_9.json", [{"kind": "bug"}])
+        _write_findings(findings_dir, "findings_batch1_review_10.json", [])
+        assert self._position(findings_dir, "code_converged") == "review_complete"
+        _write_findings(findings_dir, "findings_batch1_review_11_1700000000.json", [{"kind": "bug"}])
+        assert self._position(findings_dir, "code_converged") == "review_pending"
+
     def test_operator_pending_blocked_group(self, findings_dir: Path) -> None:
         _write_findings(findings_dir, "findings_batch1_review_1.json", [])
         assert self._position(findings_dir, "code_converged", "blocked") == "operator_pending"
@@ -433,3 +447,14 @@ def test_command_reads_closed_blocked_and_deferred_from_the_spec(tmp_path: Path)
     assert _run_command(spec, tmp_path / "host")["derived_phase_position"] == "closed"
     _set_disposition(spec, "deferred")
     assert _run_command(spec, tmp_path / "host")["groups"][0]["state"] == "deferred"
+
+
+def test_command_reads_the_newest_milestone_review_round(tmp_path: Path) -> None:
+    """An empty round 1 and a round 2 that holds a P0 finding: the review is pending, not complete."""
+    spec = example_spec(tmp_path / "host")
+    findings_dir = _findings_dir(tmp_path / "host")
+    _converge(findings_dir, ITEM)
+    _write_findings(findings_dir, "findings_account_recovery_review_1.json", [])
+    assert _run_command(spec, tmp_path / "host")["derived_phase_position"] == "review_complete"
+    _write_findings(findings_dir, "findings_account_recovery_review_2.json", [{"kind": "bug", "severity": "P0"}])
+    assert _run_command(spec, tmp_path / "host")["derived_phase_position"] == "review_pending"

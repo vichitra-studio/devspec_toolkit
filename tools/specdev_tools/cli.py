@@ -1055,6 +1055,24 @@ def main():
         except (OSError, KeyError, json.JSONDecodeError):
             pass  # silently skip if file missing or malformed
 
+        _ai_help_step_lines = {
+            "16a": (
+                "Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the plan file of the batch: specdev step create 16a <batch> --from <draft> (it writes spec/impl_context/ms_<batch>_plan.json; an existing plan is edited with specdev json patch|insert|delete --id)",
+                "Validate: specdev spec-check spec --step 16a",
+            ),
+            "16b": (
+                "Step 16b has no file of its own: it is a part of the plan file of step 16a. Record each carried-out action with specdev plan record <item>/<action> --outcome done|failed|blocked; write an open item into execution.emergent_ambiguities with specdev json patch <plan> '.execution.emergent_ambiguities' '[<item>]' (the array is missing) or specdev json insert <plan> '.execution.emergent_ambiguities' '<item>' (it exists)",
+                "Validate: specdev spec-check spec --step 16b",
+            ),
+            "16c": (
+                "Step 16c has no file of its own: it is a part of the plan file of step 16a. Write a findings file under .specdev/findings/ and record the verdict with specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred --findings-file <file>",
+                "Validate: specdev spec-check spec --step 16c",
+            ),
+        }
+        _ai_help_step = _ai_help_step_lines.get(args.step) or (
+            f"Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create {args.step} --from <draft> (an existing step is edited with specdev json patch|insert|delete --id)",
+            f"Validate: specdev spec-check spec --step {args.step}",
+        )
         if getattr(args, "json_output", False):
             lines = []
             if args.step:
@@ -1062,16 +1080,16 @@ def main():
                     f"AI help for step {args.step}:",
                     f"1. Open the prompt file: prompts/prompt_{args.step}_*.md",
                     f"2. Copy the content into your AI assistant",
-                    f"3. Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create {args.step} --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)",
-                    f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>",
+                    f"3. {_ai_help_step[0]}",
+                    f"4. {_ai_help_step[1]}",
                 ]
             else:
                 lines = [
                     "AI Interaction Guide:",
                     "1. Locate the prompt file in prompts/prompt_XX_stepname.md",
                     "2. Copy the full content into your AI assistant",
-                    "3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)",
-                    "4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>",
+                    "3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (an existing step is edited with specdev json patch|insert|delete --id)",
+                    "4. Validate with: specdev spec-check spec --step NN (the step is written as in the file name: 05, 02a, 16)",
                     "5. Ensure all IDs use kebab-case format",
                     "6. No examples should be included in the AI output",
                 ]
@@ -1094,8 +1112,8 @@ def main():
                 print(f"AI help for step {args.step}:")
                 print(f"1. Open the prompt file: prompts/prompt_{args.step}_*.md")
                 print(f"2. Copy the content into your AI assistant")
-                print(f"3. Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create {args.step} --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)")
-                print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>")
+                print(f"3. {_ai_help_step[0]}")
+                print(f"4. {_ai_help_step[1]}")
                 if args.step in _step_docs:
                     print("")
                     print("Reference docs:")
@@ -1105,8 +1123,8 @@ def main():
                 print("AI Interaction Guide:")
                 print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")
                 print("2. Copy the full content into your AI assistant")
-                print("3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)")
-                print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>")
+                print("3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (an existing step is edited with specdev json patch|insert|delete --id)")
+                print("4. Validate with: specdev spec-check spec --step NN (the step is written as in the file name: 05, 02a, 16)")
                 print("5. Ensure all IDs use kebab-case format")
                 print("6. No examples should be included in the AI output")
     elif args.cmd == "changelog":
@@ -1768,6 +1786,7 @@ def main():
 
     elif args.cmd == "milestone-state":
         from .context.milestone_state import compute_milestone_state, load_spec_view
+        from .core.step_paths import PLAN_DIR_NAME, plan_file_name
 
         repo_root = os.path.abspath(args.repo_root)
         batch_id: str = args.batch_id
@@ -1777,9 +1796,7 @@ def main():
             spec_root = os.path.abspath(args.spec_root)
         else:
             spec_root = os.path.join(repo_root, "spec")
-        plan_path = os.path.join(
-            spec_root, "impl_context", f"ms_{batch_id}_plan.json"
-        )
+        plan_path = os.path.join(spec_root, PLAN_DIR_NAME, plan_file_name(batch_id))
         if not os.path.isfile(plan_path):
             print(
                 f"E520 UNRESOLVED_INPUT missing_plan_file {plan_path}",

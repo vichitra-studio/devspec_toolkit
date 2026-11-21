@@ -29,10 +29,10 @@ from ...core.scope_helpers import as_dict, as_list, str_items
 from ...core.step_paths import PLAN_DIR_NAME
 from ...graph.build import build_graph
 from ...graph.kinds import KindRegistryError
+from ...graph.names import ROW_DONE
 from ...graph.queries import task_of
 from ...lifecycle.anchor_store import read_statuses
-from ...core.plan_files import MILESTONE_KEY, find_plan
-from ...trace.history import DONE_STATUS
+from ...core.plan_files import MILESTONE_KEY, find_plan, plan_files
 from .step_16 import _is_anchor
 
 _PLAN_SCHEMA = "vc:16-impl-context"
@@ -192,7 +192,7 @@ def _ownership_errors(
         return []
     open_plans = [
         (ms_data[MILESTONE_KEY], _realised(ms_data)) for _file, ms_data in sorted(contexts.items())
-        if statuses.get(ms_data[MILESTONE_KEY]) is not None and statuses[ms_data[MILESTONE_KEY]].status != DONE_STATUS
+        if statuses.get(ms_data[MILESTONE_KEY]) is not None and statuses[ms_data[MILESTONE_KEY]].status != ROW_DONE
     ]
     if sum(1 for _milestone, criteria in open_plans if criteria) < 2:
         return []
@@ -263,7 +263,7 @@ def _scan_plan_files(
     contexts: dict[str, dict[str, Any]] = {}
     errors: list[SpecError] = []
     orphans: list[str] = []
-    files = sorted((spec_root / PLAN_DIR_NAME).glob("*.json"))
+    files = plan_files(spec_root)
     for ms_file in files:
         ms_data = read_json_object(ms_file)
         if ms_data is None:

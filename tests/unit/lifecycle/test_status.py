@@ -16,7 +16,7 @@ from unit.lifecycle._milestone_support import change_stamp, cli_run, providers_o
 from unit.lifecycle._record_support import author, plan_host, roots
 from unit.lifecycle._support import MILESTONE, PLAN
 from unit.proof._closed import closed_example, reword_criterion
-from unit.proof._support import CRITERION, FIXTURE
+from unit.proof._support import CRITERION, FIXTURE, run
 from unit.verify._support import edit_doc
 from unit._ambiguity_support import unified_item
 
@@ -145,3 +145,74 @@ def test_status_on_a_batch_id_names_the_way_to_the_milestone(tmp_path: Path) -> 
     host = plan_host(tmp_path)
     code, _, err = cli_run(host, "status", "--milestone", "account_recovery")
     assert code == 1 and "milestone-state --batch-id account_recovery" in err
+
+
+def _stage_of_alpha(host: Path, stage: str) -> None:
+    path = host / "spec" / "extras" / "verification" / "ver-alpha.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["records"][0]["stage"] = stage
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def _owed_later(host: Path) -> list[str]:
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+    assert code == 0, out
+    return json.loads(out)["proof_owed_later"]
+
+
+def test_proof_owed_at_staging_or_prod_names_a_criterion_whose_staging_binding_has_no_evidence(tmp_path: Path) -> None:
+    host = ready_host(tmp_path)
+    assert _owed_later(host) == []  # everything is proven at dev, no later binding
+    _stage_of_alpha(host, "staging")
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0 and "proof owed at staging or prod: tc-confirm-expired-token" in out
+    assert _owed_later(host) == ["tc-confirm-expired-token"]
+    code, out, _ = cli_run(host, "milestone", "sign-off", MILESTONE)
+    assert code == 0 and "proof owed at staging or prod: tc-confirm-expired-token" in out
+    record = json.loads((host / "spec" / "extras" / "signoff" / "so-ms-account-recovery-0001.json").read_text(encoding="utf-8"))["records"][0]
+    assert record["listed"]["staging_prod_proof_owed"] == ["tc-confirm-expired-token"]
+
+
+def test_proof_owed_at_staging_or_prod_is_empty_when_the_staging_binding_has_staging_evidence(tmp_path: Path) -> None:
+    host = ready_host(tmp_path)
+    _stage_of_alpha(host, "staging")
+    run(host, ["ver-alpha"], stage="staging")
+    assert _owed_later(host) == []
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert "proof owed at staging or prod: none" in out
+
+
+def test_proof_owed_at_staging_or_prod_is_empty_for_a_criterion_with_no_binding(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)  # unbound: the gate says E811, nothing is owed LATER
+    assert _owed_later(host) == []
+
+
+def test_status_milestone_for_a_milestone_with_a_plan_and_no_anchor_row_is_e800(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    edit_doc(host, "16_impl_context.json", lambda document: document["plan"].update(milestone_index=[]))
+    code, out, err = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 1 and out == "" and err.startswith("E800") and "pending" not in err
+    start_code, _, start_err = cli_run(host, "milestone", "start", MILESTONE)
+    assert start_code == 1 and start_err == err  # the same refusal as the commands that write
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+    assert code == 1 and "E800" in out and "pending" not in out
+
+
+def test_milestone_view_does_not_count_an_item_of_only_paused_criteria_as_not_executed(tmp_path: Path) -> None:
+    host = ready_host(tmp_path)
+    edit_doc(host, PLAN, lambda document: document["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"].append({"id": "a02", "type": "file_edit", "description": "More.", "target": "src/hello.txt"}))
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0 and "plan items not executed: 1 (PWRESET_CONFIRM_EXPIRED_01)" in out
+    edit_doc(host, "14_roadmap.json", lambda document: document["milestones"][0]["tasks"][0].update(disposition={"value": "deferred", "reason": "waits for the mail relay"}))
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0 and "plan items not executed: 0" in out
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+    assert json.loads(out)["items_not_executed"] == []
+
+
+def test_a_milestone_whose_review_says_needs_work_is_not_awaiting_sign_off(tmp_path: Path) -> None:
+    host = ready_host(tmp_path)
+    assert _sections(host)["awaiting_signoff"].data == [MILESTONE]
+    for verdict in ("needs_work", "blocked", "deferred"):
+        edit_doc(host, PLAN, lambda document, verdict=verdict: document["review"].update(verdict=verdict))
+        assert _sections(host)["awaiting_signoff"].data == [] and _sections(host)["awaiting_signoff"].lines == ("none",)

@@ -180,7 +180,7 @@ invocation prompt. This agent reads it and branches.
 1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` first.
 2. Read the milestone findings file at the path supplied by the dispatcher:
    ```
-   .specdev/findings/findings_<milestone_id>_review_<round>_<ts>.json
+   .specdev/findings/findings_<batch_id>_review_<round>.json
    ```
 3. Every item shares the file boundary `plan.summary.target_file_patterns`. Read it and the
    item ids:
@@ -258,7 +258,9 @@ specdev json insert <plan> '.execution.emergent_ambiguities' '<item>'
 - The item is `{"id": "amb-new-<slug>", "description": "<what and why>", "about": ["<node-id>"]}`.
   `about` names spec nodes the question concerns (the criterion the item realises, its task, an
   API), found with `specdev trace --recipe 16b <group_id>` or `specdev node show`. Never name a
-  plan item (E702); describe the item in words and put no node id in the text.
+  plan item: the write succeeds, then `spec-check` reports E702; undo it (and only it) with
+  `specdev json delete --id <amb-id>` and write the item again.
+  Describe the item in words and put no node id in the text.
 - Never patch `.execution` itself: it holds the records `specdev plan record` wrote.
 - An open item about a node of an item's chain blocks that item: stop on it, say so in the return,
   and carry on with an item it does not concern.

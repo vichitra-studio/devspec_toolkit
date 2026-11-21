@@ -16,12 +16,14 @@ from specdev_tools.validation.graph_checks import run_graph_checks
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.prose_ids import check_prose_ids
 from specdev_tools.lifecycle.milestone import close_milestone
+from specdev_tools.trace.lockfile import LockError, with_write_lock
 from specdev_tools.lifecycle.plan_records import Address, record_action
 from unit.graph._synth import ROOT
 from unit.lifecycle._milestone_support import cli_run, providers_of, ready_host, set_row
 from unit.lifecycle._record_support import ALPHA, ITEM, author, plan_host, roots
 from unit.lifecycle._support import ANCHOR, MILESTONE, PLAN
 from unit.proof._support import REUSED_BINDING, run
+from unit.verify._support import edit_doc
 
 pytestmark = pytest.mark.usefixtures("author")
 
@@ -77,6 +79,16 @@ def test_check_flag_writes_nothing(tmp_path: Path) -> None:
     assert code == 0 and "nothing written" in out
 
 
+def test_check_flag_takes_no_write_lock_and_a_close_does(tmp_path: Path) -> None:
+    """A dry run reads the graph as it is (as ``status`` does): it passes while another write holds the lock; a close is refused (E769)."""
+    host = ready_host(tmp_path, signed=True)
+    with with_write_lock(str(host / "spec")):
+        assert _close(host, check=True).report.passed
+        with pytest.raises(LockError) as caught:
+            _close(host)
+    assert caught.value.error.code == "E769"
+
+
 def test_failed_close_lists_errors_by_owner_and_writes_nothing(tmp_path: Path) -> None:
     host = ready_host(tmp_path)
     before = (host / "spec" / ANCHOR).read_bytes()
@@ -121,3 +133,19 @@ def test_after_close_the_graph_and_prose_checks_report_nothing_for_the_anchor_ro
     context = GraphCheckContext.from_graph(graph, lock_if_present(spec), str(ROOT), git_root=str(host), spec_root=spec)
     findings = [*check_prose_ids(context, "merge"), *run_graph_checks(context, "merge")]
     assert [f for f in findings if f.node_id == "anchor-ms-account-recovery" or "so-ms-account-recovery" in f.message] == []
+
+
+def test_a_close_that_fails_the_gate_with_a_sign_off_present_writes_nothing(tmp_path: Path) -> None:
+    host = ready_host(tmp_path, signed=True)
+    edit_doc(host, PLAN, lambda document: document["review"].update(verdict="needs_work"))
+    before = (host / "spec" / ANCHOR).read_bytes()
+    result = _close(host)
+    assert not result.closed and result.record is None and [error.code for error in result.report.errors] == ["E813"]
+    assert (host / "spec" / ANCHOR).read_bytes() == before
+    code, out, err = cli_run(host, "milestone", "close", MILESTONE)
+    assert code == 1 and out == "" and "cannot be closed: 1 error(s)" in err and "E813" in err
+    assert (host / "spec" / ANCHOR).read_bytes() == before
+    code, out, _ = cli_run(host, "milestone", "close", MILESTONE, "--json")
+    assert code == 1 and json.loads(out)["closed"] is False
+    assert (host / "spec" / ANCHOR).read_bytes() == before
+    assert anchor_store.read_row(host / "spec", MILESTONE).status == "in_progress"  # type: ignore[union-attr]

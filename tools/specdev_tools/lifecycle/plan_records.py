@@ -37,6 +37,8 @@ from .records import git_author, mint_id, now_utc
 ADDRESS = re.compile(r"^(?P<item>[^/\s]+)/(?P<action>\S+)$")
 RECORDS_PATH = ".execution.records"
 NEAREST = 3
+PAUSED_ITEM_WARNING = "W826"
+"""The code of the finding for a plan item that realises only deferred or wont_do tasks."""
 
 
 @dataclass(frozen=True)
@@ -97,20 +99,6 @@ class _Target:
     action_id: str
 
 
-def refuse_if_frozen(spec_root: str, milestone: str | None, plan_file: str) -> None:
-    """Raise E820 when *milestone*, the one the plan file *plan_file* names, is closed; a plan with no milestone is never frozen.
-
-    Raises:
-        FindingError: E820 for a closed milestone; E801 for an anchor row with an unknown status.
-    """
-    if milestone is not None and frozen.is_frozen(spec_root, milestone):
-        raise refusal(
-            "E820",
-            f"plan {plan_file} belongs to milestone {milestone}, which is closed: a closed plan is frozen and changes only "
-            "through a recorded migration, so no record can be written to it or removed from it",
-        )
-
-
 def _unknown_item(graph: Graph, item_id: str) -> FindingError:
     known = [node.id for node in graph.by_kind.get(PLAN_ITEM, ())]
     nearest = ", ".join(entry["id"] for entry in nearest_ids(item_id, known, NEAREST))
@@ -119,8 +107,8 @@ def _unknown_item(graph: Graph, item_id: str) -> FindingError:
 
 
 def _plan_item(graph: Graph, item_id: str) -> Node:
-    node = graph.find(item_id)
-    if node is None or node.kind != PLAN_ITEM:
+    node = executed.plan_item_node(graph, item_id)
+    if node is None:
         raise _unknown_item(graph, item_id)
     return node
 
@@ -128,11 +116,17 @@ def _plan_item(graph: Graph, item_id: str) -> Node:
 def _action_of(graph: Graph, item: Node, action_id: str) -> Mapping[str, Any]:
     actions = executed.actions_of(item_of(graph, item) or {})
     ids = [name for action in actions if isinstance(name := action.get("id"), str)]
-    found = [action for action in actions if action.get("id") == action_id]
+    found = executed.actions_with_id(graph, item, action_id)
     if len(found) == 1:
         return found[0]
     if len(found) > 1:
         raise refusal("E821", f"{item.id} has {len(found)} actions with the id {action_id}; give each action its own id")
+    if not actions:
+        raise refusal(
+            "E821",
+            f"{item.id} has no action; insert one with `specdev json insert --id {item.id} .implementation.actions '<action with an id>'` "
+            f"(an action has an id, a type and a description), then record it as {action_id}",
+        )
     if not ids:
         raise refusal(
             "E821",
@@ -213,7 +207,7 @@ def record_action(spec_root: str, repo_root: str, git_root: str, address: Addres
     """
     with locked_graph(spec_root, repo_root, "plan record") as graph:
         item = _plan_item(graph, address.item)
-        refuse_if_frozen(spec_root, item.milestone, item.file)
+        frozen.refuse_if_frozen(spec_root, item.milestone, item.file)
         target = _Target(item, _action_of(graph, item, address.action), address.action)
         _refuse_naming(graph, target)
         record = _record_of(graph, spec_root, target, outcome, note, git_root)
@@ -237,8 +231,7 @@ def record_at_deploy(spec_root: str, repo_root: str, git_root: str, address: Add
         target = _resolve(graph, address)
         marked = executed.at_deploy_of(target.action)
         if env not in marked:
-            now = f"marked at_deploy for {', '.join(marked)}" if marked else "not marked at_deploy"
-            raise refusal("E821", f"action {address.action} of {address.item} is {now}, not for {env}; an at-deploy record names a stage its action is marked for")
+            raise refusal("E821", f"action {address.action} of {address.item} is {executed.at_deploy_state(target.action)}, not for {env}; an at-deploy record names a stage its action is marked for")
         if target.item.milestone is None:
             raise FindingError(make_error(
                 "E803", f"plan {target.item.file} has no `milestone` key: run `specdev align`", subcode="MILESTONE_KEY_MISSING", node_id=target.item.id,
@@ -281,7 +274,7 @@ def prune_records(spec_root: str, repo_root: str, milestone_id: str) -> PruneRes
     plan = plans.require_plan(spec_root, milestone_id)
     rel = os.path.relpath(plan, spec_root)
     with locked_graph(spec_root, repo_root, "plan record --prune") as graph:
-        refuse_if_frozen(spec_root, milestone_id, rel)
+        frozen.refuse_if_frozen(spec_root, milestone_id, rel)
         orphans = _orphans(graph, rel)
         before = os.path.getsize(plan)
         if orphans:
@@ -313,8 +306,8 @@ def check_plan_records(graph: Graph, lock: Lock | None, spec_root: str) -> list[
     items = list(graph.by_kind.get(PLAN_ITEM, ()))
     closed, findings = _frozen_milestones(spec_root, {item.milestone for item in items})
     records = executed.execution_records(graph)
-    latest = {(record.item, record.action): record for record in records}
-    for (item_id, action_id), record in latest.items():
+    for item_id, action_id in dict.fromkeys((record.item, record.action) for record in records):
+        record = executed.latest_record(records, item_id, action_id)
         node = graph.find(item_id)
         if node is not None and executed.is_stale(record, lock, frozen_plan=node.milestone in closed):
             findings.append(make_error(
@@ -326,7 +319,7 @@ def check_plan_records(graph: Graph, lock: Lock | None, spec_root: str) -> list[
     for item in items:
         if item.milestone not in closed and executed.realises_only_excluded(graph, item):
             findings.append(make_error(
-                "W826",
+                PAUSED_ITEM_WARNING,
                 f"plan item {item.id} realises only criteria of tasks that are deferred or wont_do, so the close gate ignores it; drop it when 16a re-plans",
                 file=item.file, jq_path=item.jq_path or None, node_id=item.id,
             ))

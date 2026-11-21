@@ -54,6 +54,16 @@ MANUAL_MODE = "manual"  # ``mode`` of a fixture that a person attests
 REVIEW_ENFORCER = "review"  # ``enforcer`` of a rule that a review enforces
 PAUSED_DISPOSITIONS = frozenset({"deferred", "wont_do"})  # ``disposition.value`` of a roadmap task that is postponed or cancelled: its criteria give no coverage
 
+# ``status`` of an anchor row (a milestone's place in the roadmap); a row with none reads as ``DEFAULT_ROW_STATUS``.  Here, at the
+# lowest layer that reads one (``trace.history``), so ``lifecycle`` and the validators spell no status twice.  The moves between
+# them are not here: each milestone command guards its own.
+ROW_PENDING = "pending"
+ROW_IN_PROGRESS = "in_progress"
+ROW_DEFERRED = "deferred"
+ROW_DONE = "done"
+ROW_STATUSES = (ROW_PENDING, ROW_IN_PROGRESS, ROW_DEFERRED, ROW_DONE)
+DEFAULT_ROW_STATUS = ROW_PENDING
+
 # roles
 VERIFIER_ROLE = "verifier"
 OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})

@@ -344,7 +344,7 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 milestone_index=[make_milestone_entry("ms-oauth")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_oauth.json", milestone="ms-oauth",
+                impl_context_dir, "ms_oauth_plan.json", milestone="ms-oauth",
                 scope_in=["oauth-flows"],  # contradicts anchor scope_out
                 scope_out=[],
             )
@@ -370,7 +370,7 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 milestone_index=[make_milestone_entry("ms-jwt")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_jwt.json", milestone="ms-jwt",
+                impl_context_dir, "ms_jwt_plan.json", milestone="ms-jwt",
                 scope_in=[],
                 scope_out=["jwt-token-validation"],  # contradicts anchor scope_in
             )
@@ -396,7 +396,7 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 milestone_index=[make_milestone_entry("ms-oauth")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_oauth.json", milestone="ms-oauth",
+                impl_context_dir, "ms_oauth_plan.json", milestone="ms-oauth",
                 scope_in=["oauth-flows"],  # differs in case from anchor scope_out
                 scope_out=[],
             )
@@ -425,11 +425,11 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 drift_checks=["Verified ownership (2026-11-16)"],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_a.json", milestone="ms-a",
+                impl_context_dir, "ms_a_plan.json", milestone="ms-a",
                 checklist=[make_checklist_item("MSA_ONE", realised[0])],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_b.json", milestone="ms-b",
+                impl_context_dir, "ms_b_plan.json", milestone="ms-b",
                 checklist=[make_checklist_item("MSB_ONE", realised[1])],
             )
             return validate_file(self.repo_root, str(anchor_path))
@@ -497,7 +497,7 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 milestone_index=[make_milestone_entry("ms-jwt")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_jwt.json", milestone="ms-jwt",
+                impl_context_dir, "ms_jwt_plan.json", milestone="ms-jwt",
                 scope_in=["jwt-token-validation"],  # matches anchor scope_in — fine
                 scope_out=[],
             )
@@ -526,11 +526,11 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
                 ],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_a.json", milestone="ms-a",
+                impl_context_dir, "ms_a_plan.json", milestone="ms-a",
                 checklist=[make_checklist_item("AUTH_LOGIN", first)],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_b.json", milestone="ms-b",
+                impl_context_dir, "ms_b_plan.json", milestone="ms-b",
                 checklist=[make_checklist_item(second_id, second)],
             )
             return validate_file(self.repo_root, str(anchor_path))
@@ -698,7 +698,7 @@ class TestStep16AnchorGuards(_AnchorTestBase):
             )
 
             # Real milestone: same AUTH_LOGIN id mapped to fr-login — by itself no E309.
-            (impl_context_dir / "ms_real.json").write_text(
+            (impl_context_dir / "ms_real_plan.json").write_text(
                 json.dumps({
                     "$schema": "vc:16-impl-context",
                     "id": "ms-real",
@@ -778,13 +778,13 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                 drift_checks=["Verified scope (2026-11-16)"],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_ghost.json", milestone="ms-ghost",
+                impl_context_dir, "ms_ghost_plan.json", milestone="ms-ghost",
                 scope_in=["oauth-flows"],  # would be E308 if the plan took part
             )
             errors = validate_file(self.repo_root, str(anchor_path))
         w611 = [e for e in errors if e.code == "W611"]
         self.assertEqual(len(w611), 1, f"Expected one W611. Got: {errors}")
-        self.assertIn("ms_ghost.json", w611[0].message)
+        self.assertIn("ms_ghost_plan.json", w611[0].message)
         self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
 
     def test_legacy_plan_file_without_milestone_is_skipped_with_notice(self):
@@ -895,7 +895,7 @@ class TestStep16AnchorGuards(_AnchorTestBase):
 
         Filename-based routing (``_get_step_from_path``) returns ``"16"`` only
         for ``16_impl_context.json`` — any other filename in ``impl_context/``
-        (``ms_foo.json``, ``anchor_backup.json``, ...) returns ``"16a"``.
+        (``ms_foo_plan.json``, ``anchor_backup.json``, ...) returns ``"16a"``.
         Content-based demotion in ``_refine_impl_context_substep`` is the
         only signal that can rescue the routing.  Pin that path.
         """
@@ -1067,19 +1067,19 @@ class TestStep16AnchorW588UnreadableMilestone(_AnchorTestBase):
             impl_context_dir.mkdir()
 
             anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
-            broken_path = impl_context_dir / "ms_broken.json"
+            broken_path = impl_context_dir / "ms_broken_plan.json"
             broken_path.write_text("{not: valid json,", encoding="utf-8")
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
         self.assertTrue(
-            any(e.code == "W588" and "ms_broken.json" in e.message for e in errors),
-            f"Expected W588 mentioning ms_broken.json. Got: {errors}"
+            any(e.code == "W588" and "ms_broken_plan.json" in e.message for e in errors),
+            f"Expected W588 mentioning ms_broken_plan.json. Got: {errors}"
         )
 
     def test_w588_fires_on_a_milestone_file_that_is_not_an_object(self):
         """A plan file whose top level is not an object is reported like an unreadable one, so W611 has a cause."""
-        for name, raw in (("ms_list.json", b"[]"), ("ms_bytes.json", b'{"a": "\xff\xfe"}')):
+        for name, raw in (("ms_list_plan.json", b"[]"), ("ms_bytes_plan.json", b'{"a": "\xff\xfe"}')):
             with tempfile.TemporaryDirectory() as td:
                 tmp_dir = Path(td)
                 impl_context_dir = tmp_dir / "impl_context"
@@ -1102,7 +1102,7 @@ class TestStep16AnchorW588UnreadableMilestone(_AnchorTestBase):
             impl_context_dir.mkdir()
 
             anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
-            make_milestone_plan(impl_context_dir, "ms_clean.json", scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_clean_plan.json", scope_in=["auth"])
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
@@ -1127,7 +1127,7 @@ class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
             impl_context_dir.mkdir()
 
             anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
-            bad = impl_context_dir / "ms_no_schema.json"
+            bad = impl_context_dir / "ms_no_schema_plan.json"
             bad.write_text(
                 json.dumps({"plan": {"spec_alignment": {"checklist": []}}}),
                 encoding="utf-8",
@@ -1136,7 +1136,7 @@ class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
             errors = validate_file(self.repo_root, str(anchor_path))
 
         self.assertTrue(
-            any(e.code == "W589" and "ms_no_schema.json" in e.message for e in errors),
+            any(e.code == "W589" and "ms_no_schema_plan.json" in e.message for e in errors),
             f"Expected W589 for missing $schema. Got: {errors}",
         )
 
@@ -1147,7 +1147,7 @@ class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
             impl_context_dir.mkdir()
 
             anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
-            bad = impl_context_dir / "ms_wrong_schema.json"
+            bad = impl_context_dir / "ms_wrong_schema_plan.json"
             bad.write_text(
                 json.dumps({"$schema": "vc:16-anchor", "plan": {}}),
                 encoding="utf-8",
@@ -1156,7 +1156,7 @@ class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
             errors = validate_file(self.repo_root, str(anchor_path))
 
         self.assertTrue(
-            any(e.code == "W589" and "ms_wrong_schema.json" in e.message for e in errors),
+            any(e.code == "W589" and "ms_wrong_schema_plan.json" in e.message for e in errors),
             f"Expected W589 for wrong $schema. Got: {errors}",
         )
 
@@ -1168,7 +1168,7 @@ class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
             impl_context_dir.mkdir()
 
             anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
-            make_milestone_plan(impl_context_dir, "ms_clean.json", scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_clean_plan.json", scope_in=["auth"])
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
@@ -1252,7 +1252,7 @@ class TestStep16AnchorW608LegacySchema(_AnchorTestBase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
             plan_path = make_milestone_plan(
-                impl_context_dir, "ms_clean.json", scope_in=["auth"]
+                impl_context_dir, "ms_clean_plan.json", scope_in=["auth"]
             )
             errors = validate_file(self.repo_root, str(plan_path))
         w608 = [e for e in errors if e.code == "W608"]
@@ -1364,7 +1364,7 @@ class TestStep16AnchorPlanDiscovery(_AnchorTestBase):
     def test_w588_w589_w611_are_found_through_find_plan(self):
         """One run: the plan ``find_plan`` returns takes part; an unreadable file is W588, a misschemaed one W589, a plan of no anchor row W611.
 
-        ``ms_a1.json`` is the first plan file naming ``ms-a`` (``find_plan`` returns it); ``ms_a2.json`` names it too and
+        ``ms_a1_plan.json`` is the first plan file naming ``ms-a`` (``find_plan`` returns it); ``ms_a2_plan.json`` names it too and
         would contradict the anchor scope, but is not the plan of ``ms-a`` and so takes no part in drift detection.
         """
         with tempfile.TemporaryDirectory() as td:
@@ -1378,18 +1378,18 @@ class TestStep16AnchorPlanDiscovery(_AnchorTestBase):
                 milestone_index=[make_milestone_entry("ms-a")],
                 drift_checks=["Verified scope (2026-11-16)"],
             )
-            make_milestone_plan(impl_context_dir, "ms_a1.json", milestone="ms-a", scope_in=["auth"])
-            make_milestone_plan(impl_context_dir, "ms_a2.json", milestone="ms-a", scope_in=["oauth-flows"])
-            make_milestone_plan(impl_context_dir, "ms_ghost.json", milestone="ms-ghost")
-            (impl_context_dir / "ms_bad.json").write_text("{not json", encoding="utf-8")
-            (impl_context_dir / "ms_other.json").write_text(json.dumps({"$schema": "vc:other", "milestone": "ms-a"}), encoding="utf-8")
+            make_milestone_plan(impl_context_dir, "ms_a1_plan.json", milestone="ms-a", scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_a2_plan.json", milestone="ms-a", scope_in=["oauth-flows"])
+            make_milestone_plan(impl_context_dir, "ms_ghost_plan.json", milestone="ms-ghost")
+            (impl_context_dir / "ms_bad_plan.json").write_text("{not json", encoding="utf-8")
+            (impl_context_dir / "ms_other_plan.json").write_text(json.dumps({"$schema": "vc:other", "milestone": "ms-a"}), encoding="utf-8")
             errors = validate_file(self.repo_root, str(anchor_path))
         codes = sorted(e.code for e in errors)
         self.assertEqual(codes, ["W588", "W589", "W611"], f"Got: {errors}")
         by_code = {e.code: e.message for e in errors}
-        self.assertIn("ms_bad.json", by_code["W588"])
-        self.assertIn("ms_other.json", by_code["W589"])
-        self.assertIn("ms_ghost.json", by_code["W611"])
+        self.assertIn("ms_bad_plan.json", by_code["W588"])
+        self.assertIn("ms_other_plan.json", by_code["W589"])
+        self.assertIn("ms_ghost_plan.json", by_code["W611"])
 
 
 class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
@@ -1412,10 +1412,10 @@ class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
             anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
 
             # Two files, both with wrong $schema — triggers W589 for each
-            (impl_context_dir / "ms_a.json").write_text(
+            (impl_context_dir / "ms_a_plan.json").write_text(
                 json.dumps({"$schema": "vc:wrong", "plan": {}}), encoding="utf-8",
             )
-            (impl_context_dir / "ms_b.json").write_text(
+            (impl_context_dir / "ms_b_plan.json").write_text(
                 json.dumps({"$schema": "vc:also-wrong", "plan": {}}), encoding="utf-8",
             )
 
@@ -1443,10 +1443,10 @@ class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
             anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
 
             # One bad, one good
-            (impl_context_dir / "ms_bad.json").write_text(
+            (impl_context_dir / "ms_bad_plan.json").write_text(
                 json.dumps({"$schema": "vc:wrong"}), encoding="utf-8",
             )
-            make_milestone_plan(impl_context_dir, "ms_good.json", scope_in=["auth"], milestone="ms-good")
+            make_milestone_plan(impl_context_dir, "ms_good_plan.json", scope_in=["auth"], milestone="ms-good")
 
             errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
 

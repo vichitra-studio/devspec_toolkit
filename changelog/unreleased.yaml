@@ -336,7 +336,8 @@ changes:
       Step 16 plan (16_impl_context): the file requires a file-level milestone
       (the roadmap milestone id the plan is about), and the anchor validator finds
       the plan of an anchor row through it (milestone-state still finds a plan by
-      its file name). plan.status, plan.deferred_reason and plan.coverage_status are removed.
+      its file name). A plan is a file impl_context/ms_<batch>_plan.json: another
+      JSON file in that folder is no plan. plan.status, plan.deferred_reason and plan.coverage_status are removed.
       A plan item (plan.spec_alignment.checklist[], node kind plan-item) loses
       spec_ref, milestone_ref, nfr_refs, fixture_ref, checklist_status,
       deferred_reason, wont_do_reason, linked_test_expectation and
@@ -881,8 +882,10 @@ changes:
       the 1.1.1 shape; the summary names its array (3 legacy open items in
       <file> (ambiguities); see upstream-backlog, or (plan.ambiguities),
       (execution.emergent_ambiguities)). W630 and W633 are not promotable. No
-      command reports E631, E632 or W633 yet: the merge gate and the close gate
-      that raise them are not run by any command.
+      command reports E631 or W633 yet: no command runs the merge gate that
+      raises them; E632 is reported by the close gate (milestone close, close
+      --check, status --milestone), and W630 is not reported for an item in the
+      plan of a closed milestone.
     migration:
       action: none
 
@@ -1423,9 +1426,14 @@ changes:
       E812 a plan item not executed, E813 the review not verified, E632, E763,
       E746, E814 no sign-off) and, when it finds nothing, writes status: done with
       the close record {signed_off_by, signoff, tree, plan_hash, closed_at,
-      migrations} and freezes the plan; close --check writes nothing and there is
-      no --dry-run. A batch id is refused with E803 and the way to the milestone
-      id. A person decides sign-off and defer. Shown by specdev milestone close
+      migrations} and freezes the plan; close --check writes nothing, takes no write lock and there is no
+      --dry-run. A milestone with no anchor row is E800, which names the specdev
+      json insert --step 16 .plan.milestone_index '<row>' that adds it. A batch
+      id is refused with E803 and the way to the milestone id. The sign-off
+      record lists the manual fixtures and how many are attested, the deferred
+      and won't-do tasks, the number of open items the person was shown and the
+      criteria whose proof is owed at staging or prod (a binding at staging or
+      prod whose proof is not proven). A person decides sign-off and defer. Shown by specdev milestone close
       ms-account-recovery --check.
     migration:
       action: none
@@ -1436,8 +1444,9 @@ changes:
       stands (pending replay, open items, milestones awaiting sign-off, outdated
       realisations, the next step that may start, the close gate as a dry run, the
       merge-check and release-gate sections that print release gate not
-      installed); with --milestone it prints the view a person signs off from. It
-      reads and writes nothing. Shown by specdev status.
+      installed); with --milestone it prints the view a person signs off from (E800 and exit 1
+      for a milestone whose anchor row is missing). It reads and writes nothing.
+      Shown by specdev status.
     migration:
       action: none
 
@@ -1531,7 +1540,9 @@ changes:
       code_converged, blocked, deferred and wont_do: verified is gone, deferred
       and wont_do follow the disposition of the tasks the item realises, blocked
       follows open items about a node of the item's chain, and
-      derived_phase_position is closed only when the anchor row is done. The group
+      derived_phase_position is closed only when the anchor row is done
+      (review_complete only when the newest review round's findings file is
+      empty). The group
       keys blocking_amb_health and fixtures_exercised are removed. A findings
       file's scope may be a plan item id. The anchor validator's E308 [ownership]
       arm now compares the roadmap tasks the plans' items realise, and E309
@@ -1548,7 +1559,7 @@ changes:
       PLANNED_UNEXECUTED, E306 SEMANTIC_REVIEW_FR_MISMATCH, E307
       BEHAVIOR_VALIDATION_PAIRING, W599 EVIDENCE_TOO_SHORT, W600
       VERIFIED_ACTION_NO_EVIDENCE and W601 EVIDENCE_NO_ARTIFACT_REF; the close
-      gate (E811, E812, E813) replaces the first three. validate --step 16b runs
+      gate (E811, E812, E813) replaces the first three. spec-check --step 16b runs
       the 16a checks (there is no 16b validator) and the validator of a 16c plan
       only checks that review is an object. E303 stays, meaning only a commit
       message that does not match commit_message_rules of step 10. Each retired
@@ -1571,8 +1582,8 @@ changes:
       --milestone <id> --stage ci (E746 reads tracked files, and a commit after
       the run makes the evidence stale, E811). A person decides sign-off, defer
       and manual attestation: the agent shows specdev status first and never
-      answers the host's prompt. The prompts no longer name spec_ref,
-      milestone_ref, checklist_status, execution_results, fixture_status,
+      answers the host's prompt. The prompts no longer name the plan item's
+      spec_ref, milestone_ref, checklist_status, execution_results, fixture_status,
       fr_coverage, the trace matrix or specdev matrix. Shown by specdev status
       --milestone ms-account-recovery.
     migration:
@@ -1585,6 +1596,10 @@ changes:
       has the order of a milestone's life and who decides each step. The specdev
       ai-help guide no longer says to write the artifact directly to spec/: it
       names specdev step create NN --from <draft> and specdev json
-      patch|insert|delete --id. Shown by specdev ai-help.
+      patch|insert|delete --id; for step 16a it names specdev step create 16a
+      <batch> --from <draft>, for 16b specdev plan record and the two open-item
+      forms, for 16c specdev review record (16b and 16c have no file of their
+      own), and its validate line is specdev spec-check spec --step <step>.
+      Shown by specdev ai-help --step 16b.
     migration:
       action: none

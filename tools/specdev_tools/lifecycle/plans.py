@@ -16,15 +16,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
 
 from ..core.errors import FindingError, make_error, refusal
 from ..core.plan_files import find_plan, milestone_key, plan_files
 from ..core.step_paths import PLAN_DIR_NAME
+from ..trace.hashing import HASH_PREFIX
 
-HASH_PREFIX = "sha256:"
-_BATCH_OF_FILE = re.compile(r"^ms_(.+)_plan\.json$")
 _NO_KEY = "run `specdev align` (the plan has no `milestone` key)"
 
 
@@ -50,41 +48,12 @@ def require_plan(spec_root: str | Path, milestone_id: str) -> Path:
     ))
 
 
-def milestone_of_batch(spec_root: str | Path, batch_id: str) -> str:
-    """The milestone id in the ``milestone`` key of the plan file ``impl_context/ms_<batch_id>_plan.json``.
-
-    Raises:
-        FindingError: E803 with subcode ``MILESTONE_KEY_MISSING`` when the file has no string ``milestone`` key,
-            ``MILESTONE_NOT_FOUND`` when there is no such file.
-    """
-    path = Path(spec_root) / PLAN_DIR_NAME / f"ms_{batch_id}_plan.json"
-    if not path.is_file():
-        raise FindingError(make_error(
-            "E803", f"there is no plan file {PLAN_DIR_NAME}/{path.name}; give the stem of a plan file as the batch id", subcode="MILESTONE_NOT_FOUND"
-        ))
-    key = milestone_key(path)
-    if key is None:
-        raise FindingError(make_error(
-            "E803", f"{PLAN_DIR_NAME}/{path.name} has no `milestone` key: {_NO_KEY}", subcode="MILESTONE_KEY_MISSING"
-        ))
-    return key
-
-
-def batch_of_milestone(spec_root: str | Path, milestone_id: str) -> str:
-    """The batch id (``<batch>`` of ``ms_<batch>_plan.json``) of the plan of *milestone_id*.
-
-    Raises:
-        FindingError: E803 as ``require_plan``.
-    """
-    path = require_plan(spec_root, milestone_id)
-    match = _BATCH_OF_FILE.match(path.name)
-    return match.group(1) if match else path.stem
-
-
 def plan_hash(plan_path: str | Path) -> str:
     """``sha256:<hex>`` of the canonical JSON of the plan file (sorted keys, no insignificant whitespace).
 
-    Not a lock hash: the snapshot a close record and a recorded migration store.
+    Not a lock hash: the snapshot a close record and a recorded migration store.  It is not ``trace.hashing``'s digest
+    (a list of values) and not ``executed.realises_hash`` (sorted pairs): the three recipes differ and a closed milestone's
+    stored ``plan_hash`` is compared byte for byte, so only the ``sha256:`` prefix is shared.
 
     Raises:
         FindingError: E520 when the file cannot be read or is not JSON.

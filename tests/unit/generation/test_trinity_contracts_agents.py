@@ -89,7 +89,8 @@ def test_the_impl_agent_writes_the_plan_only_through_plan_record_and_the_open_it
     text = _text("impl")
     for line in text.splitlines():
         if re.search(r"specdev json (patch|insert|delete)|specdev json patch\\\|insert", line):
-            assert "'.execution.emergent_ambiguities'" in line or "never use `specdev json patch|insert|delete` on a spec file" in line, line
+            undo_of_e702 = "`specdev json delete --id <amb-id>` and write the item again" in line  # the one delete: it undoes an open item that names a plan item (spec-check reports E702)
+            assert "'.execution.emergent_ambiguities'" in line or "never use `specdev json patch|insert|delete` on a spec file" in line or undo_of_e702, line
     assert "json patch <plan> '.execution' " not in text
     assert "Never patch `.execution` itself" in text
     assert "specdev plan record <group_id>/<action-id> --outcome done|failed|blocked [--note TEXT]" in text

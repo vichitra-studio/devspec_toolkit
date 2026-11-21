@@ -312,3 +312,11 @@ def test_attest_writes_through_the_library(tmp_path: Path) -> None:
     result = attest(spec, repo, git, lambda graph: plan_attest(graph, [OTHER_FIXTURE]))
     assert [(entry.about, entry.type) for entry in result.written] == [(OTHER_FIXTURE, "attestation")]
     assert _evidence_names(host) == [f"{attestation_id(OTHER_FIXTURE)}.json"]
+
+
+def test_a_review_rule_whose_bindings_are_all_retired_asks_nothing_and_is_clean(tmp_path: Path) -> None:
+    """``NOT_REQUIRED`` is a clean answer: a rule out of play has no E830."""
+    host = host_with(tmp_path, binding_item("ver-review-retired", verifier=REVIEW_RULE, proves=(), stage="staging"))
+    assert [finding.code for finding in _review_findings(host)] == ["E830"]
+    edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"]["staging"].update(scope="out"))
+    assert _review_findings(host) == []

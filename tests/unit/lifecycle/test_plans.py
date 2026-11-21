@@ -10,7 +10,7 @@ import pytest
 
 from specdev_tools.core.errors import FindingError
 from specdev_tools.lifecycle import anchor_store, frozen, plans
-from specdev_tools.lifecycle.plans import find_plan
+from specdev_tools.core.plan_files import find_plan, plan_files
 from specdev_tools.validation.open_items import check_open_items
 
 from ._support import MILESTONE, PLAN, closed_record, example_spec, toolkit_root
@@ -58,14 +58,22 @@ def test_find_plan_returns_none_without_an_impl_context_directory(tmp_path: Path
     ],
 )
 def test_find_plan_skips_a_file_it_cannot_use(tmp_path: Path, body: Any) -> None:
-    _write_plan(tmp_path, "a_unusable.json", body)
-    wanted = _write_plan(tmp_path, "b_good.json", {"milestone": "ms-a"})
+    _write_plan(tmp_path, "ms_a_unusable_plan.json", body)
+    wanted = _write_plan(tmp_path, "ms_b_good_plan.json", {"milestone": "ms-a"})
     assert find_plan(tmp_path, "ms-a") == wanted
 
 
+def test_a_stray_json_file_in_impl_context_is_no_plan(tmp_path: Path) -> None:
+    # `PLAN_FILE_GLOB` is the one spelling of "a plan file": `aaa_notes.json` holding a `milestone` key is not one.
+    _write_plan(tmp_path, "aaa_notes.json", {"milestone": "ms-x"})
+    wanted = _write_plan(tmp_path, "ms_b_plan.json", {"milestone": "ms-x"})
+    assert [p.name for p in plan_files(tmp_path)] == ["ms_b_plan.json"]
+    assert find_plan(tmp_path, "ms-x") == wanted
+
+
 def test_find_plan_returns_the_first_match_in_name_order(tmp_path: Path) -> None:
-    first = _write_plan(tmp_path, "a_plan.json", {"milestone": "ms-a"})
-    _write_plan(tmp_path, "b_plan.json", {"milestone": "ms-a"})
+    first = _write_plan(tmp_path, "ms_a_plan.json", {"milestone": "ms-a"})
+    _write_plan(tmp_path, "ms_b_plan.json", {"milestone": "ms-a"})
     assert find_plan(tmp_path, "ms-a") == first
 
 
@@ -90,25 +98,6 @@ def test_require_plan_names_the_milestone_no_plan_carries(tmp_path: Path) -> Non
     assert "ms-b" in error.message
 
 
-def test_batch_and_milestone_ids_differ(tmp_path: Path) -> None:
-    pairs = {
-        "maintain_backup": "ms-maintain-backup-recovery",
-        "membership_search": "ms-membership-search-enhancements",
-    }
-    for batch, milestone in pairs.items():
-        _write_plan(tmp_path, f"ms_{batch}_plan.json", {"milestone": milestone})
-    for batch, milestone in pairs.items():
-        assert plans.milestone_of_batch(tmp_path, batch) == milestone
-        assert plans.batch_of_milestone(tmp_path, milestone) == batch
-        assert batch != milestone
-
-
-def test_milestone_of_batch_refuses_a_plan_without_the_key_or_a_missing_file(tmp_path: Path) -> None:
-    _write_plan(tmp_path, "ms_old_plan.json", {"plan": {}})
-    assert _error_of(lambda: plans.milestone_of_batch(tmp_path, "old")).subcode == "MILESTONE_KEY_MISSING"
-    assert _error_of(lambda: plans.milestone_of_batch(tmp_path, "gone")).subcode == "MILESTONE_NOT_FOUND"
-
-
 def test_legacy_plan_with_spec_ref_readable(tmp_path: Path) -> None:
     legacy = {
         "milestone": "ms-a",
@@ -119,7 +108,6 @@ def test_legacy_plan_with_spec_ref_readable(tmp_path: Path) -> None:
     }
     path = _write_plan(tmp_path, "ms_a_plan.json", legacy)
     assert find_plan(tmp_path, "ms-a") == path
-    assert plans.milestone_of_batch(tmp_path, "a") == "ms-a"
     assert plans.plan_hash(path).startswith("sha256:")
 
 
@@ -197,3 +185,24 @@ def test_frozen_plan_drift_is_silent_for_a_legacy_close_without_a_hash(tmp_path:
     plan = spec / PLAN
     plan.write_text(plan.read_text(encoding="utf-8").replace("30 minutes", "31 minutes"), encoding="utf-8")
     assert frozen.frozen_plan_drift(spec, MILESTONE) is None
+
+
+def test_the_last_migration_decides_the_hash_a_closed_plan_must_have() -> None:
+    first, second, third = (f"sha256:{digit * 64}" for digit in "123")
+    close = {"plan_hash": first, "migrations": [{"hash_after": second}, {"hash_after": third}]}
+    assert plans.stored_plan_hash(close) == third
+    assert plans.stored_plan_hash({"plan_hash": first, "migrations": []}) == first
+    assert plans.stored_plan_hash({"plan_hash": first}) == first
+    assert plans.stored_plan_hash(None) is None
+
+
+def test_a_closed_plan_is_compared_with_the_last_of_two_migrations(tmp_path: Path) -> None:
+    spec = example_spec(tmp_path)
+    now = plans.plan_hash(spec / PLAN)
+    close = closed_record(plan_hash="sha256:" + "1" * 64)
+    close["migrations"] = [{"hash_after": "sha256:" + "2" * 64, "note": "first"}, {"hash_after": now, "note": "second"}]
+    anchor_store.write_row_state(spec, MILESTONE, "done", close=close, repo_root=toolkit_root())
+    assert frozen.frozen_plan_drift(spec, MILESTONE) is None
+    close["migrations"].reverse()
+    anchor_store.write_row_state(spec, MILESTONE, "done", close=close, repo_root=toolkit_root())
+    assert frozen.frozen_plan_drift(spec, MILESTONE) is not None

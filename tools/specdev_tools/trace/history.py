@@ -27,26 +27,24 @@ from specdev_tools.graph.gitview import (
 )
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.names import ABOUT, ROADMAP_MILESTONE
+from specdev_tools.graph.names import ABOUT, DEFAULT_ROW_STATUS, ROADMAP_MILESTONE, ROW_DONE
 from specdev_tools.trace.hashing import content_hash
 from specdev_tools.trace.lockfile import LockEntry
 
 ANCHOR_ROW_KIND = "anchor-row"
-DONE_STATUS = "done"
-_DEFAULT_STATUS = "pending"
 
 
 def _anchor_status(graph: Graph, anchor: Node) -> str:
     item = item_of(graph, anchor)
     status = item.get("status") if item is not None else None
-    return status if isinstance(status, str) else _DEFAULT_STATUS
+    return status if isinstance(status, str) else DEFAULT_ROW_STATUS
 
 
 def done_milestones(graph: Graph) -> set[str]:
     """Ids of the roadmap milestones that a live anchor row with status ``done`` is about."""
     done: set[str] = set()
     for anchor in graph.gated_nodes():
-        if anchor.kind != ANCHOR_ROW_KIND or _anchor_status(graph, anchor) != DONE_STATUS:
+        if anchor.kind != ANCHOR_ROW_KIND or _anchor_status(graph, anchor) != ROW_DONE:
             continue
         for link in anchor.links:
             milestone = graph.find(link.target) if link.field == ABOUT else None

@@ -20,7 +20,7 @@ from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.scaffold import ScaffoldScan, scaffold_scan
 from specdev_tools.validation.open_items import check_open_items
 from unit.graph._synth import ROOT
-from unit.lifecycle._record_support import ITEM, action, alpha_binding, author, close_milestone, plan_host, roots
+from unit.lifecycle._record_support import ITEM, action, alpha_binding, author, closed_row, plan_host, roots
 from unit.lifecycle._support import MILESTONE, PLAN, closed_record
 from unit.proof._closed import add_milestone, criterion
 from unit.proof._support import API, CRITERION, FIXTURE, INVARIANT, OTHER_FIXTURE, REUSED_BINDING, add_fixture, attest, binding_item, context, edit_code, run
@@ -109,7 +109,7 @@ def change_stamp(host: Path, holder: str, target: str) -> None:
 
 def test_all_checks_pass(tmp_path: Path) -> None:
     report = gate(ready(tmp_path))
-    assert (report.errors, report.warnings, report.paused, report.notes, report.legacy) == ((), (), (), (), False)
+    assert (report.errors, report.warnings, report.paused, report.notes) == ((), (), (), ())
     assert report.passed
 
 
@@ -322,7 +322,7 @@ def test_frozen_plan_drift_after_close(tmp_path: Path) -> None:
     host = ready(tmp_path)
     spec = str(host / "spec")
     assert frozen.frozen_plan_drift(spec, MILESTONE) is None
-    close_milestone(host)
+    closed_row(host)
     assert frozen.frozen_plan_drift(spec, MILESTONE) is None and frozen.check_frozen_plans(spec).errors == ()
     edit_doc(host, PLAN, lambda document: document["plan"]["summary"].update(functional_summary="Changed by hand after the close."))
     [finding] = frozen.check_frozen_plans(spec).errors
@@ -335,7 +335,7 @@ def test_legacy_close_is_not_rechecked(tmp_path: Path) -> None:
     assert {"E813", "E814"} <= set(codes(gate(host)))
     anchor_store.write_legacy_close(host / "spec", MILESTONE, "1.1.1 migration", repo_root=str(ROOT))
     report = gate(host)
-    assert (report.legacy, report.passed, report.errors, report.warnings) == (True, True, (), ())
+    assert (report.passed, report.errors, report.warnings, report.notes) == (True, (), (), ("legacy close: not re-checked",))
 
 
 # --- verify_close_record ----------------------------------------------------------------------------------------------
@@ -364,7 +364,7 @@ def test_verify_close_record_accepts_a_good_record_a_legacy_close_and_the_rows_o
 
 def test_verify_close_record_names_the_milestone_of_a_row_and_works_on_the_statuses_of_a_ref(tmp_path: Path) -> None:
     host = ready(tmp_path)
-    close_milestone(host)
+    closed_row(host)
     states = anchor_store.read_statuses(host / "spec")
     assert verify_close_record(states[MILESTONE]) == []
     row = anchor_store.read_row(host / "spec", MILESTONE)
@@ -417,3 +417,39 @@ def test_a_suspect_link_of_another_milestone_is_on_our_chain_only_when_it_points
     on_ours = chain.suspect_links_on_chain(graph, read_lock(spec), texts, chain.milestone_chain(graph, MILESTONE))
     assert [(error.node_id, error.target) for error in on_ours] == [("tc-other", f"refines->{CRITERION}")]
     assert all(error.code == "E763" for error in on_ours)
+
+
+# --- the branches the gate rests on (round 1 survivors m13, m14, m15) ---------------------------------------------------
+
+
+def test_a_not_applicable_task_is_out_of_play_with_its_criteria(tmp_path: Path) -> None:
+    """The lifecycle of a task is not passed on to its criteria, so the gate reads the task's own lifecycle."""
+    host = ready(tmp_path)
+    edit_code(host)
+    assert codes(gate(host)) == ["E811", "E811"]
+    edit_roadmap(host, lambda task: task.update(lifecycle="not_applicable"))
+    report = gate(host)
+    assert report.errors == () and report.paused == ()
+
+
+def test_an_item_that_realises_only_paused_criteria_is_not_held_to_execution(tmp_path: Path) -> None:
+    host = ready(tmp_path)
+    spec, repo, git = roots(host)
+    record_action(spec, repo, git, Address(ITEM, "a01"), "failed")
+    assert codes(gate(host)) == ["E812"]
+    edit_roadmap(host, lambda task: task.update(disposition={"value": "deferred", "reason": "Waiting for the vendor sandbox."}))
+    report = gate(host)
+    assert report.errors == ()
+    assert [error.node_id for error in report.warnings if error.node_id == ITEM] == [ITEM]
+
+
+def test_a_plan_item_of_another_milestone_is_not_held_to_this_milestones_execution(tmp_path: Path) -> None:
+    host = ready(tmp_path)
+    add_milestone(host, "ms-other", [criterion("tc-other", refines=[CRITERION], verified_by=[FIXTURE])], done=False)
+    plan = json.loads((host / "spec" / PLAN).read_text(encoding="utf-8"))
+    foreign = {"id": "OTHER_REALISES_01", "realises": [SECOND_CRITERION], "description": "Realises a criterion of the first milestone.", "type": "behavior", "layer": "api",
+               "implementation": {"actions": [action("a01")]}}
+    write_json(host / "spec" / "impl_context" / "ms_other_plan.json", {"$schema": plan["$schema"], "milestone": "ms-other", "plan": {"spec_alignment": {"checklist": [foreign]}}})
+    assert foreign["id"] in [node.id for node in graph_of(host).by_kind["plan-item"]]
+    assert [node.id for node in close_gate.plan_items(graph_of(host), "ms-other")] == [foreign["id"]]
+    assert gate(host).passed

@@ -52,6 +52,19 @@ def task_of(graph: Graph, criterion_id: str) -> Node | None:
     return task if task is not None and task.kind == TASK else None
 
 
+def task_disposition(graph: Graph, task: Node) -> tuple[str | None, str]:
+    """The ``disposition`` value of the roadmap *task* and its reason; ``(None, "")`` for a task that is planned (no ``disposition``).
+
+    The one reader of a task's disposition: whether a value is a pause is ``names.PAUSED_DISPOSITIONS``.
+    """
+    content = item_of(graph, task) or {}
+    disposition = content.get("disposition")
+    if not isinstance(disposition, Mapping):
+        return None, ""
+    reason = disposition.get("reason")
+    return disposition.get("value"), reason if isinstance(reason, str) else ""
+
+
 def relied_on_third_parties(graph: Graph, nodes: Iterable[Node]) -> list[str]:
     """The ids of the third parties the *nodes* rely on, each once: first what a node links to with ``relies_on``, then the reliance of the components it is ``provided_by``.
 

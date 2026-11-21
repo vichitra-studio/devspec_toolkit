@@ -10,7 +10,8 @@ from ...core.loaders import read_json_object
 from ...core.scope_helpers import as_dict, dict_items, str_in, str_items
 from ...core.step_paths import PLAN_DIR_NAME
 from ...lifecycle.anchor_store import is_legacy_close, read_row
-from ...lifecycle.plans import milestone_key
+from ...core.plan_files import milestone_key
+from ...graph.names import PAUSED_DISPOSITIONS
 
 # Checklist type and layer enums — currently hardcoded.  These values mirror the
 # enum constraints in schema/16_impl_context.schema.json (``checklist[].type``
@@ -21,7 +22,6 @@ VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "meta
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 
 # `disposition.value` of a roadmap task meaning "paused or permanently cancelled, not absent": E304 skips such a task.
-PAUSED_OR_CANCELLED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
 
 PLAN_BYTES_WARN = 750_000
 """W837 reports a plan file larger than this many bytes."""
@@ -233,7 +233,8 @@ def _realised_criteria(checklist: list[dict[str, Any]]) -> set[str]:
 
 def _is_set_aside(task: dict[str, Any]) -> bool:
     """True when the roadmap task carries a ``disposition`` of ``deferred`` or ``wont_do`` (paused or cancelled, not absent)."""
-    return str_in(as_dict(task.get("disposition")).get("value"), PAUSED_OR_CANCELLED_DISPOSITIONS)
+    # A raw task dict of a plan being validated: there is no graph here, so this cannot call ``graph.queries.task_disposition``.
+    return str_in(as_dict(task.get("disposition")).get("value"), PAUSED_DISPOSITIONS)
 
 
 def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]], roadmap: dict[str, Any], errors: list[SpecError]) -> None:

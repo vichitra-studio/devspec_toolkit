@@ -142,17 +142,16 @@ def _action_target(graph: Graph, address: Address, env: str) -> ActionTarget:
     Raises:
         FindingError: E824 when there is no such plan item or action, or the action is not marked for *env*.
     """
-    item = graph.find(address.item)
-    if item is None or item.kind != PLAN_ITEM:
+    item = executed.plan_item_node(graph, address.item)
+    if item is None:
         raise refusal("E824", f"{address} is not a plan action: no plan item {address.item}{nearest_suffix(address.item, (n.id for n in graph.by_kind.get(PLAN_ITEM, ())))}")
-    actions = [action for action in executed.actions_of(item_of(graph, item) or {}) if action.get("id") == address.action]
+    actions = executed.actions_with_id(graph, item, address.action)
     if len(actions) != 1:
         known = ", ".join(str(action["id"]) for action in executed.actions_of(item_of(graph, item) or {}) if "id" in action) or "none with an id"
         raise refusal("E824", f"{address} is not a plan action: {item.id} has no single action {address.action} (its actions: {known})")
     marked = executed.at_deploy_of(actions[0])
     if env not in marked:
-        now = f"marked at_deploy for {', '.join(marked)}" if marked else "not marked at_deploy"
-        raise refusal("E824", f"{address} is {now}, not for {env}; only an action marked at_deploy for the environment is attested with --env {env}")
+        raise refusal("E824", f"{address} is {executed.at_deploy_state(actions[0])}, not for {env}; only an action marked at_deploy for the environment is attested with --env {env}")
     return ActionTarget(address, _text_of(actions[0]))
 
 

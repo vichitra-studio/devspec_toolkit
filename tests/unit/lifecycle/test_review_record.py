@@ -10,7 +10,8 @@ import pytest
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.schema_validate import validate_data_against_schema
 from specdev_tools.lifecycle.review_record import VERDICTS, ReviewRequest, record_review
-from unit.lifecycle._record_support import ITEM, close_milestone, plan_document, plan_host, roots
+from unit.lifecycle._milestone_support import cli_run
+from unit.lifecycle._record_support import ITEM, closed_row, plan_document, plan_host, roots
 from unit.lifecycle._support import MILESTONE, PLAN
 from unit.trace._lock_support import run_on_example
 
@@ -53,7 +54,11 @@ def _review(host: Path) -> dict[str, Any]:
 def test_unknown_verdict_is_e823(tmp_path: Path) -> None:
     host = plan_host(tmp_path)
     error = _refusal(lambda: _record(host, "approved"))
-    assert error.code == "E823" and "approved" in error.message and "needs_work" in error.message
+    # the message of the verdict check itself, not the plan-schema refusal that would meet an unknown verdict without it
+    assert (error.code, error.message) == ("E823", "verdict 'approved' is not one of verified, needs_work, blocked, deferred")
+    assert "review" not in plan_document(host)
+    code, out, err = cli_run(host, "review", "record", MILESTONE, "--verdict", "nonsense")
+    assert (code, out) == (1, "") and err.strip() == "E823 verdict 'nonsense' is not one of verified, needs_work, blocked, deferred"
 
 
 def test_verdicts_are_the_schema_enum() -> None:
@@ -77,6 +82,18 @@ def test_verified_with_a_blocking_finding_is_accepted(tmp_path: Path, finding: d
     _record(host, "verified", findings_file=_findings(tmp_path, [finding]))
     review = _review(host)
     assert review["verdict"] == "verified" and review["findings"][0]["severity"] in ("blocking", "major")
+
+
+@pytest.mark.parametrize("severity, remediated", [("P0", True), ("P1", True), ("P2", False)])
+def test_a_blocking_or_major_finding_without_a_suggested_fix_still_gets_a_remediation_task(tmp_path: Path, severity: str, remediated: bool) -> None:
+    host = plan_host(tmp_path)
+    bare = {key: value for key, value in BUG.items() if key != "suggested_fix"}
+    _record(host, "needs_work", findings_file=_findings(tmp_path, [{**bare, "severity": severity}]))
+    (finding,) = _review(host)["findings"]
+    if remediated:
+        assert finding["remediation_task"]["summary"] == BUG["message"] and finding["remediation_task"]["task_id"] == "fix-finding-01"
+    else:
+        assert "remediation_task" not in finding
 
 
 def test_verified_with_red_security_is_accepted(tmp_path: Path) -> None:
@@ -159,7 +176,7 @@ def test_a_findings_file_that_is_not_usable_is_e823_and_names_what_is_wrong(tmp_
 
 def test_frozen_plan_is_refused_e820(tmp_path: Path) -> None:
     host = plan_host(tmp_path)
-    close_milestone(host)
+    closed_row(host)
     before = (host / "spec" / PLAN).read_bytes()
     assert _refusal(lambda: _record(host, "verified")).code == "E820"
     assert (host / "spec" / PLAN).read_bytes() == before

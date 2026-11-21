@@ -93,7 +93,7 @@
                 "items": {"$ref": "vc:core:graph#nodeId"}
               },
               "open_items": {
-                "description": "Number of plan items that are not executed.",
+                "description": "Number of open items of the plan the person was shown.",
                 "type": "integer",
                 "minimum": 0
               },

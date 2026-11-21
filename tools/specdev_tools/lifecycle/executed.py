@@ -21,27 +21,26 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from ..core.loaders import read_json_object
+from ..core.plan_files import find_plan
 from ..graph.contract import item_of
 from ..graph.model import Graph, Node, collapse_whitespace
 from ..graph.names import ABOUT, EXECUTION_RECORD, PAUSED_DISPOSITIONS, PLAN_ITEM, REALISES, VERIFIED_BY, link_targets
-from ..graph.queries import task_of
+from ..graph.queries import task_disposition, task_of
 from ..graph.stages import is_retired_binding, bindings_of
 from ..proof.proof import CLOSE_IGNORED_STAGES, PROVEN, verifier_proof
 from ..proof.validity import ProofContext
+from ..trace.hashing import HASH_PREFIX
 from ..trace.lockfile import Lock, lock_path, read_lock
-from ..verify.records import Binding, binding_of, records_folder
-from . import frozen, plans
+from ..verify.records import Binding, binding_of, deploy_records
+from . import frozen
 
 CLOSE_CAP = "dev"
 DONE = "done"
-HASH_PREFIX = "sha256:"
-DEPLOY_FILE = re.compile(r"^dep-(\d+)\.json$")
 
 AT_DEPLOY = "at-deploy"
 LATER_STAGE = "later-stage"
@@ -119,6 +118,26 @@ def at_deploy_of(action: Mapping[str, Any]) -> tuple[str, ...]:
     """The stages the action is marked ``at_deploy`` for; empty when it is not."""
     stages = action.get("at_deploy")
     return tuple(stage for stage in stages if isinstance(stage, str)) if isinstance(stages, list) else ()
+
+
+def at_deploy_state(action: Mapping[str, Any]) -> str:
+    """How the action is marked, for a refusal: ``marked at_deploy for staging, prod`` or ``not marked at_deploy``."""
+    marked = at_deploy_of(action)
+    return f"marked at_deploy for {', '.join(marked)}" if marked else "not marked at_deploy"
+
+
+def plan_item_node(graph: Graph, item_id: str) -> Node | None:
+    """The plan item *item_id* (an alias resolves to the current id); ``None`` when no node has the id or it is not a plan item.
+
+    The one lookup of "which plan item is this" for ``plan record`` and ``verify attest``; each builds its own refusal.
+    """
+    node = graph.find(item_id)
+    return node if node is not None and node.kind == PLAN_ITEM else None
+
+
+def actions_with_id(graph: Graph, item: Node, action_id: str) -> list[Mapping[str, Any]]:
+    """The actions of *item* whose ``id`` is *action_id*: one for an address that names an action, none or several otherwise."""
+    return [action for action in actions_of(item_of(graph, item) or {}) if action.get("id") == action_id]
 
 
 def _criterion_bindings(graph: Graph, criterion: str) -> list[NamedBinding]:
@@ -268,11 +287,6 @@ def item_reading(graph: Graph, ctx: ProofContext, item_id: str, lock: Lock | Non
     return ItemReading(item.id, tuple(_reading_of(action, item, graph, ctx, records, lock, frozen_plan) for action in actions_of(content)))
 
 
-def plan_item_executed(graph: Graph, ctx: ProofContext, item_id: str, lock: Lock | None) -> bool:
-    """Whether the plan item *item_id* is executed: ``item_reading(...).executed``; raises as ``item_reading``."""
-    return item_reading(graph, ctx, item_id, lock).executed
-
-
 def realises_only_excluded(graph: Graph, item: Node) -> bool:
     """Whether *item* realises criteria and every one of them belongs to a roadmap task that is deferred or wont_do."""
     criteria = link_targets(graph, item, REALISES)
@@ -281,22 +295,8 @@ def realises_only_excluded(graph: Graph, item: Node) -> bool:
     dispositions = []
     for criterion in criteria:
         task = task_of(graph, criterion)
-        content = item_of(graph, task) if task is not None else None
-        disposition = content.get("disposition") if content is not None else None
-        dispositions.append(disposition.get("value") if isinstance(disposition, Mapping) else None)
+        dispositions.append(task_disposition(graph, task)[0] if task is not None else None)
     return all(value in PAUSED_DISPOSITIONS for value in dispositions)
-
-
-def _deploy_records(spec_root: str) -> list[tuple[int, Mapping[str, Any]]]:
-    """The ``dep-`` records of *spec_root*, each with the number of its id, in id order."""
-    folder = records_folder(spec_root)
-    found: list[tuple[int, Mapping[str, Any]]] = []
-    for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else ():
-        matched = DEPLOY_FILE.match(name)
-        records = (read_json_object(os.path.join(folder, name)) or {}).get("records")
-        if matched and isinstance(records, list) and records and isinstance(records[0], Mapping):
-            found.append((int(matched.group(1)), records[0]))
-    return sorted(found, key=lambda pair: pair[0])
 
 
 def at_deploy_recorded(spec_dir: str, item_id: str, action_id: str, env: str) -> bool:
@@ -307,7 +307,7 @@ def at_deploy_recorded(spec_dir: str, item_id: str, action_id: str, env: str) ->
     """
     outcomes = [
         record.get("outcome")
-        for _, record in _deploy_records(spec_dir)
+        for record in deploy_records(spec_dir)
         if record.get("about") == [item_id] and record.get("action") == action_id and record.get("env") == env
     ]
     return bool(outcomes) and outcomes[-1] == DONE
@@ -320,7 +320,7 @@ def at_deploy_required(spec_dir: str, milestone_ids: Iterable[str]) -> list[tupl
     """
     triples: list[tuple[str, str, str]] = []
     for milestone in milestone_ids:
-        plan = plans.find_plan(spec_dir, milestone)
+        plan = find_plan(spec_dir, milestone)
         document = read_json_object(plan) if plan is not None else None
         checklist = ((document or {}).get("plan") or {}).get("spec_alignment", {}).get("checklist")
         for item in checklist if isinstance(checklist, list) else ():

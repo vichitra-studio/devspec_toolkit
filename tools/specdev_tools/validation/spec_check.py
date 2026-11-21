@@ -16,6 +16,7 @@ import sys
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from functools import partial
 from typing import Any
 
 from ..core.config import reset_config
@@ -26,7 +27,7 @@ from ..graph.check import run_graph_check
 from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
 from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
-from ..lifecycle.frozen import check_frozen_plans
+from ..lifecycle.frozen import check_frozen_plans, is_frozen_path
 from ..lifecycle.plan_records import check_plan_records
 from ..proof.built_evidence import bind_proof_seams
 from .graph_checks.removal_rules import check_removal_rules
@@ -323,7 +324,8 @@ def _check_trace_lock(ctx: CheckContext) -> dict[str, Any]:
 
 
 def _check_open_items(ctx: CheckContext) -> dict[str, Any]:
-    return check_result(check_open_items(ctx.spec_dir, gate="step", read=ctx.ambiguity_read))
+    frozen = partial(is_frozen_path, ctx.effective_spec_root)
+    return check_result(check_open_items(ctx.spec_dir, gate="step", frozen=frozen, read=ctx.ambiguity_read))
 
 
 def _check_frozen_plans(ctx: CheckContext) -> dict[str, Any]:

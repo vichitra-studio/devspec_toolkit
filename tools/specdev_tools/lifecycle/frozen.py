@@ -13,8 +13,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..core.errors import FindingError, SpecError, make_error
+from ..core.errors import FindingError, SpecError, make_error, refusal
+from ..core.plan_files import find_plan, milestone_key
 from ..core.step_paths import PLAN_DIR_NAME
+from ..graph.names import ROW_DONE
 from . import anchor_store, plans
 
 
@@ -25,7 +27,7 @@ def is_frozen(spec_root: str | Path, milestone_id: str) -> bool:
         FindingError: E801 (``STATUS_UNKNOWN``) when the row's status is not one of the four values.
     """
     row = anchor_store.read_row(spec_root, milestone_id)
-    return row is not None and row.status == "done"
+    return row is not None and row.status == ROW_DONE
 
 
 def is_frozen_path(spec_root: str | Path, plan_path: Path) -> bool:
@@ -33,8 +35,22 @@ def is_frozen_path(spec_root: str | Path, plan_path: Path) -> bool:
 
     The provider ``check_open_items`` takes is ``Callable[[Path], bool]``: pass ``functools.partial(is_frozen_path, spec_root)``.
     """
-    milestone_id = plans.milestone_key(plan_path)
+    milestone_id = milestone_key(plan_path)
     return milestone_id is not None and is_frozen(spec_root, milestone_id)
+
+
+def refuse_if_frozen(spec_root: str, milestone: str | None, plan_file: str) -> None:
+    """Raise E820 when *milestone*, the one the plan file *plan_file* names, is closed; a plan with no milestone is never frozen.
+
+    Raises:
+        FindingError: E820 for a closed milestone; E801 for an anchor row with an unknown status.
+    """
+    if milestone is not None and is_frozen(spec_root, milestone):
+        raise refusal(
+            "E820",
+            f"plan {plan_file} belongs to milestone {milestone}, which is closed: a closed plan is frozen and changes only "
+            "through a recorded migration, so no record can be written to it or removed from it",
+        )
 
 
 def frozen_plan_drift(spec_root: str | Path, milestone_id: str) -> str | None:
@@ -47,8 +63,8 @@ def frozen_plan_drift(spec_root: str | Path, milestone_id: str) -> str | None:
         FindingError: E801 (``STATUS_UNKNOWN``) for a row with an unknown status; E520 when the plan cannot be read.
     """
     row = anchor_store.read_row(spec_root, milestone_id)
-    stored = plans.stored_plan_hash(row.close) if row is not None and row.status == "done" else None
-    plan = plans.find_plan(spec_root, milestone_id)
+    stored = plans.stored_plan_hash(row.close) if row is not None and row.status == ROW_DONE else None
+    plan = find_plan(spec_root, milestone_id)
     if stored is None or plan is None:
         return None
     current = plans.plan_hash(plan)
@@ -77,7 +93,7 @@ def _drift_finding(spec_root: str, milestone_id: str) -> SpecError | None:
         return error.error
     if message is None:
         return None
-    plan = plans.find_plan(spec_root, milestone_id)
+    plan = find_plan(spec_root, milestone_id)
     file = os.path.join(PLAN_DIR_NAME, plan.name) if plan else None
     return make_error("E827", message, file=file, node_id=milestone_id)
 
@@ -88,7 +104,7 @@ def check_frozen_plans(spec_root: str) -> FrozenPlansReport:
         states = anchor_store.read_statuses(spec_root)
     except FindingError as error:
         return FrozenPlansReport(0, 0, (error.error,))
-    closed = {milestone: state for milestone, state in states.items() if state.status == "done"}
+    closed = {milestone: state for milestone, state in states.items() if state.status == ROW_DONE}
     findings = [_drift_finding(spec_root, milestone) for milestone, state in closed.items() if plans.stored_plan_hash(state.close)]
     errors = tuple(finding for finding in findings if finding is not None)
     return FrozenPlansReport(len(closed), len(findings), errors)

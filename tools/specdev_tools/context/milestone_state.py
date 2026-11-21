@@ -26,8 +26,9 @@ whose criteria are all set aside is ``wont_do`` when every one is ``wont_do``, e
 **``impl_complete`` vs ``review_pending`` disambiguation.**
 - ``impl_complete``: every active (non-deferred, non-wont_do) group in {code_converged, blocked} AND *no
   milestone-review file exists at all*.
-- ``review_pending``: same group condition AND milestone-review file(s) exist but *none* has empty findings.
-- ``review_complete``: same group condition AND >=1 milestone-review file has ``findings == []``.
+- ``review_pending``: same group condition AND milestone-review file(s) exist but the newest round's file does not have empty findings.
+- ``review_complete``: same group condition AND the newest milestone-review round's file has ``findings == []`` (rounds are
+  ordered by the number in ``findings_<batch>_review_<round>``; an earlier empty round does not count once a later one exists).
 
 **All-deferred/wont_do milestone.**  If every group is deferred or wont_do, ``derived_phase_position`` defaults to
 ``"pending"`` (nothing to track), unless the anchor row is ``done``.
@@ -44,6 +45,7 @@ from __future__ import annotations
 import glob as _glob
 import json
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -52,15 +54,13 @@ from typing import Any
 from ..core.errors import FindingError
 from ..core.scope_helpers import as_dict, as_list, dict_items, str_items
 from ..graph.build import build_graph
-from ..graph.contract import item_of
 from ..graph.kinds import KindRegistryError
 from ..graph.model import Graph
-from ..graph.names import PAUSED_DISPOSITIONS, REALISES, REFINES, VERIFIED_BY
-from ..graph.queries import task_of
+from ..graph.names import PAUSED_DISPOSITIONS, REALISES, REFINES, ROW_DONE, VERIFIED_BY
+from ..graph.queries import task_disposition, task_of
 from ..graph.trace import TraceOptions, trace_node
 from ..lifecycle.anchor_store import read_row
 from ..core.plan_files import MILESTONE_KEY
-from ..trace.history import DONE_STATUS
 
 _CHAIN_VERBS = frozenset({REALISES, REFINES, VERIFIED_BY})
 _WONT_DO = "wont_do"
@@ -112,6 +112,12 @@ def _is_empty_findings(path: str) -> bool:
     if not isinstance(data, dict):
         return False
     return data.get("findings") == []
+
+
+def _review_round_key(path: str, batch_id: str) -> tuple[int, float]:
+    """Sort key of a milestone-review file ``findings_<batch>_review_<round>[_<ts>].json``: its round number, then its mtime (a name with no number is round 0)."""
+    match = re.match(rf"findings_{re.escape(batch_id)}_review_(\d+)", os.path.basename(path))
+    return (int(match.group(1)) if match else 0, os.stat(path).st_mtime)
 
 
 def _latest_empty_findings(files: list[str]) -> str | None:
@@ -321,7 +327,7 @@ def derive_phase_position(
     )
     review_files = _glob.glob(review_glob)
     has_any_review_file = bool(review_files)
-    has_review_empty = any(_is_empty_findings(f) for f in review_files)
+    has_review_empty = has_any_review_file and _is_empty_findings(max(review_files, key=lambda f: _review_round_key(f, batch_id)))
 
     # --- operator_pending requires review_complete first
     all_advanced = all(g["state"] in _ADVANCED_STATES for g in active_groups)
@@ -385,7 +391,7 @@ def load_spec_view(plan: dict, spec_root: str, repo_root: str) -> SpecView:
             row = read_row(spec_root, milestone)
         except FindingError:
             row = None
-        closed = row is not None and row.status == DONE_STATUS
+        closed = row is not None and row.status == ROW_DONE
     try:
         graph = build_graph(spec_root, repo_root)
     except KindRegistryError:
@@ -407,8 +413,7 @@ def _item_view(graph: Graph, item: dict) -> ItemView:
 def _disposition(graph: Graph, criterion_id: str) -> str | None:
     """The set-aside ``disposition.value`` (``deferred`` or ``wont_do``) of the task that holds *criterion_id*; ``None`` for any other case."""
     task = task_of(graph, criterion_id)
-    content = item_of(graph, task) if task is not None else None
-    value = as_dict(content.get("disposition")).get("value") if content is not None else None
+    value = task_disposition(graph, task)[0] if task is not None else None
     return value if value in PAUSED_DISPOSITIONS else None
 
 

@@ -35,3 +35,21 @@ def test_a_file_with_two_records_or_none_is_no_evidence(tmp_path: Path) -> None:
     assert read_evidence(str(tmp_path), "evd-alpha-dev") is None
     _store(tmp_path, [])
     assert read_evidence(str(tmp_path), "evd-alpha-dev") is None
+
+
+def test_a_record_file_with_two_records_is_read_as_no_record_for_signoff_and_deploy(tmp_path: Path) -> None:
+    """The one reading of "the record" of a record file is exactly one: sign-off and at-deploy files agree (``check-records`` reports the second record)."""
+    from specdev_tools.verify.records import deploy_records, signoff_records
+
+    one = {"signoff_id": "so-ms-a-0001", "about": ["ms-a"], "tree": "t", "git_author": {"name": "n", "email": "e"}}
+    two = {**one, "signoff_id": "so-ms-a-0002"}
+    signoffs = tmp_path / "extras" / "signoff"
+    signoffs.mkdir(parents=True)
+    (signoffs / "so-ms-a-0001.json").write_text(json.dumps({"records": [one]}), encoding="utf-8")
+    (signoffs / "so-ms-a-0002.json").write_text(json.dumps({"records": [two, one]}), encoding="utf-8")
+    assert [r.signoff_id for r in signoff_records(tmp_path, "ms-a")] == ["so-ms-a-0001"]
+    verification = tmp_path / "extras" / "verification"
+    verification.mkdir(parents=True)
+    (verification / "dep-0001.json").write_text(json.dumps({"records": [{"deploy_id": "dep-0001"}]}), encoding="utf-8")
+    (verification / "dep-0002.json").write_text(json.dumps({"records": [{"deploy_id": "dep-0002"}, {"deploy_id": "dep-0003"}]}), encoding="utf-8")
+    assert [r["deploy_id"] for r in deploy_records(tmp_path)] == ["dep-0001"]

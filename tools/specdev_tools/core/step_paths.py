@@ -15,6 +15,13 @@ STEP_JSON_RE = re.compile(r"^(\d{2}[a-z]?)_[^/]*\.json$")
 PLAN_DIR_NAME = "impl_context"
 PLAN_FILE_GLOB = "ms_*_plan.json"
 """The one spelling of "a milestone plan file": the name pattern inside ``PLAN_DIR_NAME``."""
+
+
+def plan_file_name(batch: str) -> str:
+    """The file name of the plan of batch *batch* (``ms_<batch>_plan.json``): ``PLAN_FILE_GLOB`` with the batch for its ``*``."""
+    return PLAN_FILE_GLOB.replace("*", batch)
+
+
 PLAN_FILE_KEY = f"{PLAN_DIR_NAME}/{PLAN_FILE_GLOB}"
 """The same rule as an entry-key registry key (``impl_context/ms_*_plan.json``)."""
 STEP_DIR_RE = re.compile(r"^step_(\d{2}[a-z]?)$")

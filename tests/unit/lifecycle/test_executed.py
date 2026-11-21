@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from specdev_tools.lifecycle import executed
-from specdev_tools.lifecycle.executed import item_reading, naming_bindings, plan_item_executed
+from specdev_tools.lifecycle.executed import item_reading, naming_bindings
 from specdev_tools.lifecycle.plan_records import Address, record_action
 from specdev_tools.trace.lockfile import read_lock
 from unit.lifecycle._record_support import ALPHA, ITEM, STAGED, STAGED_COMMAND, action, alpha_binding, author, plan_host, roots
@@ -38,7 +38,7 @@ def test_truth_table_a_b_c_and_at_deploy(tmp_path: Path) -> None:
     spec, repo, git = roots(host)
     owed = {"a01": executed.NO_RECORD, "a02": executed.NEEDS_EVIDENCE, "a03": executed.LATER_STAGE, "a04": executed.AT_DEPLOY}
     assert _states(host) == owed
-    assert not plan_item_executed(graph_of(host), context(host), ITEM, read_lock(spec))
+    assert not item_reading(graph_of(host), context(host), ITEM, read_lock(spec)).executed
 
     record_action(spec, repo, git, Address(ITEM, "a01"), "blocked")
     assert _states(host)["a01"] == executed.NOT_DONE
@@ -48,7 +48,7 @@ def test_truth_table_a_b_c_and_at_deploy(tmp_path: Path) -> None:
     assert [result.passed for result in run(host, [ALPHA])] == [True]
     assert _states(host) == {"a01": executed.RECORDED, "a02": executed.PROVEN_BY_EVIDENCE, "a03": executed.LATER_STAGE, "a04": executed.AT_DEPLOY}
     graph, ctx, lock = graph_of(host), context(host), read_lock(spec)
-    assert plan_item_executed(graph, ctx, ITEM, lock)
+    assert item_reading(graph, ctx, ITEM, lock).executed
     assert item_reading(graph, ctx, ITEM, lock).owed == ()
 
 
@@ -67,7 +67,7 @@ def test_an_item_with_no_action_is_executed_and_an_unknown_item_is_not_found(tmp
     graph, ctx = graph_of(host), context(host)
     assert item_reading(graph, ctx, ITEM, None).executed
     with pytest.raises(KeyError):
-        plan_item_executed(graph, ctx, "NO_SUCH_ITEM", None)
+        item_reading(graph, ctx, "NO_SUCH_ITEM", None)
 
 
 @pytest.mark.parametrize(

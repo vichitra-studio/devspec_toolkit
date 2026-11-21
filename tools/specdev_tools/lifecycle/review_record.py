@@ -36,8 +36,7 @@ from ..core.json_utils import JsonUtilsError, check_edit, json_write_atomic, pat
 from ..core.schema_validate import SchemaValidationError, validate_data_against_schema
 from ..graph.names import PLAN_ITEM
 from ..trace.writing import locked_graph
-from . import plans
-from .plan_records import refuse_if_frozen
+from . import frozen, plans
 from .records import now_utc
 
 VERDICTS = ("verified", "needs_work", "blocked", "deferred")
@@ -218,7 +217,7 @@ def record_review(spec_root: str, repo_root: str, request: ReviewRequest) -> Rev
     rel = os.path.relpath(plan, spec_root)
     document = read_findings(request.findings_file, repo_root) if request.findings_file else None
     with locked_graph(spec_root, repo_root, "review record") as graph:
-        refuse_if_frozen(spec_root, request.milestone, rel)
+        frozen.refuse_if_frozen(spec_root, request.milestone, rel)
         items = frozenset(node.id for node in graph.by_kind.get(PLAN_ITEM, ()) if node.file == rel)
         block = _block(request, map_findings(document, request.milestone, items) if document is not None else None)
         content, before = Path(plan).read_text(encoding="utf-8"), os.path.getsize(plan)

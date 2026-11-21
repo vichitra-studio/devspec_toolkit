@@ -17,7 +17,7 @@ def test_read_row_finds_the_row_by_about(tmp_path: Path) -> None:
     spec = example_spec(tmp_path)
     row = anchor_store.read_row(spec, MILESTONE)
     assert row is not None
-    assert (row.anchor_id, row.milestone_id, row.status, row.index) == ("anchor-ms-account-recovery", MILESTONE, "in_progress", 0)
+    assert (row.milestone_id, row.status) == (MILESTONE, "in_progress")
     assert anchor_store.read_row(spec, "ms-other") is None
     assert anchor_store.read_row(tmp_path / "nowhere", MILESTONE) is None
 

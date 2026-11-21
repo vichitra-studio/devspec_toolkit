@@ -18,14 +18,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..core.errors import FindingError, SpecError, make_error
+from ..core.step_paths import PLAN_DIR_NAME, plan_file_name
 from ..graph.gitview import read_seed_texts
 from ..graph.model import Graph
-from ..graph.names import ROADMAP_MILESTONE
+from ..graph.names import ROADMAP_MILESTONE, ROW_DEFERRED, ROW_DONE, ROW_IN_PROGRESS, ROW_PENDING
 from ..proof.built_evidence import bind_proof_seams
 from ..proof.validity import ProofContext
 from ..trace.lockfile import Lock
-from ..trace.writing import locked_graph
-from ..verify.records import records_folder
+from ..trace.writing import locked_graph, writing_graph
+from ..verify.records import latest_signoff, records_folder
 from . import anchor_store, chain, close_gate, executed, plans
 from .close_gate import GateReport, OpenItemsProvider, ScaffoldProvider
 from .records import now_utc
@@ -102,11 +103,11 @@ def milestone_id_of(graph: Graph, spec_root: str, given: str) -> str:
     node = graph.find(given)
     if node is not None and node.kind == ROADMAP_MILESTONE:
         return node.id
-    plan = os.path.join(spec_root, "impl_context", f"ms_{given}_plan.json")
+    plan = os.path.join(spec_root, PLAN_DIR_NAME, plan_file_name(given))
     if os.path.isfile(plan):
         raise _refuse(
             "E803",
-            f"{given} is a batch id (the plan file impl_context/ms_{given}_plan.json), not a milestone id (ms-...); "
+            f"{given} is a batch id (the plan file {PLAN_DIR_NAME}/{plan_file_name(given)}), not a milestone id (ms-...); "
             f"`{MILESTONE_STATE_HINT.format(batch=given)}` prints the milestone of that plan under `milestone`",
             "MILESTONE_NOT_FOUND",
         )
@@ -115,7 +116,7 @@ def milestone_id_of(graph: Graph, spec_root: str, given: str) -> str:
 
 def refuse_not_in_progress(milestone_id: str, status: str, what: str) -> FindingError:
     """The E801 for *what* (``closed``, ``signed off``) a milestone that is not ``in_progress``: the way out is ``start`` unless it is done already."""
-    way = "a closed milestone stays closed" if status == "done" else f"`specdev milestone start {milestone_id}` first"
+    way = "a closed milestone stays closed" if status == ROW_DONE else f"`specdev milestone start {milestone_id}` first"
     return _refuse("E801", f"milestone {milestone_id} is {status}; only an in_progress milestone is {what} ({way})", node_id=milestone_id)
 
 
@@ -127,10 +128,16 @@ def require_row(spec_root: str, milestone_id: str) -> anchor_store.AnchorRow:
     """
     row = anchor_store.read_row(spec_root, milestone_id)
     if row is None:
+        if os.path.isfile(anchor_store.anchor_path(spec_root)):
+            way = (
+                "add the row with `specdev json insert --step 16 .plan.milestone_index "
+                f"'{{\"anchor_id\": \"anchor-{milestone_id}\", \"about\": [\"{milestone_id}\"], \"checklist_id_prefix\": \"<PREFIX>\", \"summary\": \"<one line>\"}}'`"
+            )
+        else:
+            way = "the anchor file is written with step 16 (`specdev step create 16`)"
         raise _refuse(
             "E800",
-            f"{anchor_store.ANCHOR_FILE} has no anchor row about {milestone_id}; the anchor row of a milestone is written with step 16 "
-            "(`specdev step create 16`), and a milestone id looks like ms-account-recovery",
+            f"{anchor_store.ANCHOR_FILE} has no anchor row about {milestone_id}; {way}, and a milestone id looks like ms-account-recovery",
             "ANCHOR_ROW_MISSING", milestone_id,
         )
     return row
@@ -150,9 +157,9 @@ def start_milestone(spec_root: str, repo_root: str, git_root: str, given: str) -
     with locked_graph(spec_root, repo_root, "milestone start") as graph:
         milestone_id = milestone_id_of(graph, spec_root, given)
         row = require_row(spec_root, milestone_id)
-        if row.status == "in_progress":
+        if row.status == ROW_IN_PROGRESS:
             return StartResult(milestone_id, row.status, noop=True)
-        if row.status == "done":
+        if row.status == ROW_DONE:
             raise _refuse("E800", f"milestone {milestone_id} is done; a closed milestone is not started again", "STATUS_NOT_STARTABLE", milestone_id)
         plans.require_plan(spec_root, milestone_id)
         lock = executed.lock_if_present(spec_root)
@@ -168,8 +175,8 @@ def start_milestone(spec_root: str, repo_root: str, git_root: str, given: str) -
                 ),
                 tuple(found),
             )
-    anchor_store.write_row_state(spec_root, milestone_id, "in_progress", repo_root=repo_root)
-    return StartResult(milestone_id, row.status, resumed=row.status == "deferred", notes=notes)
+    anchor_store.write_row_state(spec_root, milestone_id, ROW_IN_PROGRESS, repo_root=repo_root)
+    return StartResult(milestone_id, row.status, resumed=row.status == ROW_DEFERRED, notes=notes)
 
 
 def defer_milestone(spec_root: str, repo_root: str, given: str, reason: str | None) -> DeferResult:
@@ -184,9 +191,9 @@ def defer_milestone(spec_root: str, repo_root: str, given: str, reason: str | No
     with locked_graph(spec_root, repo_root, "milestone defer") as graph:
         milestone_id = milestone_id_of(graph, spec_root, given)
         row = require_row(spec_root, milestone_id)
-        if row.status not in ("pending", "in_progress"):
+        if row.status not in (ROW_PENDING, ROW_IN_PROGRESS):
             raise _refuse("E801", f"milestone {milestone_id} is {row.status}; only a pending or in_progress milestone is deferred", node_id=milestone_id)
-    anchor_store.write_row_state(spec_root, milestone_id, "deferred", deferral_reason=text, repo_root=repo_root)
+    anchor_store.write_row_state(spec_root, milestone_id, ROW_DEFERRED, deferral_reason=text, repo_root=repo_root)
     return DeferResult(milestone_id, row.status, text)
 
 
@@ -197,15 +204,17 @@ def close_milestone(spec_root: str, repo_root: str, git_root: str, given: str, p
     ``status: done`` and the close record (``signed_off_by`` the email of the latest sign-off's git author, ``signoff`` its id,
     ``tree``, ``plan_hash``, ``closed_at``, ``migrations: []``) in the one write of ``anchor_store.write_row_state``; the plan file
     is not rewritten and is frozen from then on.
+
+    A check (*check_only*) writes nothing and takes no write lock: it reads the graph as it is, as ``status`` does.
     """
-    with locked_graph(spec_root, repo_root, "milestone close") as graph:
+    with writing_graph(None, spec_root, repo_root, "milestone close", write=not check_only) as graph:
         milestone_id = milestone_id_of(graph, spec_root, given)
         row = require_row(spec_root, milestone_id)
-        if row.status != "in_progress":
+        if row.status != ROW_IN_PROGRESS:
             raise refuse_not_in_progress(milestone_id, row.status, "closed")
         ctx = gate_context(spec_root, git_root)
         report = run_gate(graph, ctx, executed.lock_if_present(spec_root), milestone_id, providers)
-        signed = close_gate.latest_signoff(spec_root, milestone_id)
+        signed = latest_signoff(spec_root, milestone_id)
         tree = ctx.code_tree
         plan = plans.require_plan(spec_root, milestone_id)
         plan_hash = plans.plan_hash(plan)
@@ -215,5 +224,5 @@ def close_milestone(spec_root: str, repo_root: str, git_root: str, given: str, p
         "signed_off_by": signed.git_author.get("email", ""), "signoff": signed.signoff_id, "tree": tree,
         "plan_hash": plan_hash, "closed_at": now_utc(), "migrations": [],
     }
-    anchor_store.write_row_state(spec_root, milestone_id, "done", close=record, repo_root=repo_root)
+    anchor_store.write_row_state(spec_root, milestone_id, ROW_DONE, close=record, repo_root=repo_root)
     return CloseResult(milestone_id, report, closed=True, check_only=False, record=record, signoff_tree=signed.tree, tree=tree)

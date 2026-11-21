@@ -9,14 +9,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from .loaders import read_json_object
-from .step_paths import PLAN_DIR_NAME
+from .step_paths import PLAN_DIR_NAME, PLAN_FILE_GLOB
 
 MILESTONE_KEY = "milestone"
 
 
 def plan_files(spec_root: str | Path) -> list[Path]:
-    """Every ``*.json`` file of ``<spec_root>/impl_context/``, in name order; empty when the folder is missing."""
-    return sorted((Path(spec_root) / PLAN_DIR_NAME).glob("*.json"))
+    """Every plan file (``PLAN_FILE_GLOB``) of ``<spec_root>/impl_context/``, in name order; empty when the folder is missing.
+
+    Any other file of the folder is no plan, whatever it holds.
+    """
+    return sorted((Path(spec_root) / PLAN_DIR_NAME).glob(PLAN_FILE_GLOB))
 
 
 def milestone_key(path: Path) -> str | None:
@@ -28,7 +31,7 @@ def milestone_key(path: Path) -> str | None:
 def find_plan(spec_root: str | Path, milestone_id: str) -> Path | None:
     """Return the plan file whose file-level ``milestone`` key equals *milestone_id*, or ``None``.
 
-    Scans ``<spec_root>/impl_context/*.json`` in name order and returns the first match. A file that cannot be
+    Scans ``plan_files`` in name order and returns the first match. A file that cannot be
     read, is not a JSON object, has no ``milestone`` key or holds a non-string one is skipped (a plan written
     before the key existed is such a file). Never raises: a missing directory gives ``None``.
     """

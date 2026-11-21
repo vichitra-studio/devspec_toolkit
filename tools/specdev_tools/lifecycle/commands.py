@@ -9,17 +9,23 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import Any
 
 from ..core.errors import SpecError
 from ..core.json_output import format_errors_json
 from ..graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
+from ..graph.model import Graph
+from ..graph.ownership import CLOSE_OWNER
 from ..graph.stages import DEPLOY_ENVIRONMENTS
+from ..trace.lockfile import Lock
+from .close_gate import OpenItemsProvider, ScaffoldProvider
+from .executed import lock_if_present
+from .milestone import CloseResult, MilestoneRefusal, ProviderFactory, close_milestone, defer_milestone, milestone_id_of, start_milestone
 from .plan_records import Address, DeployResult, PruneResult, RecordResult, parse_address, prune_records, record_action, record_at_deploy
 from .review_record import VERDICTS, ReviewRequest, ReviewResult, record_review
-
-if TYPE_CHECKING:
-    from .milestone import CloseResult, ProviderFactory
+from .signoff import sign_off
+from .status import build_status, milestone_view, status_context, status_dict, status_text, view_dict, view_text
 
 PLAN_DESCRIPTION = (
     "Execution records of a milestone's plan.\n\n"
@@ -62,7 +68,6 @@ REVIEW_RECORD_DESCRIPTION = (
 )
 EXIT_ERROR = 1
 OUTCOMES = ("done", "failed", "blocked")
-DEPLOY_OUTCOMES = ("done", "failed")
 NOTE_MAX = 200
 
 
@@ -292,9 +297,9 @@ def _add_status_parser(sub: Any) -> None:
     status.set_defaults(handler=run_status)
 
 
-def gate_providers(spec_root: str, repo_root: str, git_root: str) -> "ProviderFactory":
+def gate_providers(spec_root: str, repo_root: str, git_root: str) -> ProviderFactory:
     """The two checks of the close gate that live in ``validation`` (this package may not import it at the top), built for one run."""
-    def build(graph: Any, lock: Any) -> Any:
+    def build(graph: Graph, lock: Lock | None) -> tuple[OpenItemsProvider, ScaffoldProvider]:
         from ..validation.graph_checks.context import GraphCheckContext
         from ..validation.graph_checks.scaffold import scaffold_scan
         from ..validation.open_items import check_open_items
@@ -318,9 +323,7 @@ def _refused(args: argparse.Namespace, command: str, error: SpecError, details: 
     return EXIT_ERROR
 
 
-def _guarded(command: str, args: argparse.Namespace, body: Any) -> int:
-    from .milestone import MilestoneRefusal
-
+def _guarded(command: str, args: argparse.Namespace, body: Callable[[], int]) -> int:
     def run(_graph: object) -> int:
         try:
             return body()
@@ -333,7 +336,6 @@ def _guarded(command: str, args: argparse.Namespace, body: Any) -> int:
 def run_milestone_start(args: argparse.Namespace) -> int:
     """Run ``specdev milestone start`` on the parsed *args*; returns the exit code (0 started, 1 refused)."""
     def body() -> int:
-        from .milestone import start_milestone
         result = start_milestone(*_roots(args), args.milestone)
         what = "already in progress, nothing written" if result.noop else f"{'resumed' if result.resumed else 'started'} ({result.previous} -> in_progress)" + ("; the deferral reason is cleared" if result.resumed else "")
         _emit(args, {"command": "milestone start", "milestone": result.milestone, "previous": result.previous, "noop": result.noop, "resumed": result.resumed, "notes": list(result.notes)}, "\n".join([f"milestone {result.milestone}: {what}", *result.notes]))
@@ -345,7 +347,6 @@ def run_milestone_start(args: argparse.Namespace) -> int:
 def run_milestone_defer(args: argparse.Namespace) -> int:
     """Run ``specdev milestone defer`` on the parsed *args*; returns the exit code (0 deferred, 1 refused)."""
     def body() -> int:
-        from .milestone import defer_milestone
         spec_root, repo_root, _ = _roots(args)
         result = defer_milestone(spec_root, repo_root, args.milestone, args.reason)
         _emit(args, {"command": "milestone defer", "milestone": result.milestone, "previous": result.previous, "reason": result.reason}, f"milestone {result.milestone}: deferred ({result.previous} -> deferred): {result.reason}")
@@ -354,7 +355,7 @@ def run_milestone_defer(args: argparse.Namespace) -> int:
     return _guarded("milestone defer", args, body)
 
 
-def _gate_lines(result: "CloseResult") -> list[str]:
+def _gate_lines(result: CloseResult) -> list[str]:
     report = result.report
     lines = [f"  deferred or won't-do task {task.task_id} ({task.disposition}): {task.reason or 'no reason'}" for task in report.paused]
     lines.extend(f"  {warning.render()}" for warning in report.warnings)
@@ -362,10 +363,10 @@ def _gate_lines(result: "CloseResult") -> list[str]:
     return lines
 
 
-def _close_refused_text(result: "CloseResult") -> str:
+def _close_refused_text(result: CloseResult) -> str:
     by_owner: dict[str, list[SpecError]] = {}
     for error in result.report.errors:
-        by_owner.setdefault(error.owner or "close-gate", []).append(error)
+        by_owner.setdefault(error.owner or CLOSE_OWNER, []).append(error)
     lines = [f"milestone {result.milestone} cannot be closed: {len(result.report.errors)} error(s)"]
     for owner, errors in by_owner.items():
         lines.append(f"{owner} ({len(errors)}):")
@@ -373,7 +374,7 @@ def _close_refused_text(result: "CloseResult") -> str:
     return "\n".join([*lines, *_gate_lines(result)])
 
 
-def _close_json(result: "CloseResult") -> dict[str, Any]:
+def _close_json(result: CloseResult) -> dict[str, Any]:
     report = result.report
     return {
         "command": "milestone close", "milestone": result.milestone, "closed": result.closed, "check": result.check_only, "passes": report.passed,
@@ -383,7 +384,7 @@ def _close_json(result: "CloseResult") -> dict[str, Any]:
     }
 
 
-def _closed_text(result: "CloseResult") -> str:
+def _closed_text(result: CloseResult) -> str:
     record = result.record or {}
     lines = [f"milestone {result.milestone}: closed", f"  signed off by {record.get('signed_off_by')} ({record.get('signoff')}, tree {result.signoff_tree})", f"  closed at tree {result.tree}"]
     if result.signoff_tree != result.tree:
@@ -395,7 +396,6 @@ def _closed_text(result: "CloseResult") -> str:
 def run_milestone_close(args: argparse.Namespace) -> int:
     """Run ``specdev milestone close`` on the parsed *args*; returns the exit code (0 closed, or the gate passes with --check; 1 refused)."""
     def body() -> int:
-        from .milestone import close_milestone
         spec_root, repo_root, git_root = _roots(args)
         result = close_milestone(spec_root, repo_root, git_root, args.milestone, gate_providers(spec_root, repo_root, git_root), check_only=args.check)
         if not result.report.passed:
@@ -414,8 +414,6 @@ def run_milestone_close(args: argparse.Namespace) -> int:
 def run_milestone_signoff(args: argparse.Namespace) -> int:
     """Run ``specdev milestone sign-off`` on the parsed *args*; returns the exit code (0 recorded, 1 refused)."""
     def body() -> int:
-        from .signoff import sign_off
-        from .status import view_dict, view_text
         spec_root, repo_root, git_root = _roots(args)
         result = sign_off(spec_root, repo_root, git_root, args.milestone, gate_providers(spec_root, repo_root, git_root))
         document = {**view_dict(result.view), "command": "milestone sign-off", "record": result.record, "file": result.file}
@@ -427,10 +425,7 @@ def run_milestone_signoff(args: argparse.Namespace) -> int:
 
 def run_status(args: argparse.Namespace) -> int:
     """Run ``specdev status`` on the parsed *args*; returns the exit code (0 whatever it lists; 1 when it cannot read what it needs)."""
-    def run(graph: Any) -> int:
-        from .executed import lock_if_present
-        from .milestone import milestone_id_of
-        from .status import build_status, milestone_view, status_context, status_dict, status_text, view_dict, view_text
+    def run(graph: Graph) -> int:
         spec_root, repo_root, git_root = _roots(args)
         context = status_context(spec_root, repo_root, git_root, lock_if_present(spec_root), graph, gate_providers(spec_root, repo_root, git_root))
         if args.milestone:

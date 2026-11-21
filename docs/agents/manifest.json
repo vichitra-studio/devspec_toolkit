@@ -36,17 +36,17 @@
     },
     "16a": {
       "mode": "one_shot",
-      "artifact": "spec/impl_context/{step_id}.json",
+      "artifact": "spec/impl_context/ms_<batch>_plan.json",
       "schema": "16_impl_context"
     },
     "16b": {
       "mode": "loop",
-      "artifact": "spec/impl_context/{step_id}.json",
+      "artifact": "spec/impl_context/ms_<batch>_plan.json",
       "schema": "16_impl_context"
     },
     "16c": {
       "mode": "one_shot",
-      "artifact": "spec/impl_context/{step_id}.json",
+      "artifact": "spec/impl_context/ms_<batch>_plan.json",
       "schema": "16_impl_context"
     }
   },

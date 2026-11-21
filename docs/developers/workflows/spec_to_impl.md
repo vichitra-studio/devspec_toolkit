@@ -39,7 +39,7 @@ One milestone runs through the commands below, in this order; the `/specdev-trin
 
 **A person decides** sign-off, defer (`specdev milestone defer <ms-id> --reason "..."`) and manual verification, that is, the attestation of a manual fixture or of a rule enforced by review (`specdev verify attest <node-id>...`) and of an `at_deploy` action a person carried out. An agent shows `specdev status` first, asks, and never answers the host's ask prompt itself; specdev records who ran the command (from git) and checks nothing about who that is.
 
-`specdev attest` re-accepts links in the trace lock; `specdev verify attest` writes an attestation record. The milestone-wide findings file has two names on purpose: the reviewer writes `findings_<ms-id>_<round>_r1.json` and the skill copies it to `findings_<batch>_review_<round>.json`, which `milestone-state` reads. A 1.1.1 plan (no `milestone` key, with the removed fields) is read through `specdev status` only and is not driven through the loop until a later 1.2.0 migration has rewritten it.
+`specdev attest` re-accepts links in the trace lock; `specdev verify attest` writes an attestation record. The milestone-wide findings file has two names on purpose: the reviewer writes `findings_<ms-id>_<round>_r1.json` and the skill copies it to `findings_<batch>_review_<round>.json`, which `milestone-state` reads, which the skill passes to `specdev review record --findings-file` and to `milestone_fix` as its `findings_path`. A 1.1.1 plan (no `milestone` key, with the removed fields) is read through `specdev status` only and is not driven through the loop until a later 1.2.0 migration has rewritten it.
 
 ## Why Two Planning Steps?
 Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (Roadmap)**.

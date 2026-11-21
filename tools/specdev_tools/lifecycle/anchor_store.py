@@ -2,7 +2,8 @@
 
 An anchor row is a status record about one roadmap milestone (``plan.milestone_index[]``).  This module reads the rows
 and holds ``write_row_state``, the only function of the toolkit that writes an existing row's ``status``,
-``deferral_reason`` and ``close``.  The milestone commands are its callers; first authoring of a row is ``step create 16``
+``deferral_reason`` and ``close`` (it does not judge the move from one status to another: each milestone command guards
+its own, and the status values are ``graph/names.ROW_STATUSES``).  The milestone commands are its callers; first authoring of a row is ``step create 16``
 or ``json insert --step 16`` and is outside it.
 
 Readers (``read_row``, ``read_statuses``, ``is_legacy_close``) read the raw file and never validate a plan: a legacy
@@ -30,13 +31,12 @@ from ..core.errors import FindingError, make_error, refusal
 from ..core.json_utils import JsonUtilsError, check_edit, delete_text, json_write_atomic, patch_text
 from ..core.loaders import read_json_object
 from ..graph.gitview import git_reason, host_root_of, path_exists_at, resolve_ref, run_git, spec_path_in_repo
+from ..graph.names import DEFAULT_ROW_STATUS, ROW_DONE, ROW_STATUSES
 from ..trace.lockfile import with_write_lock
 from . import plans
 
 ANCHOR_FILE = "16_impl_context.json"
 LEGACY_MARKER = "legacy-migration"
-STATUSES = ("pending", "in_progress", "deferred", "done")
-DEFAULT_STATUS = "pending"
 _ROWS = ("plan", "milestone_index")
 _FIELDS = ("status", "deferral_reason", "close")
 
@@ -52,11 +52,9 @@ class AnchorState:
 
 @dataclass(frozen=True)
 class AnchorRow:
-    """One anchor row: ``milestone_id`` is the one id of its ``about``, ``index`` its place in ``plan.milestone_index``."""
+    """One anchor row: ``milestone_id`` is the one id of its ``about``."""
 
-    anchor_id: str
     milestone_id: str
-    index: int
     status: str
     deferral_reason: str | None
     close: Mapping[str, Any] | None
@@ -88,13 +86,13 @@ def anchor_path(spec_root: str | os.PathLike[str]) -> str:
 
 
 def _status_of(raw: Any, milestone_id: str) -> str:
-    """The status of a raw row value: absent reads as ``pending``; a value that is not one of ``STATUSES`` raises E801 (``STATUS_UNKNOWN``)."""
+    """The status of a raw row value: absent reads as ``pending``; a value that is not one of ``ROW_STATUSES`` raises E801 (``STATUS_UNKNOWN``)."""
     if raw is None:
-        return DEFAULT_STATUS
-    if raw not in STATUSES:
+        return DEFAULT_ROW_STATUS
+    if raw not in ROW_STATUSES:
         raise FindingError(make_error(
             "E801",
-            f"the anchor row of {milestone_id} has the status {raw!r}, which is not one of {', '.join(STATUSES)}; "
+            f"the anchor row of {milestone_id} has the status {raw!r}, which is not one of {', '.join(ROW_STATUSES)}; "
             f"set it to one of them in {ANCHOR_FILE}",
             subcode="STATUS_UNKNOWN",
             node_id=milestone_id,
@@ -102,12 +100,10 @@ def _status_of(raw: Any, milestone_id: str) -> str:
     return raw
 
 
-def _row_of(index: int, raw: Mapping[str, Any], milestone_id: str) -> AnchorRow:
+def _row_of(raw: Mapping[str, Any], milestone_id: str) -> AnchorRow:
     reason, close = raw.get("deferral_reason"), raw.get("close")
     return AnchorRow(
-        anchor_id=str(raw.get("anchor_id", "")),
         milestone_id=milestone_id,
-        index=index,
         status=_status_of(raw.get("status"), milestone_id),
         deferral_reason=reason if isinstance(reason, str) else None,
         close=close if isinstance(close, dict) else None,
@@ -135,15 +131,15 @@ def read_row(spec_root: str | os.PathLike[str], milestone_id: str) -> AnchorRow 
         FindingError: E801 (``STATUS_UNKNOWN``) when the row's ``status`` is not one of the four values.
     """
     rows = _raw_rows(read_json_object(anchor_path(spec_root)))
-    return next((_row_of(i, raw, milestone_id) for i, raw in enumerate(rows) if _milestone_of(raw) == milestone_id), None)
+    return next((_row_of(raw, milestone_id) for raw in rows if _milestone_of(raw) == milestone_id), None)
 
 
 def _statuses_of(document: Mapping[str, Any] | None) -> dict[str, AnchorState]:
     states: dict[str, AnchorState] = {}
-    for index, raw in enumerate(_raw_rows(document)):
+    for raw in _raw_rows(document):
         milestone_id = _milestone_of(raw)
         if milestone_id is not None:
-            states.setdefault(milestone_id, _row_of(index, raw, milestone_id).state)
+            states.setdefault(milestone_id, _row_of(raw, milestone_id).state)
     return states
 
 
@@ -249,7 +245,7 @@ def write_legacy_close(
         "signoff": None,
         "plan_hash": plans.plan_hash(plans.require_plan(spec, milestone_id)),
     }
-    write_row_state(spec, milestone_id, "done", close=close, repo_root=repo_root)
+    write_row_state(spec, milestone_id, ROW_DONE, close=close, repo_root=repo_root)
 
 
 def append_close_migration(
@@ -264,7 +260,7 @@ def append_close_migration(
         FindingError: E801 when the milestone is not closed; E767 as ``write_row_state``.
     """
     row = read_row(spec_root, milestone_id)
-    if row is None or row.status != "done" or row.close is None:
+    if row is None or row.status != ROW_DONE or row.close is None:
         raise refusal("E801", f"{milestone_id} is not closed (no anchor row with status done and a close record), so its close record cannot be extended")
     migrations = [*row.close.get("migrations", []), {"hash_after": hash_after, "note": note}]
-    write_row_state(spec_root, milestone_id, "done", close={**row.close, "migrations": migrations}, repo_root=repo_root)
+    write_row_state(spec_root, milestone_id, ROW_DONE, close={**row.close, "migrations": migrations}, repo_root=repo_root)

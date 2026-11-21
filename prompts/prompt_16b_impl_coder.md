@@ -62,7 +62,7 @@ After the last action of an item: review the item's implementation for gaps and 
 Field shape is `vc:core:collections#ambiguityItem` (`schema/core/collections.schema.json`): `{ "id", "description", "about": [<node-id>, ...] }` plus optional `decision`, `proposed_assumption`, `missing_kind`. An item has no status or severity: it is open until its answer is applied, then deleted. Decision rules below.
 
 *   Record any blocker or spec issue discovered during execution. The id is `amb-new-<slug>` (kebab-case; the `amb-<slug>` form is the planner's).
-*   `about` names the nodes of the spec the question concerns: the criterion the item realises, its task, an API, an invariant. Find them with `specdev trace <node-id> --up` / `--down` and `specdev node show <id>`. A plan item of the same plan is refused (E702): name the criterion it realises and describe the item in words, with no node id in the text (shared_expectations section 6, rule 9).
+*   `about` names the nodes of the spec the question concerns: the criterion the item realises, its task, an API, an invariant. Find them with `specdev trace <node-id> --up` / `--down` and `specdev node show <id>`. A plan item of the same plan is written and then reported by `spec-check` (E702): delete the item with `specdev json delete --id <amb-id>` and write it again; name the criterion it realises and describe the item in words, with no node id in the text (shared_expectations section 6, rule 9).
 *   Write the item with the form that fits what the plan holds now. Read the array first: `specdev json read <plan> '.execution.emergent_ambiguities'` prints `null` when the plan has no such array (with or without an `execution` block).
     ```bash
     # the read printed null: create the array with the item

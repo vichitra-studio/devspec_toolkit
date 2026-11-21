@@ -153,3 +153,14 @@ def test_defer_then_start_through_the_cli(tmp_path: Path) -> None:
     assert code == 0 and "in_progress -> deferred" in out
     code, out, _ = cli_run(host, "milestone", "start", MILESTONE)
     assert code == 0 and "resumed" in out and _row(host).deferral_reason is None
+
+
+def test_the_missing_row_message_names_the_form_that_works(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    edit_doc(host, ANCHOR, lambda document: document["plan"].update(milestone_index=[]))
+    message = _refusal(lambda: _start(host)).error.message
+    assert "`specdev json insert --step 16 .plan.milestone_index '{" in message and "specdev step create" not in message
+    assert f'"anchor_id": "anchor-{MILESTONE}", "about": ["{MILESTONE}"]' in message
+    (host / "spec" / ANCHOR).unlink()
+    message = _refusal(lambda: _start(host)).error.message
+    assert "`specdev step create 16`" in message and "json insert" not in message
