@@ -1,0 +1,19 @@
+{
+  "id": "PWRESET_CONFIRM_REUSED_01",
+  "realises": [
+    "tc-confirm-reused-token"
+  ],
+  "description": "The confirm handler returns 410 for a token that already changed a password, even within 30 minutes.",
+  "type": "behavior",
+  "layer": "api",
+  "implementation": {
+    "actions": [
+      {
+        "id": "a01",
+        "type": "file_edit",
+        "target": "src/routes/password-resets/confirm.ts",
+        "description": "Refuse a token that already changed a password."
+      }
+    ]
+  }
+}

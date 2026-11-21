@@ -375,8 +375,10 @@ as an alias. Deleting a node is `specdev json delete --id`.
 
 - Does not review existing artifacts without authoring. Use `/specdev-review` for that.
 - Does not manage trinity-plan gating. Use `/specdev-trinity --phase plan` for that.
-- Does not handle 16a/16b/16c. Discovery-phase steps only: `step create` writes steps 00 to 15
-  and refuses the rest (trinity phases belong to `/specdev-trinity`).
+- Does not handle 16a/16b/16c. Discovery-phase steps only: a milestone's plan is created by
+  `/specdev-trinity --phase plan` with `specdev step create 16a <batch> --from <draft>`, and the code
+  phase writes only through `specdev plan record` and `specdev review record` (trinity phases belong to
+  `/specdev-trinity`).
 - Does not commit changes. User authorizes commits separately.
 - Does not run reviewers sequentially within a round. Parallel dispatch is required.
 - Does not skip AskUserQuestion on a blocker payload. Blocker questions must be presented

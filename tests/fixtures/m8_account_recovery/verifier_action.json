@@ -1,0 +1,6 @@
+{
+  "id": "a02",
+  "type": "run_command",
+  "description": "Run the expired-token case against the confirm handler.",
+  "command": "python3 src/expired_token_test.py"
+}

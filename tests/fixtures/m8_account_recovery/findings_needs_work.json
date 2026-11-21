@@ -1,0 +1,18 @@
+{
+  "$schema": "vc:infra:findings",
+  "round": 1,
+  "scope": "ms-account-recovery-plan",
+  "generated_at": 1700000000,
+  "findings": [
+    {
+      "kind": "bug",
+      "location": "src/routes/password-resets/confirm.ts#confirm",
+      "signature": "m8e2e-expired-before-update",
+      "message": "The handler updates the password before it checks the age of the token, so an expired token still changes the hash.",
+      "severity": "P0",
+      "evidence": ["confirm.ts awaits the password update first"],
+      "suggested_fix": "Check the age of the token before the password update.",
+      "upstream_refs": ["PWRESET_CONFIRM_EXPIRED_01"]
+    }
+  ]
+}
