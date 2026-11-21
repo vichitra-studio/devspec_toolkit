@@ -8,6 +8,9 @@ Thin orchestrator that:
 5. Re-stamps spec/specdev_version when no structural changes are required,
    or directs the user to run ``specdev align`` when migration is needed.
 
+Before steps 1 to 5 the host installer (``host_install.py``) installs its pieces into the host repository, unless
+``no_install``; ``install_only`` runs the installer alone.
+
 Only structural changes block a plain re-stamp:
   steps_missing | steps_needs_update | steps_needs_rename | paradigm_shifts > 0
 Unknown steps (user extensions) and extension steps never block a re-stamp.
@@ -19,7 +22,10 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from .host_install import InstallReport
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +37,7 @@ class UpdateResult:
     """Structured result returned by run_update()."""
 
     exit_code: int
-    status: str  # "already_current" | "updated" | "would_update" | "needs_migration" | "error"
+    status: str  # "already_current" | "updated" | "would_update" | "needs_migration" | "installed" | "would_install" | "error"
     from_version: Optional[str]
     to_version: Optional[str]
     needs_migration: bool = False
@@ -41,6 +47,7 @@ class UpdateResult:
     message: str = ""
     warnings: list[str] = field(default_factory=list)
     dry_run: bool = False
+    host_install: dict = field(default_factory=dict)  # InstallReport.to_dict() of the run, on every path
 
 
 # ---------------------------------------------------------------------------
@@ -124,21 +131,87 @@ def _needs_migration(summary: dict) -> bool:
     )
 
 
+def _toolkit_version_error(repo_root: Path) -> UpdateResult:
+    """The E608 result for a toolkit root whose version cannot be read."""
+    return UpdateResult(
+        exit_code=1,
+        status="error",
+        from_version=None,
+        to_version=None,
+        message=(
+            f"E608 TOOLKIT_VERSION_MISMATCH: Could not read toolkit version from "
+            f"{repo_root / 'tools' / 'pyproject.toml'}. "
+            "Ensure the toolkit is correctly installed."
+        ),
+    )
+
+
+def _install_only_result(report: InstallReport, repo_root: Path, dry_run: bool) -> UpdateResult:
+    """The result of ``--install-only``: no version logic, no stamp; the exit code is 0 whatever the pieces did."""
+    from .core.changelog_parser import get_toolkit_version
+
+    toolkit_version = get_toolkit_version(repo_root)
+    if toolkit_version is None:
+        return _toolkit_version_error(repo_root)
+    return UpdateResult(
+        exit_code=0,
+        status="would_install" if dry_run else "installed",
+        from_version=None,
+        to_version=toolkit_version,
+        message=report.summary(),
+        dry_run=dry_run,
+    )
+
+
 def run_update(
     spec_dir: Path,
     repo_root: Path,
     dry_run: bool = False,
+    git_root: Optional[Path] = None,
+    install_only: bool = False,
+    no_install: bool = False,
+    adopt: bool = False,
+    force_claude: bool = False,
 ) -> UpdateResult:
-    """Core update logic — sync project to the current toolkit version.
+    """Sync a host to the current toolkit: install the host pieces, then re-stamp or direct to ``align``.
 
     Args:
         spec_dir: Absolute path to the project's spec/ directory.
         repo_root: Absolute path to the toolkit root (contains tools/pyproject.toml).
-        dry_run: When True, report what would be done without writing any files.
+        dry_run: When True, report what would be done without writing any files or running any command.
+        git_root: The host root; default the git top folder of ``spec_dir``.
+        install_only: Install the host pieces and skip the version logic and the stamp.
+        no_install: Skip the host install (detection only).
+        adopt: Let pieces rewrite drifted host content they would otherwise only report.
+        force_claude: Let the symlink piece replace stale skill and agent links (never a real file).
 
     Returns:
-        An UpdateResult describing outcome and exit code.
+        An UpdateResult describing outcome and exit code; ``host_install`` holds the install report on every path.
+        A piece that is refused or drifts adds warnings and never changes the exit code.
     """
+    from .host_install import NO_INSTALL_REQUESTED, InstallReport, run_host_install
+
+    report = (
+        InstallReport(skipped=NO_INSTALL_REQUESTED)
+        if no_install
+        else run_host_install(
+            spec_dir, repo_root, git_root=git_root, dry_run=dry_run, adopt=adopt, force_claude=force_claude
+        )
+    )
+    result = _install_only_result(report, repo_root, dry_run) if install_only else _run_update_core(spec_dir, repo_root, dry_run)
+    if report.pieces and not install_only:
+        result.message = f"{result.message}\n{report.summary()}"
+    result.warnings = [*result.warnings, *report.warnings()]
+    result.host_install = report.to_dict()
+    return result
+
+
+def _run_update_core(
+    spec_dir: Path,
+    repo_root: Path,
+    dry_run: bool = False,
+) -> UpdateResult:
+    """The version logic of ``update``: re-stamp ``spec/specdev_version`` or direct to ``align``."""
     from .core.changelog_parser import get_toolkit_version
     from .generation.schema_differ import (
         diff_spec_directory,
@@ -148,17 +221,7 @@ def run_update(
 
     toolkit_version = get_toolkit_version(repo_root)
     if toolkit_version is None:
-        return UpdateResult(
-            exit_code=1,
-            status="error",
-            from_version=None,
-            to_version=None,
-            message=(
-                f"E608 TOOLKIT_VERSION_MISMATCH: Could not read toolkit version from "
-                f"{repo_root / 'tools' / 'pyproject.toml'}. "
-                "Ensure the toolkit is correctly installed."
-            ),
-        )
+        return _toolkit_version_error(repo_root)
 
     host_version = get_user_version(spec_dir)
 

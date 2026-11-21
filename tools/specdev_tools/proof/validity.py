@@ -47,12 +47,15 @@ class ProofContext:
     """What proof reads besides the graph: the host repository, the spec folder, the folder of the evidence files and, for a past state, its commit.
 
     ``spec_root`` is the absolute path of ``spec_dir``.  With ``commit`` the code tree and the seed texts are those of that commit.
+    ``spec_in_host`` is the spec folder of the host when ``spec_dir`` is an archive of it at ``commit`` (outside the host): the
+    code tree leaves that folder out, as it does for a live spec.
     """
 
     git_root: str
     spec_dir: str
     evidence_dir: str
     commit: str | None = None
+    spec_in_host: str | None = None
     _hashes: tuple[Graph, dict[str, str]] | None = field(default=None, init=False, repr=False)
 
     @property
@@ -68,7 +71,7 @@ class ProofContext:
             GitViewError: E708 when git fails.
             FindingError: E520 when the host declarations cannot be read.
         """
-        return code_tree_for_host(self.git_root, self.spec_root, self.commit)
+        return code_tree_for_host(self.git_root, self.spec_root, self.commit, spec_in_host=self.spec_in_host)
 
     @cached_property
     def declarations(self) -> HostDeclarations:

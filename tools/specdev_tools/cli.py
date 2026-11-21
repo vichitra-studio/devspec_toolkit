@@ -439,6 +439,21 @@ def build_parser() -> _SpecdevParser:
         action="store_true",
         help="Show what would be done without writing any files",
     )
+    upd.add_argument("--git-root", default=None, help="Host repo root to install into (default: the git top folder of spec_dir)")
+    upd_mode = upd.add_mutually_exclusive_group()
+    upd_mode.add_argument(
+        "--install-only", action="store_true", help="Install the host files only; skip the version check and the stamp"
+    )
+    upd_mode.add_argument(
+        "--no-install", action="store_true", help="Do not install host files; check and stamp the version only"
+    )
+    upd.add_argument(
+        "--adopt", action="store_true", help="Rewrite drifted host hooks and wrappers that update only reports by default"
+    )
+    upd.add_argument(
+        "--force-claude", action="store_true",
+        help="Replace stale .claude/skills/ and .claude/agents/ symlinks (never overwrites real files/dirs)",
+    )
     upd.add_argument(
         "--json", action="store_true", help="Output results as JSON", dest="json_output"
     )
@@ -1515,7 +1530,14 @@ def main():
                 sys.exit(1)
 
         result: UpdateResult = run_update(
-            spec_dir, repo_root, dry_run=getattr(args, "dry_run", False)
+            spec_dir,
+            repo_root,
+            dry_run=getattr(args, "dry_run", False),
+            git_root=Path(os.path.abspath(args.git_root)) if args.git_root else None,
+            install_only=args.install_only,
+            no_install=args.no_install,
+            adopt=args.adopt,
+            force_claude=args.force_claude,
         )
 
         if getattr(args, "json_output", False):
@@ -1537,6 +1559,7 @@ def main():
                 "from_version": result.from_version,
                 "to_version": result.to_version,
                 "dry_run": result.dry_run,
+                "host_install": result.host_install,
             }
             print(json.dumps(out, indent=2))
             sys.exit(result.exit_code)

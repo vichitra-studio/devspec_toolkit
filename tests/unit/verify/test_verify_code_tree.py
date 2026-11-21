@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from specdev_tools.graph.gitview import archive_ref
 from specdev_tools.verify.code_tree import code_tree_for_host, submodule_warnings
 from unit.graph._synth import git
 
@@ -161,3 +162,17 @@ def test_a_repository_with_no_commit_has_an_id_that_follows_its_files(tmp_path: 
     assert first == _id(repo)
     write(repo / "src" / "app.py", "print('changed')\n")
     assert _id(repo) != first
+
+
+def test_an_archived_spec_names_the_live_folder_to_leave_out_and_gives_the_live_id(tmp_path: Path) -> None:
+    """A spec read from an archive of a past commit lies outside the host: without ``spec_in_host`` its folder would stay in the tree."""
+    repo = code_repo(tmp_path)
+    git(repo, "tag", "v1")
+    live = _id(repo, "v1")
+    write(repo / "src" / "app.py", "print('later')\n")
+    commit_all(repo, "later")
+    with archive_ref("v1", str(repo), ["spec"]) as archived:
+        spec = str(Path(archived) / "spec")
+        assert code_tree_for_host(str(repo), spec, "v1", spec_in_host=str(repo / "spec")) == live
+        assert code_tree_for_host(str(repo), spec, "v1") != live
+        assert code_tree_for_host(str(repo), str(repo / "spec"), "v1", spec_in_host=None) == live  # the default is unchanged

@@ -111,6 +111,11 @@ def proof_context(ctx: GraphCheckContext) -> ProofContext | None:
     return ctx.memo[_PROOF_KEY]
 
 
+def bind_proof_context(ctx: GraphCheckContext, proof_ctx: ProofContext) -> None:
+    """Make *proof_ctx* the proof context of *ctx*: ``built_at_cap`` and the functions on it then read the evidence and the code tree *proof_ctx* names (the spec of a past commit with the checkout's evidence)."""
+    ctx.memo[_PROOF_KEY] = proof_ctx
+
+
 def _waits_for(graph: Graph, node: Node, cap: str) -> str:
     """The lowest stage above *cap* at which a live binding of *node*, or of a verifier that ``verifies`` or ``realises`` it, is made; the stage after *cap* when none is found."""
     sources = (graph.by_id.get(link.source) for link in graph.incoming.get(node.id, ()) if link.field in (VERIFIES, REALISES))

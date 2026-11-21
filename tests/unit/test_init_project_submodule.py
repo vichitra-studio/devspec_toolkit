@@ -122,7 +122,11 @@ class TestInitIntoHost:
 
     def _init(self, host, monkeypatch) -> None:
         monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(host), "--toolkit-root", self.TOOLKIT_ROOT])
-        with mock.patch("init_project.run_cmd"), mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"):
+        with (
+            mock.patch("init_project.run_cmd"),
+            mock.patch("init_project.run_install_delegate", return_value=0),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
             init_project.main()
 
     def test_new_host_gets_the_step_gate_hook(self, tmp_path, monkeypatch):
@@ -137,6 +141,51 @@ class TestInitIntoHost:
         (tmp_path / ".pre-commit-config.yaml").write_text(old)
         self._init(tmp_path, monkeypatch)
         assert (tmp_path / ".pre-commit-config.yaml").read_text() == old
+
+
+    def test_init_delegates_to_venv_cli_after_venv_created(self, tmp_path, monkeypatch):
+        calls: list[tuple[str, list[str]]] = []
+        monkeypatch.setattr(
+            sys, "argv",
+            ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT, "--force-claude"],
+        )
+        with (
+            mock.patch("init_project.run_cmd", side_effect=lambda cmd, **kw: calls.append(("run_cmd", list(cmd)))),
+            mock.patch("init_project.run_install_delegate", side_effect=lambda cmd, cwd: calls.append(("delegate", [*cmd, cwd])) or 0),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
+        names = [name for name, _ in calls]
+        setup = next(i for i, (n, c) in enumerate(calls) if n == "run_cmd" and c[0] == "bash")
+        precommit = next(i for i, (n, c) in enumerate(calls) if n == "run_cmd" and c[:3] == ["uv", "pip", "install"])
+        delegate = names.index("delegate")
+        assert setup < precommit < delegate
+        command = calls[delegate][1]
+        rel_toolkit = os.path.relpath(self.TOOLKIT_ROOT, tmp_path).replace("\\", "/")
+        assert command == [
+            str(tmp_path / "devspec_env" / "bin" / "specdev"), "update", "spec", "--repo-root", rel_toolkit,
+            "--install-only", "--force-claude", str(tmp_path),
+        ]
+
+    def test_init_exits_nonzero_with_the_rerun_command_when_the_delegate_fails(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT])
+        with (
+            mock.patch("init_project.run_cmd"),
+            mock.patch("init_project.run_install_delegate", return_value=1),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+            pytest.raises(SystemExit) as raised,
+        ):
+            init_project.main()
+        assert raised.value.code == 1
+        assert "./tools/run_specdev.sh update spec --repo-root" in capsys.readouterr().err
+
+    def test_init_project_never_imports_the_package(self):
+        import ast
+
+        tree = ast.parse(open(init_project.__file__, encoding="utf-8").read())
+        imported = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        imported |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+        assert "specdev_tools" not in imported
 
 
 class TestManifestDerivedSeedBootstrap:

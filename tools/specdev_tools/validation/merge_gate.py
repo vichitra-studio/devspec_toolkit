@@ -112,11 +112,11 @@ def closed_by_branch(head: dict[str, AnchorState], base: dict[str, AnchorState])
     ]
 
 
-def _open_items_check(ctx: CheckContext) -> dict[str, Any]:
+def open_items_check(ctx: CheckContext) -> dict[str, Any]:
     return check_result(check_open_items(ctx.spec_dir, gate="merge", frozen=ctx.is_frozen_plan, read=ctx.ambiguity_read))
 
 
-def _pins_check(ctx: CheckContext) -> dict[str, Any]:
+def pins_check(ctx: CheckContext) -> dict[str, Any]:
     if ctx.check_graph is None:
         return skip(_NO_GRAPH)
     return check_result(check_pins(ctx.check_graph, declarations_of(ctx.effective_spec_root), ctx.project_root))
@@ -174,8 +174,8 @@ def run_merge_checks(ctx: CheckContext, base_ref: str | None) -> OrderedDict[str
     E900) is that check's one finding; the other checks still run.
     """
     merge_checks: tuple[tuple[str, Callable[[CheckContext], dict[str, Any]]], ...] = (
-        (MERGE_OPEN_ITEMS, _open_items_check),
-        (MERGE_PINS, _pins_check),
+        (MERGE_OPEN_ITEMS, open_items_check),
+        (MERGE_PINS, pins_check),
         (MERGE_BINDINGS, partial(_bindings_check, base_ref=base_ref)),
     )
     checks: OrderedDict[str, dict[str, Any]] = OrderedDict()

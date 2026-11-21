@@ -106,15 +106,19 @@ def declarations_of(spec_root: str) -> HostDeclarations:
         raise FindingError(make_error("E520", f"the host declarations {exc.path} cannot be read: {exc.reason}; correct the file")) from exc
 
 
-def code_tree_for_host(git_root: str, spec_root: str, commit: str | None = None) -> str:
+def code_tree_for_host(git_root: str, spec_root: str, commit: str | None = None, *, spec_in_host: str | None = None) -> str:
     """The code tree id of the host: ``code_tree_id`` with the seed documents of the manifest and the declared ``code_tree_exclusions`` left out.
+
+    The manifest and the declarations are read from *spec_root*.  The spec folder taken out of the tree is *spec_in_host* when
+    given, else *spec_root*: a spec read from an archive of a past commit (outside the host) leaves the same files out as the
+    live spec folder it was archived from.
 
     Raises:
         GitViewError: E708, as ``code_tree_id``.
         FindingError: E520 when the host declarations file cannot be read.
     """
     declarations = declarations_of(spec_root)
-    return code_tree_id(git_root, spec_root, seed_pathspecs(git_root, spec_root), declarations.code_tree_exclusions, commit)
+    return code_tree_id(git_root, spec_in_host or spec_root, seed_pathspecs(git_root, spec_root), declarations.code_tree_exclusions, commit)
 
 
 def dirty_submodules(git_root: str) -> list[str]:

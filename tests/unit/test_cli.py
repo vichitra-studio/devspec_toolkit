@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+import unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Optional
@@ -1295,6 +1296,99 @@ class CliTests(unittest.TestCase):
             self.assertTrue(payload["dry_run"])
             _, kwargs = p_update.call_args
             self.assertTrue(kwargs.get("dry_run"))
+
+    def _install_host(self, td: str, spec_version: str, piece_result):
+        """A git host, a toolkit with templates, and a fake registry of one piece returning *piece_result*."""
+        import subprocess
+        from specdev_tools import host_install as hi
+
+        host = Path(td) / "host"
+        spec_dir = host / "spec"
+        spec_dir.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(host)], check=True)
+        (spec_dir / "specdev_version").write_text(f'toolkit_version: "{spec_version}"\n', encoding="utf-8")
+        toolkit = Path(td) / "toolkit"
+        (toolkit / "tools").mkdir(parents=True)
+        (toolkit / "tools" / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n', encoding="utf-8")
+        (toolkit / "templates").mkdir()
+
+        def install(ctx):
+            (ctx.git_root / "fake.txt").write_text("x", encoding="utf-8")
+            return piece_result
+
+        return host, spec_dir, toolkit, patch.object(hi, "PIECES", (hi.HostPiece("fake", install),))
+
+    def test_update_cli_json_includes_host_install(self):
+        from specdev_tools import host_install as hi
+
+        with tempfile.TemporaryDirectory() as td:
+            host, spec_dir, toolkit, pieces = self._install_host(td, "1.0.0", hi.PieceResult(hi.CREATED))
+            with pieces:
+                code, out, err = self._run_cli(["update", str(spec_dir), "--repo-root", str(toolkit), "--json"])
+            self.assertEqual(0, code, msg=err)
+            payload = json.loads(out)
+            self.assertEqual(
+                {"status", "error_count", "warning_count", "command", "errors", "warnings", "output",
+                 "update_status", "from_version", "to_version", "dry_run", "host_install"},
+                set(payload),
+            )
+            self.assertEqual("created", payload["host_install"]["pieces"]["fake"]["status"])
+            self.assertTrue((host / "fake.txt").is_file())
+
+    def test_needs_migration_still_exits_1_after_install(self):
+        from specdev_tools import host_install as hi
+
+        diff = unittest.mock.MagicMock()
+        diff.summary = {"steps_missing": 1}
+        with tempfile.TemporaryDirectory() as td:
+            host, spec_dir, toolkit, pieces = self._install_host(td, "0.9.0", hi.PieceResult(hi.CREATED))
+            with pieces, \
+                    patch("specdev_tools.update.refresh_venv_installation", return_value=(True, "ok")), \
+                    patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff):
+                code, out, _ = self._run_cli(["update", str(spec_dir), "--repo-root", str(toolkit), "--json"])
+            self.assertEqual(1, code)
+            self.assertEqual("needs_migration", json.loads(out)["update_status"])
+            self.assertTrue((host / "fake.txt").is_file())
+
+    def test_update_json_warning_count_with_drift_exit_0(self):
+        from specdev_tools import host_install as hi
+
+        drift = hi.PieceResult(hi.DRIFT, "differs", (hi.Finding(hi.W_TEMPLATE_DRIFT, file="x.yaml", line=2, text="replace it"),))
+        with tempfile.TemporaryDirectory() as td:
+            _, spec_dir, toolkit, pieces = self._install_host(td, "1.0.0", drift)
+            with pieces, patch.dict(os.environ, {"SPECDEV_WARNINGS_AS_ERRORS": "1", "SPECDEV_PROMOTE_CODES": "W930"}):
+                code, out, _ = self._run_cli(["update", str(spec_dir), "--repo-root", str(toolkit), "--json"])
+            payload = json.loads(out)
+            self.assertEqual(0, code)
+            self.assertEqual(1, payload["warning_count"])
+            self.assertEqual(["W930 HOST_TEMPLATE_DRIFT: x.yaml:2: replace it"], payload["warnings"])
+            self.assertEqual(0, payload["error_count"])
+
+    def test_update_flags_are_forwarded_as_keywords(self):
+        from specdev_tools.update import UpdateResult
+
+        fake = UpdateResult(exit_code=0, status="installed", from_version=None, to_version="1.0.0", message="ok")
+        with tempfile.TemporaryDirectory() as td:
+            spec_dir = Path(td) / "spec"
+            spec_dir.mkdir()
+            with patch("specdev_tools.update.run_update", return_value=fake) as p_update:
+                code, _, err = self._run_cli(
+                    ["update", str(spec_dir), "--repo-root", td, "--git-root", td, "--install-only", "--adopt", "--force-claude"]
+                )
+            self.assertEqual(0, code, msg=err)
+            _, kwargs = p_update.call_args
+            self.assertEqual(Path(td).resolve(), Path(kwargs["git_root"]).resolve())
+            self.assertEqual((True, False, True, True), (kwargs["install_only"], kwargs["no_install"], kwargs["adopt"], kwargs["force_claude"]))
+            with patch("specdev_tools.update.run_update", return_value=fake) as p_update:
+                self._run_cli(["update", str(spec_dir), "--repo-root", td, "--no-install"])
+            _, kwargs = p_update.call_args
+            self.assertEqual((None, False, True, False, False), (kwargs["git_root"], kwargs["install_only"], kwargs["no_install"], kwargs["adopt"], kwargs["force_claude"]))
+
+    def test_update_install_only_and_no_install_are_exclusive(self):
+        with tempfile.TemporaryDirectory() as td:
+            code, _, err = self._run_cli(["update", td, "--repo-root", td, "--install-only", "--no-install"])
+        self.assertEqual(2, code)
+        self.assertIn("not allowed with", err)
 
     def test_update_command_missing_spec_dir_errors(self):
         """`update` on a non-existent spec dir errors out before calling run_update."""

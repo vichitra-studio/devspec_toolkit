@@ -43,8 +43,7 @@ REGISTERED_WITHOUT_EMITTER = {
     # above does not match; file-level forward replay and the freshness stderr lines, which wrote it, are gone.
     "W595",
     # M9: the bundle that writes the emitter takes its code out.
-    "E910", "E911", "E912", "E913", "E914", "E920", "E921", "E923", "E924", "E925", "E926",
-    "E927", "E928", "W930", "W931", "W932", "W933", "W934", "W935", "W936", "W937", "W938",
+    "E910", "E912", "E921", "E923", "E924", "W934",
 }
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic

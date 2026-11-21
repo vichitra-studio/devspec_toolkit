@@ -351,3 +351,23 @@ def test_a_committed_edit_of_the_code_is_stale_tree_too(host: Path) -> None:
     edit_code(host, "committed change\n")
     commit_all(host)
     assert _valid(host) == (False, STALE_TREE)
+
+
+def test_a_context_over_an_archived_spec_reads_the_code_tree_of_its_commit_and_the_checkouts_evidence(host: Path) -> None:
+    """``spec_in_host`` names the spec folder of the host the archive came from: the code tree equals the live one at that commit, and the checkout's evidence is valid for it after the code moved on."""
+    from specdev_tools.graph.gitview import archive_ref
+    from specdev_tools.proof.validity import ProofContext
+    from specdev_tools.verify.records import records_folder
+    from unit.graph._synth import git
+
+    at = git(host, "rev-parse", "HEAD")
+    edit_code(host, "later\n")
+    commit_all(host)
+    live = context(host)
+    assert ProofContext(live.git_root, live.spec_dir, live.evidence_dir).spec_in_host is None
+    assert _valid(host) == (False, STALE_TREE)  # the checkout's tree is not the tree of the run
+    with archive_ref(at, str(host), ["spec"]) as archived:
+        past = ProofContext(str(host), str(Path(archived) / "spec"), records_folder(str(host / "spec")), commit=at, spec_in_host=str(host / "spec"))
+        assert past.code_tree == ProofContext(str(host), str(host / "spec"), records_folder(str(host / "spec")), commit=at).code_tree
+        [evidence] = evidence_for(binding_of(graph_of(host).by_id[ALPHA], graph_of(host)), past)
+        assert evidence_valid(evidence, binding_of(graph_of(host).by_id[ALPHA], graph_of(host)), graph_of(host), past) == (True, None)

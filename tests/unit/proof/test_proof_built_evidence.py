@@ -434,3 +434,27 @@ def test_built_at_cap_removes_its_provider_and_refuses_a_cap_that_is_not_a_stage
     with pytest.raises(KeyError):
         built_at_cap(ctx, "ci", "no-such-node")
     assert compute_built(ctx)[ENVIRONMENT].state is PENDING
+
+
+def test_a_bound_proof_context_makes_built_at_cap_read_the_spec_of_a_past_commit_with_the_checkouts_evidence(tmp_path: Path) -> None:
+    """``bind_proof_context``: the graph of an archived spec asked with the proof context of its commit sees the evidence as valid; the live checkout, whose code moved on, does not."""
+    from specdev_tools.graph.build import build_graph
+    from specdev_tools.graph.gitview import archive_ref
+    from specdev_tools.proof.built_evidence import bind_proof_context, bind_proof_seams, proof_context
+    from specdev_tools.proof.validity import ProofContext
+    from unit.graph._synth import git
+
+    host = _ci_host(tmp_path)
+    at = git(host, "rev-parse", "HEAD")
+    edit_code(host)
+    commit_all(host)
+    assert _state(host, ENVIRONMENT, "ci") is NOT_BUILT  # the run was on the code of the earlier commit
+    spec = str(host / "spec")
+    bind_proof_seams()
+    with archive_ref(at, str(host), ["spec"]) as archived:
+        archived_spec = str(Path(archived) / "spec")
+        past = GraphCheckContext.from_graph(build_graph(archived_spec, str(ROOT)), read_lock(archived_spec), str(ROOT), git_root=str(host), spec_root=archived_spec)
+        assert proof_context(past).spec_root == archived_spec and proof_context(past).spec_in_host is None  # not bound: the evidence folder is the archive's, which holds none
+        bind_proof_context(past, ProofContext(str(host), archived_spec, records_folder(spec), commit=at, spec_in_host=spec))
+        assert proof_context(past).commit == at
+        assert built_state(past, past.graph.by_id[ENVIRONMENT], "ci").state is BUILT

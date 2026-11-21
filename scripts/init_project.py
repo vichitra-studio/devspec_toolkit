@@ -92,6 +92,28 @@ def run_cmd(cmd, cwd=None, check=True):
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, cwd=cwd, check=check)
 
+def build_install_delegate(venv_dir, rel_toolkit_root, force_claude=False):
+    """The command that installs the host files through the venv CLI: run with the host root as cwd.
+
+    init runs under the system Python before specdev_tools exists, so it cannot import the installer; the venv's
+    console script is the one path to it (the same code serves ``specdev update``).
+    """
+    cmd = [os.path.join(venv_dir, "bin", "specdev"), "update", "spec", "--repo-root", rel_toolkit_root, "--install-only"]
+    if force_claude:
+        cmd.append("--force-claude")
+    return cmd
+
+
+def run_install_delegate(cmd, cwd):
+    """Run the delegate; returns its exit code (a missing console script is exit code 127)."""
+    print(f"Running: {' '.join(cmd)}")
+    try:
+        return subprocess.run(cmd, cwd=cwd).returncode
+    except OSError as exc:
+        print(f"Error: cannot run {cmd[0]}: {exc}", file=sys.stderr)
+        return 127
+
+
 def get_git_root(path):
     try:
         res = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=path, capture_output=True, text=True, check=True)
@@ -693,6 +715,17 @@ def main():
          "--python", os.path.join(venv_bin, "python")],
         cwd=target_dir,
     )
+
+    # 6b. Install the host files (hooks, workflows, wrappers, links) through the venv CLI; one code path with
+    # `specdev update`. A failure leaves what init already did in place and says how to re-run (init is re-runnable).
+    delegate = build_install_delegate(venv_dir, rel_toolkit_root, args.force_claude)
+    if run_install_delegate(delegate, target_dir) != 0:
+        print(
+            "Error: installing the host files failed. Fix the cause shown above, then run:\n"
+            f"  ./tools/run_specdev.sh update spec --repo-root {rel_toolkit_root} --install-only",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # 7. Setup Git Hooks (Always run/check)
     print("Ensuring git hooks are installed...")
