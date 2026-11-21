@@ -1,0 +1,41 @@
+# Invented fixture: the spec workflow a small web project wrote by hand before the installer existed.
+name: Spec validation
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install the tooling
+        run: |
+          python3 -m venv devspec_env
+          devspec_env/bin/pip install -e devspec_toolkit/tools/
+      - name: Validate all specs
+        run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+      - name: Build the traceability matrix
+        run: |
+          devspec_env/bin/python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --output trace_matrix.json
+      - name: Keep the matrix
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-report
+          path: spec/trace_matrix.json
+
+  infra-unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci && npm test

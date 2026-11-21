@@ -29,7 +29,9 @@ from typing import NamedTuple
 import yaml
 
 from .core.changelog_parser import get_toolkit_version
+from .core.constants import REMOVED_COMMANDS
 from .core.errors import ERROR_CODES
+from .core.host_declarations import HOST_DECLARATIONS_FILE, HostDeclarationsError, load_host_declarations
 from .graph.gitview import GitViewError, git_top_level, run_git, spec_path_in_repo
 from .trace.merge_driver import ATTRIBUTES_GIT_PATH, DRIVER_ARGUMENTS, DRIVER_NAME, LockMergeError, attribute_line, install_driver
 
@@ -769,8 +771,267 @@ def install_merge_driver(ctx: InstallContext) -> PieceResult:
     return PieceResult(REFRESHED if has_line or configured is not None else CREATED, f"merge driver '{DRIVER_NAME}' set in the clone's git config")
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "workflows": ``.github/workflows/specdev-merge-check.yml`` and the scan of the host's own files for retired
+# commands.
+#
+# Only the merge-check workflow is installed; the three snippets of ``templates/workflows/`` are copied by a person.  The
+# file carries the managed header, so a refresh rewrites it, and a host file of the same name without the header is
+# drift and is never overwritten (``--adopt`` covers hooks and wrappers, not workflows).  The scan reads every other
+# workflow and the host's pre-commit config and only reports.
+# --------------------------------------------------------------------------------------------------------------------
+
+WORKFLOWS_PIECE = "workflows"
+WORKFLOWS_DIR = ".github/workflows"
+MERGE_CHECK_FILE = "specdev-merge-check.yml"
+MERGE_CHECK_PIECE = "merge-check"
+SETUP_BEGIN = "# specdev:setup-begin"
+SETUP_END = "# specdev:setup-end"
+_PLACEHOLDER_VERSION = "__SPECDEV_TOOLKIT_VERSION__"
+_PLACEHOLDER_SETUP = "__SPECDEV_SETUP_COMMAND__"
+_PLACEHOLDER = re.compile(r"__SPECDEV_[A-Z_]+__")
+_TEMPLATE_SPEC = "spec"
+_DIFF_LINE_LIMIT = 40
+
+
+def _without_placeholder_notes(lines: list[str]) -> list[str]:
+    """*lines* without the template author's note on the placeholders: the ``# Placeholders`` comment line and the
+    indented comment lines that follow it (they name the placeholders, which a rendered file must not hold)."""
+    kept: list[str] = []
+    inside = False
+    for line in lines:
+        if line.startswith("# Placeholders"):
+            inside = True
+        elif inside and line.startswith("#  "):
+            pass
+        else:
+            inside = False
+            kept.append(line)
+    return kept
+
+
+def render_merge_check_workflow(
+    template: str, *, toolkit_version: str, toolkit_rel: str, venv_name: str, spec_rel: str, setup_command: str | None
+) -> str:
+    """The merge-check template with the host's names put in.
+
+    The setup block (the marker lines and what lies between them, twice) is removed when *setup_command* is ``None``;
+    else its placeholder is replaced by the command, one line per line, at the placeholder's indentation.  The literal
+    toolkit folder, venv folder and spec folder of the template are replaced when the host's differ.
+
+    Raises:
+        HostInstallError: the setup markers are not paired, or a placeholder is left over.
+    """
+    lines = _without_placeholder_notes(template.splitlines(keepends=True))
+    if setup_command is None:
+        kept: list[str] = []
+        inside = False
+        for line in lines:
+            mark = line.strip()
+            if mark == SETUP_BEGIN:
+                inside = True
+            elif mark == SETUP_END:
+                if not inside:
+                    raise HostInstallError(f"the workflow template has '{SETUP_END}' without '{SETUP_BEGIN}'")
+                inside = False
+            elif not inside:
+                kept.append(line)
+        if inside:
+            raise HostInstallError(f"the workflow template has '{SETUP_BEGIN}' without '{SETUP_END}'")
+        text = "".join(kept)
+    else:
+        text = "".join(lines)
+    if spec_rel != _TEMPLATE_SPEC:
+        for pattern in (r"\./spec(?![\w/-])", r"(?<=spec-check )spec(?![\w/-])", r"(?<=governance-check )spec(?![\w/-])", r"spec(?=/extras/verification)"):
+            text = re.sub(pattern, lambda _m: f"./{spec_rel}" if _m[0].startswith("./") else spec_rel, text)
+    text = text.replace(_TEMPLATE_TOOLKIT, toolkit_rel).replace(DEFAULT_VENV_NAME, venv_name)
+    text = text.replace(_PLACEHOLDER_VERSION, toolkit_version)
+    if setup_command is not None:
+        command_lines = setup_command.strip("\n").splitlines()
+        out: list[str] = []
+        for line in text.splitlines(keepends=True):
+            if _PLACEHOLDER_SETUP in line:
+                indent = line[: len(line) - len(line.lstrip())]
+                out.extend(f"{indent}{part}\n" if part.strip() else "\n" for part in command_lines)
+            else:
+                out.append(line)
+        text = "".join(out)
+    left = _PLACEHOLDER.search(text)
+    if left is not None:
+        raise HostInstallError(f"the workflow template keeps the placeholder {left[0]}")
+    return text
+
+
+_VALIDATE_ALL = "validate-all"
+_VALIDATE_ALL_REPLACEMENT = "superseded by `specdev spec-check` (run it with --merge on a pull request)"
+_TRACE_MATRIX_FILE = "trace_matrix.json"
+_TRACE_MATRIX_REPLACEMENT = "no longer produced; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage"
+_INVOCATION = r"(?:\bspecdev|specdev_tools\.cli|run_specdev\.sh)"
+
+
+def _scan_lines(text: str, *, skip_block: bool) -> list[tuple[int, str]]:
+    """``(1-based line number, line)`` of the lines a host owns: not a comment line, not inside the toolkit's marked block."""
+    kept: list[tuple[int, str]] = []
+    inside = False
+    for number, line in enumerate(text.splitlines(), start=1):
+        mark = line.strip()
+        if skip_block and mark.startswith(MARKER_BEGIN):
+            inside = True
+        elif skip_block and mark.startswith(MARKER_END):
+            inside = False
+        elif not inside and mark and not mark.startswith("#"):
+            kept.append((number, line))
+    return kept
+
+
+def retired_command_findings(host_root: Path, *, removed_commands: dict[str, str] | None = None) -> list[Finding]:
+    """W932 findings for the host's own files that still call a command 1.2.0 retired (ruling N9).
+
+    Read: every ``.github/workflows/*.yml`` and ``*.yaml`` whose first line is not the toolkit's header, and
+    ``.pre-commit-config.yaml`` outside the marked block.  A finding is made for the four commands of
+    ``core.constants.REMOVED_COMMANDS`` and for ``validate-all`` when they stand as the command after ``specdev``,
+    ``specdev_tools.cli`` or ``run_specdev.sh`` (so a ``matrix:`` job strategy is not one), and for any mention of
+    ``trace_matrix.json``; a comment line is not read.  ``dag-lint`` is not a retired command.  Nothing is rewritten.
+    *removed_commands* replaces the table of ``cli``.
+    """
+    table = REMOVED_COMMANDS if removed_commands is None else removed_commands
+    replacements = {**table, _VALIDATE_ALL: _VALIDATE_ALL_REPLACEMENT}
+    patterns = {name: re.compile(rf"{_INVOCATION}\s+{re.escape(name)}(?![\w-])") for name in replacements}
+    workflows = host_root / WORKFLOWS_DIR
+    files = sorted(p for pattern in ("*.yml", "*.yaml") for p in workflows.glob(pattern)) if workflows.is_dir() else []
+    files.append(host_root / PRE_COMMIT_FILE)
+    findings: list[Finding] = []
+    for path in files:
+        try:
+            text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not text or (path.parent == workflows and read_managed_header(text) is not None):
+            continue
+        rel = path.relative_to(host_root).as_posix()
+        for number, line in _scan_lines(text, skip_block=path.name == PRE_COMMIT_FILE):
+            for name, pattern in patterns.items():
+                if pattern.search(line):
+                    findings.append(Finding(W_RETIRED_COMMAND, rel, number, name, f"'{name}' was removed in 1.2.0; {replacements[name]}"))
+            if _TRACE_MATRIX_FILE in line:
+                findings.append(Finding(W_RETIRED_COMMAND, rel, number, _TRACE_MATRIX_FILE, f"'{_TRACE_MATRIX_FILE}' is {_TRACE_MATRIX_REPLACEMENT}"))
+    return findings
+
+
+def _workflow_result(ctx: InstallContext) -> PieceResult:
+    """The merge-check workflow alone (no scan): written, refreshed, current, drift (a host file of that name) or refused."""
+    rel = f"{WORKFLOWS_DIR}/{MERGE_CHECK_FILE}"
+    target = ctx.git_root / rel
+    template_path = ctx.templates_dir / "workflows" / MERGE_CHECK_FILE
+    try:
+        existing = target.read_bytes().decode("utf-8") if target.is_file() else None
+        header = None if existing is None else read_managed_header(existing)
+        if existing is not None and (header is None or header[0] != MERGE_CHECK_PIECE):
+            note = (
+                f"{rel} is not the toolkit's (its first line is not '{managed_header(MERGE_CHECK_PIECE, ctx.toolkit_version)}'), "
+                "so the merge-check workflow is not installed; move your file aside and run 'specdev update' again "
+                "(--adopt does not touch workflows)"
+            )
+            return PieceResult(DRIFT, "a host file of that name is left as it is", (Finding(W_TEMPLATE_DRIFT, rel, 1, "", note),))
+        if not template_path.is_file():
+            raise HostInstallError(f"the workflow template {template_path.name} was not found in {template_path.parent}")
+        declarations = load_host_declarations(ctx.spec_dir)
+    except (HostInstallError, HostDeclarationsError, UnicodeDecodeError, OSError) as exc:
+        return refused(str(exc), file=rel)
+    text = render_merge_check_workflow(
+        template_path.read_text(encoding="utf-8"),
+        toolkit_version=ctx.toolkit_version,
+        toolkit_rel=ctx.toolkit_rel,
+        venv_name=ctx.venv_name,
+        spec_rel=ctx.spec_rel,
+        setup_command=declarations.setup_command if declarations.setup_command and declarations.setup_command.strip() else None,
+    )
+    findings: tuple[Finding, ...] = ()
+    if declarations.setup_command is None or not declarations.setup_command.strip():
+        where = f"{ctx.spec_rel}/{HOST_DECLARATIONS_FILE}"
+        note = f"no setup_command is declared, so the workflow runs without a host setup step; declare 'setup_command' in {where} to add one"
+        findings = (Finding(W_SETUP_UNDECLARED, where, text=note),)
+    status = write_if_changed(target, text, dry_run=ctx.dry_run)
+    detail = {CURRENT: "up to date", CREATED: "written from the template", REFRESHED: "rewritten from the template"}.get(
+        status, f"would write {rel}"
+    )
+    return PieceResult(status, detail, findings)
+
+
+def install_workflows(ctx: InstallContext) -> PieceResult:
+    """Install the merge-check workflow and report the host's own files that call retired commands.
+
+    The scan's W932 findings ride on the result of the workflow and never change its status.
+    """
+    own = _workflow_result(ctx)
+    return PieceResult(own.status, own.detail, (*own.findings, *retired_command_findings(ctx.git_root)))
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "wrappers": ``tools/run_specdev.sh`` and ``tools/ensure_venv.py``, rendered with the venv name (ruling N10).
+#
+# A wrapper has no header (the first line of a script is its shebang): the file is the toolkit's when it equals the
+# rendered template, or the unrendered template that ``init`` copies before the venv name is known.  Any other content
+# is the host's: drift (W930) until ``--adopt``.
+# --------------------------------------------------------------------------------------------------------------------
+
+WRAPPERS_PIECE = "wrappers"
+WRAPPERS_TEMPLATE_DIR = ("scripts", "templates")
+WRAPPERS: tuple[tuple[str, int | None], ...] = (("run_specdev.sh", 0o755), ("ensure_venv.py", None))
+WRAPPERS_TARGET_DIR = "tools"
+
+
+def render_wrapper(template: str, *, toolkit_rel: str, venv_name: str) -> str:
+    """A wrapper template with the host's toolkit folder and venv name put in (plain text replacement)."""
+    return template.replace(_TEMPLATE_TOOLKIT, toolkit_rel).replace(DEFAULT_VENV_NAME, venv_name)
+
+
+def _wrapper_diff(existing: str, rendered: str) -> str:
+    import difflib
+
+    diff = list(difflib.unified_diff(existing.splitlines(), rendered.splitlines(), "the host's file", "the toolkit's wrapper", lineterm="", n=1))
+    if len(diff) > _DIFF_LINE_LIMIT:
+        diff = [*diff[:_DIFF_LINE_LIMIT], "..."]
+    return "\n".join(diff)
+
+
+def _install_one_wrapper(ctx: InstallContext, name: str, mode: int | None) -> PieceResult:
+    rel = f"{WRAPPERS_TARGET_DIR}/{name}"
+    target = ctx.git_root / rel
+    source = ctx.toolkit_root.joinpath(*WRAPPERS_TEMPLATE_DIR, name)
+    try:
+        if not source.is_file():
+            raise HostInstallError(f"the wrapper template {name} was not found in {source.parent}")
+        template = source.read_text(encoding="utf-8")
+        existing = target.read_bytes().decode("utf-8") if target.is_file() else None
+    except (HostInstallError, UnicodeDecodeError, OSError) as exc:
+        return refused(str(exc), file=rel)
+    rendered = render_wrapper(template, toolkit_rel=ctx.toolkit_rel, venv_name=ctx.venv_name)
+    if existing is not None and existing not in (rendered, template) and not ctx.adopt:
+        note = (
+            f"{rel} differs from the toolkit's wrapper; 'specdev update --adopt' rewrites it, or replace it by hand "
+            f"with {ctx.toolkit_rel}/{'/'.join(WRAPPERS_TEMPLATE_DIR)}/{name} (venv folder '{ctx.venv_name}'):\n{_wrapper_diff(existing, rendered)}"
+        )
+        return PieceResult(DRIFT, "a host-edited file is left as it is", (Finding(W_TEMPLATE_DRIFT, rel, 1, "", note),))
+    status = write_if_changed(target, rendered, dry_run=ctx.dry_run)
+    if status in (CREATED, REFRESHED) and mode is not None:
+        target.chmod(mode)
+    return PieceResult(status, {CURRENT: "up to date", CREATED: "written", REFRESHED: "rewritten"}.get(status, f"would write {rel}"))
+
+
+def install_wrappers(ctx: InstallContext) -> PieceResult:
+    """Render the two wrappers of ``tools/`` with the venv name of the run; a host-edited wrapper is drift until ``--adopt``."""
+    results = [(name, _install_one_wrapper(ctx, name, mode)) for name, mode in WRAPPERS]
+    statuses = [result.status for _, result in results]
+    status = next((s for s in (REFUSED, DRIFT, WOULD_INSTALL, REFRESHED, CREATED) if s in statuses), CURRENT)
+    detail = "up to date" if status == CURRENT else "; ".join(f"{WRAPPERS_TARGET_DIR}/{name}: {result.status}" for name, result in results)
+    return PieceResult(status, detail, tuple(f for _, result in results for f in result.findings))
+
+
 PIECES: tuple[HostPiece, ...] = (
     HostPiece(PRE_COMMIT_PIECE, install_pre_commit),
     HostPiece(MERGE_DRIVER_PIECE, install_merge_driver),
+    HostPiece(WORKFLOWS_PIECE, install_workflows),
+    HostPiece(WRAPPERS_PIECE, install_wrappers),
 )
 """The registry of pieces, in install order.  A new piece adds a function and one ``HostPiece(name, function)`` line."""

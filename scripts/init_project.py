@@ -6,58 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-CI_WORKFLOW_TEMPLATE = """name: SpecDev CI
-
-on:
-  push:
-    branches: ["**"]
-  pull_request:
-  workflow_dispatch:
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
-jobs:
-  validate:
-    name: Schema & Spec Validation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v8.1.0
-      - name: Setup virtualenv & install tooling
-        run: |
-          uv python install 3.13
-          uv venv devspec_env --python 3.13  # Matches default --venv-name
-          # $GITHUB_PATH applies to LATER steps; this step targets the interpreter explicitly.
-          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
-          uv pip install --python devspec_env/bin/python -e devspec_toolkit/tools/
-      - name: Validate all specs
-        run: ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-      - name: Governance check (PR Title)
-        if: github.event_name == 'pull_request'
-        run: ./tools/run_specdev.sh governance-check spec --message "${{ github.event.pull_request.title }}" --repo-root ./devspec_toolkit
-      - name: Fixtures lint
-        run: ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
-"""
-
-def _render_ci_workflow(rel_toolkit_root: str, venv_name: str) -> str:
-    """Render the CI workflow content with toolkit-path and venv-name substitutions."""
-    content = CI_WORKFLOW_TEMPLATE
-    content = content.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
-    content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
-    content = content.replace("devspec_env", venv_name)
-    return content
-
-
 def run_cmd(cmd, cwd=None, check=True):
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, cwd=cwd, check=check)
@@ -712,26 +660,6 @@ def main():
 """
                 with open(config_path, "a") as f:
                     f.write(governance_hook)
-
-    # 7b. Generate CI Workflow
-    workflows_dir = os.path.join(target_dir, ".github", "workflows")
-    if not os.path.exists(workflows_dir):
-        os.makedirs(workflows_dir)
-    
-    ci_file = os.path.join(workflows_dir, "spec_validation.yml")
-    if not os.path.exists(ci_file):
-        print("Creating CI workflow .github/workflows/spec_validation.yml...")
-        ci_content = _render_ci_workflow(rel_toolkit_root, venv_name)
-        # Add submodule-aware flags to CI commands
-        if is_submodule:
-            ci_content = ci_content.replace(
-                f"--repo-root ./{rel_toolkit_root}",
-                f"--repo-root ./{rel_toolkit_root} --spec-root ./spec --git-root .",
-            )
-        with open(ci_file, "w") as f:
-            f.write(ci_content)
-    else:
-        print("CI workflow already exists.")
 
     # 8. Gitignore
     gitignore_path = os.path.join(target_dir, ".gitignore")

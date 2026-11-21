@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
 import init_project
-from init_project import _render_ci_workflow, copy_seeds_from_manifest
+from init_project import copy_seeds_from_manifest
 
 
 class TestInitIntoHost:
@@ -209,45 +209,3 @@ class TestManifestDerivedSeedBootstrap:
             "Unmatched template should fall back to the lexicographically first "
             "seed parent dir (alpha/seeds), not a non-deterministic choice."
         )
-
-
-class TestCiWorkflowRender:
-    def test_default_venv_name_in_ci(self):
-        content = _render_ci_workflow(".", "devspec_env")
-        # uv-driven setup: managed Python + venv on the default name
-        assert "astral-sh/setup-uv" in content
-        assert "uv venv devspec_env --python 3.13" in content
-        assert "uv pip install --python devspec_env/bin/python" in content
-        # the old pip/venv path must be gone
-        assert "python -m venv" not in content
-        assert "/bin/pip install" not in content
-
-    def test_custom_venv_name_propagates(self):
-        content = _render_ci_workflow(".", "customenv")
-        assert "uv venv customenv --python 3.13" in content
-        assert "uv pip install --python customenv/bin/python" in content
-        assert "customenv/bin" in content
-        # no leakage of the default venv name when a custom one is requested
-        assert "devspec_env" not in content
-
-    def test_ci_uses_spec_check_not_validate_all(self):
-        content = _render_ci_workflow(".", "devspec_env")
-        assert "spec-check" in content
-        assert "validate-all" not in content
-        assert "--spec-root ./spec" in content
-        assert "--git-root ." in content
-
-    def test_init_template_has_no_matrix_step(self):
-        content = _render_ci_workflow(".", "devspec_env")
-        assert "matrix" not in content
-        assert "trace_matrix" not in content
-        assert "upload-artifact" not in content
-
-    def test_toolkit_path_substitution(self):
-        content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")
-        assert "vendor/devspec_toolkit/tools" in content
-        # Every "devspec_toolkit/tools" occurrence must carry the vendor/ prefix —
-        # i.e. the path substitution left no unsubstituted bare token behind.
-        # (Discriminating: if replace-1 were dropped, bare tokens would remain and
-        # the counts would diverge.)
-        assert content.count("devspec_toolkit/tools") == content.count("vendor/devspec_toolkit/tools")

@@ -96,3 +96,17 @@ def resolve_extras_path(spec_dir: str, filename: str) -> str:
 # Refs tried, in order, when a command needs the repository's default branch and none is given.
 # Used by the step gate's base ref (core/git_base.py) and the graph's default base ref (graph/gitview.py).
 DEFAULT_BRANCH_CANDIDATES: tuple[str, ...] = ("origin/main", "origin/master", "main", "master")
+
+
+# ---------------------------------------------------------------------------
+# REMOVED_COMMANDS: the commands 1.2.0 removed and what replaces each. The
+# argument parser refuses them before argparse (``cli``); the host installer
+# scans a host's own workflows and hooks for them (``host_install``).
+# ---------------------------------------------------------------------------
+
+REMOVED_COMMANDS: dict[str, str] = {
+    "forward-replay-check": "use `specdev stale` for the pending replay and `specdev spec-check` for broken links",
+    "completeness-check": "use `specdev coverage` for the link counts and the ids that are not linked",
+    "traceability-check": "use `specdev spec-check` for the role-rule findings (E740 to E745) and broken links",
+    "matrix": "use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage",
+}

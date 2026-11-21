@@ -19,6 +19,7 @@ from typing import NoReturn
 # Lazy imports handled inside main/command blocks to improve CLI responsiveness
 
 from .core.config import get_config, reset_config
+from .core.constants import REMOVED_COMMANDS
 from .core.errors import SpecError
 from .core.toolkit_root import detect_toolkit_root
 
@@ -641,14 +642,6 @@ def build_parser() -> _SpecdevParser:
     bind_proof_seams()
     p.ctx_parser = ctx_p
     return p
-
-
-REMOVED_COMMANDS: dict[str, str] = {
-    "forward-replay-check": "use `specdev stale` for the pending replay and `specdev spec-check` for broken links",
-    "completeness-check": "use `specdev coverage` for the link counts and the ids that are not linked",
-    "traceability-check": "use `specdev spec-check` for the role-rule findings (E740 to E745) and broken links",
-    "matrix": "use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage",
-}
 
 
 def _refuse_removed_command(argv: list[str]) -> None:
