@@ -377,7 +377,7 @@ class TestWrappers:
 
 class TestRegistry:
     def test_the_pieces_of_parts_a_to_c(self):
-        assert [p.name for p in hi.PIECES] == ["pre-commit", "merge-driver", "workflows", "wrappers"]
+        assert [p.name for p in hi.PIECES][:4] == ["pre-commit", "merge-driver", "workflows", "wrappers"]
 
     def test_the_four_pieces_run_through_the_registry_twice(self, host, monkeypatch):
         monkeypatch.setattr(hi, "_run_pre_commit_install", lambda binary, root: (0, ""))

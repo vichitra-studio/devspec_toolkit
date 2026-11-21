@@ -5,6 +5,7 @@ Every host here is invented content in a temporary folder; no venv is created an
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -61,8 +62,8 @@ def _writing_piece(name: str = "fake") -> hi.HostPiece:
 
 
 class TestRegistry:
-    def test_the_registered_pieces_are_the_ones_of_parts_a_to_c(self):
-        assert [p.name for p in hi.PIECES] == ["pre-commit", "merge-driver", "workflows", "wrappers"]
+    def test_the_registered_pieces_are_the_ones_of_parts_a_to_d(self):
+        assert [p.name for p in hi.PIECES] == ["pre-commit", "merge-driver", "workflows", "wrappers", "claude-links", "ask-rules", "gitignore"]
 
     def test_pieces_run_in_registry_order_and_each_reports_under_its_name(self, host, toolkit):
         report = hi.run_host_install(host / "spec", toolkit, pieces=(_writing_piece("b"), _writing_piece("a")))
@@ -305,3 +306,103 @@ class TestRefusedHelper:
         result = hi.refused("because", file="f")
         assert result.status == hi.REFUSED
         assert [f.render() for f in result.findings] == ["W931 HOST_INSTALL_REFUSED: f: because"]
+
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def _live_host(host: Path) -> Path:
+    """The host's toolkit is the live repository (read only): every real piece finds its templates there."""
+    (host / "devspec_toolkit").symlink_to(REPO, target_is_directory=True)
+    return host / "devspec_toolkit"
+
+
+class TestRealPieces:
+    @pytest.fixture(autouse=True)
+    def no_global_git_ignores(self, tmp_path, monkeypatch):
+        for name, value in (("HOME", tmp_path / "home"), ("XDG_CONFIG_HOME", tmp_path / "home" / "xdg"), ("GIT_CONFIG_GLOBAL", os.devnull), ("GIT_CONFIG_SYSTEM", os.devnull)):
+            monkeypatch.setenv(name, str(value))
+
+    def test_second_run_is_noop_for_every_piece(self, host):
+        toolkit = _live_host(host)
+        with mock.patch.object(hi, "_run_pre_commit_install", return_value=(0, "")):
+            first = hi.run_host_install(host / "spec", toolkit)
+            after_first = _tree(host)
+            second = hi.run_host_install(host / "spec", toolkit)
+        names = [p.name for p in hi.PIECES]
+        assert [name for name, _ in first.pieces] == names == [name for name, _ in second.pieces]
+        assert {name: r.status for name, r in first.pieces} == {name: hi.CREATED for name in names} | {"merge-driver": hi.CREATED}
+        assert {name: r.status for name, r in second.pieces} == {name: hi.CURRENT for name in names}
+        assert second.warnings() == first.warnings()
+        assert _tree(host) == after_first
+
+    def test_a_dry_run_of_every_piece_writes_nothing(self, host):
+        toolkit = _live_host(host)
+        before = _tree(host)
+        config_before = (host / ".git" / "config").read_bytes()
+        report = hi.run_host_install(host / "spec", toolkit, dry_run=True)
+        assert {r.status for _, r in report.pieces} == {hi.WOULD_INSTALL}
+        assert _tree(host) == before
+        assert (host / ".git" / "config").read_bytes() == config_before
+
+
+class TestGitignorePiece:
+    def ctx(self, host: Path, toolkit: Path, **kwargs) -> hi.InstallContext:
+        return hi.InstallContext(
+            spec_dir=host / "spec", spec_rel="spec", git_root=host, toolkit_root=toolkit, templates_dir=toolkit / "templates",
+            toolkit_version=TOOLKIT_VERSION, venv_prefix=host / "devspec_env", venv_name="devspec_env",
+            dry_run=kwargs.get("dry_run", False), adopt=False, force_claude=False,
+        )
+
+    def test_gitignore_gets_specdev_entry_once_and_keeps_other_lines(self, host, toolkit):
+        original = "# my ignores\nnode_modules/\n\n*.log\ndevspec_env/\n"
+        (host / ".gitignore").write_bytes(original.encode())
+        first = hi.install_gitignore(self.ctx(host, toolkit))
+        assert first.status == hi.REFRESHED
+        assert (host / ".gitignore").read_bytes() == (original + ".specdev/\n").encode()
+        second = hi.install_gitignore(self.ctx(host, toolkit))
+        assert second.status == hi.CURRENT
+        assert (host / ".gitignore").read_bytes() == (original + ".specdev/\n").encode()
+
+    @pytest.mark.parametrize("line", [".specdev", ".specdev/", "/.specdev", "/.specdev/", "  .specdev/  "])
+    def test_an_equivalent_line_means_nothing_is_added(self, host, toolkit, line):
+        text = f"build/\n{line}\nout/\n"
+        (host / ".gitignore").write_bytes(text.encode())
+        assert hi.install_gitignore(self.ctx(host, toolkit)).status == hi.CURRENT
+        assert (host / ".gitignore").read_bytes() == text.encode()
+
+    @pytest.mark.parametrize("line", ["# .specdev/", ".specdev-old/", "!.specdev/", "docs/.specdev/", ".specdevx"])
+    def test_a_different_line_does_not_count(self, host, toolkit, line):
+        (host / ".gitignore").write_bytes(f"{line}\n".encode())
+        assert hi.install_gitignore(self.ctx(host, toolkit)).status == hi.REFRESHED
+        assert (host / ".gitignore").read_bytes() == f"{line}\n.specdev/\n".encode()
+
+    def test_a_missing_file_is_created_with_the_one_line(self, host, toolkit):
+        assert not (host / ".gitignore").exists()
+        assert hi.install_gitignore(self.ctx(host, toolkit)).status == hi.CREATED
+        assert (host / ".gitignore").read_bytes() == b".specdev/\n"
+
+    def test_a_file_without_a_final_newline_gets_one_before_the_entry(self, host, toolkit):
+        (host / ".gitignore").write_bytes(b"a\nb")
+        hi.install_gitignore(self.ctx(host, toolkit))
+        assert (host / ".gitignore").read_bytes() == b"a\nb\n.specdev/\n"
+
+    def test_a_crlf_file_gets_a_crlf_entry(self, host, toolkit):
+        (host / ".gitignore").write_bytes(b"a\r\nb")
+        hi.install_gitignore(self.ctx(host, toolkit))
+        assert (host / ".gitignore").read_bytes() == b"a\r\nb\r\n.specdev/\r\n"
+
+    def test_dry_run_writes_nothing(self, host, toolkit):
+        (host / ".gitignore").write_bytes(b"a\n")
+        result = hi.install_gitignore(self.ctx(host, toolkit, dry_run=True))
+        assert result.status == hi.WOULD_INSTALL
+        assert (host / ".gitignore").read_bytes() == b"a\n"
+        (host / ".gitignore").unlink()
+        assert hi.install_gitignore(self.ctx(host, toolkit, dry_run=True)).status == hi.WOULD_INSTALL
+        assert not (host / ".gitignore").exists()
+
+    def test_an_unreadable_file_is_refused_and_untouched(self, host, toolkit):
+        (host / ".gitignore").write_bytes(b"\xff\xfe not utf-8\n")
+        result = hi.install_gitignore(self.ctx(host, toolkit))
+        assert result.status == hi.REFUSED and result.findings[0].code == "W931"
+        assert (host / ".gitignore").read_bytes() == b"\xff\xfe not utf-8\n"

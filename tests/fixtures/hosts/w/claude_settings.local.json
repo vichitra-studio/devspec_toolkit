@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(pytest tests/unit:*)",
+      "Read(//tmp/**)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Read(./secrets/**)"
+    ]
+  },
+  "env": {
+    "EXAMPLE_FLAG": "1"
+  },
+  "enableAllProjectMcpServers": true
+}

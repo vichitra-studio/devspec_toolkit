@@ -60,210 +60,6 @@ def _get_toolkit_root(toolkit_path, script_dir):
         return os.path.dirname(seed_dir)
     return toolkit_path
 
-def install_claude_symlinks(host_root, actual_toolkit_root, force=False):
-    """Walk the toolkit's .claude/skills/ and .claude/agents/ directories and create
-    relative symlinks under the host repo's .claude/skills/ and .claude/agents/.
-
-    Symlinks (not copies) are used so the toolkit remains the single source of truth —
-    skills stay current when the submodule is updated without requiring a re-init.
-
-    Only entries in KNOWN_SKILLS / KNOWN_AGENT_PREFIXES are linked. If a new toolkit
-    skill or agent should be exposed, add it to the allowlist below.
-
-    Skills (directories) are linked as dir-to-dir; agents (.md files) as file-to-file.
-    Dotfiles, lock files, and non-directory/non-md-file entries are skipped automatically.
-
-    Idempotency rules:
-    - Symlink already pointing at the correct relative target → skip (counted as "in sync").
-    - Symlink pointing elsewhere → warn and skip unless ``force=True``, in which case
-      the old symlink is removed and recreated.
-    - Regular file or directory occupying the target name → always skip with a warning;
-      never overwritten even with ``force=True``.
-
-    Args:
-        host_root (str): Absolute path to the host repo root (== args.target resolved).
-        actual_toolkit_root (str): Absolute path to the resolved toolkit root.
-        force (bool): When True, replace stale symlinks. Never removes real files/dirs.
-
-    Returns:
-        dict with counts: created_skills, created_agents, refreshed_skills,
-        refreshed_agents, in_sync, skipped_conflict, skipped_manual, skipped_error.
-    """
-    # Allowlist of skills and agent name-prefixes to expose in the host repo.
-    # Update this list when a new toolkit skill/agent should be propagated by default.
-    KNOWN_SKILLS = {
-        "specdev-context",
-        "specdev-step",
-        "specdev-review",
-        "specdev-trinity",
-        "devspec_pr_audit",
-    }
-    KNOWN_AGENT_PREFIXES = ("specdev-", "pr-audit-")
-    toolkit_claude = os.path.join(actual_toolkit_root, ".claude")
-    host_claude = os.path.join(host_root, ".claude")
-
-    counts = {
-        "created_skills": 0,
-        "created_agents": 0,
-        "refreshed_skills": 0,
-        "refreshed_agents": 0,
-        "in_sync": 0,
-        "skipped_conflict": 0,
-        "skipped_manual": 0,
-        "skipped_error": 0,
-    }
-
-    # ---- skills (directories) ------------------------------------------------
-    toolkit_skills_dir = os.path.join(toolkit_claude, "skills")
-    host_skills_dir = os.path.join(host_claude, "skills")
-
-    if os.path.isdir(toolkit_skills_dir):
-        os.makedirs(host_skills_dir, exist_ok=True)
-        for entry in sorted(os.listdir(toolkit_skills_dir)):
-            if entry.startswith("."):
-                continue
-            if entry not in KNOWN_SKILLS:
-                print(f"Warning: skipped skill {entry!r} (not in KNOWN_SKILLS allowlist; update init_project.py to expose it).")
-                continue
-            src_abs = os.path.join(toolkit_skills_dir, entry)
-            if os.path.islink(src_abs) and not os.path.exists(src_abs):
-                print(f"Warning: Broken symlink in toolkit skills dir: {src_abs!r}; skipping.")
-                continue
-            if not os.path.isdir(src_abs):
-                # Not a directory → not a skill package, skip
-                continue
-            dst_abs = os.path.join(host_skills_dir, entry)
-            rel_target = os.path.relpath(src_abs, start=os.path.dirname(dst_abs))
-            result = _install_one_symlink(dst_abs, rel_target, force=force, label=f"skill '{entry}'")
-            if result == "created":
-                counts["created_skills"] += 1
-            elif result == "refreshed":
-                counts["refreshed_skills"] += 1
-            elif result == "in_sync":
-                counts["in_sync"] += 1
-            elif result == "skipped_conflict":
-                counts["skipped_conflict"] += 1
-            elif result == "skipped_manual":
-                counts["skipped_manual"] += 1
-            elif result == "skipped_error":
-                counts["skipped_error"] += 1
-    else:
-        print(f"Warning: toolkit has no .claude/skills/ directory at {toolkit_skills_dir}; skipping skills.")
-
-    # ---- agents (.md files) --------------------------------------------------
-    toolkit_agents_dir = os.path.join(toolkit_claude, "agents")
-    host_agents_dir = os.path.join(host_claude, "agents")
-
-    if os.path.isdir(toolkit_agents_dir):
-        os.makedirs(host_agents_dir, exist_ok=True)
-        for entry in sorted(os.listdir(toolkit_agents_dir)):
-            if entry.startswith("."):
-                continue
-            if not entry.endswith(".md"):
-                print(f"Warning: skipped non-.md agent entry {entry!r} (expected .md file; update init_project.py if this is intentional).")
-                continue
-            if not entry.startswith(KNOWN_AGENT_PREFIXES):
-                print(f"Warning: skipped agent {entry!r} (not in KNOWN_AGENT_PREFIXES allowlist; update init_project.py to expose it).")
-                continue
-            src_abs = os.path.join(toolkit_agents_dir, entry)
-            if os.path.islink(src_abs) and not os.path.exists(src_abs):
-                print(f"Warning: Broken symlink in toolkit agents dir: {src_abs!r}; skipping.")
-                continue
-            if not os.path.isfile(src_abs):
-                continue
-            dst_abs = os.path.join(host_agents_dir, entry)
-            rel_target = os.path.relpath(src_abs, start=os.path.dirname(dst_abs))
-            result = _install_one_symlink(dst_abs, rel_target, force=force, label=f"agent '{entry}'")
-            if result == "created":
-                counts["created_agents"] += 1
-            elif result == "refreshed":
-                counts["refreshed_agents"] += 1
-            elif result == "in_sync":
-                counts["in_sync"] += 1
-            elif result == "skipped_conflict":
-                counts["skipped_conflict"] += 1
-            elif result == "skipped_manual":
-                counts["skipped_manual"] += 1
-            elif result == "skipped_error":
-                counts["skipped_error"] += 1
-    else:
-        print(f"Warning: toolkit has no .claude/agents/ directory at {toolkit_agents_dir}; skipping agents.")
-
-    # ---- summary -------------------------------------------------------------
-    print(
-        f"Claude symlinks: Created {counts['created_skills']} skill symlink(s), "
-        f"{counts['created_agents']} agent symlink(s). "
-        f"Refreshed {counts['refreshed_skills']} skill symlink(s), "
-        f"{counts['refreshed_agents']} agent symlink(s). "
-        f"{counts['in_sync']} already in sync. "
-        f"{counts['skipped_conflict']} skipped (stale symlink — rerun with --force-claude). "
-        f"{counts['skipped_manual']} skipped (manual content — remove manually to allow linking)."
-    )
-    if counts["skipped_error"]:
-        print(
-            f"Warning: {counts['skipped_error']} symlink(s) could not be created due to OS errors "
-            f"(check filesystem permissions; --force-claude does not help here)."
-        )
-    return counts
-
-
-def _install_one_symlink(dst_abs, rel_target, force, label):
-    """Create (or verify) a single symlink at ``dst_abs`` pointing to ``rel_target``.
-
-    Returns one of: 'created', 'refreshed', 'in_sync', 'skipped_conflict',
-    'skipped_manual', 'skipped_error'.  'refreshed' is returned when force=True
-    replaced an existing stale symlink; 'created' is returned for net-new symlinks.
-    """
-    # lexists detects broken symlinks; os.path.exists() returns False for them.
-    if os.path.lexists(dst_abs):
-        if os.path.islink(dst_abs):
-            existing = os.readlink(dst_abs)
-            if existing == rel_target:
-                # Already points to the correct target — nothing to do.
-                return "in_sync"
-            # Symlink exists but points elsewhere.
-            if force:
-                print(f"[force] Replacing stale symlink for {label}: {existing!r} → {rel_target!r}")
-                # Remove and recreate inside one try so a failed symlink() doesn't
-                # leave dst_abs missing (dangling-removal window closed).
-                try:
-                    os.remove(dst_abs)
-                    os.symlink(rel_target, dst_abs)
-                    print(f"Linked {label}: {dst_abs!r} → {rel_target!r}")
-                    return "refreshed"
-                except OSError as exc:
-                    print(
-                        f"Warning: Could not replace symlink for {label} at {dst_abs!r}: {exc}. "
-                        f"On Windows, enable Developer Mode or run as administrator."
-                    )
-                    return "skipped_error"
-            else:
-                print(
-                    f"Warning: Stale symlink for {label} at {dst_abs!r} points to {existing!r}; "
-                    f"expected {rel_target!r}. Skipping (use --force-claude to replace)."
-                )
-                return "skipped_conflict"
-        else:
-            # Real file or directory — never overwrite.
-            print(
-                f"Warning: {label} target {dst_abs!r} is a real file/directory (not a symlink). "
-                f"Remove it manually if you want the toolkit symlink installed here."
-            )
-            return "skipped_manual"
-
-    # Create the symlink.
-    try:
-        os.symlink(rel_target, dst_abs)
-        print(f"Linked {label}: {dst_abs!r} → {rel_target!r}")
-        return "created"
-    except OSError as exc:
-        # Windows without Developer Mode raises PermissionError (OSError subclass).
-        print(
-            f"Warning: Could not create symlink for {label} at {dst_abs!r}: {exc}. "
-            f"On Windows, enable Developer Mode or run as administrator."
-        )
-        return "skipped_error"
-
 
 def copy_seeds_from_manifest(
     target_dir: str,
@@ -584,19 +380,6 @@ def main():
         os.path.isfile(os.path.join(target_dir, ".gitmodules"))
     )
 
-    # 4b. Install .claude/skills/ and .claude/agents/ symlinks into the host repo
-    print("Installing Claude Code skill/agent symlinks...")
-    install_claude_symlinks(target_dir, actual_toolkit_root, force=args.force_claude)
-    print(
-        "Note: Symlinks at .claude/skills/ and .claude/agents/ should be committed; "
-        "submodule bumps will track upstream."
-    )
-    if is_submodule:
-        print(
-            "Note: Symlinks point into the devspec_toolkit submodule; "
-            "removing the submodule will dangle them."
-        )
-
     # 6. Setup Virtual Environment (uv-managed Python 3.13) via the shared primitive.
     # setup_devspec_env.sh provisions a managed CPython 3.13, (re)creates the venv, and
     # installs the toolkit + deps editable from pyproject.toml. It is idempotent (reuses
@@ -633,6 +416,15 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
+    print(
+        "Note: Symlinks at .claude/skills/ and .claude/agents/ should be committed; "
+        "submodule bumps will track upstream."
+    )
+    if is_submodule:
+        print(
+            "Note: Symlinks point into the devspec_toolkit submodule; "
+            "removing the submodule will dangle them."
+        )
 
     # 7. Strict mode: the commit-msg hook and the governance hook. The hook file and the plain `pre-commit install`
     # belong to the installer (step 6b); this step only adds what `--strict` asks for, outside the installer's markers.

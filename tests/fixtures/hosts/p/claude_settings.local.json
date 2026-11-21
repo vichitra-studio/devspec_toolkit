@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(./tools/run_specdev.sh spec-check:*)"
+    ]
+  }
+}

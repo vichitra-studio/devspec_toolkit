@@ -16,7 +16,9 @@ The module sits beside ``update.py`` outside the layer chain: only ``update.py``
 """
 from __future__ import annotations
 
+import json
 import os
+import posixpath
 import re
 import shlex
 import subprocess
@@ -1028,10 +1030,307 @@ def install_wrappers(ctx: InstallContext) -> PieceResult:
     return PieceResult(status, detail, tuple(f for _, result in results for f in result.findings))
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "claude-links": the symlinks of the host's ``.claude/skills`` and ``.claude/agents`` into the toolkit.
+#
+# Symlinks, not copies, so the toolkit stays the one source of the skills and a submodule bump reaches the host.  A link
+# that already points at the toolkit is current; a stale one (it points elsewhere or is broken) is replaced only with
+# ``--force-claude`` (ruling N8) and is drift otherwise; a real file or folder at the name is never replaced.
+# --------------------------------------------------------------------------------------------------------------------
+
+CLAUDE_LINKS_PIECE = "claude-links"
+CLAUDE_DIR = ".claude"
+KNOWN_SKILLS = frozenset({"specdev-context", "specdev-step", "specdev-review", "specdev-trinity", "devspec_pr_audit"})
+"""The skills of the toolkit that a host gets.  A new toolkit skill that hosts should have is one more name here."""
+KNOWN_AGENT_PREFIXES = ("specdev-", "pr-audit-")
+"""The name prefixes of the toolkit's agent files that a host gets."""
+
+_LINK_CREATED = "created"
+_LINK_REFRESHED = "refreshed"
+_LINK_IN_SYNC = "in_sync"
+_LINK_STALE = "stale"
+_LINK_REAL = "real"
+_LINK_ERROR = "error"
+_LINK_WOULD_CREATE = "would_create"
+_LINK_WOULD_REFRESH = "would_refresh"
+
+
+def _install_one_symlink(dst: Path, rel_target: str, *, force: bool, dry_run: bool) -> tuple[str, str]:
+    """Make *dst* a symlink to *rel_target*; ``(outcome, note)`` where the outcome is one of the ``_LINK_*`` names.
+
+    Nothing is printed.  A link that points elsewhere is replaced only with *force*; a real file or folder is never
+    replaced; with *dry_run* nothing is written and a link that would be made says ``would_create`` / ``would_refresh``.
+    """
+    if os.path.lexists(dst):
+        if not dst.is_symlink():
+            return _LINK_REAL, "is a real file or folder, not a link into the toolkit"
+        existing = os.readlink(dst)
+        if existing == rel_target:
+            return _LINK_IN_SYNC, ""
+        if not force:
+            return _LINK_STALE, f"points to '{existing}' (expected '{rel_target}')"
+        if dry_run:
+            return _LINK_WOULD_REFRESH, ""
+        try:
+            dst.unlink()
+            dst.symlink_to(rel_target)
+        except OSError as exc:
+            return _LINK_ERROR, f"could not replace the link: {exc}"
+        return _LINK_REFRESHED, ""
+    if dry_run:
+        return _LINK_WOULD_CREATE, ""
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.symlink_to(rel_target)
+    except OSError as exc:
+        return _LINK_ERROR, f"could not create the link: {exc}"
+    return _LINK_CREATED, ""
+
+
+def _link_candidates(ctx: InstallContext) -> tuple[list[tuple[str, str]], list[str]]:
+    """``([(kind, name)...], [names the allowlists leave out])``: what the toolkit offers, skills first."""
+    offered: list[tuple[str, str]] = []
+    unlisted: list[str] = []
+    skills = ctx.toolkit_root / CLAUDE_DIR / "skills"
+    if skills.is_dir():
+        for entry in sorted(skills.iterdir()):
+            if entry.name.startswith(".") or not entry.is_dir():
+                continue
+            if entry.name in KNOWN_SKILLS:
+                offered.append(("skills", entry.name))
+            else:
+                unlisted.append(entry.name)
+    agents = ctx.toolkit_root / CLAUDE_DIR / "agents"
+    if agents.is_dir():
+        for entry in sorted(agents.iterdir()):
+            if entry.name.startswith(".") or entry.suffix != ".md" or not entry.is_file():
+                continue
+            if entry.name.startswith(KNOWN_AGENT_PREFIXES):
+                offered.append(("agents", entry.name))
+            else:
+                unlisted.append(entry.name)
+    return offered, unlisted
+
+
+def install_claude_links(ctx: InstallContext) -> PieceResult:
+    """Link the toolkit's skills and agents into the host's ``.claude`` folder (relative links through ``toolkit_rel``).
+
+    ``--force-claude`` (``ctx.force_claude``) replaces a stale link; a real file or folder is never replaced.  A stale
+    link without the flag and a real file are drift (W930); a link that cannot be made is a refusal (W931).
+    """
+    offered, unlisted = _link_candidates(ctx)
+    counts: dict[str, int] = {}
+    findings: list[Finding] = []
+    for kind, name in offered:
+        rel = f"{CLAUDE_DIR}/{kind}/{name}"
+        target = posixpath.relpath(posixpath.join("/host", ctx.toolkit_rel, CLAUDE_DIR, kind, name), posixpath.join("/host", CLAUDE_DIR, kind))
+        outcome, note = _install_one_symlink(ctx.git_root / rel, target, force=ctx.force_claude, dry_run=ctx.dry_run)
+        counts[outcome] = counts.get(outcome, 0) + 1
+        if outcome == _LINK_STALE:
+            findings.append(Finding(W_TEMPLATE_DRIFT, rel, None, "", f"{note}; 'specdev update --force-claude' replaces it"))
+        elif outcome == _LINK_REAL:
+            findings.append(Finding(W_TEMPLATE_DRIFT, rel, None, "", f"{note}, so it is left as it is; move it aside and run 'specdev update' to link the toolkit's"))
+        elif outcome == _LINK_ERROR:
+            findings.append(Finding(W_INSTALL_REFUSED, rel, None, "", note))
+    if counts.get(_LINK_ERROR):
+        status = REFUSED
+    elif counts.get(_LINK_STALE) or counts.get(_LINK_REAL):
+        status = DRIFT
+    elif counts.get(_LINK_WOULD_CREATE) or counts.get(_LINK_WOULD_REFRESH):
+        status = WOULD_INSTALL
+    elif counts.get(_LINK_REFRESHED):
+        status = REFRESHED
+    elif counts.get(_LINK_CREATED):
+        status = CREATED
+    else:
+        status = CURRENT
+    parts = [f"{counts[name]} {label}" for name, label in _LINK_LABELS if counts.get(name)]
+    detail = ", ".join(parts) if parts else "nothing to link"
+    if status == CURRENT and offered:
+        detail = "up to date"
+    if unlisted:
+        detail += f"; not linked (not in the allowlist): {', '.join(unlisted)}"
+    return PieceResult(status, detail, tuple(findings))
+
+
+_LINK_LABELS = (
+    (_LINK_CREATED, "linked"),
+    (_LINK_WOULD_CREATE, "to link"),
+    (_LINK_REFRESHED, "replaced"),
+    (_LINK_WOULD_REFRESH, "to replace"),
+    (_LINK_IN_SYNC, "already in place"),
+    (_LINK_STALE, "stale (left)"),
+    (_LINK_REAL, "real file or folder (left)"),
+    (_LINK_ERROR, "failed"),
+)
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "ask-rules": the Claude Code ask rules of the commands a person decides, in the host's local settings.
+#
+# ``.claude/settings.local.json`` is per clone and not committed.  The piece only ever APPENDS missing entries to
+# ``permissions.ask``: every other key, every ``allow`` and ``deny`` entry and their order stay, it never adds an
+# ``allow``, removes a ``deny`` or touches ``settings.json``.  A rule an earlier toolkit installed and this one no longer
+# lists is left in place.  The file is written with 2-space indentation and a final newline, and only when a rule is
+# missing.
+# --------------------------------------------------------------------------------------------------------------------
+
+ASK_RULES_PIECE = "ask-rules"
+SETTINGS_LOCAL = ".claude/settings.local.json"
+ASK_LAUNCH_FORMS = ("specdev", "./tools/run_specdev.sh")
+"""How a host starts the CLI.  ``python -m specdev_tools.cli`` and a venv path are not listed; a form is one more row here."""
+ASK_COMMAND_PATTERNS = ("milestone sign-off *", "milestone defer *", "release", "release -*", "verify attest *")
+"""The commands a person decides: sign-off, defer, the release cut (bare and with options) and ``verify attest``.  ``release
+check``, ``release prep`` and ``release rollback`` do not ask (rollback is a plain record command)."""
+
+
+def ask_rules_for(toolkit_version: str) -> list[str]:
+    """The Claude Code ``ask`` rules a host gets: every command pattern in every launch form, in a fixed order.
+
+    The list is the same for every toolkit of the 1.2 line; *toolkit_version* is the place a later version adds or
+    retires a form without changing the piece.
+    """
+    del toolkit_version
+    return [f"Bash({form} {pattern})" for form in ASK_LAUNCH_FORMS for pattern in ASK_COMMAND_PATTERNS]
+
+
+def _ask_fragment(rules: list[str]) -> str:
+    return json.dumps({"permissions": {"ask": rules}}, ensure_ascii=False)
+
+
+def _read_settings(path: Path) -> dict | None:
+    """The settings object of *path*, ``None`` when the file is absent.
+
+    Raises:
+        HostInstallError: the file cannot be read, is not JSON, or its ``permissions.ask`` is not what Claude Code reads.
+    """
+    if not path.exists():
+        return None
+    if not path.is_file():
+        raise HostInstallError(f"{SETTINGS_LOCAL} is not a file")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        raise HostInstallError(f"{SETTINGS_LOCAL} cannot be read ({exc})") from exc
+    except json.JSONDecodeError as exc:
+        raise HostInstallError(f"{SETTINGS_LOCAL} is not valid JSON ({exc.msg}, line {exc.lineno})") from exc
+    if not isinstance(data, dict):
+        raise HostInstallError(f"{SETTINGS_LOCAL} is not a JSON object")
+    permissions = data.get("permissions")
+    if permissions is not None and not isinstance(permissions, dict):
+        raise HostInstallError(f"'permissions' in {SETTINGS_LOCAL} is not an object")
+    if isinstance(permissions, dict) and not isinstance(permissions.get("ask", []), list):
+        raise HostInstallError(f"'permissions.ask' in {SETTINGS_LOCAL} is not a list")
+    return data
+
+
+def _settings_ignored(ctx: InstallContext) -> bool:
+    """Whether git already ignores the settings file (by a ``.gitignore``, the clone's exclude file or a global ignore)."""
+    process = run_git(str(ctx.git_root), ["check-ignore", "-q", "--no-index", SETTINGS_LOCAL])
+    if process.returncode not in (0, 1):
+        raise HostInstallError(f"git check-ignore failed in {ctx.git_root}")
+    return process.returncode == 0
+
+
+def _append_line(path: Path, line: str) -> bool:
+    """Append *line* to *path* (created when absent) unless a line of it already is *line*; ``True`` when it wrote."""
+    existing = path.read_bytes().decode("utf-8", errors="replace") if path.is_file() else ""
+    if line in existing.splitlines():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    separator = "" if not existing or existing.endswith("\n") else "\n"
+    with path.open("ab") as handle:
+        handle.write(f"{separator}{line}\n".encode())
+    return True
+
+
+def install_ask_rules(ctx: InstallContext) -> PieceResult:
+    """Add the missing ask rules of :func:`ask_rules_for` to the host's ``.claude/settings.local.json``.
+
+    The file is kept out of version control first (a line in the clone's ``info/exclude`` when no ignore rule covers
+    it), then written.  An unreadable or malformed file is refused (W931) and left as it is, with the fragment to merge
+    by hand; a write that the system refuses is W931 with the command the person runs themselves.
+    """
+    rules = ask_rules_for(ctx.toolkit_version)
+    path = ctx.git_root / SETTINGS_LOCAL
+    fragment = _ask_fragment(rules)
+    try:
+        data = _read_settings(path)
+        asked = [] if data is None else list(data.get("permissions", {}).get("ask", []))
+        missing = [rule for rule in rules if rule not in asked]
+        # a dry run runs no git command but rev-parse, so it does not ask whether the exclude line is needed
+        needs_exclude = not ctx.dry_run and not _settings_ignored(ctx)
+    except HostInstallError as exc:
+        return refused(f"{exc}; merge this by hand: {fragment}", file=SETTINGS_LOCAL)
+    if not missing and not needs_exclude:
+        return PieceResult(CURRENT, "up to date")
+    if ctx.dry_run:
+        return PieceResult(WOULD_INSTALL, f"would add {len(missing)} ask rule(s) to {SETTINGS_LOCAL}")
+    try:
+        if needs_exclude:
+            _append_line(_git_path(ctx, "info/exclude"), SETTINGS_LOCAL)
+        if missing:
+            document = {"permissions": {"ask": list(missing)}} if data is None else data
+            if data is not None:
+                document.setdefault("permissions", {}).setdefault("ask", []).extend(missing)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except OSError as exc:
+        again = f"! ./tools/run_specdev.sh update {ctx.spec_rel} --repo-root {ctx.toolkit_rel} --install-only"
+        return refused(f"cannot write {SETTINGS_LOCAL} ({exc.strerror or exc}); run this yourself: {again} (or merge this by hand: {fragment})", file=SETTINGS_LOCAL)
+    except HostInstallError as exc:
+        return refused(f"{exc}; merge this by hand: {fragment}", file=SETTINGS_LOCAL)
+    detail = f"{len(missing)} ask rule(s) added to {SETTINGS_LOCAL}" if missing else f"{SETTINGS_LOCAL} excluded from git"
+    return PieceResult(CREATED if data is None and missing else REFRESHED, detail)
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "gitignore": the ``.specdev/`` line.  The findings and drafts agents write there are untracked files; unless
+# they are ignored they are part of the code tree and a findings file written after ``verify run`` makes the evidence
+# stale.
+# --------------------------------------------------------------------------------------------------------------------
+
+GITIGNORE_PIECE = "gitignore"
+GITIGNORE_FILE = ".gitignore"
+SPECDEV_IGNORE = ".specdev/"
+
+
+def _names_specdev_folder(line: str) -> bool:
+    return line.strip().removeprefix("/").removesuffix("/") == SPECDEV_IGNORE.removesuffix("/")
+
+
+def install_gitignore(ctx: InstallContext) -> PieceResult:
+    """Add ``.specdev/`` to the host's ``.gitignore`` unless a line of it already names the folder.
+
+    The other lines and their order stay byte for byte; a missing file is created with the one line; the entry starts
+    on a new line and uses the file's own line ending.
+    """
+    path = ctx.git_root / GITIGNORE_FILE
+    existed = path.is_file()
+    try:
+        text = path.read_bytes().decode("utf-8") if existed else ""
+    except (OSError, UnicodeDecodeError) as exc:
+        return refused(f"{GITIGNORE_FILE} cannot be read ({exc})", file=GITIGNORE_FILE)
+    if any(_names_specdev_folder(line) for line in text.splitlines()):
+        return PieceResult(CURRENT, "up to date")
+    if ctx.dry_run:
+        return PieceResult(WOULD_INSTALL, f"would add '{SPECDEV_IGNORE}' to {GITIGNORE_FILE}")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lead = "" if not text or text.endswith("\n") else newline
+    try:
+        path.write_bytes(f"{text}{lead}{SPECDEV_IGNORE}{newline}".encode())
+    except OSError as exc:
+        return refused(f"{GITIGNORE_FILE} cannot be written ({exc.strerror or exc})", file=GITIGNORE_FILE)
+    return PieceResult(REFRESHED if existed else CREATED, f"'{SPECDEV_IGNORE}' added to {GITIGNORE_FILE}")
+
+
 PIECES: tuple[HostPiece, ...] = (
     HostPiece(PRE_COMMIT_PIECE, install_pre_commit),
     HostPiece(MERGE_DRIVER_PIECE, install_merge_driver),
     HostPiece(WORKFLOWS_PIECE, install_workflows),
     HostPiece(WRAPPERS_PIECE, install_wrappers),
+    HostPiece(CLAUDE_LINKS_PIECE, install_claude_links),
+    HostPiece(ASK_RULES_PIECE, install_ask_rules),
+    HostPiece(GITIGNORE_PIECE, install_gitignore),
 )
 """The registry of pieces, in install order.  A new piece adds a function and one ``HostPiece(name, function)`` line."""

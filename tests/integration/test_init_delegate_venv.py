@@ -60,7 +60,14 @@ def test_init_delegate_command_runs_in_temp_venv(tmp_path, venv_name):
         "merge-driver": "current",
         "workflows": "current",
         "wrappers": "current",
+        "claude-links": "current",
+        "ask-rules": "current",
+        "gitignore": "current",
     }
+    # the links, the ask rules and the ignore line are the delegate's work too (and --force-claude was accepted)
+    assert (host / ".claude" / "skills" / "specdev-step").is_symlink()
+    assert ".specdev/" in (host / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert "Bash(specdev release)" in json.loads((host / ".claude" / "settings.local.json").read_text(encoding="utf-8"))["permissions"]["ask"]
     # the wrapper is rendered with the venv of the delegate (ruling N10), not with the template's devspec_env
     assert f'VENV_DIR="${{ROOT}}/{venv_name}"' in (host / "tools" / "run_specdev.sh").read_text(encoding="utf-8")
     # the hooks name the venv the delegate ran in (ruling N5), and the driver is set in the host's own clone only
