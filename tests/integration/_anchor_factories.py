@@ -106,8 +106,7 @@ def make_legacy_milestone_entry(
 ) -> dict[str, Any]:
     """Build one pre-1.2.0 ``milestone_index[]`` entry (``milestone_id``, ``context_path``, ``fr_refs``).
 
-    It no longer satisfies the anchor schema; it exists to drive the E308 ownership arm, which still reads
-    ``fr_refs`` until the milestone commands rewrite it.
+    It no longer satisfies the anchor schema; it exists to show the schema rejects the removed row fields.
     """
     return {
         "milestone_id": milestone_id,
@@ -117,6 +116,38 @@ def make_legacy_milestone_entry(
         "checklist_id_prefix": checklist_id_prefix,
         "summary": f"{milestone_id} summary line for tests.",
     }
+
+
+def make_roadmap(tmp_dir: Path, tasks: dict[str, list[str]], *, milestone_id: str = "ms-roadmap") -> Path:
+    """Write ``tmp_dir/14_roadmap.json`` with one roadmap milestone holding *tasks* (task id -> its criterion ids).
+
+    The anchor validator reads it, through the spec graph, to find the task that holds a criterion a plan item
+    ``realises``.  It is not a fully schema-valid roadmap: the criteria carry no ``refines`` or ``verified_by``.
+    """
+    roadmap = {
+        "$schema": "vc:14-roadmap",
+        "id": "roadmap-test",
+        "owner": "product",
+        "created_at": "2024-01-01T00:00:00Z",
+        "milestones": [
+            {
+                "milestone_id": milestone_id,
+                "name": "Test milestone",
+                "tasks": [
+                    {
+                        "task_id": task_id,
+                        "description": f"Task {task_id}.",
+                        "acceptance_criteria": [{"criterion_id": cid, "text": f"Criterion {cid}."} for cid in criteria],
+                    }
+                    for task_id, criteria in tasks.items()
+                ],
+            }
+        ],
+        "canonical_refs_used": [],
+    }
+    path = tmp_dir / "14_roadmap.json"
+    path.write_text(json.dumps(roadmap), encoding="utf-8")
+    return path
 
 
 def make_milestone_plan(
@@ -137,7 +168,7 @@ def make_milestone_plan(
     (scope_in/scope_out), and ``plan.spec_alignment.checklist``.  This is
     **not** a fully schema-valid ``vc:16-impl-context`` artifact — the plan
     items a caller passes in (see ``make_checklist_item``) may omit
-    ``realises`` and ``implementation`` because the anchor validator never
+    ``implementation`` because the anchor validator never
     schema-validates the milestone files it loads.
     """
     ms: dict[str, Any] = {
@@ -198,21 +229,18 @@ def make_object_test_command(
 
 def make_checklist_item(
     item_id: str,
-    spec_ref_id: str,
+    realises: list[str],
     *,
     item_type: str = "behavior",
 ) -> dict[str, Any]:
-    """Build one 1.1.1-shaped ``plan.spec_alignment.checklist[]`` item for a milestone plan.
+    """Build one ``plan.spec_alignment.checklist[]`` plan item that ``realises`` the criteria *realises*.
 
-    Produces a structurally sufficient item for the anchor validator's
-    cross-file drift checks (E309, W610).  The anchor validator reads
-    ``id`` and ``spec_ref.id`` (its ``spec_ref`` arm is the legacy one, # M8 rewrites)
-    — it does not schema-validate the milestone plan itself, so the item
-    stays in the old shape on purpose.
+    Structurally sufficient for the anchor validator's cross-file checks (E308 ownership, E309 mapping, W610):
+    it reads ``id`` and ``realises`` and does not schema-validate the milestone plan, so ``implementation`` is omitted.
     """
     return {
         "id": item_id,
-        "spec_ref": {"type": "fr", "id": spec_ref_id},
+        "realises": realises,
         "description": f"Checklist item {item_id}.",
         "type": item_type,
         "layer": "api",

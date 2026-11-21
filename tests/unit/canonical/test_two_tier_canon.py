@@ -443,7 +443,7 @@ class TestHallucinationLintMergedRegistry:
             project_canon_dir=str(project),
         )
         # No hallucination errors for valid project canon IDs
-        hallucination_errs = [e for e in errs if "hallucin" in e.message.lower() or e.code in ("E301", "E302")]
+        hallucination_errs = [e for e in errs if "hallucin" in e.message.lower()]
         assert not hallucination_errs, f"Unexpected hallucination errors: {hallucination_errs}"
 
 

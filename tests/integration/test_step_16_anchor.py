@@ -2,8 +2,8 @@
 
 Covers:
   - Schema validation: valid fixtures pass; invalid fixtures fail on the right signal
-  - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction; the FR/API ownership arm is a no-op on the 1.2.0 row shape
-  - E309 (ANCHOR_CHECKLIST_DRIFT): cross-milestone checklist ID collision
+  - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction; one roadmap task owned by two non-done milestones
+  - E309 (ANCHOR_CHECKLIST_DRIFT): one plan-item id with different realises sets in two plans
                                   + checklist_id_prefix collision in milestone_index
   - W585 (ANCHOR_DRIFT_SKIP): spec_path is None — filesystem checks skipped
   - W586 (ANCHOR_VALIDATOR_WRONG_ARTIFACT): non-anchor artifact dispatched here
@@ -39,6 +39,7 @@ from _anchor_factories import (  # noqa: E402  — sys.path tweak above
     make_legacy_milestone_entry,
     make_milestone_entry,
     make_milestone_plan,
+    make_roadmap,
 )
 
 
@@ -407,121 +408,70 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
             f"Expected E308 for case-insensitive scope contradiction. Got: {errors}"
         )
 
-    def test_e308_fr_ownership_conflict_two_in_flight_milestones(self):
-        """E308 fires when the same FR is owned by two non-done milestones."""
+    def _ownership_errors(self, statuses: tuple[str, str], tasks: dict[str, list[str]], realised: tuple[list[str], list[str]]):
+        """Validate an anchor of two milestones (with *statuses*) whose plans realise *realised*; roadmap *tasks* give task -> criteria."""
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            (tmp_dir / "impl_context").mkdir()
-
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            make_roadmap(tmp_dir, tasks)
             anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_legacy_milestone_entry("ms-a", status="in_progress",
-                                         fr_refs=["fr-login"], checklist_id_prefix="MSA"),
-                    make_legacy_milestone_entry("ms-b", status="in_progress",
-                                         fr_refs=["fr-login"], checklist_id_prefix="MSB"),
+                    make_milestone_entry("ms-a", status=statuses[0], checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", status=statuses[1], checklist_id_prefix="MSB"),
                 ],
+                drift_checks=["Verified ownership (2026-11-16)"],
             )
-
-            errors = validate_file(self.repo_root, str(anchor_path))
-
-        self.assertTrue(
-            any(e.code == "E308" and "FR" in e.message for e in errors),
-            f"Expected E308 with FR ownership conflict marker. Got: {errors}"
-        )
-
-    def test_e308_api_ownership_conflict_uses_api_in_message(self):
-        """E308 ownership-conflict message says 'API' when the conflicting ID starts with api-."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            (tmp_dir / "impl_context").mkdir()
-
-            anchor_path = make_anchor(
-                tmp_dir,
-                scope_in=["api"],
-                milestone_index=[
-                    make_legacy_milestone_entry("ms-a", status="in_progress",
-                                         fr_refs=["api-session-create"], checklist_id_prefix="MSA"),
-                    make_legacy_milestone_entry("ms-b", status="pending",
-                                         fr_refs=["api-session-create"], checklist_id_prefix="MSB"),
-                ],
+            make_milestone_plan(
+                impl_context_dir, "ms_a.json", milestone="ms-a",
+                checklist=[make_checklist_item("MSA_ONE", realised[0])],
             )
-
-            errors = validate_file(self.repo_root, str(anchor_path))
-
-        self.assertTrue(
-            any(e.code == "E308" and "API" in e.message for e in errors),
-            f"Expected E308 with 'API' marker for api- ID conflict. Got: {errors}"
-        )
-
-    def test_e308_done_milestone_does_not_conflict(self):
-        """A 'done' milestone does not block the same FR in an in-flight milestone."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            (tmp_dir / "impl_context").mkdir()
-
-            anchor_path = make_anchor(
-                tmp_dir,
-                scope_in=["auth"],
-                milestone_index=[
-                    make_legacy_milestone_entry("ms-done", status="done",
-                                         fr_refs=["fr-login"], checklist_id_prefix="DONE"),
-                    make_legacy_milestone_entry("ms-active", status="in_progress",
-                                         fr_refs=["fr-login"], checklist_id_prefix="ACTIVE"),
-                ],
+            make_milestone_plan(
+                impl_context_dir, "ms_b.json", milestone="ms-b",
+                checklist=[make_checklist_item("MSB_ONE", realised[1])],
             )
+            return validate_file(self.repo_root, str(anchor_path))
 
-            errors = validate_file(self.repo_root, str(anchor_path))
-
-        e308 = [e for e in errors if e.code == "E308"]
-        self.assertEqual(e308, [], f"Done milestone should not trigger E308. Got: {e308}")
-        # Pin that no OTHER error codes start masquerading here. If a future
-        # regression re-labels the FR-ownership signal under a different code
-        # (e.g. re-uses E309), this test would otherwise still appear green.
-        # W587 (drift-checks-stale) fires because drift.checks is intentionally
-        # empty in this factory, and E520 because the old-shape entries no longer
-        # satisfy the schema.  Neither is an FR-ownership signal.
-        allowed_orthogonal = {"W587", "E520"}
-        unexpected = [e for e in errors if e.code not in allowed_orthogonal]
-        self.assertEqual(
-            unexpected, [],
-            f"Only W587/E520 (orthogonal signals) are expected here. "
-            f"Got unexpected codes: {[e.code for e in unexpected]}",
+    def test_e308_ownership_arm_fires_when_two_open_milestones_realise_one_task(self):
+        """E308 [ownership]: two in-flight milestones whose plan items realise criteria of one task."""
+        errors = self._ownership_errors(
+            ("in_progress", "pending"), {"task-login": ["tc-one", "tc-two"]}, (["tc-one"], ["tc-two"])
         )
+        owned = [e for e in errors if e.code == "E308" and "[ownership]" in e.message]
+        self.assertEqual(len(owned), 1, f"Expected one ownership E308. Got: {errors}")
+        self.assertIn("'task-login'", owned[0].message)
+        self.assertIn("'ms-a'", owned[0].message)
+        self.assertIn("'ms-b'", owned[0].message)
 
-    def test_e308_deferred_milestone_still_conflicts(self):
-        """A 'deferred' milestone still claims FR ownership — must trigger E308.
-
-        Only 'done' milestones are exempt from ownership conflict detection (the FR
-        has been delivered and may legitimately be revisited later). 'deferred'
-        represents a consciously postponed but still-owned commitment, so the same
-        FR in another active/pending milestone is a real contradiction.
-        Validator contract pinned at step_16_anchor.py:111.
-        """
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            (tmp_dir / "impl_context").mkdir()
-
-            anchor_path = make_anchor(
-                tmp_dir,
-                scope_in=["auth"],
-                milestone_index=[
-                    make_legacy_milestone_entry("ms-deferred", status="deferred",
-                                         fr_refs=["fr-login"], checklist_id_prefix="DEFER"),
-                    make_legacy_milestone_entry("ms-active", status="in_progress",
-                                         fr_refs=["fr-login"], checklist_id_prefix="ACTIVE"),
-                ],
-            )
-
-            errors = validate_file(self.repo_root, str(anchor_path))
-
-        e308 = [e for e in errors if e.code == "E308" and "fr-login" in e.message]
-        self.assertEqual(
-            len(e308), 1,
-            f"Deferred + active milestone sharing fr-login should fire exactly one "
-            f"E308 FR-ownership conflict. Got: {[e.message for e in errors]}",
+    def test_e308_ownership_arm_silent_when_one_milestone_is_done(self):
+        """A done milestone does not block the same task in an in-flight milestone."""
+        errors = self._ownership_errors(
+            ("done", "in_progress"), {"task-login": ["tc-one", "tc-two"]}, (["tc-one"], ["tc-two"])
         )
+        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Done milestone should not trigger E308. Got: {errors}")
+
+    def test_e308_ownership_arm_silent_when_milestones_realise_different_tasks(self):
+        """No E308 when each in-flight milestone realises a criterion of its own task."""
+        errors = self._ownership_errors(
+            ("in_progress", "in_progress"), {"task-login": ["tc-one"], "task-logout": ["tc-two"]}, (["tc-one"], ["tc-two"])
+        )
+        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
+
+    def test_e308_deferred_milestone_still_owns_its_task(self):
+        """A deferred milestone is a postponed but still-owned commitment: the same task in an in-flight milestone is a conflict."""
+        errors = self._ownership_errors(
+            ("deferred", "in_progress"), {"task-login": ["tc-one", "tc-two"]}, (["tc-one"], ["tc-two"])
+        )
+        self.assertEqual(len([e for e in errors if e.code == "E308"]), 1, f"Got: {[e.message for e in errors]}")
+
+    def test_e308_ownership_arm_ignores_a_criterion_the_roadmap_does_not_have(self):
+        """A realised id that is no criterion of the graph takes no part (the plan check reports it), and nothing raises."""
+        errors = self._ownership_errors(
+            ("in_progress", "in_progress"), {"task-login": ["tc-one"]}, (["tc-missing"], ["tc-missing"])
+        )
+        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
 
     def test_row_without_status_is_read_as_pending(self):
         """A row with no status is not done: it takes part in prefix checks and raises nothing else."""
@@ -532,20 +482,6 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
             anchor_path = make_anchor(Path(td), milestone_index=[row, other], drift_checks=["Verified rows (2026-11-16)"])
             errors = validate_file(self.repo_root, str(anchor_path))
         self.assertEqual([e.code for e in errors], ["E309"], f"Got: {errors}")
-
-    def test_ownership_arm_noop_on_new_shape(self):
-        """Two in-flight rows about different milestones raise no E308: the ownership arm reads the removed fr_refs."""
-        with tempfile.TemporaryDirectory() as td:
-            anchor_path = make_anchor(
-                Path(td),
-                scope_in=["auth"],
-                milestone_index=[
-                    make_milestone_entry("ms-a", status="in_progress", checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", status="pending", checklist_id_prefix="MSB"),
-                ],
-            )
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
 
     def test_no_e308_when_no_scope_overlap(self):
         """No E308 when milestone scope does not overlap anchor scope."""
@@ -575,13 +511,12 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
 class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
     """E309 ANCHOR_CHECKLIST_DRIFT — cross-milestone checklist ID + prefix collisions."""
 
-    def test_e309_same_id_different_spec_ref(self):
-        """E309 fires when same checklist ID maps to different spec_ref.id across milestones."""
+    def _mapping_errors(self, first: list[str], second: list[str], *, second_id: str = "AUTH_LOGIN"):
+        """Validate two plans whose items are ``AUTH_LOGIN`` realising *first* and *second_id* realising *second*."""
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
-
             anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["auth"],
@@ -592,78 +527,32 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
             )
             make_milestone_plan(
                 impl_context_dir, "ms_a.json", milestone="ms-a",
-                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],
+                checklist=[make_checklist_item("AUTH_LOGIN", first)],
             )
             make_milestone_plan(
                 impl_context_dir, "ms_b.json", milestone="ms-b",
-                # Same ID "AUTH_LOGIN" but different spec_ref.id — E309
-                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v2")],
+                checklist=[make_checklist_item(second_id, second)],
             )
+            return validate_file(self.repo_root, str(anchor_path))
 
-            errors = validate_file(self.repo_root, str(anchor_path))
+    def test_e309_fires_when_one_item_id_has_two_realises_sets(self):
+        """E309 [mapping]: one plan-item id carries different realises sets in two plans."""
+        errors = self._mapping_errors(["tc-login-v1"], ["tc-login-v2"])
+        mapping = [e for e in errors if e.code == "E309" and "[mapping]" in e.message]
+        self.assertEqual(len(mapping), 1, f"Expected one mapping E309. Got: {errors}")
+        self.assertIn("'AUTH_LOGIN'", mapping[0].message)
+        self.assertIn("'tc-login-v1'", mapping[0].message)
+        self.assertIn("'tc-login-v2'", mapping[0].message)
 
-        self.assertTrue(
-            any(e.code == "E309" for e in errors),
-            f"Expected E309 for checklist ID collision. Got: {errors}"
-        )
+    def test_e309_silent_when_realises_sets_are_equal(self):
+        """No E309 when the same plan-item id realises the same set in both plans, whatever the order."""
+        errors = self._mapping_errors(["tc-a", "tc-b"], ["tc-b", "tc-a"])
+        self.assertEqual([e for e in errors if e.code == "E309"], [], f"Got: {errors}")
 
-    def test_no_e309_same_id_same_spec_ref(self):
-        """No E309 when same checklist ID maps to same spec_ref.id (valid duplication)."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-
-            anchor_path = make_anchor(
-                tmp_dir,
-                scope_in=["auth"],
-                milestone_index=[
-                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
-                ],
-            )
-            make_milestone_plan(
-                impl_context_dir, "ms_a.json", milestone="ms-a",
-                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],
-            )
-            make_milestone_plan(
-                impl_context_dir, "ms_b.json", milestone="ms-b",
-                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],  # same — ok
-            )
-
-            errors = validate_file(self.repo_root, str(anchor_path))
-
-        e309 = [e for e in errors if e.code == "E309"]
-        self.assertEqual(e309, [], f"Did not expect E309. Got: {e309}")
-
-    def test_no_e309_different_ids_different_spec_refs(self):
-        """No E309 when checklist IDs are unique across milestones."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-
-            anchor_path = make_anchor(
-                tmp_dir,
-                scope_in=["auth"],
-                milestone_index=[
-                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
-                ],
-            )
-            make_milestone_plan(
-                impl_context_dir, "ms_a.json", milestone="ms-a",
-                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login")],
-            )
-            make_milestone_plan(
-                impl_context_dir, "ms_b.json", milestone="ms-b",
-                checklist=[make_checklist_item("AUTH_SESSION", "fr-session")],
-            )
-
-            errors = validate_file(self.repo_root, str(anchor_path))
-
-        e309 = [e for e in errors if e.code == "E309"]
-        self.assertEqual(e309, [], f"Did not expect E309. Got: {e309}")
+    def test_e309_silent_when_item_ids_differ(self):
+        """No E309 when the plan-item ids are unique across plans."""
+        errors = self._mapping_errors(["tc-login"], ["tc-session"], second_id="AUTH_SESSION")
+        self.assertEqual([e for e in errors if e.code == "E309"], [], f"Got: {errors}")
 
     def test_e309_fires_for_duplicate_checklist_id_prefix_in_milestone_index(self):
         """E309 fires at anchor authoring time when two milestone_index entries share checklist_id_prefix.
@@ -708,29 +597,6 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
         e309 = [e for e in errors if e.code == "E309"]
         self.assertEqual(e309, [], f"Did not expect E309 with unique prefixes. Got: {e309}")
 
-
-    def test_spec_ref_arm_noop_on_new_shape(self):
-        """A bare task id as spec_ref (the 1.2.0 plan item) raises no E309 even when the same id maps differently."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            anchor_path = make_anchor(
-                tmp_dir,
-                scope_in=["auth"],
-                milestone_index=[
-                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
-                ],
-            )
-            for name, milestone, task in (("ms_a.json", "ms-a", "task-one"), ("ms_b.json", "ms-b", "task-two")):
-                plan = make_milestone_plan(
-                    impl_context_dir, name, milestone=milestone,
-                    checklist=[{"id": "AUTH_LOGIN", "spec_ref": task}],
-                )
-                self.assertIn(task, plan.read_text(encoding="utf-8"))
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertEqual([e for e in errors if e.code == "E309"], [], f"Got: {errors}")
 
 class TestStep16AnchorGuards(_AnchorTestBase):
     """W585 / W586 guards plus the "anchor route never emits E304" contract."""
@@ -1444,7 +1310,7 @@ class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
                 impl_context_dir, "ms_auth_plan.json", milestone="ms-auth",
                 scope_in=["auth"],
                 checklist=[
-                    make_checklist_item("BILLING_LOGIN_01", spec_ref_id="fr-login"),
+                    make_checklist_item("BILLING_LOGIN_01", ["tc-login"]),
                 ],
             )
 
@@ -1481,8 +1347,8 @@ class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
                 impl_context_dir, "ms_auth_plan.json", milestone="ms-auth",
                 scope_in=["auth"],
                 checklist=[
-                    make_checklist_item("AUTH_LOGIN_01", spec_ref_id="fr-login"),
-                    make_checklist_item("AUTH_LOGIN_02", spec_ref_id="fr-login"),
+                    make_checklist_item("AUTH_LOGIN_01", ["tc-login"]),
+                    make_checklist_item("AUTH_LOGIN_02", ["tc-login"]),
                 ],
             )
 
@@ -1490,6 +1356,40 @@ class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
 
         w610 = [e for e in errors if e.code == "W610"]
         self.assertEqual(w610, [], f"W610 should not fire when IDs respect prefix. Got: {w610}")
+
+
+class TestStep16AnchorPlanDiscovery(_AnchorTestBase):
+    """W588, W589 and W611 are reported over the plan files, and ``find_plan`` decides which file is a milestone's plan."""
+
+    def test_w588_w589_w611_are_found_through_find_plan(self):
+        """One run: the plan ``find_plan`` returns takes part; an unreadable file is W588, a misschemaed one W589, a plan of no anchor row W611.
+
+        ``ms_a1.json`` is the first plan file naming ``ms-a`` (``find_plan`` returns it); ``ms_a2.json`` names it too and
+        would contradict the anchor scope, but is not the plan of ``ms-a`` and so takes no part in drift detection.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                scope_out=["oauth-flows"],
+                milestone_index=[make_milestone_entry("ms-a")],
+                drift_checks=["Verified scope (2026-11-16)"],
+            )
+            make_milestone_plan(impl_context_dir, "ms_a1.json", milestone="ms-a", scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_a2.json", milestone="ms-a", scope_in=["oauth-flows"])
+            make_milestone_plan(impl_context_dir, "ms_ghost.json", milestone="ms-ghost")
+            (impl_context_dir / "ms_bad.json").write_text("{not json", encoding="utf-8")
+            (impl_context_dir / "ms_other.json").write_text(json.dumps({"$schema": "vc:other", "milestone": "ms-a"}), encoding="utf-8")
+            errors = validate_file(self.repo_root, str(anchor_path))
+        codes = sorted(e.code for e in errors)
+        self.assertEqual(codes, ["W588", "W589", "W611"], f"Got: {errors}")
+        by_code = {e.code: e.message for e in errors}
+        self.assertIn("ms_bad.json", by_code["W588"])
+        self.assertIn("ms_other.json", by_code["W589"])
+        self.assertIn("ms_ghost.json", by_code["W611"])
 
 
 class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):

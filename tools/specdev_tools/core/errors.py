@@ -52,7 +52,10 @@ class FindingError(Exception):
 #   the traceability closure and completeness checks: E535, E536, E560, E561, E562, E563, E564, E565, E568, E569, E575, E576
 #   and their warnings W560, W561, W562, W563, W564, W565, W568, W569, W575, W576 (W566 and W567 are gone too: E566 and E567
 #   stay, as errors computed from the graph);
-#   the trace matrix and the coverage thresholds: E592, W592, E604, W604.
+#   the trace matrix and the coverage thresholds: E592, W592, E604, W604;
+#   the proof and review checks of the step-16 validator, whose inputs the plan schema no longer has (a milestone closes
+#   on the close gate, E810 to E814): E301, E302, E305, E306, E307, W599, W600, W601.
+# E303 stays: `governance-check` raises it for a commit message that does not match the governance rule.
 # `tests/unit/core/test_error_code_registry.py` (REMOVED_CODES) fails if one of them is registered or written as a code literal again.
 ERROR_CODES = {
     # Canonical integrity (1xx)
@@ -70,13 +73,8 @@ ERROR_CODES = {
     "E210": "CROSS_ARTIFACT_DRIFT",
     "E211": "PARTIAL_DRIFT",
     # Proof / review closure (3xx)
-    "E301": "MISSING_PROOF_CLOSURE",
-    "E302": "UNPROVEN_VERIFIED_REVIEW",
-    "E303": "CI_GATE_VIOLATION",
+    "E303": "COMMIT_MESSAGE_MISMATCH",
     "E304": "ROADMAP_TASK_UNCOVERED",
-    "E305": "PLANNED_UNEXECUTED",
-    "E306": "SEMANTIC_REVIEW_FR_MISMATCH",
-    "E307": "BEHAVIOR_VALIDATION_PAIRING",
     "E308": "ANCHOR_SCOPE_DRIFT",
     "E309": "ANCHOR_CHECKLIST_DRIFT",
     "E310": "PROMPT_SCHEMA_DRIFT",
@@ -166,9 +164,6 @@ ERROR_CODES = {
     "W595": "CONTENT_STALENESS",
     "W596": "UNDECLARED_UPSTREAM_REF",
     "W597": "EXTRACTION_INTENT_VAGUE",
-    "W599": "EVIDENCE_TOO_SHORT",
-    "W600": "VERIFIED_ACTION_NO_EVIDENCE",
-    "W601": "EVIDENCE_NO_ARTIFACT_REF",
     "W603": "FILES_OUTSIDE_TASK_SCOPE",
     # Glossary parity (6xx)
     "E606": "GLOSSARY_PROPOSAL_DRIFT",

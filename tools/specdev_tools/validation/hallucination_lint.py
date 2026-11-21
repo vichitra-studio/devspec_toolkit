@@ -796,10 +796,10 @@ _E541_SKIP_KEYS = {
     "review_requirements",
 
     # Category C: execution subtree (16_impl_context.schema.json only).
-    # execution.final_status.test_results items have additionalProperties unset
-    # (intentionally free-form test-runner output — not bindable spec vocabulary).
-    # The structural rule requires additionalProperties:false and will NOT suppress
-    # items with unset additionalProperties, so this key-name skip is necessary.
+    # execution holds records, file lists and configuration-validation flags: run
+    # output, not bindable spec vocabulary, and a record's free text (`note`) is
+    # not a vocabulary slot. The structural rule would not suppress every such
+    # property, so this key-name skip is necessary.
     # "execution" appears only in 16_impl_context.schema.json; no other current
     # pipeline step defines it.
     "execution",

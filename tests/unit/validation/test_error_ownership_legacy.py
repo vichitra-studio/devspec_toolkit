@@ -76,7 +76,7 @@ def test_step_gate_delta_that_adds_content_raises_no_error_of_its_own(tmp_path: 
     ("plan", "step"),
     [
         ({}, "16a"),
-        ({"execution": {"execution_results": [{"x": 1}]}}, "16b"),
+        ({"execution": {"records": [{"x": 1}]}}, "16a"),
         ({"review": {"verdict": "verified"}}, "16c"),
     ],
 )

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Any, Optional
 import fnmatch
-from collections import defaultdict
 import os
-import re
 from pathlib import Path
 
-from ...core.errors import make_error, SpecError
+from ...core.errors import FindingError, make_error, SpecError
 from ...core.loaders import read_json_object
 from ...core.scope_helpers import as_dict, dict_items, str_in, str_items
-from ..linter_utils import extract_command_string
+from ...core.step_paths import PLAN_DIR_NAME
+from ...lifecycle.anchor_store import is_legacy_close, read_row
+from ...lifecycle.plans import milestone_key
 
 # Checklist type and layer enums — currently hardcoded.  These values mirror the
 # enum constraints in schema/16_impl_context.schema.json (``checklist[].type``
@@ -19,17 +19,12 @@ from ..linter_utils import extract_command_string
 # and the schema is the single source of truth.  See AUDIT-023.
 VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "metadata", "perf", "logging", "docs", "security"})
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
-TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf", "security"})
 
 # `disposition.value` of a roadmap task meaning "paused or permanently cancelled, not absent": E304 skips such a task.
 PAUSED_OR_CANCELLED_DISPOSITIONS = frozenset({"deferred", "wont_do"})
 
-
-# Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
-_SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failures")
-
-# Spec artifact ID pattern for evidence binding validation (AUDIT-032)
-_ARTIFACT_ID_RE = re.compile(r'\b(?:fr|api|nfr|inv)-[a-z0-9-]+\b')
+PLAN_BYTES_WARN = 750_000
+"""W837 reports a plan file larger than this many bytes."""
 
 # Built-in doc basenames — any file whose basename matches is treated as a doc
 # regardless of directory depth.  Covers the common case of per-component
@@ -136,64 +131,9 @@ def _roadmap_path(spec_path: str) -> Path:
     return base / "14_roadmap.json"
 
 
-# M8 rewrites: E307 keys on the 1.1.1 `spec_ref`
-def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
-    """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
-
-    Keyed on the 1.1.1 ``spec_ref``; a 1.2.0 plan item has none, so on that shape this finds nothing.
-
-    Groups checklist items by their spec_ref.id and checks that each group has
-    both a 'behavior' and a 'validation' type item. Deferred items are included
-    in this grouping -- a deferred 'validation' item still satisfies the pairing
-    requirement (it's paused, not absent).
-    Non-behavioral spec_ref types ('doc', 'code', 'task') are excluded — these are work items,
-    not testable behaviors, and do not require behavior+validation pairing.
-    """
-    groups: dict[str, set] = defaultdict(set)
-    for item in checklist:
-        spec_ref = item.get("spec_ref")
-        if not isinstance(spec_ref, dict):
-            continue
-        ref_id = spec_ref.get("id")
-        if not isinstance(ref_id, str) or not ref_id:
-            continue
-        # Skip non-behavioral spec_ref types (doc, code, task) — work items, not testable behaviors
-        if spec_ref.get("type") in ("doc", "code", "task"):
-            continue
-        item_type = item.get("type")
-        if isinstance(item_type, str) and item_type:
-            groups[ref_id].add(item_type)
-
-    for ref_id, types in groups.items():
-        missing = []
-        if "behavior" not in types:
-            missing.append("behavior")
-        if "validation" not in types:
-            missing.append("validation")
-        if missing:
-            errors.append(
-                make_error("E307", f"BEHAVIOR_VALIDATION_PAIRING: spec ref '{ref_id}' "
-                f"is missing checklist item(s) of type: {', '.join(missing)}")
-            )
-
-
 def _checklist_of(plan: dict[str, Any]) -> list[dict[str, Any]]:
     """The plan items (``plan.spec_alignment.checklist``) that are objects."""
     return dict_items(as_dict(plan.get("spec_alignment")).get("checklist"))
-
-
-# M8 rewrites: reads the 1.1.1 `implementation.status`
-def _legacy_status(item: dict[str, Any]) -> Optional[str]:
-    """``implementation.status`` of a 1.1.1-shaped plan item; ``None`` on the 1.2.0 shape, which stores none.
-
-    The status-keyed rules below run only when this returns a value.
-    """
-    status = as_dict(item.get("implementation")).get("status")
-    return status if isinstance(status, str) else None
-
-
-# M8 rewrites: values of the 1.1.1 `checklist_status` that E305 skips
-_LEGACY_SET_ASIDE_STATUSES = frozenset({"deferred", "wont_do"})
 
 
 def _check_type_and_layer(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
@@ -208,85 +148,8 @@ def _check_type_and_layer(checklist: list[dict[str, Any]], errors: list[SpecErro
             errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_LAYERS))}"))
 
 
-def _check_action_evidence(item_id: str, item_type: str, actions: list[dict[str, Any]], errors: list[SpecError]) -> None:
-    """E301, W599, W600, W601 on the actions of one legacy ``verified`` item (evidence presence and quality).
-
-    Task 7-03 (AUDIT-070) + Task 7-04 (AUDIT-032): evidence content quality and binding.
-    """
-    has_evidence = False
-    for action in actions:
-        evidence = action.get("evidence")
-        if evidence is None:
-            # W600: each individual verified action should have evidence
-            errors.append(make_error("W600", f"VERIFIED_ACTION_NO_EVIDENCE: verified action '{action.get('type', 'unknown')}' in checklist item '{item_id}' has no evidence field"))
-            continue
-        # evidence is present — mark presence and validate quality
-        has_evidence = True
-        if not isinstance(evidence, dict):
-            # Non-dict evidence (e.g., plain string) satisfies presence check but
-            # cannot be quality-validated — skip content/structure checks
-            continue
-        content = evidence.get("content")
-        has_structured = "stdout" in evidence or "stderr" in evidence
-        if isinstance(content, str):
-            if len(content) < 50:
-                errors.append(make_error("W599", f"EVIDENCE_TOO_SHORT: action evidence in checklist item '{item_id}' has content shorter than 50 characters ({len(content)} chars)"))
-            has_success_marker = any(marker in content for marker in _SUCCESS_MARKERS)
-            if not has_success_marker and not has_structured:
-                errors.append(make_error("E301", f"EVIDENCE_CONTENT_INVALID: action evidence in checklist item '{item_id}' lacks a success marker keyword (e.g. PASS, OK, passed, success, '0 failures') and has no stdout/stderr fields"))
-        elif not has_structured:
-            # Evidence dict present but missing both content and stdout/stderr
-            errors.append(make_error("W600", f"EVIDENCE_NO_CONTENT: verified action in checklist item '{item_id}' has evidence dict but no 'content', 'stdout', or 'stderr' field"))
-        # AUDIT-032: check that evidence content references at least one spec artifact ID.
-        # Only proof-types (TYPES_REQUIRING_PROOF) have an honest fr-/nfr-/inv- tie to
-        # cite; non-proof types (metadata, docs, logging, config) legitimately have none.
-        if str_in(item_type, TYPES_REQUIRING_PROOF):
-            combined = " ".join(filter(None, [
-                content if isinstance(content, str) else "",
-                evidence.get("stdout") if isinstance(evidence.get("stdout"), str) else "",
-                evidence.get("stderr") if isinstance(evidence.get("stderr"), str) else "",
-            ]))
-            if combined and not _ARTIFACT_ID_RE.search(combined):
-                errors.append(make_error("W601", f"EVIDENCE_NO_ARTIFACT_REF: evidence in checklist item '{item_id}' action '{action.get('type', 'unknown')}' does not reference any spec artifact ID (fr-*, api-*, nfr-*, inv-*)"))
-    if not has_evidence:
-        errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
-
-
-# M8 rewrites: E301 and the evidence checks key on `implementation.status`
-def _check_legacy_verified_items(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
-    """E301 and the evidence-quality checks (W599, W600, W601) of 1.1.1-shaped plans.
-
-    Runs only for an item that carries ``implementation.status``; a 1.2.0 plan item stores none.
-    """
-    for item in checklist:
-        status = _legacy_status(item)
-        if status not in ("verified", "in_progress"):
-            continue
-        item_id = item.get("id", "unknown")
-        actions = dict_items(as_dict(item.get("implementation")).get("actions"))
-        if status == "verified" and not actions:
-            errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but has no actions."))
-        elif status == "verified":
-            _check_action_evidence(item_id, item.get("type", ""), actions, errors)
-
-
-# M8 rewrites: reads the 1.1.1 `implementation.files_touched`
-def _legacy_touched_files(checklist: list[dict[str, Any]]) -> set[str]:
-    """The ``implementation.files_touched`` of the started items (``in_progress`` or ``verified``) of a 1.1.1-shaped plan."""
-    touched: set[str] = set()
-    for item in checklist:
-        if _legacy_status(item) in ("in_progress", "verified"):
-            touched.update(str_items(as_dict(item.get("implementation")).get("files_touched")))
-    return touched
-
-
-def _touched_files(checklist: list[dict[str, Any]], execution_files: set[str]) -> set[str]:
-    """Files the plan says it touches: ``execution.files_touched`` plus, on legacy plans, the files of started items."""
-    return set(execution_files) | _legacy_touched_files(checklist)
-
-
 def _check_target_patterns_and_scope(data: dict[str, Any], plan: dict[str, Any], checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
-    """E520 for touched files outside ``target_file_patterns``; W603 for execution files outside any declared scope."""
+    """E520 for execution files outside ``target_file_patterns``; W603 for execution files outside any declared scope."""
     summary = as_dict(plan.get("summary"))
     summary_patterns = set(str_items(summary.get("target_file_patterns")))
     execution_files = set(str_items(as_dict(data.get("execution")).get("files_touched")))
@@ -303,7 +166,7 @@ def _check_target_patterns_and_scope(data: dict[str, Any], plan: dict[str, Any],
                 f"— may be outside task scope",
             ))
 
-    for f in _touched_files(checklist, execution_files):
+    for f in execution_files:
         if not any(fnmatch.fnmatch(f, pattern) for pattern in summary_patterns):
             errors.append(make_error("E520", f"File '{f}' is touched by implementation but not covered by target_file_patterns."))
 
@@ -363,78 +226,6 @@ def _check_docs_impact(plan: dict[str, Any], checklist: list[dict[str, Any]], sp
                 errors.append(make_error("E520", f"plan.docs_impact.docs_touched contains non-doc path: {doc_path}"))
 
 
-def _executed_commands(data: dict[str, Any]) -> tuple[set[str], set[str]]:
-    """``(passed, acknowledged)`` command strings of ``execution.execution_results``.
-
-    Acknowledged = passed or blocked: a blocked entry is an explicit acknowledgment, not a missing proof, so it
-    satisfies E301 but not E302 (verified verdict).
-    """
-    passed: set[str] = set()
-    acknowledged: set[str] = set()
-    for result in dict_items(as_dict(data.get("execution")).get("execution_results")):
-        status, cmd = result.get("status"), result.get("command")
-        if not isinstance(cmd, str):
-            continue
-        if status == "passed":
-            passed.add(cmd.strip())
-        if status in ("passed", "blocked"):
-            acknowledged.add(cmd.strip())
-    return passed, acknowledged
-
-
-def _check_proof_closure(data: dict[str, Any], plan: dict[str, Any], errors: list[SpecError]) -> None:
-    """E301 MISSING_PROOF_CLOSURE (D22), E302 UNPROVEN_VERIFIED_REVIEW (D23) and E303 CI_GATE_VIOLATION."""
-    review_reqs = as_dict(plan.get("review_requirements"))
-    test_commands = review_reqs.get("test_commands", [])
-    test_commands = test_commands if isinstance(test_commands, list) else []
-    execution = data.get("execution", {})
-    execution_results = as_dict(execution).get("execution_results")
-    passed_commands, acknowledged_commands = _executed_commands(data)
-
-    # A plan stores no status since 1.2.0 (the anchor holds a milestone's deferral): an absent status is an active plan.
-    if plan.get("status", "active") == "active" and test_commands and execution_results:
-        for cmd in test_commands:
-            cmd_str = extract_command_string(cmd)
-            if cmd_str and cmd_str.strip() not in acknowledged_commands:
-                errors.append(
-                    make_error("E301", f"MISSING_PROOF_CLOSURE test command '{cmd_str}' required "
-                    f"by review_requirements but not found in execution_results with status=passed")
-                )
-
-    review = as_dict(data.get("review"))
-    verdict = review.get("verdict")
-    if verdict != "verified":
-        return
-    if not execution or not isinstance(execution, dict):
-        errors.append(make_error("E302", "UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' but no execution section exists"))
-    elif not execution_results:
-        errors.append(make_error("E302", "UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' but execution_results is empty"))
-
-    unproven = [
-        cmd_str for cmd in test_commands
-        for cmd_str in [extract_command_string(cmd)]
-        if cmd_str and cmd_str.strip() not in passed_commands
-    ]
-    if unproven:
-        errors.append(
-            make_error("E302", f"UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
-            f"but {len(unproven)} test command(s) lack proof: {unproven}")
-        )
-
-    # E303 -- ci_status gate (Task 7-04 AUDIT-032: strengthened to reject anything not explicitly 'green')
-    ci_status_val = as_dict(review.get("fixture_status")).get("ci_status")
-    if ci_status_val is None:
-        errors.append(
-            make_error("E303", "CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status is absent or "
-            "review.fixture_status.ci_status is missing -- set ci_status to 'green' or change verdict")
-        )
-    elif ci_status_val != "green":
-        errors.append(
-            make_error("E303", f"CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status.ci_status is '{ci_status_val}' -- "
-            "set fixture_status.ci_status to 'green' or change verdict")
-        )
-
-
 def _realised_criteria(checklist: list[dict[str, Any]]) -> set[str]:
     """Every criterion id some plan item ``realises``."""
     return {cid for item in checklist for cid in str_items(item.get("realises"))}
@@ -476,54 +267,6 @@ def _check_roadmap_coverage(data: dict[str, Any], checklist: list[dict[str, Any]
             )
 
 
-# M8 rewrites: E305 keys on `implementation.status` and `critical_evidence`
-def _check_planned_vs_executed(data: dict[str, Any], checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
-    """E305 PLANNED_UNEXECUTED: a green legacy plan lists an active item that ``critical_evidence`` does not satisfy.
-
-    Runs only when a plan item carries ``implementation.status``; the 1.2.0 shape stores neither.
-    """
-    if not any(_legacy_status(item) for item in checklist):
-        return
-    execution = as_dict(data.get("execution"))
-    if as_dict(execution.get("final_status")).get("ci_status") != "green":
-        return
-    satisfied_ids = set(str_items(as_dict(execution.get("critical_evidence")).get("satisfied_checklist_ids")))
-    for item in sorted(checklist, key=lambda i: str(i.get("id"))):
-        item_id = item.get("id")
-        if not isinstance(item_id, str) or str_in(item.get("checklist_status"), _LEGACY_SET_ASIDE_STATUSES):
-            continue
-        if item_id in satisfied_ids:
-            continue
-        test_hint = item.get("linked_test_expectation")
-        suffix = f" (expected test: {test_hint})" if test_hint else ""
-        errors.append(
-            make_error("E305", f"PLANNED_UNEXECUTED: checklist item '{item_id}' is active but not in satisfied_checklist_ids{suffix}")
-        )
-
-
-def _check_fr_coverage_against_step_04(data: dict[str, Any], spec_path: str, errors: list[SpecError]) -> None:
-    """E306: every ``review.semantic_review.fr_coverage[].fr_id`` is a functional requirement of Step 04."""
-    fr_coverage = as_dict(as_dict(data.get("review")).get("semantic_review")).get("fr_coverage")
-    if not isinstance(fr_coverage, list) or not fr_coverage:
-        return
-    artifact_path = Path(spec_path)
-    # When artifact lives inside impl_context/, step 04 is one level up
-    fr_base = artifact_path.parent.parent if artifact_path.parent.name == "impl_context" else artifact_path.parent
-    fr_list_path = fr_base / "04_fr_list.json"
-    fr_data = read_json_object(fr_list_path)
-    if fr_data is None:
-        return  # Step 04 absent or unreadable -- skip E306
-    known_fr_ids = {fr["fr_id"] for fr in dict_items(fr_data.get("functional_requirements")) if isinstance(fr.get("fr_id"), str) and fr["fr_id"]}
-    for entry in dict_items(fr_coverage):
-        fr_id = entry.get("fr_id")
-        if isinstance(fr_id, str) and fr_id not in known_fr_ids:
-            errors.append(
-                make_error("E306", f"SEMANTIC_REVIEW_FR_MISMATCH: "
-                f"fr_coverage references '{fr_id}' "
-                f"not found in 04_fr_list.json")
-            )
-
-
 def _check_roadmap(data: dict[str, Any], checklist: list[dict[str, Any]], spec_path: str, errors: list[SpecError]) -> None:
     """Load ``14_roadmap.json`` beside *spec_path* and run E304 on it (a 16a plan, never the anchor)."""
     roadmap = _load_roadmap(spec_path)
@@ -531,6 +274,37 @@ def _check_roadmap(data: dict[str, Any], checklist: list[dict[str, Any]], spec_p
         _check_roadmap_coverage(data, checklist, roadmap, errors)
     elif _roadmap_path(spec_path).exists():  # present but not a UTF-8 JSON object
         errors.append(make_error("E304", "ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: not a UTF-8 JSON object"))
+
+
+def is_legacy_closed_plan(spec_path: str, spec_root: Optional[str] = None) -> bool:
+    """Whether the plan file at *spec_path* belongs to a milestone whose anchor row is legacy-closed (ruling L2).
+
+    A legacy-closed plan keeps the 1.1.1 shape as history until ``specdev align`` migrates it, so its schema findings
+    are not reported and it is not asked for ``realises``.  The plan's milestone is its file-level ``milestone`` key;
+    *spec_root* defaults to the folder above ``impl_context/``.  A file outside ``impl_context/``, a plan without the
+    key, a milestone with no anchor row and an anchor file that cannot be read all answer ``False``.
+    """
+    path = Path(spec_path)
+    if path.parent.name != PLAN_DIR_NAME:
+        return False
+    milestone = milestone_key(path)
+    if milestone is None:
+        return False
+    try:
+        row = read_row(spec_root or path.parent.parent, milestone)
+    except FindingError:
+        return False
+    return row is not None and is_legacy_close(row.close)
+
+
+def _check_plan_file_size(spec_path: str, errors: list[SpecError]) -> None:
+    """W837: the plan file at *spec_path* is larger than ``PLAN_BYTES_WARN`` bytes (a file that cannot be read has no size to report)."""
+    try:
+        size = os.path.getsize(spec_path)
+    except OSError:
+        return
+    if size > PLAN_BYTES_WARN:
+        errors.append(make_error("W837", f"PLAN_FILE_LARGE: the plan file is {size} bytes, above {PLAN_BYTES_WARN}; split the milestone so each plan stays small"))
 
 
 def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
@@ -553,16 +327,11 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
     checklist = _checklist_of(plan)
 
     _check_type_and_layer(checklist, errors)
-    _check_legacy_verified_items(checklist, errors)
     _check_target_patterns_and_scope(data, plan, checklist, errors)
     _check_docs_impact(plan, checklist, spec_path, spec_root, errors)
-    # E307 keys on `spec_ref`, which the 1.2.0 plan item no longer has: it finds nothing there.
-    _check_behavior_validation_pairing(checklist, errors)
-    _check_proof_closure(data, plan, errors)
-    if spec_path and not _is_anchor(spec_path, data):
-        _check_roadmap(data, checklist, spec_path, errors)
-    _check_planned_vs_executed(data, checklist, errors)
     if spec_path:
-        _check_fr_coverage_against_step_04(data, spec_path, errors)
+        _check_plan_file_size(spec_path, errors)
+        if not _is_anchor(spec_path, data) and not is_legacy_closed_plan(spec_path, spec_root):
+            _check_roadmap(data, checklist, spec_path, errors)
 
     return errors

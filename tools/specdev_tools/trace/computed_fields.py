@@ -3,7 +3,7 @@
 ``COMPUTED_VIEWS`` has one row for each computed view of the design (DOC section 4.6, "Computed, never stored").  A row
 names the field names that are rejected when a node of the row's scope stores them, or, when no name is enforced, the
 reason none is.  Only names that the 1.2.0 schemas no longer declare are enforced: a name that is authored somewhere
-else (``impact``, ``baseline``, ``fr_coverage``) is not listed.
+else (``impact``, ``baseline``) is not listed.
 """
 from __future__ import annotations
 

@@ -6,10 +6,9 @@ description: >
   assignments, max_rounds, rationale). Dispatched once per loop invocation before any
   reviewer agents run. Trigger: any invocation of /specdev-review, /specdev-step, or
   /specdev-trinity.
-  Milestone-state mode (mode: "milestone_state"): delegates per-group implementation state
+  Milestone-state mode (mode: "milestone_state"): delegates per-group convergence state
   and milestone-level phase position computation to the `specdev milestone-state` CLI and
-  returns its JSON verbatim; used by /specdev-trinity --phase impl|review orchestration
-  orchestration.
+  returns its JSON verbatim; used by /specdev-trinity --phase impl|review orchestration.
 model: haiku
 tools: [Bash, Read, Grep]
 ---
@@ -215,24 +214,21 @@ specdev milestone-state \
   --git-root .
 ```
 
-The CLI computes the full output contract deterministically: per-group state (using `implementation.status` string as the single source of truth), `derived_phase_position`, `blockers[]`, and `blocking_amb_health` (including `well_formed`, which checks `severity` and `description` presence per the `crossCycleAmbiguityItem` schema). Do not re-derive anything by hand. Do not read plan or findings files directly.
+The CLI computes the full output contract deterministically: per-group `state`, `derived_phase_position` and `blockers[]`. A plan item stores no status: a group's state comes from the review findings under `.specdev/findings/` (convergence), from the `disposition` of the roadmap tasks the item realises (`deferred`, `wont_do`) and from the open items of the plan that are about a node on the item's chain (`blocked`); `closed` comes from the anchor row of the milestone. Do not re-derive anything by hand. Do not read plan or findings files directly.
 
 **Output contract** (single JSON to stdout, no other text):
 ```json
 {
   "milestone_id": "<batch_id>",
+  "milestone": "<the plan's file-level milestone key, or null>",
   "groups": [
     {
       "group_id": "...",
-      "state": "pending|code_converged|blocked|verified|deferred|wont_do",
+      "state": "pending|code_converged|blocked|deferred|wont_do",
       "implementation_converged_at": "<ISO timestamp or null>",
       "reviewer_rounds": 0,
       "findings_resolved_path": "<path or null>",
-      "blocking_amb_ids": ["..."],
-      "blocking_amb_health": [
-        { "id": "...", "status": "...", "resolved": false, "well_formed": true }
-      ],
-      "fixtures_exercised": ["..."]
+      "blocking_amb_ids": ["..."]
     }
   ],
   "derived_phase_position": "pending|impl_in_progress|impl_complete|review_pending|review_complete|operator_pending|closed",
@@ -242,9 +238,9 @@ The CLI computes the full output contract deterministically: per-group state (us
 }
 ```
 
-> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, `deferred`, and `wont_do` (DEVSPEC-122 follow-up). `wont_do` (permanently cancelled) has the same precedence and roll-up exclusion as `deferred` (paused) — both are excluded identically from `derived_phase_position`'s progress computations — but are kept as distinct literals so callers can tell "paused" from "cancelled".
+> Note: the CLI never emits `executing`. The emitted group states are `pending`, `code_converged`, `blocked`, `deferred` and `wont_do`. `wont_do` (permanently cancelled) has the same precedence and roll-up exclusion as `deferred` (paused) — both are excluded identically from `derived_phase_position`'s progress computations — but are kept as distinct literals so callers can tell "paused" from "cancelled". A group is `blocked` only when its findings have converged and an open item of the plan is about a node on its chain; an open item has no status, so every open item counts.
 
-Note: `reactivation_condition` and routable `impact_routes[]` are proposed K2 extensions NOT landed this session — `well_formed` excludes them. When schema lands them, the CLI will be updated.
+`milestone_id` echoes the batch id and is not the milestone: `milestone` is the id of the milestone the plan names in its `milestone` key (`null` when the plan has none). `derived_phase_position` is `closed` only when the anchor row of that milestone is `done`; no group state implies it.
 
 ---
 

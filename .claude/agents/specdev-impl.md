@@ -500,7 +500,7 @@ Or on partial success:
       "finding_kind": "gap",
       "location": "spec/04_fr_list.json#/functional_requirements/3",
       "message": "Gap requires full author-mode content; cannot be resolved via targeted patch.",
-      "e_codes": ["E530-LINKED_TEST_FILE_NOT_FOUND"]
+      "e_codes": ["E530-INVENTED_ENUM_OR_ID"]
     }
   ]
 }

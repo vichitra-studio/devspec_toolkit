@@ -481,8 +481,7 @@ Before emitting, verify:
               {
                 "type": "file_edit",
                 "target": "src/auth/routes.py",
-                "description": "Implement login handler",
-                "evidence": { "type": "snippet", "content": "def login(request): return issue_token(request.user)" }
+                "description": "Implement login handler"
               }
             ]
           }
@@ -493,15 +492,6 @@ Before emitting, verify:
   },
   "execution": {
     "files_touched": ["src/auth/routes.py"],
-    "execution_results": [
-      {
-        "status": "failed",
-        "outcome_description": "JWT assertion failed in targeted auth test.",
-        "reasoning": "Token field omitted from login response — fix requires returning {'token': issue_token(user)} in routes.py:L14.",
-        "command": "pytest tests/auth/test_login.py::test_jwt -q",
-        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
-      }
-    ],
     "emergent_ambiguities": []
   },
   "canonical_refs_used": [{ "id": "cn:core:unit:ms", "kind": "unit" }]

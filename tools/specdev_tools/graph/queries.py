@@ -20,7 +20,9 @@ from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import check_unique_ids, defining_file
 from specdev_tools.graph.kinds import SEED_KIND, SEED_STEP, LinkDecl
 from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
-from specdev_tools.graph.names import COMPONENT, CONNECTION, CONNECTS_TO, DERIVES_FROM, PROVIDED_BY, RELIES_ON, ROADMAP_MILESTONE, THIRD_PARTY
+from specdev_tools.graph.names import (
+    COMPONENT, CONNECTION, CONNECTS_TO, DERIVES_FROM, PROVIDED_BY, RELIES_ON, ROADMAP_MILESTONE, TASK, TASK_CRITERION, THIRD_PARTY,
+)
 from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
 
 NEAREST_COUNT = 3
@@ -41,6 +43,13 @@ def milestone_of(graph: Graph, node: Node) -> str | None:
             return current.id
         current = graph.by_id.get(current.parent) if current.parent else None
     return None
+
+
+def task_of(graph: Graph, criterion_id: str) -> Node | None:
+    """The roadmap task node that holds the task criterion *criterion_id* (an alias resolves to the current id); ``None`` when no such criterion, or it has no task parent."""
+    node = graph.by_id.get(graph.canonical_id(criterion_id))
+    task = graph.by_id.get(node.parent) if node is not None and node.kind == TASK_CRITERION and node.parent else None
+    return task if task is not None and task.kind == TASK else None
 
 
 def relied_on_third_parties(graph: Graph, nodes: Iterable[Node]) -> list[str]:

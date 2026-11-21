@@ -191,7 +191,7 @@ def test_legacy_per_file_error_gets_step_owner(spec_dir):
     ("document", "step"),
     [
         ({}, "16a"),
-        ({"execution": {"execution_results": [{"x": 1}]}}, "16b"),
+        ({"execution": {"records": [{"x": 1}]}}, "16a"),
         ({"review": {"verdict": "verified"}}, "16c"),
     ],
 )

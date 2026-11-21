@@ -1,19 +1,10 @@
 import unittest
 import os
-import sys
 import json
 import tempfile
 from pathlib import Path
 
 from specdev_tools.validation.validate import validate_file
-
-# tests/integration/ has no __init__.py; add it to sys.path so factory modules
-# next to this file can be imported by name (matches test_step_16_anchor.py).
-_INTEGRATION_DIR = Path(__file__).resolve().parent
-if str(_INTEGRATION_DIR) not in sys.path:
-    sys.path.insert(0, str(_INTEGRATION_DIR))
-
-from _anchor_factories import make_object_test_command  # noqa: E402
 
 class TestStep16(unittest.TestCase):
     def setUp(self):
@@ -40,14 +31,6 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid empty execution/review fixture should pass. Errors: {errors}")
 
-    def test_legacy_verified_item_without_evidence_fires_e301(self):
-        # A 1.1.1-shaped item (implementation.status 'verified') with no evidence in its actions: the guarded
-        # status-keyed rule still fires. # M8 rewrites
-        path = os.path.join(self.fixtures_dir, "legacy_verified_missing_evidence.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "Invalid fixture (missing evidence) should fail validation")
-        self.assertTrue(any(e.code == "E301" for e in errors), f"Expected E301. Got: {errors}")
-
     def test_invalid_bad_enum(self):
         # Expect failure due to bad enum
         path = os.path.join(self.fixtures_dir, "invalid_bad_enum.json")
@@ -56,10 +39,7 @@ class TestStep16(unittest.TestCase):
         self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
 
     def test_valid_metadata_item_without_proof(self):
-        # A non-deferred metadata item legitimately omits nfr_refs and fixture_ref.
-        # The fixture_ref requirement (schema allOf branch + step_16 TYPES_REQUIRING_PROOF)
-        # applies only to proof-types (behavior/constraint/validation/perf/security);
-        # metadata/docs/logging are exempt. Guards against a future revert of the schema branch.
+        # A metadata item needs no proof link: a plan item stores one link, `realises`.
         path = os.path.join(self.fixtures_dir, "valid_metadata_no_proof.json")
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid metadata-without-proof fixture should pass. Errors: {errors}")
@@ -79,88 +59,11 @@ class TestStep16(unittest.TestCase):
         self.assertTrue(len(errors) > 0, "Invalid fixture (invalid layer) should fail validation")
         self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
     
-    def test_invalid_verified_red_ci(self):
-        # E303: verdict=verified but ci_status=red should fail
-        path = os.path.join(self.fixtures_dir, "invalid_verified_red_ci.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "E303 fixture should fail validation")
-        self.assertTrue(
-            any(e.code == "E303" for e in errors),
-            f"Expected E303 error. Got: {errors}"
-        )
-
-    def test_legacy_unexecuted_planned_item_fires_e305(self):
-        # E305 (guarded, runs on a plan whose item carries implementation.status): an active item not in
-        # satisfied_checklist_ids when CI is green. # M8 rewrites
-        path = os.path.join(self.fixtures_dir, "legacy_planned_unexecuted.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "E305 fixture should fail validation")
-        self.assertTrue(
-            any(e.code == "E305" for e in errors),
-            f"Expected E305 error. Got: {errors}"
-        )
-
-    def test_wont_do_item_excluded_from_e305_planned_vs_executed(self):
-        """E305 exempts wont_do items from the planned-vs-executed diff, same as
-        deferred (DEVSPEC-122 follow-up): a wont_do item was never intended to
-        be executed, so it should not count as an unexecuted planned item."""
-        path = os.path.join(self.fixtures_dir, "legacy_planned_unexecuted.json")
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        # cl-002 was 'deferred' in the base fixture; make it 'wont_do' instead.
-        cl_002 = data["plan"]["spec_alignment"]["checklist"][1]
-        self.assertEqual(cl_002["id"], "cl-002")
-        del cl_002["checklist_status"]
-        del cl_002["deferred_reason"]
-        cl_002["checklist_status"] = "wont_do"
-        cl_002["wont_do_reason"] = "Session-store team abandoned token revocation; logout now client-side only."
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        e305_errors = [e for e in errors if e.code == "E305"]
-        self.assertFalse(
-            any("cl-002" in e.message for e in e305_errors),
-            f"Did not expect E305 for wont_do item cl-002. Got: {e305_errors}"
-        )
-        # Control: cl-001 (still active, still unexecuted) must still fire E305.
-        self.assertTrue(
-            any("cl-001" in e.message for e in e305_errors),
-            f"Expected E305 for still-active unexecuted item cl-001. Got: {e305_errors}"
-        )
-
     def test_valid_with_semantic_review(self):
         # Valid fixture with semantic_review populated and verdict=verified should pass
         path = os.path.join(self.fixtures_dir, "valid_with_semantic_review.json")
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid semantic_review fixture should pass. Errors: {errors}")
-
-    def test_invalid_missing_semantic_review(self):
-        # verified verdict without semantic_review should fail schema allOf conditional
-        path = os.path.join(self.fixtures_dir, "invalid_missing_semantic_review.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "Missing semantic_review on verified verdict should fail validation")
-        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
-
-    def test_invalid_verified_no_fixture_status(self):
-        # E303: verified verdict with absent fixture_status should fire E303
-        path = os.path.join(self.fixtures_dir, "invalid_verified_no_fixture_status.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "Verified with no fixture_status should fail E303")
-        self.assertTrue(
-            any(e.code == "E303" for e in errors),
-            f"Expected E303 error for absent fixture_status. Got: {errors}"
-        )
 
     def test_e304_roadmap_task_uncovered(self):
         # E304: roadmap has implement-logout but checklist only covers implement-login
@@ -171,82 +74,6 @@ class TestStep16(unittest.TestCase):
             any(e.code == "E304" for e in errors),
             f"Expected E304 error. Got: {errors}"
         )
-
-    def test_e306_semantic_review_invalid_fr_id(self):
-        """E306: fr_coverage with non-existent fr_id triggers E306."""
-        # Load the valid semantic review fixture as base
-        base_path = os.path.join(self.fixtures_dir, "valid_with_semantic_review.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Change the fr_id to something non-existent
-        data["review"]["semantic_review"]["fr_coverage"][0]["fr_id"] = "fr-nonexistent"
-
-        # Create Step 04 with known fr_ids
-        step04 = {
-            "functional_requirements": [
-                {"fr_id": "fr-user-login"},
-                {"fr_id": "fr-user-registration"}
-            ]
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            # Fixture must live inside impl_context/ so it routes to the 16a validator
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Step 04 lives at spec-root level (parent of impl_context/)
-            (tmp_dir / "04_fr_list.json").write_text(json.dumps(step04), encoding="utf-8")
-            # Also need a seed_manifest for docs validation
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8"
-            )
-
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        self.assertTrue(
-            any(e.code == "E306" for e in errors),
-            f"Expected E306 error for non-existent fr_id. Got: {errors}"
-        )
-
-    def test_e306_semantic_review_valid_fr_id(self):
-        """Valid fr_id in fr_coverage should not trigger E306."""
-        base_path = os.path.join(self.fixtures_dir, "valid_with_semantic_review.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # The fixture has fr_id "fr-user-login" — make Step 04 include it
-        step04 = {
-            "functional_requirements": [
-                {"fr_id": "fr-user-login"}
-            ]
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            # Fixture inside impl_context/ so it routes to the 16a validator
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Step 04 at spec-root level
-            (tmp_dir / "04_fr_list.json").write_text(json.dumps(step04), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8"
-            )
-
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        e306_errors = [e for e in errors if e.code == "E306"]
-        self.assertEqual(e306_errors, [], f"Did not expect E306 errors. Got: {e306_errors}")
 
     def test_e304_malformed_roadmap_reports_error(self):
         """E304: Malformed 14_roadmap.json should produce E304 parse/structure error, not silent pass."""
@@ -332,164 +159,6 @@ class TestStep16(unittest.TestCase):
                 self.fail(f"validate_step_16 crashed on non-dict 'plan' with a roadmap present: {exc}")
 
         self.assertIsInstance(errors, list)
-
-    def test_e307_behavior_validation_pairing(self):
-        """E307: roadmap task with only behavior items (no validation) triggers E307."""
-        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Create checklist with one roadmap task covered by behavior only (no validation)
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "REQ_ONLY_BEHAVIOR",
-                "spec_ref": {
-                    "type": "fr",
-                    "id": "task-login-impl",
-                    "line_range": "L1-L50",
-                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                "description": "Implement login endpoint",
-                "type": "behavior",
-                "layer": "api",
-                "linked_test_expectation": "login returns 200",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "fixture_ref": "fixture-login-api"
-            }
-        ]
-        # Remove execution/review sections to avoid unrelated errors
-        data.pop("execution", None)
-        data["review"] = {}
-        data["plan"].pop("review_requirements", None)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            # Fixture inside impl_context/ so it routes to the 16a validator (not anchor)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Create seed_manifest for docs validation
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8"
-            )
-
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        self.assertTrue(
-            any(e.code == "E307" for e in errors),
-            f"Expected E307 BEHAVIOR_VALIDATION_PAIRING error. Got: {errors}"
-        )
-
-    def test_e307_code_spec_ref_type_excluded(self):
-        """E307 does NOT fire when spec_ref.type is 'code' — non-behavioral work items are excluded."""
-        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # code-type spec_ref with behavior-only checklist — should NOT trigger E307
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "WORK_ITEM_B",
-                "spec_ref": {
-                    "type": "code",
-                    "id": "task-code-impl",
-                    "line_range": "L1-L50",
-                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                "description": "Implement code change",
-                "type": "behavior",
-                "layer": "api",
-                "linked_test_expectation": "passes tests",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "fixture_ref": "fixture-impl"
-            }
-        ]
-        data.pop("execution", None)
-        data["review"] = {}
-        data["plan"].pop("review_requirements", None)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            # Fixture inside impl_context/ so it routes to the 16a validator (not anchor)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        e307_errors = [e for e in errors if e.code == "E307"]
-        self.assertEqual(e307_errors, [], f"Did not expect E307 for code spec_ref.type. Got: {e307_errors}")
-
-    def test_e307_deferred_validation_item_still_counts_as_pairing(self):
-        """A deferred 'validation' item still satisfies E307 pairing -- paused, not absent."""
-        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "REQ_BEHAVIOR",
-                "spec_ref": {
-                    "type": "fr",
-                    "id": "task-login-impl",
-                    "line_range": "L1-L50",
-                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                "description": "Implement login endpoint",
-                "type": "behavior",
-                "layer": "api",
-                "linked_test_expectation": "login returns 200",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "fixture_ref": "fixture-login-api"
-            },
-            {
-                "id": "REQ_VALIDATION_DEFERRED",
-                "spec_ref": {
-                    "type": "fr",
-                    "id": "task-login-impl",
-                    "line_range": "L1-L50",
-                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                "description": "Validate login endpoint edge cases",
-                "type": "validation",
-                "layer": "tests",
-                "checklist_status": "deferred",
-                "deferred_reason": "Edge-case test harness not ready yet; resume once fixture-login-api-edge lands."
-            }
-        ]
-        data.pop("execution", None)
-        data["review"] = {}
-        data["plan"].pop("review_requirements", None)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        e307_errors = [e for e in errors if e.code == "E307"]
-        self.assertEqual(
-            [], e307_errors,
-            f"Deferred validation item should still satisfy E307 pairing. Got: {e307_errors}"
-        )
 
     # --- 1.2.0 plan shape: milestone key, realises, no pins ---
 
@@ -600,36 +269,6 @@ class TestStep16(unittest.TestCase):
         errors = self._validate_plan_data(self._doc_plan_example())
         self.assertEqual([e for e in errors if e.code == "E520"], [])
 
-    def test_e305_e307_and_status_keyed_e301_guarded_on_new_shape(self):
-        """A plan whose items carry no implementation.status gets none of the status-keyed findings."""
-        data = self._doc_plan_example()
-        data["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"][0]["evidence"] = {"type": "log", "content": "short"}
-        data["execution"] = {"final_status": {"ci_status": "green"}}
-        data["review"] = {}
-        codes = {e.code for e in self._run_step16_validate(data)}
-        self.assertFalse(codes & {"E305", "E307", "E301", "W599", "W600", "W601"}, codes)
-
-    def test_e305_e307_and_status_keyed_e301_still_fire_on_legacy_status(self):
-        data = self._minimal_impl_context(checklist_items=[{
-            "id": "CHK_LEGACY", "spec_ref": {"type": "fr", "id": "fr-legacy"}, "description": "Legacy item",
-            "type": "behavior", "layer": "api", "implementation": {"status": "verified", "actions": []},
-        }])
-        data["execution"] = {"final_status": {"ci_status": "green"}, "critical_evidence": {"satisfied_checklist_ids": []}}  # 1.1.1 key
-        codes = {e.code for e in self._run_step16_validate(data)}
-        self.assertTrue({"E301", "E305", "E307"} <= codes, codes)
-
-    def test_w616_and_w582_removed(self):
-        """A deferred item marked verified (W616) and an uncovered milestone FR at a verified verdict (W582) say nothing."""
-        data = self._minimal_impl_context(checklist_items=[{
-            "id": "CHK_STALE", "spec_ref": {"type": "fr", "id": "fr-stale"}, "description": "Stale item",
-            "type": "behavior", "layer": "api", "checklist_status": "deferred",
-            "implementation": {"status": "verified", "actions": [{"type": "manual_verification", "description": "x"}]},
-        }], milestone="m1")
-        data["review"] = {"verdict": "verified", "semantic_review": {"fr_coverage": []}}
-        roadmap = [{"milestone_id": "m1", "fr_refs": ["fr-uncovered"], "tasks": []}]
-        errors = self._validate_plan_data(data, roadmap)
-        self.assertFalse({e.code for e in errors} & {"W616", "W582"}, [e.code for e in errors])
-
     # --- E304: the plan's milestone, covered through realised criteria ---
 
     def _roadmap_task(self, task_id, criterion_ids, disposition=None):
@@ -739,23 +378,6 @@ class TestStep16(unittest.TestCase):
             "implementation": {"actions": [{"type": "manual_verification", "description": f"Verify {item_id}"}]},
         }
 
-    def test_invalid_verified_no_semantic_review(self):
-        """E520: verified verdict without semantic_review triggers schema allOf violation."""
-        path = os.path.join(self.fixtures_dir, "invalid_verified_no_semantic_review.json")
-        errors = validate_file(self.repo_root, path)
-
-        self.assertTrue(len(errors) > 0, "Fixture with verified verdict but no semantic_review should fail validation")
-
-        e520_errors = [e for e in errors if e.code == "E520"]
-        self.assertTrue(
-            len(e520_errors) > 0,
-            f"Expected at least one E520 error. Got: {errors}"
-        )
-        self.assertTrue(
-            any("semantic_review" in e.message for e in e520_errors),
-            f"Expected an E520 error mentioning 'semantic_review'. Got E520 errors: {[e.message for e in e520_errors]}"
-        )
-
     def test_valid_with_emergent_ambiguities(self):
         """Valid fixture with new-shape emergent_ambiguities (about, optional proposed_assumption) should pass."""
         path = os.path.join(self.fixtures_dir, "valid_with_emergent_ambiguities.json")
@@ -772,142 +394,25 @@ class TestStep16(unittest.TestCase):
         )
         self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
 
-    def test_impl_context_16c_dispatch_fires_verdict_enum_check(self):
-        """Content-based dispatch: an impl_context/ artifact with review.verdict
-        must route to validate_step_16c, which enforces the verdict enum.
-
-        Pre-fix, impl_context/*.json always dispatched to validate_step_16a,
-        so 16c-specific checks (like the verdict enum) never fired through
-        the top-level validate_file pipeline.
-        """
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-16c-dispatch-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": "16c dispatch test.",
-                    "scope_in": ["auth"],
-                    "scope_out": [],
-                    "target_file_patterns": ["src/auth.py"],
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
-                    "checklist": [],
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
-                "review_requirements": {"test_commands": ["pytest tests/"]},
-            },
-            "review": {
-                "verdict": "TOTALLY_INVALID_VERDICT",  # 16c validator must flag this
-                "fixture_status": {
-                    "implemented_interfaces": [],
-                    "test_results": [],
-                    "ci_status": "green",
-                },
-            },
-            "canonical_refs_used": [],
+    def test_impl_context_16c_dispatch_chains_up_through_the_16a_checks(self):
+        """Content-based dispatch: an impl_context/ artifact with review.verdict routes to the 16c validator,
+        which runs the 16a checks too: the remediation-link warning (W584) of 16a fires for a reviewed plan."""
+        data = self._doc_plan_example()
+        data["review"] = {
+            "verdict": "needs_work",
+            "findings": [{"id": "finding-one", "type": "bug", "severity": "minor", "description": "A finding.",
+                          "remediation_task": {"task_id": "fix-1", "checklist_ids": ["NO_SUCH_ITEM"]},
+                          "metadata": {"source": "reviewer", "impact": "none"}}],
         }
+        from specdev_tools.core.step_paths import refine_impl_context_substep
 
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_dispatch_review.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": []}), encoding="utf-8"
-            )
-
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        # The 16c validator fires an E520 for the invalid verdict — proof the
-        # content-based dispatch promoted this artifact past 16a.
-        self.assertTrue(
-            any(
-                e.code == "E520" and "invalid verdict" in e.message
-                for e in errors
-            ),
-            f"Expected E520 invalid verdict from validate_step_16c. Got: {errors}"
-        )
-
-    def test_impl_context_16b_dispatch_fires_duplicate_command_check(self):
-        """Content-based dispatch: an impl_context/ artifact with populated
-        execution.execution_results (but no review.verdict) must route to
-        validate_step_16b, which enforces duplicate-command detection.
-        """
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-16b-dispatch-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": "16b dispatch test.",
-                    "scope_in": ["auth"],
-                    "scope_out": [],
-                    "target_file_patterns": ["src/auth.py"],
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
-                    "checklist": [],
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
-                "review_requirements": {"test_commands": ["pytest tests/"]},
-            },
-            "execution": {
-                "execution_results": [
-                    {
-                        "command": "pytest tests/",
-                        "status": "passed",
-                        "outcome_description": "Passed.",
-                        "reasoning": "OK.",
-                        "evidence": "1 passed",
-                        "evidence_ref": "ci-001",
-                    },
-                    {
-                        # Duplicate command — 16b validator flags this
-                        "command": "pytest tests/",
-                        "status": "passed",
-                        "outcome_description": "Duplicate.",
-                        "reasoning": "OK.",
-                        "evidence": "1 passed",
-                        "evidence_ref": "ci-002",
-                    },
-                ],
-                "final_status": {"ci_status": "green"},
-            },
-            "canonical_refs_used": [],
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_dispatch_exec.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": []}), encoding="utf-8"
-            )
-
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        self.assertTrue(
-            any(
-                e.code == "E520" and "duplicate execution_result command" in e.message
-                for e in errors
-            ),
-            f"Expected E520 duplicate execution_result from validate_step_16b. Got: {errors}"
-        )
+        self.assertEqual(refine_impl_context_substep("16a", data), "16c")
+        errors = self._validate_plan_data(data)
+        link_errors = [e for e in errors if e.code == "W584" and "NO_SUCH_ITEM" in e.message]
+        self.assertEqual(len(link_errors), 1, f"Expected the 16a remediation-link warning through the 16c route. Got: {errors}")
 
     def test_impl_context_16a_dispatch_stays_16a_for_plan_only_artifact(self):
-        """An impl_context/ artifact with no execution.execution_results and
-        no review.verdict stays on the 16a path (default)."""
+        """An impl_context/ artifact with no review.verdict stays on the 16a path (default); execution records do not change the route."""
         from specdev_tools.core.step_paths import refine_impl_context_substep
 
         plan_only = {
@@ -917,7 +422,7 @@ class TestStep16(unittest.TestCase):
         plan_plus_empty_exec = {
             "$schema": "vc:16-impl-context",
             "plan": {},
-            "execution": {"execution_results": []},
+            "execution": {"records": []},
             "review": {},
         }
         self.assertEqual(refine_impl_context_substep("16a", plan_only), "16a")
@@ -926,59 +431,10 @@ class TestStep16(unittest.TestCase):
         self.assertEqual(refine_impl_context_substep("04", plan_only), "04")
         self.assertEqual(refine_impl_context_substep("unknown", plan_only), "unknown")
 
-    def test_e307_doc_spec_ref_type_excluded(self):
-        """E307 does NOT fire when spec_ref.type is 'doc' — task references are work
-        items, not testable behaviors, and must not require behavior+validation pairing.
-        """
-        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # doc-type spec_ref with behavior-only checklist — should NOT trigger E307
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "WORK_ITEM_D",
-                "spec_ref": {
-                    "type": "doc",
-                    "id": "task-doc-impl",
-                },
-                "description": "Implement documentation work item.",
-                "type": "behavior",
-                "layer": "api",
-                "linked_test_expectation": "passes tests",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "fixture_ref": "fixture-impl",
-            }
-        ]
-        data.pop("execution", None)
-        data["review"] = {}
-        data["plan"].pop("review_requirements", None)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            # Fixture inside impl_context/ so it routes to the 16a validator (not anchor)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8",
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        e307_errors = [e for e in errors if e.code == "E307"]
-        self.assertEqual(
-            e307_errors, [],
-            f"Did not expect E307 for doc spec_ref.type. Got: {e307_errors}"
-        )
-
     def test_impl_context_16a_dispatch_e2e_routes_through_16a_validator(self):
         """End-to-end counterpart to the refiner-only 16a dispatch test.
 
-        Writes a plan-only artifact (no execution.execution_results, no
+        Writes a plan-only artifact (no
         review.verdict) through the full validate_file pipeline and pins
         that the 16a-specific remediation-link check fires via dispatch
         (W584) — proving content refinement leaves plan-only artifacts
@@ -1018,351 +474,28 @@ class TestStep16(unittest.TestCase):
         )
 
     def test_step_16c_chain_up_deduplicates_base_checks(self):
-        """Chain-up (16c → 16b → 16a → base) must not cause base checks to
-        fire multiple times on the same artifact.
+        """Chain-up (16c -> 16a -> base) must not cause base checks to fire multiple times on the same artifact.
 
-        Only 16a calls the base validator, so a base-level error (here E307)
-        appears exactly once in the list returned by 16c.
+        Only 16a calls the base validator, so a base-level error (here E530) appears exactly once in the list
+        returned by 16c.
         """
         from specdev_tools.validation.validators.step_16c import validate_step_16c
 
-        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Force an E307 (base-level) pairing failure: FR ref with only a
-        # behavior item and no validation partner.
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "FR_ONLY_BEHAVIOR",
-                "spec_ref": {"type": "fr", "id": "fr-solo-behavior"},
-                "description": "Behavior item without validation partner.",
-                "type": "behavior",
-                "layer": "api",
-                "linked_test_expectation": "passes tests",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "fixture_ref": "fixture-impl",
-            }
-        ]
-        # Make the artifact 16c-shaped so chain-up runs all three layers.
-        data["review"] = {
-            "verdict": "verified",
-            "fixture_status": {
-                "implemented_interfaces": [],
-                "test_results": [],
-                "ci_status": "green",
-            },
-        }
-        data["execution"] = {"execution_results": []}
+        data = self._doc_plan_example()
+        data["plan"]["spec_alignment"]["checklist"][0]["type"] = "not-a-type"
+        data["review"] = {"verdict": "verified"}
 
         with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir = Path(td) / "impl_context"
             impl_context_dir.mkdir()
             fixture_path = impl_context_dir / "ms_chainup.json"
             fixture_path.write_text(json.dumps(data), encoding="utf-8")
-
             errors = validate_step_16c(data, self.repo_root, str(fixture_path))
 
-        e307_errors = [
-            e for e in errors
-            if e.code == "E307" and "fr-solo-behavior" in e.message
-        ]
+        e530_errors = [e for e in errors if e.code == "E530" and "not-a-type" in e.message]
         self.assertEqual(
-            len(e307_errors), 1,
-            f"Chain-up must fire base-level E307 exactly once (cache dedup). "
-            f"Got {len(e307_errors)} occurrences. Full errors: {errors}"
-        )
-
-    # --- Evidence validation tests (Bug fixes: W599, W600, E301) ---
-
-    def _make_evidence_test_data(self, item_id, actions):
-        """Build a minimal impl_context dict with a single verified checklist item for evidence tests."""
-        return {
-            "$schema": "vc:16-impl-context",
-            "id": f"step-evidence-test-{item_id}",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": "Evidence validation test case.",
-                    "scope_in": ["core"],
-                    "scope_out": [],
-                    "target_file_patterns": []
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": [
-                        {
-                            "id": item_id,
-                            "spec_ref": {
-                                "type": "fr",
-                                "id": f"task-{item_id}",
-                                "line_range": "L1-L10",
-                                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
-                            },
-                            "description": f"Evidence test item {item_id}",
-                            "type": "behavior",
-                            "layer": "api",
-                            "linked_test_expectation": f"pytest test_{item_id}",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": f"fixture-{item_id}",
-                            "implementation": {
-                                "status": "verified",
-                                "files_touched": [],
-                                "actions": actions
-                            }
-                        },
-                        {
-                            "id": f"{item_id}-VAL",
-                            "spec_ref": {
-                                "type": "fr",
-                                "id": f"task-{item_id}",
-                                "line_range": "L1-L10",
-                                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
-                            },
-                            "description": f"Validation item for {item_id}",
-                            "type": "validation",
-                            "layer": "tests",
-                            "linked_test_expectation": f"pytest test_{item_id}_val",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": f"fixture-{item_id}"
-                        }
-                    ]
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No code changes."}
-            },
-            "canonical_refs_used": []
-        }
-
-    def test_w599_fires_for_short_evidence(self):
-        """W599 fires when verified action evidence content is shorter than 50 characters."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Check output",
-                "evidence": {"type": "log", "content": "PASS short"}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W599_SHORT", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w599_errors = [e for e in errors if e.code == "W599"]
-        self.assertTrue(
-            len(w599_errors) > 0,
-            f"Expected W599 for short evidence content. Got: {errors}"
-        )
-        self.assertTrue(
-            any("CHK_W599_SHORT" in e.message for e in w599_errors),
-            f"Expected W599 message to reference item id. Got: {[e.message for e in w599_errors]}"
-        )
-
-    def test_e301_fires_no_success_marker(self):
-        """E301 EVIDENCE_CONTENT_INVALID fires when evidence content has no success marker keyword."""
-        long_content = (
-            "This is a detailed description of what was done during the implementation "
-            "phase with no markers indicating test outcome at all."
-        )
-        self.assertGreaterEqual(len(long_content), 50, "Test content must be >= 50 chars")
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Detailed check",
-                "evidence": {"type": "log", "content": long_content}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_E301_NO_MARKER", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e301_content_errors = [
-            e for e in errors if e.code == "E301" and "EVIDENCE_CONTENT_INVALID" in e.message
-        ]
-        self.assertTrue(
-            len(e301_content_errors) > 0,
-            f"Expected E301 EVIDENCE_CONTENT_INVALID for missing success marker. Got: {errors}"
-        )
-
-    def test_structured_evidence_bypasses_success_marker_check(self):
-        """Structured evidence (stdout/stderr present) does not require a success marker keyword."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Run build",
-                "evidence": {"type": "log", "stdout": "build output here..."}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_STRUCTURED_EVIDENCE", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e301_content_errors = [
-            e for e in errors if e.code == "E301" and "EVIDENCE_CONTENT_INVALID" in e.message
-        ]
-        self.assertEqual(
-            e301_content_errors, [],
-            f"Structured evidence (stdout present) must not fire E301 EVIDENCE_CONTENT_INVALID. "
-            f"Got: {e301_content_errors}"
-        )
-
-    def test_w600_fires_per_action_not_all_or_nothing(self):
-        """W600 fires for each individual verified action missing evidence, even if other actions have evidence."""
-        long_ok_content = "Tests passed: 12/12. All assertions OK. PASS - 0 failures detected in suite."
-        actions = [
-            {
-                "type": "file_edit",
-                "target": "src/main.py",
-                "description": "Action with valid evidence",
-                "evidence": {"type": "log", "content": long_ok_content}
-            },
-            {
-                "type": "manual_verification",
-                "description": "Action without evidence — should trigger W600"
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W600_PER_ACTION", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w600_errors = [e for e in errors if e.code == "W600"]
-        self.assertTrue(
-            len(w600_errors) > 0,
-            f"Expected W600 for the second action which has no evidence. Got: {errors}"
-        )
-        self.assertTrue(
-            any("CHK_W600_PER_ACTION" in e.message for e in w600_errors),
-            f"Expected W600 message to reference checklist item id. Got: {[e.message for e in w600_errors]}"
-        )
-        # The overall item has_evidence = True (first action has evidence),
-        # so E301 'no evidence in any action' must NOT fire
-        e301_no_evidence = [
-            e for e in errors if e.code == "E301" and "contains no evidence in any action" in e.message
-        ]
-        self.assertEqual(
-            e301_no_evidence, [],
-            f"E301 'no evidence' must not fire when at least one action has evidence. "
-            f"Got: {e301_no_evidence}"
-        )
-
-    def test_non_dict_evidence_bypasses_quality_check(self):
-        """Non-dict evidence (e.g., plain string) satisfies presence check without triggering W599 or W600."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Action with plain-string evidence",
-                "evidence": "plain string evidence value"
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_NON_DICT_EVIDENCE", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w599_errors = [e for e in errors if e.code == "W599"]
-        w600_errors = [e for e in errors if e.code == "W600"]
-        self.assertEqual(
-            w599_errors, [],
-            f"Non-dict evidence must not trigger W599. Got: {w599_errors}"
-        )
-        self.assertEqual(
-            w600_errors, [],
-            f"Non-dict evidence must not trigger W600. Got: {w600_errors}"
-        )
-
-    def test_w600_empty_dict_evidence_fires_evidence_no_content(self):
-        """W600 with EVIDENCE_NO_CONTENT fires when evidence is {} (empty dict).
-        E301 'no evidence in any action' must NOT fire because the evidence key IS present.
-        """
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Action with empty dict evidence",
-                "evidence": {}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W600_EMPTY_DICT", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        # W600 must fire with EVIDENCE_NO_CONTENT label (empty dict — evidence present but no fields)
-        w600_errors = [e for e in errors if e.code == "W600"]
-        self.assertTrue(
-            len(w600_errors) > 0,
-            f"Expected W600 for empty dict evidence. Got: {errors}"
-        )
-        self.assertTrue(
-            any("EVIDENCE_NO_CONTENT" in e.message for e in w600_errors),
-            f"Expected W600 message label EVIDENCE_NO_CONTENT for empty dict. "
-            f"Got W600 messages: {[e.message for e in w600_errors]}"
-        )
-        # E301 'contains no evidence in any action' must NOT fire — evidence key IS present
-        e301_no_evidence = [
-            e for e in errors if e.code == "E301" and "contains no evidence in any action" in e.message
-        ]
-        self.assertEqual(
-            e301_no_evidence, [],
-            f"E301 'no evidence in any action' must not fire when evidence key is present (even if empty). "
-            f"Got: {e301_no_evidence}"
+            len(e530_errors), 1,
+            f"Chain-up must fire the base-level E530 exactly once. Got {len(e530_errors)}. Full errors: {errors}",
         )
 
     def test_execution_files_touched_outside_patterns_fires_e520(self):
@@ -1417,103 +550,6 @@ class TestStep16(unittest.TestCase):
         )
 
 
-    # --- W601 tests ---
-
-    def test_w601_fires_when_evidence_has_no_artifact_ref(self):
-        """W601 fires when evidence content contains no spec artifact ID (fr-*, api-*, etc.)."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Action with evidence lacking artifact refs",
-                "evidence": {"type": "log", "content": "All tests passed successfully, no issues found in the output logs"}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W601_NO_REF", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w601_errors = [e for e in errors if e.code == "W601"]
-        self.assertTrue(
-            len(w601_errors) > 0,
-            f"Expected W601 for evidence without artifact ID refs. Got errors: {[e.code for e in errors]}"
-        )
-        self.assertTrue(
-            any("EVIDENCE_NO_ARTIFACT_REF" in e.message for e in w601_errors),
-            f"Expected W601 message to contain EVIDENCE_NO_ARTIFACT_REF. Got: {[e.message for e in w601_errors]}"
-        )
-
-    def test_w601_does_not_fire_when_evidence_has_artifact_ref(self):
-        """W601 must not fire when evidence content references a spec artifact ID."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Action with artifact ref in evidence",
-                "evidence": {"type": "log", "content": "Verified fr-user-login endpoint returns 200 with valid token as per api-session-create contract"}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W601_HAS_REF", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w601_errors = [e for e in errors if e.code == "W601"]
-        self.assertEqual(
-            w601_errors, [],
-            f"W601 must not fire when evidence references a spec artifact ID. Got: {w601_errors}"
-        )
-
-    def test_w601_does_not_fire_for_metadata_type_item_without_artifact_ref(self):
-        """W601 must not fire for type:metadata items — same exemption rationale as E520
-        (infra/setup checklist items, e.g. CI config or wrangler routes, legitimately have
-        no fr-/nfr-/inv- artifact to cite in evidence, mirroring TYPES_REQUIRING_PROOF)."""
-        data = self._make_evidence_test_data("CHK_W601_METADATA", [
-            {
-                "type": "run_command",
-                "description": "Action with evidence lacking artifact refs on a metadata-type item",
-                "evidence": {"type": "log", "content": "All tests passed successfully, no issues found in the output logs"}
-            }
-        ])
-        data["plan"]["spec_alignment"]["checklist"][0]["type"] = "metadata"
-        del data["plan"]["spec_alignment"]["checklist"][0]["nfr_refs"]
-        del data["plan"]["spec_alignment"]["checklist"][0]["fixture_ref"]
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w601_errors = [e for e in errors if e.code == "W601"]
-        self.assertEqual(
-            w601_errors, [],
-            f"W601 must not fire for type:metadata items without artifact refs. Got: {w601_errors}"
-        )
-
     # --- W603 tests ---
 
     def test_w603_fires_for_execution_file_outside_task_scope(self):
@@ -1535,28 +571,21 @@ class TestStep16(unittest.TestCase):
                     "checklist": [
                         {
                             "id": "CHK_W603",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "realises": ["tc-x"],
                             "description": "Login feature",
                             "type": "behavior",
                             "layer": "api",
-                            "linked_test_expectation": "pytest test_login",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login",
                             "implementation": {
-                                "status": "in_progress",
                                 "files_touched": ["src/auth.py"],
                                 "actions": []
                             }
                         },
                         {
                             "id": "CHK_W603_VAL",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "realises": ["tc-x"],
                             "description": "Validate login",
                             "type": "validation",
-                            "layer": "tests",
-                            "linked_test_expectation": "pytest test_login_val",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login"
+                            "layer": "tests"
                         }
                     ]
                 },
@@ -1610,28 +639,21 @@ class TestStep16(unittest.TestCase):
                     "checklist": [
                         {
                             "id": "CHK_W603_OK",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "realises": ["tc-x"],
                             "description": "Login feature",
                             "type": "behavior",
                             "layer": "api",
-                            "linked_test_expectation": "pytest test_login",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login",
                             "implementation": {
-                                "status": "in_progress",
                                 "files_touched": ["src/auth.py", "src/utils.py"],
                                 "actions": []
                             }
                         },
                         {
                             "id": "CHK_W603_OK_VAL",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "realises": ["tc-x"],
                             "description": "Validate login",
                             "type": "validation",
-                            "layer": "tests",
-                            "linked_test_expectation": "pytest test_login_val",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login"
+                            "layer": "tests"
                         }
                     ]
                 },
@@ -1661,359 +683,6 @@ class TestStep16(unittest.TestCase):
             f"W603 must not fire when all execution files are in checklist scope. Got: {w603_errors}"
         )
 
-    # --- E302 tests ---
-
-    def test_e302_fires_verified_verdict_no_execution(self):
-        """E302 fires when review.verdict is 'verified' but no execution section exists."""
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-e302-no-exec",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": "E302 test — verified verdict without execution.",
-                    "scope_in": ["core"],
-                    "scope_out": [],
-                    "target_file_patterns": []
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": []
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No changes."}
-            },
-            "review": {
-                "verdict": "verified",
-                "findings": [],
-                "fixture_status": {"ci_status": "green"}
-            },
-            "canonical_refs_used": []
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e302_errors = [e for e in errors if e.code == "E302"]
-        self.assertTrue(
-            any("no execution section" in e.message for e in e302_errors),
-            f"Expected E302 for verified verdict without execution. Got: {[e.code + ': ' + e.message for e in errors if e.code == 'E302']}"
-        )
-
-    def test_e302_fires_verified_verdict_empty_results(self):
-        """E302 fires when review.verdict is 'verified' but execution_results is empty."""
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-e302-empty-results",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": "E302 test — verified verdict with empty execution_results.",
-                    "scope_in": ["core"],
-                    "scope_out": [],
-                    "target_file_patterns": []
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": []
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No changes."},
-                "review_requirements": {"test_commands": ["pytest tests/"]}
-            },
-            "execution": {
-                "execution_results": []
-            },
-            "review": {
-                "verdict": "verified",
-                "findings": [],
-                "fixture_status": {"ci_status": "green"}
-            },
-            "canonical_refs_used": []
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e302_errors = [e for e in errors if e.code == "E302"]
-        self.assertTrue(
-            any("execution_results is empty" in e.message for e in e302_errors),
-            f"Expected E302 for verified verdict with empty execution_results. Got: {[e.code + ': ' + e.message for e in errors if e.code == 'E302']}"
-        )
-
-    def test_e302_fires_unproven_test_commands(self):
-        """E302 fires when review.verdict is 'verified' but test commands lack proof."""
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-e302-unproven-cmds",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": "E302 test — unproven test commands.",
-                    "scope_in": ["core"],
-                    "scope_out": [],
-                    "target_file_patterns": []
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": []
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No changes."},
-                "review_requirements": {"test_commands": ["pytest tests/", "npm test"]}
-            },
-            "execution": {
-                "execution_results": [
-                    {"command": "pytest tests/", "status": "passed", "output": "ok"}
-                ]
-            },
-            "review": {
-                "verdict": "verified",
-                "findings": [],
-                "fixture_status": {"ci_status": "green"}
-            },
-            "canonical_refs_used": []
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e302_errors = [e for e in errors if e.code == "E302"]
-        self.assertTrue(
-            any("npm test" in e.message for e in e302_errors),
-            f"Expected E302 for unproven 'npm test' command. Got E302: {[e.message for e in e302_errors]}"
-        )
-
-    # --- Object-form test_commands tests (E301 + E302) ---
-
-    def _run_step16_validate(self, data):
-        """Helper: write *data* to a temp 16_impl_context.json and run validate_step_16."""
-        from specdev_tools.validation.validators.step_16 import validate_step_16
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            return validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-    def _base_step16_artifact(
-        self,
-        *,
-        artifact_id="step-objform",
-        summary="Object-form test_commands.",
-        test_commands=None,
-        execution_results=None,
-        review=None,
-    ):
-        """Minimal valid-shape Step 16 artifact for E301/E302 tests.
-
-        All fields not relevant to a test get sensible defaults; callers override
-        only what they need. Keeps each test focused on the behavior under check
-        instead of repeating ~50 lines of plan/execution scaffolding.
-        """
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": artifact_id,
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "summary": {
-                    "functional_summary": summary,
-                    "scope_in": ["core"], "scope_out": [], "target_file_patterns": [],
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": [],
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No changes."},
-                "review_requirements": {"test_commands": test_commands or []},
-            },
-            "execution": {
-                "execution_results": execution_results or [],
-            },
-            "canonical_refs_used": [],
-        }
-        if review is not None:
-            data["review"] = review
-        return data
-
-    def test_e301_object_form_test_commands_pass_when_all_commands_executed(self):
-        """E301 must NOT fire when object-form test_commands all appear in execution_results."""
-        data = self._base_step16_artifact(
-            artifact_id="step-e301-objform-pass",
-            summary="Object-form test_commands all executed.",
-            test_commands=[
-                make_object_test_command("pytest tests/", description="unit tests"),
-                make_object_test_command("npm test"),
-            ],
-            execution_results=[
-                {"command": "pytest tests/", "status": "passed", "output": "ok"},
-                {"command": "npm test", "status": "passed", "output": "ok"},
-            ],
-        )
-        errors = self._run_step16_validate(data)
-        e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
-        self.assertEqual(e301, [], f"Expected no E301 MISSING_PROOF_CLOSURE; got: {[e.message for e in e301]}")
-
-    def test_e301_object_form_test_commands_fire_when_command_missing(self):
-        """E301 fires when an object-form test_commands entry lacks an execution_results match."""
-        data = self._base_step16_artifact(
-            artifact_id="step-e301-objform-fail",
-            summary="Object-form test_commands with one missing.",
-            test_commands=[
-                make_object_test_command("pytest tests/"),
-                make_object_test_command("npm test"),
-            ],
-            execution_results=[
-                {"command": "pytest tests/", "status": "passed", "output": "ok"},
-            ],
-        )
-        errors = self._run_step16_validate(data)
-        e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
-        self.assertTrue(
-            any("npm test" in e.message for e in e301),
-            f"Expected E301 MISSING_PROOF_CLOSURE for 'npm test'; got: {[e.message for e in e301]}"
-        )
-
-    def test_string_form_and_object_form_test_commands_produce_identical_e301(self):
-        """Regression parity: a string-form entry and an equivalent object-form entry
-        must produce the same E301 (MISSING_PROOF_CLOSURE) outcome for the same command."""
-        def build(test_commands):
-            return self._base_step16_artifact(
-                artifact_id="step-parity",
-                summary="String/object parity check.",
-                test_commands=test_commands,
-                # 'npm test' deliberately missing → must fire E301 in both forms
-                execution_results=[
-                    {"command": "pytest tests/", "status": "passed", "output": "ok"},
-                ],
-            )
-
-        string_form_errors = self._run_step16_validate(build([
-            "pytest tests/", "npm test",
-        ]))
-        object_form_errors = self._run_step16_validate(build([
-            make_object_test_command("pytest tests/"),
-            make_object_test_command("npm test"),
-        ]))
-
-        def e301_for(errors, needle):
-            return [e for e in errors
-                    if e.code == "E301"
-                    and "MISSING_PROOF_CLOSURE" in e.message
-                    and needle in e.message]
-
-        def e301_messages(errors):
-            return sorted(e.message for e in errors if e.code == "E301")
-
-        self.assertTrue(
-            e301_for(string_form_errors, "npm test"),
-            f"string-form must fire E301 for 'npm test'; got: {[e.message for e in string_form_errors if e.code == 'E301']}",
-        )
-        self.assertTrue(
-            e301_for(object_form_errors, "npm test"),
-            f"object-form must fire E301 for 'npm test'; got: {[e.message for e in object_form_errors if e.code == 'E301']}",
-        )
-        # Strict parity: full E301 message set must match between string and object form.
-        # Catches regressions where object form silently produces extra/missing E301s
-        # for any command (not just 'npm test').
-        self.assertEqual(
-            e301_messages(string_form_errors),
-            e301_messages(object_form_errors),
-            "string-form and object-form must produce the identical E301 message set.",
-        )
-
-    def test_mixed_string_and_object_test_commands_both_enforced(self):
-        """Mixed list (one string entry, one object entry) — both must be enforced
-        consistently by E301. Pins that there is no silent-skip for either form
-        when the two are interleaved."""
-        # An unrelated command was executed; neither 'pytest tests/' nor 'npm test'
-        # is in passed_commands → E301 must fire for both forms.
-        data = self._base_step16_artifact(
-            artifact_id="step-mixed",
-            summary="Mixed string+object test_commands.",
-            test_commands=[
-                "pytest tests/",                          # string form
-                make_object_test_command("npm test"),     # object form
-            ],
-            execution_results=[
-                {"command": "echo placeholder", "status": "passed", "output": "ok"},
-            ],
-        )
-        errors = self._run_step16_validate(data)
-        e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
-        self.assertTrue(any("pytest tests/" in e.message for e in e301),
-                        f"E301 must fire for string-form 'pytest tests/'; got: {[e.message for e in e301]}")
-        self.assertTrue(any("npm test" in e.message for e in e301),
-                        f"E301 must fire for object-form 'npm test'; got: {[e.message for e in e301]}")
-
-    # --- E307 reverse direction test ---
-
-    def test_e307_fires_for_validation_only_without_behavior(self):
-        """E307 fires when a spec_ref.id has only validation items but no behavior item."""
-        data = self._minimal_impl_context(checklist_items=[
-            {
-                "id": "CHK_VAL_ONLY",
-                "spec_ref": {"type": "fr", "id": "fr-orphan", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-                "description": "Validation without paired behavior",
-                "type": "validation",
-                "layer": "tests",
-                "linked_test_expectation": "pytest test_orphan",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "fixture_ref": "fixture-orphan"
-            }
-        ])
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e307_errors = [e for e in errors if e.code == "E307"]
-        self.assertTrue(
-            any("fr-orphan" in e.message for e in e307_errors),
-            f"Expected E307 for fr-orphan (validation only, no behavior). Got E307: {[e.message for e in e307_errors]}"
-        )
-
-
     # --- Schema root-properties shape: no phantom unevaluated-properties companion ---
 
     def test_schema_accepts_all_root_properties_plan_execution_review(self):
@@ -2039,7 +708,7 @@ class TestStep16(unittest.TestCase):
                 },
                 "spec_alignment": {
                     "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": [{"id": "CHK", "spec_ref": {"type": "not-a-valid-enum", "id": "fr-x"}, "description": "d", "type": "behavior", "layer": "api"}],
+                    "checklist": [{"id": "CHK", "realises": ["tc-x"], "description": "d", "type": "not-a-valid-enum", "layer": "api"}],
                 },
                 "docs_impact": {"status": "not_required", "rationale": "n/a"},
             },
@@ -2178,15 +847,11 @@ class TestStep16(unittest.TestCase):
                     "requirements_summary": [{"theme": "Core", "summary": "x"}],
                     "checklist": [{
                         "id": "CHK_D",
-                        "spec_ref": {"type": "fr", "id": "fr-x", "line_range": "L1-L10", "commit_hash": "a" * 40},
+                        "realises": ["tc-x"],
                         "description": "implement x",
                         "type": "behavior",
                         "layer": "api",
-                        "linked_test_expectation": "pytest x",
-                        "nfr_refs": ["nfr-availability-uptime"],
-                        "fixture_ref": "fixture-x",
                         "implementation": {
-                            "status": "in_progress",
                             "files_touched": ["src/x.py"],
                             "actions": [{"type": "file_edit", "target": "src/x.py", "description": "edit"}],
                         },
@@ -2242,15 +907,11 @@ class TestStep16(unittest.TestCase):
                 "requirements_summary": [{"theme": "Core", "summary": "x"}],
                 "checklist": [{
                     "id": "CHK_W603_FIX",
-                    "spec_ref": {"type": "fr", "id": "fr-x", "line_range": "L1-L10", "commit_hash": "a" * 40},
+                    "realises": ["tc-x"],
                     "description": "work",
                     "type": "behavior",
                     "layer": "api",
-                    "linked_test_expectation": "pytest x",
-                    "nfr_refs": ["nfr-availability-uptime"],
-                    "fixture_ref": "fixture-x",
                     "implementation": {
-                        "status": "in_progress",
                         "files_touched": ["src/x.py"],
                         "actions": [],
                     },

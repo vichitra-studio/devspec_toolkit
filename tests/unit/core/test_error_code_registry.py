@@ -21,6 +21,7 @@ REMOVED_CODES = (
     "E560", "E561", "W561", "E562", "W562", "E563", "W563", "E564", "W564", "E565", "W565",
     "W566", "W567", "E568", "W568", "E569", "W569", "E575", "W575", "E576", "W576",
     "E535", "E536",
+    "E301", "E302", "E305", "E306", "E307", "W599", "W600", "W601",
 )
 
 # The W->E pairs of PROMOTABLE_PAIRS. A later change that adds or removes a pair
@@ -45,7 +46,7 @@ REGISTERED_WITHOUT_EMITTER = {
     "E800", "E802",
     "E810", "E811", "E812", "E813", "E814",
     "E820", "E821", "E822", "E823", "E824", "E830",
-    "W825", "W826", "W837",
+    "W825", "W826",
 }
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic
@@ -66,7 +67,6 @@ CROSS_PREFIX_SEMANTIC_ALLOWLIST = {
     "590",  # E=CROSS_STEP_ID_NOT_FOUND       / W=CROSS_STEP_UPSTREAM_MISSING
     "596",  # E=DAG_DEAD_END_PRODUCER         / W=UNDECLARED_UPSTREAM_REF
     "597",  # E=EXTRACTION_INTENT_UPSTREAM_GAP/ W=EXTRACTION_INTENT_VAGUE
-    "599",  # E=DAG_CONSUMER_INCONSISTENCY    / W=EVIDENCE_TOO_SHORT
     "606",  # E=GLOSSARY_PROPOSAL_DRIFT       / W=GLOSSARY_CANON_ORPHAN
     "608",  # E=TOOLKIT_VERSION_MISMATCH      / W=ANCHOR_LEGACY_SCHEMA
 }

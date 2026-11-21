@@ -41,11 +41,7 @@
               {
                 "type": "file_edit",
                 "target": "src/api/auth.py",
-                "description": "Add login route handler with JWT generation",
-                "evidence": {
-                  "type": "log",
-                  "content": "PASSED tests/test_auth.py::test_login_route_handler_returns_jwt (0.08s) [fr-user-login]"
-                }
+                "description": "Add login route handler with JWT generation"
               }
             ]
           }
@@ -65,11 +61,7 @@
             "actions": [
               {
                 "type": "manual_verification",
-                "description": "Verify JWT token structure in test output",
-                "evidence": {
-                  "type": "log",
-                  "content": "PASSED tests/test_auth.py::test_login_returns_jwt (0.05s) - 1 passed in 0.45s [fr-user-login]"
-                }
+                "description": "Verify JWT token structure in test output"
               }
             ]
           }
@@ -89,40 +81,10 @@
       ]
     }
   },
-  "execution": {
-    "execution_results": [
-      {
-        "command": "pytest tests/test_auth.py",
-        "status": "passed",
-        "outcome_description": "All authentication tests passed successfully.",
-        "reasoning": "Test suite covers login endpoint with valid and invalid credentials.",
-        "evidence": "1 passed in 0.45s - tests/test_auth.py::test_login_returns_jwt PASSED",
-        "evidence_ref": "ci-run-2024-01-15-001"
-      }
-    ],
-    "final_status": {
-      "ci_status": "green"
-    }
-  },
+  "execution": {},
   "review": {
     "verdict": "verified",
-    "fixture_status": {
-      "implemented_interfaces": [
-        "auth-login"
-      ],
-      "ci_status": "green"
-    },
     "semantic_review": {
-      "fr_coverage": [
-        {
-          "fr_id": "fr-user-login",
-          "satisfied": true,
-          "evidence_summary": "Login endpoint returns signed JWT with correct claims as verified by test_auth_login_returns_jwt passing in CI.",
-          "checklist_ids": [
-            "REQ_AUTH_LOGIN"
-          ]
-        }
-      ],
       "hallucinated_features": [],
       "scope_delta": "No unplanned features detected. Implementation matches spec scope exactly."
     }

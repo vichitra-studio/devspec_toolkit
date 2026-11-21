@@ -348,7 +348,7 @@ class TestHallucinationLintTwoTier:
         # No hallucination errors for valid project canon IDs
         hallucination_errors = [
             e for e in payload.get("errors", [])
-            if any(code in str(e) for code in ("E301", "E302", "E303"))
+            if "hallucin" in str(e).lower()
         ]
         assert not hallucination_errors, (
             f"Unexpected hallucination errors: {hallucination_errors}"

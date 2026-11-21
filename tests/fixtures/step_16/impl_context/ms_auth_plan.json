@@ -45,12 +45,7 @@
               {
                 "type": "file_create",
                 "target": "src/auth.py",
-                "description": "Create auth module",
-                "evidence": {
-                  "type": "log",
-                  "content": "pytest tests/test_auth.py::test_login_issues_jwt PASS — 1 test for fr-user-login",
-                  "evidence_ref": "ci://run/42"
-                }
+                "description": "Create auth module"
               }
             ]
           }
@@ -70,12 +65,7 @@
             "actions": [
               {
                 "type": "manual_verification",
-                "description": "Verified fr-user-login JWT claim structure matches spec.",
-                "evidence": {
-                  "type": "log",
-                  "content": "Manual review confirmed fr-user-login claim set: iss, sub, exp, iat all PASS",
-                  "evidence_ref": "review://2024-01-02"
-                }
+                "description": "Verified fr-user-login JWT claim structure matches spec."
               }
             ]
           }

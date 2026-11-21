@@ -33,7 +33,6 @@ EXTERNAL = "external"
 STRING_REF_TARGETS = {
     "nfr_ref": "nfr",
     "nfr_refs": "nfr",
-    "evidence_ref": EXTERNAL,
     "input_schema_ref": EXTERNAL,
     "output_schema_ref": EXTERNAL,
 }

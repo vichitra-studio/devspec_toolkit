@@ -1764,7 +1764,7 @@ def main():
                 print(f"OK ({len(added)} added, {len(skipped)} skipped, {malformed} malformed)")
 
     elif args.cmd == "milestone-state":
-        from .context.milestone_state import compute_milestone_state
+        from .context.milestone_state import compute_milestone_state, load_spec_view
 
         repo_root = os.path.abspath(args.repo_root)
         batch_id: str = args.batch_id
@@ -1795,8 +1795,8 @@ def main():
         with open(plan_path, "r", encoding="utf-8") as _fh:
             plan = json.load(_fh)
 
-        result = compute_milestone_state(plan, findings_dir, batch_id)
-        print(json.dumps(result, indent=2))
+        state = compute_milestone_state(plan, findings_dir, batch_id, load_spec_view(plan, spec_root, repo_root))
+        print(json.dumps(state, indent=2))
 
     elif args.cmd == "context":
         from .context import (

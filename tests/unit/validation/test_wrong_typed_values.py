@@ -11,7 +11,7 @@ folder with one file mutated, and ``compute_milestone_state`` over the mutated p
 a sibling file replaced by ``{`` or by non-UTF-8 bytes does not make a validator raise, except through the three
 1.1.1 loaders of ``_LOADERS_THAT_RAISE`` (steps 03 and 04), and a present roadmap that cannot be read keeps
 ``ROADMAP_PARSE_ERROR``.  A free-form payload holding every guarded field name, put in each of
-nine free-form locations of the 1.2.0 schemas, leaves the readers' output unchanged.
+eight free-form locations of the 1.2.0 schemas, leaves the readers' output unchanged.
 """
 from __future__ import annotations
 
@@ -111,15 +111,14 @@ def _load(base: Path, name: str) -> dict[str, Any]:
 
 
 def _full_plan() -> dict[str, Any]:
-    """The example plan with the execution and review sections of 16b and 16c added, so those validators run."""
+    """The example plan with the execution and review sections of the loop added, so the 16c validator runs."""
     plan = _load(_EXAMPLE, _PLAN)
     plan["execution"] = {
-        "execution_results": [{"command": "npm run test:contract", "status": "passed"}],
-        "code_artifacts": [],
+        "records": [{"record_id": "rec-0001", "about": ["PWRESET_CONFIRM_EXPIRED_01"], "action": "a01", "outcome": "done"}],
     }
     plan["review"] = {
         "verdict": "verified",
-        "semantic_review": {"fr_coverage": [{"fr_id": "fr-password-reset"}]},
+        "semantic_review": {"hallucinated_features": []},
         "findings": [
             {"remediation_task": {"task_id": "rem-1", "checklist_ids": ["PWRESET_CONFIRM_EXPIRED_01"]}},
         ],
@@ -128,8 +127,10 @@ def _full_plan() -> dict[str, Any]:
 
 
 def _legacy_plan() -> dict[str, Any]:
-    """The full plan with the 1.1.1 fields of an executed item (status, evidence, spec_ref) the legacy rules read."""
+    """The full plan with the 1.1.1 fields (status, evidence, spec_ref, execution_results and the rest) a frozen plan keeps; no reader may raise on them."""
     plan = _full_plan()
+    plan["execution"]["execution_results"] = [{"command": "npm run test:contract", "status": "passed"}]
+    plan["review"]["semantic_review"]["fr_coverage"] = [{"fr_id": "fr-password-reset"}]
     item = plan["plan"]["spec_alignment"]["checklist"][0]
     item["spec_ref"] = {"type": "fr", "id": "fr-password-reset"}
     item["checklist_status"] = "active"
@@ -178,8 +179,8 @@ def _cases() -> list[tuple[str, Path, str, str, Any]]:
              for name, step in _STEP_OF_FILE.items()]
     cases += [(f"corpus/{name}", _CORPUS, name, step, lambda name=name: _load(_CORPUS, name))
               for name, step in _CORPUS_STEPS.items()]
-    cases += [("plan+execution+review", _EXAMPLE, _PLAN, step, _full_plan) for step in ("16a", "16b", "16c")]
-    cases += [("1.1.1 plan", _EXAMPLE, _PLAN, step, _legacy_plan) for step in ("16", "16a", "16b", "16c")]
+    cases += [("plan+execution+review", _EXAMPLE, _PLAN, step, _full_plan) for step in ("16a", "16c")]
+    cases += [("1.1.1 plan", _EXAMPLE, _PLAN, step, _legacy_plan) for step in ("16", "16a", "16c")]
     return cases
 
 
@@ -372,9 +373,8 @@ _GUARDED_NAMES = sorted({
     "source_milestones", "deliverables", "future", "wont-have", "out_of_scope", "spec_ref", "critical_evidence",
 })
 # Free-form locations of the 1.2.0 schemas: fixture `input` and `expected`, API `parameters` and `errors` entries,
-# the plan item's `implementation`, a CI job's `token_permissions`, a plan's `command_overrides` and
-# `test_results[]`, the `environments{}` map of 02a.  (file, path of the object that receives the payload keys;
-# a missing parent object is created)
+# the plan item's `implementation`, a CI job's `token_permissions`, a plan's `command_overrides`, the `environments{}` map of 02a.
+# (file, path of the object that receives the payload keys; a missing parent object is created)
 _FREE_FORM_LOCATIONS = [
     ("08_fixtures.json", ("fixtures", 0, "input")),
     ("08_fixtures.json", ("fixtures", 0, "expected")),
@@ -383,10 +383,9 @@ _FREE_FORM_LOCATIONS = [
     (_PLAN, ("plan", "spec_alignment", "checklist", 0, "implementation")),
     ("12_ci_gates.json", ("jobs", 0, "token_permissions")),
     (_PLAN, ("extensions", "execution_context", "command_overrides")),
-    (_PLAN, ("execution", "final_status", "test_results")),
     ("02a_delivery_baseline.json", ("environments",)),
 ]
-_ARRAYS_OF_OBJECTS = ("parameters", "errors", "test_results")
+_ARRAYS_OF_OBJECTS = ("parameters", "errors")
 
 
 def _payload() -> dict[str, Any]:

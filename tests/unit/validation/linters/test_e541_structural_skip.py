@@ -13,11 +13,11 @@ Four surfaces were affected on the host:
   1. plan.ambiguities[].description  (16_impl_context.schema.json, ap:false, no ref slot)
   2. plan.docs_impact.rationale       (16_impl_context.schema.json, ap:false, no ref slot)
   3. milestones[].name                (09_impl_plan.schema.json,    ap:false, no ref slot)
-  4. execution.final_status.test_results[].name  (16_impl_context.schema.json, ap:UNSET)
+  4. execution.records[].note         (16_impl_context.schema.json, free text of a record)
 
 Surfaces 1–3 are covered by the structural rule (this test file).
 Surface 4 is covered by the ``execution`` key-name skip in ``_E541_SKIP_KEYS``
-(ap:UNSET = free-form test-runner output, not spec vocabulary).
+(the free text of an execution record is run output, not spec vocabulary).
 
 Both-directions guard (DoD #1)
 -------------------------------
@@ -316,33 +316,30 @@ class TestPlanSubtreesStructuralRule:
 
 
 # ---------------------------------------------------------------------------
-# Surface 4: execution.final_status.test_results[].name — key-name skip
+# Surface 4: execution.records[].note — key-name skip
 # ---------------------------------------------------------------------------
 
-class TestExecutionTestResultsSkip:
-    """Surface 4: execution.final_status.test_results[].name.
+class TestExecutionRecordNoteSkip:
+    """Surface 4: execution.records[].note.
 
-    test_results items have additionalProperties UNSET (free-form).  The
-    structural rule requires ap:false and will NOT suppress these; they are
-    covered by the 'execution' key-name skip in _E541_SKIP_KEYS.
+    The free text of an execution record is run output.  It is covered by the
+    'execution' key-name skip in _E541_SKIP_KEYS.
     """
 
-    def test_test_results_name_suppressed(self):
-        """execution.final_status.test_results[].name must NOT fire E541."""
+    def test_record_note_suppressed(self):
+        """execution.records[].note must NOT fire E541."""
         canonical_terms = {"ghost": {"cn:project:term:ghost"}}
         obj = {
             "execution": {
-                "final_status": {
-                    "test_results": [
-                        {"name": "Ghost admin login test", "status": "pass"},
-                    ]
-                }
+                "records": [
+                    {"record_id": "rec-0001", "action": "a01", "outcome": "done", "note": "Ghost admin login test passed"},
+                ]
             }
         }
         errs = _check_free_text_terms("ms_plan.json", obj, canonical_terms)
         e541 = [e for e in errs if e.code == "E541"]
         assert not e541, (
-            f"execution.final_status.test_results[].name must be suppressed; "
+            f"execution.records[].note must be suppressed; "
             f"got: {[e.render() for e in e541]}"
         )
 
@@ -427,7 +424,7 @@ class TestE541StructuralRuleEndToEnd:
             )
 
     def test_16_impl_context_surfaces_suppressed_end_to_end(self):
-        """Surfaces 1, 2, 4: plan.ambiguities, plan.docs_impact, execution.test_results
+        """Surfaces 1, 2, 4: plan.ambiguities, plan.docs_impact, execution.records
         must all be suppressed end-to-end."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -449,17 +446,10 @@ class TestE541StructuralRuleEndToEnd:
                 },
                 "execution": {
                     "files_touched": [],
-                    "execution_results": [],
-                    "critical_evidence": {
-                        "satisfied_checklist_ids": [],
-                        "passed_test_commands": [],
-                    },
                     "emergent_ambiguities": [],
-                    "final_status": {
-                        "test_results": [
-                            {"name": "Ghost admin login with tag filter", "status": "pass"},
-                        ]
-                    },
+                    "records": [
+                        {"record_id": "rec-0001", "action": "a01", "outcome": "done", "note": "Ghost admin login with tag filter"},
+                    ],
                 },
             }, "ms_bootstrap_plan.json")
             errs = lint_hallucinations(
@@ -552,9 +542,7 @@ class TestE541StructuralRuleEndToEnd:
                         {"id": "amb-01", "description": "Ghost admin behaviour is unclear"}
                     ],
                     "execution": {
-                        "final_status": {
-                            "test_results": [{"name": "Ghost login test", "status": "pass"}]
-                        }
+                        "records": [{"record_id": "rec-0001", "action": "a01", "outcome": "done", "note": "Ghost login test"}]
                     },
                 }),
                 encoding="utf-8",

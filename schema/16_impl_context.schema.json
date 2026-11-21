@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:16-impl-context",
   "title": "16_impl_context",
-  "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence recorded per execution result.",
+  "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation: a plan of checklist items, execution records written by `specdev plan record`, and a review block written by `specdev review record`.",
   "$defs": {
     "specRef": {
       "type": "object",
@@ -39,55 +39,6 @@
     },
     "severityLevel": {
       "$ref": "vc:core:atoms#severityLevel"
-    },
-    "executionStatus": {
-      "type": "string",
-      "enum": [
-        "passed",
-        "failed",
-        "blocked",
-        "partial"
-      ],
-      "description": "Execution outcome. Decision rule: 'partial' = started but not all sub-tasks complete; 'blocked' = cannot proceed due to an unresolved dependency or ambiguity (describe the blocker in outcome_description). Example: use 'blocked' when an upstream API contract is not finalised; use 'partial' when 3 of 5 test suites pass but 2 are still running. Anti-pattern: using 'partial' for a run that has not started at all (use 'passed'/'failed' after completion)."
-    },
-    "evidenceObject": {
-      "type": "object",
-      "description": "Concrete evidence proving that a requirement or check was satisfied. Good evidence example: {content: 'All 47 unit tests pass with 94% branch coverage — see CI run #1234', evidence_ref: 'ci://run/1234', path: 'tests/unit/auth/'}. Bad evidence example: {content: 'tests pass'} — too vague to trace. The 'content' field must contain verbatim output or a precise description; use 'path' and 'section' to pin the source location.",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
-            "log",
-            "snippet",
-            "screenshot",
-            "reference"
-          ],
-          "description": "The form of evidence: log output, code snippet, screenshot, or external reference."
-        },
-        "content": {
-          "type": "string",
-          "minLength": 20,
-          "pattern": "\\S",
-          "description": "The evidence content itself (minimum 20 characters, must contain non-whitespace). Example: '47 unit tests pass, branch coverage 94% per pytest-cov report' (good). Anti-pattern: 'done' or 'completed' — too vague to trace back to an observable outcome."
-        },
-        "evidence_ref": {
-          "type": "string",
-          "description": "URL or CI run reference that makes the evidence independently verifiable. Include when the evidence has a stable external URL or CI run reference. Examples: 'ci://github-actions/run/12345' (CI run reference), 'https://sonarcloud.io/summary/new_code?id=myproject' (external quality dashboard). Omit when the evidence is inline command output with no external reference (e.g., a local test run captured in the 'content' field). Anti-pattern: leaving blank when a CI run URL is available — the URL is what makes the evidence auditable and reproducible."
-        },
-        "path": {
-          "type": "string",
-          "description": "Relative path from repo root where the evidence was captured. Examples: 'src/auth/handlers.py', 'tests/unit/auth/'. Anti-pattern: absolute paths like '/Users/dev/project/src/auth/'."
-        },
-        "section": {
-          "type": "string",
-          "description": "Section or function name within the file where evidence was found. Examples: 'authenticate_user function', 'AuthMiddleware class', 'POST /auth/login handler'. Anti-pattern: 'main' or 'utils' (too vague to locate)."
-        }
-      },
-      "required": [
-        "type",
-        "content"
-      ]
     }
   },
   "type": "object",
@@ -378,10 +329,6 @@
                             "command": {
                               "type": "string",
                               "description": "Shell command to execute for run_command actions. Must be executable as-is. Examples: 'pytest tests/unit/auth/ --tb=short', 'ruff check src/auth/', 'python -m mypy src/auth/'. Anti-pattern: 'run tests' (not executable as-is)."
-                            },
-                            "evidence": {
-                              "$ref": "#/$defs/evidenceObject",
-                              "description": "Evidence proving this action was completed successfully."
                             },
                             "command_ref": {
                               "description": "Canonical reference for the command in the registry.",
@@ -1224,88 +1171,6 @@
             }
           }
         },
-        "execution_results": {
-          "type": "array",
-          "description": "Results from running test and verification commands.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "status": {
-                "$ref": "#/$defs/executionStatus",
-                "description": "Outcome status of this execution result."
-              },
-              "outcome_description": {
-                "type": "string",
-                "description": "Human-readable description of the execution outcome."
-              },
-              "reasoning": {
-                "type": "string",
-                "description": "Explanation of why this outcome occurred."
-              },
-              "command": {
-                "type": "string",
-                "description": "The command that was executed."
-              },
-              "evidence": {
-                "type": "string",
-                "minLength": 20,
-                "description": "Concrete evidence supporting this execution result. Should contain raw command output, test runner output, or observable system behavior — not assertions. Include file paths, test counts (e.g., '5 passed'), commit hashes, or exit codes. Avoid vague claims like 'it worked'; capture actual output. Minimum 20 characters."
-              },
-              "evidence_ref": {
-                "type": "string",
-                "description": "External reference or URI pointing to the evidence source."
-              },
-              "command_ref": {
-                "description": "Canonical reference for the command in the registry.",
-                "allOf": [
-                  {
-                    "$ref": "vc:core:collections#canonicalRef"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "command"
-                      }
-                    }
-                  }
-                ]
-              }
-            },
-            "required": [
-              "status",
-              "outcome_description",
-              "reasoning",
-              "command",
-              "evidence"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "status": {
-                      "const": "passed"
-                    }
-                  },
-                  "required": [
-                    "status"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "evidence_ref"
-                  ],
-                  "properties": {
-                    "evidence": {
-                      "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
-                    }
-                  }
-                }
-              }
-            ],
-            "description": "Result from running a single test or verification command during execution."
-          }
-        },
         "config_validation": {
           "type": "object",
           "description": "Validation status of configuration artifacts (dashboards, alerts, drift schedules).",
@@ -1332,29 +1197,6 @@
         "emergent_ambiguities": {
           "$ref": "vc:core:collections#ambiguityList",
           "description": "Open ambiguities discovered during execution that planning did not anticipate. An item is deleted once its answer is applied."
-        },
-        "final_status": {
-          "type": "object",
-          "description": "Final execution status summarizing test results and CI outcome.",
-          "additionalProperties": false,
-          "properties": {
-            "test_results": {
-              "type": "array",
-              "description": "Summary of test results from execution.",
-              "items": {
-                "type": "object",
-                "description": "A test result summary object. Structure is intentionally flexible to accommodate different test runners. Should include at minimum a test name/ID and pass/fail status."
-              }
-            },
-            "ci_status": {
-              "type": "string",
-              "enum": [
-                "green",
-                "red"
-              ],
-              "description": "Overall CI status: green (all passing) or red (failures present)."
-            }
-          }
         }
       }
     },
@@ -1366,7 +1208,7 @@
         "findings": {
           "type": "array",
           "description": "Issues found during review with severity and remediation plans.",
-            "maxItems": 50,
+          "maxItems": 50,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -1564,33 +1406,6 @@
           "maxLength": 1000,
           "description": "Specify the concrete action, the responsible party (if known), and the prerequisite condition. Next actions must be executable without further clarification. Examples: 'Fix 3 BLOCKING findings (auth null check, missing retry logic, uncovered error states) before resubmitting for APPROVED verdict.'; 'Deploy to staging via CI pipeline after this APPROVED verdict — coordinate with @platform-team on deployment slot.'; 'Schedule security review with @security-team — required before prod deployment per governance rule gr-security-review.' Anti-pattern: 'Continue with implementation' (not a specific action); 'Review the findings' (circular — this is the current step)."
         },
-        "fixture_status": {
-          "type": "object",
-          "description": "CI status and the implemented interfaces of the fixture tests.",
-          "additionalProperties": false,
-          "properties": {
-            "implemented_interfaces": {
-              "type": "array",
-              "description": "Ids of interfaces that have been implemented.",
-              "items": {
-                "$ref": "vc:core:atoms#kebabId",
-                "description": "Id of an implemented interface."
-              }
-            },
-            "ci_status": {
-              "type": "string",
-              "enum": [
-                "green",
-                "red"
-              ],
-              "description": "CI status for fixture tests: green (all passing) or red (failures)."
-            }
-          },
-          "required": [
-            "implemented_interfaces",
-            "ci_status"
-          ]
-        },
         "security_status": {
           "type": "string",
           "enum": [
@@ -1658,48 +1473,8 @@
         },
         "semantic_review": {
           "type": "object",
-          "description": "Semantic review checking FR coverage, hallucinated features, and scope delta. A quality semantic review: (1) traces every FR from the spec to at least one checklist item and evidence summary; (2) explicitly lists any features implemented without spec backing under hallucinated_features; (3) provides a scope_delta narrative if unplanned work occurred. Avoid marking FRs 'satisfied' without linking concrete evidence. The review should be machine-verifiable: reference checklist IDs, not vague assertions.",
+          "description": "Semantic review of the finished work: hallucinated features (implemented without spec backing) and a scope delta narrative if unplanned work occurred. A quality semantic review lists every feature implemented without spec backing under hallucinated_features and explains unplanned work in scope_delta. Reference checklist IDs, not vague assertions.",
           "properties": {
-            "fr_coverage": {
-              "type": "array",
-              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "fr_id": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                    "description": "Functional requirement ID being assessed."
-                  },
-                  "satisfied": {
-                    "type": "boolean",
-                    "description": "Whether this FR has been satisfied by the implementation."
-                  },
-                  "evidence_summary": {
-                    "type": "string",
-                    "minLength": 20,
-                    "description": "Concrete evidence summary showing how this FR was satisfied. Should reference file paths, test output, commit hashes, or observable system behavior. Avoid assertions without supporting data (e.g., prefer 'IMPL_CHECK_001 verified at tests/test_auth.py:L45 — 3 passing tests' over 'implemented correctly'). Minimum 20 characters."
-                  },
-                  "checklist_ids": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "vc:core:atoms#screamingSnakeId"
-                    },
-                    "uniqueItems": true,
-                    "description": "IDs of checklist items verified for this FR. Each must be a SCREAMING_SNAKE_CASE identifier matching a checklist item defined in plan.spec_alignment.checklist."
-                  }
-                },
-                "required": [
-                  "fr_id",
-                  "satisfied",
-                  "evidence_summary",
-                  "checklist_ids"
-                ],
-                "additionalProperties": false,
-                "description": "Per-FR coverage assessment with satisfaction status and evidence summary."
-              },
-              "minItems": 1
-            },
             "hallucinated_features": {
               "type": "array",
               "description": "Features implemented that were not specified in the spec (scope creep detection).",
@@ -1715,61 +1490,11 @@
             }
           },
           "required": [
-            "fr_coverage",
             "hallucinated_features"
           ],
           "additionalProperties": false
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "verdict"
-            ],
-            "properties": {
-              "verdict": {
-                "const": "verified"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "fixture_status"
-            ],
-            "properties": {
-              "fixture_status": {
-                "properties": {
-                  "ci_status": {
-                    "const": "green",
-                    "description": "CI status must be green when verdict is verified."
-                  }
-                },
-                "required": [
-                  "ci_status"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "verdict"
-            ],
-            "properties": {
-              "verdict": {
-                "const": "verified"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "semantic_review"
-            ]
-          }
-        }
-      ]
+      }
     },
     "policy_ref": {
       "description": "Canonical reference to the governance policy applicable to this implementation context. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Validated by canonical-integrity lint.",

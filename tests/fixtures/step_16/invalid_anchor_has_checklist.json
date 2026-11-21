@@ -21,7 +21,7 @@
           "type": "behavior",
           "layer": "api",
           "description": "Login endpoint accepts valid credentials.",
-          "spec_ref": { "type": "fr", "id": "fr-login" }
+          "realises": ["tc-login"]
         }
       ]
     }

@@ -15,7 +15,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Cross-artifact drift (2xx)
             "E210", "E211",
             # Proof / review closure (3xx)
-            "E301", "E302", "E303", "E304", "E305", "E306", "E307",
+            "E303", "E304",
             "E308", "E309",
             "E310", "E311", "E320",
             "E330", "E331", "E332", "E333", "E334", "E336", "E337", "E338", "E339", "E341", "E342", "E343", "E344", "E347", "E348", "W350", "W351",
@@ -34,8 +34,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E590", "E591", "E593", "E594", "E595",
             "E596", "E597", "E598", "E599",
             "W590", "W591", "W593", "W594", "W595",
-            "W596", "W597", "W599", "W600",
-            "W601", "W603",
+            "W596", "W597", "W603",
             # Glossary parity (6xx)
             "E606", "E607", "W606",
             # Toolkit version gate (6xx)

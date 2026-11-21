@@ -11,7 +11,6 @@ performs deep (semantic) validation beyond what JSON Schema alone catches.
 # validator is added to DEEP_VALIDATORS, add a corresponding import here.
 from . import (  # noqa: F401 – re-exported for validate.py DEEP_VALIDATORS
     step_16a,
-    step_16b,
     step_16c,
     step_16_anchor,
 )

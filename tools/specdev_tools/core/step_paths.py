@@ -31,11 +31,11 @@ def get_step_from_path(path: str) -> str:
     - ``16_impl_context.json`` NOT inside ``impl_context/`` → step ``"16"``
       (Trinity Anchor; dispatches to validate_step_16_anchor).
     - Any ``.json`` inside an ``impl_context/`` directory → step ``"16a"``
-      by default.  ``refine_impl_context_substep`` promotes to ``"16b"`` or
-      ``"16c"`` based on artifact content (presence of ``execution.execution_results``
-      or ``review.verdict``).  All three sub-step validators now chain up through
-      their predecessors, so dispatching to the highest-phase validator runs
-      every earlier phase's checks as well.
+      by default.  ``refine_impl_context_substep`` promotes to ``"16c"`` based on
+      artifact content (presence of ``review.verdict``).  The 16c validator chains
+      up through the 16a one, so dispatching to the highest-phase validator runs
+      every earlier phase's checks as well.  Nothing routes to ``"16b"``: an
+      execution record is a record in the plan, not a phase of the file.
     """
     filename = os.path.basename(path)
 
@@ -67,16 +67,16 @@ def get_step_from_path(path: str) -> str:
 def refine_impl_context_substep(step: str, data: Any) -> str:
     """Promote/demote ``impl_context/`` dispatch by artifact content.
 
-    All three Trinity sub-step artifacts share ``spec/impl_context/`` and the
+    A plan file and its review share ``spec/impl_context/`` and the
     ``vc:16-impl-context`` schema, so path alone cannot distinguish them.
     Content signals the highest phase present:
 
     - ``artifact_role == "anchor"``                      → ``"16"`` (misfiled anchor)
     - ``review.verdict`` present (non-empty string)      → ``"16c"`` (reviewer output)
-    - ``execution.execution_results`` populated (len>0)  → ``"16b"`` (coder output)
     - otherwise                                          → ``"16a"`` (planner output)
 
-    ``validate_step_16c`` chains through ``validate_step_16b`` → ``validate_step_16a``,
+    Execution records (``execution.records``) do not change the route.
+    ``validate_step_16c`` chains through ``validate_step_16a``,
     so routing to the highest phase runs every earlier phase's checks as well.
     Non-``"16a"`` inputs are returned unchanged — this function is a no-op for
     charter artifacts, scaffold artifacts, etc.
@@ -108,9 +108,4 @@ def refine_impl_context_substep(step: str, data: Any) -> str:
     review = data.get("review")
     if isinstance(review, dict) and isinstance(review.get("verdict"), str) and review["verdict"].strip():
         return "16c"
-    execution = data.get("execution")
-    if isinstance(execution, dict):
-        results = execution.get("execution_results")
-        if isinstance(results, list) and len(results) > 0:
-            return "16b"
     return "16a"

@@ -63,13 +63,13 @@ from .validators import (
     step_15,
     step_16,
     step_16a,
-    step_16b,
     step_16c,
     step_16_anchor,
 )
 
 
 from ..core.step_paths import get_step_from_path, refine_impl_context_substep
+from .validators.step_16 import is_legacy_closed_plan
 
 
 def _duplicate_id_errors(repo_root: str, path: str, data: dict[str, Any]) -> list[SpecError]:
@@ -148,9 +148,12 @@ def validate_file(
         errors = sorted(raw_errors, key=lambda t: t[0])
 
         # Resolve step once — use content-based refinement for impl_context/
-        # artifacts so 16b/16c sub-step validators actually run during
+        # artifacts so the 16c validator actually runs during
         # validate_file (path-only routing always yielded "16a").
         step = refine_impl_context_substep(get_step_from_path(path), data)
+        # Ruling L2: a plan of a legacy-closed milestone keeps its 1.1.1 shape as history, so the schema does not judge it.
+        if step in ("16a", "16c") and is_legacy_closed_plan(path, spec_root):
+            errors = []
 
         # Enhance error messages with context
         enhanced_errors: list[SpecError] = []
@@ -471,14 +474,14 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
     # "16" → Trinity Anchor validator (spec/16_impl_context.json, not in impl_context/).
-    # "16a" / "16b" / "16c" → all live under spec/impl_context/ and initially land on "16a"
-    #   via path regex. refine_impl_context_substep(step, data) (core/step_paths.py) then promotes the step
-    #   based on content:  non-empty review.verdict → "16c",  non-empty
-    #   execution.execution_results → "16b",  else stays at "16a". Chain-up inside the
-    #   validators (16c→16b→16a→base) preserves downstream checks.
+    # "16a" / "16c" → both live under spec/impl_context/ and initially land on "16a" via path regex.
+    #   refine_impl_context_substep(step, data) (core/step_paths.py) then promotes a plan with a non-empty
+    #   review.verdict to "16c"; chain-up inside the validators (16c→16a→base) preserves the earlier checks.
+    # "16b" is a pipeline step of tools/step_order.json that has no validator of its own (a coder's output is an
+    #   execution record, not a file), so `validate --step 16b` runs the 16a checks.
     "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
     "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
-    "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
+    "16b": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
     "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
 }
 

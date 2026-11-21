@@ -341,15 +341,6 @@ Before emitting, verify:
   },
   "execution": {
     "files_touched": ["src/auth/routes.py"],
-    "execution_results": [
-      {
-        "status": "failed",
-        "outcome_description": "JWT assertion failed in targeted auth test.",
-        "reasoning": "Login response missing token field — routes.py:L14 returns empty dict instead of {'token': issue_token(user)}.",
-        "command": "pytest tests/auth/test_login.py::test_jwt -q",
-        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
-      }
-    ],
     "emergent_ambiguities": []
   },
   "review": {

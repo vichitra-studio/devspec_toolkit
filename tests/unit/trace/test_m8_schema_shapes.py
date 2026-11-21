@@ -159,6 +159,34 @@ def test_review_block_shape_and_limits() -> None:
     assert any("recorded_at" in p for p in _problems(_with_review(recorded_at=3)))
 
 
+def _with_removed(field: str) -> dict[str, Any]:
+    """The example plan carrying the removed *field* (a name of ``REMOVED_FIELDS``) at the place the 1.1.1 schema had it."""
+    plan = _plan()
+    where = {
+        "execution_results": lambda: plan.setdefault("execution", {}).update(execution_results=[]),
+        "final_status": lambda: plan.setdefault("execution", {}).update(final_status={"ci_status": "green"}),
+        "evidence": lambda: _action(plan).update(evidence={"content": "x"}),
+        "fixture_status": lambda: plan.setdefault("review", {"verdict": "needs_work"}).update(fixture_status={"ci_status": "green"}),
+        "fr_coverage": lambda: plan.setdefault("review", {"verdict": "needs_work"}).update(semantic_review={"fr_coverage": []}),
+    }
+    where[field]()
+    return plan
+
+
+REMOVED_FIELDS = ("execution_results", "final_status", "evidence", "fixture_status", "fr_coverage")
+
+
+@pytest.mark.parametrize("field", REMOVED_FIELDS)
+def test_removed_fields_fail_validation_naming_the_field(field: str) -> None:
+    problems = _problems(_with_removed(field))
+    assert any(f"'{field}' was unexpected" in problem for problem in problems), problems
+
+
+def test_verified_no_longer_requires_fixture_status() -> None:
+    """A ``verified`` verdict needs neither ``fixture_status`` nor ``semantic_review`` any more: the close gate judges it."""
+    assert _problems(_with_review(verdict="verified")) == []
+
+
 def _anchor(row: dict[str, Any]) -> dict[str, Any]:
     anchor = json.loads((EXAMPLE_SPEC / "16_impl_context.json").read_text(encoding="utf-8"))
     anchor["plan"]["milestone_index"] = [{**anchor["plan"]["milestone_index"][0], **row}]
