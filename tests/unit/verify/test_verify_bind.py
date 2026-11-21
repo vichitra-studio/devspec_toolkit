@@ -157,6 +157,22 @@ def test_a_narrower_request_does_not_take_over_the_wider_bindings_id(host: Path)
     assert error.error.code == "E333" and "ver-wide" in error.error.message
 
 
+def test_a_binding_made_under_a_custom_id_without_proves_is_replaced_by_a_plain_bind_and_keeps_the_id(host: Path) -> None:
+    _add_fixture(host, fixture_id="fix-single", verifies=[CRITERION, API])
+    first = _bind(host, "fix-single", record_id="ver-custom")
+    again = _bind(host, "fix-single", guard="passed again")
+    assert (first.plan.record_id, again.plan.record_id, again.plan.replaced) == ("ver-custom", "ver-custom", True)
+    assert [name for name in _record_files(host) if "single" in name or "custom" in name] == ["ver-custom.json"]
+
+
+def test_a_wider_request_does_not_take_over_a_narrower_bindings_id(host: Path) -> None:
+    _add_fixture(host, fixture_id="fix-mixed", verifies=[CRITERION, API])
+    _bind(host, "fix-mixed", proves=(CRITERION,), record_id="ver-narrow")
+    error = _refusal(host, "fix-mixed", proves=(CRITERION, API))
+    assert error.error.code == "E333" and "ver-narrow" in error.error.message
+    assert [name for name in _record_files(host) if name.startswith("ver-narrow")] == ["ver-narrow.json"]
+
+
 @pytest.mark.parametrize("guard", [None, ""])
 def test_missing_guard_is_e332(host: Path, guard: str | None) -> None:
     assert _refusal(host, guard=guard).error.code == "E332"
@@ -176,7 +192,7 @@ def test_empty_matching_guard_is_accepted_with_a_note(host: Path) -> None:
 def test_manual_fixture_is_refused_with_the_attest_pointer(host: Path) -> None:
     _add_fixture(host, fixture_id="fix-manual-review", verifies=[CRITERION], mode="manual", manual_reason="a person looks")
     error = _refusal(host, "fix-manual-review")
-    assert error.error.code == "E767" and "a person attests it" in error.error.message and "verify attest" not in error.error.message
+    assert error.error.code == "E767" and "a person attests it with `specdev verify attest fix-manual-review`" in error.error.message
 
 
 def test_removal_fixture_is_accepted_at_dev_only(host: Path) -> None:

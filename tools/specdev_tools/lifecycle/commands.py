@@ -11,6 +11,7 @@ import os
 from typing import Any
 
 from ..graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
+from ..graph.stages import DEPLOY_ENVIRONMENTS
 from .plan_records import Address, DeployResult, PruneResult, RecordResult, parse_address, prune_records, record_action, record_at_deploy
 from .review_record import VERDICTS, ReviewRequest, ReviewResult, record_review
 
@@ -54,7 +55,6 @@ REVIEW_RECORD_DESCRIPTION = (
     "E803 when no plan names the milestone. Exit 0 written, 1 refused."
 )
 EXIT_ERROR = 1
-ENVIRONMENTS = ("staging", "prod")
 OUTCOMES = ("done", "failed", "blocked")
 DEPLOY_OUTCOMES = ("done", "failed")
 NOTE_MAX = 200
@@ -74,7 +74,7 @@ def _add_plan_parser(sub: Any) -> None:
     record.add_argument("--outcome", choices=OUTCOMES, help="done, failed or blocked (required; for --at-deploy only done or failed, default done)")
     record.add_argument("--note", metavar="TEXT", help=f"A short note, at most {NOTE_MAX} characters: what was done, or why it failed or is blocked")
     record.add_argument("--at-deploy", action="store_true", dest="at_deploy", help="Write the deploy record of an action marked at_deploy (needs --env)")
-    record.add_argument("--env", choices=ENVIRONMENTS, help="With --at-deploy: the environment the deploy job ran for")
+    record.add_argument("--env", choices=DEPLOY_ENVIRONMENTS, help="With --at-deploy: the environment the deploy job ran for")
     record.add_argument("--tag", metavar="TAG", help="With --at-deploy: the release tag that was deployed")
     record.add_argument("--prune", metavar="MILESTONE", help="Remove the records of this milestone's plan whose item or action no longer exists")
     add_root_flags(record)

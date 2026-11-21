@@ -36,6 +36,9 @@ class PromptContractsTests(unittest.TestCase):
         disk_first_patterns = (
             r"write the final json artifact directly to disk",
             r"write/?update.*artifact file",
+            # 16a (WI-M8-13): the artifact reaches disk through a command, never by hand and never in chat.
+            r"specdev step create",
+            r"specdev plan record",
         )
         for path in sorted(self.prompt_dir.glob("prompt_*.md")):
             text = path.read_text(encoding="utf-8")
@@ -96,7 +99,7 @@ class PromptContractsTests(unittest.TestCase):
                 for line in required_lines:
                     self.assertIn(line, text, msg=f"{path.name} missing hardening line: {line}")
 
-    def test_trinity_output_examples_include_non_empty_canonical_refs(self):
+    def test_trinity_output_examples_carry_a_canonical_refs_used_array(self):
         for file_name in (
             "prompt_16a_impl_planner.md",
             "prompt_16b_impl_coder.md",
@@ -110,9 +113,11 @@ class PromptContractsTests(unittest.TestCase):
             payload = json.loads(blocks[-1])
             refs = payload.get("canonical_refs_used")
             self.assertIsInstance(refs, list, msg=f"{file_name} canonical_refs_used must be an array")
-            self.assertGreater(len(refs), 0, msg=f"{file_name} canonical_refs_used must be non-empty")
-            self.assertIn("id", refs[0], msg=f"{file_name} canonical ref must include id")
-            self.assertIn("kind", refs[0], msg=f"{file_name} canonical ref must include kind")
+            # An entry the plan does not use is E210 ``canonical_refs_used_extra`` on a real plan (run on the worked
+            # example with ``cn:core:unit:ms``), so the examples, which use no canonical entry, carry ``[]`` (WI-M8-13).
+            for ref in refs:
+                self.assertIn("id", ref, msg=f"{file_name} canonical ref must include id")
+                self.assertIn("kind", ref, msg=f"{file_name} canonical ref must include kind")
 
     def test_trinity_update_logic_examples_preserve_canonical_refs_used(self):
         for file_name in ("prompt_16b_impl_coder.md", "prompt_16c_impl_reviewer.md"):
@@ -129,11 +134,6 @@ class PromptContractsTests(unittest.TestCase):
                 input_payload["canonical_refs_used"],
                 output_payload["canonical_refs_used"],
                 msg=f"{file_name} output must carry-forward canonical_refs_used from input example",
-            )
-            self.assertGreater(
-                len(output_payload["canonical_refs_used"]),
-                0,
-                msg=f"{file_name} output canonical_refs_used must remain non-empty",
             )
 
 

@@ -10,7 +10,7 @@ stored in step 12 and the checks read it themselves.
 
 - an environment, a gate or a secret is built when the job that realises it is proven (``proof``);
 - a step-10 rule is built when a job that realises it is proven, or when its ``cli_command`` is in the command list
-  (``proof`` holds both); a rule enforced by ``review`` is left to the default branch (M8);
+  (``proof`` holds both); a rule enforced by ``review`` is built when a valid attestation of it exists (``proof`` reads it);
 - a threat or an edge case is built when it has a mitigation, every obligation that mitigates it is built and every fixture
   that mitigates it is proven; zero mitigations is not built;
 - an NFR keeps the default branch (a closed milestone refines it), and is ``RELIEVED`` when that makes it built and its
@@ -26,10 +26,9 @@ from functools import cache
 
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.host_declarations import HostDeclarationsError, load_host_declarations, pin_sources_by_id
-from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.names import ABOUT, BINDING_KIND, NFR, OBLIGATION_ROLES, REALISES, REVIEW_ENFORCER, RULE, THIRD_PARTY, VERIFIER_ROLE, VERIFIES
+from specdev_tools.graph.names import ABOUT, BINDING_KIND, NFR, OBLIGATION_ROLES, REALISES, THIRD_PARTY, VERIFIER_ROLE, VERIFIES
 from specdev_tools.graph.stages import STAGES, binding_stage, bindings_of, is_retired_binding, retired_binding_ids, stage_at_least, stage_rank
 from specdev_tools.proof.proof import (
     NOT_REQUIRED, PENDING_STAGE, PROVEN, REASON_NO_VERIFIER, REASON_UNBOUND, STAGE_UNKNOWN, ProofResult, proof, verifier_proof,
@@ -163,12 +162,8 @@ class _EvidenceBranches:
     cap: str
 
     def claims(self, node: Node) -> bool:
-        """Whether the branches decide *node*: an obligation of an evidence kind, except a rule enforced by ``review``, and an NFR."""
-        if node.role not in OBLIGATION_ROLES:
-            return False
-        if node.kind == RULE:
-            return (item_of(self.graph, node) or {}).get("enforcer") != REVIEW_ENFORCER
-        return node.kind in EVIDENCE_KINDS or node.kind == NFR
+        """Whether the branches decide *node*: an obligation of an evidence kind (a rule enforced by ``review`` too) and an NFR."""
+        return node.role in OBLIGATION_ROLES and (node.kind in EVIDENCE_KINDS or node.kind == NFR)
 
     def __call__(self, computation: BuiltComputation, node: Node) -> BuiltResult:
         """The state of *node* from its proof; a proof that cannot be made (E334: the stage cannot be told) is not built, with the finding's message as the reason."""

@@ -42,7 +42,7 @@ def test_counts_match_the_parsers():
     assert len([p for p in paths if p.startswith("align ")]) == 7
     assert len([p for p in paths if p.startswith("lock ")]) == 2
     assert len([p for p in paths if p.startswith("step ")]) == 2
-    assert len([p for p in paths if p.startswith("verify ")]) == 2
+    assert len([p for p in paths if p.startswith("verify ")]) == 3
     assert len([p for p in paths if p.startswith("third-party ")]) == 2
     assert len([p for p in paths if p.startswith("plan ")]) == 1
     assert len([p for p in paths if p.startswith("review ")]) == 1

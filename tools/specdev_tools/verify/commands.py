@@ -1,4 +1,4 @@
-"""The verify commands of the CLI: ``specdev verify bind`` and ``specdev verify run``.
+"""The verify commands of the CLI: ``specdev verify bind``, ``specdev verify run`` and ``specdev verify attest``.
 
 ``cli.py`` registers them with one call, ``add_verify_parsers``; each parser names its handler with ``set_defaults``.  A
 handler returns the process exit code: 0 done, 1 refused or a binding failed, 2 a usage error (argparse's, and a run
@@ -14,7 +14,7 @@ from typing import Any
 
 from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.stages import DEFAULT_STAGE, STAGES
+from specdev_tools.graph.stages import DEFAULT_STAGE, DEPLOY_ENVIRONMENTS, STAGES
 from specdev_tools.trace.records import RECORDS_DIR
 from specdev_tools.trace.writing import locked_graph
 from specdev_tools.verify.bind import BindRequest, BindResult, apply_bind
@@ -23,11 +23,13 @@ from specdev_tools.verify.installed_versions import installed_overrides, install
 from specdev_tools.verify.records import Evidence, records_folder
 from specdev_tools.verify.run import run_bindings, selected_ids
 
+
 VERIFY_DESCRIPTION = (
-    "Bind verifiers to commands and run them.\n\n"
+    "Bind verifiers to commands, run them, and attest what no command can run.\n\n"
     "Subcommands:\n"
     "  bind <verifier-id> --command CMD --guard REGEX   Write the verification record of a fixture, a job or a rule\n"
-    "  run [<binding-id> ...] [--all | --milestone ID]  Run bindings and write their evidence"
+    "  run [<binding-id> ...] [--all | --milestone ID]  Run bindings and write their evidence\n"
+    "  attest <node-id> [<node-id> ...]                 A person attests a manual fixture, a review rule or an at-deploy action"
 )
 
 BIND_DESCRIPTION = (
@@ -53,8 +55,21 @@ RUN_DESCRIPTION = (
 )
 
 
+ATTEST_DESCRIPTION = (
+    "A person attests what no command can run: a fixture with mode manual, a step-10 rule whose enforcer is review, or a plan "
+    "action <ITEM>/<action-id> marked at_deploy that a person carried out (needs --env). Not 'specdev attest', which re-accepts "
+    "links. Writes one evidence record of type attestation for each node (extras/verification/evd-<node id>-attested.json: the "
+    "code tree, the node's content hash and the git author; a second attestation of the node replaces it), or the deploy record "
+    "'plan record --at-deploy' writes (dep-<NNNN>.json) for an action. The stage an attestation claims is the stage its node "
+    "needs (the stage a binding of it would have), printed before anything is written; --stage gives another. Several ids go in "
+    "one command, and all are checked before any record is written: an id that is not attestable is E824 and nothing is "
+    "written. An attestation holds while the node and the code tree are as they were: change either and it is stale. "
+    "Exit 0 written, 1 refused, 2 usage."
+)
+
+
 def add_verify_parsers(sub: Any) -> None:
-    """Register the ``verify`` group (``bind``, ``run``) on the top-level sub-parsers action *sub*."""
+    """Register the ``verify`` group (``bind``, ``run``, ``attest``) on the top-level sub-parsers action *sub*."""
     verify = sub.add_parser("verify", help="Bind verifiers to commands; run the bindings", description=VERIFY_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     verify_sub = verify.add_subparsers(dest="verify_cmd", required=True)
 
@@ -79,6 +94,13 @@ def add_verify_parsers(sub: Any) -> None:
     run.add_argument("--timeout", type=float, metavar="SEC", help="Kill a command that runs longer than this, per command")
     add_root_flags(run)
     run.set_defaults(handler=run_verify_run)
+
+    attest = verify_sub.add_parser("attest", help="Attest a manual fixture, a review rule or an at-deploy action", description=ATTEST_DESCRIPTION)
+    attest.add_argument("node_ids", nargs="+", metavar="node-id", help="A manual fixture, a rule enforced by review, or a plan action ITEM/action marked at_deploy")
+    attest.add_argument("--stage", choices=STAGES, help="The stage the attestation claims (default: the stage the node needs)")
+    attest.add_argument("--env", choices=DEPLOY_ENVIRONMENTS, help="With a plan action ITEM/action: the environment it was carried out for")
+    add_root_flags(attest)
+    attest.set_defaults(handler=run_verify_attest)
 
 
 def _bind_text(result: BindResult) -> str:
@@ -190,3 +212,14 @@ def _run(args: argparse.Namespace, graph: Graph) -> int:
 def run_verify_run(args: argparse.Namespace) -> int:
     """Run ``specdev verify run`` on the parsed *args*; returns the exit code (0 all passed, 1 a binding failed or a refusal, 2 usage)."""
     return run_on_graph("verify run", args, lambda graph: _run(args, graph))
+
+
+def run_verify_attest(args: argparse.Namespace) -> int:
+    """Run ``specdev verify attest`` on the parsed *args*; returns the exit code (0 written, 1 refused, 2 usage).
+
+    The command lives in ``lifecycle/attest.py``, a package to the right of this one (it reads the proof and writes the deploy
+    record), so it is imported here when the command runs and not when the parser is built.
+    """
+    from specdev_tools.lifecycle.attest import run_verify_attest as run
+
+    return run(args)

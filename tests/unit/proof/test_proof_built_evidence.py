@@ -244,11 +244,19 @@ def test_rule_with_cli_command_absent_from_the_list_is_not_built(tmp_path: Path)
     assert (_state(host, COMMAND_RULE), prove(host, COMMAND_RULE).status) == (NOT_BUILT, NO_VERIFIER)
 
 
-def test_review_enforced_rule_stays_pending_evidence(tmp_path: Path) -> None:
+def test_review_enforced_rule_is_built_once_attested(tmp_path: Path) -> None:
     host = host_with(tmp_path)
-    assert _state(host, REVIEW_RULE) is PENDING
+    assert _state(host, REVIEW_RULE) is NOT_BUILT
+    assert "has no valid evidence (NO_EVIDENCE)" in _built(host)[REVIEW_RULE].reason
     attest(host, REVIEW_RULE)
-    assert _state(host, REVIEW_RULE) is PENDING, "an attestation is read at release by M8, not here"
+    assert (_state(host, REVIEW_RULE), prove(host, REVIEW_RULE).status) == (BUILT, PROVEN)
+
+
+def test_a_review_rule_attested_before_the_rule_changed_is_not_built(tmp_path: Path) -> None:
+    host = host_with(tmp_path)
+    attest(host, REVIEW_RULE)
+    edit_doc(host, "10_governance.json", lambda doc: doc["rules"][2].update(text="A person reviews every change to reset-token handling and its mail templates."))
+    assert _state(host, REVIEW_RULE) is NOT_BUILT and "STALE_HASH" in _built(host)[REVIEW_RULE].reason
 
 
 def test_command_rule_without_a_binding_is_built_and_proven(tmp_path: Path) -> None:
@@ -412,7 +420,7 @@ def test_a_host_with_no_verification_folder_and_no_declarations_reports_what_the
     assert not (host / "spec" / "common" / "host_declarations.json").exists()
     states = _built(host)
     assert states[ENVIRONMENT].state is NOT_BUILT and "no binding" in states[ENVIRONMENT].reason
-    assert states[COMMAND_RULE].state is BUILT and states[REVIEW_RULE].state is PENDING
+    assert states[COMMAND_RULE].state is BUILT and states[REVIEW_RULE].state is NOT_BUILT
     assert pin_matches(_ctx(host), graph_of(host).by_id[TP]) == "UNKNOWN"
 
 

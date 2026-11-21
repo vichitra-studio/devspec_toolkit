@@ -112,6 +112,14 @@ def _combine(obligation: str, outcomes: Sequence[_Outcome]) -> ProofResult:
     return ProofResult(obligation, PROVEN if any(outcome.status == PROVEN for outcome in outcomes) else NOT_REQUIRED)
 
 
+def is_attested_by_person(node: Node, graph: Graph) -> bool:
+    """Whether *node* is satisfied by a person's attestation and not by a run: a fixture with ``mode: manual``, or a rule enforced by ``review``."""
+    item = item_of(graph, node) or {}
+    if node.kind == FIXTURE:
+        return item.get("mode") == MANUAL_MODE
+    return node.kind == RULE and item.get("enforcer") == REVIEW_ENFORCER
+
+
 def _needed_stage(graph: Graph, obligation: Node | None, verifier: Node) -> str:
     """The stage the obligation needs proof at, as far as a stored binding can be held to it.
 
@@ -175,11 +183,6 @@ class _Prover:
     def _ignored_in_close(self, binding: Binding) -> bool:
         return self.treat_ci_as_dev and binding.stage in CLOSE_IGNORED_STAGES
 
-    def _is_manual(self, verifier: Node) -> bool:
-        if verifier.kind == FIXTURE:
-            return (item_of(self.graph, verifier) or {}).get("mode") == MANUAL_MODE
-        return verifier.kind == RULE and (item_of(self.graph, verifier) or {}).get("enforcer") == REVIEW_ENFORCER
-
     def _attested(self, verifier: Node, obligation: Node | None) -> _Outcome:
         needed = _needed_stage(self.graph, obligation, verifier) if obligation is not None and obligation.kind != RULE else DEFAULT_STAGE
         if not stage_at_least(self.cap, needed):
@@ -195,7 +198,7 @@ class _Prover:
     def verifier_outcome(self, verifier: Node, obligation: Node | None) -> _Outcome:
         """How *verifier* stands for *obligation* (any when ``None``) at this gate."""
         bindings = self._bindings_for(verifier, obligation)
-        if not bindings and self._is_manual(verifier) and not bindings_of(verifier, self.graph):
+        if not bindings and is_attested_by_person(verifier, self.graph) and not bindings_of(verifier, self.graph):
             return self._attested(verifier, obligation)
         if not bindings:
             return _Outcome(UNBOUND, (Shortfall(verifier.id, None, REASON_UNBOUND),))
@@ -359,7 +362,7 @@ def _advice(shortfall: Shortfall) -> str:
     if shortfall.reason == REASON_UNBOUND:
         return f"bind it with `specdev verify bind {shortfall.verifier} --command \"<command>\" --guard \"<regex>\"`"
     if shortfall.binding is None:
-        return "a person attests it: it needs a valid attestation record"
+        return f"a person attests it: run `specdev verify attest {shortfall.verifier}`"
     command = f"`specdev verify run {shortfall.binding} --stage {shortfall.stage}`"
     first = _WAY_OUT.get(shortfall.reason, "fix it, then run" if shortfall.reason in _FIX_FIRST else "run")
     return f"{_CAUSE[shortfall.reason]}; {first} {command}"

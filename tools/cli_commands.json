@@ -244,6 +244,9 @@
       "path": "verify"
     },
     {
+      "path": "verify attest"
+    },
+    {
       "path": "verify bind"
     },
     {

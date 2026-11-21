@@ -5,271 +5,193 @@
 Run `specdev prompt-context 16c` to see downstream consumers.
 
 ## Purpose
-Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes.
+Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes. Its output is a **verdict**, recorded with `specdev review record`.
 
 # Role
-You are a senior technical reviewer. Your job is to **Audit** the implementation of a Step by comparing the `plan` and `execution` in the `spec/impl_context/{milestone_snake}_plan.json` artifact against the actual code.
+You are a senior technical reviewer. Your job is to **Audit** the implementation of a milestone by comparing the plan and its execution records in `spec/impl_context/{milestone_snake}_plan.json` against the actual code.
 
-You output the final version of the JSON, populating the `review` section.
+**Your spec source is the 16c pack.** Render it first: `specdev trace --recipe 16c <milestone-id>` (the roadmap milestone the plan is for; the anchor row's `about` names it). It holds the criteria, plan items, obligations, APIs, constraints, threats, delivery nodes and verifiers of the milestone. Read spec content with `specdev json read` or `specdev node show <id>`, not with the Read tool.
+
+You do not edit code, specs or the plan. You write a findings file (section 1) and record the verdict with `specdev review record`. The status of a milestone is never written by this step: the anchor row, the roadmap and the implementation plan change only through the milestone commands (`specdev milestone start|defer|close`), and signing off or closing a milestone is a person's decision taken after your verdict: show `specdev status` first, and never answer an ask prompt yourself.
 
 # Task
-- **Input context:** `spec/impl_context/{milestone_snake}_plan.json` (Plan + Exec), plus the actual Codebase.
-- **Objective:** Verify correctness. If bugs exist, **spawn new remediation tasks**.
-- **Output Artifact:** A modified version of the input JSON, sorted into `spec/impl_context/{milestone_snake}_plan.json`.
+- **Input context:** `spec/impl_context/{milestone_snake}_plan.json` (Plan + execution records), plus the actual codebase.
+- **Objective:** Verify correctness. If bugs exist, name each one as a finding with a fix.
+- **Output:** the `review` block of the plan, written by `specdev review record` from your findings file and your verdict.
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
 
-Before marking a milestone complete, verify all deliverables listed in `14_roadmap.json` for that milestone are satisfied by `execution_results`. A milestone with unverified deliverables MUST NOT be marked `done`.
-
-## Crucial Side Effect (Anchor + Roadmap Sync)
-
-> **Agentified flow note:** When running via `/specdev-trinity --phase review`, the
-> anchor/roadmap sync is performed by the skill's post-convergence Step C3, not by this
-> prompt directly. The skill synthesizes the `review` block, writes `review.verdict`, and
-> then presents an operator AskUserQuestion gate before updating the three files below. If
-> running 16c manually (human-driven flow), execute this Crucial Side Effect yourself as
-> documented here.
-
-- If your `verdict` is `verified`, you **MUST** also update:
-    - `spec/16_impl_context.json` (Trinity Anchor): Set the corresponding `plan.milestone_index[<this milestone>].status` to `done` and update its `summary` line.
-    - `spec/14_roadmap.json`: Set the corresponding milestone's status to `done`.
-    - `spec/09_impl_plan.json`: Set the corresponding milestone's status to `done`.
-- This ensures the anchor, roadmap, and implementation plan stay in sync with implementation reality. Skipping the anchor update leaves a stale status that blocks the next milestone from claiming the same FRs.
+Before you record `verified`, check that every task criterion of the milestone is realised by a plan item (`specdev trace --recipe 16c` lists them) and that no item is left unexecuted. A milestone with unrealised or unproven criteria MUST NOT be `verified`.
 
 # Field Definitions & Rules (MANDATORY)
 
-You must populate the `review` JSON object according to these specific definitions.
+## 1. The findings file and `specdev review record`
+Reviewer agents write their findings as a file under `.specdev/findings/` (`findings_<scope>_<round>.json`); in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`):
 
-## 1. `review.fixture_status` (The Scoreboard)
-*   **The Final Gatekeeper**.
-*   `implemented_interfaces`: List only endpoints that are LIVE and passing.
-*   `test_results`: List status for critical fixtures (allowed values per `schema/16_impl_context.schema.json` `review.fixture_status.test_results.items.status` enum).
-*   `ci_status`: Overall health (allowed values per `schema/16_impl_context.schema.json` `review.fixture_status.ci_status` enum).
-*   *Heuristic*: If `ci_status` is red, you CANNOT have a `verified` verdict.
-*   *Example*:
-    ```json
-    "test_results": [
-        { "fixture_ref": "fixture-draft-not-public", "status": "pass" },
-        { "fixture_ref": "fixture-admin-api-unauthorized", "status": "pass" }
-    ]
-    ```
+```json
+{
+  "$schema": "vc:infra:findings",
+  "round": 1,
+  "scope": "ms-account-recovery",
+  "generated_at": 1795305600,
+  "findings": [
+    {
+      "kind": "bug",
+      "location": "src/routes/password-resets/confirm.ts#L14",
+      "signature": "reused-token-second-redemption-returns-200",
+      "message": "src/routes/password-resets/confirm.ts:14 marks the token used after the password update, so a concurrent second redemption can still succeed; this violates the item PWRESET_CONFIRM_REUSED_01 and its criterion tc-confirm-reused-token.",
+      "severity": "P0",
+      "evidence": ["npm run test:contract: FAILED reused token, expected 410, got 200"],
+      "suggested_fix": "Mark the token used in the same transaction that sets the password, and return 410 when the update finds it already used.",
+      "upstream_refs": ["PWRESET_CONFIRM_REUSED_01"]
+    }
+  ]
+}
+```
+*   `"$schema": "vc:infra:findings"` is required. `scope` is a short id (lowercase letters, digits, `_`, `-`, or uppercase letters, digits, `_`): the milestone id, or a plan-item id for a review of one item.
+*   `kind` is one of `gap, miss, bug, regression, assumption, ambiguity, hallucination, drift, coverage, determinism, seed-grounding`; `severity` is `P0`, `P1` or `P2`. The tool maps them: P0 to `blocking`, P1 to `major`, P2 to `minor`; `bug`/`regression`/`drift`/`determinism` to type `bug`, `gap`/`miss`/`seed-grounding` to `gap`, `assumption`/`ambiguity` to `design`, `hallucination` (behavior no criterion backs) to `scope_creep`, `coverage` to `tests`.
+*   Name the plan items a finding concerns: the file's `scope` when it is a plan-item id, and each `upstream_refs` entry written as a plan-item id. Each must be an item of the plan, or `review record` refuses the file (E823).
+*   A finding with `"status": "verified"` is fixed and confirmed and is left out of the review. A finding's `message` is at most 600 characters; the review holds at most 50 open findings.
+*   A blocking or major finding (and any finding with a `suggested_fix`) gets a `remediation_task` made from its `suggested_fix` (else its `message`) and the file part of its `location`.
 
-## 2. `review.ratings` (The Rubric)
-*   Provide a 0-5 score for:
-    *   `spec_completeness`: Are all specs met? **Are spec items verbose and atomic?**
-    *   `code_quality`: Is the code clean/safe?
-    *   `tests_completeness`: Are all paths tested?
-    *   `docs_completeness`: Are docs updated?
-    *   `metadata_usage`: How well are canonical references and traceability metadata used? (Is `canonical_refs_used` populated? Are all `*_ref` fields present and carrying valid `cn:` IDs? Are `canonical_proposals` added for new terms? Do all trace links resolve?)
-    *   **(New)**: `review.ratings` object MUST include `metadata_usage`.
-*   **Scale**:
+Then record the verdict:
+
+```bash
+specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred \
+  --findings-file .specdev/findings/<file>.json \
+  [--next-actions TEXT] [--security-status green|red] [--ratings-json '{"spec_completeness":4,...}']
+```
+It replaces the whole `review` block with this one verdict (no history), adds the time, and prints the plan's size before and after. `--ratings-json` is an object of all five ratings of section 2. It checks the input and not your judgement: it refuses an unknown verdict, a findings file that is invalid or names an unknown plan item (E823) and a closed milestone (E820), and accepts `verified` with a blocking finding. The rules of "Reviewer judgement" below are yours to apply. You never write `execution`, `review`, a time or a hash by hand; `semantic_review` and `delivery_status` are not written by `review record`, so report scope creep and delivery gaps as findings.
+
+## 2. Ratings (the rubric)
+*   Provide a 0-5 integer for all five: `spec_completeness` (are all criteria realised? are items verbose and atomic?), `code_quality`, `tests_completeness`, `docs_completeness`, `metadata_usage` (are references and traceability used well? do all links resolve?).
+*   **Scale** (reviewer judgement — rating bounds):
     *   **5**: Exemplary. Verified. (Specs are exhaustive, no "hand-waving").
     *   **4**: Good (minor nits). Verified.
     *   **3**: Acceptable (missing edges, or spec was slightly vague but code works).
-    *   **2**: Needs Improvement (critical tests fail OR spec was ambiguous/missing metadata). Deferred.
+    *   **2**: Needs Improvement (critical tests fail OR spec was ambiguous). Deferred.
     *   **1**: Poor (major bugs OR "magic" implementation vs spec). Rejected.
     *   **0**: Blocked.
 
 ## 2b. `plan.docs_impact` (Docs Gate)
 *   If code changes are present, `plan.docs_impact.status` MUST be `required` and `docs_touched` MUST be non-empty.
-    *   *Rule*: Spec changes (including `spec/common/seed_manifest.json` and any `spec/*.json`) are code changes and REQUIRE docs updates.
-*   Verify that every doc in `plan.docs_impact.docs_touched` was updated and appears in `execution.files_touched`.
-*   If docs are missing or status is `not_required` despite code changes, add a `docs` finding with `major` severity.
+*   Verify that every doc in `plan.docs_impact.docs_touched` was updated (`git diff --name-only <base>`).
+*   If docs are missing or status is `not_required` despite code changes, add a `gap` finding of severity `P1`.
 
-## 3. `review.findings` (Gaps / Bugs / Scope Creep)
-*   List every issue as a structured object:
-    *   `type`: allowed values defined in `schema/16_impl_context.schema.json` (`review.findings.items.type` enum).
-    *   `severity`: allowed values defined in `schema/16_impl_context.schema.json` (`review.findings.items.severity` enum).
-    *   `spec_ref`: **MANDATORY**. Cite the spec/plan line violated.
-        *   *Check*: Does the code match the Spec Version/Commit hash? If mismatch, flag as `gap`.
-    *   `description`: Concrete description of the issue.
-    *   `metadata`: Optional map for `source` (e.g. "User Feedback") or `impact` (e.g. "Data Loss").
-    *   `remediation_task`: **REQUIRED for Blocking/Major items**.
-        *   See Section 3 below.
+## 3. Findings (gaps, bugs, scope creep)
+*   List every issue as a finding of section 1. Cite what you saw (`file:line`), why it matters, and the item or criterion it violates.
+*   A finding for a blocking or major issue carries a `suggested_fix` that says what to change in which file.
+*   Behavior that no criterion backs is a `hallucination` finding.
 
-## 4. `review.findings[].remediation_task` (Recursion)
-*   For every significant finding, you must define a nested task to fix it.
-    *   `task_id`: `rev-{step_id}-{index}` (e.g., `rev-api-01`).
-    *   `summary`: One-line fix instruction.
-    *   `checklist_ids`: Link to the relevant checklist items.
-    *   `files_to_touch`: List specific files to fix.
-*   *Expectation*: This object allows the Coder (16b) to run again and fix the issue.
-
-## 4b. `review.semantic_review` (required when verdict = verified)
-
-For each FR ID referenced in the checklist items:
-1. Set `fr_id` to the functional requirement ID from `spec/04_fr_list.json`
-2. Set `satisfied: true` only if:
-   - ≥1 checklist item has this FR in its `spec_ref.id`
-   - That item's `implementation.status == "verified"` with evidence
-   - Corresponding test appears in `execution.critical_evidence.passed_test_commands`
-3. Write `evidence_summary`: cite specific evidence content, not generic phrases. When `satisfied: false`, `evidence_summary` MUST cite the specific missing assertion, failing test, or unimplemented behavior — not a generic phrase like "Not implemented".
-4. List all `checklist_ids` that satisfy this FR (MANDATORY — `checklist_ids` is required even if `satisfied: false`; use `[]` only if no checklist item references this FR)
-
-`hallucinated_features`: List any implemented behavior NOT traceable to any FR, capability, or roadmap task. **Always include this field; use `[]` to explicitly assert no untraced behavior was detected.**
-
-`scope_delta`: Free-text summary of any scope creep or unplanned features detected during review. Include this field when any behavior deviates from the planned milestone scope. Omit only when scope is exactly as planned.
-
-**FORBIDDEN:**
-- `satisfied: true` when no evidence exists
-- Skipping FRs that appear in checklist spec_refs
-- Empty `evidence_summary`
-- Omitting `checklist_ids` from any `fr_coverage` entry
-
-## 5. `review.verdict` (Closure Decision)
-
-Allowed verdict values are defined in `schema/16_impl_context.schema.json` (`review.verdict` enum). Decision guidance for each value:
+## 4. The verdict
+Allowed verdicts: `verified`, `needs_work`, `blocked`, `deferred` (the `review.verdict` enum of `schema/16_impl_context.schema.json`). Decision guidance:
 
 | Verdict | Condition | Rating |
 |---------|-----------|--------|
-| `verified` | All tests passed, all evidence bound, ci_status == green | 4-5 |
+| `verified` | Every item executed or proven, no blocking finding, CI-stage bindings pass | 4-5 |
 | `needs_work` | Minor issues, clear remediation path | 2-3 |
 | `blocked` | External dependency missing, cannot proceed without unblocking action | 0-1 |
 | `deferred` | Intentionally postponed; scope moved out of current cycle | 0-3 |
 
-### CRITICAL: Verdict Gates
-1. `verdict: verified` is **FORBIDDEN** if `fixture_status.ci_status == red`
-2. `verdict: verified` is **FORBIDDEN** if any `blocking` finding exists
-3. `verdict: verified` is **FORBIDDEN** if any checklist item lacks evidence
+### Reviewer judgement (the tool does not enforce these)
+`review record` checks input only. Each rule below is reviewer judgement: apply it yourself, and say in `--next-actions` which one held a `verified` back.
+1.  **Blocking finding forbids `verified`** — reviewer judgement: with a `blocking` (P0) finding the verdict is not `verified`.
+2.  **Security RED forbids `verified`** — reviewer judgement: with `--security-status red` the verdict is not `verified`.
+3.  **Rating evidence (ENF-140)** — reviewer judgement: a rating of 3 or less cites the evidence that lowers it; a rating above 3 is not given while any evidence is missing, and 5 not without verified security checks.
+4.  **Remediation for every finding (ENF-144)** — reviewer judgement: every finding says how to fix it (a `suggested_fix`); a finding you will not fix says why.
+5.  **Rating bounds** — reviewer judgement: the scale of section 2 bounds the verdict; `verified` takes 4-5.
+6.  **Vague findings** — reviewer judgement: a finding cites a specific location and line and the item or criterion it violates; "the code has issues" is not a finding.
+7.  **Per-item verdicts** — reviewer judgement: every plan item is either executed or proven, or named by a finding; no item is left unaddressed.
 
-## 6. `review.security_status` & `review.delivery_status`
-*   **Security (Gate)**:
-    *   Verify `plan.security.new_fixtures` are implemented and passing.
-    *   *Check*: Do they cover the specific threats?
-    *   *Verdict*: `green` only if all mitigations verified.
-*   **Delivery (Gate)**:
-    *   Verify `deployments` are recorded for all active environments (`dev`, `staging`, `prod`).
-    *   *Check*: Are `dashboards` linked to NFRs? Do links work?
-    *   *Check*: Do `alerts` exist for all Critical NFRs?
-    *   *Verdict*: `red` if any Critical NFR is unmonitored.
-*   *Example*:
-    ```json
-    "delivery_status": {
-        "deployments": [
-            { "env": "dev", "build_id": "b123", "status": "success" },
-            { "env": "staging", "build_id": "b456", "status": "success" }
-        ],
-        "dashboards": [
-            {
-                "dashboard_id": "dashboard-availability",
-                "nfr_refs": ["nfr-availability-uptime"],
-                "url": "https://monitoring.example.com/dashboards/availability"
-            }
-        ],
-        "alerts": [
-            {
-                "alert_id": "alert-latency-high",
-                "nfr_ref": "nfr-latency-page-load",
-                "rule": "p99 > 200ms",
-                "severity": "critical"
-            }
-        ]
-    }
-    ```
+## 5. Security and delivery gates
+*   **Security (gate)**: the threats of the milestone are in the 16c pack and in the task criteria that refine them. Check the code and the evidence for each, and set `--security-status green` only when every mitigation is verified; otherwise `red` and a finding.
+*   **Delivery (gate)**: verify `plan.delivery` was carried out: dashboards linked to NFRs work, alerts exist for all Critical NFRs. A Critical NFR that is unmonitored is a finding.
 
-## 7. Advanced Schema Fields (Verification Rules)
-You must **VERIFY** that the Coder respected these high-fidelity fields.
-*   **`checklist` Coverage**:
-    *   Verify checklist item implementation evidence and alignment with `plan.spec_alignment.checklist[]`.
-    *   `legacy_test_output`: Did the `execution.evidence` match the expected output format?
-*   **`plan.context.coding_examples`**:
-    *   *Check*: Did the implementation follow the provided `code` structure?
-*   **Populating Metadata**:
-    *   When creating `review.findings`, you **MUST** populate `metadata` with:
-        *   `source`: Where did you find this issue? (e.g. "Manual Audit", "CI Log").
-        *   `impact`: What is the risk? (e.g. "Data Loss", "Security Bypass").
+## 6. Advanced Schema Fields (Verification Rules)
+*   **`plan.context.coding_examples`**: did the implementation follow the provided `code` structure? A deviation is a finding.
+*   Spec-level proof (criteria proven, verifiers passing, attestations) is computed by the toolkit, not asserted by you: spot-check it with `specdev verify run --milestone <milestone-id> --stage ci` and read the PASS/FAIL lines; a failing binding is a finding.
 
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- **spec/impl_context/{milestone_snake}_plan.json**: the milestone context file you are reviewing — the same artifact 16a authored and 16b populated with execution evidence. 16c reads `plan.spec_alignment.checklist[]`, `execution.execution_results[]`, and `execution.critical_evidence` and writes `review.verdict`, `review.findings`, `review.semantic_review`, and `review.fixture_status` into the same file.
-- **spec/16_impl_context.json**: Trinity Anchor — read `plan.summary` (scope), `plan.milestone_index[<this milestone>]` (FR ownership for this milestone), and `plan.ambiguities` (cross-cycle decisions) so the review verdict is bounded by anchor-declared scope.
-- **spec/04_fr_list.json**: FR acceptance criteria as review checklist — extract criterion_id and text for the AC-gap semantic pass and for verifying that every checklist item links back to an AC-traceable FR
+- **spec/impl_context/{milestone_snake}_plan.json**: the milestone context file you are reviewing — the same artifact 16a authored and 16b recorded execution into. 16c reads `plan.spec_alignment.checklist[]` and `execution.records[]` and, through `specdev review record`, writes the `review` block (`verdict`, `findings`, `ratings`, `next_actions`, `security_status`).
+- **spec/16_impl_context.json**: Trinity Anchor — read `plan.summary` (scope), `plan.milestone_index[<this milestone>]` (the row about this milestone) and `plan.ambiguities` (cross-cycle decisions) so the review verdict is bounded by anchor-declared scope.
+- **spec/04_fr_list.json**: FR acceptance criteria as review checklist — extract criterion_id and text for the AC-gap semantic pass and for verifying that every plan item links back to a criterion traceable to an FR
 - **spec/05_interface_contracts.json**: API contracts to verify implementation against — extract api_id, method, path, and request/response schemas used to reconcile endpoint fixtures against declared contracts
 
 #### Reference Sources (context only)
 - **spec/02a_delivery_baseline.json**: environment constraints and deployment targets used to verify that implementation evidence (e.g. CI commands, environment refs) aligns with the declared delivery baseline
 - **spec/06_invariants.json**: system invariants to check are not violated — extract invariant_id and rule text for validation-type checklist items
 - **spec/07_nfrs.json**: NFR thresholds to verify — extract nfr_id, measurement method, and threshold values used to cross-check performance and security evidence
-- **spec/08_fixtures.json**: fixture identifiers and target bindings used to verify that every checklist's `linked_test_expectation` maps to a real fixture and that `review.fixture_status` covers every declared fixture
-- **spec/11_redteam.json**: threat identifiers and severity ratings used to verify that security-sensitive code paths declared in scope have matching mitigation evidence or remediation tasks in `review.findings`
-- **spec/12_ci_gates.json**: CI gate definitions used when reconciling `review.fixture_status.ci_status` against the configured pipeline expectations
-- **spec/14_roadmap.json**: roadmap milestone definitions used to verify that this milestone's checklist actually covers every `tasks[].task_id` declared for it
+- **spec/08_fixtures.json**: fixture identifiers and target bindings used to verify that every criterion's verifier exists and that the bindings of the milestone pass
+- **spec/11_redteam.json**: threat identifiers and severity ratings used to verify that security-sensitive code paths declared in scope have matching mitigation evidence or findings
+- **spec/12_ci_gates.json**: CI gate definitions used when reconciling the CI-stage bindings against the configured pipeline expectations
+- **spec/14_roadmap.json**: roadmap milestone definitions used to verify that this milestone's plan items realise every criterion of every task declared for it
 
 # Operating Flow: Evidence-Based Audit
 
 ## Audit Checklist (Mandatory)
-For each `checklist[]` item:
-1. ☐ Does `implementation.status == verified` have evidence in `actions[]`?
-2. ☐ Does `evidence.content` contain success markers?
-3. ☐ Is `spec_ref.commit_hash` valid in git?
-4. ☐ Are files in `implementation.files_touched` within `target_file_patterns`?
-5. ☐ Does `linked_test_expectation` appear in `execution.critical_evidence.passed_test_commands`? When `test_commands[]` entries use object form (`{ command, command_ref?, description? }`), compare against the **`.command` field** of each entry — not the dict itself. `linked_test_expectation` is a free-form test identifier or command string (e.g. a pytest nodeid, a curl invocation, or a script path); it is **not** required to be a filesystem path.
-6. ☐ If code changes exist, do `plan.docs_impact` and updated docs match the execution?
+For each plan item (`checklist[]`):
+1. ☐ Is every action recorded `done` in `execution.records` (the newest record of an action counts), proven by `specdev verify run`, or marked `at_deploy`?
+2. ☐ Is the record current? `specdev spec-check` reports a stale one as W825 (what the item realises changed after it was written).
+3. ☐ Are the files changed within `plan.summary.target_file_patterns` (`git diff --name-only <base>`)?
+4. ☐ Do the item's test commands pass when you run them yourself (spot-check at least one test)?
+5. ☐ If code changes exist, do `plan.docs_impact` and the updated docs match?
+6. ☐ Does the code do what the item's `description` says, and nothing the criteria do not back?
 
 ## Red Flags (Immediate Rejection)
-- Empty `evidence.content` on verified action
-- Paraphrased evidence ("tests passed" instead of actual output)
-- `ci_status: red` with `verdict: verified`
+- An action recorded `done` that was not carried out (the code or the test is absent)
+- A failing CI-stage binding with `verdict: verified`
 - Files touched outside scope without acknowledgment
-- `checklist_status: deferred` or `checklist_status: wont_do` on an item whose `implementation.status` is `verified`
+- An open item in the plan (`execution.emergent_ambiguities`) about a node of the milestone, which the verdict ignores
 
 # Failure Modes (Pitfalls)
-*   **Rubber Stamping**: Approving based on prose summary, not test logs. *Fix*: Verify `execution.execution_results` matches `critical_evidence`.
-*   **Infinite Loop**: Failing to spawn recursive `remediation_tasks` for findings. *Fix*: Every finding must have a `task` unless it's a "won't fix".
-*   **Security Bypass**: Verifying while `security_status` is RED. *Fix*: Check Step 11 (red team) and Step 12 (CI gates) explicitly.
+*   **Rubber Stamping**: Approving based on a record's note, not on the code and the test run. *Fix*: Read the code and run the tests yourself.
+*   **Missing fix**: A finding with no way forward. *Fix*: Every finding has a `suggested_fix`.
+*   **Security Bypass**: Verifying while the security status is RED. *Fix*: Check the threats of the pack explicitly.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- The Step 16b execution artifact (`spec/impl_context/{milestone_snake}_plan.json`) is present.
+- The Step 16b execution artifact (`spec/impl_context/{milestone_snake}_plan.json`) is present and holds `execution.records`.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
 - `spec/14_roadmap.json` is present and contains at least one milestone entry.
 - `spec/05_interface_contracts.json` is present and contains at least one api entry.
 
 ## Coverage Closure
-Before emitting, verify:
-- Every checklist item in `spec/impl_context/{milestone_snake}_plan.json` has a per-item verdict in either (a) `execution.critical_evidence.satisfied_checklist_ids` (passed items) or (b) `review.findings` (failing items). `findings` is for issues only — clean items do **not** require an invented finding entry; they are recorded in `satisfied_checklist_ids` and `semantic_review.fr_coverage[*].checklist_ids`. No active checklist item should be left unaddressed.
-- All `fr_id` values in `plan.spec_alignment.checklist` appear in `semantic_review.fr_coverage` with a coverage status.
-- Every `linked_test_expectation` referenced in the checklist resolves to runnable evidence — typically a test file/nodeid, but also acceptable as a script invocation, curl probe, or other free-form test identifier (it is not required to be a filesystem path).
-- No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
-- If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
-- Every FR referenced in the active milestone's `fr_refs` has a corresponding entry in `semantic_review.fr_coverage`.
-- [ ] Review covers all FRs listed in the active milestone's `fr_refs`
-- [ ] Every finding includes a specific file:line reference (no vague "the code has issues")
-- [ ] Verdict is based on measurable criteria from FR acceptance criteria — not subjective quality judgment
-- [ ] Every high-severity finding has a remediation_task with a specific, actionable fix description (not "fix the issue")
-- [ ] `semantic_review.fr_coverage` is populated for every FR listed in the active milestone's `fr_refs` (no FR left without a coverage verdict)
-- [ ] When `verdict == "verified"`: anchor's `plan.milestone_index[<this milestone>].status` was updated to `done` (see "Crucial Side Effect" above).
+Before recording, verify:
+- Every plan item has a per-item verdict of yours: executed or proven, or named by a finding (reviewer judgement). `findings` is for issues only — a clean item does **not** need an invented finding.
+- Every task criterion of the milestone is realised by an item (the 16c pack lists criteria and items).
+- If any test command is missing or a coverage claim is unverifiable: make it a finding rather than accepting the implementation as complete.
+- [ ] Every finding includes a specific `file:line` location (no vague "the code has issues")
+- [ ] The verdict is based on measurable criteria — the criteria's text and the test runs — not subjective quality judgment
+- [ ] Every blocking or major finding has a `suggested_fix` that is specific and actionable (not "fix the issue")
+- [ ] The rules of "Reviewer judgement" held for the verdict you record
 
 ## Negative Constraints
 
 ### Verification
-1. **NEVER** accept `verified` without inspecting actual `evidence` content
-2. **NEVER** trust coder's claim without spot-checking at least one test
-3. **NEVER** approve if `ci_status == red`
-4. **NEVER** approve if mandatory `evidence_binding` is missing
+1. **NEVER** accept `verified` without inspecting the code and a test run yourself
+2. **NEVER** trust the coder's records without spot-checking at least one test
+3. **NEVER** approve while a CI-stage binding fails
+4. **NEVER** write a milestone status, a hash, a time or the `review` block by hand
 
 ### Findings
-1. **NEVER** create `blocking` or `major` finding without `remediation_task`
-2. **NEVER** write vague findings — cite specific `spec_ref` and line numbers
-3. **NEVER** skip `metadata.source` and `metadata.impact` on findings
+1. **NEVER** create a blocking or major finding without a `suggested_fix`
+2. **NEVER** write vague findings — cite a specific location and the item or criterion
+3. **NEVER** name a plan item that does not exist
 
 ### Scope
-1. **NEVER** ignore scope creep in `files_touched`
-2. **NEVER** approve if `target_file_patterns` violated
-3. **NEVER** approve incomplete checklist coverage
+1. **NEVER** ignore scope creep: files changed outside `target_file_patterns`, or behavior no criterion backs
+2. **NEVER** approve if `target_file_patterns` were violated
+3. **NEVER** approve incomplete item coverage
 
 ### Ratings
-1. **NEVER** give rating > 3 if any evidence is missing
-2. **NEVER** give rating 5 without verified security fixtures
-3. **NEVER** skip `metadata_usage` rating
-
-### Semantic Review
-1. **NEVER** emit `verdict: verified` without populating `semantic_review.fr_coverage` for every FR in the checklist
-2. **NEVER** mark `fr_id.satisfied: true` without citing concrete evidence in `evidence_summary`
+1. **NEVER** give a rating above 3 if any evidence is missing
+2. **NEVER** give rating 5 without verified security checks
+3. **NEVER** skip a rating: `--ratings-json` takes all five
 
 # Output Rule
-1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2.  The JSON must validate against `schema/16_impl_context.schema.json`.
+1.  Record the verdict with `specdev review record` as in section 1. Never write the plan file by hand. In the Output Contract the output block is what the plan file holds after the command ran.
+2.  The plan must still validate against `schema/16_impl_context.schema.json`; `specdev spec-check` shows it.
 
 # Schema Reference
 - Schema URI: vc:16-impl-context
@@ -277,102 +199,158 @@ Before emitting, verify:
 - Schema Registry: tools/schema_registry.json
 
 # Output Contract (Update Logic)
-*Input*:
+*Input* — the plan file after 16b:
 ```json
 {
   "$schema": "vc:16-impl-context",
-  "id": "ms-auth-plan",
+  "id": "plan-ms-account-recovery-reuse",
   "owner": "api",
-  "created_at": "2025-01-01T00:00:00Z",
-  "milestone": "milestone-auth",
+  "created_at": "2026-11-15T00:00:00Z",
+  "milestone": "ms-account-recovery",
   "plan": {
     "summary": {
-      "functional_summary": "Implement core API login",
-      "scope_in": ["login"],
-      "scope_out": ["oauth"],
-      "target_file_patterns": ["src/auth/routes.py"]
+      "functional_summary": "Confirm endpoint rejects a reset token that already changed a password.",
+      "scope_in": ["password-reset-confirm"],
+      "scope_out": ["sms-reset"],
+      "target_file_patterns": ["src/routes/password-resets/confirm.ts", "tests/contract/password-reset-confirm.test.ts", "docs/api/password-resets.md"]
     },
     "spec_alignment": {
       "checklist": [
         {
-          "id": "CHK_AUTH_01",
-          "realises": ["tc-auth-login-jwt"],
-          "description": "POST /login returns JWT",
+          "id": "PWRESET_CONFIRM_REUSED_01",
+          "realises": ["tc-confirm-reused-token"],
+          "description": "This item is satisfied when a second redemption of a used reset token returns HTTP 410 and leaves the password hash unchanged.",
           "type": "behavior",
           "layer": "api",
-          "implementation": { "actions": [{ "type": "file_edit", "target": "src/auth/routes.py", "description": "Return the issued token from the login handler.", "evidence": { "type": "snippet", "content": "def login(request): return issue_token(request.user)" } }] }
+          "implementation": {
+            "actions": [
+              { "id": "a01", "type": "file_edit", "target": "src/routes/password-resets/confirm.ts", "description": "Mark the token used in the same transaction that sets the password, and return 410 when it is already used." },
+              { "id": "a02", "type": "file_edit", "target": "tests/contract/password-reset-confirm.test.ts", "description": "Add the contract test that redeems the same token twice and expects 410 the second time." }
+            ]
+          }
         }
       ]
     },
-    "review_requirements": { "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"] },
-    "docs_impact": { "status": "required", "rationale": "Code changes require docs.", "docs_touched": ["README.md"] }
+    "review_requirements": { "test_commands": ["npm run test:contract"] },
+    "docs_impact": { "status": "required", "rationale": "The confirm endpoint changes its error behaviour.", "docs_touched": ["docs/api/password-resets.md"] }
   },
   "execution": {
-    "files_touched": ["src/auth/routes.py"],
-    "execution_results": [
+    "records": [
       {
-        "status": "failed",
-        "outcome_description": "JWT assertion failed in targeted auth test.",
-        "reasoning": "Login response missing token field — fix requires returning {'token': issue_token(user)} in routes.py.",
-        "command": "pytest tests/auth/test_login.py::test_jwt -q",
-        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+        "record_id": "rec-0001",
+        "about": ["PWRESET_CONFIRM_REUSED_01"],
+        "action": "a01",
+        "outcome": "done",
+        "note": "Token is marked used in the confirm transaction; 410 on reuse.",
+        "realises_hash": "sha256:17e601012af4d6672c321317fc373a15c18efe30b1d5679830934128cb361c6a",
+        "recorded_at": "2026-11-21T07:35:51Z",
+        "git_author": { "name": "Dev One", "email": "dev.one@example.com" }
+      },
+      {
+        "record_id": "rec-0002",
+        "about": ["PWRESET_CONFIRM_REUSED_01"],
+        "action": "a02",
+        "outcome": "done",
+        "note": "Contract test redeems the token twice and expects 410.",
+        "realises_hash": "sha256:17e601012af4d6672c321317fc373a15c18efe30b1d5679830934128cb361c6a",
+        "recorded_at": "2026-11-21T07:35:52Z",
+        "git_author": { "name": "Dev One", "email": "dev.one@example.com" }
       }
-    ],
-    "emergent_ambiguities": []
+    ]
   },
-  "review": {},
-  "canonical_refs_used": [{ "id": "cn:core:unit:ms", "kind": "unit" }],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }
 ```
 
-*Output*:
+*Output* — the same file after `specdev review record ms-account-recovery --verdict needs_work --findings-file <the file of section 1> --next-actions "..." --security-status green --ratings-json '{...}'`; the `review` block is written by the command:
 ```json
 {
   "$schema": "vc:16-impl-context",
-  "id": "ms-auth-plan",
+  "id": "plan-ms-account-recovery-reuse",
   "owner": "api",
-  "created_at": "2025-01-01T00:00:00Z",
-  "milestone": "milestone-auth",
+  "created_at": "2026-11-15T00:00:00Z",
+  "milestone": "ms-account-recovery",
   "plan": {
-    "summary": { "functional_summary": "Implement core API login", "scope_in": ["login"], "scope_out": ["oauth"], "target_file_patterns": ["src/auth/routes.py"] },
-    "review_requirements": { "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"] }
+    "summary": {
+      "functional_summary": "Confirm endpoint rejects a reset token that already changed a password.",
+      "scope_in": ["password-reset-confirm"],
+      "scope_out": ["sms-reset"],
+      "target_file_patterns": ["src/routes/password-resets/confirm.ts", "tests/contract/password-reset-confirm.test.ts", "docs/api/password-resets.md"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "PWRESET_CONFIRM_REUSED_01",
+          "realises": ["tc-confirm-reused-token"],
+          "description": "This item is satisfied when a second redemption of a used reset token returns HTTP 410 and leaves the password hash unchanged.",
+          "type": "behavior",
+          "layer": "api",
+          "implementation": {
+            "actions": [
+              { "id": "a01", "type": "file_edit", "target": "src/routes/password-resets/confirm.ts", "description": "Mark the token used in the same transaction that sets the password, and return 410 when it is already used." },
+              { "id": "a02", "type": "file_edit", "target": "tests/contract/password-reset-confirm.test.ts", "description": "Add the contract test that redeems the same token twice and expects 410 the second time." }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": { "test_commands": ["npm run test:contract"] },
+    "docs_impact": { "status": "required", "rationale": "The confirm endpoint changes its error behaviour.", "docs_touched": ["docs/api/password-resets.md"] }
   },
   "execution": {
-    "files_touched": ["src/auth/routes.py"],
-    "emergent_ambiguities": []
+    "records": [
+      {
+        "record_id": "rec-0001",
+        "about": ["PWRESET_CONFIRM_REUSED_01"],
+        "action": "a01",
+        "outcome": "done",
+        "note": "Token is marked used in the confirm transaction; 410 on reuse.",
+        "realises_hash": "sha256:17e601012af4d6672c321317fc373a15c18efe30b1d5679830934128cb361c6a",
+        "recorded_at": "2026-11-21T07:35:51Z",
+        "git_author": { "name": "Dev One", "email": "dev.one@example.com" }
+      },
+      {
+        "record_id": "rec-0002",
+        "about": ["PWRESET_CONFIRM_REUSED_01"],
+        "action": "a02",
+        "outcome": "done",
+        "note": "Contract test redeems the token twice and expects 410.",
+        "realises_hash": "sha256:17e601012af4d6672c321317fc373a15c18efe30b1d5679830934128cb361c6a",
+        "recorded_at": "2026-11-21T07:35:52Z",
+        "git_author": { "name": "Dev One", "email": "dev.one@example.com" }
+      }
+    ]
   },
   "review": {
+    "findings": [
+      {
+        "id": "finding-01",
+        "type": "bug",
+        "severity": "blocking",
+        "spec_ref": { "type": "code", "id": "ms-account-recovery", "note": "src/routes/password-resets/confirm.ts#L14" },
+        "description": "src/routes/password-resets/confirm.ts:14 marks the token used after the password update, so a concurrent second redemption can still succeed; this violates the item PWRESET_CONFIRM_REUSED_01 and its criterion tc-confirm-reused-token.",
+        "metadata": { "source": "findings round 1, scope ms-account-recovery", "impact": "npm run test:contract: FAILED reused token, expected 410, got 200" },
+        "related_checklist_ids": ["PWRESET_CONFIRM_REUSED_01"],
+        "remediation_task": {
+          "task_id": "fix-finding-01",
+          "summary": "Mark the token used in the same transaction that sets the password, and return 410 when the update finds it already used.",
+          "files_to_touch": ["src/routes/password-resets/confirm.ts"],
+          "checklist_ids": ["PWRESET_CONFIRM_REUSED_01"]
+        }
+      }
+    ],
+    "verdict": "needs_work",
+    "recorded_at": "2026-11-21T07:37:49Z",
+    "next_actions": "Fix the reuse race and run npm run test:contract again.",
+    "security_status": "green",
     "ratings": {
       "spec_completeness": 3,
       "code_quality": 3,
-      "tests_completeness": 2,
-      "docs_completeness": 3,
+      "tests_completeness": 3,
+      "docs_completeness": 4,
       "metadata_usage": 4
-    },
-    "verdict": "deferred",
-    "findings": [
-      {
-        "id": "finding-auth-01",
-        "type": "bug",
-        "severity": "major",
-        "spec_ref": { "type": "api", "id": "api-auth-login" },
-        "description": "src/auth/routes.py:L14 — login response omits token field required by api-auth-login contract.",
-        "remediation_task": {
-          "task_id": "rev-api-core-01",
-          "summary": "Add `token` field to login response in src/auth/routes.py:L14 — return `{\"token\": issue_token(user)}`.",
-          "checklist_ids": ["CHK_AUTH_01"],
-          "files_to_touch": ["src/auth/routes.py"]
-        },
-        "metadata": { "source": "execution_results", "impact": "blocks authentication acceptance criteria" }
-      }
-    ],
-    "next_actions": "Implement remediation task and rerun targeted auth tests."
+    }
   },
-  "canonical_refs_used": [{ "id": "cn:core:unit:ms", "kind": "unit" }],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }
 ```
-

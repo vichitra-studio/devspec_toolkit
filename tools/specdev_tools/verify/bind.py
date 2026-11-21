@@ -69,7 +69,7 @@ def _verifier_of(graph: Graph, verifier_id: str) -> Node:
         raise refusal("E767", f"'{node.id}' is not_applicable and takes no binding; set it active first or bind another verifier")
     item = item_of(graph, node) or {}
     if node.kind == FIXTURE and item.get("mode") == MANUAL_MODE:
-        raise refusal("E767", f"fixture '{node.id}' is manual and is not run, so it takes no binding; a person attests it")
+        raise refusal("E767", f"fixture '{node.id}' is manual and is not run, so it takes no binding; a person attests it with `specdev verify attest {node.id}`")
     return node
 
 

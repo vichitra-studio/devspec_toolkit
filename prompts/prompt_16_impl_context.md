@@ -5,13 +5,13 @@
 Run `specdev prompt-context 16` to see downstream consumers.
 
 ## Purpose
-Create or update the **Trinity Anchor** at `spec/16_impl_context.json`. The anchor is the **union/root scope declaration** for a multi-milestone implementation cycle. It is validated against `vc:16-anchor` — a schema distinct from the per-milestone `vc:16-impl-context` used by 16a/16b/16c. The anchor's job is scope + cross-milestone drift detection; it does **not** carry per-FR checklist detail (that lives in each 16a plan).
+Create or update the **Trinity Anchor** at `spec/16_impl_context.json`. The anchor is the **union/root scope declaration** for a multi-milestone implementation cycle. It is validated against `vc:16-anchor` — a schema distinct from the per-milestone `vc:16-impl-context` used by 16a/16b/16c. The anchor's job is scope + cross-milestone drift detection; it does **not** carry per-item checklist detail (that lives in each 16a plan).
 
 The anchor must:
 1. Declare the full scope spanning every milestone in this cycle (`plan.summary`).
 2. Carry forward unresolved decisions and ambiguities across Trinity cycles (`plan.ambiguities`).
 3. Record drift checks performed across milestone cycles (`plan.drift`).
-4. Register which milestones own which FRs/APIs and under which checklist ID namespace (`plan.milestone_index`).
+4. Register one row per roadmap milestone: its anchor id, the milestone it is about, its checklist ID namespace and a one-line summary (`plan.milestone_index`). Which tasks a milestone owns is read from its 16a plan, never stored on the row.
 
 ## When To Use This Prompt
 - You are starting a new Trinity cycle and need the root anchor before any 16a milestone plan.
@@ -19,7 +19,8 @@ The anchor must:
 
 ## When NOT To Use This Prompt
 - You are authoring a per-milestone **implementation plan** (16a) — use `prompt_16a_impl_planner.md` against `spec/impl_context/<milestone>_plan.json` (schema `vc:16-impl-context`).
-- You are recording execution evidence (16b) or review verdicts (16c) — those write into the same milestone context file.
+- You are recording execution (16b: `specdev plan record`) or a review verdict (16c: `specdev review record`) — those commands write into the milestone's plan file.
+- You want to move a milestone from `pending` to `in_progress`, `deferred` or `done`: the status of a row and its `close` and `deferral_reason` are written only by `specdev milestone start|defer|close`, never by this prompt.
 
 # Role
 You are a senior software architect producing the Step 16 **Trinity Anchor**.
@@ -28,9 +29,9 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- **14_roadmap.json**: milestone identifiers, statuses, and fr_refs — the authoritative source for which milestones this anchor governs and which FR/API IDs each milestone owns; drives `plan.milestone_index[]` directly
-- **04_fr_list.json**: functional requirement IDs and capability mappings — validates that every FR ID listed in `milestone_index[].fr_refs` resolves to a real requirement and informs scope boundaries
-- **05_interface_contracts.json**: API contract identifiers and endpoint boundaries — validates API IDs referenced in `milestone_index[].fr_refs`
+- **14_roadmap.json**: milestone identifiers and their tasks — the authoritative source for which milestones this anchor governs; drives `plan.milestone_index[]` directly
+- **04_fr_list.json**: functional requirement IDs and capability mappings — informs the wording of `scope_in` / `scope_out` and the boundaries between milestones
+- **05_interface_contracts.json**: API contract identifiers and endpoint boundaries — informs the wording of `scope_in` / `scope_out`
 
 #### Reference Sources (context only)
 - **08_fixtures.json**: test fixture identifiers used to sanity-check that in-scope FRs have a path to verifiable tests
@@ -40,25 +41,29 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 - **15_scaffold.json**: generated file structure that grounds per-milestone `target_file_patterns` in 16a plans
 
 # Operating Flow (MANDATORY)
-1. **Context Review**: Ingest `14_roadmap.json` (milestone list, fr_refs, status), `04_fr_list.json` (FR IDs), `05_interface_contracts.json` (API IDs). Load any existing `spec/impl_context/*.json` milestone plans to understand what is already under way.
+1. **Context Review**: Ingest `14_roadmap.json` (milestone list and tasks), `04_fr_list.json` (FR IDs), `05_interface_contracts.json` (API IDs). Read any existing `spec/impl_context/*.json` milestone plans with `specdev json read` to understand what is already under way.
 2. **Scope**: Derive `plan.summary.functional_summary`, `scope_in`, `scope_out` spanning **every milestone in this cycle**. The anchor is the union of milestone scope — not a milestone plan itself.
-3. **Milestone Index**: For every milestone in `14_roadmap.json` that participates in this cycle, emit one `plan.milestone_index[]` entry with `milestone_id`, `context_path`, `status`, `fr_refs`, `checklist_id_prefix`, and a one-line `summary`. Drop a milestone from the index only when it has been removed from the roadmap entirely.
+3. **Milestone Index**: For every milestone in `14_roadmap.json` that participates in this cycle, emit one `plan.milestone_index[]` row with `anchor_id` (`anchor-<milestone id>`), `about` (a one-item array naming the roadmap milestone), `checklist_id_prefix` and a one-line `summary`. Leave `status` out (it reads as `pending`) or write `pending`; never write `in_progress`, `deferred` or `done`, and never write `close` or `deferral_reason`: `specdev milestone start|defer|close` write them. Drop a milestone's row only when the milestone has been removed from the roadmap entirely.
 4. **Ambiguities**: Carry forward unresolved ambiguities from prior Trinity cycles and surface any new cross-milestone decisions that are not yet resolved.
 5. **Drift**: Record drift checks performed in this session and previous cycles in `plan.drift.checks` as short, dated human-readable strings (e.g., `"Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-14)"`). May be `[]` only when `plan.milestone_index` is also empty (fresh anchor with no milestones yet); otherwise at least one drift check is expected (W587 — see `docs/developers/error-codes.md`).
-6. **Emit**: Write the JSON artifact to `spec/16_impl_context.json`. The schema forbids extra fields at both the root and `plan` level — only emit the fields in the Output Contract.
+6. **Emit**: never write a file under `spec/` yourself.
+    - No anchor file yet: write the whole artifact as a draft outside `spec/` (`.specdev/drafts/step_16.json`) and run `specdev step create 16 --from .specdev/drafts/step_16.json` (`--dry-run` prints the report and writes nothing). It refuses an existing anchor file.
+    - Anchor file present, one more milestone: `specdev json insert --step 16 .plan.milestone_index '<row>'` (a row is validated and written on its own; a one-character `summary` is refused as too short).
+    - Anchor file present, any other change: `specdev json patch|insert|delete --id <node-id> ...` on the row or open item it names (for example `specdev json patch --id anchor-ms-account-recovery .summary '"<text>"'`), or `specdev json patch spec/16_impl_context.json '<path>' '<value>'` on a path that holds no node (for example `.plan.summary.functional_summary`).
+    Then run `specdev spec-check` and fix what it reports for step 16. The schema forbids extra fields at both the root and `plan` level — only emit the fields in the Output Contract.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode and emit gap questions only — do not write the artifact.
 - `spec/14_roadmap.json` is present and contains at least one milestone.
 - `spec/04_fr_list.json` is present and contains at least one `functional_requirements` entry.
 - `spec/05_interface_contracts.json` is present and contains at least one `apis` entry.
-- Every `milestone_id` you plan to list in `plan.milestone_index` exists in `14_roadmap.json`.
-- Every FR/API ID in any `plan.milestone_index[].fr_refs` resolves to a real ID in Step 04 or Step 05.
+- Every roadmap milestone you plan to name in a row's `about` exists in `14_roadmap.json`.
+- Every `about` of an open item in `plan.ambiguities` names a node that exists (`specdev node show <id>` or `specdev trace <id>` finds it).
 
 ## Coverage Closure
 Before emitting, verify:
 - Every milestone in `14_roadmap.json` appears in `plan.milestone_index`, OR is explicitly listed in `scope_out` with a rationale in `plan.ambiguities`. The anchor is the cumulative ledger — `done` milestones must remain indexed so traceability stays enforceable.
-- No FR/API ID appears in `fr_refs` of two milestones whose status is not `done` — a delivered ID may be revisited, but two active milestones cannot own the same FR simultaneously (E308 — see `docs/developers/error-codes.md`). This ownership check treats `deferred` the same as `in_progress`/`pending`: a deferred milestone still owns every FR/API ID in its `fr_refs` (intentional — releasing the claim automatically risks silent duplicate work by whichever milestone picks it up next). **To release an FR/API from a deferred milestone** so another milestone can claim it, explicitly remove that ID from the deferred milestone's `fr_refs` — there is no automatic release on deferral.
+- No roadmap task is realised by the plan items of two milestones that are not `done` (E308 — see `docs/developers/error-codes.md`). A plan owns the tasks of the criteria its items realise; `deferred` counts as not `done`. Settle this when the 16a plans are written, not on the anchor: the row stores no task list.
 - No entry in `plan.summary.scope_in` also appears in `plan.summary.scope_out` — and neither contradicts any milestone's scope.
 - Each `checklist_id_prefix` is unique across `plan.milestone_index` — 16a plans allocate checklist IDs from this namespace.
 - All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`.
@@ -66,15 +71,15 @@ Before emitting, verify:
 ## Negative Constraints
 1. **NEVER** emit sub-fields on `plan` beyond what the anchor schema (`schema/16_anchor.schema.json`) allows — `additionalProperties: false` enforces this. Fields that belong on 16a/16b/16c milestone contexts must not appear on the anchor.
 2. **NEVER** emit an `execution` or `review` top-level section.
-3. **NEVER** emit a top-level `milestone_ref` — the anchor spans all milestones.
+3. **NEVER** emit a top-level `milestone` key — that key names the one milestone of a 16a plan; the anchor spans all milestones.
 4. **NEVER** author a per-FR checklist on the anchor — that detail lives in each 16a plan.
 5. **NEVER** set `artifact_role` to anything other than `"anchor"`.
 6. **NEVER** emit placeholder or empty-string values where content is required — consult the schema for minimum lengths.
 7. **NEVER** place `16_impl_context.json` inside `spec/impl_context/`. The anchor lives at `spec/16_impl_context.json` at the spec directory root. Files in `spec/impl_context/` are milestone plans.
 
 # Heuristics For Completeness
-1. **Every `milestone_index[].milestone_id` exists in `14_roadmap.json`** — invent no IDs.
-2. **Every `fr_refs` ID resolves in Step 04 (FRs) or Step 05 (APIs)** — invent no IDs.
+1. **Every `milestone_index[].about` names a milestone of `14_roadmap.json`** — invent no IDs.
+2. **Every `about` of an open item names an existing node** — invent no IDs.
 3. **`scope_in` and `scope_out` are disjoint** on the anchor, and consistent with every milestone's own scope.
 4. **`checklist_id_prefix` values are pairwise unique** across milestones.
 5. **`ambiguities[]` carries forward** unresolved items from prior cycles — do not silently drop them.
@@ -82,20 +87,20 @@ Before emitting, verify:
 
 # Best Practices
 1. **Keep the anchor small.** A well-formed anchor fits on one screen — the schema enforces this by forbidding checklist and implementation detail.
-2. **Update the anchor whenever a milestone is added, completed, or scope shifts** — it is the cross-cycle record.
+2. **Update the anchor whenever a milestone is added or scope shifts** — it is the cross-cycle record. A milestone's progress is not an edit of yours: the milestone commands write it.
 3. **Use concrete scope strings** (`"login-endpoint"`, `"jwt-token-validation"`) not vague labels (`"auth"`).
 4. **Prefix checklist IDs by milestone** in the 16a plans (via `checklist_id_prefix`) so cross-milestone ID collisions are trivially avoided.
-5. **When resolving an ambiguity, set its `status` to `resolved`** rather than removing the entry — preserves the decision log.
+5. **An open item is deleted once its answer is applied** (`specdev json delete --id <item-id>`); it carries no status, so there is nothing to mark resolved.
 
 # Common Pitfalls
 - **Schema rejection from extra fields**: Emitting `checklist`, `review_requirements`, or `docs_impact` on the anchor. *Fix*: Author only `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`.
-- **Scope contradiction**: A milestone claims something the anchor excludes, or two active milestones claim the same FR. *Fix*: Reconcile scope and ownership before emitting.
+- **Scope contradiction**: A milestone claims something the anchor excludes, or two milestones that are not `done` realise criteria of the same task. *Fix*: Reconcile scope and ownership before emitting.
 - **Namespace collision**: Two milestones sharing the same `checklist_id_prefix`. *Fix*: Assign distinct prefixes (e.g., `AUTH`, `SESSION`, `BILLING`).
 - **Stale drift log**: Milestones are indexed but no drift checks recorded. *Fix*: Record at least one check string per Trinity cycle.
 
 # Clarification Questions
 - "Which milestones from `14_roadmap.json` should this anchor cover in the current cycle?"
-- "Are any previously-resolved ambiguities now open again (e.g., due to scope change)?"
+- "Has any open item been answered since the last cycle (delete it) or does a scope change raise a new one?"
 - "What `checklist_id_prefix` should each milestone use? (Must be unique, SCREAMING_SNAKE, ≤20 chars.)"
 
 # Schema Reference
@@ -104,48 +109,40 @@ Before emitting, verify:
 - Schema Registry: tools/schema_registry.json
 
 # Output Contract
+The example is the draft `specdev step create 16 --from <draft>` takes; a row added later with `specdev json insert --step 16` is one element of `plan.milestone_index`.
 ```json
 {
   "$schema": "vc:16-anchor",
-  "id": "anchor-v1",
+  "id": "anchor-password-reset",
   "owner": "api",
-  "created_at": "2026-02-08T00:00:00Z",
+  "created_at": "2026-11-15T00:00:00Z",
   "artifact_role": "anchor",
   "canonical_refs_used": [],
   "plan": {
     "summary": {
-      "functional_summary": "Implement Core Authentication flow — login, logout, and session management across two milestones.",
-      "scope_in": ["login-endpoint", "logout-endpoint", "session-management"],
-      "scope_out": ["oauth-flows", "mfa", "third-party-sso"]
+      "functional_summary": "Password reset by emailed single-use link.",
+      "scope_in": ["password-reset-confirm"],
+      "scope_out": ["sms-reset"]
     },
     "ambiguities": [
       {
         "id": "amb-token-ttl",
-        "description": "JWT token TTL not confirmed by security team — 24h vs 8h options remain open.",
-        "about": ["fr-token-refresh"]
+        "description": "The token lifetime is not confirmed by the security team: 30 minutes or 15 minutes remain open.",
+        "about": ["tc-confirm-expired-token"]
       }
     ],
     "drift": {
       "checks": [
-        "Verified ms-auth scope_in does not overlap anchor scope_out (2026-02-10)",
-        "Verified ms-session fr_refs do not conflict with ms-auth fr_refs (2026-02-12)"
+        "Verified the ms-account-recovery plan names a milestone of 14_roadmap (2026-11-15)"
       ]
     },
     "milestone_index": [
       {
-        "anchor_id": "anchor-ms-auth",
-        "about": ["ms-auth"],
-        "status": "done",
-        "close": {"signed_off_by": "legacy-migration", "source": "spec/impl_context/ms_auth_plan.json final_status"},
-        "checklist_id_prefix": "AUTH",
-        "summary": "Auth token issuance — all 4 checklist items verified, CI green"
-      },
-      {
-        "anchor_id": "anchor-ms-session",
-        "about": ["ms-session"],
-        "status": "in_progress",
-        "checklist_id_prefix": "SESSION",
-        "summary": "Session management — 2/4 checklist items in progress"
+        "anchor_id": "anchor-ms-account-recovery",
+        "about": ["ms-account-recovery"],
+        "status": "pending",
+        "checklist_id_prefix": "PWRESET",
+        "summary": "Confirm endpoint: expired and reused reset tokens are rejected."
       }
     ]
   }

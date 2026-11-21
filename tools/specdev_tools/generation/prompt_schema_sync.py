@@ -468,7 +468,7 @@ _PROMPT_STEP_OVERRIDE: dict[str, str] = {
 # they legitimately appear in multiple artifacts with different semantics.
 _SUBSTEP_EXPECTED_KEYS = {
     "16a": {"spec_alignment", "checklist"},
-    "16b": {"execution", "implementation", "evidence"},
+    "16b": {"execution", "implementation"},
     "16c": {"review", "verdict", "semantic_review"},
 }
 
