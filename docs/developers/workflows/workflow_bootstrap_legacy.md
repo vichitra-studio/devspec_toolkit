@@ -435,9 +435,9 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 
 ### Steps 6.3–6.5: The Trinity Loop (16a / 16b / 16c)
 
-The Trinity Loop iterates over each implementation milestone. All three steps operate on milestone-scoped execution files in `spec/impl_context/`, anchored to `spec/16_impl_context.json`. Loop back to 16a if the reviewer returns an unverified verdict.
+The Trinity Loop iterates over each implementation milestone. All three steps operate on the milestone's plan file in `spec/impl_context/`, anchored to `spec/16_impl_context.json`. Loop back to 16a if the reviewer returns an unverified verdict. The order of a milestone's life (start, record, review, sign-off, close) and who decides each step is in [Spec to implementation](spec_to_impl.md#the-life-of-a-milestone).
 
-#### Step 6.3: Impl Planner — `spec/impl_context/{step_id}.json`
+#### Step 6.3: Impl Planner — `spec/impl_context/ms_<batch>_plan.json`
 
 *Prompt: `prompts/prompt_16a_impl_planner.md`*
 
@@ -451,9 +451,9 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > - `spec/14_roadmap.json` (active milestone tasks and acceptance criteria)
 > - `spec/04_fr_list.json`, `spec/05_interface_contracts.json`
 >
-> The AI creates or updates `spec/impl_context/{step_id}.json` with the plan and checklist for the coding agent.
+> The AI writes a draft of the plan and its checklist, and the plan file is created with `specdev step create 16a <batch> --from <draft>` (an existing plan is edited with `specdev json patch|insert|delete --id <item-id>`). A person approves the plan, then `specdev milestone start <milestone-id>` starts the milestone.
 
-#### Step 6.4: Impl Coder — `spec/impl_context/{step_id}.json`
+#### Step 6.4: Impl Coder — `spec/impl_context/ms_<batch>_plan.json`
 
 *Prompt: `prompts/prompt_16b_impl_coder.md`*
 
@@ -463,12 +463,12 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > Open `prompts/prompt_16b_impl_coder.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/impl_context/{step_id}.json` (the Plan from 16a)
+> - `spec/impl_context/ms_<batch>_plan.json` (the Plan from 16a)
 > - The actual codebase files targeted by `plan.summary.target_file_patterns`
 >
-> The AI writes code files and updates the artifact's `execution` section. If ambiguities are found, it returns an artifact with `emergent_ambiguities` and no code changes — resolve them and re-run 16a.
+> The AI writes code files and records each carried-out action with `specdev plan record <ITEM>/<action-id> --outcome done` (an action that names a verifier is proven by `specdev verify run <binding>` instead). If ambiguities are found, it writes them into `execution.emergent_ambiguities` and stops — resolve them and re-run 16a.
 
-#### Step 6.5: Impl Reviewer — `spec/impl_context/{step_id}.json`
+#### Step 6.5: Impl Reviewer — `spec/impl_context/ms_<batch>_plan.json`
 
 *Prompt: `prompts/prompt_16c_impl_reviewer.md`*
 
@@ -478,10 +478,10 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > Open `prompts/prompt_16c_impl_reviewer.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/impl_context/{step_id}.json` (Plan + Execution)
+> - `spec/impl_context/ms_<batch>_plan.json` (Plan + Execution)
 > - The actual codebase for the implemented milestone
 >
-> The AI audits the implementation against the plan and spec. If `verdict` is `verified`, the milestone's row in the anchor `spec/16_impl_context.json` (`plan.milestone_index[]`) is set to `status: done` with its `close` record; `spec/14_roadmap.json` and `spec/09_impl_plan.json` carry no milestone status. If unverified, loop back to Step 16a with the surfaced remediation tasks.
+> The AI audits the implementation against the plan and spec and writes a findings file; the verdict is recorded with `specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred --findings-file <file>`. The milestone is closed only by commands: the code is committed, `specdev verify run --milestone <milestone-id> --stage ci` runs, a person signs the milestone off (`specdev milestone sign-off <milestone-id>`), and `specdev milestone close <milestone-id>` runs the close gate and sets the milestone's row in the anchor `spec/16_impl_context.json` (`plan.milestone_index[]`) to `status: done` with its `close` record. `spec/14_roadmap.json` and `spec/09_impl_plan.json` carry no milestone status. If unverified, loop back to Step 16a with the surfaced remediation tasks.
 
 **Validation ritual after each Trinity Loop iteration:**
 ```bash

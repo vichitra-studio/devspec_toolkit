@@ -8,8 +8,9 @@ The following flags are available on most spec-operating commands, including
 `spec-quality-lint`, `hallucination-lint`,
 `milestone-state`, and `canon-schema-alignment`; the trace commands `stale`,
 `attest`, `coverage`, `step create`, `step ready`, `node rename`,
-`lock install-driver`, `verify bind`, `verify run`, `third-party pin` and
-`third-party check` take all three (and `--json`). Per-command exceptions (per
+`lock install-driver`, `verify bind`, `verify run`, `verify attest`, `third-party pin`,
+`third-party check`, `plan record`, `review record`, `milestone start|defer|sign-off|close`
+and `status` take all three (and `--json`). Per-command exceptions (per
 CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
 `--spec-root`; the path forms of `specdev json` (`read`, `patch`, `insert`, ...)
 take `--repo-root` only, while `json patch|insert|delete --id` and
@@ -166,9 +167,11 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh changelog --version <version> --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --validate <version> --repo-root ./devspec_toolkit
 
-# Trinity milestone-state — deterministic phase-position computation (DEVSPEC-38)
+# Trinity milestone-state — deterministic phase-position computation (DEVSPEC-38); prints the milestone id
 ./tools/run_specdev.sh milestone-state --batch-id <batch-id> \
   --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+# The life of a milestone (a person decides sign-off, defer and manual attestation): see "The life of a milestone"
+./tools/run_specdev.sh status --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Targeted JSON read/query of a spec artifact (avoids direct Read)
 ./tools/run_specdev.sh json read spec/03_glossary.json '.terms[0].id' --repo-root ./devspec_toolkit
@@ -336,7 +339,7 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 | `specdev attest --prune [--dry-run]` | Remove the lock entries whose link no longer exists (E762), and the verification and evidence records whose every `verifies` / `about` target is gone (repeated until none dangles, so the evidence of a removed binding goes with it; a record that still has a target is kept). It writes at once, without `--yes`; `--dry-run` lists and deletes nothing. The text adds `attest --prune: removed N orphan records` and one file per line (`would remove` with `--dry-run`); `--json` carries `pruned_records` (a list, empty when no record was removed). E520 while a spec file cannot be read, with `--dry-run` as well |
 | `specdev lock merge BASE OURS THEIRS PATH` | The git merge driver of the lock: merges the three versions entry by entry and writes the result over OURS. Git runs it with `%O %A %B %P`; it takes no root flags. When both sides changed one entry in different ways, the entry the common ancestor had is kept, or, when it had none, the entry with the smaller chain stamp (string order); the link is suspect again when its target changed after the kept entry. E760 for an input that is not a valid lock, E520 for a file that cannot be read |
 | `specdev lock install-driver --driver-command CMD` | Set up the merge driver in the clone at the git root (`--git-root`, or the folder that holds `--spec-root`): add the line `<path of the lock relative to the git top level> merge=specdev-trace-lock` (`spec/extras/trace.lock.json merge=specdev-trace-lock` when the spec folder is `spec/` at the top level, `sub/spec/extras/trace.lock.json merge=specdev-trace-lock` for a spec folder `sub/spec`) to the file `git rev-parse --git-path info/attributes` names (`<top>/.git/info/attributes`; in the nested layout `git check-attr merge -- sub/spec/extras/trace.lock.json` then says `specdev-trace-lock`), and set `merge.specdev-trace-lock.driver` to `CMD %O %A %B %P`. Running it again changes nothing. Quote what a shell needs quoted in `CMD`, for example `'<venv>/bin/specdev lock merge'` |
-| `specdev step create NN --from DRAFT [--dry-run]` | Write the file of step NN from a JSON draft that holds the whole artifact (ids of sub-items may be left out; they are minted). The draft is checked against the step's schema, every link must resolve, and the lock entries of its links are written. E767 when the step already has its file (use `json ... --id`), for steps 16 to 16c (E767 `step 16 has no spec file that step create writes`), for a draft that cannot be read or whose `$schema` is not the step's; `step create` has no `--full`. The skills write the draft outside `spec/`, at `.specdev/drafts/step_<NN>.json`, then run `step create NN --from` on it and gate the step with `spec-check --step NN` |
+| `specdev step create NN --from DRAFT [--dry-run]` | Write the file of step NN from a JSON draft that holds the whole artifact (ids of sub-items may be left out; they are minted). The draft is checked against the step's schema, every link must resolve, and the lock entries of its links are written. **Step 16** creates the anchor `16_impl_context.json` when it is missing, and **step 16a** takes a batch name, `step create 16a <batch> --from DRAFT`, and creates the plan file `impl_context/ms_<batch>_plan.json` (the batch is letters, digits, `_` and `-`; the draft carries the ids of its plan items, actions and open items, which are not minted); a milestone has one plan file, so a draft whose `milestone` already has one is E767 (`step create` creates a second plan only for another milestone). E767 when the step already has its file (use `json ... --id`), for step 16b or 16c (`E767 step 16b has no spec file of its own: it is a part of the plan file of step 16a`; their content is written by `plan record` and `review record`, below), for a batch given to a step that is not 16a or missing for 16a, for a draft that cannot be read or whose `$schema` is not the step's; `step create` has no `--full`. The skills write the draft outside `spec/`, at `.specdev/drafts/step_<NN>.json`, then run `step create NN --from` on it and gate the step with `spec-check --step NN` |
 | `specdev step ready NN` | Exit 0 and `step NN: ready` when every step NN links to has a spec file and no pending replay (a suspect link, or a coverage gap: E740, E742 or E743); otherwise E773 with the blockers, exit 1, and a last line by the blockers of the first step: `write step NN first` for a missing file, `replay step NN first` for suspect links, `fix the coverage gaps of step NN first` for coverage gaps only, `replay step NN first and fix its coverage gaps` for both; E520, exit 1, when a spec file cannot be read. `--json` adds `ready`, `upstream`, `replay_first` and `blockers`. The step's own file is not required. When NN has no spec file yet, the steps checked, for presence and for pending replay, are its declared inputs (the `required_spec_inputs` of NN in `tools/step_order.json`); run on copies of the worked example with the files from step K on removed, `step ready` printed `ready` for K = 02, 04 and 05, `not ready, 1 blocker` (step 07: `coverage gap E740: metric-reset-completion-rate`) for K = 08 and 09, and `not ready, 11 blockers` (steps 07, 08 and 12) for K = 14. |
 | `specdev coverage [--by fr]` | Information, no gate: exit 0 when it shows the counts and unlinked ids; a spec file that cannot be read is a warning on stderr, a lock that cannot be read is E760, exit 1. How many FRs have an API, how many have a fixture and how many capabilities have an FR, with the ids that are not linked; the criteria that have a current refinement; and the exempt FRs, capabilities and criteria (lifecycle `not_applicable`, scope `later` or `out`), which no count includes. A `Role findings` section lists the coverage gaps (E740, E742, E743) by owner step, with a count of each code (`E740: N`, `E743: N`). `--by fr` prints, per FR and criterion, the nodes that link to it directly, each with `current`, `suspect` and `historical` in `--json` (the text prints `[not current, suspect]` for a suspect link). No rule requires an FR to have an API |
 
@@ -374,7 +377,36 @@ Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root`
 ./tools/run_specdev.sh third-party check --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-`spec-check` reads the records in its `records` check (see above); a binding that no run has covered is not an error of `spec-check`. The findings that say a binding has no valid evidence (E347, E348) are returned by the library function `proof_errors` for the close and release gates, which no command runs in this release.
+`spec-check` reads the records in its `records` check (see above); a binding that no run has covered is not an error of `spec-check`. The findings that say a binding has no valid evidence (E347, E348) are returned by the library function `proof_errors`; `specdev milestone close` runs the close gate that calls it and prints them as E811, `specdev status --milestone` shows them as a dry run (see "The life of a milestone" below), and the release gate that calls it too is not in this release. A fixture with mode `manual` and a rule enforced by `review` have no binding: `specdev verify attest` records their attestation (below).
+
+### The life of a milestone: `milestone`, `plan record`, `review record`, `verify attest`, `status`
+
+A milestone's status, the plan's execution and review records, the sign-off and the attestations are written by these commands and by nothing else: a person or an agent never edits them by hand. Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root` (default: the folder that holds `--spec-root`) and `--json`, writes nothing when it refuses, and exits 0 when it wrote (or, for `close --check` and `status`, when it only read), 1 when it refused and 2 for a usage error. The refusal codes are in [error-codes.md](error-codes.md), "Milestone Lifecycle". A milestone is named by its **roadmap milestone id** (`ms-account-recovery`), never by the batch id of its plan file; `specdev milestone-state --batch-id <batch>` prints the milestone id under `milestone`. A person decides sign-off, defer and manual attestation: these three commands record who ran them (the git author) and check nothing about who that is; in a host the operator's approval is the Claude Code ask rule, which a later 1.2.0 change installs.
+
+| Command | Purpose |
+|---------|---------|
+| `specdev milestone start <milestone-id>` | Start the milestone, or resume it: writes `status: in_progress` on its anchor row and clears a deferral reason; nothing else. A milestone already `in_progress` is left as it is (`already in progress, nothing written`, exit 0). Prints `milestone ms-account-recovery: started (pending -> in_progress)` (`resumed (deferred -> in_progress); the deferral reason is cleared` for a deferred one). E800 for no anchor row, for a `done` milestone, and for a suspect link on the milestone's chain (the plan items, their criteria and what those reach upward; a suspect link elsewhere does not stop it). E803 for a batch id or an id no plan names. With no trace lock the suspect check is skipped and the command says so |
+| `specdev milestone defer <milestone-id> --reason TEXT` | A person puts the whole milestone aside: `status: deferred` and `deferral_reason` on the anchor row, from `pending` or `in_progress`. `--reason` is required, at most 300 characters (E802). Tasks, plan items and open items are not touched (one task is deferred by its `disposition` in step 14). E801 for a `deferred` or `done` milestone. `milestone start` resumes it |
+| `specdev milestone sign-off <milestone-id>` | A person signs off an `in_progress` milestone: writes `spec/extras/signoff/so-<milestone-id>-<NNNN>.json` (the code tree now, the git author, the time, and what was listed: manual fixtures and how many are attested, deferred and won't-do tasks, plan items not executed, proof owed at staging or prod; a second sign-off gets the next number) and prints the view of `status --milestone`. Nothing checks who runs it, that the review said `verified`, or that the tree is the one the close is made at. E801 when the milestone is not `in_progress`; E800, E803 |
+| `specdev milestone close <milestone-id> [--check]` | Run the close gate on an `in_progress` milestone, all findings at once: E810 a criterion no plan item realises, E811 a criterion not proven (at `dev`; a `ci` binding counts as `dev`; `staging` and `prod` bindings do not hold the close up), E812 a plan item not executed, E813 the review is not `verified`, E632 an open item in the plan, E763 a suspect link on the chain, E746 a scaffold row that is not a tracked file, E814 no sign-off record. With findings: exit 1, nothing written, the findings listed by owner. With none: ONE write sets `status: done` and the close record `{signed_off_by, signoff, tree, plan_hash, closed_at, migrations}` (`signed_off_by` is the git author email of the latest sign-off), and prints `milestone ms-account-recovery: closed`; the plan is frozen from then on (`plan record` and `review record` are E820, a hand edit of the plan is E827 in `spec-check`). `--check` runs the gate and writes nothing (`the close gate passes; nothing written`); there is no `--dry-run`. E801 when the milestone is not `in_progress` (a second close too) |
+| `specdev status [--milestone <milestone-id>]` | Where the work stands; reads and writes nothing, exit 0 whatever it lists (1 only when it cannot read what it needs). Without `--milestone`, eight sections: pending replay by step, open items by owner, milestones awaiting sign-off, outdated and removed realisations, the next step that may start, the gate-owned errors of the milestones in progress (the close gate as a dry run, with W350 for a submodule with uncommitted content), the merge-check and release-gate errors and the production verification (both print `release gate not installed`). `--json`: `{"command": "status", "sections": {pending_replay, open_items, awaiting_signoff, realisations, next_step, gate_owned_errors, merge_release_gates, production_verification: {"title", "lines", "data"}}}`. With `--milestone`: the view `milestone sign-off` prints: the plan file, the code tree, the sign-offs, the proof of each criterion in play, the manual share, deferred and won't-do tasks, open items, plan items not executed, proof owed at staging or prod, and the close gate as a dry run; `--json` keys: `command, milestone, status, plan, tree, signoffs, criteria, manual, paused_tasks, paused_items, open_items, items_not_executed, proof_owed_later, warnings, close_gate` (`close_gate`: `{passes, errors, notes}`) |
+| `specdev plan record <ITEM>/<action-id> --outcome done\|failed\|blocked [--note TEXT]` | Write an execution record: appended to `execution.records` of the plan that holds the item, with the git author, the time and the hash of what the item realises; prints `recorded rec-0001: PWRESET_CONFIRM_EXPIRED_01/a01 done (impl_context/ms_account_recovery_plan.json)` and the plan size in bytes before and after. `--outcome` is required; `--note` at most 200 characters. Recording again adds a newer record and the latest one counts. E821 for an unknown item or action (an action with no `id` cannot be addressed), E822 for an action whose command is the command of a binding (its proof is `specdev verify run`, not a record), E820 for the plan of a closed milestone, E803, E767 when git names no author. `--json`: `{"command", "record", "plan", "bytes_before", "bytes_after", "notes"}` |
+| `specdev plan record --at-deploy <ITEM>/<action-id> --env staging\|prod [--tag TAG] [--outcome done\|failed]` | Record that an action marked `at_deploy` for the environment was carried out by the deploy: a file of its own, `spec/extras/verification/dep-<NNNN>.json`, the plan untouched, so it works for a closed milestone. `--outcome` defaults to `done`; no `--note`; with no git identity the author is `ci`. E821 for an action not marked for that environment. A person who carried the action out by hand records it with `specdev verify attest <ITEM>/<action-id> --env staging\|prod`, which writes the same record |
+| `specdev plan record --prune <milestone-id>` | Remove the records of that milestone's plan whose item or action is gone (after a re-plan); prints `removed N orphan record(s) from <plan>`. Nothing else is allowed with `--prune`. Not `specdev attest --prune`, which removes orphan lock entries |
+| `specdev review record <milestone-id> --verdict verified\|needs_work\|blocked\|deferred [--findings-file PATH] [--next-actions TEXT] [--security-status green\|red] [--ratings-json JSON]` | Replace the whole `review` block of the milestone's plan with one verdict (no history is kept) and the time; prints `recorded the review of impl_context/ms_account_recovery_plan.json: verdict verified, 0 finding(s)` and the plan size before and after. `--findings-file` is the converged findings file of the reviewer: JSON with `"$schema": "vc:infra:findings"`, valid against `schema/infra/findings.schema.json`; each finding that is not already verified becomes an entry of `review.findings` (at most 50, each message at most 600 characters), and a finding names plan items through the file's `scope` or its `upstream_refs`. The command checks the input, not the judgement: `verified` is accepted with a blocking finding or a red security status. E823 for an unknown verdict, an invalid findings file, a finding that names an unknown item, or a block that breaks the plan schema; E820 for a closed milestone; E803. `--json`: `{"command", "milestone", "plan", "review", "bytes_before", "bytes_after"}` |
+| `specdev verify attest <node-id> [<node-id> ...] [--stage dev\|ci\|staging\|prod]` | A person attests what no command can run: a fixture with mode `manual`, or a rule of step 10 whose enforcer is `review`. Writes one evidence record of type `attestation` per node, `spec/extras/verification/evd-<node id>-attested.json` (the stage, the code tree, the node's content hash and the git author; a second attestation of the node replaces it), printing `attested <id>: <file>`; the stage is the stage the node needs, printed before anything is written (`--stage` gives another; E334 when it cannot be told). All ids are checked before any record is written: an id that is not attestable is E824 and nothing is written. An attestation holds while the node and the code tree are as they were. Not `specdev attest`, which re-accepts links in the trace lock |
+| `specdev verify attest <ITEM>/<action-id> --env staging\|prod` | The same for a plan action marked `at_deploy` that a person carried out: writes `dep-<NNNN>.json` as `plan record --at-deploy` does and prints `recorded dep-0002: ... done at prod`. A usage error (exit 2) without `--env` for an action, or with `--env` for a node |
+
+```bash
+./tools/run_specdev.sh milestone-state --batch-id account_recovery --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh milestone start ms-account-recovery --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh plan record PWRESET_CONFIRM_EXPIRED_01/a01 --outcome done --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh review record ms-account-recovery --verdict verified --findings-file .specdev/findings/findings_ms-account-recovery_1_r1.json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh status --milestone ms-account-recovery --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh milestone close ms-account-recovery --check --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
+
+The records these commands write are checked by `spec-check`: the check `plan-records` warns W825 for an execution record whose item's criteria changed since (`specdev plan record <ITEM>/<action-id> --outcome done` again clears it) and W826 for a plan item that realises only tasks that are deferred or won't-do; the check `frozen-plans` reports E827 for a plan changed after its milestone closed. The order of a milestone's life, with who decides each step, is in [the trinity loop](workflows/spec_to_impl.md).
 
 ### Registry, Canon & Prompt Maintenance Commands
 
@@ -432,37 +464,42 @@ Read-only diagnostic that prints the active validation configuration. Modifies n
 #### `milestone-state`
 
 Deterministic milestone-state computation for the Trinity loop. Reads
-`spec/impl_context/ms_<batch-id>_plan.json`, probes `.specdev/findings/` under the host
-git root, and emits a single JSON object to stdout.
+`spec/impl_context/ms_<batch-id>_plan.json`, the anchor row and the spec graph, probes
+`.specdev/findings/` under the host git root, and emits a single JSON object to stdout. It writes nothing.
+
+**It is not the `milestone` command group.** `milestone-state` reads and computes: it takes a **batch id**
+(the name of a plan file) and prints, under `milestone`, the roadmap milestone id that the plan names. The
+commands `milestone start|defer|sign-off|close` and `status` write the milestone's life and take that
+**milestone id** (see "The life of a milestone" above). The output's `milestone_id` echoes the batch id and is not a
+milestone id.
 
 This command replaces the LLM-evaluated `milestone_state` mode of the `specdev-scope` agent
-(DEVSPEC-38, D7/D7a). The `specdev-scope` agent now delegates to this command and passes its
+(DEVSPEC-38, D7/D7a). The `specdev-scope` agent delegates to this command and passes its
 output through unchanged, so the output contract is identical for skills that parse it.
 
 **Flags:**
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--batch-id BATCH_ID` | Yes | Milestone batch identifier (e.g. `phase2_newsletter_send`) |
+| `--batch-id BATCH_ID` | Yes | Batch identifier: the plan file `impl_context/ms_<batch-id>_plan.json` (e.g. `account_recovery`) |
 | `--repo-root REPO_ROOT` | No | Toolkit root directory (schema tier). Default: cwd |
 | `--spec-root SPEC_ROOT` | No | Host spec directory used to locate `spec/impl_context/ms_<batch-id>_plan.json`. Default: `<repo-root>/spec` |
 | `--git-root GIT_ROOT` | No | Host repo git root used to locate `.specdev/findings/` (host-relative, NOT under spec-root). Default: `<repo-root>` |
 
-**Output contract** (JSON to stdout):
+**Output contract** (JSON to stdout; the keys are those the command prints now, run on the worked example):
 
 ```json
 {
-  "milestone_id": "<string>",
+  "milestone_id": "<the batch id>",
+  "milestone": "<the plan's milestone key, or null when the plan has none>",
   "groups": [
     {
-      "group_id": "<string>",
-      "state": "<pending|code_converged|blocked|verified|deferred|wont_do>",
+      "group_id": "<plan item id>",
+      "state": "<pending|code_converged|blocked|deferred|wont_do>",
       "implementation_converged_at": "<ISO8601 or null>",
       "reviewer_rounds": "<integer>",
       "findings_resolved_path": "<path or null>",
-      "blocking_amb_ids": ["<string>"],
-      "blocking_amb_health": [{"id": "<string>", "status": "<string>", "resolved": <boolean>, "well_formed": <boolean>}],
-      "fixtures_exercised": ["<string>"]
+      "blocking_amb_ids": ["<open item id>"]
     }
   ],
   "derived_phase_position": "<pending|impl_in_progress|impl_complete|review_pending|review_complete|operator_pending|closed>",
@@ -472,22 +509,30 @@ output through unchanged, so the output contract is identical for skills that pa
 }
 ```
 
+A plan item stores no status, so a group's state is derived: `deferred` or `wont_do` when every task the item
+realises has that `disposition` in step 14, `blocked` when its findings converged and an open item is about a node
+of its chain (`blocking_amb_ids` lists them), `code_converged` when its findings files converged, else `pending`.
+`closed` is never a group state: `derived_phase_position` is `closed` only when the milestone's anchor row is `done`.
+Since 1.2.0 the key `milestone` is new and the group state `verified` and the group keys `blocking_amb_health` and
+`fixtures_exercised` are gone. `blockers[]` is advisory: gate on `derived_phase_position`, not on its emptiness.
+A host plan with no `milestone` key prints `"milestone": null`; the commands above then refuse with E803.
+
 **Submodule deployment:**
 
 ```bash
 specdev milestone-state \
-  --batch-id phase2_newsletter_send \
+  --batch-id account_recovery \
   --repo-root ./devspec_toolkit \
   --spec-root ./spec \
   --git-root .
 ```
 
-**When to run:** When debugging Trinity loop state, verifying phase-position transitions, or
-smoke-testing the `specdev-trinity` skill's milestone dispatch.
+**When to run:** To read the milestone id of a plan before a `milestone` command, when debugging Trinity loop
+state, verifying phase-position transitions, or smoke-testing the `specdev-trinity` skill's milestone dispatch.
 
 > **Note:** The former `specdev-trinity-plan` skill no longer exists as a separate skill;
-> its plan-phase functionality is now `/specdev-trinity <batch_id> --phase plan` (the default
-> phase — see `.claude/skills/specdev-trinity/SKILL.md`).
+> the skill is `/specdev-trinity` with `--phase plan|impl|review`
+> (see `.claude/skills/specdev-trinity/SKILL.md`).
 
 ### Version Update & Migration
 

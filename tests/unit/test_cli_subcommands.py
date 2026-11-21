@@ -609,5 +609,53 @@ class TestLifecycleCommands(_CliMixin, unittest.TestCase):
         self.assertTrue(err.startswith("E520"), err)
 
 
+class TestLifecycleCommandsHelp(_CliMixin, unittest.TestCase):
+    """WI-M8-16: ``--help`` of each command of the milestone's life prints its usage, exit 0; and the ``ai-help`` guide tells the true way to write a step."""
+
+    COMMANDS = (
+        ["step", "create"], ["plan", "record"], ["review", "record"], ["verify", "attest"],
+        ["milestone", "start"], ["milestone", "defer"], ["milestone", "sign-off"], ["milestone", "close"], ["status"],
+    )
+
+    def test_help_of_each_command_prints_its_usage(self):
+        for path in self.COMMANDS:
+            with self.subTest(command=" ".join(path)):
+                code, out, err = self._run_cli([*path, "--help"])
+                self.assertEqual(code, 0, err)
+                self.assertIn(f"usage: specdev-tools {' '.join(path)}", out)
+                self.assertIn("--repo-root", out)
+
+    def test_the_help_of_the_milestone_commands_names_their_refusals_and_exit_codes(self):
+        expected = {
+            ("milestone", "start"): ("E800", "Exit 0 started, 1 refused"),
+            ("milestone", "defer"): ("E802", "Exit 0 deferred, 1 refused"),
+            ("milestone", "sign-off"): ("E801", "Exit 0 recorded, 1 refused"),
+            ("milestone", "close"): ("E814", "Exit 0 closed or passes, 1 refused"),
+            ("plan", "record"): ("E822", "Exit 0 written, 1 refused, 2 usage"),
+            ("verify", "attest"): ("E824", "Exit 0 written, 1 refused, 2 usage"),
+        }
+        for path, (code_name, exits) in expected.items():
+            with self.subTest(command=" ".join(path)):
+                _, out, _ = self._run_cli([*path, "--help"])
+                flat = " ".join(out.split())
+                self.assertIn(code_name, flat)
+                self.assertIn(exits, flat)
+
+    def test_close_has_check_and_no_dry_run(self):
+        _, out, _ = self._run_cli(["milestone", "close", "--help"])
+        self.assertIn("--check", out)
+        self.assertNotIn("--dry-run", out)
+
+    def test_ai_help_no_longer_says_to_write_a_file_under_spec_directly(self):
+        for argv in (["ai-help"], ["ai-help", "--step", "04"], ["ai-help", "--json"], ["ai-help", "--step", "04", "--json"]):
+            with self.subTest(argv=argv):
+                code, out, err = self._run_cli([*argv, "--repo-root", str(REPO_ROOT)])
+                self.assertEqual(code, 0, err)
+                text = out.replace("\\n", "\n")
+                self.assertNotIn("directly to spec/", text)
+                self.assertIn("specdev step create", text)
+                self.assertIn("specdev json patch|insert|delete --id", text)
+
+
 if __name__ == "__main__":
     unittest.main()

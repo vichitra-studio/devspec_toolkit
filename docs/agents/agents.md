@@ -57,9 +57,9 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 13 | `spec/13_extension_manifest.json` | Review proposed extension schemas |
 | 14 | `spec/14_roadmap.json` | Run `specdev step ready 14` first (it lists the blockers owned by the steps below 14, to fix first; the gaps step 14 owns, E566, E742, E744, E745 and the E740 of nodes a task criterion uses, are not blockers: the task criteria of step 14 clear them); gate with `spec-check --step 14`; then initiate the JIT implementation loop |
 | 15 | `spec/15_scaffold.json` | Implement scaffold manually |
-| 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Tasks, Security, Delivery, Drift |
-| 16b | `spec/impl_context/{step_id}.json` | Trinity Build: Code, Configs, Docs |
-| 16c | `spec/impl_context/{step_id}.json` | Trinity Review: Verification & closure |
+| 16a | `spec/impl_context/ms_<batch>_plan.json` | Trinity Plan: Tasks, Security, Delivery, Drift (`step create 16a <batch>`) |
+| 16b | `spec/impl_context/ms_<batch>_plan.json` | Trinity Build: Code, Configs, Docs (`plan record`, `verify run`) |
+| 16c | `spec/impl_context/ms_<batch>_plan.json` | Trinity Review: Verification (`review record`); a person signs off, `milestone close` closes |
 
 ## 5. Escalation Triggers
 - Schema validation fails after two retries → request human clarification.

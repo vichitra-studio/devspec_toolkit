@@ -34,6 +34,7 @@
 - A write that puts a hash into the trace lock (`specdev json patch|insert|delete --id`, `json insert --step`, `step create`, each with or without `--dry-run`, `attest <node-id> --yes` and `attest --step NN --yes`, each with or without `--dry-run`) refused because a seed document that the spec names is not found under the host root: the hash would be the hash of a missing file. The root is `--git-root`, or the folder that holds the spec folder. Nothing is written; exit 1. Example, on a copy whose spec folder is `h/sub/spec` and whose seed documents are at `h/docs/seed`, run from `h` with no `--git-root`: `E520 seed document docs/seed/seed_accounts.md (seed-accounts) was not found under <h>/sub; if the repository root is another folder pass --git-root`; several seeds read `seed documents A (id), B (id) were not found under ...`. With `--git-root .` the same commands ran. `node rename`, `node rename --label`, `node status` and `attest --prune` were run in that layout and were not refused. The reads that report on the lock (`stale`, `coverage`, `step ready`, an `attest` preview, `attest --prune`) print one line on stderr and then their answer: `note: seed documents not found under <h>/sub: docs/seed/seed_accounts.md (seed-accounts); their links count as suspect; if the repository root is another folder pass --git-root`; `spec-check` and `validate-all` print the same line on stderr and report the links as E763.
 - `specdev verify run` found the host declarations file `spec/common/host_declarations.json` unreadable or against its schema: `E520 the host declarations <spec>/common/host_declarations.json cannot be read: .code_tree_exclusions: 'build/' is not of type 'array'; correct the file`, exit 1, nothing run. Correct the file; the next run went on.
 - `specdev third-party check` (no flags) found the same file unreadable or against its schema: `E520 the host declarations <spec>/common/host_declarations.json cannot be read: .code_tree_exclusions: 'build/' is not of type 'array'; correct the file`, exit 1. Correct the file; the next run printed `every pin matches its declared sources`.
+- A plan file (`impl_context/ms_<batch>_plan.json`) that is not valid against the plan schema, reported by `spec-check` (check `schema-validation`) and `specdev validate`: the action `id` is required (`E520 <plan file>:plan/spec_alignment/checklist/0/implementation/actions/0: 'id' is a required property`; resolution: `specdev json patch --id <plan-item-id> '.implementation.actions[0].id' '"a01"'`, run on a copy: the E520 was gone), and the fields of the 1.1.1 plan that 1.2.0 removed are refused as unknown properties: `execution.execution_results` and `execution.final_status` (`execution: Additional properties are not allowed ('execution_results', 'final_status' were unexpected)`), an action's `evidence`, `review.fixture_status` and `review.semantic_review.fr_coverage` (resolution: delete the field; run on a copy: no E520 was left). A plan of a milestone whose anchor row is `done` with a `close` whose `signed_off_by` is `legacy-migration` (the close record a migration writes for a milestone closed before 1.2.0) is not reported for its removed fields (run: with that close record the E520 of `execution_results` was gone). On a 1.1.1 host the migration of a later 1.2.0 work item adds the action ids; until then every action of every plan is an E520.
 - `changelog_parser.py` structural validation — `validate_changelog()` in `tools/specdev_tools/core/changelog_parser.py` emits `E520` for unloadable/malformed YAML (missing file, parse error, empty or non-mapping content), plus four raw-dict structural checks run before the changelog is parsed into a dataclass: **Check 1** — `breaking` is present but not a `bool`; **Check 2** — a top-level key is not in the format's `required_fields`/`optional_fields`; **Check 3** — `version` is not valid semver or does not match the filename's version, except that a `version: "unreleased"` value in `unreleased.yaml` is exempted via an explicit unreleased-sentinel bypass; **Check 4** — a declared `source_of_truth`/`render_target` path is not a non-empty string, does not exist on disk, exists but points to a non-file path (e.g. a directory), or exists but is empty. It also emits `E520` for invalid `change.type` / `change.migration.action` values found after parsing.
 
 **Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable. For `docs_impact` failures, set `plan.docs_impact.status` to `"required"` and list the touched doc paths in `docs_touched`, matching a pattern in `seed_manifest.json`'s `doc_paths`. For `changelog_parser.py` failures, fix the offending YAML field per the check that fired (correct `breaking`'s type, remove/rename the unknown key, fix `version` to match the filename or use the `unreleased` sentinel only in `unreleased.yaml`, or fix the `source_of_truth`/`render_target` path).
@@ -86,7 +87,7 @@
    - **`review_requirements`** — Step 16 operational verification instructions (test commands, NFR measurement methods); these are not canonical term-binding sites. Note: structural suppression cannot reliably cover these because `test_commands[]` uses `oneOf` and `nfr_measurement_methods` uses `patternProperties`, both of which can cause `slot_kinds` to resolve as `None` under certain schema-navigation paths.
 
    *Category C — free-form runner output:*
-   - **`execution`** — `execution.final_status.test_results` items have `additionalProperties` unset (intentionally free-form test-runner output). The structural rule requires `additionalProperties: false` and will NOT suppress items with unset `additionalProperties`, so a key-name skip is necessary. Example subtree that triggers this: a `16_impl_context.json` artifact's `execution.final_status.test_results[]` items describing test-runner output such as `{"name": "test_send_newsletter", "status": "passed", "duration": 1.2}`.
+   - **`execution`** — holds execution records (`execution.records[]`, whose free-text `note` is not a vocabulary slot), file lists and configuration-validation flags: run output, not bindable spec vocabulary. The structural rule would not suppress every such property, so a key-name skip is necessary. It applies to `16_impl_context.schema.json` only.
 
    **File-scoped skips (`_E541_SKIP_KEYS_BY_FILE`):**
    - **`edge_cases` in `11_redteam.json`** — unbindable narrative subtree; the red-team schema sets `additionalProperties: false` with no `*_ref` field on `edge_cases` items. Scoped to that file to avoid silently exempting a future `edge_cases` key in another artifact.
@@ -391,31 +392,15 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: W615 → E615 (via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`).
 
-### Trinity Evidence & Proof Closure (30x / 599–603)
+### Trinity Plan, Review and Anchor Checks (30x / 599-603)
 
-**Note on the plan-item checks**: E301 shapes (1) to (3), W599, W600, W601 and E305 read `implementation.status` of a plan item, and E307 reads an object `spec_ref`. A 1.2.0 plan item stores neither field, so these checks report nothing on it until a later 1.2.0 change replaces them. The text below describes the 1.1.1 reading. E301's plan-level shape, E302, E303, E304 and E306 run on 1.2.0 plans.
+A plan item of 1.2.0 stores no status, no `evidence` and no execution result: what was carried out is an execution record (`specdev plan record`), what was proven is the evidence of a run (`specdev verify run`), and whether a milestone may close is the close gate (E810 to E814, see [Milestone Lifecycle](#milestone-lifecycle-80x--81x--82x--83x)). The checks that read the removed fields are gone: E301, E302, E305, E306, E307, W599, W600 and W601 are in [Removed Codes](#removed-codes). E303 stays, with the meaning it has for commit messages. E304 and E308 run on 1.2.0 plans.
 
-### E301 MISSING_PROOF_CLOSURE
+### E303 COMMIT_MESSAGE_MISMATCH
 
-**Trigger**: Fired by `step_16.py` in any of three shapes, each only for a plan item that carries `implementation.status`: (1) a checklist item's `implementation.status` is `"verified"` but it has no `actions`; (2) a `"verified"` item has actions but none of them carry an `evidence` field (`EVIDENCE_CONTENT_INVALID`/no-evidence variant); or (3) an action's `evidence.content` is present but lacks a recognized success-marker keyword (e.g. `PASS`, `OK`, `passed`, `success`, `0 failures`) and the evidence has no `stdout`/`stderr` field to fall back on. A fourth, plan-level shape (`MISSING_PROOF_CLOSURE`) runs on every plan: it fires when the plan is active (`plan.status` is `active` or absent, as in every 1.2.0 plan), `execution.execution_results` is non-empty, and a `review_requirements.test_commands` entry is not found among `execution.execution_results` with `status` in (`passed`, `blocked`) — an unacknowledged test command on an active plan.
+**Trigger**: `specdev governance-check --message "<commit message>"` (`validation/governance.py`): `10_governance.json` has `commit_message_rules` with `require_spec_ids` true and a `pattern`, and the message does not match the pattern. Printed, with the rule `^(feat|fix): .+ \(fr-[a-z-]+\)$` and the message `bad message`: `E303 Commit message mismatch. Must match regex: '^(feat|fix): .+ \(fr-[a-z-]+\)$' (defined in spec/10_governance.json)`; when the rule has an `error_message`, the message is `E303 Commit message mismatch. <error_message>`. Before 1.2.0 the same code was also used for a plan check on `review.fixture_status.ci_status`; that field and that check are gone, and the code means only this.
 
-**Resolution**: Add `actions` documenting the work for verified items, ensure at least one action carries an `evidence` field, and make evidence content include a success marker (or structured `stdout`/`stderr`) so proof can be machine-verified. For the plan-level shape, run the declared test command and record its result in `execution.execution_results`, or mark it `blocked` with a reason.
-
-**Promotable**: No (error only; no `W301` counterpart).
-
-### E302 UNPROVEN_VERIFIED_REVIEW
-
-**Trigger**: `review.verdict == "verified"` but the proof chain backing that verdict is incomplete, in any of three ways: (1) no `execution` section exists at all; (2) `execution.execution_results` is empty; or (3) one or more `review_requirements.test_commands` entries have no matching `status == "passed"` entry in `execution_results`. Unlike E301's `acknowledged` set (which also accepts `blocked`), E302 requires an explicit `passed` status — a `blocked` acknowledgment satisfies E301 but not E302.
-
-**Resolution**: Do not set `review.verdict` to `"verified"` until every `review_requirements.test_commands` entry has a corresponding `status: "passed"` entry in `execution.execution_results`.
-
-**Promotable**: No (error only; no `W302` counterpart).
-
-### E303 CI_GATE_VIOLATION
-
-**Trigger**: `review.verdict == "verified"` but `review.fixture_status.ci_status` is absent or is not exactly `"green"` (Task 7-04 / AUDIT-032 strengthened this to reject any non-`"green"` value, not just an explicit failure status).
-
-**Resolution**: Set `review.fixture_status.ci_status` to `"green"` once CI has genuinely passed, or revert `review.verdict` until it has. (E303 is also the code used for governance commit-message mismatches — see `validation/governance.py` — a distinct emitter sharing the same code for a different artifact class.)
+**Resolution**: Write a message that matches the pattern, or change `commit_message_rules` in `10_governance.json`. Followed: `fix: reset link (fr-password-reset-request)` printed `OK`.
 
 **Promotable**: No (error only; no `W303` counterpart).
 
@@ -427,61 +412,13 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only; no `W304` counterpart).
 
-### E305 PLANNED_UNEXECUTED
-
-**Trigger**: Only for a plan whose items carry `implementation.status`. `execution.final_status.ci_status == "green"` but a checklist item that is active (`checklist_status` not in the paused/cancelled set) is not present in `execution.critical_evidence.satisfied_checklist_ids`. A green final CI status implies every planned item should have been executed and recorded as satisfied. Both fields are 1.1.1 fields; a 1.2.0 plan has neither, so E305 reports nothing on it.
-
-**Resolution**: Add the item's `id` to `execution.critical_evidence.satisfied_checklist_ids` once its work is genuinely done, or set `checklist_status` to `deferred`/`wont_do` if it was intentionally skipped for this milestone pass.
-
-**Promotable**: No (error only; no `W305` counterpart).
-
-### E306 SEMANTIC_REVIEW_FR_MISMATCH
-
-**Trigger**: `review.semantic_review.fr_coverage[].fr_id` references an `fr_id` that does not exist in the corresponding `04_fr_list.json` (resolved one directory up when the artifact lives under `impl_context/`). Skipped silently if `04_fr_list.json` is missing or unreadable.
-
-**Resolution**: Correct the `fr_id` to reference an FR that actually exists in `04_fr_list.json`, or remove the stale `fr_coverage` entry.
-
-**Promotable**: No (error only; no `W306` counterpart).
-
-### E307 BEHAVIOR_VALIDATION_PAIRING
-
-**Trigger**: Only for plan items that carry an object `spec_ref` (a 1.1.1 field; a 1.2.0 plan item has none, so E307 reports nothing on it). For every behavioral `spec_ref` (types other than `doc`, `code`, `task` — i.e. `fr`, `api`, `inv`, `nfr`) referenced by at least one checklist item, the full set of checklist items sharing that `spec_ref.id` must include at least one item of `type: "behavior"` and one of `type: "validation"`. Deferred items still count toward pairing (a paused validation item still satisfies the pairing requirement); only its own proof-of-work fields are exempted elsewhere.
-
-**Resolution**: Add the missing `behavior` and/or `validation` checklist item(s) for the flagged `spec_ref.id`.
-
-**Promotable**: No (error only; no `W307` counterpart).
-
 ### E308 ANCHOR_SCOPE_DRIFT
 
-**Trigger**: Fired by `step_16_anchor.py` (the Trinity Anchor's cross-milestone drift check) in two shapes: (1) `[ownership]` — the same FR/API `ref_id` appears in `fr_refs` of two non-done `milestone_index` entries, i.e. two active milestones both claim the same requirement; a 1.2.0 anchor row has no `fr_refs`, so this shape finds nothing on it; (2) `[scope]` — a milestone plan's `plan.summary.scope_in` item (case-insensitive) appears in the anchor's own `plan.summary.scope_out`, or a plan's `scope_out` item appears in the anchor's `scope_in` — a bidirectional scope contradiction. The `[scope]` shape only runs when `spec_path` is provided and at least one plan file takes part in drift detection (see W611); the `[ownership]` shape runs purely in-memory off `milestone_index` regardless of `spec_path`.
+**Trigger**: Fired by `step_16_anchor.py` (the Trinity Anchor's cross-milestone drift check; run by `specdev validate spec/16_impl_context.json`) in two shapes. (1) `[ownership]`: two milestones of `milestone_index` that are not `done` have plans whose items `realises` criteria of one roadmap task, so two active milestones own the same task. Printed on a copy with a second milestone `ms-account-lockout` whose plan realises `tc-confirm-reused-token`: `E308 <anchor file>: ANCHOR_SCOPE_DRIFT [ownership]: task ownership conflict — 'task-implement-password-reset-confirm' is realised by plan items of both non-done milestone 'ms-account-lockout' and 'ms-account-recovery'.  Only one non-done milestone may own a given task at a time.` The plans are found through the `milestone` key of the plan files, and the shape needs the spec graph to map a criterion to its task, so it runs where the anchor is validated with a spec folder. (2) `[scope]`: a milestone plan's `plan.summary.scope_in` item (case-insensitive) appears in the anchor's own `plan.summary.scope_out`, or a plan's `scope_out` item appears in the anchor's `scope_in`, a bidirectional scope contradiction. The `[scope]` shape only runs when `spec_path` is provided and at least one plan file takes part in drift detection (see W611).
 
-**Resolution**: For `[ownership]` conflicts (1.1.1 anchors only), ensure at most one non-done milestone claims a given FR/API in its `fr_refs` (mark the stale milestone `done` or remove the duplicate ref). For `[scope]` conflicts, reconcile the milestone's `scope_in`/`scope_out` against the anchor's `plan.summary.scope_in`/`scope_out` so the same category is not declared in-scope by one and out-of-scope by the other.
+**Resolution**: For `[ownership]`, finish one of the two milestones (its anchor row `done`, with its `close`), or move the item to a criterion of another task. Followed: with `ms-account-recovery` set `done` the E308 was gone. For `[scope]`, reconcile the milestone's `scope_in`/`scope_out` against the anchor's `plan.summary.scope_in`/`scope_out` so the same category is not declared in-scope by one and out-of-scope by the other.
 
 **Promotable**: No (error only; no `W308` counterpart).
-
-### W599 EVIDENCE_TOO_SHORT
-
-**Trigger**: A verified action's `evidence.content` is a string shorter than 50 characters — too short to plausibly contain a meaningful proof of work.
-
-**Resolution**: Expand the evidence content to include the actual command output, or reference `stdout`/`stderr` fields instead of a short freeform string.
-
-**Promotable**: No (warning only; no `E599` counterpart — `E599` is `DAG_CONSUMER_INCONSISTENCY`, an unrelated Step-04→Step-05 DAG check).
-
-### W600 VERIFIED_ACTION_NO_EVIDENCE
-
-**Trigger**: Two shapes share this code: (1) `VERIFIED_ACTION_NO_EVIDENCE` — a verified action has no `evidence` field at all; (2) `EVIDENCE_NO_CONTENT` — the action's `evidence` is a dict but has none of `content`, `stdout`, or `stderr`.
-
-**Resolution**: Add an `evidence` field to the action (a `content` string or structured `stdout`/`stderr` fields) documenting what was actually verified.
-
-**Promotable**: No (warning only; no `E600` counterpart).
-
-### W601 EVIDENCE_NO_ARTIFACT_REF
-
-**Trigger**: A verified action's evidence (`content`, `stdout`, and/or `stderr` combined) does not contain any recognizable spec artifact ID pattern (`fr-*`, `api-*`, `nfr-*`, `inv-*`) — the evidence cannot be tied back to the spec artifact it is meant to prove.
-
-**Resolution**: Include the relevant artifact ID (e.g. the `fr-*` or `api-*` being verified) in the evidence content, stdout, or stderr text.
-
-**Promotable**: No (warning only; no `E601` counterpart).
 
 ### W603 FILES_OUTSIDE_TASK_SCOPE
 
@@ -505,7 +442,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Trigger**: A milestone-plan JSON file in `impl_context/*.json` exists on disk but cannot be read or parsed as JSON. `step_16_anchor.py` emits it (directory-glob discovery, feeding E308/E309 cross-milestone drift detection). A declared `context_path` that is missing from disk reports nothing.
 
-**Resolution**: Fix the malformed JSON in the named milestone-plan file, or restore its file-read permissions. Until fixed, the file is excluded from E308/E309 drift detection — see W611 below if this causes every milestone plan to be filtered out.
+Printed: `W588 <anchor file>: ANCHOR_MILESTONE_UNREADABLE: 'ms_bad.json' in impl_context/ could not be read or parsed as a UTF-8 JSON object; drift detection skipped this file.`
+
+**Resolution**: Fix the malformed JSON in the named milestone-plan file, restore its file-read permissions, or remove the file. Followed: removing the file made `specdev validate spec/16_impl_context.json` print `OK`. Until fixed, the file is excluded from E308/E309 drift detection — see W611 below if this causes every milestone plan to be filtered out.
 
 **Promotable**: No. W588 has no `E588` counterpart — an unreadable file is a data-integrity problem to fix directly, not a severity to escalate.
 
@@ -513,7 +452,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Trigger**: The Trinity Anchor's `impl_context/` directory contains one or more JSON files, and either none of them takes part in drift detection or some plan file names a milestone that no anchor row is about. A file takes part when it declares `$schema='vc:16-impl-context'` and its file-level `milestone` names a milestone that some anchor row is `about`. With zero participating plans, the cross-milestone E308 (scope drift) and E309 (checklist drift) checks are completely suppressed — the anchor looks clean while contributing nothing to drift detection. Does not fire when `impl_context/` is genuinely empty (no JSON files), which is a valid state for a fresh anchor.
 
-**Resolution**: Fix the W588/W589/W608 warnings reported above the W611 line, or add the anchor row a plan file's `milestone` names, so the per-milestone plans take part. Once at least one plan takes part, E308/E309 drift detection is restored.
+Printed, for a plan of a milestone that has no anchor row: `W611 <anchor file>: ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains 2 JSON file(s); 1 take part in E308/E309 drift detection. Plan file(s) 'ms_account_lockout_plan.json' name a milestone that no anchor row is about.  Fix the W588/W589/W608 warnings above, or add the anchor row, to restore drift checks.`
+
+**Resolution**: Fix the W588/W589/W608 warnings reported above the W611 line, or add the anchor row a plan file's `milestone` names, so the per-milestone plans take part. Followed: with the row added, the W611 was gone (and E308 and E309 were then reported where they apply). Once at least one plan takes part, E308/E309 drift detection is restored.
 
 **Promotable**: No. W611 flags a suppressed-coverage condition, not a concrete drift defect; it has no `E611` counterpart.
 
@@ -645,9 +586,9 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E334 UNKNOWN_STAGE_FOR_ENVIRONMENT
 
-**Trigger**: A binding needs the stage of an environment (a job that `realises` it, or the environment itself) and the environment's key in step 02a is not one of `dev`, `ci`, `staging`, `prod`. `specdev verify bind` refuses and writes nothing. Example, with an environment `qa` and a job `job-qa-smoke` that realises it: `verify bind job-qa-smoke --command "npm run smoke" --guard ok` printed `E334 environment 'qa' is not a stage; name it dev, ci, staging or prod` and exited 1. The step 02a schema also rejects such a key (`spec-check` gives E520 `'qa' is not one of ['dev', 'ci', 'staging', 'prod']`). The record check names the same code for a stored binding whose `proves` names the environment: `E334 verification record ver-qa-smoke: environment 'qa' is not a stage; name it dev, ci, staging or prod`. The proof functions refuse the same way and never read such a node as `dev`: `proof_errors` for `qa` (the environment and the job edited into the spec files by hand) returned `E334 environment qa: environment 'qa' is not a stage; name it dev, ci, staging or prod` for that node and went on with the next node of its scope; `proof` itself raises it, so a gate that calls `proof` must catch it.
+**Trigger**: A binding needs the stage of an environment (a job that `realises` it, or the environment itself) and the environment's key in step 02a is not one of `dev`, `ci`, `staging`, `prod`. `specdev verify bind` refuses and writes nothing. Example, with an environment `qa` and a job `job-qa-smoke` that realises it: `verify bind job-qa-smoke --command "npm run smoke" --guard ok` printed `E334 environment 'qa' is not a stage; name it dev, ci, staging or prod` and exited 1. The step 02a schema also rejects such a key (`spec-check` gives E520 `'qa' is not one of ['dev', 'ci', 'staging', 'prod']`). The record check names the same code for a stored binding whose `proves` names the environment: `E334 verification record ver-qa-smoke: environment 'qa' is not a stage; name it dev, ci, staging or prod`. The proof functions refuse the same way and never read such a node as `dev`: `proof_errors` for `qa` (the environment and the job edited into the spec files by hand) returned `E334 environment qa: environment 'qa' is not a stage; name it dev, ci, staging or prod` for that node and went on with the next node of its scope; `proof` itself raises it, so a gate that calls `proof` must catch it. `specdev verify attest <id>` refuses with it when the stage the node needs cannot be told and `--stage` is not given: `E334 the stage fix-manual-latency needs cannot be told ('weekly' is not a stage (dev, ci, staging, prod)); give --stage dev, ci, staging or prod`.
 
-**Resolution**: Command refusal at bind time: no owner, no node id (owner `merge-check` when the record check reports it). Make the job realise an environment that is a stage: after `specdev json patch --id job-qa-smoke .realises '["ci"]'` the bind printed `binding ver-qa-smoke written (stage ci, ...)` and exited 0. For a stored binding, the same patch and `proves` set to `["ci"]` in the record file cleared the finding.
+**Resolution**: Command refusal at bind time: no owner, no node id (owner `merge-check` when the record check reports it). Make the job realise an environment that is a stage: after `specdev json patch --id job-qa-smoke .realises '["ci"]'` the bind printed `binding ver-qa-smoke written (stage ci, ...)` and exited 0. For a stored binding, the same patch and `proves` set to `["ci"]` in the record file cleared the finding. For `verify attest`, `specdev verify attest fix-manual-latency --stage staging` printed `attested fix-manual-latency: extras/verification/evd-fix-manual-latency-attested.json`.
 
 **Promotable**: No (error only).
 
@@ -717,7 +658,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E347 VERIFIER_NO_VALID_EVIDENCE
 
-**Trigger**: Returned by `proof.proof.proof_errors(graph, ctx, scope, cap, ...)` for the gate that calls it (the close gate, the release check); no `spec-check` check and no command runs it in this release. A binding that a verifier of the node needs, at a stage up to the gate's cap, has no valid passing evidence. The `subcode` is the reason: `NO_EVIDENCE` (no run wrote a file), `NONZERO_EXIT`, `GUARD_NOT_MATCHED`, `STALE_TREE` (the code changed since the run), `STALE_HASH` (the binding, its verifier or a node it proves changed since the run, or is gone), `STALE_TP_VERSION` (a third party the proved nodes rely on is at another version than the pin, or has a declared version source and no version recorded by the run), `STAGE_TOO_LOW` (the run was at a lower stage than the binding). Owner: the step of the node. Run on a copy of the worked example, whose record `ver-password-reset-expired-token` runs the host's own test command, which a copy cannot run (there `verify run` printed `FAIL ... (exit 1)` and the finding was `NONZERO_EXIT`: `the commands failed; fix it, then run ...`); so the record was first re-bound to `python -c "print('expired token case passed')"` (`verify bind fix-password-reset-expired-token --command ... --guard 'expired token .*passed'`), then left unrun, then run, then the code edited: `E347 criterion ac-password-reset-3: binding ver-password-reset-expired-token has no valid evidence (NO_EVIDENCE): no run has written evidence for it; run `specdev verify run ver-password-reset-expired-token --stage dev``; after the run, `proof_errors` returned nothing; after a file under the code tree was added, `... (STALE_TREE): the code changed since the run; run `specdev verify run ver-password-reset-expired-token --stage dev``. After a run, a change of the binding (its commands, its guard, its stage or the nodes it proves: `verify bind` again) or an edit of a node it proves gives `... (STALE_HASH): the binding, its verifier or a node it proves changed since the run; run `specdev verify run ver-password-reset-expired-token --stage dev``: the evidence rests on the binding, so a changed binding needs a new run (a `verify bind` that changes nothing leaves the evidence valid). Evidence written before this rule did not record the binding and reads as `STALE_HASH` once: run it again. A manual fixture or a rule enforced by `review` has no binding: its finding says `verifier <id> has no valid evidence (NO_EVIDENCE): a person attests it: it needs a valid attestation record` (not run: the command that writes the attestation is not in this release).
+**Trigger**: Returned by `proof.proof.proof_errors(graph, ctx, scope, cap, ...)` for the gate that calls it (the close gate, the release check); no `spec-check` check runs it. `specdev milestone close` and `specdev status --milestone` run it for the criteria of the closing milestone and print its findings as E811 (see [Milestone Lifecycle](#milestone-lifecycle-80x--81x--82x--83x)), with the subcode and the way out of this entry; the release check is not in this release. A binding that a verifier of the node needs, at a stage up to the gate's cap, has no valid passing evidence. The `subcode` is the reason: `NO_EVIDENCE` (no run wrote a file), `NONZERO_EXIT`, `GUARD_NOT_MATCHED`, `STALE_TREE` (the code changed since the run), `STALE_HASH` (the binding, its verifier or a node it proves changed since the run, or is gone), `STALE_TP_VERSION` (a third party the proved nodes rely on is at another version than the pin, or has a declared version source and no version recorded by the run), `STAGE_TOO_LOW` (the run was at a lower stage than the binding). Owner: the step of the node. Run on a copy of the worked example, whose record `ver-password-reset-expired-token` runs the host's own test command, which a copy cannot run (there `verify run` printed `FAIL ... (exit 1)` and the finding was `NONZERO_EXIT`: `the commands failed; fix it, then run ...`); so the record was first re-bound to `python -c "print('expired token case passed')"` (`verify bind fix-password-reset-expired-token --command ... --guard 'expired token .*passed'`), then left unrun, then run, then the code edited: `E347 criterion ac-password-reset-3: binding ver-password-reset-expired-token has no valid evidence (NO_EVIDENCE): no run has written evidence for it; run `specdev verify run ver-password-reset-expired-token --stage dev``; after the run, `proof_errors` returned nothing; after a file under the code tree was added, `... (STALE_TREE): the code changed since the run; run `specdev verify run ver-password-reset-expired-token --stage dev``. After a run, a change of the binding (its commands, its guard, its stage or the nodes it proves: `verify bind` again) or an edit of a node it proves gives `... (STALE_HASH): the binding, its verifier or a node it proves changed since the run; run `specdev verify run ver-password-reset-expired-token --stage dev``: the evidence rests on the binding, so a changed binding needs a new run (a `verify bind` that changes nothing leaves the evidence valid). Evidence written before this rule did not record the binding and reads as `STALE_HASH` once: run it again. A manual fixture or a rule enforced by `review` has no binding: its finding says `verifier <id> has no valid evidence (NO_EVIDENCE): a person attests it: run `specdev verify attest <id>``. Run on a copy whose second fixture was made manual: `E347 task-criterion tc-confirm-reused-token: verifier fix-password-reset-reused-token has no valid evidence (NO_EVIDENCE): a person attests it: run `specdev verify attest fix-password-reset-reused-token``; after `specdev verify attest fix-password-reset-reused-token` (a person's decision; it records the stage the node needs, printed, and the code tree) `proof_errors` returned nothing.
 
 **Resolution**: Owner `step:<the step of the node>`. Run the binding the message names. Run (on the re-bound record of the Trigger): `specdev verify run ver-password-reset-expired-token --stage dev` printed `PASS ver-password-reset-expired-token at dev` and the next `proof_errors` for the criterion and the API returned nothing; the same after the run that follows a changed binding, a changed proved node or a changed code tree. For `NONZERO_EXIT` and `GUARD_NOT_MATCHED` fix the test or the guard first. For `STALE_TP_VERSION` after a pin bump, while the repository still declares the old version, the run alone does not clear it: the run records the version the repository declares (the file `third-party check` names), so make that file say the pin first. The message reads `... (STALE_TP_VERSION): the run did not record the pinned version of a third party; check the pins with `specdev third-party check` and fix what it names, then run `specdev verify run ver-password-reset-expired-token --stage dev``. Run, on the declarations fixture (a bound record run once, then `third-party pin tp-argon2 0.42.0`): `proof_errors` gave `STALE_TP_VERSION`; `verify run` again still gave it; with `package-lock.json` edited to `0.42.0`, `third-party check` printed `every pin matches its declared sources`, `verify run` printed `PASS` and `proof_errors` returned nothing. The reason also follows when a third party has a declared source and the run recorded no version for it, because the source was declared after the run or the third party came to be relied on after it. Run, on the declarations fixture with the record run once before `host_declarations.json` was copied into `spec/common/`: `proof_errors` returned nothing; after the copy it returned `E347 criterion ac-password-reset-3: binding ver-password-reset-expired-token has no valid evidence (STALE_TP_VERSION): ...` and the same for the API; the repository file already said the pin, `third-party check` printed `every pin matches its declared sources` and named nothing to fix, so `verify run` alone cleared it (`PASS ver-password-reset-expired-token at dev`, then nothing) and the evidence then held `{'tp-argon2': '0.41.1', 'tp-mailrelay': 'api-v3'}`. A third party with no `pin_sources` entry is not compared unless the run recorded a version for it: with `verify run ver-password-reset-expired-token --installed tp-argon2=0.41.1` and no entry, `third-party pin tp-argon2 0.42.0` gave `STALE_TP_VERSION`; without `--installed`, nothing. A `pin_sources` key may be an id the third party had before a rename: after `node rename tp-argon2 tp-argon2-lib` with the key still `tp-argon2`, `verify run` recorded `{'tp-argon2-lib': '0.41.1', ...}` and, after `third-party pin tp-argon2-lib 0.42.0`, `proof_errors` returned `STALE_TP_VERSION`. An edit of a spec node that the binding and its verifier do not prove or name (a glossary term, say) leaves the evidence valid: run on the example, a glossary definition edited, `proof_errors` returned nothing. A seed, a plan, an anchor or the lock edit leaves evidence valid too: run on the example, after the record was re-bound to the one-liner and run, a milestone summary of `16_impl_context.json` patched, a `note` added to `impl_context/ms_account_recovery_plan.json`, trailing blank lines added to `extras/trace.lock.json` and `docs/seed/seed_accounts.md` rewritten, `proof_errors` returned nothing (the test `test_spec_plan_anchor_and_lock_edits_leave_evidence_valid` pins it); an edit of a seed changes the content hash of the seed node only.
 
@@ -725,7 +666,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E348 OBLIGATION_NOT_PROVEN
 
-**Trigger**: Returned by `proof_errors` (as E347; no command runs it in this release). Two subcodes. `UNBOUND`: a verifier of the node has no binding for it. `NO_VERIFIER`: nothing verifies the node (a task criterion with no `verified_by` too). Examples, on the worked example: `E348 invariant inv-reset-token-single-use: its verifier fix-password-reset-reused-token has no binding; bind it with `specdev verify bind fix-password-reset-reused-token --command "<command>" --guard "<regex>"`` and `E348 criterion ac-password-reset-1 has no verifier to prove it: add a fixture or a job that verifies it`. A binding above the cap of the gate gives nothing (it is pending), and with the close gate's keywords a `staging` or `prod` binding is ignored. Missing verifiers are found earlier, at spec time, by E743.
+**Trigger**: Returned by `proof_errors` (as E347; the close gate prints it as E811). Two subcodes. `UNBOUND`: a verifier of the node has no binding for it. `NO_VERIFIER`: nothing verifies the node (a task criterion with no `verified_by` too). Examples, on the worked example: `E348 invariant inv-reset-token-single-use: its verifier fix-password-reset-reused-token has no binding; bind it with `specdev verify bind fix-password-reset-reused-token --command "<command>" --guard "<regex>"`` and `E348 criterion ac-password-reset-1 has no verifier to prove it: add a fixture or a job that verifies it`. A binding above the cap of the gate gives nothing (it is pending), and with the close gate's keywords a `staging` or `prod` binding is ignored. Missing verifiers are found earlier, at spec time, by E743.
 
 **Resolution**: Owner `step:<the step of the node>`. Bind the verifier, or add one. Run, with a command that a copy of the example can run (the host's own test file does not exist in it: `verify run` of `python3 src/reused_token_test.py` printed `FAIL ... (exit 2)`): `verify bind fix-password-reset-reused-token --command "python -c \"print('reused token case passed')\"" --guard "reused token .*passed"` then `verify run ver-password-reset-reused-token` (`PASS ver-password-reset-reused-token at dev`): the invariant no longer appeared. For `NO_VERIFIER`: a fixture `fix-reset-link-sent` that verifies `ac-password-reset-1` was added (E743 asks for the same fixture); `proof_errors` then returned E348 `UNBOUND` until `verify bind fix-reset-link-sent --command "python -c \"print('link sent case passed')\"" --guard "link sent .*passed"` (E347 `NO_EVIDENCE` after it) and `verify run ver-reset-link-sent` (`PASS ver-reset-link-sent at dev`), after which it returned nothing. The fixture was added with `specdev json insert spec/08_fixtures.json '.fixtures' '<fixture>'`.
 
@@ -817,9 +758,9 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E309 ANCHOR_CHECKLIST_DRIFT
 
-**Trigger**: Fired by `step_16_anchor.py` in two shapes: (1) `[prefix]` — two `milestone_index` entries declare the same `checklist_id_prefix`, so two milestones would allocate checklist IDs from the same namespace; (2) `[mapping]` — the same checklist item `id` appears in two different milestone plan files but maps to a different `spec_ref.id` in each, i.e. the same ID is bound to two different requirements. The `[mapping]` shape reads an object `spec_ref`, which a 1.2.0 plan item no longer has, so it finds nothing on a 1.2.0 plan.
+**Trigger**: Fired by `step_16_anchor.py` in two shapes. (1) `[prefix]`: two `milestone_index` entries declare the same `checklist_id_prefix`, so two milestones would allocate checklist ids from the same namespace: `E309 <anchor file>: ANCHOR_CHECKLIST_DRIFT [prefix]: checklist_id_prefix 'PWRESET' is shared by milestone_index entries 'ms-account-recovery' and 'ms-account-lockout' — two milestones cannot allocate checklist IDs from the same namespace.` (2) `[mapping]`: the same plan item `id` appears in two plan files with different `realises` sets, so one id stands for two things: `E309 <anchor file>: ANCHOR_CHECKLIST_DRIFT [mapping]: plan item 'PWRESET_CONFIRM_EXPIRED_01' realises 'tc-confirm-expired-token' in 'ms_account_recovery_plan.json' but 'tc-confirm-reused-token' in 'ms_account_lockout_plan.json' — same id, different realises`. The plans are found through the `milestone` key of the plan files.
 
-**Resolution**: For `[prefix]`, give each milestone a unique `checklist_id_prefix`. For `[mapping]`, rename the colliding checklist `id` in one of the milestone plans so each ID maps to exactly one `spec_ref.id`.
+**Resolution**: For `[prefix]`, give each milestone a unique `checklist_id_prefix`. For `[mapping]`, give one of the two items another id; a W610 on the same item says the id must start with the prefix of its row. Followed: the item of the second plan became `LOCK_CONFIRM_REUSED_01` (its row prefix is `LOCK`), and `specdev validate spec/16_impl_context.json` printed `OK` (E309 and W610 both gone).
 
 **Promotable**: No (error only; no `W309` counterpart).
 
@@ -843,7 +784,9 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 **Trigger**: A JSON file under `impl_context/` parses successfully but declares a `$schema` other than `vc:16-impl-context` — it isn't recognized as a milestone plan, so it's excluded from every cross-milestone drift check (E308/E309).
 
-**Resolution**: Correct the file's `$schema` to `vc:16-impl-context`, or move the file out of `impl_context/` if it isn't meant to be a milestone plan.
+Printed: `W589 <anchor file>: ANCHOR_MILESTONE_MISSCHEMAED: 'ms_wrong.json' in impl_context/ has $schema='vc:other' — expected 'vc:16-impl-context'. Drift checks skipped this file.`
+
+**Resolution**: Correct the file's `$schema` to `vc:16-impl-context`, or move the file out of `impl_context/` if it isn't meant to be a milestone plan. Followed: removing the file made `specdev validate spec/16_impl_context.json` print `OK`.
 
 **See also**: W611 ANCHOR_DRIFT_SUPPRESSED (fires when W589/W588 filter out every milestone plan, suppressing drift detection entirely).
 
@@ -939,21 +882,21 @@ An open item is an entry of an `ambiguities` array (the step files 00 to 15, the
 
 **Trigger**: The merge gate finds an open item that is not in a frozen plan, one E631 for each item, owner `merge-check`, for example `open item amb-reset-seed in 05_interface_contracts.json: about seed-accounts; apply the answer (known: apply in the batch pass), then delete the item`. No command runs the merge gate yet.
 
-**Resolution**: Apply the answer to the spec, then delete the item.
+**Resolution**: Apply the answer to the spec, then delete the item (`specdev json delete --id <item-id>`; run for E632, which has the same resolution: the finding was gone).
 
 **Promotable**: No (error only).
 
 ### E632 OPEN_ITEM_IN_PLAN
 
-**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan of the closing milestone only. `specdev milestone close` runs the close gate.
+**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan of the closing milestone only. `specdev milestone close` runs the close gate, and `close --check` and `status --milestone` show the finding without closing. Printed by a run, for an item written with `specdev json patch <plan> .execution.emergent_ambiguities '[<item>]'`: `E632 open item amb-token-store in impl_context/ms_account_recovery_plan.json: about tc-confirm-expired-token; answer it and delete the item before the milestone closes`.
 
-**Resolution**: Answer the item and delete it before the milestone closes.
+**Resolution**: Answer the item and delete it before the milestone closes. Followed: `specdev json delete --id amb-token-store` printed `deleted amb-token-store (impl_context/ms_account_recovery_plan.json .execution.emergent_ambiguities[0])` and `milestone close ms-account-recovery --check` no longer printed the E632.
 
 **Promotable**: No (error only).
 
 ### W633 OPEN_ITEM_LEGACY_TRIAGE
 
-**Trigger**: The merge gate finds an open item in a frozen milestone plan, one W633 for each item, owner `merge-check`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; in a frozen plan: listed for triage, does not fail the merge`. No command runs the merge gate yet, and no plan is frozen yet (`default_frozen` answers no for every plan), so nothing reports W633.
+**Trigger**: The merge gate finds an open item in a frozen milestone plan, one W633 for each item, owner `merge-check`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; in a frozen plan: listed for triage, does not fail the merge`. No command runs the merge gate yet, so nothing reports W633 (a plan is frozen when its milestone is closed, but the step gate that `spec-check` runs asks `default_frozen`, which answers no for every plan).
 
 **Resolution**: Informational only. Decide for each item whether it still matters; a frozen plan is not edited.
 
@@ -1131,7 +1074,7 @@ A verifier that was the only one for a node gives that node's E743 back; the unc
 
 ### E746 SCAFFOLD_PATH_NOT_TRACKED
 
-**Trigger**: A scaffold row (step 15) names a file that git does not track, for an API that is built. An API is built when a task criterion of a closed milestone refines it and the link is attested at the content the API has now (the run added a criterion that refines `api-password-reset-confirm`, attested it, and set the row of the milestone in `plan.milestone_index` of `16_impl_context.json` to `done`, with `close.signed_off_by`). A criterion that was not attested gave E761 and no E746; an API edited after the attest was not built, so it gave no E746. `spec-check` checks a row only once an API it realises is built (a row of two APIs is checked when either is built; a row of an API that is not built is not); with no API built, as on the unchanged worked example, it reports nothing. A file that exists but was never added to git is not tracked; one that is added to the index is. A row whose path lies under a submodule that is not checked out cannot be judged: `spec-check` writes a note on stderr (`note: scaffold row scaffold-password-reset-confirm path theme/routes/confirm.ts is under submodule theme, which is not checked out: not checked`) and checks the other rows. Outside a git repository the check is skipped and the summary says why: `[SKIP] scaffold-paths (git ls-files failed: fatal: not a git repository (or any of the parent directories): .git)`. It is skipped too when every row to check lies under a submodule that is not checked out, as in a clone that has not run `git submodule update`: `[SKIP] scaffold-paths (every scaffold row to check is under a submodule that is not checked out (theme))`; `--json` gives the same text as the `reason`. Reported by `spec-check` (check `scaffold-paths`). Example, after a done milestone made `api-password-reset-confirm` built: `E746 scaffold row scaffold-password-reset-confirm names src/routes/password-resets/confirm.ts, which is not a tracked file (merge mode); add and commit the file, or correct the row's path`. The words `merge mode` name the mode in which `spec-check` runs this check: it reads only the rows of built APIs. The modes `close` and `release`, which read every row, belong to the milestone close and release gates, which no command runs yet.
+**Trigger**: A scaffold row (step 15) names a file that git does not track, for an API that is built. An API is built when a task criterion of a closed milestone refines it and the link is attested at the content the API has now (the run added a criterion that refines `api-password-reset-confirm`, attested it, and set the row of the milestone in `plan.milestone_index` of `16_impl_context.json` to `done`, with `close.signed_off_by`). A criterion that was not attested gave E761 and no E746; an API edited after the attest was not built, so it gave no E746. `spec-check` checks a row only once an API it realises is built (a row of two APIs is checked when either is built; a row of an API that is not built is not); with no API built, as on the unchanged worked example, it reports nothing. A file that exists but was never added to git is not tracked; one that is added to the index is. A row whose path lies under a submodule that is not checked out cannot be judged: `spec-check` writes a note on stderr (`note: scaffold row scaffold-password-reset-confirm path theme/routes/confirm.ts is under submodule theme, which is not checked out: not checked`) and checks the other rows. Outside a git repository the check is skipped and the summary says why: `[SKIP] scaffold-paths (git ls-files failed: fatal: not a git repository (or any of the parent directories): .git)`. It is skipped too when every row to check lies under a submodule that is not checked out, as in a clone that has not run `git submodule update`: `[SKIP] scaffold-paths (every scaffold row to check is under a submodule that is not checked out (theme))`; `--json` gives the same text as the `reason`. Reported by `spec-check` (check `scaffold-paths`). Example, after a done milestone made `api-password-reset-confirm` built: `E746 scaffold row scaffold-password-reset-confirm names src/routes/password-resets/confirm.ts, which is not a tracked file (merge mode); add and commit the file, or correct the row's path`. The words `merge mode` name the mode in which `spec-check` runs this check: it reads only the rows of built APIs. The mode `close`, which reads every row, is run by the close gate (`specdev milestone close`, `close --check` and `status --milestone`): `E746 scaffold row scaffold-password-reset-confirm names src/routes/password-resets/confirm.ts, which is not a tracked file (close mode); add and commit the file, or correct the row's path`. Committing the file cleared it (run). The mode `release` belongs to the release gate, which no command runs yet.
 
 **Resolution**: Owner `step:15`. Add the file to git, or correct the `path` of the row. Both were run: creating the file and `git add` cleared it (the check reads the index, so `git add` is enough for `spec-check` although the message says commit), and so did setting the `path` to a tracked file. No attest step was needed.
 
@@ -1223,7 +1166,7 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 ### E767 WRITE_REFUSED
 
-**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>`, `specdev json insert --step NN` and `specdev step create NN --from DRAFT`, and by `specdev verify bind` and `specdev verify run`. The reasons include: the node is a seed; the field path names the node's id; the edit adds a schema violation; the edit would leave a link that does not resolve (for example E700) or an alias collision (E771); for `insert --id`, a field the node does not have when its schema does not declare that field as an array (a field it does declare as an array is created with the one item), or a field the node has that holds a string, an object, a number or a boolean instead of an array (a field that already holds an array takes the insert); for `insert --step`, a path that is not a node collection of the step, or one that is a map keyed by id; for `step create`, a step that already has its file, a step from 16 to 16c, a draft that cannot be read, or a draft whose `$schema` is not the step's own. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written. Examples: `E767 .fr_id is the id of 'fr-password-reset'; an id is changed with `specdev node rename``; `E767 'seed-accounts' is a seed; a seed is edited as a file, not by id`; `E767 step 07 already has a spec file (07_nfrs.json); edit it with `specdev json patch|insert|delete --id``; `E767 .environments is a map keyed by id, and `specdev json insert --step` does not add to a map` (`json insert --step 02a .environments '{...}'`); `E767 step 02a has no node collection .nope; its collections: .ambiguities (ambiguity-item), .ci_gates (gate), .environments (environment, map: not added by this command), .secrets (secret)` (`json insert --step 02a .nope '{}'`); `E767 'fr-password-reset' has no nope and its schema does not declare .nope as an array, so there is nothing to insert into; set the field with `specdev json patch --id`` (`json insert --id fr-password-reset .nope '"x"'`); `E767 .statement of 'fr-password-reset' is a string, not an array, so nothing can be inserted into it; set it with `specdev json patch --id fr-password-reset .statement <value>`` (`json insert --id fr-password-reset .statement '"x"'`); `E767 .interface_ref of 'api-password-reset-confirm' is an object, not an array, so nothing can be inserted into it; set it with `specdev json patch --id api-password-reset-confirm .interface_ref <value>`` (`json insert --id api-password-reset-confirm .interface_ref '"x"'`); `E767 step 16 has no spec file that step create writes; it creates steps 00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15` (`step create 16 --from draft.json`; step 13a no longer exists, so `step create 13a` is E706); for `verify bind`, a verifier that is not a fixture, a job or a rule, is `not_applicable`, or is a manual fixture, a fixture or job whose nodes need different stages when `--proves` is not given, and an `--id` that is not `ver-` and a kebab-case name or that another node has: `E767 fixture 'fix-manual-look' is manual and is not run, so it takes no binding; a person attests it` (no command of this release writes an attestation), `E767 'nfr-latency-reset-email' is of kind nfr; a binding verifies a fixture, a job or a rule`, `E767 'fix-mixed' proves nodes of different stages (dev: ac-password-reset-3; staging: nfr-latency-reset-email); one binding per stage: run `verify bind` again with `--proves ...``, `E767 'Bad_Id' is not a binding id: ver- followed by a kebab-case name`, `E767 'fix-mixed' is not_applicable and takes no binding; set it active first or bind another verifier`; for `verify run`, a binding named above the stage of the run: `E767 binding 'ver-reset-email-delivery-time' is a staging binding and this run is at dev; run with --stage staging` (with `--stage staging` the run printed `PASS ver-reset-email-delivery-time at staging`). `verify run` names an id that is not a binding with E706: `E706 'fix-mixed' is of kind fixture, not a binding (a verification record)`. `specdev third-party check --installed ... --env '!!'` refuses an environment that has no letter or digit to name the record from: `E767 the environment '!!' has no letter or digit to name the install-check record from; give --env a name such as prod` (exit 1, nothing written).
+**Trigger**: A command that writes a spec file or the lock refused the write. Raised by `specdev json patch|insert|delete --id <node-id>`, `specdev json insert --step NN` and `specdev step create NN --from DRAFT`, and by `specdev verify bind` and `specdev verify run`. The reasons include: the node is a seed; the field path names the node's id; the edit adds a schema violation; the edit would leave a link that does not resolve (for example E700) or an alias collision (E771); for `insert --id`, a field the node does not have when its schema does not declare that field as an array (a field it does declare as an array is created with the one item), or a field the node has that holds a string, an object, a number or a boolean instead of an array (a field that already holds an array takes the insert); for `insert --step`, a path that is not a node collection of the step, or one that is a map keyed by id; for `step create`, a step that already has its file, a step that has no file of its own (16b and 16c are parts of the plan file of 16a), a batch name that is missing (16a) or given for a step that is not 16a, a draft for a milestone that already has a plan file, a draft that cannot be read, or a draft whose `$schema` is not the step's own. An unknown id or step is E706, a payload that stores a computed field is E768. Nothing is written. Examples: `E767 .fr_id is the id of 'fr-password-reset'; an id is changed with `specdev node rename``; `E767 'seed-accounts' is a seed; a seed is edited as a file, not by id`; `E767 step 07 already has a spec file (07_nfrs.json); edit it with `specdev json patch|insert|delete --id``; `E767 .environments is a map keyed by id, and `specdev json insert --step` does not add to a map` (`json insert --step 02a .environments '{...}'`); `E767 step 02a has no node collection .nope; its collections: .ambiguities (ambiguity-item), .ci_gates (gate), .environments (environment, map: not added by this command), .secrets (secret)` (`json insert --step 02a .nope '{}'`); `E767 'fr-password-reset' has no nope and its schema does not declare .nope as an array, so there is nothing to insert into; set the field with `specdev json patch --id`` (`json insert --id fr-password-reset .nope '"x"'`); `E767 .statement of 'fr-password-reset' is a string, not an array, so nothing can be inserted into it; set it with `specdev json patch --id fr-password-reset .statement <value>`` (`json insert --id fr-password-reset .statement '"x"'`); `E767 .interface_ref of 'api-password-reset-confirm' is an object, not an array, so nothing can be inserted into it; set it with `specdev json patch --id api-password-reset-confirm .interface_ref <value>`` (`json insert --id api-password-reset-confirm .interface_ref '"x"'`); for `step create 16 --from <draft>` (it creates the anchor `16_impl_context.json` when it is missing) and `step create 16a <batch> --from <draft>` (it creates `impl_context/ms_<batch>_plan.json` and the lock entries of the links of its items): `E767 step 16 already has a spec file (16_impl_context.json); edit it with `specdev json patch|insert|delete --id``, `E767 step 16b has no spec file of its own: it is a part of the plan file of step 16a; it creates steps 00, 01, 02, 02a, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 16a` (the same for 16c), `E767 step 16a is one plan file per batch; name the batch: step create 16a <batch> --from <draft>`, `E767 step 04 is one file (04_fr_list.json) and takes no batch; leave 'foo' out`, `E767 'bad batch!' is not a batch name the file pattern impl_context/ms_*_plan.json matches; use letters, digits, '_' and '-'`, `E767 the plan file impl_context/ms_account_recovery_plan.json already exists; edit it with `specdev json patch|insert|delete --id`, or name another batch`, and for a second plan of one milestone `E767 milestone ms-account-recovery already has the plan file impl_context/ms_account_recovery_plan.json; a milestone has one plan file. To change that plan, edit it: `specdev json patch --id <item-id> '.description' '"new text"'` (or `json insert`, `json delete`). If the draft is for another milestone, set its `milestone` key to that milestone's id and run `specdev step create 16a second --from <draft>` again` (followed: with the draft's `milestone` set to another milestone, the command printed `created plan-ms-account-lockout` and wrote the lock entry of its link; step 13a no longer exists, so `step create 13a` is E706); for `verify bind`, a verifier that is not a fixture, a job or a rule, is `not_applicable`, or is a manual fixture, a fixture or job whose nodes need different stages when `--proves` is not given, and an `--id` that is not `ver-` and a kebab-case name or that another node has: `E767 fixture 'fix-manual-look' is manual and is not run, so it takes no binding; a person attests it with `specdev verify attest fix-manual-look``, `E767 'nfr-latency-reset-email' is of kind nfr; a binding verifies a fixture, a job or a rule`, `E767 'fix-mixed' proves nodes of different stages (dev: ac-password-reset-3; staging: nfr-latency-reset-email); one binding per stage: run `verify bind` again with `--proves ...``, `E767 'Bad_Id' is not a binding id: ver- followed by a kebab-case name`, `E767 'fix-mixed' is not_applicable and takes no binding; set it active first or bind another verifier`; for `verify run`, a binding named above the stage of the run: `E767 binding 'ver-reset-email-delivery-time' is a staging binding and this run is at dev; run with --stage staging` (with `--stage staging` the run printed `PASS ver-reset-email-delivery-time at staging`). `verify run` names an id that is not a binding with E706: `E706 'fix-mixed' is of kind fixture, not a binding (a verification record)`. `specdev third-party check --installed ... --env '!!'` refuses an environment that has no letter or digit to name the record from: `E767 the environment '!!' has no letter or digit to name the install-check record from; give --env a name such as prod` (exit 1, nothing written).
 
 **Resolution**: Command refusal: no owner. With `--json` the error names the node in `node_id`. The message names the reason.
 
@@ -1300,6 +1243,164 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 **Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id> --yes`: it writes the current stored hashes and clears the marker.
 
 **Promotable**: No (error only).
+
+## Milestone Lifecycle (80x / 81x / 82x / 83x)
+
+A milestone's life is written by commands, never by hand: `specdev milestone start|defer|sign-off|close`, `specdev plan record`, `specdev review record` and `specdev verify attest`. Each of them reads the state first and refuses with one of the codes below, writing nothing. The 80x codes are refusals of the `milestone` commands, E820 to E824 are refusals of the record commands, and E810 to E814 are the findings of the close gate (owner `close-gate`): `specdev milestone close <id>` runs the gate and writes the close only when it finds nothing, `specdev milestone close <id> --check` runs it and writes nothing, and `specdev status --milestone <id>` prints the same findings as a dry run. E827, W825 and W826 are findings of `spec-check` (E827 of the check `frozen-plans`; W825 and W826 of the check `plan-records`). W837 is a warning of the step 16 validator. E830 is raised by a library function that the release gate of a later 1.2.0 change calls.
+
+Exit codes of the commands: 0 written (or, for `--check`, the gate passes), 1 refused, 2 a usage error. Every message below was printed by a run on a git copy of the worked example, and every Resolution was followed on that copy to the state it states.
+
+### E800 MILESTONE_NOT_STARTABLE
+
+**Trigger**: `specdev milestone start <milestone-id>` refused. Three reasons. (1) The anchor `16_impl_context.json` has no row about the milestone (`defer`, `sign-off` and `close` refuse a missing row the same way, and so does `close --check`): `E800 16_impl_context.json has no anchor row about ms-account-recovery; the anchor row of a milestone is written with step 16 (`specdev step create 16`), and a milestone id looks like ms-account-recovery`. (2) The row is `done`: `E800 milestone ms-account-recovery is done; a closed milestone is not started again`. (3) A link on the chain of the milestone is suspect (E763): `E800 milestone ms-account-recovery cannot start: 1 suspect link(s) on its chain (tc-confirm-expired-token refines->ac-password-reset-3); replay the steps `specdev stale` lists, then start again`, followed by one `[merge-check] E763` line for each link. A suspect link that is not on the chain does not stop a start.
+
+**Resolution**: (1) Write the row of the roadmap milestone: with the row deleted, `specdev json insert --step 16 .plan.milestone_index '{"anchor_id": "anchor-ms-account-recovery", "about": ["ms-account-recovery"], "status": "pending", "checklist_id_prefix": "PWRESET", "summary": "..."}'` printed `inserted into anchor-ms-account-recovery` and the next `milestone start` printed `started (pending -> in_progress)`. For a new anchor file, `specdev step create 16 --from <draft>`. (2) None: a closed milestone stays closed. (3) Replay the steps `specdev stale` lists, or, when the change upstream is accepted, `specdev attest <node-id> --yes`. Followed on a copy whose lock entry for `tc-confirm-expired-token refines ac-password-reset-3` was given a chain stamp the target no longer has: `specdev attest tc-confirm-expired-token --yes` wrote the link, and `milestone start` then printed `started (pending -> in_progress)`.
+
+**Promotable**: No (error only).
+
+### E801 MILESTONE_TRANSITION_INVALID
+
+**Trigger**: A `milestone` command found a status it cannot move from. Nothing is written. `sign-off` and `close` need `in_progress`: `E801 milestone ms-account-recovery is deferred; only an in_progress milestone is signed off (`specdev milestone start ms-account-recovery` first)`, `... is done; only an in_progress milestone is closed (a closed milestone stays closed)`. `defer` needs `pending` or `in_progress`: `E801 milestone ms-account-recovery is done; only a pending or in_progress milestone is deferred`. A second `close` of a closed milestone is the same refusal. `start` of an `in_progress` milestone is not an error: it prints `already in progress, nothing written` and exits 0. A reader that meets a row whose status is not `pending`, `in_progress`, `deferred` or `done` reports it too, in every command that reads the row and in `spec-check` (check `schema-validation`): `E801 the anchor row of ms-account-recovery has the status 'finished', which is not one of pending, in_progress, deferred, done; set it to one of them in 16_impl_context.json`.
+
+**Resolution**: Move the milestone along its own path: `specdev milestone start <id>` for a `pending` or `deferred` milestone (it clears the deferral reason), then sign-off and close. Followed: `milestone defer ms-account-recovery --reason "..."`, then `sign-off` and `close` were refused with E801 and `milestone start ms-account-recovery` printed `resumed (deferred -> in_progress); the deferral reason is cleared`. For an unknown status, set it to one of the four in `16_impl_context.json` (followed: the row then read as `in_progress` and the E801 was gone).
+
+**Promotable**: No (error only).
+
+### E802 DEFER_REASON_MISSING
+
+**Trigger**: `specdev milestone defer <id>` with no `--reason`, an empty one, or one above 300 characters: `E802 a milestone is deferred with a reason (no reason was given); give `--reason "<why it waits>"`, at most 300 characters`; with a long one `(the reason is 301 characters; at most 300)`. A person decides a deferral. Nothing is written.
+
+**Resolution**: Give the reason. Followed: `specdev milestone defer ms-account-recovery --reason "waiting on the identity provider contract"` printed `milestone ms-account-recovery: deferred (pending -> deferred): waiting on the identity provider contract` and the row holds the text in `deferral_reason`.
+
+**Promotable**: No (error only).
+
+### E803 PLAN_MILESTONE_UNKNOWN
+
+**Trigger**: A command that takes a milestone id (`plan record --prune`, `review record`, `milestone ...`) cannot find the plan file of it. Three reasons, each printed by a run. (1) The id given is a batch id, the name of a plan file: `E803 account_recovery is a batch id (the plan file impl_context/ms_account_recovery_plan.json), not a milestone id (ms-...); `specdev milestone-state --batch-id account_recovery` prints the milestone of that plan under `milestone``. (2) No plan names the milestone in its file-level `milestone` key: `E803 no plan names milestone ms-nope in its `milestone` key; give the id of a milestone that has a plan in impl_context/`. (3) The plan has no `milestone` key at all, which is how a 1.1.1 plan looks: `E803 no plan names milestone ms-account-recovery: run `specdev align` (the plan has no `milestone` key)`. `milestone start ms-nope` is E800 (no row), not E803.
+
+**Resolution**: (1) Use the id `specdev milestone-state --batch-id <batch>` prints under `milestone` (followed: `ms-account-recovery`, accepted). (2) Give the id of a milestone that has a plan. (3) Add the key: `specdev json patch spec/impl_context/ms_account_recovery_plan.json .milestone '"ms-account-recovery"'` printed `Updated .milestone` and `review record ms-account-recovery --verdict verified` then printed `recorded the review`. For a host with many plans the migration of a later 1.2.0 work item writes the key; `specdev align` does not write it in this release.
+
+**Promotable**: No (error only).
+
+### E810 CLOSE_CRITERION_UNREALISED
+
+**Trigger**: The close gate (`specdev milestone close`, `close --check`, `status --milestone`) finds a task criterion in play that no plan item of the milestone's plan `realises`: `E810 task criterion tc-confirm-reused-token (task task-implement-password-reset-confirm) has no plan item that realises it; add a plan item with `realises: ["tc-confirm-reused-token"]` to impl_context/ms_account_recovery_plan.json, or mark the criterion not_applicable`. A criterion of a task whose `disposition` is `deferred` or `wont_do`, and a `not_applicable` criterion, is not in play and needs no item. Owner `close-gate`.
+
+**Resolution**: Add a plan item that realises it. Followed: `specdev json insert impl_context/ms_account_recovery_plan.json .plan.spec_alignment.checklist '<item with "realises": ["tc-confirm-reused-token"]>'`; the next `milestone close --check` no longer printed the E810 (and printed E812 for the new item until it was recorded). The new link has no lock entry yet, which `spec-check` reports as E761; `specdev attest PWRESET_CONFIRM_REUSED_01 --yes` wrote it (`spec-check` was back to 29 checks, 25 errors, 7 warnings).
+
+**Promotable**: No (error only).
+
+### E811 CLOSE_CRITERION_UNPROVEN
+
+**Trigger**: The close gate finds a task criterion in play that is not proven at the stage the gate reads (`dev`; a `ci` run counts as `dev`; a binding at `staging` or `prod` is ignored). The message names the node and what its verifier lacks: `E811 task-criterion tc-confirm-expired-token: binding ver-password-reset-expired-token has no valid evidence (NO_EVIDENCE): no run has written evidence for it; run `specdev verify run ver-password-reset-expired-token --stage dev``; `E811 task-criterion tc-confirm-reused-token: its verifier fix-password-reset-reused-token has no binding; bind it with `specdev verify bind fix-password-reset-reused-token --command "<command>" --guard "<regex>"``; `... (STALE_TREE): the code changed since the run; run `specdev verify run ver-password-reset-expired-token --stage dev`` (the code was committed after the run: commit the code first, then run); for a manual fixture: `E811 task-criterion tc-confirm-reused-token: verifier fix-password-reset-reused-token has no valid evidence (NO_EVIDENCE): a person attests it: run `specdev verify attest fix-password-reset-reused-token``. The subcodes are those of E347 and E348. Owner `close-gate`.
+
+**Resolution**: Do what the message says. Followed on the copy: `specdev verify bind` of the second fixture, then `specdev verify run --all --stage dev` (`2 run, 2 passed, 0 failed`): both E811 findings were gone. After a commit that followed the run, `specdev verify run ver-password-reset-expired-token --stage dev` and the same for the second binding cleared the `STALE_TREE` findings. For the manual fixture, `specdev verify attest fix-password-reset-reused-token` (a person's decision) cleared it. The code must be committed before the run: a commit after it makes the evidence `STALE_TREE`.
+
+**Promotable**: No (error only).
+
+### E812 CLOSE_ITEM_NOT_EXECUTED
+
+**Trigger**: The close gate finds a plan item that realises a criterion in play and is not executed: `E812 plan item PWRESET_CONFIRM_EXPIRED_01 is not executed (action a01: no record: run `specdev plan record` for it)`. An action is carried out when its latest execution record says `done`, or, for an action that names a verifier, when the verifier's evidence proves it; an action marked `at_deploy` does not hold up the close (run: a plan with an unrecorded `at_deploy` action passed `close --check` and closed, and `plan record --at-deploy` and `verify attest <item>/<action> --env prod` then wrote `dep-0001.json` and `dep-0002.json` for the closed milestone). Owner `close-gate`.
+
+**Resolution**: Carry the action out and record it: `specdev plan record PWRESET_CONFIRM_EXPIRED_01/a01 --outcome done` printed `recorded rec-0001: PWRESET_CONFIRM_EXPIRED_01/a01 done` and the E812 for that item was gone.
+
+**Promotable**: No (error only).
+
+### E813 CLOSE_REVIEW_NOT_VERIFIED
+
+**Trigger**: The close gate finds that the plan's `review` block is missing or its verdict is not `verified`: `E813 impl_context/ms_account_recovery_plan.json: no review is recorded, and the close needs `verified`; run the 16c review, then `specdev review record ms-account-recovery --verdict verified --findings-file <file>``; with a verdict recorded: `E813 impl_context/ms_account_recovery_plan.json: the verdict is needs_work, and the close needs `verified`; ...`. Owner `close-gate`.
+
+**Resolution**: Review the milestone, then record the verdict: `specdev review record ms-account-recovery --verdict verified --findings-file <converged findings file>`. Followed (with the file of the example's tests): `recorded the review of impl_context/ms_account_recovery_plan.json: verdict verified, 0 finding(s)`, and the E813 was gone.
+
+**Promotable**: No (error only).
+
+### E814 CLOSE_NO_SIGNOFF
+
+**Trigger**: The close gate finds no sign-off record of the milestone in `spec/extras/signoff/`: `E814 milestone ms-account-recovery has no sign-off record; a person signs the milestone off with `specdev milestone sign-off ms-account-recovery``. Owner `close-gate`. A sign-off made at an older code tree does not stop the close (run: code committed and re-run after the sign-off, `close --check` passed; the close record names both trees).
+
+**Resolution**: A person signs the milestone off (the command records who, from git; the agent shows `specdev status` first and never answers the person's prompt): `specdev milestone sign-off ms-account-recovery` printed `recorded so-ms-account-recovery-0001 (extras/signoff/so-ms-account-recovery-0001.json): tree ..., signed by Ada Lovelace <ada@example.invalid>`; `milestone close ms-account-recovery --check` then printed `the close gate passes; nothing written`, and `milestone close ms-account-recovery` wrote the close. A close with a close record that names no sign-off is checked by `verify_close_record`, which only the release gate of a later 1.2.0 change calls.
+
+**Promotable**: No (error only).
+
+### E820 PLAN_FROZEN
+
+**Trigger**: `specdev plan record`, `plan record --prune` or `review record` on the plan of a milestone whose anchor row is `done`: `E820 plan impl_context/ms_account_recovery_plan.json belongs to milestone ms-account-recovery, which is closed: a closed plan is frozen and changes only through a recorded migration, so no record can be written to it or removed from it`. Nothing is written. `plan record --at-deploy` is not refused: it writes a record file, not the plan.
+
+**Resolution**: None clears it: a closed plan is not changed. Record against the plan of an open milestone.
+
+**Promotable**: No (error only).
+
+### E821 RECORD_TARGET_UNKNOWN
+
+**Trigger**: `specdev plan record <ITEM>/<action-id>` (or `--at-deploy`) names something the plan does not have. Messages as printed: `E821 no plan item NOPE; the nearest plan items are PWRESET_CONFIRM_EXPIRED_01`; `E821 PWRESET_CONFIRM_EXPIRED_01 has no action a09; its actions are a01`; `E821 action a01 of PWRESET_CONFIRM_EXPIRED_01 is not marked at_deploy, not for staging; an at-deploy record names a stage its action is marked for`; for an action with no `id`: `E821 PWRESET_CONFIRM_EXPIRED_01 has no action a01: its actions carry no id; give the first one with `specdev json patch --id PWRESET_CONFIRM_EXPIRED_01 '.implementation.actions[0].id' '"a01"'`, and so on for the others` (a plan action without an id is also E520, see there). Two actions with the same id are refused the same way. Nothing is written.
+
+**Resolution**: Use an item and an action the message lists. For an action with no id: the `json patch --id` command of the message, then the same `plan record`: followed, it printed `recorded rec-0001: PWRESET_CONFIRM_EXPIRED_01/a01 done` and `spec-check` had no E520 left.
+
+**Promotable**: No (error only).
+
+### E822 RECORD_ACTION_NAMES_VERIFIER
+
+**Trigger**: `specdev plan record` for an action whose `command` is, after trimming and collapsing whitespace, a command of a binding of a verifier that a criterion of the item lists in `verified_by`, at any stage. Its proof is the evidence of the run, not a record: `E822 action a02 of PWRESET_CONFIRM_EXPIRED_01 names a verifier: its command is a command of binding ver-password-reset-expired-token (verifier fix-password-reset-expired-token, stage dev), so its proof is the evidence of `specdev verify run ver-password-reset-expired-token`, not a record`. Nothing is written.
+
+**Resolution**: Run the binding instead: `specdev verify run ver-password-reset-expired-token --stage dev` printed `PASS ver-password-reset-expired-token at dev`; the close gate then reads that action as proven, and no record is written for it.
+
+**Promotable**: No (error only).
+
+### E823 REVIEW_RECORD_INVALID
+
+**Trigger**: `specdev review record` refused its input. Messages as printed: an unknown verdict, `E823 verdict 'bogus' is not one of verified, needs_work, blocked, deferred`; a findings file with no `$schema`, `E823 the findings file f.json has no "$schema"; add "$schema": "vc:infra:findings"`; a file that is not valid against the findings schema, `E823 the findings file e.json is not a valid findings document: file: 'round' is a required property`; an unreadable file, `E823 the findings file d.json cannot be read as JSON (Expecting property name enclosed in double quotes: line 1 column 3 (char 2)); give the path of a converged findings file`; a finding that names an item the plan lacks, `E823 finding 1 names plan item NOPE_ITEM_01, which no plan item of milestone ms-account-recovery has; name an item of the plan, or drop it from the finding`; too many findings, `E823 the findings file holds 51 open findings, above the 50 the review block takes; fix the most serious first and run the review again`; a long message, `E823 finding 1 of the findings file has a message of 601 characters, above 600; shorten it`; `--ratings-json` that is not an object, `E823 --ratings-json is not a JSON object; give an object such as '{"code_quality": 4, ...}'`. The tool checks the input, not the judgement: `verified` is accepted with a blocking finding or a red security status (the close gate reads the verdict). Nothing is written.
+
+**Resolution**: Fix what the message names. Followed: adding `"$schema": "vc:infra:findings"` to the file made the same command print `recorded the review of impl_context/ms_account_recovery_plan.json: verdict verified, 0 finding(s)`.
+
+**Promotable**: No (error only).
+
+### E824 ATTEST_TARGET_NOT_ATTESTABLE
+
+**Trigger**: `specdev verify attest <id> ...` was given an id that a person cannot attest: a fixture whose mode is not `manual`, a node of another kind, an id no node has, or a plan action that is not marked `at_deploy` for `--env`. Nothing is written for any id of the call. Messages as printed: `E824 fixture fix-password-reset-expired-token has mode contract, not manual, so it is bound and run, not attested; bind it with `specdev verify bind fix-password-reset-expired-token --command CMD --guard REGEX``; `E824 tc-confirm-expired-token is a task-criterion; verify attest takes a manual fixture, a rule enforced by review, or a plan action ITEM/action marked at_deploy`; `E824 no node with the id 'nope'; nearest: scope-sms-reset, ms-account-recovery, cap-account-recovery`; `E824 PWRESET_CONFIRM_EXPIRED_01/a01 is not marked at_deploy, not for staging; only an action marked at_deploy for the environment is attested with --env staging`. An action address without `--env` (or `--env` without an action) is a usage error, exit 2.
+
+**Resolution**: Leave the id out, or make it attestable. For a fixture that should be run: `specdev verify bind` and `specdev verify run`. For a manual fixture: `specdev json patch --id <fixture> .mode '"manual"'` (a contract fixture needs `.manual_reason` first). Followed on the copy: `specdev verify attest fix-password-reset-reused-token` printed `attested fix-password-reset-reused-token: extras/verification/evd-fix-password-reset-reused-token-attested.json`, and for a rule `specdev verify attest rule-security-review-of-token-handling` wrote `evd-rule-security-review-of-token-handling-attested.json`. Not `specdev attest`: that command re-accepts links in the trace lock; `verify attest` writes an attestation record.
+
+**Promotable**: No (error only).
+
+### W825 EXECUTION_STALE
+
+**Trigger**: Reported by `spec-check` (check `plan-records`; owner step 16, node the record, file the plan). The latest execution record of an action stored a `realises_hash` that differs from the hash of what the item realises in the trace lock now, so the action was carried out for a criterion that has since changed: `W825 execution record rec-0002 (action a01 of PWRESET_CONFIRM_EXPIRED_01) is stale: what the item realises changed since it was written; carry the action out again and run `specdev plan record PWRESET_CONFIRM_EXPIRED_01/a01 --outcome done``. Provoked by editing the text of the criterion the item realises and accepting the link (`specdev attest PWRESET_CONFIRM_EXPIRED_01 --yes`).
+
+**Resolution**: Carry the action out again and record it: that command printed `recorded rec-0003` and `plan-records` went from WARN to PASS. The latest record of an action is the one that counts.
+
+**Promotable**: No (warning only; not in `PROMOTABLE_PAIRS`).
+
+### W826 PLAN_ITEM_REALISES_EXCLUDED_TASK
+
+**Trigger**: Reported by the same check. A plan item realises criteria and every one belongs to a task whose `disposition.value` is `deferred` or `wont_do`, so the close gate ignores the item: `W826 plan item PWRESET_CONFIRM_EXPIRED_01 realises only criteria of tasks that are deferred or wont_do, so the close gate ignores it; drop it when 16a re-plans`.
+
+**Resolution**: Drop the item, then remove its records. Followed: `specdev json delete --id PWRESET_CONFIRM_EXPIRED_01` (it printed the three records' `about` links as now broken), then `specdev plan record --prune ms-account-recovery` printed `removed 3 orphan record(s) from impl_context/ms_account_recovery_plan.json`; `plan-records` was PASS. (`plan record --prune` is not `specdev attest --prune`, which removes lock entries.)
+
+**Promotable**: No (warning only; not in `PROMOTABLE_PAIRS`).
+
+### E827 PLAN_CHANGED_AFTER_CLOSE
+
+**Trigger**: Reported by `spec-check` (check `frozen-plans`; owner step 16, `file` the plan, `node_id` the milestone). The plan of a closed milestone no longer has the hash the close record stores in `plan_hash`: `E827 plan impl_context/ms_account_recovery_plan.json changed after milestone ms-account-recovery was closed (its hash is sha256:ceb59f369c21, the close record holds sha256:61dec62314bc); restore the plan to its closed text`. It reports; it blocks no command.
+
+**Resolution**: Restore the plan to its closed text. Followed: the plan was edited by hand after the close was committed, and `git checkout spec/impl_context/ms_account_recovery_plan.json` made `frozen-plans` go from FAIL to PASS.
+
+**Promotable**: No (error only).
+
+### E830 REVIEW_RULE_UNATTESTED
+
+**Trigger**: Raised by `lifecycle.attest.review_rule_attested(rule_id, graph, ctx)` for a rule enforced by `review`; no command prints it in this release (the release gate of a later 1.2.0 change calls it). Owner `release-gate`. The subcode is the reason: `NO_ATTESTATION`, `STALE_HASH` (the rule changed since it was attested) or `STALE_TREE` (the code tree changed since). Printed by a call on the worked example: `E830 rule rule-security-review-of-token-handling is enforced by review and has no valid attestation (NO_ATTESTATION); run `specdev verify attest rule-security-review-of-token-handling` after the review`. A rule that also has a binding is satisfied by its runs, not by an attestation.
+
+**Resolution**: A person reviews, then runs the command of the message. Followed: `specdev verify attest rule-security-review-of-token-handling` wrote the attestation, and the function then returned no finding; after the text of the rule was edited it returned `STALE_HASH`, and after a commit to the code `STALE_TREE`, each cleared by the same command.
+
+**Promotable**: No (error only).
+
+### W837 PLAN_FILE_LARGE
+
+**Trigger**: The step 16 validator (`specdev validate`, `spec-check` check `schema-validation`) finds a plan file above 750000 bytes; the threshold is fixed: `W837 <plan file>: PLAN_FILE_LARGE: the plan file is 761463 bytes, above 750000; split the milestone so each plan stays small`.
+
+**Resolution**: Split the milestone so each plan stays small. Followed only as far as the size: with the plan back under the threshold, `schema-validation` printed `0 warnings`.
+
+**Promotable**: No (warning only; not in `PROMOTABLE_PAIRS`).
 
 ## Removed Codes
 
@@ -1408,6 +1509,38 @@ Removed in 1.2.0 with `specdev forward-replay-check`. A node that was deleted le
 ### E604 / W604 TRACE_MATRIX_STALE (removed)
 
 Removed in 1.2.0, see E763: no command writes `extras/trace_matrix.json` and no check compares the age of a stored file with `14_roadmap.json`. An edit to a roadmap node shows in `spec-check` (check `trace-lock`) as E763 on each link whose target, or something above its target, was edited, and `specdev stale` lists those nodes as suspect.
+
+### E301 MISSING_PROOF_CLOSURE (removed)
+
+Removed in 1.2.0 with the plan fields it read (`implementation.status`, an action's `evidence`, `execution.execution_results`): a milestone closes when the close gate finds every criterion in play proven (E811), every plan item executed (E812) and the review verified (E813). `specdev milestone close --check` runs it.
+
+### E302 UNPROVEN_VERIFIED_REVIEW (removed)
+
+Removed in 1.2.0 with `execution.execution_results` and `review.fixture_status`: the proof behind a `verified` verdict is read by the close gate as E811, E812 and E813, not from fields of the review block.
+
+### E305 PLANNED_UNEXECUTED (removed)
+
+Removed in 1.2.0 with `execution.final_status` and `execution.critical_evidence`: a plan item that is not carried out is E812 at the close gate (`specdev plan record` writes the execution record that satisfies it).
+
+### E306 SEMANTIC_REVIEW_FR_MISMATCH (removed)
+
+Removed in 1.2.0: `review.semantic_review.fr_coverage` is removed from the plan schema, so there is no `fr_id` left to check.
+
+### E307 BEHAVIOR_VALIDATION_PAIRING (removed)
+
+Removed in 1.2.0: a plan item stores no object `spec_ref`, which the pairing read, and no rule of the new shape replaces it (a plan item `realises` task criteria, and E304 and E810 check that each one is realised).
+
+### W599 EVIDENCE_TOO_SHORT (removed)
+
+Removed in 1.2.0 with the action `evidence` field: the proof of an action is an execution record (`specdev plan record`) or the evidence record of a run (`specdev verify run`).
+
+### W600 VERIFIED_ACTION_NO_EVIDENCE (removed)
+
+Removed in 1.2.0 with the action `evidence` field (see W599).
+
+### W601 EVIDENCE_NO_ARTIFACT_REF (removed)
+
+Removed in 1.2.0 with the action `evidence` field (see W599).
 
 ### W602 / W605 TECH_STACK_02_MISMATCH / TECH_STACK_02_MISSING (removed)
 

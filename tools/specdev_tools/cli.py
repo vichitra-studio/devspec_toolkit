@@ -1062,7 +1062,7 @@ def main():
                     f"AI help for step {args.step}:",
                     f"1. Open the prompt file: prompts/prompt_{args.step}_*.md",
                     f"2. Copy the content into your AI assistant",
-                    f"3. Write the AI-produced JSON directly to spec/{args.step}_*.json",
+                    f"3. Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create {args.step} --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)",
                     f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>",
                 ]
             else:
@@ -1070,7 +1070,7 @@ def main():
                     "AI Interaction Guide:",
                     "1. Locate the prompt file in prompts/prompt_XX_stepname.md",
                     "2. Copy the full content into your AI assistant",
-                    "3. Write the JSON artifact directly to spec/NN_name.json",
+                    "3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)",
                     "4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>",
                     "5. Ensure all IDs use kebab-case format",
                     "6. No examples should be included in the AI output",
@@ -1094,7 +1094,7 @@ def main():
                 print(f"AI help for step {args.step}:")
                 print(f"1. Open the prompt file: prompts/prompt_{args.step}_*.md")
                 print(f"2. Copy the content into your AI assistant")
-                print(f"3. Write the AI-produced JSON directly to spec/{args.step}_*.json")
+                print(f"3. Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create {args.step} --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)")
                 print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>")
                 if args.step in _step_docs:
                     print("")
@@ -1105,7 +1105,7 @@ def main():
                 print("AI Interaction Guide:")
                 print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")
                 print("2. Copy the full content into your AI assistant")
-                print("3. Write the JSON artifact directly to spec/NN_name.json")
+                print("3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (step 16a also takes the batch name; an existing step is edited with specdev json patch|insert|delete --id)")
                 print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>")
                 print("5. Ensure all IDs use kebab-case format")
                 print("6. No examples should be included in the AI output")

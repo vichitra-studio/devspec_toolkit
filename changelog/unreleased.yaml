@@ -481,34 +481,32 @@ changes:
 
   - type: change_schema
     description: >
-      Interim states until later 1.2.0 changes: the Trinity files
-      (prompts/prompt_16a_impl_planner.md, prompts/prompt_16b_impl_coder.md,
-      prompts/prompt_16c_impl_reviewer.md, the skill specdev-trinity and the
-      agents specdev-trinity-impl and specdev-trinity-reviewer) still name
-      removed fields (spec_ref, fr_refs, severity) and the words "forward-replay
-      data"; specdev align prompts output, the migration templates in
-      prompts/migration/, docs/developers/workflows/workflow_migration.md,
+      Interim states until later 1.2.0 changes: the migration templates
+      prompts/migration/template_impl_context.md, template_impl_coder.md and
+      template_impl_reviewer.md (and specdev align prompts output made from them)
+      still tell a migrating agent to write the removed fields execution_results,
+      fixture_status and fr_coverage and a milestone status and context_path, so
+      their output fails specdev spec-check with E520 until a later 1.2.0 change
+      re-points them; prompts/migration/template_frs.md and template_nfrs.md say
+      to regenerate the trace matrix (no command does), template_governance.md
+      lists matrix as an allowed pr_rules value (step 10 has had no pr_rules since
+      this release began), and docs/developers/workflows/workflow_migration.md,
       docs/developers/design/migration_system_spec.md and
-      tests/fixtures/spec_corpus still describe the 1.1.1 shape. These
-      procedures do not work on a 1.2.0-shaped spec until then: the
-      milestone-close steps of prompt_16c_impl_reviewer.md and of the
-      specdev-trinity skill (the anchor row refuses status: done without close,
-      and a step 09 or step 14 milestone has no status); the emergent-ambiguity
-      insert in .claude/agents/specdev-trinity-impl.md (it writes severity and
-      no about); the two steps of prompts/prompt_16b_impl_coder.md named "Step
-      2" (about lines 109 and 199), which run specdev matrix spec --repo-root
-      ... --git-root . (it now exits 2 with the pointer quoted in the matrix
-      entry), read canon/kinds/trace_type.json (the file is deleted) and read
-      spec/extras/trace_matrix.json (no command writes it);
-      prompts/migration/template_frs.md and prompts/migration/template_nfrs.md,
-      which say to regenerate the trace matrix after migration (no command
-      does); prompts/migration/template_governance.md, which lists matrix as an
-      allowed pr_rules value (step 10 has had no pr_rules since this release
-      began); and host CI that calls specdev matrix or forward-replay-check (it
-      fails with exit 2 after the toolkit is updated). A host whose project
-      canon holds entries of kind completeness_dimension, or that still has
+      tests/fixtures/spec_corpus still describe the 1.1.1 shape; host CI that
+      calls specdev matrix or forward-replay-check fails with exit 2 after the
+      toolkit is updated. A host whose plans have no milestone key gets E803,
+      which says to run specdev align; specdev align does not write that key in
+      this release, the migration of a later 1.2.0 work item does (until then
+      specdev json patch <plan> .milestone '"<milestone-id>"' writes it). Until a
+      later 1.2.0 change installs the Claude Code ask rules in a host, specdev
+      milestone sign-off, specdev milestone defer and specdev verify attest run
+      without a prompt unless the host wrote its own rule, and release is not a
+      command of this toolkit version. A host whose project canon holds entries of
+      kind completeness_dimension, or that still has
       spec/13a_completeness_assessment.json, is migrated by a later 1.2.0 change
-      (see the step 13a entry).
+      (see the step 13a entry). Shown by specdev milestone-state --batch-id
+      account_recovery --repo-root ./devspec_toolkit --spec-root ./spec --git-root
+      ..
     migration:
       action: none
 
@@ -711,7 +709,7 @@ changes:
       specdev step create NN --from DRAFT [--dry-run] writes the file of step NN from
       a draft that holds the whole artifact (ids of sub-items may be left out), checks
       it against the step's schema, requires every link to resolve and writes the lock
-      entries of its links; E767 when the step already has its file, for steps 16 to 16c, for a draft that cannot be read, for a draft whose $schema is not the step's
+      entries of its links; E767 when the step already has its file, for step 16b and 16c (they are parts of the plan file of 16a), for a draft that cannot be read, for a draft whose $schema is not the step's
       and for a link that does not resolve; E520 when a spec file cannot be read or a seed document is not found under the host root (also for a dry run). specdev step ready NN prints step NN: ready and exits 0 when the steps NN links
       to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, ending with what to do
       first by the blockers of the first step: write it (no file), replay it (suspect links), fix its coverage gaps (coverage gaps
@@ -1391,5 +1389,202 @@ changes:
       specdev trace <milestone-id> --recipe 16c lists the verification records and
       the evidence records of a run among the verifiers of the milestone. Shown by
       specdev trace <milestone-id> --recipe 16c after specdev verify run.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step 16 plan (16_impl_context), breaking for a host's plans: the action id
+      is required (a01, a02, ...), and the 1.1.1 plan fields that the new loop
+      replaces are removed: execution.execution_results, execution.final_status,
+      an action's evidence, review.fixture_status,
+      review.semantic_review.fr_coverage and the two verified conditions of the
+      review block. A host plan with an action that has no id, or with a removed
+      field, is reported by specdev spec-check and specdev validate as E520 ('id'
+      is a required property; Additional properties are not allowed); the plan of
+      a milestone closed by a migration (a close whose signed_off_by is
+      legacy-migration) is exempt. The migration of a later 1.2.0 work item adds
+      the action ids and the plan's milestone key; until it has run, a 1.1.1 plan
+      is read only through specdev status and is not driven through
+      /specdev-trinity. Shown by specdev spec-check spec --repo-root
+      ./devspec_toolkit --spec-root ./spec --git-root ., which lists the E520.
+    migration:
+      action: ai_assisted
+
+  - type: add_module
+    description: >
+      specdev milestone start|defer|sign-off|close <milestone-id> write a
+      milestone's life on its row of the anchor 16_impl_context.json: start moves
+      pending or deferred to in_progress (refused with E800 when a suspect link is
+      on the milestone's chain), defer --reason TEXT (at most 300 characters) puts
+      it aside, sign-off writes the record
+      spec/extras/signoff/so-<milestone-id>-<NNNN>.json, and close runs the close
+      gate (E810 a criterion no plan item realises, E811 a criterion not proven,
+      E812 a plan item not executed, E813 the review not verified, E632, E763,
+      E746, E814 no sign-off) and, when it finds nothing, writes status: done with
+      the close record {signed_off_by, signoff, tree, plan_hash, closed_at,
+      migrations} and freezes the plan; close --check writes nothing and there is
+      no --dry-run. A batch id is refused with E803 and the way to the milestone
+      id. A person decides sign-off and defer. Shown by specdev milestone close
+      ms-account-recovery --check.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev status [--milestone <milestone-id>] [--json] prints where the work
+      stands (pending replay, open items, milestones awaiting sign-off, outdated
+      realisations, the next step that may start, the close gate as a dry run, the
+      merge-check and release-gate sections that print release gate not
+      installed); with --milestone it prints the view a person signs off from. It
+      reads and writes nothing. Shown by specdev status.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev plan record <ITEM>/<action-id> --outcome done|failed|blocked [--note
+      TEXT] appends an execution record to execution.records of the plan (an
+      action that names a verifier is E822: its proof is specdev verify run);
+      specdev plan record --at-deploy <ITEM>/<action-id> --env staging|prod writes
+      spec/extras/verification/dep-<NNNN>.json for an action marked at_deploy;
+      specdev plan record --prune <milestone-id> removes the records of an item or
+      action that is gone; specdev review record <milestone-id> --verdict
+      verified|needs_work|blocked|deferred --findings-file F replaces the plan's
+      review block (E823 for invalid input). The plan of a closed milestone
+      refuses both (E820). The spec-check check plan-records warns W825 (a record
+      older than a change of what its item realises) and W826 (an item that
+      realises only deferred or won't-do tasks), and the new check frozen-plans
+      reports E827 for a plan edited after its milestone closed; spec-check now
+      runs 29 checks. Shown by specdev plan record --help and specdev review
+      record --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev verify attest <node-id>... records an attestation
+      (spec/extras/verification/evd-<node id>-attested.json) of a fixture with
+      mode manual or a rule enforced by review, and specdev verify attest
+      <ITEM>/<action-id> --env staging|prod records an at_deploy action a person
+      carried out; a person decides, and an id that is not attestable is E824 with
+      nothing written. It is not specdev attest, which re-accepts links. A review
+      rule is built once it is attested (it was reported as pending evidence
+      before), and the advice of E347, E348 and the E767 of a manual fixture name
+      specdev verify attest. The release gate's check of an unattested rule, E830,
+      is a library function in this release. Shown by specdev verify attest
+      --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev step create 16 --from DRAFT creates the anchor file when it is
+      missing and specdev step create 16a <batch> --from DRAFT creates the plan
+      file impl_context/ms_<batch>_plan.json and the lock entries of its links
+      (the draft carries the ids of its items, actions and open items); a
+      milestone has one plan, so a draft for a milestone that already has a plan
+      file is E767, and step create 16b or 16c is E767 (they are parts of the plan
+      file). Shown by specdev step create --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      New error codes E800 MILESTONE_NOT_STARTABLE, E801
+      MILESTONE_TRANSITION_INVALID, E802 DEFER_REASON_MISSING, E803
+      PLAN_MILESTONE_UNKNOWN, E810 CLOSE_CRITERION_UNREALISED, E811
+      CLOSE_CRITERION_UNPROVEN, E812 CLOSE_ITEM_NOT_EXECUTED, E813
+      CLOSE_REVIEW_NOT_VERIFIED, E814 CLOSE_NO_SIGNOFF, E820 PLAN_FROZEN, E821
+      RECORD_TARGET_UNKNOWN, E822 RECORD_ACTION_NAMES_VERIFIER, E823
+      REVIEW_RECORD_INVALID, E824 ATTEST_TARGET_NOT_ATTESTABLE, W825
+      EXECUTION_STALE, W826 PLAN_ITEM_REALISES_EXCLUDED_TASK, E827
+      PLAN_CHANGED_AFTER_CLOSE, E830 REVIEW_RULE_UNATTESTED and W837
+      PLAN_FILE_LARGE (a plan file above 750000 bytes). Each has an entry with its
+      message and the way out in docs/developers/error-codes.md, "Milestone
+      Lifecycle". Shown by grep -n '^### E8' docs/developers/error-codes.md.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step 16 schemas, additions: an action may carry at_deploy (staging, prod);
+      execution.records[] holds the execution records specdev plan record writes;
+      the review block has recorded_at and limits on what a record takes
+      (review.findings 50, a finding's description 600, next_actions 1000, a
+      record's note 200, execution.records 1000); the anchor row's deferral_reason
+      takes at most 300 characters and its close record is {signed_off_by,
+      signoff, tree, plan_hash, closed_at, migrations}. New record schemas
+      vc:extras:signoff-record (spec/extras/signoff/so-*.json) and
+      vc:extras:at-deploy-record (spec/extras/verification/dep-*.json); specdev
+      spec-check reads both folders (E774 for an invalid file). Shown by specdev
+      validate spec/impl_context/ms_<batch>_plan.json --repo-root
+      ./devspec_toolkit.
+    migration:
+      action: ai_assisted
+
+  - type: change_config
+    description: >
+      specdev milestone-state --batch-id <batch> prints a new key milestone (the
+      plan's milestone key, null when it has none; milestone_id still echoes the
+      batch id and is not a milestone id). Group states are pending,
+      code_converged, blocked, deferred and wont_do: verified is gone, deferred
+      and wont_do follow the disposition of the tasks the item realises, blocked
+      follows open items about a node of the item's chain, and
+      derived_phase_position is closed only when the anchor row is done. The group
+      keys blocking_amb_health and fixtures_exercised are removed. A findings
+      file's scope may be a plan item id. The anchor validator's E308 [ownership]
+      arm now compares the roadmap tasks the plans' items realise, and E309
+      [mapping] compares the realises sets of one item id in two plans. Shown by
+      specdev milestone-state --batch-id account_recovery --repo-root
+      ./devspec_toolkit --spec-root ./spec --git-root ..
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      Error codes retired into the removed set with the plan fields they read:
+      E301 MISSING_PROOF_CLOSURE, E302 UNPROVEN_VERIFIED_REVIEW, E305
+      PLANNED_UNEXECUTED, E306 SEMANTIC_REVIEW_FR_MISMATCH, E307
+      BEHAVIOR_VALIDATION_PAIRING, W599 EVIDENCE_TOO_SHORT, W600
+      VERIFIED_ACTION_NO_EVIDENCE and W601 EVIDENCE_NO_ARTIFACT_REF; the close
+      gate (E811, E812, E813) replaces the first three. validate --step 16b runs
+      the 16a checks (there is no 16b validator) and the validator of a 16c plan
+      only checks that review is an object. E303 stays, meaning only a commit
+      message that does not match commit_message_rules of step 10. Each retired
+      code has a stub in docs/developers/error-codes.md, "Removed Codes". Shown by
+      grep -n '(removed)' docs/developers/error-codes.md.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The step 16 prompts (prompt_16_impl_context.md, prompt_16a_impl_planner.md,
+      prompt_16b_impl_coder.md, prompt_16c_impl_reviewer.md), the agents
+      specdev-trinity-impl and specdev-trinity-reviewer and the skill
+      /specdev-trinity describe the 1.2.0 loop: a plan is created by step create
+      16a <batch>, items realise task criteria, a carried-out action is recorded
+      with plan record, a verifier action is proven by verify run, the review is
+      recorded with review record from a vc:infra:findings file, and the milestone
+      ends with status --milestone, a person's milestone sign-off, milestone close
+      --check and milestone close. The code is committed before specdev verify run
+      --milestone <id> --stage ci (E746 reads tracked files, and a commit after
+      the run makes the evidence stale, E811). A person decides sign-off, defer
+      and manual attestation: the agent shows specdev status first and never
+      answers the host's prompt. The prompts no longer name spec_ref,
+      milestone_ref, checklist_status, execution_results, fixture_status,
+      fr_coverage, the trace matrix or specdev matrix. Shown by specdev status
+      --milestone ms-account-recovery.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      docs/developers/reference.md documents the commands above and the
+      milestone-state output as printed; docs/developers/workflows/spec_to_impl.md
+      has the order of a milestone's life and who decides each step. The specdev
+      ai-help guide no longer says to write the artifact directly to spec/: it
+      names specdev step create NN --from <draft> and specdev json
+      patch|insert|delete --id. Shown by specdev ai-help.
     migration:
       action: none
