@@ -177,14 +177,14 @@ def test_the_four_person_decisions_are_left_to_a_person() -> None:
         "A **person** decides:",
         "**sign-off** (`specdev milestone sign-off <ms-id>`) and **defer**",
         "`specdev verify attest <node-id>...`; not `specdev attest`, which re-accepts links",
-        "**release**: not a command of this toolkit version",
+        "**release**, the cut (`specdev release --tag <name>`): not a step of a milestone's loop; the person runs it and the skill never does.",
         "Before each of them: show `specdev status --milestone <ms-id>` first, ask the person in the conversation, and run the command only on an explicit yes.",
         "that prompt is the person's and the skill never answers it",
         "The skill never runs one of these commands on its own judgement.",
     ):
         assert sentence in text, sentence
     code, out = run_cli("release", "--help")
-    assert code != 0, "`release` is not a command: the skill says so"
+    assert code == 0 and "--tag" in out, "`release --tag` is the command the skill names"
 
 
 def test_the_skill_asks_before_a_manual_record_and_before_a_manual_attestation() -> None:

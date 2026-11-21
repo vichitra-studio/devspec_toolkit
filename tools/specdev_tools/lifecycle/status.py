@@ -2,13 +2,15 @@
 
 ``status`` reads and writes nothing and is not a gate: it lists what is owed and exits 0 (it exits 1 only when it cannot read
 what it needs: the trace lock, the host declarations, an anchor row with an unknown status).  Each section is a function that
-is registered under a name, ``register_status_section(name, fn)``; this module registers the sections below, and the release
-gate (M9) re-registers ``MERGE_RELEASE_SECTION`` and ``PRODUCTION_SECTION``, which print "release gate not installed" until
-then.  A section function gets a ``StatusContext`` and returns a ``Section``.
+is registered under a name, ``register_status_section(name, fn)``; this module registers the sections below.  The two release
+sections, ``MERGE_RELEASE_SECTION`` and ``PRODUCTION_SECTION``, are registered here as placeholders that print "release gate not
+installed"; ``release.status_sections.install()``, which ``cli.build_parser`` calls (this package does not import ``release``),
+replaces them in their places with the merge-check and release-gate findings and the production verification of the previous
+release.  A section function gets a ``StatusContext`` and returns a ``Section``.
 
 ``milestone_view`` is the view of one milestone that ``status --milestone`` and ``milestone sign-off`` print: the code tree,
 the proof of each criterion, the manual share, what is deferred or won't-do, what is open, and the close gate as a dry run (not for a ``done`` row: a closed
-milestone stays closed, and what changed after the close is ``spec-check``'s to report).
+milestone stays closed; a plan changed after the close is ``spec-check``'s to report, E827, and code that moved on is not reported).
 Every question about several nodes is asked node by node: a node whose stage cannot be told (E334) is reported as that and the
 others are still answered.
 """

@@ -24,6 +24,19 @@ pytestmark = pytest.mark.usefixtures("author")
 SECTION_NAMES = ["pending_replay", "open_items", "awaiting_signoff", "realisations", "next_step", "gate_owned_errors", "merge_release_gates", "production_verification"]
 
 
+@pytest.fixture
+def default_release_sections(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The two release sections as this package registers them: ``cli.build_parser`` replaces them (the registry is process-wide), and the test puts them back when it ends."""
+    for name, title in ((status_module.MERGE_RELEASE_SECTION, "Merge-check and release-gate errors"), (status_module.PRODUCTION_SECTION, "Production verification")):
+        monkeypatch.setitem(status_module.SECTIONS, name, status_module._release_not_installed(name, title))
+
+
+def test_default_release_sections_say_not_installed(tmp_path: Path, default_release_sections: None) -> None:
+    sections = _sections(closed_example(tmp_path))
+    assert list(sections) == SECTION_NAMES
+    assert sections["merge_release_gates"].lines == (status_module.RELEASE_NOT_INSTALLED,) == sections["production_verification"].lines
+
+
 def _sections(host: Path) -> dict[str, Section]:
     spec, repo, git = roots(host)
     context = status_context(spec, repo, git, lock_if_present(spec), build_graph(spec, repo), providers_of(host))
@@ -42,7 +55,6 @@ def test_each_section_on_a_fixture(tmp_path: Path) -> None:
     assert any(line.startswith("E343 outdated") for line in sections["realisations"].lines)
     assert sections["next_step"].lines == ("every step has a spec file",)
     assert sections["awaiting_signoff"].lines == ("none",)
-    assert sections["merge_release_gates"].lines == ("release gate not installed",) == sections["production_verification"].lines
 
 
 def test_awaiting_signoff_row_appears_after_a_verified_review_and_goes_after_signoff(tmp_path: Path) -> None:
@@ -260,11 +272,13 @@ def test_status_milestone_of_a_done_row_runs_no_close_gate_and_says_nothing_of_t
     assert code == 0 and "close gate" not in out and "E811" not in out and "STALE_TREE" not in out
 
 
-@pytest.mark.parametrize("status", ["in_progress", "deferred"])
+@pytest.mark.parametrize("status", ["pending", "in_progress", "deferred"])
 def test_status_milestone_of_a_row_that_can_still_close_keeps_the_dry_run(tmp_path: Path, status: str) -> None:
     host = ready_host(tmp_path)
     if status == "deferred":
         set_row(host, "deferred", deferral_reason="waits")
+    if status == "pending":
+        set_row(host, "pending")
     code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
     assert code == 0 and f"milestone {MILESTONE}: {status}" in out and "close gate (dry run):" in out
     code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")

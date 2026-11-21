@@ -264,8 +264,9 @@ CLOSE_DESCRIPTION = (
 STATUS_DESCRIPTION = (
     "Where the work stands, in sections: pending replay by step, open items by owner, milestones awaiting sign-off, outdated and "
     "removed realisations, the next step that may start, the gate-owned errors of the milestones in progress (the close gate as a "
-    "dry run, and the W350 warning for a submodule with uncommitted content), the merge-check and release-gate errors and the "
-    "production verification (both print 'release gate not installed' until the release gate is). Reads and writes nothing; "
+    "dry run, and the W350 warning for a submodule with uncommitted content), the merge-check and release-gate errors (the release "
+    "gate run on the checkout, by owner) and the production verification of the previous release (verified in production, rollback "
+    "recorded, not verified, none (previous tag predates 1.2.0) or none). Reads and writes nothing; "
     "exit 0 whatever it lists (1 only when it cannot read what it needs). --milestone <id> prints the view `milestone sign-off` "
     "shows: the code tree, the proof of each criterion, the manual share, deferred and won't-do tasks, open items and the close "
     "gate as a dry run. --json prints the same data with stable keys."

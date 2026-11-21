@@ -66,7 +66,8 @@ and `specdev milestone close`. A **person** decides:
   `specdev plan record <ITEM>/<action-id> --outcome done --note "operator confirmed"`), and whether a
   **manual fixture** or a **rule enforced by review** was attested (`specdev verify attest <node-id>...`;
   not `specdev attest`, which re-accepts links);
-- **release**: not a command of this toolkit version; the host's release flow is the person's.
+- **release**, the cut (`specdev release --tag <name>`): not a step of a milestone's loop; the person
+  runs it and the skill never does.
 
 Before each of them: show `specdev status --milestone <ms-id>` first, ask the person in the conversation,
 and run the command only on an explicit yes. When the host has installed ask rules, Claude Code also

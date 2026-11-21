@@ -6,36 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-def _build_pre_commit_config(rel_toolkit_root: str, venv_name: str = "devspec_env") -> str:
-    """Read the host pre-commit template and substitute the toolkit root path."""
-    template_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..", "templates", "pre-commit-config.host.yaml",
-    )
-    template_path = os.path.abspath(template_path)
-    if os.path.exists(template_path):
-        with open(template_path) as f:
-            content = f.read()
-        # Replace ./devspec_toolkit (flags) and bare devspec_toolkit/ (files: patterns)
-        content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
-        content = content.replace("devspec_toolkit/", f"{rel_toolkit_root}/")
-        content = content.replace("devspec_env", venv_name)
-        return content
-    # Fallback: minimal config if template is missing
-    repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
-    return f"""# Pre-commit hooks — template not found, minimal config generated.
-repos:
-  - repo: local
-    hooks:
-      - id: spec-check
-        name: Step gate for touched steps and seed paths
-        entry: {venv_name}/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root . --paths
-        language: system
-        pass_filenames: true
-        require_serial: true
-        types: [file]
-"""
-
 CI_WORKFLOW_TEMPLATE = """name: SpecDev CI
 
 on:
@@ -679,17 +649,6 @@ def main():
             "removing the submodule will dangle them."
         )
 
-    # 5. Hook setup (Pre-commit)
-    pre_commit_file = os.path.join(target_dir, ".pre-commit-config.yaml")
-    if not os.path.exists(pre_commit_file):
-        print("Creating .pre-commit-config.yaml...")
-        config_content = _build_pre_commit_config(rel_toolkit_root, args.venv_name)
-        with open(pre_commit_file, "w") as f:
-            f.write(config_content)
-        print("Note: pre-commit will be installed into the virtualenv and 'pre-commit install' run automatically.")
-    else:
-        print(".pre-commit-config.yaml exists. Please manually ensure devspec hooks are configured.")
-
     # 6. Setup Virtual Environment (uv-managed Python 3.13) via the shared primitive.
     # setup_devspec_env.sh provisions a managed CPython 3.13, (re)creates the venv, and
     # installs the toolkit + deps editable from pyproject.toml. It is idempotent (reuses
@@ -727,37 +686,32 @@ def main():
         )
         sys.exit(1)
 
-    # 7. Setup Git Hooks (Always run/check)
-    print("Ensuring git hooks are installed...")
+    # 7. Strict mode: the commit-msg hook and the governance hook. The hook file and the plain `pre-commit install`
+    # belong to the installer (step 6b); this step only adds what `--strict` asks for, outside the installer's markers.
     pre_commit_bin = os.path.join(venv_bin, "pre-commit")
-    if os.path.exists(pre_commit_bin):
-        # Run pre-commit install (basic)
-        run_cmd([pre_commit_bin, "install"], cwd=target_dir)
-        
-        # If strict mode, install commit-msg hook
-        if args.strict:
-            print("Strict mode enabled: Installing commit-msg hook...")
-            run_cmd([pre_commit_bin, "install", "--hook-type", "commit-msg"], cwd=target_dir)
-            
-            # Append governance commit-msg hook if not already present
-            config_path = os.path.join(target_dir, ".pre-commit-config.yaml")
-            if os.path.exists(config_path):
-                with open(config_path, "r") as f:
-                    config_content = f.read()
-                if "devspec-governance" not in config_content:
-                    print("Enabling governance check in pre-commit config...")
-                    repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
-                    governance_hook = f"""      - id: devspec-governance
+    if args.strict and not os.path.exists(pre_commit_bin):
+        print(f"Warning: pre-commit binary not found in {venv_name}. Skipping the strict-mode hooks.")
+    elif args.strict:
+        print("Strict mode enabled: Installing commit-msg hook...")
+        run_cmd([pre_commit_bin, "install", "--hook-type", "commit-msg"], cwd=target_dir)
+
+        # Append governance commit-msg hook if not already present
+        config_path = os.path.join(target_dir, ".pre-commit-config.yaml")
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                config_content = f.read()
+            if "devspec-governance" not in config_content:
+                print("Enabling governance check in pre-commit config...")
+                repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
+                governance_hook = f"""      - id: devspec-governance
         name: DevSpec Governance Check
         entry: {venv_name}/bin/python -m specdev_tools.cli governance-check spec {repo_root_flag} --spec-root ./spec --git-root . --message
         language: system
         pass_filenames: true
         stages: [commit-msg]
 """
-                    with open(config_path, "a") as f:
-                        f.write(governance_hook)
-    else:
-        print(f"Warning: pre-commit binary not found in {venv_name}. Skipping hook install.")
+                with open(config_path, "a") as f:
+                    f.write(governance_hook)
 
     # 7b. Generate CI Workflow
     workflows_dir = os.path.join(target_dir, ".github", "workflows")

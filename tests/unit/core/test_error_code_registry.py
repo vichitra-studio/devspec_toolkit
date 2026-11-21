@@ -42,8 +42,6 @@ REGISTERED_WITHOUT_EMITTER = {
     # W595 is emitted, but only inside longer message strings (context/seed_indexer.py), which the literal pattern
     # above does not match; file-level forward replay and the freshness stderr lines, which wrote it, are gone.
     "W595",
-    # M9: the bundle that writes the emitter takes its code out.
-    "E910", "E912", "E921", "E923", "E924", "W934",
 }
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic

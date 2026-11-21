@@ -18,15 +18,20 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
+import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import NamedTuple
 
+import yaml
+
 from .core.changelog_parser import get_toolkit_version
 from .core.errors import ERROR_CODES
-from .graph.gitview import GitViewError, git_top_level, spec_path_in_repo
+from .graph.gitview import GitViewError, git_top_level, run_git, spec_path_in_repo
+from .trace.merge_driver import ATTRIBUTES_GIT_PATH, DRIVER_ARGUMENTS, DRIVER_NAME, LockMergeError, attribute_line, install_driver
 
 W_TEMPLATE_DRIFT = "W930"
 W_INSTALL_REFUSED = "W931"
@@ -118,7 +123,10 @@ class InstallContext:
     @property
     def toolkit_rel(self) -> str:
         """The toolkit folder relative to the host root, ``/``-separated (``.`` when they are one folder)."""
-        return Path(os.path.relpath(self.toolkit_root, self.git_root)).as_posix()
+        # ``git_root`` is resolved; resolve the toolkit's parent folder too, so a symlinked path to the same folder
+        # (``/tmp`` for ``/private/tmp`` on macOS) does not turn ``devspec_toolkit`` into ``../../..``.
+        toolkit = self.toolkit_root.parent.resolve() / self.toolkit_root.name
+        return Path(os.path.relpath(toolkit, self.git_root)).as_posix()
 
 
 class HostPiece(NamedTuple):
@@ -128,8 +136,6 @@ class HostPiece(NamedTuple):
     install: Callable[[InstallContext], PieceResult]
 
 
-PIECES: tuple[HostPiece, ...] = ()
-"""The registry of pieces, in install order.  A new piece adds a function and one ``HostPiece(name, function)`` line."""
 
 
 @dataclass(frozen=True)
@@ -320,3 +326,451 @@ def run_host_install(
     except HostInstallError as exc:
         return InstallReport(pieces=tuple((piece.name, refused(str(exc))) for piece in registry))
     return InstallReport(pieces=tuple((piece.name, _run_piece(piece, ctx)) for piece in registry))
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "pre-commit": the host's ``.pre-commit-config.yaml``.
+#
+# The toolkit's hooks live between two marker lines in the host's own file.  The file is read with ``yaml.compose`` for
+# the hooks' line spans and never loaded and dumped again (a round trip drops comments), so every line outside the block
+# is kept byte for byte.
+# --------------------------------------------------------------------------------------------------------------------
+
+PRE_COMMIT_FILE = ".pre-commit-config.yaml"
+PRE_COMMIT_TEMPLATE = "pre-commit-config.host.yaml"
+PRE_COMMIT_PIECE = "pre-commit"
+_TEMPLATE_TOOLKIT = "devspec_toolkit"
+_CLI_SUBCOMMAND = re.compile(r"specdev_tools\.cli\s+(\S+)")
+_COMPARED_FIELDS = ("entry", "files", "pass_filenames", "require_serial", "types")
+_PRE_COMMIT_TIMEOUT_SECONDS = 120
+
+
+@dataclass(frozen=True)
+class PreCommitHook:
+    """One hook of a ``repo: local`` entry: the fields the installer compares and where it sits in the file.
+
+    ``start`` and ``end`` are 1-based line numbers (the line of the ``- `` and the last line with content of the hook;
+    comment lines between two hooks belong to neither); ``col`` is the 0-based column of the ``-``.  Absent fields hold
+    pre-commit's defaults, so a hook that leaves ``pass_filenames`` out equals one that says ``true``.
+    """
+
+    id: str
+    entry: str
+    files: str | None
+    pass_filenames: bool
+    require_serial: bool
+    types: tuple[str, ...]
+    start: int
+    end: int
+    col: int
+
+    @property
+    def subcommand(self) -> str | None:
+        """The ``specdev_tools.cli <subcommand>`` the entry runs, ``None`` for a hook that does not run the toolkit."""
+        match = _CLI_SUBCOMMAND.search(self.entry)
+        return match[1] if match else None
+
+    def differences(self, other: PreCommitHook) -> list[str]:
+        """The names of the compared fields in which *other* differs from this hook."""
+        return [name for name in _COMPARED_FIELDS if getattr(self, name) != getattr(other, name)]
+
+
+@dataclass(frozen=True)
+class _ConfigShape:
+    """What the installer needs to know of a pre-commit config: the local hooks and where hooks or a repo can be added."""
+
+    hooks: tuple[PreCommitHook, ...] = ()
+    local_lists: tuple[tuple[int, int], ...] = ()  # per local repo with hooks: (last content line, column of the dashes)
+    repos_end: int | None = None  # last content line of the ``repos`` list, when it is a block list
+    repos_col: int = 0
+
+
+def _template_file(templates_dir: Path | None) -> Path | None:
+    """The hook template of the toolkit, ``None`` when the folder or the file is missing."""
+    path = None if templates_dir is None else templates_dir / PRE_COMMIT_TEMPLATE
+    return path if path is not None and path.is_file() else None
+
+
+def render_pre_commit_template(rel_toolkit_root: str, venv_name: str, templates_dir: Path | None = None) -> str:
+    """The toolkit's hook template with the host's toolkit folder and venv name put in.
+
+    Text substitution only: ``./devspec_toolkit`` and ``devspec_toolkit/`` become the toolkit folder relative to the
+    host root, ``devspec_env`` becomes *venv_name*.  A missing template gives a minimal config with the one step-gate
+    hook, so a host never ends up with none.
+    """
+    template = _template_file(templates_dir)
+    if template is not None:
+        content = template.read_text(encoding="utf-8")
+        content = content.replace(f"./{_TEMPLATE_TOOLKIT}", f"./{rel_toolkit_root}")
+        content = content.replace(f"{_TEMPLATE_TOOLKIT}/", f"{rel_toolkit_root}/")
+        return content.replace(DEFAULT_VENV_NAME, venv_name)
+    return f"""# Pre-commit hooks: template not found, minimal config generated.
+repos:
+  - repo: local
+    hooks:
+      - id: spec-check
+        name: Step gate for touched steps and seed paths
+        entry: {venv_name}/bin/python -m specdev_tools.cli spec-check spec --repo-root ./{rel_toolkit_root} --spec-root ./spec --git-root . --paths
+        language: system
+        pass_filenames: true
+        require_serial: true
+        types: [file]
+"""
+
+
+def _content_end_line(node: yaml.Node) -> int:
+    """The 0-based last line of *node* that holds content (a block ends where the next token starts, so step back)."""
+    while isinstance(node, yaml.MappingNode | yaml.SequenceNode) and node.value:
+        last = node.value[-1]
+        node = last[1] if isinstance(node, yaml.MappingNode) else last
+    mark = node.end_mark
+    return mark.line - 1 if mark.column == 0 and mark.line > node.start_mark.line else mark.line
+
+
+def _dash_position(lines: list[str], node: yaml.Node) -> tuple[int, int]:
+    """``(0-based line, column)`` of the ``-`` that opens the sequence item *node*."""
+    line = node.start_mark.line
+    for candidate in (line, line - 1):
+        if candidate < 0:
+            break
+        prefix = lines[candidate][: node.start_mark.column] if candidate == line else lines[candidate]
+        stripped = prefix.rstrip()
+        if stripped.endswith("-") and not stripped[:-1].strip():
+            return candidate, len(stripped) - 1
+    raise HostInstallError(f"line {line + 1}: a hook list item is not in the block form '- id: ...'")
+
+
+def _mapping_value(node: yaml.Node, key: str) -> yaml.Node | None:
+    if not isinstance(node, yaml.MappingNode):
+        return None
+    return next((value for k, value in node.value if getattr(k, "value", None) == key), None)
+
+
+def _as_list(value: object) -> tuple[str, ...]:
+    return tuple(str(v) for v in value) if isinstance(value, list) else ()
+
+
+def _parse_pre_commit(text: str) -> _ConfigShape:
+    """The local hooks of a config and the places to add hooks, read with ``yaml.compose`` (no rewrite of anything).
+
+    Raises:
+        HostInstallError: the text is not YAML, or its ``repos`` is not a list of mappings.
+    """
+    try:
+        root = yaml.compose(text)
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise HostInstallError(f"{PRE_COMMIT_FILE} is not valid YAML: {' '.join(str(exc).split())}") from exc
+    if root is None:
+        return _ConfigShape()
+    repos = _mapping_value(root, "repos")
+    if not isinstance(root, yaml.MappingNode) or not isinstance(data, dict) or not isinstance(data.get("repos"), list):
+        raise HostInstallError(f"{PRE_COMMIT_FILE} has no 'repos' list")
+    lines = text.splitlines()
+    repos_end, repos_col = None, 0
+    if isinstance(repos, yaml.SequenceNode) and not repos.flow_style and repos.value:
+        repos_end = _content_end_line(repos) + 1
+        repos_col = _dash_position(lines, repos.value[0])[1]
+    hooks: list[PreCommitHook] = []
+    lists: list[tuple[int, int]] = []
+    for repo_node, repo in zip(repos.value if isinstance(repos, yaml.SequenceNode) else [], data["repos"], strict=False):
+        hooks_node = _mapping_value(repo_node, "hooks")
+        if not isinstance(repo, dict) or repo.get("repo") != "local" or not isinstance(hooks_node, yaml.SequenceNode):
+            continue
+        if hooks_node.flow_style or not hooks_node.value:
+            continue
+        for hook_node, hook in zip(hooks_node.value, repo["hooks"], strict=False):
+            if not isinstance(hook, dict) or not isinstance(hook.get("id"), str):
+                continue
+            start, col = _dash_position(lines, hook_node)
+            hooks.append(
+                PreCommitHook(
+                    id=hook["id"],
+                    entry=str(hook.get("entry", "")),
+                    files=None if hook.get("files") is None else str(hook["files"]),
+                    pass_filenames=hook.get("pass_filenames", True) is not False,
+                    require_serial=hook.get("require_serial", False) is True,
+                    types=_as_list(hook.get("types", ["file"])),
+                    start=start + 1,
+                    end=_content_end_line(hook_node) + 1,
+                    col=col,
+                )
+            )
+        last_node = hooks_node.value[-1]
+        lists.append((_content_end_line(last_node) + 1, _dash_position(lines, hooks_node.value[0])[1]))
+    return _ConfigShape(tuple(hooks), tuple(lists), repos_end, repos_col)
+
+
+def enumerate_pre_commit_hooks(text: str) -> tuple[PreCommitHook, ...]:
+    """The hooks of the local repos of a pre-commit config, in file order (the one reader of a template's hooks)."""
+    return _parse_pre_commit(text).hooks
+
+
+def _indent(lines: list[str], delta: int) -> list[str]:
+    """*lines* moved right by *delta* columns (left when negative, never past column 0); blank lines are kept as they are."""
+    moved = []
+    for line in lines:
+        if not line.strip():
+            moved.append(line)
+        elif delta >= 0:
+            moved.append(" " * delta + line)
+        else:
+            moved.append(line[min(-delta, len(line) - len(line.lstrip(" "))) :])
+    return moved
+
+
+def _with_newline(lines: list[str]) -> list[str]:
+    return [*lines[:-1], lines[-1] + "\n"] if lines and not lines[-1].endswith("\n") else lines
+
+
+@dataclass(frozen=True)
+class _Template:
+    """The rendered hook template cut into its head (up to the first hook) and the hook block (first hook to the end)."""
+
+    head: list[str]
+    body: list[str]
+    col: int
+    hooks: tuple[PreCommitHook, ...]
+
+    def block(self, col: int) -> list[str]:
+        """The hook lines moved to the column *col*, ready to sit between two marker lines."""
+        return _with_newline(_indent(self.body, col - self.col))
+
+    def hook_text(self, hook: PreCommitHook) -> str:
+        """The exact lines of one template hook, as a person would paste them."""
+        return "".join(self.body[hook.start - len(self.head) - 1 : hook.end - len(self.head)]).rstrip()
+
+
+def _read_template(ctx: InstallContext) -> _Template:
+    rendered = render_pre_commit_template(ctx.toolkit_rel, ctx.venv_name, ctx.templates_dir)
+    hooks = enumerate_pre_commit_hooks(rendered)
+    if not hooks:
+        raise HostInstallError(f"the hook template {PRE_COMMIT_TEMPLATE} has no hook")
+    lines = rendered.splitlines(keepends=True)
+    start = hooks[0].start - 1
+    if any(line.strip() and not line.lstrip().startswith("#") for line in lines[hooks[-1].end :]):
+        raise HostInstallError(f"the hook template {PRE_COMMIT_TEMPLATE} must end with its hook list")
+    return _Template(lines[:start], lines[start:], hooks[0].col, hooks)
+
+
+def _marker_pair(col: int) -> tuple[str, str]:
+    pad = " " * col
+    return f"{pad}{MARKER_BEGIN} (the toolkit rewrites the lines between the markers on 'specdev update')\n", f"{pad}{MARKER_END}\n"
+
+
+def _marked_block(template: _Template, col: int) -> list[str]:
+    begin, end = _marker_pair(col)
+    return [begin, *template.block(col), end]
+
+
+def _new_config(template: _Template) -> str:
+    return "".join([*template.head, *_marked_block(template, template.col)])
+
+
+def _marker_column(before: str) -> int:
+    last = before.rstrip("\n").rsplit("\n", 1)[-1]
+    return len(last) - len(last.lstrip(" "))
+
+
+def _candidates(hook: PreCommitHook, shape: _ConfigShape) -> list[PreCommitHook]:
+    """The host hooks that stand for the template hook *hook*: the same id, else the same ``specdev_tools.cli`` subcommand."""
+    by_id = [h for h in shape.hooks if h.id == hook.id]
+    return by_id or [h for h in shape.hooks if hook.subcommand is not None and h.subcommand == hook.subcommand]
+
+
+def _hook_findings(template: _Template, shape: _ConfigShape) -> tuple[list[Finding], list[PreCommitHook]]:
+    """The W930 findings of a hand-written config (a template hook that is missing or differs) and the host hooks that matched."""
+    matched = sorted({h for hook in template.hooks for h in _candidates(hook, shape)}, key=lambda h: h.start)
+    anchor = matched[0].start if matched else None
+    findings: list[Finding] = []
+    missing: list[str] = []
+    for hook in template.hooks:
+        found = _candidates(hook, shape)
+        if not found:
+            missing.append(hook.id)
+            continue
+        different = hook.differences(found[0])
+        if different:
+            what = (
+                f"hook '{found[0].id}' differs from the template in {', '.join(different)}; "
+                "'specdev update --adopt' replaces it, or replace it by hand"
+            )
+            findings.append(Finding(W_TEMPLATE_DRIFT, PRE_COMMIT_FILE, found[0].start, hook.subcommand or "", f"{what} with:\n{template.hook_text(hook)}"))
+    if missing:
+        what = (
+            f"template hooks not in the config: {', '.join(missing)}; "
+            f"'specdev update --adopt' adds them, or copy them from {PRE_COMMIT_TEMPLATE}"
+        )
+        findings.append(Finding(W_TEMPLATE_DRIFT, PRE_COMMIT_FILE, anchor, "", what))
+    return findings, matched
+
+
+def _adopt(lines: list[str], template: _Template, matched: list[PreCommitHook]) -> list[str]:
+    """*lines* with the spans of the matched host hooks removed and one marked block at the first of them."""
+    block = _marked_block(template, matched[0].col)
+    result: list[str] = []
+    index = 0
+    while index < len(lines):
+        line_no = index + 1
+        span = next((h for h in matched if h.start == line_no), None)
+        if span is None:
+            result.append(lines[index])
+            index += 1
+            continue
+        if span is matched[0]:
+            result.extend(block)
+        index = span.end
+    return result
+
+
+def _append_block(lines: list[str], template: _Template, shape: _ConfigShape) -> list[str]:
+    """*lines* with the marked block added after the last local hook, or as a new local repo at the end of ``repos``."""
+    if shape.local_lists:
+        after, col = shape.local_lists[0]
+        return [*_with_newline(lines[:after]), *_marked_block(template, col), *lines[after:]]
+    if shape.repos_end is None:
+        raise HostInstallError(f"{PRE_COMMIT_FILE} has no block-style 'repos' list to add the hooks to")
+    pad = " " * shape.repos_col
+    repo = [f"{pad}- repo: local\n", f"{pad}  hooks:\n"]
+    return [*_with_newline(lines[: shape.repos_end]), *repo, *_marked_block(template, shape.repos_col + 4), *lines[shape.repos_end :]]
+
+
+def _plan_pre_commit(ctx: InstallContext, template: _Template, existing: str | None) -> tuple[str, list[Finding], str]:
+    """``(new text, findings, detail)``: the text the file should hold (unchanged when the host's hooks are not touched)."""
+    if existing is None or not existing.strip():
+        return _new_config(template), [], "written with the toolkit hooks between markers"
+    if "\r" in existing:
+        raise HostInstallError(f"{PRE_COMMIT_FILE} uses CRLF line endings; convert it to LF first or add the hooks by hand")
+    parts = split_marked_block(existing)
+    if parts is not None:
+        replaced = replace_marked_block(existing, "".join(template.block(_marker_column(parts[0]))))
+        assert replaced is not None
+        return replaced, [], "the hooks between the markers rewritten from the template"
+    shape = _parse_pre_commit(existing)
+    findings, matched = _hook_findings(template, shape)
+    lines = existing.splitlines(keepends=True)
+    if not matched:
+        return "".join(_append_block(lines, template, shape)), [], "no toolkit hook found: block added after the host's own hooks"
+    if ctx.adopt:
+        return "".join(_adopt(lines, template, matched)), [], f"{len(matched)} hand-written hook(s) replaced by one marked block"
+    return existing, findings, "hand-written toolkit hooks left as they are" + (f"; {len(findings)} differ from the template" if findings else "")
+
+
+def _run_pre_commit_install(binary: Path, git_root: Path) -> tuple[int, str]:
+    """Run ``<binary> install`` in the host (the one place the installer starts pre-commit; tests replace it)."""
+    process = subprocess.run(
+        [str(binary), "install"], cwd=git_root, capture_output=True, text=True, check=False, timeout=_PRE_COMMIT_TIMEOUT_SECONDS
+    )
+    return process.returncode, " ".join((process.stdout + process.stderr).split())
+
+
+def _install_git_hook(ctx: InstallContext) -> list[Finding]:
+    """``<venv>/bin/pre-commit install`` when pre-commit is in the venv; a failure is a W931 finding, not an exception."""
+    binary = ctx.venv_bin / "pre-commit"
+    if ctx.dry_run or not binary.is_file():
+        return []
+    try:
+        code, output = _run_pre_commit_install(binary, ctx.git_root)
+    except (OSError, subprocess.SubprocessError) as exc:
+        code, output = 1, str(exc)
+    if code == 0:
+        return []
+    return [Finding(W_INSTALL_REFUSED, PRE_COMMIT_FILE, text=f"'pre-commit install' failed: {output or f'exit {code}'}; run '{binary} install' by hand")]
+
+
+def install_pre_commit(ctx: InstallContext) -> PieceResult:
+    """Put the toolkit's hooks into the host's ``.pre-commit-config.yaml`` and install the git hook.
+
+    No file: it is written from the template, the hooks between markers.  A file with the markers: the lines between
+    them are replaced.  A file whose hooks were written by hand: they are left alone and a W930 finding per differing
+    or missing hook gives the exact lines, until ``--adopt`` replaces them by one marked block at the first of them.  A
+    file with no toolkit hook: the block is added after its last local hook.  Lines outside the block are never touched.
+    """
+    path = ctx.git_root / PRE_COMMIT_FILE
+    try:
+        existing = path.read_bytes().decode("utf-8") if path.is_file() else None
+        template = _read_template(ctx)
+        new_text, findings, detail = _plan_pre_commit(ctx, template, existing)
+    except (HostInstallError, UnicodeDecodeError, OSError) as exc:
+        return refused(str(exc), file=PRE_COMMIT_FILE)
+    status = write_if_changed(path, new_text, dry_run=ctx.dry_run)
+    if findings:
+        status = DRIFT
+    elif status == CURRENT:
+        detail = "up to date"
+    return PieceResult(status, detail, (*findings, *_install_git_hook(ctx)))
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Piece "merge-driver": the git merge driver of ``spec/extras/trace.lock.json`` (``trace.merge_driver.install_driver``).
+# --------------------------------------------------------------------------------------------------------------------
+
+MERGE_DRIVER_PIECE = "merge-driver"
+
+
+def _git_path(ctx: InstallContext, name: str) -> Path:
+    """The file git keeps for *name* (``info/attributes``, ``config``) in the clone that holds the host: worktree-safe."""
+    process = run_git(str(ctx.git_root), ["rev-parse", "--git-path", name])
+    if process.returncode != 0:
+        raise HostInstallError(f"git rev-parse --git-path {name} failed in {ctx.git_root}")
+    return ctx.git_root / process.stdout.decode("utf-8", errors="replace").strip()
+
+
+def _unquote_config_value(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        value = re.sub(r"\\(.)", r"\1", value[1:-1])
+    return value
+
+
+def _driver_command_in_config(ctx: InstallContext, key: str) -> str | None:
+    """The value of ``merge.<driver>.<key>`` in the clone's config.
+
+    A real run asks ``git config --local --get``; a dry run runs no ``git config``, so it reads the config file text.
+    """
+    if not ctx.dry_run:
+        process = run_git(str(ctx.git_root), ["config", "--local", "--get", f"merge.{DRIVER_NAME}.{key}"])
+        return process.stdout.decode("utf-8", errors="replace").strip() if process.returncode == 0 else None
+    config = _git_path(ctx, "config")
+    if not config.is_file():
+        return None
+    in_section = False
+    for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_section = stripped.replace(" ", "").lower() == f'[merge"{DRIVER_NAME}"]'
+        elif in_section and stripped.startswith(f"{key}") and "=" in stripped:
+            return _unquote_config_value(stripped.split("=", 1)[1])
+    return None
+
+
+def install_merge_driver(ctx: InstallContext) -> PieceResult:
+    """Install the lock merge driver in the host's clone: its git config and one line of ``info/attributes``.
+
+    The work is ``trace.merge_driver.install_driver``; this piece supplies the driver command (the quoted
+    ``specdev`` of the venv that runs the command, and ``lock merge``) and says whether anything changed.  The
+    config and the attributes file are local to the clone and not committed, so every clone runs ``update`` once.
+    """
+    command = f"{shlex.quote(str(ctx.venv_bin / 'specdev'))} lock merge"
+    try:
+        attributes = _git_path(ctx, ATTRIBUTES_GIT_PATH)
+        line = attribute_line(ctx.spec_rel)
+        has_line = attributes.is_file() and line in attributes.read_text(encoding="utf-8", errors="replace").splitlines()
+        configured = _driver_command_in_config(ctx, "driver")
+        if has_line and configured == f"{command} {DRIVER_ARGUMENTS}":
+            return PieceResult(CURRENT, "up to date")
+        if ctx.dry_run:
+            return PieceResult(WOULD_INSTALL, f"would set merge.{DRIVER_NAME} and add the line '{line}' to {attributes.name}")
+        install_driver(str(ctx.git_root), ctx.spec_rel, command)
+    except LockMergeError as exc:
+        return refused(exc.error.message)
+    except HostInstallError as exc:
+        return refused(str(exc))
+    return PieceResult(REFRESHED if has_line or configured is not None else CREATED, f"merge driver '{DRIVER_NAME}' set in the clone's git config")
+
+
+PIECES: tuple[HostPiece, ...] = (
+    HostPiece(PRE_COMMIT_PIECE, install_pre_commit),
+    HostPiece(MERGE_DRIVER_PIECE, install_merge_driver),
+)
+"""The registry of pieces, in install order.  A new piece adds a function and one ``HostPiece(name, function)`` line."""

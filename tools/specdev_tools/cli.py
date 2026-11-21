@@ -628,6 +628,11 @@ def build_parser() -> _SpecdevParser:
     # --- lifecycle commands (plan record, review record) ---
     from .lifecycle.commands import add_lifecycle_parsers
     add_lifecycle_parsers(sub)
+    # --- release commands (release, release check, release rollback) and the release sections of `status` ---
+    from .release.commands import add_release_parsers
+    add_release_parsers(sub, _discover_project_canon_dir)
+    from .release.status_sections import install as install_release_sections
+    install_release_sections(_discover_project_canon_dir)
     # `stale`, `coverage` and `step ready` read the coverage gaps; the role gap provider they ask is installed by a call.
     from .validation.graph_checks import install_gap_provider
     install_gap_provider()

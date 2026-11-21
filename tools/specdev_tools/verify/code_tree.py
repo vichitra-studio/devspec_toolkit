@@ -76,7 +76,7 @@ def code_tree_id(git_root: str, spec_root: str, seed_paths: Sequence[str], exclu
         if commit is None:
             _git_in_index(root, index, ["add", "-A"])
         if removals:
-            _git_in_index(root, index, ["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", *removals])
+            _git_in_index(root, index, ["rm", "-r", "-f", "--cached", "-q", "--ignore-unmatch", "--", *removals])
         return _git_in_index(root, index, ["write-tree"]).strip()
 
 

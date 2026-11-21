@@ -1,118 +1,16 @@
-"""Tests for init_project.py pre-commit config generation and seed bootstrap."""
+"""Tests for init_project.py: the host install delegate, the strict-mode hook, seed bootstrap and the CI workflow render."""
 import json
 import os
 import sys
 from unittest import mock
 
 import pytest
-import yaml
 
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
 import init_project
-from init_project import _build_pre_commit_config, _render_ci_workflow, copy_seeds_from_manifest
-
-SPEC_CHECK_ENTRY_TAIL = "spec-check spec --repo-root ./{root} --spec-root ./spec --git-root . --paths"
-
-
-def _spec_check_hook(content: str) -> dict:
-    """Return the `spec-check` hook mapping of a rendered pre-commit config."""
-    hooks = yaml.safe_load(content)["repos"][0]["hooks"]
-    return next(h for h in hooks if h["id"] == "spec-check")
-
-
-class TestBuildPreCommitConfig:
-    def test_repo_root_flag_present(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "--repo-root ./devspec_toolkit" in content
-
-    def test_custom_toolkit_path(self):
-        content = _build_pre_commit_config("custom/path")
-        assert "--repo-root ./custom/path" in content
-
-    def test_contains_spec_check_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "spec-check" in content
-
-    def test_contains_canonical_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "canonical-lint" in content
-
-    def test_contains_seed_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "seed-lint" in content
-
-    def test_contains_dependency_order_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "dependency-order-lint" in content
-
-    def test_path_substitution_applied(self):
-        content = _build_pre_commit_config("my_toolkit")
-        assert "./devspec_toolkit" not in content
-        assert "devspec_toolkit/" not in content
-        assert "devspec_toolkit/tools" not in content
-        assert "./my_toolkit" in content
-        assert "my_toolkit/" in content
-
-    def test_build_pre_commit_config_missing_template(self):
-        with mock.patch("init_project.os.path.exists", return_value=False):
-            content = _build_pre_commit_config("devspec_toolkit")
-        assert "spec-check" in content
-        assert "devspec_env/bin/python" in content
-        assert "--repo-root ./devspec_toolkit" in content
-        assert "--spec-root ./spec" in content
-        assert "--git-root ." in content
-
-    def test_contains_dag_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "dag-lint" in content
-
-    def test_contains_extraction_intent_check_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "extraction-intent-check" in content
-
-    def test_contains_canon_schema_alignment_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "canon-schema-alignment" in content
-
-    def test_contains_canonical_integrity_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "canonical-integrity" in content
-
-    def test_custom_venv_name_propagates(self):
-        content = _build_pre_commit_config("devspec_toolkit", "customenv")
-        assert "customenv/bin/python" in content
-        # no leakage of the default venv name when a custom one is requested
-        assert "devspec_env/bin/python" not in content
-
-    def test_spec_check_hook_ends_with_paths_takes_filenames_and_has_no_files_filter(self):
-        hook = _spec_check_hook(_build_pre_commit_config("devspec_toolkit"))
-        assert hook["entry"].endswith(" --paths")
-        assert hook["pass_filenames"] is True
-        assert hook["require_serial"] is True
-        assert "files" not in hook
-
-    @pytest.mark.parametrize("root", ["devspec_toolkit", "custom/path", "my_toolkit"])
-    def test_custom_toolkit_root_is_substituted_in_the_spec_check_entry(self, root):
-        hook = _spec_check_hook(_build_pre_commit_config(root))
-        assert hook["entry"] == (
-            "devspec_env/bin/python -m specdev_tools.cli "
-            + SPEC_CHECK_ENTRY_TAIL.format(root=root)
-        )
-
-    def test_fallback_hook_also_ends_with_paths(self):
-        with mock.patch("init_project.os.path.exists", return_value=False):
-            hook = _spec_check_hook(_build_pre_commit_config("my_toolkit", "venv2"))
-        assert hook["entry"] == "venv2/bin/python -m specdev_tools.cli " + SPEC_CHECK_ENTRY_TAIL.format(root="my_toolkit")
-        assert hook["pass_filenames"] is True
-        assert "files" not in hook
-
-    def test_seed_lint_hook_keeps_its_files_filter(self):
-        hooks = yaml.safe_load(_build_pre_commit_config("devspec_toolkit"))["repos"][0]["hooks"]
-        seed_lint = next(h for h in hooks if h["id"] == "seed-lint")
-        assert seed_lint["files"] == r"spec/.*\.json$"
-        assert seed_lint["pass_filenames"] is False
+from init_project import _render_ci_workflow, copy_seeds_from_manifest
 
 
 class TestInitIntoHost:
@@ -129,19 +27,43 @@ class TestInitIntoHost:
         ):
             init_project.main()
 
-    def test_new_host_gets_the_step_gate_hook(self, tmp_path, monkeypatch):
-        self._init(tmp_path, monkeypatch)
-        hook = _spec_check_hook((tmp_path / ".pre-commit-config.yaml").read_text())
-        assert hook["entry"].endswith(" --git-root . --paths")
-        assert hook["pass_filenames"] is True
-        assert "files" not in hook
+    def test_init_itself_writes_no_pre_commit_config_and_runs_no_plain_pre_commit_install(self, tmp_path, monkeypatch):
+        calls: list[list[str]] = []
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT])
+        with (
+            mock.patch("init_project.run_cmd", side_effect=lambda cmd, **kw: calls.append(list(cmd))),
+            mock.patch("init_project.run_install_delegate", return_value=0),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
+        assert not (tmp_path / ".pre-commit-config.yaml").exists()
+        assert not any(c[-1:] == ["install"] and "pre-commit" in c[0] for c in calls)
+        assert not hasattr(init_project, "_build_pre_commit_config")
 
-    def test_existing_pre_commit_config_is_left_untouched(self, tmp_path, monkeypatch):
-        old = "repos:\n  - repo: local\n    hooks:\n      - id: spec-check\n        files: spec/.*\\.json$\n"
-        (tmp_path / ".pre-commit-config.yaml").write_text(old)
-        self._init(tmp_path, monkeypatch)
-        assert (tmp_path / ".pre-commit-config.yaml").read_text() == old
+    def test_strict_adds_the_commit_msg_hook_and_appends_the_governance_hook_after_the_delegate(self, tmp_path, monkeypatch):
+        (tmp_path / "devspec_env" / "bin").mkdir(parents=True)
+        (tmp_path / "devspec_env" / "bin" / "pre-commit").write_text("#!/bin/sh\n")
+        config = tmp_path / ".pre-commit-config.yaml"
+        calls: list[tuple[str, list[str]]] = []
 
+        def delegate(cmd, cwd):  # the installer writes the file; init only appends the strict hook afterwards
+            calls.append(("delegate", list(cmd)))
+            config.write_text("repos:\n  - repo: local\n    hooks:\n      # >>> specdev-managed\n      - id: spec-check\n      # <<< specdev-managed\n")
+            return 0
+
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT, "--strict"])
+        with (
+            mock.patch("init_project.run_cmd", side_effect=lambda cmd, **kw: calls.append(("run_cmd", list(cmd)))),
+            mock.patch("init_project.run_install_delegate", side_effect=delegate),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
+        order = [name for name, _ in calls]
+        commit_msg = next(i for i, (n, c) in enumerate(calls) if n == "run_cmd" and c[-2:] == ["--hook-type", "commit-msg"])
+        assert order.index("delegate") < commit_msg
+        text = config.read_text()
+        assert text.rstrip().endswith("stages: [commit-msg]")
+        assert text.index("devspec-governance") > text.index("# <<< specdev-managed")
 
     def test_init_delegates_to_venv_cli_after_venv_created(self, tmp_path, monkeypatch):
         calls: list[tuple[str, list[str]]] = []

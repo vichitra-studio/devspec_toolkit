@@ -63,7 +63,7 @@ specdev review record <milestone-id> --verdict verified|needs_work|blocked|defer
 It replaces the whole `review` block with this one verdict (no history), adds the time, and prints the plan's size before and after. `--ratings-json` is an object of all five ratings of section 2. The three optional flags are passed by whoever runs the command: in a manual run you set them as sections 2, 4 and 5 say; the skill passes none of them, so under `/specdev-trinity` the `review` block holds the findings, the verdict and the time, and what the flags would say (a security gap, the rule that held a `verified` back) is a finding in your file. It checks the input and not your judgement: it refuses an unknown verdict, a findings file that is invalid or names an unknown plan item (E823) and a closed milestone (E820), and accepts `verified` with a blocking finding. The rules of "Reviewer judgement" below are yours to apply. You never write `execution`, `review`, a time or a hash by hand; `semantic_review` and `delivery_status` are not written by `review record`, so report scope creep and delivery gaps as findings.
 
 ## 2. Ratings (the rubric)
-*   Provide a 0-5 integer for all five: `spec_completeness` (are all criteria realised? are items verbose and atomic?), `code_quality`, `tests_completeness`, `docs_completeness`, `metadata_usage` (are references and traceability used well? do all links resolve?).
+*   In a manual run, provide a 0-5 integer for all five: `spec_completeness` (are all criteria realised? are items verbose and atomic?), `code_quality`, `tests_completeness`, `docs_completeness`, `metadata_usage` (are references and traceability used well? do all links resolve?).
 *   **Scale** (reviewer judgement — rating bounds):
     *   **5**: Exemplary. Verified. (Specs are exhaustive, no "hand-waving").
     *   **4**: Good (minor nits). Verified.
@@ -103,7 +103,7 @@ Allowed verdicts: `verified`, `needs_work`, `blocked`, `deferred` (the `review.v
 7.  **Per-item verdicts** — reviewer judgement: every plan item is either executed or proven, or named by a finding; no item is left unaddressed.
 
 ## 5. Security and delivery gates
-*   **Security (gate)**: the threats of the milestone are in the 16c pack and in the task criteria that refine them. Check the code and the evidence for each, and set `--security-status green` only when every mitigation is verified; otherwise `red` and a finding.
+*   **Security (gate)**: the threats of the milestone are in the 16c pack and in the task criteria that refine them. Check the code and the evidence for each, and write a finding for each mitigation that is not verified; in a manual run set `--security-status green` only when every one is, otherwise `red`.
 *   **Delivery (gate)**: verify `plan.delivery` was carried out: dashboards linked to NFRs work, alerts exist for all Critical NFRs. A Critical NFR that is unmonitored is a finding.
 
 ## 6. Advanced Schema Fields (Verification Rules)
@@ -113,7 +113,7 @@ Allowed verdicts: `verified`, `needs_work`, `blocked`, `deferred` (the `review.v
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- **spec/impl_context/{milestone_snake}_plan.json**: the milestone context file you are reviewing — the same artifact 16a authored and 16b recorded execution into. 16c reads `plan.spec_alignment.checklist[]` and `execution.records[]` and, through `specdev review record`, writes the `review` block (`verdict`, `findings`, `ratings`, `next_actions`, `security_status`).
+- **spec/impl_context/{milestone_snake}_plan.json**: the milestone context file you are reviewing — the same artifact 16a authored and 16b recorded execution into. 16c reads `plan.spec_alignment.checklist[]` and `execution.records[]` and, through `specdev review record`, writes the `review` block (`verdict`, `findings`; `ratings`, `next_actions` and `security_status` only when their flags are given, which is a manual run).
 - **spec/16_impl_context.json**: Trinity Anchor — read `plan.summary` (scope), `plan.milestone_index[<this milestone>]` (the row about this milestone) and `plan.ambiguities` (cross-cycle decisions) so the review verdict is bounded by anchor-declared scope.
 - **spec/04_fr_list.json**: FR acceptance criteria as review checklist — extract criterion_id and text for the AC-gap semantic pass and for verifying that every plan item links back to a criterion traceable to an FR
 - **spec/05_interface_contracts.json**: API contracts to verify implementation against — extract api_id, method, path, and request/response schemas used to reconcile endpoint fixtures against declared contracts
@@ -187,7 +187,7 @@ Before recording, verify:
 ### Ratings
 1. **NEVER** give a rating above 3 if any evidence is missing
 2. **NEVER** give rating 5 without verified security checks
-3. **NEVER** skip a rating: `--ratings-json` takes all five
+3. **NEVER** skip a rating in a manual run: `--ratings-json` takes all five
 
 # Output Rule
 1.  The verdict is recorded with `specdev review record` as in section 1 (by the skill under `/specdev-trinity`; by the person in a manual run). Never write the plan file by hand. In the Output Contract the output block is what the plan file holds after the command ran.

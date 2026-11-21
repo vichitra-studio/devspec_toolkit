@@ -61,8 +61,8 @@ def _writing_piece(name: str = "fake") -> hi.HostPiece:
 
 
 class TestRegistry:
-    def test_no_real_piece_is_registered_yet(self):
-        assert hi.PIECES == ()
+    def test_the_registered_pieces_are_the_ones_of_parts_a_to_b(self):
+        assert [p.name for p in hi.PIECES] == ["pre-commit", "merge-driver"]
 
     def test_pieces_run_in_registry_order_and_each_reports_under_its_name(self, host, toolkit):
         report = hi.run_host_install(host / "spec", toolkit, pieces=(_writing_piece("b"), _writing_piece("a")))

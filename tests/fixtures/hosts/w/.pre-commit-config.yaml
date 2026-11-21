@@ -1,0 +1,43 @@
+# Invented fixture: a small web project that set its hooks up by hand before the installer existed.
+# Order matters here: formatting first, the spec gate in the middle, the unit tests last.
+repos:
+  - repo: https://example.invalid/hooks/basic-checks
+    rev: v1.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: local
+    hooks:
+      # the formatter of the web code (a project hook, not the toolkit's)
+      - id: web-format
+        name: Format the web code
+        entry: npm run format --silent
+        language: system
+        pass_filenames: false
+        files: ^web/.*\.(ts|tsx)$
+
+      # hand-written copy of the step gate: it runs the whole spec on every change
+      - id: spec-check
+        name: Step gate (full run)
+        entry: devspec_env/bin/python -m specdev_tools.cli spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+        language: system
+        pass_filenames: false
+        files: ^spec/(?!impl_context/).*\.json$
+        types: [file]
+
+      - id: seed-lint
+        name: Seed reference lint
+        entry: devspec_env/bin/python -m specdev_tools.cli seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+        language: system
+        pass_filenames: false
+        files: spec/.*\.json$
+        types: [file]
+
+      # unit tests of the web code run last
+      - id: web-unit
+        name: Web unit tests
+        entry: npm test --silent
+        language: system
+        pass_filenames: false
+        files: ^web/

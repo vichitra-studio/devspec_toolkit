@@ -66,7 +66,8 @@ DEFAULT_ROW_STATUS = ROW_PENDING
 
 # roles
 VERIFIER_ROLE = "verifier"
-OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
+DELIVERY_ROLE = "obligation-delivery"
+OBLIGATION_ROLES = frozenset({"obligation-system", DELIVERY_ROLE})
 
 
 def link_targets(graph: Graph, node: Node, field: str) -> list[str]:

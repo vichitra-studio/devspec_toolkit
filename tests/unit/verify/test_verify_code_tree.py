@@ -176,3 +176,24 @@ def test_an_archived_spec_names_the_live_folder_to_leave_out_and_gives_the_live_
         assert code_tree_for_host(str(repo), spec, "v1", spec_in_host=str(repo / "spec")) == live
         assert code_tree_for_host(str(repo), spec, "v1") != live
         assert code_tree_for_host(str(repo), str(repo / "spec"), "v1", spec_in_host=None) == live  # the default is unchanged
+
+
+def test_a_commit_whose_spec_differs_from_head_gives_the_id_of_its_clean_checkout(tmp_path: Path) -> None:
+    """The spec folder at the commit may differ from HEAD's and from the working tree: the id is still the commit's, and nothing real is touched."""
+    repo = code_repo(tmp_path)
+    write(repo / "spec" / "x.json", '{"note": "at the tag"}\n')
+    commit_all(repo, "spec at the tag")
+    tagged = git(repo, "rev-parse", "HEAD")
+    clean = _id(repo, tagged)
+    write(repo / "spec" / "x.json", '{"note": "at head"}\n')
+    commit_all(repo, "spec at head")
+    write(repo / "spec" / "x.json", '{"note": "in the working tree"}\n')
+    files = {path: path.read_bytes() for path in repo.rglob("*") if path.is_file() and ".git" not in path.parts and path.name != "index"}
+    index, status = (repo / ".git" / "index").read_bytes(), git(repo, "status", "--porcelain")
+    assert _id(repo, tagged) == clean
+    assert {path: path.read_bytes() for path in files} == files and (repo / ".git" / "index").read_bytes() == index
+    assert git(repo, "status", "--porcelain") == status
+    clone = tmp_path / "clone"
+    git(tmp_path, "clone", "-q", str(repo), str(clone))
+    git(clone, "checkout", "-q", tagged)
+    assert _id(clone) == clean

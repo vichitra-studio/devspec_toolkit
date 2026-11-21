@@ -53,4 +53,11 @@ def test_init_delegate_command_runs_in_temp_venv(tmp_path, venv_name):
     assert as_json.returncode == 0, as_json.stderr
     payload = json.loads(as_json.stdout)
     assert payload["update_status"] == "installed"
-    assert payload["host_install"] == {"skipped": None, "pieces": {}}
+    assert payload["host_install"]["skipped"] is None
+    # the first run (above) installed both pieces; the second says so: nothing left to do
+    assert {name: piece["status"] for name, piece in payload["host_install"]["pieces"].items()} == {
+        "pre-commit": "current",
+        "merge-driver": "current",
+    }
+    # the hooks name the venv the delegate ran in (ruling N5), and the driver is set in the host's own clone only
+    assert f"{venv_name}/bin/python -m specdev_tools.cli" in (host / ".pre-commit-config.yaml").read_text(encoding="utf-8")

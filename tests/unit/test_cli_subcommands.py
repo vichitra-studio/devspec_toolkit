@@ -17,6 +17,8 @@ from pathlib import Path
 
 from unittest.mock import patch
 
+import pytest
+
 from specdev_tools import cli
 from specdev_tools.core.toolkit_root import detect_toolkit_root
 from specdev_tools.trace import gaps
@@ -698,6 +700,58 @@ class TestSpecCheckMerge(_CliMixin, unittest.TestCase):
         code, err, _ = self._spy_run(["--base-ref", "main"])
         self.assertEqual(code, 2)
         self.assertIn("apply only with --step or --paths (--base-ref also with --merge)", err)
+
+
+# --- specdev release (WI-M9-06) ---------------------------------------------------------------------------------------------
+
+
+def _parse(*argv: str):
+    return cli.build_parser().parse_args(list(argv))
+
+
+def test_parse_release_tag_flag():
+    args = _parse("release", "--tag", "v1.0.0", "--message", "first")
+    assert (args.cmd, args.release_cmd, args.cut_tag, args.cut_message) == ("release", None, "v1.0.0", "first")
+    assert callable(args.handler) and (args.spec_root, args.git_root, args.json_output) == ("./spec", None, False)
+    assert _parse("release").cut_tag is None
+
+
+def test_parse_release_check_stage_prod_tag():
+    args = _parse("release", "check", "--stage", "prod", "--tag", "v1.0.0")
+    assert (args.release_cmd, args.stage, args.check_tag, args.cut_tag) == ("check", "prod", "v1.0.0", None)
+    assert args.handler.__name__ == "run_release_check"
+
+
+def test_parse_release_rollback_positional_and_reason():
+    args = _parse("release", "rollback", "v1.0.0", "--reason", "never reached production")
+    assert (args.release_cmd, args.tag, args.reason) == ("rollback", "v1.0.0", "never reached production")
+    assert args.handler.__name__ == "run_release_rollback"
+    for argv in (["release", "rollback", "--reason", "x"], ["release", "rollback", "v1.0.0"]):
+        with pytest.raises(SystemExit) as stop:
+            _parse(*argv)
+        assert stop.value.code == 2
+
+
+@pytest.mark.parametrize(("argv", "needle"), [
+    (["release", "check", "--tag", "v1.0.0"], "--stage"),
+    (["release", "check", "--stage", "staging", "--tag", "v1.0.0"], "invalid choice: 'staging'"),
+    (["release", "check", "--stage", "prod"], "--tag"),
+])
+def test_parse_release_check_requires_stage_prod(argv: list[str], needle: str, capsys: pytest.CaptureFixture[str]):
+    with pytest.raises(SystemExit) as stop:
+        _parse(*argv)
+    assert stop.value.code == 2 and needle in capsys.readouterr().err
+
+
+def test_parse_path_flag_before_and_after_subcommand():
+    before = _parse("release", "--git-root", "X", "check", "--stage", "prod", "--tag", "t")
+    after = _parse("release", "check", "--stage", "prod", "--tag", "t", "--git-root", "X")
+    assert before.git_root == after.git_root == "X" and (before.check_tag, after.check_tag) == ("t", "t")
+    both = _parse("release", "--spec-root", "A", "rollback", "v1.0.0", "--reason", "r", "--spec-root", "B", "--json")
+    assert both.spec_root == "B" and both.json_output is True
+    kept = _parse("release", "--spec-root", "A", "--json", "rollback", "v1.0.0", "--reason", "r")
+    assert kept.spec_root == "A" and kept.json_output is True, "a value given before the subcommand survives"
+    assert _parse("release", "check", "--stage", "prod", "--tag", "t").spec_root == "./spec", "the defaults are the release parser's"
 
 
 if __name__ == "__main__":
