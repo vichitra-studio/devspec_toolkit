@@ -15,11 +15,11 @@ from typing import Any
 from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.stages import DEFAULT_STAGE, STAGES
+from specdev_tools.trace.records import RECORDS_DIR
 from specdev_tools.trace.writing import locked_graph
 from specdev_tools.verify.bind import BindRequest, BindResult, apply_bind
 from specdev_tools.verify.code_tree import submodule_warnings
 from specdev_tools.verify.installed_versions import installed_overrides, installed_pairs
-from specdev_tools.trace.records import RECORDS_DIR
 from specdev_tools.verify.records import Evidence, records_folder
 from specdev_tools.verify.run import run_bindings, selected_ids
 
@@ -41,7 +41,7 @@ BIND_DESCRIPTION = (
 )
 
 RUN_DESCRIPTION = (
-    "Run the commands of bindings and write one evidence record per binding and stage (extras/verification/evd-<binding>-<stage>.json; "
+    "Run the commands of bindings and write one evidence record per binding and stage (extras/verification/evd-<name>-<stage>.json, <name> being the binding id without its ver- prefix; "
     "each run overwrites the last). A binding passes when its commands exit 0 and the output matches its guard; the exit code "
     "is 1 when any binding fails. Name bindings, or take --all, or --milestone ID (the bindings of the verifiers its task "
     "criteria name in verified_by). --stage (default dev) is the stage the run executes in: bindings of that stage or below "

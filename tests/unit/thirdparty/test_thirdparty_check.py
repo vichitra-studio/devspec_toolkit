@@ -9,6 +9,7 @@ import pytest
 from specdev_tools.core.errors import FindingError
 from specdev_tools.core.host_declarations import HostDeclarations, PinSource
 from specdev_tools.thirdparty.check import check_installed, check_pins, write_install_checks
+from specdev_tools.verify.installed_versions import installed_overrides
 from specdev_tools.verify.records import records_folder, write_binding
 from specdev_tools.verify.run import run_bindings
 from unit.graph._synth import ROOT
@@ -118,16 +119,14 @@ def test_check_pins_raises_e336_on_a_hand_edited_latest_pin(host: Path, code: Pa
 
 
 def test_deploy_mode_mismatch_is_e339(host: Path) -> None:
-    resolved, findings = check_installed(graph_of(host), {ARGON: "0.42.0", RELAY: "api-v3"})
-    assert resolved == {ARGON: "0.42.0", RELAY: "api-v3"}
-    (finding,) = findings
+    (finding,) = check_installed(graph_of(host), {ARGON: "0.42.0", RELAY: "api-v3"})
     assert finding.code == "E339" and finding.node_id == ARGON and "0.42.0" in finding.message and "0.41.1" in finding.message
 
 
 @pytest.mark.parametrize("name", ["tp-nope", "api-password-reset-confirm"])
 def test_deploy_mode_refuses_a_name_that_is_not_a_third_party(host: Path, name: str) -> None:
     with pytest.raises(FindingError) as caught:
-        check_installed(graph_of(host), {name: "1.0"})
+        installed_overrides([(name, "1.0")], graph_of(host))
     assert caught.value.error.code == "E706"
 
 
@@ -166,9 +165,10 @@ def test_an_install_check_never_replaces_the_run_evidence_of_a_binding_that_shar
     before = _record(host, "evd-install-argon2-ci.json")
     with pytest.raises(FindingError) as caught:
         write_install_checks(spec, str(ROOT), str(host), {ARGON: "0.41.1"}, "ci", None)
-    assert caught.value.error.code == "E767" and "evd-install-argon2-ci.json holds a record of type 'run'" in caught.value.error.message and "--id" in caught.value.error.message
+    assert caught.value.error.code == "E767" and "evd-install-argon2-ci.json holds a record of type 'run'" in caught.value.error.message and caught.value.error.message.endswith("give --env another name (the file is named from the environment)")
     assert _record(host, "evd-install-argon2-ci.json") == before
     write_install_checks(spec, str(ROOT), str(host), {ARGON: "0.41.1"}, "prod", None)
     with pytest.raises(FindingError) as again:
         run_bindings(["ver-install-argon2"], spec, records_folder(spec), str(host), stage="prod", repo_root=str(ROOT))
-    assert again.value.error.code == "E767"
+    assert again.value.error.code == "E767" and again.value.error.message.endswith("run with another --stage (the file is named from the stage)")
+    assert [evidence.evidence_id for evidence in run_bindings(["ver-install-argon2"], spec, records_folder(spec), str(host), stage="staging", repo_root=str(ROOT))] == ["evd-install-argon2-staging"]

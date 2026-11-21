@@ -15,13 +15,14 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import NamedTuple
 
+from specdev_tools.core.host_declarations import HostDeclarations, pin_sources_by_id
 from specdev_tools.graph.gitview import read_seed_texts_at, read_seed_texts_noting
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.queries import pin_of, relied_on_third_parties
 from specdev_tools.graph.stages import CI_STAGE, DEFAULT_STAGE, STAGES, stage_at_least
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.verify.bind import hashed_ids, proved_ids
-from specdev_tools.verify.code_tree import code_tree_for_host, same_code_tree
+from specdev_tools.verify.code_tree import code_tree_for_host, declarations_of, same_code_tree
 from specdev_tools.verify.records import Attestation, Binding, Evidence, evidence_id, read_evidence
 
 GUARD_NOT_MATCHED = "GUARD_NOT_MATCHED"
@@ -69,6 +70,15 @@ class ProofContext:
         """
         return code_tree_for_host(self.git_root, self.spec_root, self.commit)
 
+    @cached_property
+    def declarations(self) -> HostDeclarations:
+        """The host declarations of the spec folder, read once.
+
+        Raises:
+            FindingError: E520 when the declarations file cannot be read.
+        """
+        return declarations_of(self.spec_root)
+
     def content_hashes(self, graph: Graph) -> dict[str, str]:
         """The content hash of each node of *graph* that has one, computed once for each graph object.
 
@@ -98,6 +108,21 @@ def _passes(evidence: Evidence) -> str | None:
     return None if evidence.guard_matched else GUARD_NOT_MATCHED
 
 
+def _recorded(evidence: Evidence, graph: Graph) -> dict[str, str]:
+    return {graph.canonical_id(name): digest for name, digest in evidence.recorded_hashes.items()}
+
+
+def _required(evidence: Evidence, binding: Binding, graph: Graph) -> list[str]:
+    """The ids *evidence* must have recorded to count for *binding*: those a run of it hashes; the binding itself only when the file is about it."""
+    own = binding.id in evidence.about
+    return [name for name in hashed_ids(binding, graph) if own or name != binding.id]
+
+
+def covers(evidence: Evidence, binding: Binding, graph: Graph) -> bool:
+    """Whether *evidence* can count for *binding* at all: the file is about it, or it recorded the verifier and every node *binding* proves (a file of a sibling that did not is no evidence of this binding, stale or not)."""
+    return binding.id in evidence.about or all(name in _recorded(evidence, graph) for name in _required(evidence, binding, graph))
+
+
 def _stale_hash(evidence: Evidence, binding: Binding, graph: Graph, ctx: ProofContext) -> bool:
     """Whether a node the evidence rests on is gone, reads differently, or was never hashed by the run.
 
@@ -106,21 +131,30 @@ def _stale_hash(evidence: Evidence, binding: Binding, graph: Graph, ctx: ProofCo
     The file must also have recorded the verifier of *binding* and every node it proves: an id it did not record is stale.
     """
     current = ctx.content_hashes(graph)
-    recorded = {graph.canonical_id(name): digest for name, digest in evidence.recorded_hashes.items()}
-    own = binding.id in evidence.about
-    required = [name for name in hashed_ids(binding, graph) if own or name != binding.id]
-    for name in dict.fromkeys((*required, *recorded)):
+    recorded = _recorded(evidence, graph)
+    for name in dict.fromkeys((*_required(evidence, binding, graph), *recorded)):
         node = graph.find(name)
         if node is None or recorded.get(name) != current.get(node.id):
             return True
     return False
 
 
-def _stale_third_party(evidence: Evidence, binding: Binding, graph: Graph) -> bool:
-    """Whether a third party the proved nodes rely on is at another version than the evidence recorded; one the evidence omits is skipped."""
+def _stale_third_party(evidence: Evidence, binding: Binding, graph: Graph, ctx: ProofContext) -> bool:
+    """Whether a third party the proved nodes rely on is at another version than the evidence recorded, or has a declared version source now and no recorded version.
+
+    One with no declared source and no recorded version is skipped: nothing reads its version (the provisional case).  One the
+    host declares a source for NOW and the run did not record was never compared with its pin; a run records it.
+    """
     installed = {graph.canonical_id(name): version for name, version in evidence.installed_versions.items()}
+    sourced = pin_sources_by_id(ctx.declarations, graph.canonical_id)
     proved = [node for name in proved_ids(binding, graph) if (node := graph.find(name)) is not None]
-    return any(version != pin_of(graph, third_party) for third_party in relied_on_third_parties(graph, proved) if (version := installed.get(third_party)) is not None)
+    for third_party in relied_on_third_parties(graph, proved):
+        version = installed.get(third_party)
+        if version is None and sourced.get(third_party):
+            return True
+        if version is not None and version != pin_of(graph, third_party):
+            return True
+    return False
 
 
 def evidence_valid(evidence: Evidence, binding: Binding, graph: Graph, ctx: ProofContext, *, treat_ci_as_dev: bool = False) -> Validity:
@@ -139,7 +173,7 @@ def evidence_valid(evidence: Evidence, binding: Binding, graph: Graph, ctx: Proo
         failed = STALE_TREE
     if failed is None and _stale_hash(evidence, binding, graph, ctx):
         failed = STALE_HASH
-    if failed is None and _stale_third_party(evidence, binding, graph):
+    if failed is None and _stale_third_party(evidence, binding, graph, ctx):
         failed = STALE_TP_VERSION
     if failed is None and not stage_at_least(evidence.stage, effective_stage(binding.stage, treat_ci_as_dev)):
         failed = STAGE_TOO_LOW

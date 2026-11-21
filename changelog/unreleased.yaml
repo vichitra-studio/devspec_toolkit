@@ -1219,28 +1219,34 @@ changes:
       [ver-ID ...] [--all | --milestone ms-ID] [--stage S] [--only-stage]
       [--no-record] [--installed TP=VERSION ...] [--timeout SEC] runs the
       commands of bindings and writes one evidence record
-      evd-<binding>-<stage>.json for each, with the code-tree id of the run and
-      the version that each declared source reads for the third parties the
-      proved nodes rely on (those reached through the providing component's
-      connections included). verify run exits 1 when a binding fails and warns
-      W350 (a registered submodule with uncommitted content; an embedded
-      repository that is not a registered submodule is not seen) and W351 (the
-      run changed the code tree). Evidence rests on the binding too: the run
-      records the hash of the binding itself beside the hashes of its verifier
-      and of the nodes it proves, so after a change of a binding (its commands,
-      guard, stage or proves) its evidence is stale (E347 STALE_HASH) until
-      verify run is repeated, while a verify bind that changes nothing leaves it
-      valid; evidence written without the hash of the binding is stale once.
-      verify bind of the same verifier and nodes replaces the record also when
-      the stage differs, so the plain command is the way out of E330 for a
-      stored binding. The guard of a binding is compiled before its commands
-      run, so a guard that is no regular expression is E332 and nothing ran. An
-      id of --installed that is no third-party node is E706 and a third party
-      named twice is a usage error (exit 2). A write never replaces an evidence
-      file that holds a record of another type: E767. Shown by specdev verify
-      bind --help, specdev verify run --help and specdev verify run --all, which
-      prints one PASS or FAIL line for each binding and then N run, N passed, N
-      failed.
+      evd-<name>-<stage>.json (<name> being the binding id without its ver-
+      prefix) for each, with the code-tree id of the run and the version that
+      each declared source reads for the third parties the proved nodes rely on
+      (those reached through the providing component's connections included).
+      verify run exits 1 when a binding fails and warns W350 (a registered
+      submodule with uncommitted content; an embedded repository that is not a
+      registered submodule is not seen) and W351 (the run changed the code
+      tree). Evidence rests on the binding too: the run records the hash of the
+      binding itself beside the hashes of its verifier and of the nodes it
+      proves, so after a change of a binding (its commands, guard, stage or
+      proves) its evidence is stale (E347 STALE_HASH) until verify run is
+      repeated, while a verify bind that changes nothing leaves it valid;
+      evidence written without the hash of the binding is stale once. verify
+      bind of the same verifier and nodes replaces the record, whatever its id,
+      also when the stage differs, so the plain command is the way out of E330
+      for every stored binding. A third party that the proved nodes rely on and
+      that has a declared version source but no version recorded by the run (a
+      source declared after the run, or a reliance that appeared after it) makes
+      the evidence stale (E347 STALE_TP_VERSION) until verify run is repeated.
+      The guard of a binding is compiled before its commands run, so a guard
+      that is no regular expression is E332 and nothing ran. An id of
+      --installed that is no third-party node is E706 and a third party named
+      twice is a usage error (exit 2). A write never replaces an evidence file
+      that holds a record of another type: E767, which names the way out
+      (third-party check another --env, verify run another --stage). Shown by
+      specdev verify bind --help, specdev verify run --help and specdev verify
+      run --all, which prints one PASS or FAIL line for each binding and then N
+      run, N passed, N failed.
     migration:
       action: none
 
@@ -1275,8 +1281,10 @@ changes:
       reads code_tree_exclusions and pin_sources, specdev third-party check
       reads pin_sources, and specdev third-party check --installed also reads
       code_tree_exclusions; a regex source is matched with MULTILINE, as the
-      output guard is, and a third party with no pin_sources entry gets no
-      stale-version check; no command reads the other two keys in this release.
+      output guard is, a key of pin_sources may be an id the third party had
+      before a rename, and a third party with no pin_sources entry gets no
+      stale-version check unless the run recorded a version for it
+      (--installed); no command reads the other two keys in this release.
       spec-check reports a file that breaks its schema as E520. A host that does
       not use the file has nothing to do, and no command installs the template
       yet (copy it by hand).

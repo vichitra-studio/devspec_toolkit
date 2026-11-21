@@ -38,7 +38,7 @@ PIN_DESCRIPTION = (
     "Write <version> as the pin of the third-party node <tp-id> (an id or an alias). The version must be exact: a version, "
     "a commit or a contract id; latest, *, x-wildcards and ranges are E336. The edit goes through the id-keyed write path, "
     "so the node's content hash changes, the links into it go suspect (listed by `specdev stale`) and the command prints "
-    "how many, by step. The code change itself is made in this branch through a change milestone. Exit 0 written, 1 refused."
+    "how many, by step. The code change itself is made in this branch through a change milestone. Exit 0 written, or the node already had that pin and nothing was written; 1 refused. The version is written without surrounding spaces."
 )
 
 CHECK_DESCRIPTION = (
@@ -122,15 +122,15 @@ def _check_deploy(args: argparse.Namespace, graph: Graph, pairs: list[tuple[str,
         installed = installed_overrides(pairs, graph)
     except ValueError as exc:
         return usage_error("third-party check", str(exc))
-    resolved, findings = check_installed(graph, installed)
+    findings = check_installed(graph, installed)
     if findings:
         return _report_findings(findings, args.json_output)
-    files = write_install_checks(os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args), resolved, args.env, args.tag)
+    files = write_install_checks(os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args), installed, args.env, args.tag)
     records = [f"{RECORDS_DIR}/{name}" for name in files]
     if args.json_output:
-        print_json({"command": "third-party check", "mode": "installed", "env": args.env, "tag": args.tag, "installed": resolved, "records": records, "errors": []})
+        print_json({"command": "third-party check", "mode": "installed", "env": args.env, "tag": args.tag, "installed": installed, "records": records, "errors": []})
     else:
-        for (node_id, version), record in zip(resolved.items(), records):
+        for (node_id, version), record in zip(installed.items(), records):
             print(f"{node_id}: installed {version} is the pin; recorded {record}")
     return 0
 

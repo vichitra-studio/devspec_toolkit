@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 
 from specdev_tools.core.errors import refusal
-from specdev_tools.core.host_declarations import HostDeclarations
+from specdev_tools.core.host_declarations import HostDeclarations, pin_sources_by_id
 from specdev_tools.core.pin_sources import SourceError, read_source
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.names import THIRD_PARTY
@@ -68,11 +68,12 @@ def installed_versions(
     """
     versions: dict[str, str] = {}
     notes: list[str] = []
+    sources_of = pin_sources_by_id(declarations, graph.canonical_id)
     for third_party in relied_on_third_parties(graph, nodes):
         if third_party in overrides:
             versions[third_party] = overrides[third_party]
             continue
-        sources = declarations.pin_sources.get(third_party, ())
+        sources = sources_of.get(third_party, ())
         if not sources:
             continue
         try:

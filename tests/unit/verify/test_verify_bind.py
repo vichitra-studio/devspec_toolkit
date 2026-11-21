@@ -98,6 +98,35 @@ def test_a_rebind_after_the_stage_of_a_proved_node_changed_replaces_the_record_w
     assert not [name for name in _record_files(host) if name.startswith("ver-reset-email-delivery-time-")]
 
 
+def test_a_rebind_replaces_the_binding_whose_proved_nodes_are_the_requests_whatever_its_id(host: Path) -> None:
+    """The second binding of a verifier is ``ver-mixed-staging``; when its node moves to ``prod`` the plain re-bind updates that record and keeps its id."""
+    _add_fixture(host, fixture_id="fix-mixed", verifies=[CRITERION, NFR])
+    _bind(host, "fix-mixed", proves=(CRITERION,))
+    second = _bind(host, "fix-mixed", proves=(NFR,))
+    edit_doc(host, "07_nfrs.json", lambda doc: doc["nfrs"][0].update(stage="prod"))
+    again = _bind(host, "fix-mixed", proves=(NFR,))
+    assert (second.plan.record_id, second.plan.stage) == ("ver-mixed-staging", "staging")
+    assert (again.plan.record_id, again.plan.stage, again.plan.replaced) == ("ver-mixed-staging", "prod", True)
+    assert not [name for name in _record_files(host) if name.startswith("ver-mixed-prod")]
+
+
+def test_a_rebind_replaces_a_binding_with_an_explicit_id_the_same_way(host: Path) -> None:
+    _add_fixture(host, fixture_id="fix-mixed", verifies=[CRITERION, NFR])
+    _bind(host, "fix-mixed", proves=(CRITERION,))
+    _bind(host, "fix-mixed", proves=(NFR,), record_id="ver-latency-only")
+    edit_doc(host, "07_nfrs.json", lambda doc: doc["nfrs"][0].update(stage="prod"))
+    again = _bind(host, "fix-mixed", proves=(NFR,))
+    assert (again.plan.record_id, again.plan.replaced) == ("ver-latency-only", True)
+
+
+def test_a_rebind_with_proved_nodes_that_overlap_a_binding_without_being_its_nodes_is_still_e333(host: Path) -> None:
+    _add_fixture(host, fixture_id="fix-mixed", verifies=[CRITERION, NFR])
+    _bind(host, "fix-mixed", proves=(CRITERION,))
+    _bind(host, "fix-mixed", proves=(NFR,))
+    error = _refusal(host, "fix-mixed", proves=(CRITERION, NFR), record_id="ver-both")
+    assert error.error.code == "E333" and "ver-mixed" in error.error.message
+
+
 @pytest.mark.parametrize("guard", [None, ""])
 def test_missing_guard_is_e332(host: Path, guard: str | None) -> None:
     assert _refusal(host, guard=guard).error.code == "E332"

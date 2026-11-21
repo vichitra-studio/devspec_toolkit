@@ -23,7 +23,7 @@ from specdev_tools.graph.model import Graph
 from specdev_tools.graph.names import BINDING_KIND, ROADMAP_MILESTONE, TASK_CRITERION, VERIFIED_BY
 from specdev_tools.graph.queries import milestone_of, unknown_node_error
 from specdev_tools.graph.stages import DEFAULT_STAGE, stage_at_least
-from specdev_tools.trace.hashing import compute_all
+from specdev_tools.trace.hashing import HASH_PREFIX, compute_all
 from specdev_tools.trace.lockfile import with_write_lock
 from specdev_tools.trace.writing import seed_texts_for_write
 from specdev_tools.verify.bind import hashed_ids, proved_ids
@@ -34,7 +34,6 @@ from specdev_tools.verify.records import Binding, Evidence, all_bindings, bindin
 
 TIMEOUT_EXIT_CODE = 124
 """The exit code recorded for a command that was killed at ``--timeout`` (the code of ``timeout(1)``)."""
-_NO_HASH = "sha256:"
 
 
 @dataclass(frozen=True)
@@ -90,7 +89,7 @@ def _execute(binding: Binding, spec_dir: str, git_root: str, timeout: float | No
     exit_code, output = _run_commands(binding.commands, git_root, timeout)
     after = code_tree_for_host(git_root, spec_dir)
     matched = exit_code != TIMEOUT_EXIT_CODE and guard_matches(binding.guard, output)
-    return _Execution(exit_code, _NO_HASH + hashlib.sha256(output).hexdigest(), matched, after, after != before)
+    return _Execution(exit_code, HASH_PREFIX + hashlib.sha256(output).hexdigest(), matched, after, after != before)
 
 
 def _tree_note(binding_id: str) -> str:

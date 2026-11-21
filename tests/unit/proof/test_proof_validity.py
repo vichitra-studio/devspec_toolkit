@@ -12,6 +12,8 @@ from specdev_tools.proof.validity import (
 from specdev_tools.verify.records import attestations_about
 from specdev_tools.verify.records import binding_of
 
+from unit.verify._support import write_json
+
 from ._support import API, CRITERION, FIXTURE, TP, attest, binding_item, commit_all, context, edit_binding, edit_code, edit_doc, graph_of, host_with, run
 
 ALPHA = "ver-alpha"
@@ -140,6 +142,72 @@ def test_a_third_party_the_evidence_omits_is_skipped(tmp_path: Path) -> None:
     assert _valid(host) == (True, None)
 
 
+def _lock_pointer(name: str) -> dict[str, object]:
+    return {"type": "json-pointer", "file": "package-lock.json", "pointer": f"/packages/node_modules~1{name}/version"}
+
+
+def _declare_sources(host: Path, *names: str) -> None:
+    """Declare the lock file as the source of the pin of each third party in *names* (``tp-<name>``); a spec edit, so the code tree stays."""
+    write_json(host / "spec" / "common" / "host_declarations.json", {"$schema": "vc:host-declarations", "pin_sources": {f"tp-{name}": [_lock_pointer(name)] for name in names}})
+
+
+def _host_with_lock(tmp_path: Path) -> Path:
+    """The example with a lock file that reads each pin, one binding of the API, committed (the lock is code: it is there before the run)."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(API,)))
+    write_json(host / "package-lock.json", {"packages": {"node_modules/argon2": {"version": "0.41.1"}, "node_modules/mailrelay": {"version": "api-v3"}, "node_modules/sms": {"version": "1.0.0"}}})
+    commit_all(host)
+    return host
+
+
+def test_a_source_declared_after_the_run_for_a_third_party_the_evidence_omits_is_stale_tp_version(tmp_path: Path) -> None:
+    """The run recorded no version for the relied-on third parties (no source then); with a source now the pass rests on a version nobody recorded."""
+    host = _host_with_lock(tmp_path)
+    run(host, [ALPHA])
+    assert _valid(host) == (True, None)
+    _declare_sources(host, "argon2")
+    assert _valid(host) == (False, STALE_TP_VERSION)
+    run(host, [ALPHA])
+    assert _valid(host) == (True, None)
+
+
+def test_a_reliance_that_appears_after_the_run_and_has_a_source_is_stale_tp_version(tmp_path: Path) -> None:
+    """A component connection that reaches a new third party changes the hash of no node the evidence rests on."""
+    host = _host_with_lock(tmp_path)
+    _declare_sources(host, "argon2", "mailrelay")
+    run(host, [ALPHA])
+    assert _valid(host) == (True, None)
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"].append({"third_party_id": "tp-sms", "name": "sms", "pin": "1.0.0", "derives_from": ["seed-accounts"]}))
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["connections"][0]["connects_to"].append("tp-sms"))
+    assert _valid(host) == (True, None), "no declared source for tp-sms yet: nothing to compare"
+    _declare_sources(host, "argon2", "mailrelay", "sms")
+    assert _valid(host) == (False, STALE_TP_VERSION)
+    run(host, [ALPHA])
+    assert _valid(host) == (True, None)
+
+
+def test_a_run_after_the_rename_of_a_third_party_records_its_version_and_a_pin_bump_is_stale(tmp_path: Path) -> None:
+    """``pin_sources`` keeps the id the author wrote: the run reads it through the aliases, so the renamed third party is compared with its pin."""
+    host = _host_with_lock(tmp_path)
+    _declare_sources(host, "argon2", "mailrelay")
+    renamed = "tp-argon2-lib"
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(third_party_id=renamed, aliases=[TP]))
+    edit_doc(host, "05_interface_contracts.json", lambda doc: doc["apis"][0].update(relies_on=[renamed]))
+    [evidence] = run(host, [ALPHA])
+    assert dict(evidence.installed_versions)[renamed] == "0.41.1"
+    assert _valid(host) == (True, None)
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(pin="0.99.0"))
+    assert _valid(host) == (False, STALE_TP_VERSION)
+
+
+def test_a_declared_source_of_a_third_party_the_proved_nodes_do_not_rely_on_is_not_asked_for(tmp_path: Path) -> None:
+    host = _host_with_lock(tmp_path)
+    _declare_sources(host, "argon2", "mailrelay")
+    run(host, [ALPHA])
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"].append({"third_party_id": "tp-sms", "name": "sms", "pin": "1.0.0", "derives_from": ["seed-accounts"]}))
+    _declare_sources(host, "argon2", "mailrelay", "sms")
+    assert _valid(host) == (True, None)
+
+
 def test_evidence_below_the_binding_stage_is_stage_too_low(tmp_path: Path) -> None:
     """A sibling binding with the same commands and guard at a higher stage is not satisfied by the dev run of the first."""
     host = host_with(tmp_path, binding_item(ALPHA), binding_item("ver-beta", proves=(CRITERION,), stage="ci"))
@@ -256,6 +324,15 @@ def test_an_attestation_survives_the_rename_of_the_attested_node(tmp_path: Path)
     graph = graph_of(host)
     [attestation] = attestations_about(graph, renamed)
     assert attestation_valid(attestation, renamed, graph, context(host)) == (True, None)
+
+
+def test_run_evidence_survives_the_rename_of_the_verifier_and_of_a_proved_node(host: Path) -> None:
+    """The keys of ``recorded_hashes`` keep the ids the run read; they are read through the aliases, as the keys of an attestation are."""
+    renamed = "fix-password-reset-expired-token-v2"
+    edit_doc(host, "08_fixtures.json", lambda doc: doc["fixtures"][0].update(fixture_id=renamed, aliases=[FIXTURE]))
+    assert _valid(host) == (True, None)
+    edit_doc(host, "05_interface_contracts.json", lambda doc: doc["apis"][0].update(api_id="api-password-reset-confirm-v2", aliases=[API]))
+    assert _valid(host) == (True, None)
 
 
 def test_a_committed_edit_of_the_code_is_stale_tree_too(host: Path) -> None:

@@ -174,10 +174,14 @@ def _explicit_id(record_id: str, verifier: Node, graph: Graph) -> str:
 
 
 def _record_id(request: BindRequest, verifier: Node, stage: str, proves: tuple[str, ...], graph: Graph) -> str:
-    """The id of the record: ``--id``, else ``ver-<verifier suffix>`` (with ``-<stage>`` when that is another binding's), else the first free id."""
+    """The id of the record: ``--id``; else the id of the binding of this verifier whose proved nodes are *proves* (whatever its id); else ``ver-<verifier suffix>`` (with ``-<stage>`` when that is another binding's), else the first free id."""
     if request.record_id:
         return _explicit_id(request.record_id, verifier, graph)
-    own = {binding.id: binding for binding in _own_bindings(verifier, graph)}
+    bindings = _own_bindings(verifier, graph)
+    same_nodes = next((binding.id for binding in bindings if set(proved_ids(binding, graph)) == set(proves)), None)
+    if same_nodes is not None:
+        return same_nodes
+    own = {binding.id: binding for binding in bindings}
     taken = set(graph.by_id) | set(graph.alias_index)
     suffix = id_suffix(verifier.kind, verifier.id)
     for candidate in (mint_slug(suffix, (), prefix=BINDING_PREFIX), mint_slug(f"{suffix}-{stage}", (), prefix=BINDING_PREFIX)):

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -56,6 +57,15 @@ class HostDeclarations:
     setup_command: str | None = None
     code_tree_exclusions: tuple[str, ...] = ()
     pin_sources: dict[str, tuple[PinSource, ...]] = field(default_factory=dict)
+
+
+def pin_sources_by_id(declarations: HostDeclarations, resolve: Callable[[str], str]) -> dict[str, tuple[PinSource, ...]]:
+    """``pin_sources`` keyed by current id: *resolve* (``Graph.canonical_id``) maps each key, which may be an id the third party had before a rename.
+
+    The one reading of the keys of ``pin_sources``: every reader of the declared sources of a third party goes through it, so a rename
+    that leaves ``host_declarations.json`` as it was changes no answer.  A key that names no third party stays under its own name.
+    """
+    return {resolve(name): sources for name, sources in declarations.pin_sources.items()}
 
 
 def load_host_declarations(spec_root: str | os.PathLike[str]) -> HostDeclarations:

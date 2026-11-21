@@ -1,1 +1,1 @@
-"""Proof of obligations: stages, bindings and evidence validity."""
+"""Proof of obligations: ``proof`` (the status of an obligation at a gate), ``validity`` (when stored evidence still proves a binding), ``realisation`` (what became of what a closed milestone refined) and ``built_evidence`` (the evidence branches and seams of the built computation)."""

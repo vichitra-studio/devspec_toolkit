@@ -163,6 +163,36 @@ def test_installed_flag_overrides_the_discovered_version(tmp_path: Path) -> None
     assert (dict(discovered.installed_versions), dict(overridden.installed_versions)) == ({TP: "0.31.0"}, {TP: "9.9.9"})
 
 
+def _rename_argon2(host: Path) -> str:
+    """Rename tp-argon2 (a spec edit, as ``node rename`` does it): the declarations still say ``tp-argon2``."""
+    renamed = "tp-argon2-lib"
+    edit_doc(host, "02_system_sketch.json", lambda document: document["third_parties"][0].update(third_party_id=renamed, aliases=[TP]))
+    edit_doc(host, "05_interface_contracts.json", lambda document: document["apis"][0].update(relies_on=[renamed]))
+    return renamed
+
+
+def _declare_argon2(host: Path, key: str) -> None:
+    write_json(host / "package-lock.json", {"packages": {"node_modules/argon2": {"version": "0.31.0"}}})
+    write_json(host / "spec" / "common" / "host_declarations.json", {"$schema": "vc:host-declarations", "pin_sources": {key: [{"type": "json-pointer", "file": "package-lock.json", "pointer": "/packages/node_modules~1argon2/version"}]}})
+    commit_all(host)
+
+
+def test_a_pin_sources_key_that_is_the_old_id_of_a_renamed_third_party_still_gives_the_installed_version(tmp_path: Path) -> None:
+    host = _host(tmp_path, _binding("ver-alpha"))
+    renamed = _rename_argon2(host)
+    _declare_argon2(host, TP)
+    [evidence] = _run(host, ["ver-alpha"], record=False)
+    assert dict(evidence.installed_versions)[renamed] == "0.31.0"
+
+
+def test_a_pin_sources_key_that_is_the_current_id_gives_the_installed_version(tmp_path: Path) -> None:
+    host = _host(tmp_path, _binding("ver-alpha"))
+    renamed = _rename_argon2(host)
+    _declare_argon2(host, renamed)
+    [evidence] = _run(host, ["ver-alpha"], record=False)
+    assert dict(evidence.installed_versions)[renamed] == "0.31.0"
+
+
 def test_the_evidence_of_an_api_records_the_version_of_a_third_party_its_components_connection_reaches(tmp_path: Path) -> None:
     """identity-service connects to tp-mailrelay; with the API's own relies_on gone, only that computed reliance names it."""
     host = _host(tmp_path, _binding("ver-alpha"))

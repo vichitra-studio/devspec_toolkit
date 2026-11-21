@@ -25,12 +25,15 @@ from dataclasses import dataclass
 from functools import cache
 
 from specdev_tools.core.errors import FindingError
-from specdev_tools.core.host_declarations import HostDeclarationsError, load_host_declarations
+from specdev_tools.core.host_declarations import HostDeclarationsError, load_host_declarations, pin_sources_by_id
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.proof.proof import NOT_REQUIRED, PENDING_STAGE, PROVEN, REASON_NO_VERIFIER, REASON_UNBOUND, ProofResult, proof, verifier_proof
+from specdev_tools.graph.names import ABOUT, BINDING_KIND, NFR, OBLIGATION_ROLES, REALISES, REVIEW_ENFORCER, RULE, THIRD_PARTY, VERIFIER_ROLE, VERIFIES
 from specdev_tools.graph.stages import STAGES, binding_stage, bindings_of, is_retired_binding, retired_binding_ids, stage_at_least, stage_rank
+from specdev_tools.proof.proof import (
+    NOT_REQUIRED, PENDING_STAGE, PROVEN, REASON_NO_VERIFIER, REASON_UNBOUND, STAGE_UNKNOWN, ProofResult, proof, verifier_proof,
+)
 from specdev_tools.proof.validity import ProofContext
 from specdev_tools.thirdparty.check import check_pins
 from specdev_tools.validation.graph_checks.built import (
@@ -38,7 +41,6 @@ from specdev_tools.validation.graph_checks.built import (
     register_built_provider,
 )
 from specdev_tools.validation.graph_checks.context import PIN_UNKNOWN, GraphCheckContext, bind_seams
-from specdev_tools.graph.names import ABOUT, BINDING_KIND, NFR, OBLIGATION_ROLES, REALISES, REVIEW_ENFORCER, RULE, THIRD_PARTY, VERIFIER_ROLE, VERIFIES
 from specdev_tools.validation.graph_checks.refinement import mitigations
 from specdev_tools.verify.records import EVIDENCE_KIND, records_folder
 
@@ -88,7 +90,7 @@ def _read_pins(ctx: GraphCheckContext) -> dict[str, str]:
     except HostDeclarationsError:
         return {}
     wrong = {finding.node_id for finding in check_pins(ctx.graph, declarations, ctx.git_root)}
-    sourced = (ctx.graph.by_id.get(ctx.graph.canonical_id(name)) for name in declarations.pin_sources)
+    sourced = (ctx.graph.by_id.get(node_id) for node_id in pin_sources_by_id(declarations, ctx.graph.canonical_id))
     return {node.id: PIN_MISMATCH if node.id in wrong else PIN_OK for node in sourced if node is not None and node.kind == THIRD_PARTY}
 
 
@@ -119,6 +121,13 @@ def _waits_for(graph: Graph, node: Node, cap: str) -> str:
     ]
     above = [stage for stage in stages if not stage_at_least(cap, stage)]
     return min(above, key=stage_rank) if above else STAGES[min(stage_rank(cap) + 1, len(STAGES) - 1)]
+
+
+def _not_built_when_stage_unknown(exc: FindingError) -> BuiltResult:
+    """The state of a node whose stage cannot be told (E334: not proven, the others are still answered); every other finding is raised again."""
+    if exc.error.code != STAGE_UNKNOWN:
+        raise exc
+    return BuiltResult(BuiltState.NOT_BUILT, exc.error.message)
 
 
 def _unproven_reason(result: ProofResult) -> str:
@@ -175,7 +184,7 @@ class _EvidenceBranches:
         except GitViewError as exc:
             return BuiltResult(BuiltState.PENDING_EVIDENCE, f"the code tree cannot be read: {exc}")
         except FindingError as exc:
-            return BuiltResult(BuiltState.NOT_BUILT, exc.error.message)
+            return _not_built_when_stage_unknown(exc)
 
     def _nfr(self, computation: BuiltComputation, node: Node) -> BuiltResult:
         """The default state; relieved when that is built and the proof of the NFR waits only for a stage above the cap (an unreadable host leaves the default)."""
@@ -188,7 +197,7 @@ class _EvidenceBranches:
         except GitViewError:
             return default
         except FindingError as exc:
-            return BuiltResult(BuiltState.NOT_BUILT, exc.error.message)
+            return _not_built_when_stage_unknown(exc)
         return _relieved(self.graph, node, self.cap, default.reason + "; its proof waits for a later stage") if result.status == PENDING_STAGE else default
 
     def _threat(self, computation: BuiltComputation, node: Node, host: ProofContext) -> BuiltResult:

@@ -40,7 +40,10 @@ BINDING_ID = re.compile(rf"^{re.escape(BINDING_PREFIX)}[a-z0-9]+(?:-[a-z0-9]+)*$
 
 
 def id_suffix(kind: str, node_id: str) -> str:
-    """*node_id* without the prefix ``graph.ids`` suggests for *kind* (the whole id when it does not start with it)."""
+    """*node_id* without the prefix ``graph.ids`` suggests for *kind* (the whole id when it does not start with it).
+
+    A verifier that wears the prefix of another kind (a fixture named ``job-x``) keeps it in the binding id (``ver-job-x``); a binding that exists keeps its id on a re-bind, so no stored id changes.
+    """
     prefix = suggest_prefix(kind)
     return node_id.removeprefix(prefix) if prefix else node_id
 
@@ -158,11 +161,16 @@ def evidence_from_item(item: Mapping[str, Any]) -> Evidence | None:
     )
 
 
+def _only_record(path: str) -> Mapping[str, Any] | None:
+    """The one record of the record file at *path*; ``None`` when there is no file, it is unreadable, or it does not hold exactly one record: the one reading of "the record" of an evidence file."""
+    document = read_json_object(path)
+    records = document.get("records") if document is not None else None
+    return records[0] if isinstance(records, list) and len(records) == 1 and isinstance(records[0], dict) else None
+
+
 def read_evidence(folder: str, evidence_id: str) -> Evidence | None:
     """The run evidence stored as ``<evidence_id>.json`` in *folder*; ``None`` when there is no such file, it is unreadable or it is not a run record."""
-    document = read_json_object(os.path.join(folder, record_file(evidence_id)))
-    records = document.get("records") if document is not None else None
-    item = records[0] if isinstance(records, list) and len(records) == 1 and isinstance(records[0], dict) else None
+    item = _only_record(os.path.join(folder, record_file(evidence_id)))
     return evidence_from_item(item) if item is not None else None
 
 
@@ -223,11 +231,16 @@ def write_binding(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     return _write_record(folder, repo_root, VERIFICATION_SCHEMA, item["verification_id"], item)
 
 
+_WAYS_OUT = {
+    RUN_TYPE: "run with another --stage (the file is named from the stage)",
+    "install-check": "give --env another name (the file is named from the environment)",
+}
+"""For the type of a write that meets a record of another type: the one way out that works, found by running both directions."""
+
+
 def _stored_type(path: str) -> str | None:
-    """The ``type`` of the one record of the evidence file at *path*; ``None`` when there is no file or it holds no record."""
-    document = read_json_object(path)
-    records = document.get("records") if document is not None else None
-    item = records[0] if isinstance(records, list) and records and isinstance(records[0], dict) else None
+    """The ``type`` of the one record of the evidence file at *path*; ``None`` when there is no such record (a file that holds none, or more than one, is overwritten like a corrupt one)."""
+    item = _only_record(path)
     return item.get("type", RUN_TYPE) if item is not None else None
 
 
@@ -240,9 +253,10 @@ def write_evidence(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
     """
     wanted, stored = item.get("type", RUN_TYPE), _stored_type(os.path.join(folder, record_file(item["evidence_id"])))
     if stored is not None and stored != wanted:
+        way_out = _WAYS_OUT.get(wanted)
         raise refusal(
             "E767",
-            f"{record_file(item['evidence_id'])} holds a record of type '{stored}' and this write has type '{wanted}', which would replace it; "
-            f"choose another binding id with `specdev verify bind ... --id ver-<name>` or another --env for the install check",
+            f"{record_file(item['evidence_id'])} holds a record of type '{stored}' and this write has type '{wanted}', which would replace it"
+            + (f"; {way_out}" if way_out else ""),
         )
     return _write_record(folder, repo_root, EVIDENCE_SCHEMA, item["evidence_id"], item)

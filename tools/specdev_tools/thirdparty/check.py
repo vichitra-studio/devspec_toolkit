@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.core.host_declarations import HostDeclarations, PinSource
+from specdev_tools.core.host_declarations import HostDeclarations, PinSource, pin_sources_by_id
 from specdev_tools.core.pin_sources import SourceError, read_source
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.names import THIRD_PARTY
@@ -19,7 +19,6 @@ from specdev_tools.graph.queries import pin_of
 from specdev_tools.thirdparty.pin import not_exact_error, pin_is_exact
 from specdev_tools.trace.lockfile import with_write_lock
 from specdev_tools.verify.code_tree import code_tree_for_host
-from specdev_tools.verify.installed_versions import third_party_of
 from specdev_tools.verify.records import install_check_id, records_folder, write_evidence
 
 INSTALL_CHECK_TYPE = "install-check"
@@ -51,7 +50,7 @@ def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Pat
     whose version is not the pin is E337.  A third party with no declared source is not checked; a ``pin_sources`` key that
     names no third-party node is E338 (a mistyped key would otherwise switch the check off).
     """
-    sources_of = {graph.canonical_id(name): sources for name, sources in declarations.pin_sources.items()}
+    sources_of = pin_sources_by_id(declarations, graph.canonical_id)
     third_parties = {node.id for node in graph.by_kind.get(THIRD_PARTY, ())}
     findings: list[SpecError] = [
         make_error("E338", f"pin_sources names '{name}', which is no third-party node, so its sources are not checked; correct the key")
@@ -67,23 +66,17 @@ def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Pat
     return findings
 
 
-def check_installed(graph: Graph, installed: Mapping[str, str]) -> tuple[dict[str, str], list[SpecError]]:
-    """The installed versions keyed by current id, and an E339 finding for each one that is not the pin of its node.
-
-    Raises:
-        FindingError: E706 when a name is no node, or the node is not a third party.
-    """
-    resolved = {third_party_of(graph, name).id: version for name, version in installed.items()}
-    findings = [
+def check_installed(graph: Graph, installed: Mapping[str, str]) -> list[SpecError]:
+    """An E339 finding for each of *installed* (``{third party id: version}`` as ``installed_overrides`` resolved it) that is not the pin of its node."""
+    return [
         make_error(
             "E339",
             f"'{node_id}' is installed at '{version}' but the spec pin is '{pin}'; install the pinned version, or change the pin with third-party pin",
             node_id=node_id,
         )
-        for node_id, version in resolved.items()
+        for node_id, version in installed.items()
         if version != (pin := pin_of(graph, node_id))
     ]
-    return resolved, findings
 
 
 def install_check_item(third_party_id: str, version: str, env: str, tag: str | None, tested_tree: str) -> dict[str, object]:

@@ -15,7 +15,7 @@ from specdev_tools.verify.records import binding_of, records_folder, write_bindi
 from unit.graph._synth import ROOT
 
 from ._support import (
-    API, ci_host, edit_binding, CRITERION, FIXTURE, INVARIANT, NFR, OTHER_FIXTURE, REUSED_BINDING, add_fixture, attest, binding_item, context, edit_code, edit_doc, graph_of,
+    API, ci_host, commit_all, edit_binding, CRITERION, FIXTURE, INVARIANT, NFR, OTHER_FIXTURE, REUSED_BINDING, add_fixture, attest, binding_item, context, edit_code, edit_doc, graph_of,
     host_with, prove, run,
 )
 
@@ -322,3 +322,46 @@ def test_a_verifier_with_two_bindings_at_the_cap_is_unproven_when_the_second_fai
     assert (result.status, result.shortfalls[0].binding) == (UNPROVEN, "ver-api")
     run(host, ["ver-api"])
     assert verifier_proof(graph_of(host), context(host), FIXTURE, "dev").status == PROVEN
+
+
+def test_a_binding_that_never_ran_whose_only_countable_file_is_a_siblings_that_does_not_cover_it_has_no_evidence(tmp_path: Path) -> None:
+    """Same verifier, same commands and guard, disjoint nodes: the sibling's file recorded none of this binding's nodes, so it is not evidence of it: run it (NO_EVIDENCE), not re-run it (STALE_HASH)."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)), binding_item("ver-beta", proves=(API,)))
+    run(host, [ALPHA])
+    result = prove(host, API)
+    assert (result.status, result.shortfalls[0].reason, result.shortfalls[0].binding) == (UNPROVEN, NO_EVIDENCE, "ver-beta")
+
+
+def test_a_binding_of_a_verifier_that_proves_nothing_is_proven_by_the_run_of_a_sibling_with_the_same_commands_and_guard(tmp_path: Path) -> None:
+    """The one path that reaches the credit of another binding's file: a rule has no node to prove, so two bindings of it (the second with ``--id``) cannot overlap."""
+    one, two = binding_item("ver-rule-one", verifier=CLI_RULE, proves=(), stage="ci"), binding_item("ver-rule-two", verifier=CLI_RULE, proves=(), stage="ci")
+    host = host_with(tmp_path, one, two)
+    run(host, ["ver-rule-one"], stage="ci")
+    assert [path.name for path in (host / "spec" / "extras" / "verification").glob("evd-*")] == ["evd-rule-one-ci.json"]
+    assert prove(host, CLI_RULE, "ci").status == PROVEN
+    edit_binding(host, "ver-rule-one", lambda record: record.update(output_guard="expected"))
+    assert prove(host, CLI_RULE, "ci").status == UNPROVEN
+
+
+def test_two_bindings_that_share_commands_each_get_their_own_file_from_one_execution(tmp_path: Path) -> None:
+    """``verify run`` runs a group of bindings with the same commands and guard once and writes one file for each binding: with disjoint nodes the files are not shared."""
+    counter = tmp_path / "executions.txt"
+    commands = (f"echo once >> {counter}; echo expected line",)
+    add = {"fixture_id": SECOND, "verifies": [CRITERION, NFR]}
+    host = host_with(tmp_path, binding_item("ver-one", verifier=SECOND, proves=(CRITERION,), commands=commands), binding_item("ver-two", verifier=SECOND, proves=(NFR,), stage="staging", commands=commands))
+    add_fixture(host, **add)
+    commit_all(host)
+    first, second = run(host, ["ver-one", "ver-two"], stage="staging")
+    assert counter.read_text(encoding="utf-8").splitlines() == ["once"]
+    assert (first.evidence_id, second.evidence_id) == ("evd-one-staging", "evd-two-staging")
+    assert first.output_hash == second.output_hash and first.about == ("ver-one",) and second.about == ("ver-two",)
+    assert prove(host, NFR, "staging").status == PROVEN
+
+
+def test_a_retired_binding_is_left_out_of_the_proof_of_its_verifier(tmp_path: Path) -> None:
+    """A binding whose stage names an environment that is out of scope is not asked for: the live binding alone decides."""
+    host = host_with(tmp_path, binding_item(ALPHA, proves=(CRITERION,)), binding_item("ver-late", proves=(API,), stage="staging"))
+    run(host, [ALPHA])
+    assert verifier_proof(graph_of(host), context(host), FIXTURE, "staging").status == UNPROVEN
+    edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"]["staging"].update(scope="out"))
+    assert verifier_proof(graph_of(host), context(host), FIXTURE, "staging").status == PROVEN

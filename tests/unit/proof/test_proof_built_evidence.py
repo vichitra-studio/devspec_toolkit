@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from specdev_tools.core.errors import FindingError
 from specdev_tools.graph.model import Node
 from specdev_tools.proof import validity
 from specdev_tools.proof.built_evidence import built_at_cap, built_state, pin_matches, record_users, relieved_nodes, retired_bindings
@@ -296,6 +297,16 @@ def test_relieved_list_holds_an_nfr_with_only_a_staging_binding_at_cap_ci(tmp_pa
     assert (result.state, result.waits_for) == (RELIEVED, "staging")
 
 
+def test_a_retired_binding_does_not_set_the_stage_a_relieved_node_waits_for(tmp_path: Path) -> None:
+    """At cap dev the NFR waits for the lowest stage of a live binding above the cap; a binding of a retired environment (ci is out) is not one."""
+    host = _latency_host(tmp_path)
+    write_binding(records_folder(str(host / "spec")), str(ROOT), binding_item("ver-latency-ci", verifier=LATENCY_FIXTURE, proves=(NFR,), stage="ci"))
+    commit_all(host)
+    assert built_state(_ctx(host), graph_of(host).by_id[NFR], "dev").waits_for == "ci"
+    edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"]["ci"].update(scope="out"))
+    assert built_state(_ctx(host), graph_of(host).by_id[NFR], "dev").waits_for == "staging"
+
+
 def test_relieved_node_satisfies_its_ancestor_at_cap_ci(tmp_path: Path) -> None:
     """A threat mitigated by the relieved NFR is satisfied (it waits for the same stage); at cap staging nothing waits and it is built."""
     host = _latency_host(tmp_path)
@@ -376,6 +387,15 @@ def test_a_node_whose_stage_cannot_be_told_is_not_built_and_the_other_nodes_are_
     assert states["qa"].state is BuiltState.NOT_BUILT
     assert "environment 'qa' is not a stage" in states["qa"].reason
     assert ENVIRONMENT in states
+
+
+def test_unreadable_host_declarations_are_raised_once_by_built_at_cap_not_reported_for_every_node(tmp_path: Path) -> None:
+    """Only the stage finding (E334) becomes a reason on one node; an E520 of the host declarations is raised, as ``proof_errors`` raises it."""
+    host = _ci_host(tmp_path)
+    write(host / "spec" / "common" / "host_declarations.json", "{ not json")
+    with pytest.raises(FindingError) as caught:
+        _built(host)
+    assert caught.value.error.code == "E520"
 
 
 def test_a_host_with_no_verification_folder_and_no_declarations_reports_what_the_branches_say(tmp_path: Path) -> None:

@@ -17,11 +17,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.names import REFINES, REMOVES, TASK_CRITERION, link_targets
 from specdev_tools.graph.queries import milestone_of
 from specdev_tools.trace.hashing import compute_all, content_hash
 from specdev_tools.trace.history import contained, done_milestones
 from specdev_tools.trace.lockfile import Lock
-from specdev_tools.graph.names import REFINES, REMOVES, TASK_CRITERION, link_targets
 
 CURRENT = "current"
 OUTDATED = "outdated"

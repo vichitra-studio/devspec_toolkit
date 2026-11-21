@@ -13,6 +13,7 @@ from specdev_tools.core.host_declarations import (
     HostDeclarationsError,
     PinSource,
     load_host_declarations,
+    pin_sources_by_id,
 )
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.schema_validate import schema_violations
@@ -104,3 +105,12 @@ def test_template_validates_and_lists_the_toolkit_path(tmp_path: Path) -> None:
     assert set(document) == {"$schema", "release_tag_pattern", "setup_command", "code_tree_exclusions", "pin_sources"}
     declarations = load_host_declarations(_spec_with(tmp_path, TEMPLATE.read_text(encoding="utf-8")))
     assert TOOLKIT_PATH in declarations.code_tree_exclusions
+
+
+def test_pin_sources_are_keyed_by_current_id_whatever_key_the_author_wrote() -> None:
+    """The one reading of the keys: an old id and a current id both resolve; a key that names nothing stays under its own name."""
+    source = PinSource(type="regex", file="a.txt", pattern="v(.*)")
+    declarations = HostDeclarations(pin_sources={"tp-old": (source,), "tp-current": (source,), "tp-nothing": (source,)})
+    renames = {"tp-old": "tp-new"}
+    keyed = pin_sources_by_id(declarations, lambda name: renames.get(name, name))
+    assert set(keyed) == {"tp-new", "tp-current", "tp-nothing"}

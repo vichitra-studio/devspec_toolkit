@@ -22,20 +22,20 @@ from specdev_tools.core.errors import FindingError, SpecError, make_error, refus
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.graph.names import (
+    API_ERROR, DERIVES_FROM, FIXTURE, FR, JOB, MANUAL_MODE, MITIGATED_BY, OBLIGATION_ROLES, REALISES, REFINES, REVIEW_ENFORCER, RULE, TASK_CRITERION,
+    VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets,
+)
 from specdev_tools.graph.ownership import OwnerContext, load_owner_context, owner_for
 from specdev_tools.graph.stages import (
     CI_STAGE, DEFAULT_STAGE, STAGES, UnknownStageForEnvironment, bindings_of, is_retired_binding, is_retired_verifier, required_stage, stage_at_least, stage_rank,
 )
 from specdev_tools.proof.validity import (
     GUARD_NOT_MATCHED, NO_EVIDENCE, NONZERO_EXIT, STAGE_TOO_LOW, STALE_HASH, STALE_TP_VERSION, STALE_TREE, ProofContext, Validity,
-    attestation_valid, effective_stage, evidence_for, evidence_valid, same_run,
+    attestation_valid, covers, effective_stage, evidence_for, evidence_valid, same_run,
 )
 from specdev_tools.trace.coverage import exemption
 from specdev_tools.trace.history import contained, containers_of
-from specdev_tools.graph.names import (
-    API_ERROR, DERIVES_FROM, FIXTURE, FR, JOB, MANUAL_MODE, MITIGATED_BY, OBLIGATION_ROLES, REALISES, REFINES, REVIEW_ENFORCER, RULE, TASK_CRITERION,
-    VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets,
-)
 from specdev_tools.verify.bind import proved_ids
 from specdev_tools.verify.records import Binding, Evidence, attestations_about, binding_of
 
@@ -148,7 +148,7 @@ class _Prover:
         """Whether a run of *binding*, or of another binding of the same verifier with the same commands and guard, proves it now."""
         verifier = self.graph.by_id[binding.verifier]
         siblings = [binding_of(node, self.graph) for node in bindings_of(verifier, self.graph)]
-        candidates = [evidence for sibling in siblings if same_run(binding, sibling) for evidence in self._evidence(sibling)]
+        candidates = [evidence for sibling in siblings if same_run(binding, sibling) for evidence in self._evidence(sibling) if covers(evidence, binding, self.graph)]
         verdicts = [(evidence, evidence_valid(evidence, binding, self.graph, self.ctx, treat_ci_as_dev=self.treat_ci_as_dev)) for evidence in candidates]
         for _evidence, verdict in verdicts:
             if verdict.valid:
