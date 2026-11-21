@@ -754,5 +754,14 @@ def test_parse_path_flag_before_and_after_subcommand():
     assert _parse("release", "check", "--stage", "prod", "--tag", "t").spec_root == "./spec", "the defaults are the release parser's"
 
 
+def test_parse_release_prep():
+    args = _parse("release", "prep")
+    assert (args.cmd, args.release_cmd, args.cut_tag) == ("release", "prep", None)
+    after = _parse("release", "prep", "--git-root", "X", "--json")
+    before = _parse("release", "--git-root", "X", "prep")
+    assert (after.git_root, after.json_output, before.git_root) == ("X", True, "X")
+    assert _parse("release", "prep").spec_root == "./spec", "the defaults are the release parser's"
+
+
 if __name__ == "__main__":
     unittest.main()

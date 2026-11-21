@@ -1,7 +1,7 @@
-"""``specdev release``: the release cut, ``release check --stage prod`` and ``release rollback``.
+"""``specdev release``: the release cut, ``release check --stage prod``, ``release rollback`` and ``release prep``.
 
-``add_release_parsers`` registers one ``release`` parser.  ``release --tag <name>`` (no subcommand) cuts the release; ``release check``
-and ``release rollback`` are its subcommands.  The three path flags and ``--json`` are on the ``release`` parser with their real
+``add_release_parsers`` registers one ``release`` parser.  ``release --tag <name>`` (no subcommand) cuts the release; ``release check``,
+``release rollback`` and ``release prep`` are its subcommands.  The three path flags and ``--json`` are on the ``release`` parser with their real
 defaults and again on each subcommand through one parent parser whose defaults are ``argparse.SUPPRESS``, so a value given before the
 subcommand survives and a value given after it wins.  The cut flags have their own destinations (``cut_tag``, ``cut_message``; ``release check``
 uses ``check_tag``), so a subparser's default can never overwrite a parent's value.
@@ -20,6 +20,7 @@ from specdev_tools.core.errors import SpecError
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.graph.commands import add_root_flags, resolve_git_root, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
+from specdev_tools.release.prep import run_release_prep
 from specdev_tools.release.prod_gate import ProdGateResult, run_prod_gate
 from specdev_tools.release.records import write_rollback
 from specdev_tools.release.status_sections import CanonDirOf
@@ -54,6 +55,13 @@ ROLLBACK_DESCRIPTION = (
     "(E927). The file is written, not committed: commit it through the normal branch. Exit 0 written, 1 refused."
 )
 
+PREP_DESCRIPTION = (
+    "Prepare a release on a branch: `specdev release prep` runs every dev- and CI-stage binding whose evidence is missing, failed or stale "
+    "for the code tree checked out (at stage ci, through `verify run`), writes the evidence under spec/extras/verification/, and then lists "
+    "what the release gate still finds. A binding with valid evidence for this code tree is not run again: a second run on the same tree "
+    "runs nothing. It commits, pushes and tags nothing. Exit 0 when no binding failed, 1 when one failed or a run was refused."
+)
+
 
 def _path_flags_parent() -> argparse.ArgumentParser:
     """The flags of ``add_root_flags`` again, for a subcommand: a flag that is not given leaves the value of the ``release`` parser alone."""
@@ -84,6 +92,8 @@ def add_release_parsers(sub: Any, canon_dir_of: CanonDirOf) -> None:
     rollback.add_argument("tag", metavar="TAG", help="The release tag the record is about")
     rollback.add_argument("--reason", required=True, metavar="TEXT", help="Why the release is not verified in production")
     rollback.set_defaults(handler=run_release_rollback)
+    prep = release_sub.add_parser("prep", parents=[parent], help="Run the unproven dev and CI bindings and list what the release gate still finds", description=PREP_DESCRIPTION)
+    prep.set_defaults(handler=lambda args: run_release_prep(args, canon_dir_of))
 
 
 def _roots(args: argparse.Namespace) -> tuple[str, str, str]:

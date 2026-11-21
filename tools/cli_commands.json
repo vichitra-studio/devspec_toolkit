@@ -208,6 +208,9 @@
       "path": "release check"
     },
     {
+      "path": "release prep"
+    },
+    {
       "path": "release rollback"
     },
     {

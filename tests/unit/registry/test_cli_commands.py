@@ -47,7 +47,7 @@ def test_counts_match_the_parsers():
     assert len([p for p in paths if p.startswith("plan ")]) == 1
     assert len([p for p in paths if p.startswith("review ")]) == 1
     assert len([p for p in paths if p.startswith("milestone ")]) == 4
-    assert len([p for p in paths if p.startswith("release ")]) == 2
+    assert len([p for p in paths if p.startswith("release ")]) == 3
     assert paths == sorted(paths)
 
 
