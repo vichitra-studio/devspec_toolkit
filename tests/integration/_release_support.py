@@ -17,9 +17,10 @@ from unit.graph._synth import ROOT, git
 from unit.lifecycle._record_support import action, closed_row
 from unit.lifecycle._support import PLAN
 from specdev_tools.verify.records import records_folder, write_binding
-from unit.proof._support import GUARD, PASSING, binding_item, run
-from unit.release._support import release_host, stamp
-from unit.verify._support import commit_all, edit_doc, write
+from unit.proof._closed import accept, criterion
+from unit.proof._support import GUARD, NFR, PASSING, add_fixture, binding_item, run
+from unit.release._support import LATENCY_BINDING, LATENCY_FIXTURE, PATTERN, release_host, stamp
+from unit.verify._support import commit_all, edit_doc, write, write_json
 
 THREAT = "threat-reset-token-replay"
 FIXTURE = "fix-password-reset-expired-token"
@@ -82,3 +83,35 @@ def snapshot(host: Path) -> dict[str, object]:
     """Everything a refused command must leave as it was: every file outside ``.git`` (bytes), every ref, HEAD."""
     files = {str(path.relative_to(host)): path.read_bytes() for path in sorted(host.rglob("*")) if path.is_file() and ".git" not in path.relative_to(host).parts}
     return {"files": files, "refs": git(host, "for-each-ref"), "head": git(host, "rev-parse", "HEAD")}
+
+
+LOCKED_PIN = ("tp-argon2", "0.41.1")
+DECLARED_PIN_SOURCES = {"tp-argon2": [{"type": "json-pointer", "file": "package-lock.json", "pointer": "/packages/node_modules~1argon2/version"}]}
+
+
+def flow_host(tmp_path: Path, name: str = "host") -> Path:
+    """The host the end-to-end flow of a release is carried through (``test_m9_release_flow.py``, ``test_deploy_snippet_flow.py``); committed, no evidence yet.
+
+    A release-ready example (``release_host``) in which the latency NFR stays in scope and waits for staging proof (``LATENCY_BINDING`` verifies it at
+    ``staging``: at the release gate it is relieved, at the production gate it needs staging evidence), the one binding of the example gives a command
+    that passes at ``dev`` (what ``release prep`` runs), the pin of ``tp-argon2`` is declared against a ``package-lock.json`` (what the deploy preamble
+    checks), and the closed milestone has an at-deploy action for ``staging`` and ``prod`` (what the deploy jobs record); stamped 1.2.0.
+    """
+    host = release_host(tmp_path, NFR, name=name)
+    path = host / "spec" / "extras" / "verification" / f"{BINDING}.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["records"][0].update(commands=[PASSING], output_guard=GUARD)
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    add_fixture(host, fixture_id=LATENCY_FIXTURE, verifies=[NFR])
+    accept(host, LATENCY_FIXTURE)
+    edit_doc(host, "14_roadmap.json", lambda document: document["milestones"][0]["tasks"][0]["acceptance_criteria"].append(criterion("tc-latency-check", refines=[NFR])))
+    accept(host, "tc-latency-check")
+    write_binding(records_folder(str(host / "spec")), str(ROOT), binding_item(LATENCY_BINDING, verifier=LATENCY_FIXTURE, proves=(NFR,), stage="staging"))
+    write_json(host / "spec" / "common" / "host_declarations.json", {"$schema": "vc:host-declarations", "release_tag_pattern": PATTERN, "pin_sources": DECLARED_PIN_SOURCES})
+    write_json(host / "package-lock.json", {"packages": {"node_modules/argon2": {"version": LOCKED_PIN[1]}}})
+    write(host / "src" / "hello.txt", "hello\n")
+    edit_doc(host, PLAN, lambda document: document["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"].append(action(DEPLOY_ACTION, at_deploy=["staging", "prod"])))
+    closed_row(host)
+    stamp(host, "1.2.0")
+    commit_all(host, "the host of the release flow")
+    return host
