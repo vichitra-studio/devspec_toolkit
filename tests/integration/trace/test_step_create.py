@@ -31,12 +31,14 @@ PLAN_ITEM_ENTRY = ("PWRESET_CONFIRM_EXPIRED_01", "realises", "tc-confirm-expired
 class Host:
     """A temporary host holding the worked example up to a step; the files from that step on wait in ``drafts``."""
 
-    def __init__(self, root: Path, first_missing: str) -> None:
+    def __init__(self, root: Path, first_missing: str | None) -> None:
         self.root = root
         self.spec = root / "spec"
         self.drafts = root.parent / "drafts"
         self.drafts.mkdir()
         shutil.copytree(EXAMPLE_HOST, root)
+        if first_missing is None:
+            return
         steps = list(STEP_FILES)
         for step in steps[steps.index(first_missing):]:
             shutil.move(self.spec / STEP_FILES[step], self.drafts / STEP_FILES[step])
@@ -46,6 +48,12 @@ class Host:
 
     def flags(self) -> list[str]:
         return ["--repo-root", str(ROOT), "--spec-root", str(self.spec), "--git-root", str(self.root)]
+
+    def create_step_16(self, step: str, *args: str, batch: str | None = None, draft: Path, code: int = 0) -> str:
+        """``step create <step> [<batch>] --from <draft>`` with *args* and the root flags; the exit code must be *code*."""
+        status, out = run_cli("step", "create", step, *([batch] if batch else []), "--from", str(draft), *args, *self.flags())
+        assert status == code, out
+        return out
 
     def draft(self, step: str) -> Path:
         return self.drafts / STEP_FILES[step]
@@ -184,13 +192,6 @@ def test_step_create_of_section12_steps_in_order_reproduces_lock_example(tmp_pat
         assert json.loads((host.spec / name).read_text(encoding="utf-8")) == json.loads((EXAMPLE_HOST / "spec" / name).read_text(encoding="utf-8")), step
 
 
-def test_step_create_refuses_step_16_as_a_step_with_no_file_it_writes(host: Host) -> None:
-    document = host.create_json("16", draft=host.draft(FR_STEP), code=1)
-    (error,) = document["errors"]
-    assert error["code"] == "E767" and "step 16 has no spec file that step create writes" in error["message"] and "creates steps 00, 01" in error["message"]
-    assert not (host.spec / STEP_FILES[FR_STEP]).exists()
-
-
 @pytest.mark.parametrize("step", ["13a", "99"])
 def test_step_create_refuses_the_retired_step_13a_as_unknown(host: Host, step: str) -> None:
     status, out = run_cli("step", "create", step, "--from", str(host.draft(FR_STEP)), *host.flags())
@@ -220,3 +221,104 @@ def test_step_create_refuses_a_draft_of_another_step(host: Host) -> None:
 def test_step_create_needs_from(host: Host) -> None:
     status, out = run_cli("step", "create", FR_STEP, *host.flags())
     assert status == 2 and "--from" in out
+
+
+# --- step 16: the anchor file and the plan files (ruling L1) -------------------------------------------------------------
+ANCHOR_FILE = "16_impl_context.json"
+EXAMPLE_PLAN = "impl_context/ms_account_recovery_plan.json"
+NEW_ITEM = "PWRESET_CONFIRM_REUSED_01"
+NEW_ITEM_ENTRY = (NEW_ITEM, "realises", "tc-confirm-reused-token")
+
+
+@pytest.fixture
+def full(tmp_path: Path) -> Host:
+    """The worked example whole; the anchor file and the plan of the example are copied into ``drafts``."""
+    host = Host(tmp_path / "host", None)
+    shutil.copy(host.spec / ANCHOR_FILE, host.drafts / ANCHOR_FILE)
+    shutil.copy(host.spec / EXAMPLE_PLAN, host.drafts / "plan.json")
+    return host
+
+
+def _second_plan_draft(host: Host) -> Path:
+    """A plan draft for the milestone of the example: one item that realises the second task criterion, with its action numbered."""
+    document = json.loads((host.drafts / "plan.json").read_text(encoding="utf-8"))
+    document["id"] = "plan-ms-account-recovery-b"
+    (item,) = document["plan"]["spec_alignment"]["checklist"]
+    item.update(id=NEW_ITEM, realises=["tc-confirm-reused-token"])
+    item["implementation"]["actions"][0]["id"] = "a01"
+    path = host.drafts / "second_plan.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def test_step_create_16a_writes_one_plan_file_and_its_lock_entries(full: Host) -> None:
+    draft = _second_plan_draft(full)
+    document = json.loads(full.create_step_16("16a", "--json", batch="second", draft=draft))
+    assert document["written"] is True and document["action"] == "create" and document["file"] == "impl_context/ms_second_plan.json"
+    assert (full.spec / "impl_context" / "ms_second_plan.json").is_file()
+    assert [(item["holder"], item["field"], item["target"]) for item in document["targets"]] == [NEW_ITEM_ENTRY]
+    assert NEW_ITEM_ENTRY in full.lock_keys()
+    status, out = run_cli("spec-check", str(full.spec), *full.flags())
+    assert "E761" not in out and "E704" not in out
+
+
+def test_step_create_16a_refuses_an_existing_plan_file(full: Host) -> None:
+    draft = _second_plan_draft(full)
+    full.create_step_16("16a", batch="second", draft=draft)
+    before = full.snapshot()
+    document = json.loads(full.create_step_16("16a", "--json", batch="second", draft=draft, code=1))
+    (error,) = document["errors"]
+    assert error["code"] == "E767" and "impl_context/ms_second_plan.json already exists" in error["message"]
+    assert full.snapshot() == before
+
+
+def test_step_create_16a_needs_a_batch_and_other_steps_refuse_one(full: Host) -> None:
+    draft = _second_plan_draft(full)
+    before = full.snapshot()
+    missing = json.loads(full.create_step_16("16a", "--json", draft=draft, code=1))["errors"][0]
+    assert missing["code"] == "E767" and "name the batch" in missing["message"]
+    for batch in ("a/b", "x*y", ".."):
+        bad = json.loads(full.create_step_16("16a", "--json", batch=batch, draft=draft, code=1))["errors"][0]
+        assert bad["code"] == "E767" and f"'{batch}' is not a batch name" in bad["message"]
+    for step in ("04", "16"):
+        extra = json.loads(full.create_step_16(step, "--json", batch="second", draft=draft, code=1))["errors"][0]
+        assert extra["code"] == "E767" and "takes no batch" in extra["message"]
+    assert full.snapshot() == before
+
+
+def test_step_create_16_creates_a_missing_anchor_file(full: Host) -> None:
+    (full.spec / ANCHOR_FILE).unlink()
+    before = full.snapshot()
+    assert full.create_step_16("16", "--dry-run", draft=full.drafts / ANCHOR_FILE).startswith("[dry-run] would create ")
+    assert full.snapshot() == before
+    document = json.loads(full.create_step_16("16", "--json", draft=full.drafts / ANCHOR_FILE))
+    assert document["written"] is True and document["action"] == "create" and document["file"] == ANCHOR_FILE
+    assert (full.spec / ANCHOR_FILE).read_text(encoding="utf-8").startswith("{")
+    assert [item["holder"] for item in document["targets"]] == ["anchor-ms-account-recovery"]
+
+
+def test_step_create_16_refuses_when_the_anchor_file_exists(full: Host) -> None:
+    before = full.snapshot()
+    (error,) = json.loads(full.create_step_16("16", "--json", draft=full.drafts / ANCHOR_FILE, code=1))["errors"]
+    assert error["code"] == "E767" and "step 16 already has a spec file (16_impl_context.json)" in error["message"]
+    assert full.snapshot() == before
+
+
+def test_step_create_16b_and_16c_stay_refused(full: Host) -> None:
+    before = full.snapshot()
+    for step in ("16b", "16c"):
+        (error,) = json.loads(full.create_step_16(step, "--json", draft=_second_plan_draft(full), code=1))["errors"]
+        assert error["code"] == "E767" and f"step {step} has no spec file of its own" in error["message"] and "plan file of step 16a" in error["message"]
+        assert "creates steps 00, 01" in error["message"] and error["message"].endswith("15, 16, 16a")
+    assert full.snapshot() == before
+
+
+def test_step_create_16a_dry_run_writes_nothing(full: Host) -> None:
+    draft = _second_plan_draft(full)
+    before = full.snapshot()
+    text = full.create_step_16("16a", "--dry-run", batch="second", draft=draft)
+    assert text.splitlines()[0] == "[dry-run] would create plan-ms-account-recovery-b (impl_context/ms_second_plan.json .)"
+    assert "lock entry to write: " in text and "lock entry written" not in text
+    document = json.loads(full.create_step_16("16a", "--dry-run", "--json", batch="second", draft=draft))
+    assert document["written"] is False
+    assert full.snapshot() == before and not (full.spec / "impl_context" / "ms_second_plan.json").exists()

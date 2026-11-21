@@ -147,8 +147,13 @@ def add_trace_parsers(sub: Any) -> None:
 
     step = sub.add_parser("step", help="Create the artifact of a step; check that a step may start", description=STEP_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     step_sub = step.add_subparsers(dest="step_cmd", required=True)
-    create = step_sub.add_parser("create", help="Write the artifact of a step from a draft", description="Write the artifact of step NN from the draft file given with --from.")
-    create.add_argument("step", metavar="NN", help="The step to create, for example 04 or 02a")
+    create = step_sub.add_parser(
+        "create", help="Write the artifact of a step from a draft",
+        description="Write the artifact of step NN from the draft file given with --from. Step 16 creates the anchor file when it is missing; "
+        "step 16a creates the plan file of one batch (give the batch: step create 16a <batch>); a batch is given for no other step.",
+    )
+    create.add_argument("step", metavar="NN", help="The step to create, for example 04, 02a, 16 or 16a")
+    create.add_argument("batch", nargs="?", metavar="BATCH", help="Step 16a only: the batch name of the plan file, impl_context/ms_<BATCH>_plan.json")
     create.add_argument("--from", required=True, dest="draft", metavar="DRAFT", help="JSON file holding the whole artifact; ids of sub-items may be left out")
     create.add_argument("--dry-run", action="store_true", dest="dry_run", help="Print the same report and write nothing")
     add_root_flags(create)
@@ -296,7 +301,7 @@ def _step_create(args: argparse.Namespace, graph: Graph) -> int:
         os.path.abspath(args.spec_root),
         os.path.abspath(args.repo_root),
         resolve_git_root(args),
-        StepCreateRequest(args.step, args.draft),
+        StepCreateRequest(args.step, args.draft, args.batch),
         dry_run=args.dry_run,
     )
     if args.json_output:

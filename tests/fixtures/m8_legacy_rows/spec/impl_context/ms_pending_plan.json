@@ -1,0 +1,6 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "plan-ms-pending",
+  "milestone": "ms-pending",
+  "plan": { "spec_alignment": { "checklist": [] } }
+}

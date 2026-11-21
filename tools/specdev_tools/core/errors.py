@@ -284,6 +284,29 @@ ERROR_CODES = {
     "E752": "NODE_ID_IN_PROSE",
     "E882": "MIGRATION_BASELINE_NOT_REATTESTED",
     "W720": "LINK_TO_DEPRECATED_NODE",
+    # Milestone lifecycle (8xx). E800 to E803, E820 to E824 are command refusals (no owner, no node; E820 is raised by the
+    # plan and review writers, not by a validator).  E810 to E814 are the close gate's (owner close-gate) and E830 the
+    # release gate's.  E827 is a finding of the ``frozen-plans`` check (owner step 16); W825 and W826 are findings of the
+    # ``plan-records`` check (owner step 16) and W837 of the step-16 validator.
+    "E800": "MILESTONE_NOT_STARTABLE",
+    "E801": "MILESTONE_TRANSITION_INVALID",
+    "E802": "DEFER_REASON_MISSING",
+    "E803": "PLAN_MILESTONE_UNKNOWN",
+    "E810": "CLOSE_CRITERION_UNREALISED",
+    "E811": "CLOSE_CRITERION_UNPROVEN",
+    "E812": "CLOSE_ITEM_NOT_EXECUTED",
+    "E813": "CLOSE_REVIEW_NOT_VERIFIED",
+    "E814": "CLOSE_NO_SIGNOFF",
+    "E820": "PLAN_FROZEN",
+    "E821": "RECORD_TARGET_UNKNOWN",
+    "E822": "RECORD_ACTION_NAMES_VERIFIER",
+    "E823": "REVIEW_RECORD_INVALID",
+    "E824": "ATTEST_TARGET_NOT_ATTESTABLE",
+    "E827": "PLAN_CHANGED_AFTER_CLOSE",
+    "E830": "REVIEW_RULE_UNATTESTED",
+    "W825": "EXECUTION_STALE",
+    "W826": "PLAN_ITEM_REALISES_EXCLUDED_TASK",
+    "W837": "PLAN_FILE_LARGE",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

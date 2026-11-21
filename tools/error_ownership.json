@@ -114,7 +114,13 @@
     {
       "class": "close-gate-failure",
       "owner": "close-gate",
-      "codes": [],
+      "codes": [
+        "E810",
+        "E811",
+        "E812",
+        "E813",
+        "E814"
+      ],
       "authority": "DOC L824-840 row 14; DS L420"
     },
     {
@@ -122,7 +128,8 @@
       "owner": "release-gate",
       "codes": [
         "E343",
-        "E344"
+        "E344",
+        "E830"
       ],
       "authority": "DOC L824-840 row 15; DS L402; DS L420"
     },
@@ -210,6 +217,17 @@
         "E342"
       ],
       "authority": "M7 WI-09"
+    },
+    {
+      "class": "plan-lifecycle",
+      "owner": "fixed_step:16",
+      "codes": [
+        "E820",
+        "E827",
+        "W825",
+        "W826"
+      ],
+      "authority": "M8 WI-01"
     }
   ]
 }

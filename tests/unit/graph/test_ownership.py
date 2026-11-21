@@ -160,7 +160,7 @@ def test_a_missing_or_unreadable_ownership_table_is_an_error(tmp_path):
 
 
 def test_ownership_table_codes_exist(table):
-    assert len(table) == 25
+    assert len(table) == 26
     for row in table:
         for code in row.codes:
             assert code in ERROR_CODES, f"{row.class_name}: {code}"

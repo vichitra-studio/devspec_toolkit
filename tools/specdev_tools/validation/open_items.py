@@ -54,7 +54,7 @@ _ANSWER_NEEDED = "needed from the operator"
 def default_frozen(plan_path: Path) -> bool:
     """The frozen-plan provider until a close record exists (M8): no plan is frozen.
 
-    M8 passes ``functools.partial(plans.is_frozen_path, spec_root)`` instead; merge and release gates pass that
+    M8 passes ``functools.partial(frozen.is_frozen_path, spec_root)`` instead; merge and release gates pass that
     provider, never this one.
     """
     return False

@@ -1,8 +1,9 @@
 """``specdev step create NN --from <draft>``: write the artifact of a step from a draft, with its lock entries.
 
 The draft is the whole artifact as JSON; ids of sub-items may be left out and are minted.  The file name is the step's
-key in ``tools/entry_key_registry.json`` (``04_fr_list.json``); step 16 (the anchor and the plans of the trinity)
-cannot be created this way.  The draft is checked against the schema of the step, the candidate
+key in ``tools/entry_key_registry.json`` (``04_fr_list.json``).  Step 16 is the anchor file, created when missing;
+step 16a is one plan file per batch (``16a <batch>``: the registry's glob with the batch in place of ``*``); steps 16b
+and 16c have no file of their own.  The draft is checked against the schema of the step, the candidate
 graph (the spec with the draft in it) must resolve every link, and the file and the lock entries of all its links are
 written under the write lock of the spec folder by ``id_writes.write_new_file``, the writer the id-keyed writes use.
 Edits to an artifact that exists go through ``specdev json patch|insert|delete --id``.
@@ -10,29 +11,37 @@ Edits to an artifact that exists go through ``specdev json patch|insert|delete -
 from __future__ import annotations
 
 import json
+import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
+from specdev_tools.core.entry_key_registry import match_glob_key
 from specdev_tools.core.errors import make_error
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.registry import get_shared_registry
 from specdev_tools.core.schema_validate import SchemaValidationError, jq_path_of, schema_violations, violation_text
-from specdev_tools.graph.kinds import FileDecl, load_kind_registry
+from specdev_tools.graph.kinds import EXTRAS_STEP, FileDecl, load_kind_registry
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import WriteRefusedError, WriteResult, with_ids, write_new_file
 from specdev_tools.trace.writing import writing_graph
 from specdev_tools.validation.linter_utils import graph_known_ids
 
-ANCHOR_STEP = "16"
+#: The schema of the files whose name is not the stem of their schema: the anchor file has its own schema (``16_anchor``) and
+#: the schema named ``16_impl_context`` is the one of the plan files (the same split as ``PLAN_FILE_HOSTS`` and
+#: ``STEP_EXTRA_HOSTS`` in ``registry/generate.py``).
+SCHEMA_OF_FILE = {"16_impl_context.json": "schema/16_anchor.schema.json", "impl_context/ms_*_plan.json": "schema/16_impl_context.schema.json"}
+BATCH_NAME = re.compile(r"[A-Za-z0-9_-]+")
 MAX_SHOWN_VIOLATIONS = 10
 
 
 @dataclass(frozen=True)
 class StepCreateRequest:
-    """One ``step create``: the step *step* (``"04"``) from the draft file at *draft*."""
+    """One ``step create``: the step *step* (``"04"``) from the draft file at *draft*; *batch* names the plan of ``16a``."""
 
     step: str
     draft: str
+    batch: str | None = None
 
 
 def _refuse(message: str) -> WriteRefusedError:
@@ -40,8 +49,12 @@ def _refuse(message: str) -> WriteRefusedError:
 
 
 def creatable_files(graph: Graph, repo_root: str) -> dict[str, FileDecl]:
-    """The registry file of every step ``step create`` writes, by step, in waterfall order (not step 16 or its plans)."""
-    declared = {file.step: file for file in load_kind_registry(repo_root).files if not file.is_glob and file.step != ANCHOR_STEP}
+    """The registry file of every step ``step create`` writes, by step, in waterfall order.
+
+    That is every named file (the anchor of step 16 included) and the plan glob (one file per batch); the glob files
+    that hold records (step ``extras``) are written by their own commands.
+    """
+    declared = {file.step: file for file in load_kind_registry(repo_root).files if not file.is_glob or file.step != EXTRAS_STEP}
     return {step: declared[step] for step in sorted(declared, key=graph.shape.step_key)}
 
 
@@ -49,8 +62,27 @@ def step_file(graph: Graph, repo_root: str, step: str) -> FileDecl:
     """The registry file of *step*; E767 naming the steps that can be created when *step* has no file ``step create`` writes."""
     files = creatable_files(graph, repo_root)
     if step not in files:
-        raise _refuse(f"step {step} has no spec file that step create writes; it creates steps {', '.join(files)}")
+        reason = (
+            f"step {step} has no spec file of its own: it is a part of the plan file of step 16a"
+            if step in ("16b", "16c")
+            else f"step {step} has no spec file that step create writes"
+        )
+        raise _refuse(f"{reason}; it creates steps {', '.join(files)}")
     return files[step]
+
+
+def target_file(decl: FileDecl, request: StepCreateRequest) -> str:
+    """The path of the file to create, relative to the spec folder: the registry key, with the batch in a glob's place; E767 for a wrong batch."""
+    if not decl.is_glob:
+        if request.batch is not None:
+            raise _refuse(f"step {request.step} is one file ({decl.pattern}) and takes no batch; leave '{request.batch}' out")
+        return decl.pattern
+    if request.batch is None:
+        raise _refuse(f"step {request.step} is one plan file per batch; name the batch: step create {request.step} <batch> --from <draft>")
+    rel = decl.pattern.replace("*", request.batch)
+    if not BATCH_NAME.fullmatch(request.batch) or not match_glob_key(rel, decl.pattern):
+        raise _refuse(f"'{request.batch}' is not a batch name the file pattern {decl.pattern} matches; use letters, digits, '_' and '-'")
+    return rel
 
 
 def read_draft(path: str) -> dict[str, Any]:
@@ -80,7 +112,7 @@ def mint_ids(graph: Graph, decl: FileDecl, draft: dict[str, Any]) -> tuple[dict[
 
 def _step_schema_uri(repo_root: str, decl: FileDecl) -> str | None:
     """The ``$schema`` URI whose schema file is ``schema/<stem of the step's file>.schema.json``, or ``None``."""
-    wanted = f"schema/{decl.pattern.removesuffix('.json')}.schema.json"
+    wanted = SCHEMA_OF_FILE.get(decl.pattern, f"schema/{decl.pattern.removesuffix('.json')}.schema.json")
     registry = get_shared_registry(resolve_effective_toolkit_root(repo_root))
     return next((uri for uri, path in registry.map.items() if path == wanted), None)
 
@@ -104,12 +136,16 @@ def check_draft(repo_root: str, decl: FileDecl, document: dict[str, Any]) -> Non
 
 def _create_on(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: StepCreateRequest, *, write: bool) -> WriteResult:
     decl = step_file(graph, repo_root, request.step)
-    if graph.shape.files_by_step.get(request.step):
+    rel = target_file(decl, request)
+    if decl.is_glob:
+        if os.path.exists(os.path.join(spec_root, rel)):
+            raise _refuse(f"the plan file {rel} already exists; edit it with `specdev json patch|insert|delete --id`, or name another batch")
+    elif graph.shape.files_by_step.get(request.step):
         raise _refuse(f"step {request.step} already has a spec file ({', '.join(graph.shape.files_by_step[request.step])}); edit it with `specdev json patch|insert|delete --id`")
     document, minted = mint_ids(graph, decl, read_draft(request.draft))
     check_draft(repo_root, decl, document)
-    node_id = str(document.get("id") or decl.pattern.removesuffix(".json"))
-    return write_new_file(graph, spec_root, repo_root, git_root, decl.pattern, document, node_id, minted, write=write)
+    node_id = str(document.get("id") or rel.removesuffix(".json"))
+    return write_new_file(graph, spec_root, repo_root, git_root, rel, document, node_id, minted, write=write)
 
 
 def create_step(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: StepCreateRequest, *, dry_run: bool = False) -> WriteResult:
