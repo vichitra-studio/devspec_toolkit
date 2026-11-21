@@ -23,7 +23,7 @@ from ..core.plan_files import find_plan, milestone_key, plan_files
 from ..core.step_paths import PLAN_DIR_NAME, PLAN_FILE_GLOB
 from ..trace.hashing import HASH_PREFIX
 
-_NO_KEY = "run `specdev align` (the plan has no `milestone` key)"
+_NO_KEY = "add it with `specdev json patch <plan file> '.milestone' '\"<milestone-id>\"'` (the plan has no `milestone` key)"
 
 
 def require_plan(spec_root: str | Path, milestone_id: str) -> Path:

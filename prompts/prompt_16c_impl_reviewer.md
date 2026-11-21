@@ -5,19 +5,19 @@
 Run `specdev prompt-context 16c` to see downstream consumers.
 
 ## Purpose
-Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes. Its output is a **verdict**, recorded with `specdev review record`.
+Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes. Its output is a **verdict**, recorded with `specdev review record` (section 1 says who runs it).
 
 # Role
 You are a senior technical reviewer. Your job is to **Audit** the implementation of a milestone by comparing the plan and its execution records in `spec/impl_context/{milestone_snake}_plan.json` against the actual code.
 
 **Your spec source is the 16c pack.** Render it first: `specdev trace --recipe 16c <milestone-id>` (the roadmap milestone the plan is for; the anchor row's `about` names it). It holds the criteria, plan items, obligations, APIs, constraints, threats, delivery nodes and verifiers of the milestone. Read spec content with `specdev json read` or `specdev node show <id>`, not with the Read tool.
 
-You do not edit code, specs or the plan. You write a findings file (section 1) and record the verdict with `specdev review record`. The status of a milestone is never written by this step: the anchor row changes only through the milestone commands (`specdev milestone start|defer|sign-off|close`). Signing off or deferring a milestone is a person's decision taken after your verdict, and `specdev milestone close` runs only after a sign-off: show `specdev status --milestone <milestone-id>` first, and never answer an ask prompt yourself.
+You do not edit code, specs or the plan. You write a findings file (section 1); the verdict is recorded from it with `specdev review record`. The status of a milestone is never written by this step: the anchor row changes only through the milestone commands (`specdev milestone start|defer|sign-off|close`). Signing off or deferring a milestone is a person's decision taken after your verdict, and `specdev milestone close` runs only after a sign-off: show `specdev status --milestone <milestone-id>` first, and never answer an ask prompt yourself.
 
 # Task
 - **Input context:** `spec/impl_context/{milestone_snake}_plan.json` (Plan + execution records), plus the actual codebase.
 - **Objective:** Verify correctness. If bugs exist, name each one as a finding with a fix.
-- **Output:** the `review` block of the plan, written by `specdev review record` from your findings file and your verdict.
+- **Output:** the `review` block of the plan, written by `specdev review record` from the findings file and the verdict.
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
 
 Before you record `verified`, check that every task criterion of the milestone is realised by a plan item (`specdev trace --recipe 16c` lists them) and that no item is left unexecuted. A milestone with unrealised or unproven criteria MUST NOT be `verified`.
@@ -25,7 +25,7 @@ Before you record `verified`, check that every task criterion of the milestone i
 # Field Definitions & Rules (MANDATORY)
 
 ## 1. The findings file and `specdev review record`
-The reviewer agent writes its findings as a file under `.specdev/findings/` (`findings_<scope>_<round>_r<reviewer_id>.json`); the skill copies the milestone-wide one to `findings_<batch>_review_<round>.json`, the name `specdev milestone-state` reads; in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`):
+The reviewer agent writes its findings as a file under `.specdev/findings/` (`findings_<scope>_<round>_r<reviewer_id>.json`); the skill copies the milestone-wide one to `findings_<batch>_review_<round>.json`, the name `specdev milestone-state` reads; in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`). Who runs `specdev review record`: under `/specdev-trinity` the skill records the review from the converged findings file and the reviewer agent writes findings only; a person running 16c by hand, without the skill, runs `specdev review record` themselves:
 
 ```json
 {
@@ -53,7 +53,7 @@ The reviewer agent writes its findings as a file under `.specdev/findings/` (`fi
 *   A finding with `"status": "verified"` is fixed and confirmed and is left out of the review. A finding's `message` is at most 600 characters; the review holds at most 50 open findings.
 *   A blocking or major finding (and any finding with a `suggested_fix`) gets a `remediation_task` made from its `suggested_fix` (else its `message`) and the file part of its `location`.
 
-Then record the verdict:
+The verdict is recorded with:
 
 ```bash
 specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred \
@@ -190,7 +190,7 @@ Before recording, verify:
 3. **NEVER** skip a rating: `--ratings-json` takes all five
 
 # Output Rule
-1.  Record the verdict with `specdev review record` as in section 1. Never write the plan file by hand. In the Output Contract the output block is what the plan file holds after the command ran.
+1.  The verdict is recorded with `specdev review record` as in section 1 (by the skill under `/specdev-trinity`; by the person in a manual run). Never write the plan file by hand. In the Output Contract the output block is what the plan file holds after the command ran.
 2.  The plan must still validate against `schema/16_impl_context.schema.json`; `specdev spec-check` shows it.
 
 # Schema Reference

@@ -200,7 +200,7 @@ def test_the_skill_stops_on_a_plan_without_a_milestone_key() -> None:
     assert "read the `milestone` key ONCE" in text
     assert "`milestone_id` echoes the batch id and is not a milestone id" in text
     assert 'If `milestone` is `null`, the plan has no `milestone` key' in text
-    assert 'E803 no plan names milestone <ms-id>: run `specdev align` (the plan has no `milestone` key)' in text
+    assert 'E803 no plan names milestone <ms-id>: add it with `specdev json patch <plan file> \'.milestone\' \'"<milestone-id>"\'` (the plan has no `milestone` key)' in text
     assert "the migration which writes the key may not be in this toolkit version yet" in text
 
 
@@ -377,7 +377,7 @@ def test_the_milestone_id_is_read_from_milestone_state_and_a_batch_id_is_not_one
     code, out = run_on_example(host, "milestone-state", "--batch-id", BATCH)
     assert code == 0 and json.loads(out)["milestone"] is None, out
     code, out = run_on_example(host, "status", "--milestone", MILESTONE)
-    assert code == 1 and out.startswith("E803 ") and "run `specdev align`" in out, out
+    assert code == 1 and out.startswith("E803 ") and "add it with `specdev json patch <plan file>" in out, out
 
 
 def _write(host: Path, name: str, document: dict) -> Path:

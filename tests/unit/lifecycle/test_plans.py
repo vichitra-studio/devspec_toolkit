@@ -87,7 +87,7 @@ def test_require_plan_missing_key_message(tmp_path: Path) -> None:
     _write_plan(tmp_path, "ms_old_plan.json", {"plan": {}})
     error = _error_of(lambda: plans.require_plan(tmp_path, "ms-a"))
     assert (error.code, error.subcode) == ("E803", "MILESTONE_KEY_MISSING")
-    assert "run `specdev align` (the plan has no `milestone` key)" in error.message
+    assert "add it with `specdev json patch <plan file> '.milestone' '\"<milestone-id>\"'` (the plan has no `milestone` key)" in error.message
 
 
 def test_require_plan_names_the_milestone_no_plan_carries(tmp_path: Path) -> None:

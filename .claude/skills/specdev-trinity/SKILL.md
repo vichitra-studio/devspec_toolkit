@@ -50,9 +50,10 @@ plan file exists, dispatch `specdev-scope` with `{ "mode": "milestone_state", "b
 command is E803).
 
 If `milestone` is `null`, the plan has no `milestone` key (it was written before 1.2.0): stop. Tell
-the operator what the toolkit prints for it, "E803 no plan names milestone <ms-id>: run `specdev align`
-(the plan has no `milestone` key)", and that the migration which writes the key may not be in this
-toolkit version yet; do nothing else with that plan.
+the operator what the toolkit prints for it, "E803 no plan names milestone <ms-id>: add it with
+`specdev json patch <plan file> '.milestone' '"<milestone-id>"'` (the plan has no `milestone` key)", and that
+the migration which writes the key may not be in this toolkit version yet (`specdev align` does not write it);
+the operator runs that command or not; do nothing else with that plan.
 
 ## Who decides what
 

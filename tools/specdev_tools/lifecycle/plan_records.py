@@ -234,7 +234,7 @@ def record_at_deploy(spec_root: str, repo_root: str, git_root: str, address: Add
             raise refusal("E821", f"action {address.action} of {address.item} is {executed.at_deploy_state(target.action)}, not for {env}; an at-deploy record names a stage its action is marked for")
         if target.item.milestone is None:
             raise FindingError(make_error(
-                "E803", f"plan {target.item.file} has no `milestone` key: run `specdev align`", subcode="MILESTONE_KEY_MISSING", node_id=target.item.id,
+                "E803", f"plan {target.item.file} has no `milestone` key: add it with `specdev json patch <plan file> '.milestone' '\"<milestone-id>\"'`", subcode="MILESTONE_KEY_MISSING", node_id=target.item.id,
             ))
         record: dict[str, Any] = {
             "deploy_id": mint_id("dep", [node.id for node in graph.by_kind.get(AT_DEPLOY_RECORD, ())]),

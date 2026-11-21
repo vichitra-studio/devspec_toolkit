@@ -496,9 +496,9 @@ changes:
       tests/fixtures/spec_corpus still describe the 1.1.1 shape; host CI that
       calls specdev matrix or forward-replay-check fails with exit 2 after the
       toolkit is updated. A host whose plans have no milestone key gets E803,
-      which says to run specdev align; specdev align does not write that key in
-      this release, the migration of a later 1.2.0 work item does (until then
-      specdev json patch <plan> .milestone '"<milestone-id>"' writes it). Until a
+      which says to add the key with specdev json patch <plan file> '.milestone'
+      '"<milestone-id>"'; specdev align does not write that key in this release,
+      the migration of a later 1.2.0 work item does. Until a
       later 1.2.0 change installs the Claude Code ask rules in a host, specdev
       milestone sign-off, specdev milestone defer and specdev verify attest run
       without a prompt unless the host wrote its own rule, and release is not a
