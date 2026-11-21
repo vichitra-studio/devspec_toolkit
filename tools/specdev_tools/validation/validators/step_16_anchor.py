@@ -31,7 +31,7 @@ from ...graph.build import build_graph
 from ...graph.kinds import KindRegistryError
 from ...graph.queries import task_of
 from ...lifecycle.anchor_store import read_statuses
-from ...lifecycle.plans import MILESTONE_KEY, find_plan
+from ...core.plan_files import MILESTONE_KEY, find_plan
 from ...trace.history import DONE_STATUS
 from .step_16 import _is_anchor
 

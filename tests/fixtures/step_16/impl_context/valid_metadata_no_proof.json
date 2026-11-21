@@ -39,6 +39,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_create",
                 "target": "tsconfig.json",
                 "description": "Create TypeScript config"

@@ -1,7 +1,8 @@
 """Plan discovery and the freeze of a closed plan: which 16a plan file belongs to which milestone, and whether it changed.
 
-A plan names its milestone in one file-level key, ``milestone``. Discovery scans ``<spec_root>/impl_context/*.json``
-for that key. This is the place the 1.2.0 shape maps a milestone to its plan file; one reader still builds a plan path
+A plan names its milestone in one file-level key, ``milestone``. Discovery (``find_plan``, ``milestone_key``) is
+``core/plan_files.py``, shared with ``step create 16a``; the commands here build on it. This is the place the 1.2.0
+shape maps a milestone to its plan file; one reader still builds a plan path
 from 1.1.1 data (``cli.py`` ``milestone-state``, by name).
 
 These readers read the file-level key and the raw bytes only and never validate a plan against the plan schema, so a
@@ -19,26 +20,12 @@ import re
 from pathlib import Path
 
 from ..core.errors import FindingError, make_error, refusal
-from ..core.loaders import read_json_object
+from ..core.plan_files import find_plan, milestone_key, plan_files
 from ..core.step_paths import PLAN_DIR_NAME
 
-MILESTONE_KEY = "milestone"
 HASH_PREFIX = "sha256:"
 _BATCH_OF_FILE = re.compile(r"^ms_(.+)_plan\.json$")
 _NO_KEY = "run `specdev align` (the plan has no `milestone` key)"
-
-
-def find_plan(spec_root: str | Path, milestone_id: str) -> Path | None:
-    """Return the plan file whose file-level ``milestone`` key equals *milestone_id*, or ``None``.
-
-    Scans ``<spec_root>/impl_context/*.json`` in name order and returns the first match. A file that cannot be
-    read, is not a JSON object, has no ``milestone`` key or holds a non-string one is skipped (a plan written
-    before the key existed is such a file). Never raises: a missing directory gives ``None``.
-    """
-    for path in _plan_files(spec_root):
-        if milestone_key(path) == milestone_id:
-            return path
-    return None
 
 
 def require_plan(spec_root: str | Path, milestone_id: str) -> Path:
@@ -51,7 +38,7 @@ def require_plan(spec_root: str | Path, milestone_id: str) -> Path:
     found = find_plan(spec_root, milestone_id)
     if found is not None:
         return found
-    if not any(milestone_key(path) for path in _plan_files(spec_root)):
+    if not any(milestone_key(path) for path in plan_files(spec_root)):
         raise FindingError(make_error(
             "E803", f"no plan names milestone {milestone_id}: {_NO_KEY}", subcode="MILESTONE_KEY_MISSING", node_id=milestone_id
         ))
@@ -119,14 +106,4 @@ def stored_plan_hash(close: object) -> str | None:
     if isinstance(migrations, list) and migrations and isinstance(migrations[-1], dict):
         return migrations[-1].get("hash_after")
     value = close.get("plan_hash")
-    return value if isinstance(value, str) else None
-
-
-def _plan_files(spec_root: str | Path) -> list[Path]:
-    return sorted((Path(spec_root) / PLAN_DIR_NAME).glob("*.json"))
-
-
-def milestone_key(path: Path) -> str | None:
-    """The file-level ``milestone`` of the JSON file at *path*; ``None`` when absent, mistyped or unreadable."""
-    value = (read_json_object(path) or {}).get(MILESTONE_KEY)
     return value if isinstance(value, str) else None

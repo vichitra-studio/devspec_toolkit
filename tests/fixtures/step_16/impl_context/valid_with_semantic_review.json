@@ -39,6 +39,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_edit",
                 "target": "src/api/auth.py",
                 "description": "Add login route handler with JWT generation"
@@ -60,6 +61,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify JWT token structure in test output"
               }

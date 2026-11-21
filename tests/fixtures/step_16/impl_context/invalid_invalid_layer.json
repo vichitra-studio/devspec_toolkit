@@ -39,6 +39,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_create",
                 "target": "src/auth.py",
                 "description": "Create auth module"

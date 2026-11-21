@@ -59,7 +59,7 @@ from ..graph.names import PAUSED_DISPOSITIONS, REALISES, REFINES, VERIFIED_BY
 from ..graph.queries import task_of
 from ..graph.trace import TraceOptions, trace_node
 from ..lifecycle.anchor_store import read_row
-from ..lifecycle.plans import MILESTONE_KEY
+from ..core.plan_files import MILESTONE_KEY
 from ..trace.history import DONE_STATUS
 
 _CHAIN_VERBS = frozenset({REALISES, REFINES, VERIFIED_BY})

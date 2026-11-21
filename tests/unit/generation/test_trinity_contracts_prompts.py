@@ -83,8 +83,9 @@ def test_each_artifact_is_written_by_its_command() -> None:
     assert "specdev step create 16a <batch> --from" in _text("16a")
     assert "specdev plan record" in _text("16b") and "specdev verify run" in _text("16b")
     assert "specdev review record" in _text("16c")
-    for form in ("json patch <plan> '.execution' '{\"emergent_ambiguities\":[<item>]}'", "json insert <plan> '.execution.emergent_ambiguities' '<item>'"):
+    for form in ("json patch <plan> '.execution.emergent_ambiguities' '[<item>]'", "json insert <plan> '.execution.emergent_ambiguities' '<item>'"):
         assert form in _text("16b")
+    assert "json patch <plan> '.execution' " not in _text("16b")
 
 
 @pytest.mark.parametrize(("key", "role"), [("16a", "16a"), ("16b", "16b"), ("16c", "16c")])

@@ -186,6 +186,7 @@ class TestStep16(unittest.TestCase):
                     "implementation": {
                         "files_touched": ["src/routes/password-resets/confirm.ts"],
                         "actions": [{
+                            "id": "a01",
                             "type": "file_edit",
                             "target": "src/routes/password-resets/confirm.ts",
                             "description": "Reject expired tokens before the password update.",
@@ -214,6 +215,15 @@ class TestStep16(unittest.TestCase):
     def test_doc_plan_example_validates(self):
         errors = self._validate_plan_data(self._doc_plan_example())
         self.assertEqual(errors, [], f"The design's plan example must validate. Got: {errors}")
+
+    def test_action_without_an_id_fails_naming_id(self):
+        data = self._doc_plan_example()
+        del data["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"][0]["id"]
+        errors = self._validate_plan_data(data)
+        self.assertTrue(
+            any(e.code == "E520" and "actions/0: 'id' is a required property" in e.message for e in errors),
+            f"Expected a schema error naming the missing action id. Got: {errors}",
+        )
 
     def test_item_without_realises_fails(self):
         path = os.path.join(self.fixtures_dir, "invalid_missing_realises.json")
@@ -375,7 +385,7 @@ class TestStep16(unittest.TestCase):
             "description": f"Implement {item_id}",
             "type": "behavior",
             "layer": "api",
-            "implementation": {"actions": [{"type": "manual_verification", "description": f"Verify {item_id}"}]},
+            "implementation": {"actions": [{"id": "a01", "type": "manual_verification", "description": f"Verify {item_id}"}]},
         }
 
     def test_valid_with_emergent_ambiguities(self):
@@ -853,7 +863,7 @@ class TestStep16(unittest.TestCase):
                         "layer": "api",
                         "implementation": {
                             "files_touched": ["src/x.py"],
-                            "actions": [{"type": "file_edit", "target": "src/x.py", "description": "edit"}],
+                            "actions": [{"id": "a01", "type": "file_edit", "target": "src/x.py", "description": "edit"}],
                         },
                     }],
                 },

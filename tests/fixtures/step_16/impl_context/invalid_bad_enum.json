@@ -34,6 +34,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify Do the thing"
               }

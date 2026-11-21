@@ -42,8 +42,6 @@ REGISTERED_WITHOUT_EMITTER = {
     # W595 is emitted, but only inside longer message strings (context/seed_indexer.py), which the literal pattern
     # above does not match; file-level forward replay and the freshness stderr lines, which wrote it, are gone.
     "W595",
-    # Milestone lifecycle (M8): registered once by the lifecycle core; the bundle that writes the emitter deletes its line.
-    "E800", "E802",
 }
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic

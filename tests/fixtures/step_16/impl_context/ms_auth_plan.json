@@ -43,6 +43,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_create",
                 "target": "src/auth.py",
                 "description": "Create auth module"
@@ -64,6 +65,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verified fr-user-login JWT claim structure matches spec."
               }

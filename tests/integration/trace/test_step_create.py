@@ -239,10 +239,11 @@ def full(tmp_path: Path) -> Host:
     return host
 
 
-def _second_plan_draft(host: Host) -> Path:
-    """A plan draft for the milestone of the example: one item that realises the second task criterion, with its action numbered."""
+def _second_plan_draft(host: Host, milestone: str = "ms-account-recovery-b") -> Path:
+    """A plan draft with one item that realises the second task criterion, its action numbered; by default for ANOTHER milestone than the example's."""
     document = json.loads((host.drafts / "plan.json").read_text(encoding="utf-8"))
     document["id"] = "plan-ms-account-recovery-b"
+    document["milestone"] = milestone
     (item,) = document["plan"]["spec_alignment"]["checklist"]
     item.update(id=NEW_ITEM, realises=["tc-confirm-reused-token"])
     item["implementation"]["actions"][0]["id"] = "a01"
@@ -269,6 +270,37 @@ def test_step_create_16a_refuses_an_existing_plan_file(full: Host) -> None:
     document = json.loads(full.create_step_16("16a", "--json", batch="second", draft=draft, code=1))
     (error,) = document["errors"]
     assert error["code"] == "E767" and "impl_context/ms_second_plan.json already exists" in error["message"]
+    assert full.snapshot() == before
+
+
+def test_step_create_16a_refuses_a_second_plan_for_a_milestone_that_has_one(full: Host) -> None:
+    """Ruling L22: a milestone has one plan file; the refusal names the milestone and the file, and nothing is written (also on a dry run)."""
+    draft = _second_plan_draft(full, milestone="ms-account-recovery")
+    before = full.snapshot()
+    for flags in ((), ("--dry-run",)):
+        (error,) = json.loads(full.create_step_16("16a", "--json", *flags, batch="second", draft=draft, code=1))["errors"]
+        assert error["code"] == "E767"
+        assert "milestone ms-account-recovery already has the plan file impl_context/ms_account_recovery_plan.json" in error["message"]
+        assert "`specdev json patch --id <item-id> '.description'" in error["message"]
+        assert f"set its `milestone` key to that milestone's id and run `specdev step create 16a second --from {draft}` again" in error["message"]
+    assert full.snapshot() == before and not (full.spec / "impl_context" / "ms_second_plan.json").exists()
+
+
+def test_step_create_16a_a_second_plan_for_another_milestone_is_created(full: Host) -> None:
+    draft = _second_plan_draft(full)
+    document = json.loads(full.create_step_16("16a", "--json", batch="second", draft=draft))
+    assert document["written"] is True and document["file"] == "impl_context/ms_second_plan.json"
+    assert (full.spec / EXAMPLE_PLAN).is_file()
+
+
+def test_step_create_16a_a_draft_without_a_milestone_key_fails_its_schema_not_the_milestone_check(full: Host) -> None:
+    document = json.loads(_second_plan_draft(full).read_text(encoding="utf-8"))
+    del document["milestone"]
+    draft = full.drafts / "no_milestone.json"
+    draft.write_text(json.dumps(document), encoding="utf-8")
+    before = full.snapshot()
+    (error,) = json.loads(full.create_step_16("16a", "--json", batch="second", draft=draft, code=1))["errors"]
+    assert error["code"] == "E767" and "not valid against its schema" in error["message"] and "'milestone' is a required property" in error["message"]
     assert full.snapshot() == before
 
 

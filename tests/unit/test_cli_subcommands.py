@@ -549,7 +549,7 @@ class TestStepCommand(_CliMixin, unittest.TestCase):
 
 
 class TestLifecycleCommands(_CliMixin, unittest.TestCase):
-    """``plan record`` and ``review record``: the parsers, and the usage errors that need no spec folder."""
+    """``plan record``, ``review record``, ``milestone`` and ``status``: the parsers, and the usage errors that need no spec folder."""
 
     def test_plan_record_takes_the_address_the_outcome_and_the_at_deploy_flags(self):
         args = cli.build_parser().parse_args(["plan", "record", "ITEM/a01", "--outcome", "done", "--note", "n"])
@@ -576,8 +576,30 @@ class TestLifecycleCommands(_CliMixin, unittest.TestCase):
             self.assertEqual(code, 2, err)
             self.assertIn(text, err)
 
+    def test_milestone_commands_take_the_milestone_id_and_their_flags(self):
+        parse = cli.build_parser().parse_args
+        self.assertEqual(parse(["milestone", "start", "ms-a"]).milestone, "ms-a")
+        args = parse(["milestone", "defer", "ms-a", "--reason", "waiting"])
+        self.assertEqual((args.milestone, args.reason), ("ms-a", "waiting"))
+        self.assertIsNone(parse(["milestone", "defer", "ms-a"]).reason)
+        self.assertEqual(parse(["milestone", "sign-off", "ms-a"]).milestone, "ms-a")
+        args = parse(["milestone", "close", "ms-a", "--check"])
+        self.assertEqual((args.milestone, args.check), ("ms-a", True))
+        self.assertFalse(parse(["milestone", "close", "ms-a"]).check)
+
+    def test_status_takes_an_optional_milestone(self):
+        parse = cli.build_parser().parse_args
+        self.assertIsNone(parse(["status"]).milestone)
+        self.assertEqual(parse(["status", "--milestone", "ms-a", "--json"]).milestone, "ms-a")
+
+    def test_milestone_commands_on_a_missing_spec_folder_are_e520(self):
+        for argv in (["milestone", "start", "ms-a"], ["milestone", "close", "ms-a"], ["status"]):
+            code, _, err = self._run_cli([*argv, "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+            self.assertEqual(code, 1)
+            self.assertTrue(err.startswith("E520"), err)
+
     def test_the_groups_need_their_subcommand(self):
-        for group in ("plan", "review"):
+        for group in ("plan", "review", "milestone"):
             code, _, _ = self._run_cli([group])
             self.assertEqual(code, 2)
 

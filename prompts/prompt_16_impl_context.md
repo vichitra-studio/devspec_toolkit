@@ -20,7 +20,7 @@ The anchor must:
 ## When NOT To Use This Prompt
 - You are authoring a per-milestone **implementation plan** (16a) — use `prompt_16a_impl_planner.md` against `spec/impl_context/<milestone>_plan.json` (schema `vc:16-impl-context`).
 - You are recording execution (16b: `specdev plan record`) or a review verdict (16c: `specdev review record`) — those commands write into the milestone's plan file.
-- You want to move a milestone from `pending` to `in_progress`, `deferred` or `done`: the status of a row and its `close` and `deferral_reason` are written only by `specdev milestone start|defer|close`, never by this prompt.
+- You want to change the state of a milestone (`pending` to `in_progress` or `deferred`, `in_progress` to `done`): the status of a row and its `close` and `deferral_reason` are written only by `specdev milestone start|defer|close`, never by this prompt.
 
 # Role
 You are a senior software architect producing the Step 16 **Trinity Anchor**.

@@ -19,6 +19,7 @@ from typing import Any
 from specdev_tools.core.entry_key_registry import match_glob_key
 from specdev_tools.core.errors import make_error
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
+from specdev_tools.core.plan_files import MILESTONE_KEY, find_plan
 from specdev_tools.core.registry import get_shared_registry
 from specdev_tools.core.schema_validate import SchemaValidationError, jq_path_of, schema_violations, violation_text
 from specdev_tools.graph.kinds import EXTRAS_STEP, FileDecl, load_kind_registry
@@ -134,6 +135,19 @@ def check_draft(repo_root: str, decl: FileDecl, document: dict[str, Any]) -> Non
         raise _refuse(f"the draft is not valid against its schema; nothing was written:\n{lines}{tail}")
 
 
+def _refuse_second_plan(spec_root: str, request: StepCreateRequest, draft: dict[str, Any]) -> None:
+    """E767 when a plan file of the spec folder already names the milestone of *draft*: a milestone has one plan file."""
+    milestone = draft.get(MILESTONE_KEY)
+    existing = find_plan(spec_root, milestone) if isinstance(milestone, str) else None
+    if existing is not None:
+        raise _refuse(
+            f"milestone {milestone} already has the plan file {existing.parent.name}/{existing.name}; a milestone has one plan file. "
+            f"To change that plan, edit it: `specdev json patch --id <item-id> '.description' '\"new text\"'` (or `json insert`, `json delete`). "
+            f"If the draft is for another milestone, set its `{MILESTONE_KEY}` key to that milestone's id and run "
+            f"`specdev step create {request.step} {request.batch} --from {request.draft}` again"
+        )
+
+
 def _create_on(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: StepCreateRequest, *, write: bool) -> WriteResult:
     decl = step_file(graph, repo_root, request.step)
     rel = target_file(decl, request)
@@ -142,7 +156,10 @@ def _create_on(graph: Graph, spec_root: str, repo_root: str, git_root: str, requ
             raise _refuse(f"the plan file {rel} already exists; edit it with `specdev json patch|insert|delete --id`, or name another batch")
     elif graph.shape.files_by_step.get(request.step):
         raise _refuse(f"step {request.step} already has a spec file ({', '.join(graph.shape.files_by_step[request.step])}); edit it with `specdev json patch|insert|delete --id`")
-    document, minted = mint_ids(graph, decl, read_draft(request.draft))
+    draft = read_draft(request.draft)
+    if decl.is_glob:
+        _refuse_second_plan(spec_root, request, draft)
+    document, minted = mint_ids(graph, decl, draft)
     check_draft(repo_root, decl, document)
     node_id = str(document.get("id") or rel.removesuffix(".json"))
     return write_new_file(graph, spec_root, repo_root, git_root, rel, document, node_id, minted, write=write)
@@ -156,8 +173,8 @@ def create_step(graph: Graph, spec_root: str, repo_root: str, git_root: str, req
     when the artifact is written.
 
     Raises:
-        WriteRefusedError: E767 (step not creatable, artifact exists, draft unreadable or invalid, a link that does not
-            resolve; nothing is written).
+        WriteRefusedError: E767 (step not creatable, artifact exists, a plan file already names the draft's milestone, draft
+            unreadable or invalid, a link that does not resolve; nothing is written).
         LockError: E769 when another specdev write holds the lock; E760 when the lock file cannot be read.
     """
     with writing_graph(graph, spec_root, repo_root, "step create", write=not dry_run) as planned:

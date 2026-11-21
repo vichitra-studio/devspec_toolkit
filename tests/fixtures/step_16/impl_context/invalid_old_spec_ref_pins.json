@@ -45,6 +45,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify Create user table migration"
               }
@@ -71,11 +72,13 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_edit",
                 "target": "src/api/profile.py",
                 "description": "Add route handler"
               },
               {
+                "id": "a02",
                 "type": "manual_verification",
                 "description": "Curl the endpoint"
               }
@@ -93,6 +96,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify profile endpoint returns correct data"
               }

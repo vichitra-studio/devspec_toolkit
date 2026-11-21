@@ -111,7 +111,7 @@ class SignoffRecord:
 
 
 @dataclass(frozen=True)
-class _Scope:
+class Scope:
     """What the gate judges: the criteria in play with the task each belongs to, and the tasks it leaves out."""
 
     criteria: tuple[tuple[Node, str], ...]
@@ -140,7 +140,7 @@ def _disposition(graph: Graph, task: Node) -> tuple[str | None, str]:
     return disposition.get("value"), reason if isinstance(reason, str) else ""
 
 
-def _scope(graph: Graph, milestone_id: str) -> _Scope:
+def scope_of(graph: Graph, milestone_id: str) -> Scope:
     """The criteria of the milestone's tasks that are in play, and the tasks left out because they are deferred or wont_do (with their reason)."""
     criteria: list[tuple[Node, str]] = []
     paused: list[PausedTask] = []
@@ -155,10 +155,10 @@ def _scope(graph: Graph, milestone_id: str) -> _Scope:
             node = graph.by_id.get(child)
             if node is not None and node.kind == TASK_CRITERION and node.lifecycle != NOT_APPLICABLE:
                 criteria.append((node, task.id))
-    return _Scope(tuple(criteria), tuple(paused))
+    return Scope(tuple(criteria), tuple(paused))
 
 
-def _plan_items(graph: Graph, milestone_id: str) -> list[Node]:
+def plan_items(graph: Graph, milestone_id: str) -> list[Node]:
     """The plan items of the plan that names *milestone_id*, in graph order."""
     return [node for node in graph.by_kind.get(PLAN_ITEM, ()) if node.lifecycle != NOT_APPLICABLE and node.milestone is not None and graph.canonical_id(node.milestone) == milestone_id]
 
@@ -172,7 +172,7 @@ def _realised(graph: Graph, items: list[Node]) -> dict[str, list[Node]]:
     return found
 
 
-def _unrealised_findings(scope: _Scope, realised: Mapping[str, list[Node]], plan_file: str) -> list[SpecError]:
+def _unrealised_findings(scope: Scope, realised: Mapping[str, list[Node]], plan_file: str) -> list[SpecError]:
     """E810 for each criterion in play that no plan item realises."""
     return [
         _finding(
@@ -185,7 +185,7 @@ def _unrealised_findings(scope: _Scope, realised: Mapping[str, list[Node]], plan
     ]
 
 
-def _proof_of(graph: Graph, ctx: ProofContext, node: Node) -> ProofResult | SpecError:
+def proof_of(graph: Graph, ctx: ProofContext, node: Node) -> ProofResult | SpecError:
     """The close-mode proof of the criterion *node*, or its E334 finding when the stage of one of its verifiers cannot be told."""
     try:
         return proof(graph, ctx, node.id, CLOSE_CAP, treat_ci_as_dev=True)
@@ -201,11 +201,11 @@ def _unproven_finding(graph: Graph, ctx: ProofContext, node: Node, result: Proof
     return _finding("E811", lacking or f"task criterion {node.id} is not proven at the close gate ({result.status})", node)
 
 
-def _proof_findings(graph: Graph, ctx: ProofContext, scope: _Scope) -> list[SpecError]:
+def _proof_findings(graph: Graph, ctx: ProofContext, scope: Scope) -> list[SpecError]:
     """E811 for each criterion in play that is not proven, E334 for one whose stage cannot be told; every criterion is asked."""
     findings: list[SpecError] = []
     for node, _ in scope.criteria:
-        answer = _proof_of(graph, ctx, node)
+        answer = proof_of(graph, ctx, node)
         if isinstance(answer, SpecError):
             findings.append(answer)
         elif answer.status not in _PASSING:
@@ -213,7 +213,7 @@ def _proof_findings(graph: Graph, ctx: ProofContext, scope: _Scope) -> list[Spec
     return findings
 
 
-def _in_scope_items(graph: Graph, items: list[Node], scope: _Scope) -> list[Node]:
+def in_scope_items(graph: Graph, items: list[Node], scope: Scope) -> list[Node]:
     """The plan items that realise at least one criterion in play."""
     wanted = {node.id for node, _ in scope.criteria}
     return [item for item in items if wanted.intersection(link_targets(graph, item, REALISES))]
@@ -267,7 +267,7 @@ def _suspect_findings(graph: Graph, ctx: ProofContext, lock: Lock | None, milest
     return _owned(on_the_chain), []
 
 
-def _apis_of(graph: Graph, scope: _Scope) -> list[str]:
+def _apis_of(graph: Graph, scope: Scope) -> list[str]:
     """The APIs the criteria in play reach upward through their links, each once."""
     found: dict[str, None] = {}
     for node, _ in scope.criteria:
@@ -277,7 +277,7 @@ def _apis_of(graph: Graph, scope: _Scope) -> list[str]:
     return list(found)
 
 
-def _scaffold_findings(graph: Graph, scope: _Scope, scaffold: ScaffoldProvider) -> tuple[list[SpecError], list[str]]:
+def _scaffold_findings(graph: Graph, scope: Scope, scaffold: ScaffoldProvider) -> tuple[list[SpecError], list[str]]:
     """The findings of the scaffold scan for the APIs of the criteria in play, and the notes saying what it could not check."""
     apis = _apis_of(graph, scope)
     if not apis:
@@ -358,9 +358,9 @@ def check_close_gate(
         return GateReport(milestone_id, legacy=True, notes=("legacy close: not re-checked",))
     plan = plans.require_plan(spec_root, milestone_id)
     plan_file = os.path.join(PLAN_DIR_NAME, plan.name)
-    scope = _scope(graph, milestone_id)
-    items = _plan_items(graph, milestone_id)
-    in_scope = _in_scope_items(graph, items, scope)
+    scope = scope_of(graph, milestone_id)
+    items = plan_items(graph, milestone_id)
+    in_scope = in_scope_items(graph, items, scope)
     suspects, suspect_notes = _suspect_findings(graph, ctx, lock, milestone_id)
     scaffold_findings, scaffold_notes = _scaffold_findings(graph, scope, scaffold)
     errors = [

@@ -151,6 +151,21 @@
       "path": "lock merge"
     },
     {
+      "path": "milestone"
+    },
+    {
+      "path": "milestone close"
+    },
+    {
+      "path": "milestone defer"
+    },
+    {
+      "path": "milestone sign-off"
+    },
+    {
+      "path": "milestone start"
+    },
+    {
       "path": "milestone-state"
     },
     {
@@ -206,6 +221,9 @@
     },
     {
       "path": "stale"
+    },
+    {
+      "path": "status"
     },
     {
       "path": "step"

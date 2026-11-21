@@ -33,6 +33,7 @@ RUN_TYPE = "run"
 VERIFICATION_SCHEMA = "vc:extras:verification-record"
 EVIDENCE_SCHEMA = "vc:extras:evidence-record"
 AT_DEPLOY_SCHEMA = "vc:extras:at-deploy-record"
+SIGNOFF_SCHEMA = "vc:extras:signoff-record"
 BINDING_PREFIX = "ver-"
 EVIDENCE_PREFIX = "evd-"
 INSTALL_CHECK_SUFFIX = "-install"
@@ -248,3 +249,11 @@ def write_at_deploy(folder: str, repo_root: str, item: Mapping[str, Any]) -> str
     The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
     """
     return _write_record(folder, repo_root, AT_DEPLOY_SCHEMA, item["deploy_id"], item)
+
+
+def write_signoff(folder: str, repo_root: str, item: Mapping[str, Any]) -> str:
+    """Write the sign-off record *item* as ``<signoff_id>.json`` in *folder* (the sign-off folder of the spec); returns the file name.
+
+    The caller holds the write lock.  Raises ``FindingError`` (E774) when *item* breaks the record schema; nothing is written then.
+    """
+    return _write_record(folder, repo_root, SIGNOFF_SCHEMA, item["signoff_id"], item)

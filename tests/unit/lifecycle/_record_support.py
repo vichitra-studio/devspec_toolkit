@@ -63,17 +63,18 @@ def action(action_id: str, kind: str = "file_edit", **fields: Any) -> dict[str, 
 def plan_host(tmp_path: Path, *extra: dict[str, Any], bindings: tuple[dict[str, Any], ...] = (), keep_ids: bool = False, name: str = "host") -> Path:
     """The worked example as a git host with code and the given bindings; its plan item's first action is ``a01`` and *extra* actions follow.
 
-    With *keep_ids* the plan stays as the example has it (an action with no id).
+    With *keep_ids* the first action has no id (a plan written before the id was required, or edited by hand: ``plan record`` still reads it).
     """
     host = host_with(tmp_path, *bindings, name=name)
-    if not keep_ids:
-        def edit(document: dict[str, Any]) -> None:
-            actions = document["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"]
-            actions[0]["id"] = "a01"
-            actions.extend(extra)
 
-        edit_doc(host, PLAN, edit)
-        commit_all(host, "plan with action ids")
+    def edit(document: dict[str, Any]) -> None:
+        actions = document["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"]
+        if keep_ids:
+            del actions[0]["id"]
+        actions.extend(extra)
+
+    edit_doc(host, PLAN, edit)
+    commit_all(host, "plan with action ids" if not keep_ids else "plan without action ids")
     return host
 
 

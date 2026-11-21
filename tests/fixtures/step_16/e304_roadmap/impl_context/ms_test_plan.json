@@ -36,6 +36,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "file_edit",
                 "target": "src/api/auth.py",
                 "description": "Add POST /auth/login handler"
@@ -54,6 +55,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify JWT payload schema"
               }

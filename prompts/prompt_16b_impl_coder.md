@@ -63,16 +63,14 @@ Field shape is `vc:core:collections#ambiguityItem` (`schema/core/collections.sch
 
 *   Record any blocker or spec issue discovered during execution. The id is `amb-new-<slug>` (kebab-case; the `amb-<slug>` form is the planner's).
 *   `about` names the nodes of the spec the question concerns: the criterion the item realises, its task, an API, an invariant. Find them with `specdev trace <node-id> --up` / `--down` and `specdev node show <id>`. A plan item of the same plan is refused (E702): name the criterion it realises and describe the item in words, with no node id in the text (shared_expectations section 6, rule 9).
-*   Write the item with the form that fits what the plan holds now. Read the block first: `specdev json read <plan> '.execution'` prints `null` when the plan has no `execution` block.
+*   Write the item with the form that fits what the plan holds now. Read the array first: `specdev json read <plan> '.execution.emergent_ambiguities'` prints `null` when the plan has no such array (with or without an `execution` block).
     ```bash
-    # the plan has no `execution` block yet
-    specdev json patch <plan> '.execution' '{"emergent_ambiguities":[<item>]}'
-    # the block exists (it holds records) but not the array
+    # the read printed null: create the array with the item
     specdev json patch <plan> '.execution.emergent_ambiguities' '[<item>]'
-    # the array exists
+    # the array exists: add to it
     specdev json insert <plan> '.execution.emergent_ambiguities' '<item>'
     ```
-    Pick the first form only when that read printed `null`; `json patch '.execution'` on a plan that has records replaces them. (The second form also works when the block is absent.)
+    Never patch `.execution` itself: it holds the records `specdev plan record` wrote.
 *   An open item about a node of an item's chain (its criteria, their task) blocks that item: stop on it and say so; carry on with an item it does not concern.
 
 ## 5. Advanced Schema Fields (Consumption Rules)

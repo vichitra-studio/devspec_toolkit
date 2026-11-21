@@ -925,7 +925,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 An open item is an entry of an `ambiguities` array (the step files 00 to 15, the anchor's `plan.ambiguities`, a milestone plan's `plan.ambiguities` and `execution.emergent_ambiguities`) that has not been answered and deleted: a question the spec cannot answer yet. An item of the 1.2.0 shape has `about` (the ids of the nodes it is about, or a node kind with `missing_kind`) and, once the operator has answered, a non-empty `decision`. An item of the 1.1.1 shape has `severity` and `status` and is open until `status` is `resolved`. The check is `open-items` (`validation/open_items.py`), at one of three gates.
 
-Today one command reports these codes. `spec-check` reports W630 (check `open-items`): in plain `spec-check` and in `spec-check --step` and `--paths`. No command runs the merge gate or the close gate yet, so no command reports E631, E632 or W633.
+`spec-check` reports W630 (check `open-items`): in plain `spec-check` and in `spec-check --step` and `--paths`. `specdev milestone close` runs the close gate and reports E632. No command runs the merge gate yet, so no command reports E631 or W633.
 
 ### W630 OPEN_ITEM
 
@@ -945,7 +945,7 @@ Today one command reports these codes. `spec-check` reports W630 (check `open-it
 
 ### E632 OPEN_ITEM_IN_PLAN
 
-**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan named by `plan_path` only. No command runs the close gate yet.
+**Trigger**: The close gate finds an open item in the milestone plan that is closing, one E632 for each item, owner `close-gate`, for example `open item amb-plan-confirm-status in impl_context/ms_account_recovery_plan.json: about api-password-reset-confirm; answer it and delete the item before the milestone closes`. It looks at the plan of the closing milestone only. `specdev milestone close` runs the close gate.
 
 **Resolution**: Answer the item and delete it before the milestone closes.
 

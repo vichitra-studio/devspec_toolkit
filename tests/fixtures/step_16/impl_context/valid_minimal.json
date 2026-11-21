@@ -40,6 +40,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_create",
                 "target": "src/auth.py",
                 "description": "Create auth module"
@@ -58,6 +59,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify login response schema"
               }

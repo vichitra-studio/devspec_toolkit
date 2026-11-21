@@ -39,6 +39,7 @@
             ],
             "actions": [
               {
+                "id": "a01",
                 "type": "file_create",
                 "target": "src/main.py",
                 "description": "Create main module"
@@ -57,6 +58,7 @@
           "implementation": {
             "actions": [
               {
+                "id": "a01",
                 "type": "manual_verification",
                 "description": "Verify login response"
               }
