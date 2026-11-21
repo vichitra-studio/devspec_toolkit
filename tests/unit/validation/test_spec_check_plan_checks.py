@@ -15,7 +15,8 @@ from specdev_tools.validation.open_items import check_open_items
 from specdev_tools.validation.spec_check import _check_plan_records, run_spec_check_json
 from unit.graph._synth import ROOT
 from unit.lifecycle._record_support import ITEM, change_lock_hash, closed_row, plan_host, roots
-from unit.lifecycle._support import MILESTONE, PLAN, closed_record, example_spec
+from unit._ambiguity_support import unified_item
+from unit.lifecycle._support import MILESTONE, PLAN, closed_record, edit_row, example_spec
 from unit.verify._support import edit_doc
 
 
@@ -146,3 +147,32 @@ def test_the_latest_record_of_an_action_decides_w825(tmp_path: Path, monkeypatch
     assert [finding["code"] for finding in _plan_records(host / "spec")["findings"]] == ["W825"]
     record_action(spec, repo, git, Address(ITEM, "a01"), "done")  # the second record carries the hash of now
     assert _plan_records(host / "spec")["status"] == "PASS"
+
+
+def _plan_with_open_item(spec: Path) -> None:
+    plan = spec / PLAN
+    document = json.loads(plan.read_text(encoding="utf-8"))
+    document["plan"]["ambiguities"] = [unified_item("amb-token-length", about=["tc-confirm-expired-token"])]
+    plan.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def test_an_anchor_row_with_an_unknown_status_does_not_stop_spec_check_at_one_line(tmp_path: Path) -> None:
+    spec = example_spec(tmp_path)
+    _plan_with_open_item(spec)
+    edit_row(spec, lambda row: row.update(status="bogus"))
+    _errors, context = run_spec_check_json(str(ROOT), str(spec))
+    checks = context["checks"]
+    assert len(checks) > 5  # the whole report, not the one line of the E801
+    assert [finding["code"] for finding in checks["frozen-plans"]["findings"]] == ["E801"]
+    assert [error.code for error in _errors].count("E801") == 1
+    assert [finding["code"] for finding in checks["open-items"]["findings"]] == ["W630"]
+
+
+def test_an_open_item_of_a_closed_plan_is_silent_and_of_an_open_one_is_listed(tmp_path: Path) -> None:
+    spec = example_spec(tmp_path)
+    _plan_with_open_item(spec)
+    _errors, context = run_spec_check_json(str(ROOT), str(spec))
+    assert [finding["code"] for finding in context["checks"]["open-items"]["findings"]] == ["W630"]
+    anchor_store.write_row_state(spec, MILESTONE, "done", close=closed_record(plan_hash=plans.plan_hash(spec / PLAN)), repo_root=str(ROOT))
+    _errors, context = run_spec_check_json(str(ROOT), str(spec))
+    assert context["checks"]["open-items"]["findings"] == []

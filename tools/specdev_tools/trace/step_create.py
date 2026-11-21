@@ -22,6 +22,7 @@ from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.plan_files import MILESTONE_KEY, find_plan
 from specdev_tools.core.registry import get_shared_registry
 from specdev_tools.core.schema_validate import SchemaValidationError, jq_path_of, schema_violations, violation_text
+from specdev_tools.core.step_paths import PLAN_FILE_KEY
 from specdev_tools.graph.kinds import EXTRAS_STEP, FileDecl, load_kind_registry
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import WriteRefusedError, WriteResult, with_ids, write_new_file
@@ -31,7 +32,7 @@ from specdev_tools.validation.linter_utils import graph_known_ids
 #: The schema of the files whose name is not the stem of their schema: the anchor file has its own schema (``16_anchor``) and
 #: the schema named ``16_impl_context`` is the one of the plan files (the same split as ``PLAN_FILE_HOSTS`` and
 #: ``STEP_EXTRA_HOSTS`` in ``registry/generate.py``).
-SCHEMA_OF_FILE = {"16_impl_context.json": "schema/16_anchor.schema.json", "impl_context/ms_*_plan.json": "schema/16_impl_context.schema.json"}
+SCHEMA_OF_FILE = {"16_impl_context.json": "schema/16_anchor.schema.json", PLAN_FILE_KEY: "schema/16_impl_context.schema.json"}
 BATCH_NAME = re.compile(r"[A-Za-z0-9_-]+")
 MAX_SHOWN_VIOLATIONS = 10
 
@@ -63,12 +64,10 @@ def step_file(graph: Graph, repo_root: str, step: str) -> FileDecl:
     """The registry file of *step*; E767 naming the steps that can be created when *step* has no file ``step create`` writes."""
     files = creatable_files(graph, repo_root)
     if step not in files:
-        reason = (
-            f"step {step} has no spec file of its own: it is a part of the plan file of step 16a"
-            if step in ("16b", "16c")
-            else f"step {step} has no spec file that step create writes"
-        )
-        raise _refuse(f"{reason}; it creates steps {', '.join(files)}")
+        if step in ("16b", "16c"):
+            writer = "specdev plan record" if step == "16b" else "specdev review record"
+            raise _refuse(f"step {step} has no spec file of its own: it is a part of the plan file of step 16a; its content is written by `{writer}`")
+        raise _refuse(f"step {step} has no spec file that step create writes; `step create` writes the files of steps {', '.join(files)}")
     return files[step]
 
 

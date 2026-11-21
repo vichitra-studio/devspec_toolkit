@@ -52,7 +52,7 @@ specdev plan record <ITEM>/<action-id> --outcome done|failed|blocked [--note TEX
 *   An action marked `at_deploy` is not carried out here and does not hold up closing the milestone: its proof is a record the deploy job writes with `specdev plan record --at-deploy <ITEM>/<action-id> --env staging|prod`. Skip it.
 *   You **MUST** run every command in `plan.review_requirements.test_commands` that covers your item (for an object-form entry run the value of `.command`, not the object) and read the real output. A failing command is a `failed` record or a fix, never a hidden one.
 *   *Rule*: Do NOT record `done` for an action you did not carry out. Do NOT say "not run" without a concrete blocker.
-*   `specdev plan record --prune <milestone-id>` is for the caller after a re-plan; run it only when `specdev spec-check` reports a record whose item or action is gone.
+*   `specdev plan record --prune <milestone-id>` is for the caller after a re-plan; run it only when `specdev spec-check` reports a record (E700 on a `rec-NNNN`) whose item is gone. It also removes a record whose action is gone from an item that still exists; nothing reports that one, so prune after deleting an action that had a record.
 
 ## 3. Review Loop
 After the last action of an item: review the item's implementation for gaps and bugs. If findings exist, fix them, record the actions again and re-review until none remain, then proceed to the next item.

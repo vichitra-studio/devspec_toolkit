@@ -341,7 +341,7 @@ def test_step_create_16b_and_16c_stay_refused(full: Host) -> None:
     for step in ("16b", "16c"):
         (error,) = json.loads(full.create_step_16(step, "--json", draft=_second_plan_draft(full), code=1))["errors"]
         assert error["code"] == "E767" and f"step {step} has no spec file of its own" in error["message"] and "plan file of step 16a" in error["message"]
-        assert "creates steps 00, 01" in error["message"] and error["message"].endswith("15, 16, 16a")
+        assert error["message"].endswith("`specdev plan record`" if step == "16b" else "`specdev review record`") and "creates steps" not in error["message"]
     assert full.snapshot() == before
 
 

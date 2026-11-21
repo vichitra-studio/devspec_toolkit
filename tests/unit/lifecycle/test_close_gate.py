@@ -237,6 +237,18 @@ def test_deferred_task_is_excluded_with_its_reason(tmp_path: Path, value: str) -
     assert sorted(error.node_id or "" for error in report.warnings) == [ITEM, SECOND_ITEM] and {error.code for error in report.warnings} == {"W826"}
 
 
+def test_a_w826_of_an_item_outside_the_milestone_is_not_in_its_warnings(tmp_path: Path) -> None:
+    host = ready(tmp_path)
+    edit_code(host)
+    edit_roadmap(host, lambda task: task.update(disposition={"value": "deferred", "reason": "Waiting for the vendor sandbox."}))
+    graph = graph_of(host)
+    both = [graph.find(ITEM), graph.find(SECOND_ITEM)]
+    assert all(node is not None for node in both)
+    spec = str(host / "spec")
+    warnings = close_gate._paused_items_warnings(graph, lock_if_present(spec), spec, [both[1]])
+    assert [error.node_id for error in warnings] == [SECOND_ITEM]
+
+
 def test_an_item_that_realises_a_paused_and_a_live_criterion_is_still_held_to_execution(tmp_path: Path) -> None:
     host = ready(tmp_path)
     spec, repo, git = roots(host)

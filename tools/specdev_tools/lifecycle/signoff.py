@@ -17,7 +17,7 @@ from ..trace.lockfile import Lock
 from ..trace.records import SIGNOFF_DIR
 from ..trace.writing import locked_graph
 from ..verify.records import signoff_records, write_signoff
-from . import close_gate, executed, plans
+from . import executed, plans
 from .milestone import ProviderFactory, milestone_id_of, refuse_not_in_progress, require_row
 from .records import git_author, mint_id, now_utc
 from .status import MilestoneView, milestone_view, status_context

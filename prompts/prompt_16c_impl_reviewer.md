@@ -25,7 +25,7 @@ Before you record `verified`, check that every task criterion of the milestone i
 # Field Definitions & Rules (MANDATORY)
 
 ## 1. The findings file and `specdev review record`
-Reviewer agents write their findings as a file under `.specdev/findings/` (`findings_<scope>_<round>.json`); in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`):
+The reviewer agent writes its findings as a file under `.specdev/findings/` (`findings_<scope>_<round>_r<reviewer_id>.json`); the skill copies the milestone-wide one to `findings_<batch>_review_<round>.json`, the name `specdev milestone-state` reads; in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`):
 
 ```json
 {

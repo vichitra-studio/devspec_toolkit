@@ -391,7 +391,7 @@ def _prefix_errors(
 ) -> list[SpecError]:
     """W610: every checklist id of a plan must start with the ``checklist_id_prefix`` of its anchor row.
 
-    The plan of a row is found through ``plans.find_plan``.  16a planners are told to name checklist ids with the
+    The plan of a row is found through ``core.plan_files.find_plan``.  16a planners are told to name checklist ids with the
     prefix; the schema cannot enforce this cross-artifact contract, so it is verified here.
     """
     errors: list[SpecError] = []

@@ -16,11 +16,11 @@ import sys
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from functools import partial
+from pathlib import Path
 from typing import Any
 
 from ..core.config import reset_config
-from ..core.errors import SpecError
+from ..core.errors import FindingError, SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.check import run_graph_check
@@ -324,7 +324,12 @@ def _check_trace_lock(ctx: CheckContext) -> dict[str, Any]:
 
 
 def _check_open_items(ctx: CheckContext) -> dict[str, Any]:
-    frozen = partial(is_frozen_path, ctx.effective_spec_root)
+    def frozen(plan_path: Path) -> bool:
+        try:
+            return is_frozen_path(ctx.effective_spec_root, plan_path)
+        except FindingError:
+            return False  # a row that cannot be read is not frozen here; the `frozen-plans` check reports its E801
+
     return check_result(check_open_items(ctx.spec_dir, gate="step", frozen=frozen, read=ctx.ambiguity_read))
 
 

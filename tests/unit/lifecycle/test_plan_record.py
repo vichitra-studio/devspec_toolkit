@@ -285,6 +285,7 @@ def test_an_item_with_no_action_is_told_to_insert_one_and_the_insert_works(tmp_p
     error = _refusal(lambda: record_action(spec, repo, git, A01, "done"))
     assert error.code == "E821" and f"{ITEM} has no action;" in error.message
     assert f"`specdev json insert --id {ITEM} .implementation.actions '<action with an id>'`" in error.message
+    assert "an action needs an id, a type, a description, and a `target` for `file_create` and `file_edit` or a `command` for `run_command`" in error.message
     assert "carry no id" not in error.message and "actions[0]" not in error.message
     code, out, err = cli_run(host, "json", "insert", "--id", ITEM, ".implementation.actions", json.dumps({"id": "a01", "type": "file_edit", "description": "Edit.", "target": "src/hello.txt"}))
     assert code == 0, out + err

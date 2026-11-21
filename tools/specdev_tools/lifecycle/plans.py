@@ -20,7 +20,7 @@ from pathlib import Path
 
 from ..core.errors import FindingError, make_error, refusal
 from ..core.plan_files import find_plan, milestone_key, plan_files
-from ..core.step_paths import PLAN_DIR_NAME
+from ..core.step_paths import PLAN_DIR_NAME, PLAN_FILE_GLOB
 from ..trace.hashing import HASH_PREFIX
 
 _NO_KEY = "run `specdev align` (the plan has no `milestone` key)"
@@ -30,19 +30,21 @@ def require_plan(spec_root: str | Path, milestone_id: str) -> Path:
     """The plan file of *milestone_id*; the wrapper every lifecycle command calls where ``find_plan`` would return ``None``.
 
     Raises:
-        FindingError: E803 with subcode ``MILESTONE_KEY_MISSING`` when no plan file carries a ``milestone`` key (a
+        FindingError: E803 with subcode ``MILESTONE_KEY_MISSING`` when plan files exist and none carries a ``milestone`` key (a
             host before the migration), or ``MILESTONE_NOT_FOUND`` when plans carry it and none names *milestone_id*.
     """
     found = find_plan(spec_root, milestone_id)
     if found is not None:
         return found
-    if not any(milestone_key(path) for path in plan_files(spec_root)):
+    named_as_plans = plan_files(spec_root)
+    if named_as_plans and not any(milestone_key(path) for path in named_as_plans):
         raise FindingError(make_error(
             "E803", f"no plan names milestone {milestone_id}: {_NO_KEY}", subcode="MILESTONE_KEY_MISSING", node_id=milestone_id
         ))
     raise FindingError(make_error(
         "E803",
-        f"no plan names milestone {milestone_id} in its `milestone` key; give the id of a milestone that has a plan in {PLAN_DIR_NAME}/",
+        f"no plan names milestone {milestone_id} in its `milestone` key; a plan file is {PLAN_DIR_NAME}/{PLAN_FILE_GLOB} with the `milestone` key "
+        f"(a plan saved under another name is not found): give the id of a milestone that has one",
         subcode="MILESTONE_NOT_FOUND",
         node_id=milestone_id,
     ))

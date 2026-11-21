@@ -46,6 +46,16 @@ def test_close_writes_status_and_the_close_record(tmp_path: Path) -> None:
     assert validate_data_against_schema(str(ROOT), json.loads((host / "spec" / ANCHOR).read_text(encoding="utf-8"))) == []
 
 
+def test_close_names_the_newest_of_two_signoffs(tmp_path: Path) -> None:
+    host = ready_host(tmp_path, signed=True)
+    code, _, err = cli_run(host, "milestone", "sign-off", MILESTONE)
+    assert code == 0, err
+    assert (host / "spec" / "extras" / "signoff" / "so-ms-account-recovery-0002.json").is_file()
+    assert _close(host).closed
+    row = anchor_store.read_row(host / "spec", MILESTONE)
+    assert row is not None and (row.close or {})["signoff"] == "so-ms-account-recovery-0002"
+
+
 def test_close_leaves_the_plan_bytes_unchanged(tmp_path: Path) -> None:
     host = ready_host(tmp_path, signed=True)
     before = (host / "spec" / PLAN).read_bytes()

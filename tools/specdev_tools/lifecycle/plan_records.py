@@ -125,7 +125,7 @@ def _action_of(graph: Graph, item: Node, action_id: str) -> Mapping[str, Any]:
         raise refusal(
             "E821",
             f"{item.id} has no action; insert one with `specdev json insert --id {item.id} .implementation.actions '<action with an id>'` "
-            f"(an action has an id, a type and a description), then record it as {action_id}",
+            f"(an action needs an id, a type, a description, and a `target` for `file_create` and `file_edit` or a `command` for `run_command`), then record it as {action_id}",
         )
     if not ids:
         raise refusal(
@@ -309,7 +309,7 @@ def check_plan_records(graph: Graph, lock: Lock | None, spec_root: str) -> list[
     for item_id, action_id in dict.fromkeys((record.item, record.action) for record in records):
         record = executed.latest_record(records, item_id, action_id)
         node = graph.find(item_id)
-        if node is not None and executed.is_stale(record, lock, frozen_plan=node.milestone in closed):
+        if record is not None and node is not None and executed.is_stale(record, lock, frozen_plan=node.milestone in closed):
             findings.append(make_error(
                 "W825",
                 f"execution record {record.record_id} (action {action_id} of {item_id}) is stale: what the item realises changed since it was written; "

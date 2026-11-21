@@ -145,8 +145,8 @@ invocation prompt. This agent reads it and branches.
    ```
    .specdev/findings/findings_<group_id>_<round>.json
    ```
-   (Written by `specdev-trinity-reviewer` with `_r<reviewer_id>` suffix during review;
-   the dispatcher may supply a merged path from the skill's jq merge step.)
+   (`specdev-trinity-reviewer` writes `findings_<group_id>_<round>_r<reviewer_id>.json`; the dispatcher
+   supplies the copy the skill made of it with `cp`, which has no `_r<id>` suffix.)
 3. Read the item's plan entry and `plan.summary.target_file_patterns` (same reads as execute
    mode step 3) and render its pack (execute mode step 2).
 4. For each finding in `findings[]`, apply the finding-to-edit translation rule from the
@@ -407,5 +407,5 @@ Or on partial success:
   person decisions are not this agent's.
 - Does not write the `review` block, a convergence marker or a findings file.
 - Does not commit changes. The user authorizes commits separately.
-- Does not merge findings from sibling reviewers. The skill does this with the jq one-liner.
+- Does not copy or rename findings files. The skill copies the reviewer's file to the name this agent is given.
 - Does not invoke `specdev findings emit/merge/dedup` — no such CLI exists.

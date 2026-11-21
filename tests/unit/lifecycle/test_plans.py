@@ -206,3 +206,12 @@ def test_a_closed_plan_is_compared_with_the_last_of_two_migrations(tmp_path: Pat
     close["migrations"].reverse()
     anchor_store.write_row_state(spec, MILESTONE, "done", close=close, repo_root=toolkit_root())
     assert frozen.frozen_plan_drift(spec, MILESTONE) is not None
+
+
+def test_a_plan_saved_under_another_name_is_not_a_missing_key(tmp_path: Path) -> None:
+    saved = _write_plan(tmp_path, "account_recovery_plan.json", {"milestone": "ms-a", "plan": {}})
+    error = _error_of(lambda: plans.require_plan(tmp_path, "ms-a"))
+    assert (error.code, error.subcode) == ("E803", "MILESTONE_NOT_FOUND")
+    assert "align" not in error.message and "impl_context/ms_*_plan.json" in error.message and "`milestone` key" in error.message
+    named = saved.rename(saved.with_name("ms_a_plan.json"))
+    assert plans.require_plan(tmp_path, "ms-a") == named

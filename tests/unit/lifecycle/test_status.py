@@ -13,7 +13,7 @@ from specdev_tools.lifecycle.executed import lock_if_present
 from specdev_tools.lifecycle.signoff import sign_off
 from specdev_tools.lifecycle.status import Section, build_status, register_status_section, status_context
 from unit.lifecycle._milestone_support import change_stamp, cli_run, providers_of, ready_host, set_row
-from unit.lifecycle._record_support import author, plan_host, roots
+from unit.lifecycle._record_support import alpha_binding, author, closed_row, plan_host, roots
 from unit.lifecycle._support import MILESTONE, PLAN
 from unit.proof._closed import closed_example, reword_criterion
 from unit.proof._support import CRITERION, FIXTURE, run
@@ -38,7 +38,7 @@ def test_each_section_on_a_fixture(tmp_path: Path) -> None:
     sections = _sections(host)
     assert list(sections) == SECTION_NAMES
     assert any("suspect link" in line for line in sections["pending_replay"].lines)
-    assert sections["open_items"].data == {"step:16a": ["amb-token-length"]}
+    assert sections["open_items"].data == {}, "the plan is closed: its open item is a legacy item, as for spec-check"
     assert any(line.startswith("E343 outdated") for line in sections["realisations"].lines)
     assert sections["next_step"].lines == ("every step has a spec file",)
     assert sections["awaiting_signoff"].lines == ("none",)
@@ -137,6 +137,7 @@ def test_a_node_whose_stage_cannot_be_told_does_not_stop_the_report(tmp_path: Pa
     code, out, err = cli_run(host, "status", "--milestone", MILESTONE)
     assert code == 0 and "tc-confirm-reused-token (task task-implement-password-reset-confirm): E334" in out
     assert "tc-confirm-expired-token (task task-implement-password-reset-confirm): proven" in out and "E334" in out.split("close gate (dry run)")[1]
+    assert _owed_later(host) == [], "a stage that cannot be told (E334) is the gate's finding, not an owed proof"
     code, out, _ = cli_run(host, "status")
     assert code == 0 and "E334" in out
 
@@ -182,6 +183,14 @@ def test_proof_owed_at_staging_or_prod_is_empty_when_the_staging_binding_has_sta
     assert "proof owed at staging or prod: none" in out
 
 
+def test_proof_owed_at_staging_or_prod_is_empty_for_a_criterion_unproven_at_dev_with_no_later_binding(tmp_path: Path) -> None:
+    host = plan_host(tmp_path, bindings=(alpha_binding(),))  # bound at dev, never run: unproven at dev, nothing at staging or prod
+    code, out, _ = cli_run(host, "status", "--milestone", MILESTONE)
+    assert code == 0 and "tc-confirm-expired-token (task task-implement-password-reset-confirm): unproven" in out
+    assert _owed_later(host) == []
+    assert "proof owed at staging or prod: none" in out
+
+
 def test_proof_owed_at_staging_or_prod_is_empty_for_a_criterion_with_no_binding(tmp_path: Path) -> None:
     host = plan_host(tmp_path)  # unbound: the gate says E811, nothing is owed LATER
     assert _owed_later(host) == []
@@ -216,3 +225,19 @@ def test_a_milestone_whose_review_says_needs_work_is_not_awaiting_sign_off(tmp_p
     for verdict in ("needs_work", "blocked", "deferred"):
         edit_doc(host, PLAN, lambda document, verdict=verdict: document["review"].update(verdict=verdict))
         assert _sections(host)["awaiting_signoff"].data == [] and _sections(host)["awaiting_signoff"].lines == ("none",)
+
+
+def test_the_open_items_of_a_closed_plan_are_left_out_by_status_as_by_spec_check(tmp_path: Path) -> None:
+    host = ready_host(tmp_path)
+    edit_doc(host, PLAN, lambda document: document["plan"].update(ambiguities=[unified_item("amb-token-store", about=["tc-confirm-expired-token"])]))
+
+    def listed() -> tuple[dict[str, Any], list[str]]:
+        code, out, _ = cli_run(host, "status", "--milestone", MILESTONE, "--json")
+        return _sections(host)["open_items"].data, json.loads(out)["open_items"]
+
+    assert listed() == ({"step:16a": ["amb-token-store"]}, ["amb-token-store"])
+    code, _, err = cli_run(host, "milestone", "close", MILESTONE, "--check")
+    assert code != 0 and "E632" in err
+    closed_row(host)
+    assert listed() == ({}, [])
+    assert _sections(host)["open_items"].lines == ("none",)

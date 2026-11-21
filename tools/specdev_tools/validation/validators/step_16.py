@@ -21,8 +21,6 @@ from ...graph.names import PAUSED_DISPOSITIONS
 VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "metadata", "perf", "logging", "docs", "security"})
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 
-# `disposition.value` of a roadmap task meaning "paused or permanently cancelled, not absent": E304 skips such a task.
-
 PLAN_BYTES_WARN = 750_000
 """W837 reports a plan file larger than this many bytes."""
 

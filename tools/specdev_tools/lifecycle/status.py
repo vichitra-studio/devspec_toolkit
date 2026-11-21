@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from ..core.ambiguity_items import is_open, read_ambiguity_items
+from ..core.ambiguity_items import PLAN_ITEM_STEPS, AmbiguityItem, is_open, read_ambiguity_items
 from ..core.errors import FindingError, SpecError
 from ..core.plan_files import find_plan
 from ..core.step_order import load_step_order
@@ -36,6 +37,7 @@ from ..trace.lockfile import Lock
 from ..verify.code_tree import submodule_warnings
 from ..verify.records import signoff_records
 from . import anchor_store, close_gate, executed, plans
+from .frozen import is_frozen_path
 from .milestone import ProviderFactory, gate_context, require_row, run_gate
 
 RELEASE_NOT_INSTALLED = "release gate not installed"
@@ -102,13 +104,17 @@ def _pending_replay(sc: StatusContext) -> Section:
     return Section("pending_replay", title, (*lines, "`specdev stale` lists the links") if lines else ("none",), data)
 
 
+def _live_open_items(spec_root: str, items: Iterable[AmbiguityItem]) -> list[AmbiguityItem]:
+    """The open items of *items* left after the ones in the plan of a closed milestone: the test ``spec-check`` uses (``frozen.is_frozen_path``)."""
+    return [item for item in items if is_open(item) and not (item.step in PLAN_ITEM_STEPS and is_frozen_path(spec_root, Path(item.artifact_path)))]
+
+
 def _open_items(sc: StatusContext) -> Section:
     title = "Open items by owner"
     read = read_ambiguity_items(sc.spec_root)
     by_owner: dict[str, list[str]] = defaultdict(list)
-    for item in read.items:
-        if is_open(item):
-            by_owner[f"step:{item.step}"].append(item.id or "(no id)")
+    for item in _live_open_items(sc.spec_root, read.items):
+        by_owner[f"step:{item.step}"].append(item.id or "(no id)")
     lines = [f"{owner}: {len(ids)} ({', '.join(ids)})" for owner, ids in sorted(by_owner.items())]
     if read.error is not None:
         lines.append(f"the list may be incomplete: {read.error}")
@@ -315,7 +321,7 @@ def milestone_view(sc: StatusContext, milestone_id: str) -> MilestoneView:
     report = run_gate(graph, sc.ctx, sc.lock, milestone_id, sc.providers)
     realised_only_paused = tuple(w.node_id for w in report.warnings if w.node_id)
     plan_path = os.path.abspath(plan)
-    open_items = tuple(item.id or "(no id)" for item in read_ambiguity_items(spec_root).items if is_open(item) and os.path.abspath(item.artifact_path) == plan_path)
+    open_items = tuple(item.id or "(no id)" for item in _live_open_items(spec_root, read_ambiguity_items(spec_root).items) if os.path.abspath(item.artifact_path) == plan_path)
     return MilestoneView(
         milestone=milestone_id,
         status=row.status,

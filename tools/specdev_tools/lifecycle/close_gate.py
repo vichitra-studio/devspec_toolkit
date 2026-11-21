@@ -32,7 +32,6 @@ from typing import Any, Protocol
 from ..core.errors import FindingError, SpecError, make_error
 from ..core.loaders import read_json_object
 from ..core.step_paths import PLAN_DIR_NAME
-from ..graph.contract import item_of
 from ..graph.gitview import read_seed_texts
 from ..graph.model import NOT_APPLICABLE, Graph, Node
 from ..graph.names import API, PLAN_ITEM, PAUSED_DISPOSITIONS, REALISES, ROW_DONE, TASK, TASK_CRITERION, link_targets

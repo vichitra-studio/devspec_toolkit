@@ -15,6 +15,7 @@ the worked example under ``tmp_path``.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -355,6 +356,13 @@ class TestDerivePhasePosition:
         assert self._position(findings_dir, "code_converged") == "review_complete"
         _write_findings(findings_dir, "findings_batch1_review_11_1700000000.json", [{"kind": "bug"}])
         assert self._position(findings_dir, "code_converged") == "review_pending"
+
+    def test_the_round_number_decides_not_the_file_time(self, findings_dir: Path) -> None:
+        older = _write_findings(findings_dir, "findings_batch1_review_10.json", [])
+        newer = _write_findings(findings_dir, "findings_batch1_review_9.json", [{"kind": "bug"}])
+        os.utime(older, (1_700_000_000, 1_700_000_000))
+        os.utime(newer, (1_800_000_000, 1_800_000_000))
+        assert self._position(findings_dir, "code_converged") == "review_complete"
 
     def test_operator_pending_blocked_group(self, findings_dir: Path) -> None:
         _write_findings(findings_dir, "findings_batch1_review_1.json", [])
