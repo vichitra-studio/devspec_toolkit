@@ -90,6 +90,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Enforcer**: `enforcer` accepts only `review`, and a rule that carries `enforcer` must not carry `cli_command`.
 - **Regex Errors**: `commit_message_rules.pattern` must be a valid regular expression. Invalid patterns will fail the verification script.
 - **Schema Detection**: Ensure your file is named `spec/10_governance.json` or has an ID starting with `governance-` so tooling can detect it.
+- **Enforcement**: the rules are checked by the merge check (`specdev spec-check --merge`, run by the `specdev-merge-check.yml` workflow); the toolkit does not block a pull request.
 
 ## Step 11 Troubleshooting
 - **Missing Targets**: Validation fails if a threat has no `threatens` (at least one id of an API, component, connection or third party). An edge case needs `threatens` (API, component or FR ids) and `mitigated_by` (at least one id).

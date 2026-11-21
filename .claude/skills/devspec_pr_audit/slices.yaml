@@ -364,13 +364,14 @@ slices:
 - name: host_integration
   description: >
     The toolkit's host-integration surface: init script, wrapper template,
-    and template files that init_project.py writes into host repos.
+    and template files that `specdev update` (tools/specdev_tools/host_install.py,
+    also run by init_project.py) writes into host repos.
     Audits toolkit-side artifacts only — not files generated into host repos.
   globs:
     - "scripts/init_project.py"
     - "scripts/**/*.py"
     - "scripts/templates/**"
-    - "scripts/templates/run_specdev.sh"  # template source; init_project writes this into host
+    - "scripts/templates/run_specdev.sh"  # template source; host_install renders it into the host (`update`)
     - "templates/**"                       # toolkit-root templates shipped to host
     - "seed_templates/**"                  # phase-0 seed templates for host bootstrap
     - ".claude/skills/**"                  # toolkit-distributed skills (host-installed)

@@ -8,12 +8,18 @@ The file is written by hand. Its shape is `schema/host_declarations.schema.json`
 
 | Item | What it declares | Read today by |
 |------|------------------|---------------|
-| `release_tag_pattern` | The regular expression a git tag must match to count as a release tag | No command yet; the release gates of milestone M9 read it |
-| `setup_command` | The command that prepares a clean checkout to run verification commands | No command yet; the gates of milestone M9 read it |
+| `release_tag_pattern` | The regular expression a git tag must match to count as a release tag | `specdev release --tag` and `release rollback` (E911 when it is absent, E912 for a name that does not match); the release gate, which looks up the previous release with it; `specdev status` (its production-verification section prints `not read: E911 ...` without it) |
+| `setup_command` | The command that prepares a clean checkout to run verification commands | `specdev update` and `init`, which put it into the "Host setup" step of the installed merge-check workflow (W935 when it is absent) |
 | `code_tree_exclusions` | Git pathspecs left out of the code-tree id, so a change under them does not make recorded evidence stale | `specdev verify run` (the tree it records and compares, W351); `specdev third-party check --installed` (the tree its install-check record names) |
-| `pin_sources` | Where the repository declares the version of a third party, keyed by the id of its third-party node (or an id it had before a rename): a `json-pointer` into a JSON file, or a `regex` with one capture group over a text file | `specdev third-party check` (E337, E338); `specdev verify run` (the `installed_versions` it records) |
+| `pin_sources` | Where the repository declares the version of a third party, keyed by the id of its third-party node (or an id it had before a rename): a `json-pointer` into a JSON file, or a `regex` with one capture group over a text file | `specdev third-party check` (E337, E338); `specdev spec-check --merge` (check `merge-pins`); `specdev verify run` (the `installed_versions` it records) |
 
-An item no command reads yet is still validated, so a mistake in it is found now and not at the first gate that needs it.
+A mistake in an item is found when the file is validated (`spec-check`, E520), not at the first command that needs it.
+
+With and without each of the three items, as run on a copy:
+
+- **`release_tag_pattern`.** Absent, `specdev release --tag v1.0.0` printed `E911 the host declares no release_tag_pattern; add one to spec/common/host_declarations.json (a regular expression, for example ^v[0-9]+[.][0-9]+[.][0-9]+$)` and wrote nothing; with `^v[0-9]+[.][0-9]+[.][0-9]+$` declared it went on to the release gate, and `--tag banana` printed `E912 'banana' does not match the release tag pattern ...`. The pattern is searched in the name, not matched against all of it: with `v[0-9]+` declared, `--tag release-v9-final` was tagged, so anchor it with `^` and `$`.
+- **`setup_command`.** Absent, `specdev update spec ... --install-only` printed `W935 HOST_SETUP_UNDECLARED: ...` and wrote the merge-check workflow without its "Host setup" step; with `"setup_command": "npm ci"` declared the next run printed `workflows: refreshed (rewritten from the template)`, no W935, and both jobs of the workflow had a "Host setup" step that runs `npm ci`.
+- **`pin_sources`.** Absent for a third party, `spec-check spec --merge` printed `[PASS] merge-pins` even with `package-lock.json` at another version than the pin; with the entry of `tp-argon2` declared and the lock file at `0.42.0` it printed `[FAIL] merge-pins` and `E337 the pin '0.41.1' of 'tp-argon2' differs from package-lock.json at /packages/node_modules~1argon2/version, which gives '0.42.0'; make them equal with third-party pin or in that file`.
 
 `code_tree_exclusions` is for what is not the product's own code: the toolkit submodule path, generated report folders. A source folder of the product does not belong there, because evidence would then outlive a change to the code. A path that a run writes into and that is not ignored gives W351 (see its entry in [error-codes.md](error-codes.md)); add the path here or to `.gitignore`.
 
@@ -47,6 +53,6 @@ Both pins of the example (`tp-argon2` at `0.41.1`, `tp-mailrelay` at `api-v3`) e
 
 ## Getting the file
 
-No command installs the file in this release. A host that wants it copies `templates/host_declarations.host.json` to `spec/common/host_declarations.json` and edits it: the template has the four keys, with the toolkit submodule path already listed in `code_tree_exclusions` (a toolkit version bump should not make the product's evidence stale) and an empty `pin_sources`. Installing the template by `init_project.py` and `update` is milestone M9's.
+`init` and `update` do not install the file, on purpose: its `setup_command` is host-specific, and adding an exclusion later would make recorded evidence stale once. `update` prints W935 when `setup_command` is absent, as the nudge. A host that wants the file copies `templates/host_declarations.host.json` to `spec/common/host_declarations.json` and edits it: the template has the four keys, with the toolkit submodule path already listed in `code_tree_exclusions` (a toolkit version bump should not make the product's evidence stale) and an empty `pin_sources`. [host_setup.md](host_setup.md) says what `update` reads from it.
 
 Nothing has to be done for a host that does not use the file.

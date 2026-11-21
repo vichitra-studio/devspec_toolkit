@@ -10,7 +10,7 @@ This guide onboards developers to the end-to-end spec workflow and shows how to 
 - Familiarity with Git and basic JSON editing
 
 ## 0. Initialize the Project
-Before setting up your environment, initialize your project using the toolkit's automated utility. This sets up the directory structure, adds the toolkit as a submodule, seeds context documents, and generates a CI workflow.
+Before setting up your environment, initialize your project using the toolkit's automated utility. This sets up the directory structure, adds the toolkit as a submodule, seeds context documents, creates the virtual environment and then runs `specdev update --install-only`, which installs the pre-commit hooks, the merge-check CI workflow, the wrappers and the other host files (see [host_setup.md](host_setup.md)).
 
 ```bash
 # From within the toolkit checkout (or if you curl the script):
@@ -19,10 +19,11 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/my/project --s
 
 The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
-2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, `.github/workflows/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
+2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
 3.  **Seed Templates**: Copies the seed files declared in `spec/common/seed_manifest.json` (`seeds[].path`) and the manifest itself.
-4.  **Environment**: Creates `devspec_env` and installs dependencies + hooks.
-5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
+4.  **Environment**: Creates `devspec_env` and installs dependencies.
+5.  **Host files**: Runs `specdev update spec --repo-root <toolkit> --install-only` (the same command an existing host runs): the pre-commit hooks, the lock merge driver, `.github/workflows/specdev-merge-check.yml`, `tools/run_specdev.sh` and `tools/ensure_venv.py`, the links of the toolkit's skills and agents into `.claude/`, the ask rules and a `.gitignore` line. Commit what it wrote; run `specdev update` once in every other clone too.
+6.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
 ## 1. Set Up Your Environment
 The initialization utility has already created and configured your virtual environment.
@@ -53,14 +54,14 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev update` whenever the toolkit version changes. Every project must have this file; `spec-check` reports E608 if it is absent.
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev update` whenever the toolkit version changes. `specdev update` also installs the host files each time it runs (see [host_setup.md](host_setup.md)). Every project must have this file; `spec-check` reports E608 if it is absent.
 
 **Sync your project to the current toolkit version:**
 ```bash
 specdev update spec --repo-root ./devspec_toolkit
 ```
 
-*   **No schema changes**: `specdev_version` is re-stamped instantly and you are good to go.
+*   **No schema changes**: `specdev_version` is re-stamped and the host files are refreshed (what changed is printed, piece by piece); commit what `update` wrote.
 *   **Schema changes required**: The command directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`). `align validate` runs full post-migration validation and stamps `specdev_version` with a migration-history entry.
 *   See the [Migration Workflow](workflows/workflow_align.md) for the full align walkthrough.
 

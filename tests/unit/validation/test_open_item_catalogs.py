@@ -25,7 +25,7 @@ _SOURCE = _ROOT / "tools" / "specdev_tools"
 _OPEN_ITEMS_SOURCE = _SOURCE / "validation" / "open_items.py"
 
 M6A_CODES = ("W630", "E631", "E632", "W633")
-_GATES_NO_COMMAND_RUNS = ("merge", "close")
+_GATES_RUN_BY_A_COMMAND = ("merge", "close")
 _GATE_HELP_PREFIX = "With --step or --paths"
 
 # One distinctive phrase per changelog entry that M6a wrote; the md bullet and the yaml change carrying it must agree.
@@ -100,19 +100,22 @@ def test_every_m6a_code_has_a_catalogue_entry(code):
     assert code not in REGISTERED_WITHOUT_EMITTER
 
 
-def test_the_catalogue_names_the_gates_no_command_runs_while_none_does():
-    """E631, E632 and W633 come from the merge and close gates; the entries say so exactly as long as no command runs them."""
-    callers = [
-        path for path in _SOURCE.rglob("*.py")
-        if path != _OPEN_ITEMS_SOURCE
-        and any(f'gate="{gate}"' in path.read_text(encoding="utf-8") for gate in _GATES_NO_COMMAND_RUNS)
-    ]
+def test_the_catalogue_names_the_command_that_runs_the_merge_gate():
+    """E631 and W633 name `spec-check --merge`, E632 names `milestone close`, and none of the three says that no command runs its gate.
+
+    Until M9 the entries said "No command runs the merge gate yet" and this test passed only while that stayed true; since `spec-check --merge` exists the
+    sentence is gone, and the test guards what replaced it.  The merge gate is run by the command and the close gate by `milestone close`: both are
+    callers of ``check_open_items`` outside its own module.
+    """
     text = _ERROR_CODES_MD.read_text(encoding="utf-8")
-    said = all("No command runs" in _entry(text, code) for code in ("E631", "E632", "W633"))
-    assert said == (not callers), (
-        f"the catalogue entries of E631, E632 and W633 say no command runs the merge and close gates: {said}; "
-        f"source files that call check_open_items with one of them: {[p.name for p in callers]}"
-    )
+    assert "spec-check --merge" in _entry(text, "E631") and "spec-check --merge" in _entry(text, "W633")
+    assert "specdev milestone close" in _entry(text, "E632")
+    assert not [code for code in ("E631", "E632", "W633") if "No command runs" in _entry(text, code)]
+    callers = {
+        gate: [path.name for path in _SOURCE.rglob("*.py") if path != _OPEN_ITEMS_SOURCE and f'gate="{gate}"' in path.read_text(encoding="utf-8")]
+        for gate in _GATES_RUN_BY_A_COMMAND
+    }
+    assert all(callers.values()), f"a gate the catalogue says a command runs has no caller outside open_items.py: {callers}"
 
 
 @pytest.mark.parametrize("marker", M6A_CHANGELOG_MARKERS)

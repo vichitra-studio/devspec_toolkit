@@ -65,7 +65,7 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 - **deploy** — deploys via the plan in Step 09/16
 - **drift-audit** — compares runtime data to spec assertions as defined in `16_impl_context.json` (Step 16a)
 
-Ensure the generated `.github/workflows/spec_validation.yml` reflects these jobs and references the spec IDs they enforce.
+Ensure the host's own workflows reflect these jobs and reference the spec IDs they enforce. `specdev update` installs one workflow, `.github/workflows/specdev-merge-check.yml` (the merge gate and `release prep`); the deploy jobs are the host's own, built from the snippets described in [host_setup.md](../host_setup.md).
 
 
 ## Outputs

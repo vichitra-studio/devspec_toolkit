@@ -5,6 +5,7 @@ Use this index to locate the developer-facing material while working through the
 ## Onboarding
 - [`getting_started.md`](getting_started.md) — single-path setup guide and workflow primer.
 - [`reference.md`](reference.md) — command cheatsheet, naming rules, and troubleshooting steps.
+- [`host_setup.md`](host_setup.md) — what `init` and `specdev update` install into a host, the workflow templates a person copies, and a release from `release prep` to a rollback.
 - [`host_declarations.md`](host_declarations.md) — the optional host file `spec/common/host_declarations.json`: its items and which command reads each.
 
 ## Workflow Guides
