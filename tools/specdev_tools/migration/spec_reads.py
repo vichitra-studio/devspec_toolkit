@@ -2,7 +2,8 @@
 
 Which file is step N, which files are plans, which milestone a plan is for, which milestones are legacy-closed, the
 renames phase 2 recorded, and how a row of the shape map (``maps/v1_2_0.yaml``) finds the files it applies to.  A script
-imports these from here, never from another script, so the order ``p1`` to ``p7`` is a run order only.
+imports these from here, never from another script, so the order ``p1`` to ``p7`` is a run order only
+(the open-item array helpers and the 09 schedule proposals are here for that reason).
 """
 
 from __future__ import annotations
@@ -15,7 +16,10 @@ from typing import Any
 from specdev_tools.core.ambiguity_items import ANCHOR_STEP
 from specdev_tools.core.plan_files import MILESTONE_KEY, plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
-from specdev_tools.graph.names import ROW_DONE
+from specdev_tools.graph.ids import mint_slug
+from specdev_tools.graph.model import Graph
+from specdev_tools.graph.names import ABOUT, ROW_DONE
+from specdev_tools.graph.resolve import link_target_allowed
 from specdev_tools.lifecycle.anchor_store import is_legacy_close
 from specdev_tools.migration.context import CAPTURE_REL, MigrationContext
 
@@ -24,6 +28,10 @@ LEGACY = "legacy_"
 RENAMES_KEY = "renames"
 """The capture section that lists the ids phase 2 renamed."""
 ROADMAP_STEP = "14"
+AMBIGUITY = "ambiguity-item"
+PLAN_HOLDER_STEP = "16a"
+"""The step the graph gives every open item of a plan file."""
+OPEN_ITEM_ID_PREFIX = "amb-"
 VERDICT_VERIFIED = "verified"
 CAPTURE_STATUS = "milestone_status"
 SOURCE_ROADMAP = "14.status"
@@ -165,6 +173,75 @@ def capture_renames(ctx: MigrationContext) -> dict[str, dict[str, str]]:
     for entry in renames if isinstance(renames, list) else ():
         if isinstance(entry, dict):
             found.setdefault(entry["kind"], {})[entry["old"]] = entry["new"]
+    return found
+
+
+# --- open items of a plan and the 09 milestone schedule ------------------------------------------------------------------
+
+
+def array_at(data: dict[str, Any], location: str) -> list[Any] | None:
+    """The list at a dotted ``.a.b`` location of *data*, ``None`` when a key or the list is missing."""
+    node: Any = data
+    for key in location.lstrip(".").split("."):
+        node = node.get(key) if isinstance(node, dict) else None
+    return node if isinstance(node, list) else None
+
+
+def ensure_array(data: dict[str, Any], location: str) -> list[Any]:
+    """The list at a dotted ``.a.b`` location of *data*; the missing keys and the list are made (a key after the last one holds the list)."""
+    *walk, last = location.lstrip(".").split(".")
+    node = data
+    for key in walk:
+        node = node.setdefault(key, {})
+    return node.setdefault(last, [])
+
+
+def has_open_item(array: list[Any], description: str, about: list[str]) -> bool:
+    """Whether *array* holds an item with this description and ``about``."""
+    return any(isinstance(entry, dict) and entry.get("description") == description and entry.get("about") == about for entry in array)
+
+
+def add_open_item(array: list[Any], description: str, about: list[str], taken: set[str], label: str) -> bool:
+    """Append a unified open item to *array* unless ``has_open_item``; its id is minted from *label*, free of *taken* (and added to it).  Returns whether it added one."""
+    if has_open_item(array, description, about):
+        return False
+    new_id = mint_slug(label, taken, prefix=OPEN_ITEM_ID_PREFIX)
+    taken.add(new_id)
+    array.append({"id": new_id, "description": description, "about": about})
+    return True
+
+
+def about_allowed(graph: Graph, holder_step: str, target_id: str) -> bool:
+    """Whether an open item of step *holder_step* may name *target_id* in ``about``: the node exists and is in an earlier step (E700, E701, E702 stay quiet)."""
+    decl = next(link for link in graph.decls[AMBIGUITY].links if link.field == ABOUT)
+    target = graph.by_id.get(target_id)
+    return target is not None and link_target_allowed(decl, holder_step, target, graph.shape)
+
+
+def schedule_proposals(ctx, graph, kind_of: dict[str, str]) -> dict[str, list[str]]:
+    """``{09 milestone id (now): obligation ids it could schedule}``: the typed ``deliverables`` of the milestone and the FRs of the paired 14 milestones.
+
+    Read from ``capture.json`` (``milestone_links``): the 09 rows are keyed by the id the milestone had when the capture
+    was made, the 14 rows name their 09 milestones in ``legacy_source_milestones`` by the same old ids; ``capture_renames``
+    maps an old 09 id to its id now.  Only ids of a kind the registry lets a 09 milestone schedule are proposed.
+    """
+    renames = capture_renames(ctx).get("design-milestone", {})
+    decl = graph.decls.get("design-milestone")
+    allowed = {k for link in (decl.links if decl else ()) if link.field == "schedules" for k in link.kinds}
+    rows = ctx.documents.load(CAPTURE_REL).data.get("milestone_links") or []
+    paired: dict[str, list[str]] = {}
+    for row in rows:
+        if row.get("step") == "14":
+            for old in row.get("legacy_source_milestones") or []:
+                paired.setdefault(old, []).extend(row.get("legacy_fr_refs") or [])
+    found: dict[str, list[str]] = {}
+    for row in rows:
+        if row.get("step") != "09":
+            continue
+        old = str(row["milestone"])
+        ids = [e.get("id") for e in row.get("legacy_deliverables") or [] if isinstance(e, dict)] + paired.get(old, [])
+        unique = list(dict.fromkeys(i for i in ids if isinstance(i, str) and kind_of.get(i) in allowed))
+        found[renames.get(old, old)] = unique
     return found
 
 

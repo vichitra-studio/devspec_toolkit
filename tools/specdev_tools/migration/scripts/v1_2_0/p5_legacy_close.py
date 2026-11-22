@@ -88,8 +88,10 @@ def _conflicts(ctx) -> list[WorklistItem]:
             ROADMAP_STEP, KIND_CONFLICT, milestone, audience="operator", blocking=True,
             evidence=f"the sources of {milestone} disagree: {said} ({outcome})",
             proposal=(
-                f"confirm that {milestone} is done; if it is not, set its anchor row back to in_progress and delete the row's `close` "
-                "(`specdev json patch` and `specdev json delete` on 16_impl_context.json), which unfreezes its plan"
+                f"decide this item first, before any other work of the pass. If {milestone} is done, resolve the item. If it is not: undo the migration "
+                "(`git checkout -- spec && git clean -fd spec` before the migration commit; `git revert <the migration commit>` after it), correct in the 1.1.1 spec each source "
+                "that says done (the evidence names them), commit, and run `specdev align apply spec --auto` again: the milestone is then open and its plan is migrated as an open plan "
+                "(see the host guide, 'A milestone closed by mistake')"
                 if milestone in closed else f"decide whether {milestone} is done and close it with `specdev milestone close`"
             ),
         ))

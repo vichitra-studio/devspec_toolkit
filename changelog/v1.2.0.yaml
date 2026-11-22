@@ -1913,7 +1913,8 @@ changes:
     description: >
       Migration script p3_remove (mechanical). Removes the fields 1.2.0 dropped
       (the *_refs_ingested lists, tech_stack, task status and assumptions,
-      stored computed names, ...) after capture.json holds the values a later
+      stored computed names (on node objects only; a key of that name inside a
+      fixture's payload stays), ...) after capture.json holds the values a later
       pass reads; a plan that was done before 1.2.0 loses from this script only
       the stored computed names (content_hash, chain_stamp, and the
       milestone_ref, nfr_refs and fixture_ref of a checklist item); the
@@ -2055,7 +2056,8 @@ changes:
   - type: add_script
     description: >
       Migration script p4_nfr_verifiers (judgement). Each in-play NFR that
-      nothing verifies gets a worklist item with a candidate job.
+      nothing verifies gets a worklist item; the item names a candidate job
+      only when a job's own text mentions the NFR.
     migration:
       action: auto
       script: p4_nfr_verifiers
@@ -2104,7 +2106,9 @@ changes:
       hook and lock files and lists, as worklist items, the retired commands
       found in them (validate-all, matrix, ... with file and line) and the host
       declarations the host lacks (release_tag_pattern, setup_command,
-      code_tree_exclusions, a pin source for each third party). It writes
+      code_tree_exclusions, a pin source for each third party, each as a pair of
+      commands that is safe to run in any order and creates the file when it
+      does not exist). It writes
       nothing outside spec/, and no file of the host.
     migration:
       action: auto

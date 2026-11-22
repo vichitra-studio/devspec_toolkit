@@ -13,7 +13,7 @@
 
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
-| `ambiguity-about` | operator | An open item of a plan does not name exactly one node of an earlier step | `specdev json patch --id <item-id> .about '["<node-id>"]'`, then remove each old field with `specdev json delete <file> '<item path>.<field>'` |
+| `ambiguity-about` | operator | An open item of a plan does not name exactly one node of an earlier step | Answer it in the spec, then delete the item: `specdev json delete --id <item-id>`. An `about` (`specdev json patch --id <item-id> .about '["<node-id>"]'`, then `specdev json delete <file> '<item path>.<field>'` for each old field) repairs the item's shape (E520) and nothing more: the merge check (`align validate`) reports E631 for every open item outside a frozen plan until it is deleted. A question that is still open is deleted here and raised again after the migration |
 | `plan-security-item` | operator | A closed plan asked for a fixture or a spec change that was never made (the plan is not changed) | Raise it again in the right artifact (a fixture: `specdev json insert --step 08 .fixtures '{...}'`), or drop it |
 | `spec-ref-realises` | agent | A plan item's `spec_ref` names a task; the item must `realises` task criteria | `specdev json insert --id <plan-item-id> .realises '"<criterion-id>"'` (the proposal names the criteria), then remove the old field of that item: `specdev json delete <plan file> '.plan.spec_alignment.checklist[<N>].spec_ref'` (`<N>` is the item's place in the plan's `checklist`; the plan item is still an error, E520, until the field is gone; `--id` removes a whole node, not a field, so the file form with a path is the one that deletes a field) |
 

@@ -146,7 +146,7 @@ agent (66 open):
 
 Each item has an id, a step, a kind, the node or file it is about, the evidence the script saw and, when it has one, a proposal. **operator** items need a decision of a person. **agent** items are ones an agent can work out from the spec and propose, which a person confirms. `BLOCKING` is a display hint: it sorts the list, and nothing refuses on it. `--step NN`, `--audience operator|agent` and `--json` narrow or reformat the list. The list is ordered by audience, blocking first, then step and kind.
 
-Read the `status-conflict` items first (`--step 14` lists them). Each names the sources that disagree about a milestone and says which one closed it. A milestone closed by mistake is reopened by setting its anchor row back to `in_progress` and deleting its `close` (`specdev json patch` and `specdev json delete` on `16_impl_context.json`); its plan is then unfrozen.
+Decide the `status-conflict` items first (`--step 14` lists them), before any other work of the pass. Each names the sources that disagree about a milestone and says which one closed it. If the milestone is done, resolve the item. If it is not, the migration closed it by mistake, and the way to reopen it is in the 1.1.1 spec, before the migration; see "A milestone closed by mistake" below.
 
 The kinds you will meet most, by what you do:
 
@@ -155,7 +155,7 @@ The kinds you will meet most, by what you do:
 | `trace-link`, `fixture-target`, `legacy-ref`, `schedules`, `connection-external` | a link field the old data could not fix: say what the node derives from, verifies or schedules |
 | `scope-reason`, `rule-reason` | the reason a `later` or `out` item or a rule needs; no reason is invented |
 | `legacy-exit-condition` | the old exit condition is now a task criterion; name what it `refines` |
-| `legacy-open-item`, `anchor-open-item`, `ambiguity-about`, `duplicate-promoted-item` | an open item without an `about`, or kept in two places: write the answer into the spec and delete the item, or give it an `about` |
+| `legacy-open-item`, `anchor-open-item`, `ambiguity-about`, `duplicate-promoted-item` | an open item without an `about`, or kept in two places: write the answer into the spec and delete the item (`specdev json delete --id <item-id>`). An `about` repairs the item's shape (E520) and nothing more: `spec-check --merge`, which `align validate` runs, reports E631 for every open item outside a frozen plan until the item is deleted. A question that is still open is deleted here and raised again after the migration |
 | `third-party-proposal`, `external-dependency`, `host-pin-source` | an external component or a dependency written as a sentence in step 09: decide whether it is a third party and give its pin |
 | `seed-route-cleanup`, `decisions-seed` | a seed no node distils, or a decisions seed that folds into others |
 | `spec-ref-realises`, `pending-task`, `plan-item-disposition` | a plan item of an open plan, or a task of a closed milestone, that needs a decision |
@@ -240,9 +240,25 @@ E744 task task-x falls under inv-y through cmp-z but no criterion of the task re
 
 You have two answers. Narrow the invariant to the requirement or API it is really about (change its `constrains` to name that node instead of the component), or add a task criterion to each task that `refines` the invariant and is `verified_by` a fixture or job that verifies it. The tasks of closed milestones are not asked. On the two real hosts nearly every invariant named a component, but only a dozen tasks (or none) were in reach, so this is a short list; no worklist item is written for it.
 
+### A milestone closed by mistake
+
+A milestone is closed by the migration when any one of three 1.1.1 sources says it is done: its `status` in `14_roadmap.json`, the `status` of its row in `16_impl_context.json`, or the `verdict` (`verified`) in the `review` block of its plan file. The migration keeps what they said, so a second run closes it again, and its plan is then a closed plan, not an open one. Reopening it in the migrated spec (setting the anchor row to `in_progress` and deleting its `close`) leaves a plan with 1.1.1 fields that the open-plan scripts never reshaped. To reopen it, undo the migration, correct the 1.1.1 spec, and run it again:
+
+1. Undo the migration. Before the migration commit: `git checkout -- spec && git clean -fd spec`. After it: `git revert --no-edit <the migration commit>`.
+2. Correct each source that says done. The item's evidence names them (`14 says done`, `anchor says done`, `16c verdict verified`). `specdev json patch` works on the 1.1.1 files with the toolkit's `--repo-root`:
+
+   ```bash
+   specdev json patch spec/14_roadmap.json '.milestones[<N>].status' '"in_progress"' --repo-root $TK
+   specdev json patch spec/16_impl_context.json '.plan.milestone_index[<N>].status' '"in_progress"' --repo-root $TK
+   specdev json patch spec/impl_context/ms_<batch>_plan.json '.review.verdict' '"needs_work"' --repo-root $TK
+   ```
+
+   (`<N>` is the place of the milestone or row in its list; `specdev json read <file> '<path>'` shows it. Patch only the sources the item names.)
+3. Commit, then run `specdev align apply spec --auto --repo-root $TK --git-root .` again. Followed on a copy of the example host for its `ms-late-fees` (whose only source saying done was the roadmap `status`): after the undo by either form and the one patch, the run printed no `legacy close` line for it, the worklist held no `status-conflict` item, and its anchor row read `pending`. For a milestone that all three sources called done, the same three patches left the row `in_progress`, the run closed no milestone but the ones still done, and `spec-check` reported on its plan only what it reports on any open plan (E520 for the `spec_ref` and missing `realises` of each item, E304 `ROADMAP_TASK_UNCOVERED`), which the open-plan paragraph below tells you to repair.
+
 ### An open plan
 
-A plan whose milestone is still open is not frozen. If the plan was deferred as a whole, the worklist holds one `plan-item-disposition` item about its milestone that quotes the old reason: `specdev milestone defer <milestone-id> --reason "..."` keeps the deferral. The migration removed its old progress fields (`execution.execution_results`, `implementation.status`, an action's `evidence`, `review.fixture_status` and the like); their values are not copied into the capture. Read them in git: `specdev align triage spec --legacy 16a` prints the plan files as they were (`--legacy 16` prints only the anchor file `16_impl_context.json`). **Record each action that was carried out again** with `specdev plan record <item>/<action>` (see `specdev plan record --help`); the close gate asks for the records by name. A plan item keeps its `spec_ref` (with its pins) until you write `realises` on the item and delete the old field with the file form, `specdev json delete <plan file> '.plan.spec_alignment.checklist[<N>].spec_ref'` (`<N>` is the item's place in the `checklist`): the `spec-ref-realises` items say which items. Items marked deferred or dropped in the old plan are `plan-item-disposition` items for you, not open items in the plan. A frozen plan (a milestone whose anchor row says `done`) is changed by the migration in three things and by nothing else, and you never edit it: it gains the `milestone` key; the names the toolkit now computes are removed from it (`milestone_ref`, `nfr_refs` and `fixture_ref` of its plan items, and a stored `content_hash` or `chain_stamp`); and its open items (`execution.emergent_ambiguities` and the like) are removed from it and listed as `legacy-open-item` worklist items (a closed plan keeps no open item; the old item is in the capture and in git).
+A plan whose milestone is still open is not frozen (this is also the plan of a milestone you had the migration reopen, see "A milestone closed by mistake"). If the plan was deferred as a whole, the worklist holds one `plan-item-disposition` item about its milestone that quotes the old reason: `specdev milestone defer <milestone-id> --reason "..."` keeps the deferral. The migration removed its old progress fields (`execution.execution_results`, `implementation.status`, an action's `evidence`, `review.fixture_status` and the like); their values are not copied into the capture. Read them in git: `specdev align triage spec --legacy 16a` prints the plan files as they were (`--legacy 16` prints only the anchor file `16_impl_context.json`). **Record each action that was carried out again** with `specdev plan record <item>/<action>` (see `specdev plan record --help`); the close gate asks for the records by name. A plan item keeps its `spec_ref` (with its pins) until you write `realises` on the item and delete the old field with the file form, `specdev json delete <plan file> '.plan.spec_alignment.checklist[<N>].spec_ref'` (`<N>` is the item's place in the `checklist`): the `spec-ref-realises` items say which items. Items marked deferred or dropped in the old plan are `plan-item-disposition` items for you, not open items in the plan. A frozen plan (a milestone whose anchor row says `done`) is changed by the migration in three things and by nothing else, and you never edit it: it gains the `milestone` key; the names the toolkit now computes are removed from it (`milestone_ref`, `nfr_refs` and `fixture_ref` of its plan items, and a stored `content_hash` or `chain_stamp`); and its open items (`execution.emergent_ambiguities` and the like) are removed from it and listed as `legacy-open-item` worklist items (a closed plan keeps no open item; the old item is in the capture and in git).
 
 ## Step 7: finish
 
@@ -322,7 +338,7 @@ The mechanical stage removes about 60 to 70 percent of the errors. What is left,
 | Left after the stage | Larger host | Smaller host | Who clears it |
 |---|---|---|---|
 | `E882` baseline links | 1,948 | 386 | a person, one `attest <node> --yes` per node |
-| `E752` an id in live text | 1,409 | 148 | reword, or write the link |
+| `E752` an id in live text (closed step-14 nodes not counted) | 1,337 | 112 | reword, or write the link |
 | `E520` a field only a person can give (`derives_from`, `refines` on task criteria, `scope_reason`, `pin`) | 884 | 323 | a person, from the worklist |
 | `E740` a node nothing links to | 854 | 197 | link it, or give it a scope reason |
 | `E743` / `E742` no verifier / an unused verifier | 304 / 109 | 79 / 23 | a fixture or job that `verifies`, a `verified_by` |

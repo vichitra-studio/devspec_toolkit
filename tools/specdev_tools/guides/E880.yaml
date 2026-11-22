@@ -8,9 +8,9 @@ trigger: |
       names a folder that is not one.
     - "records no toolkit_version": spec/specdev_version has no
       toolkit_version, or the file does not exist.
-    - "older than 1.0.0", "newer than this toolkit", or "is not a version
-      listed in <toolkit>/changelog": the stamp names a version the migration
-      cannot start from.
+    - "is not a version number", "older than 1.0.0", "newer than this
+      toolkit", or "is not a version listed in <toolkit>/changelog": the stamp
+      names a version the migration cannot start from.
     - "has uncommitted changes": spec/ is not committed.
   A dry run (--dry-run) is allowed on a dirty spec/, and a run that resumes (the
   stamp says migration_status: in_progress) is allowed too.
@@ -25,8 +25,9 @@ resolution: |
      spec as already migrated and never runs.
   3. A version the migration cannot start from: update the toolkit submodule to
      the release you migrate to ("newer than this toolkit"); for a version the
-     changelog does not list, put the version the spec was really built with
-     back into the stamp.
+     changelog does not list, or a stamp that is not a version number (for
+     example `toolkit_version: "abc"`), put the version the spec was really
+     built with into the stamp.
   4. Uncommitted changes: commit them (the migration is reviewed with
      `git diff spec` and undone with `git checkout -- spec && git clean -fd
      spec`), or pass --allow-dirty when the changes are the ones you want migrated.

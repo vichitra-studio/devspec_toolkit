@@ -24,14 +24,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.contract import path_steps
 from specdev_tools.graph.model import LIFECYCLES, Node
 from specdev_tools.graph.names import ABOUT, CONNECTS_TO
 from specdev_tools.migration.maps import LEGACY_STEP_IDS, legacy_ref_fields, shape_rows
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.spec_reads import capture_renames, closed_plan_files, row_step, step_file
+from specdev_tools.migration.spec_reads import closed_plan_files, row_step, schedule_proposals, step_file
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 from specdev_tools.migration.writer import WriterError
 
@@ -376,33 +375,6 @@ class _Pass:
             if item.get("scope") in (SCOPE_LATER, SCOPE_OUT) and not item.get("scope_reason"):
                 self.worklist(node, KIND_SCOPE_REASON, "", f"{node.id} has scope `{item['scope']}` and no scope_reason; the old data gave none",
                               "write why, from the seed or the charter; no reason is invented here", blocking=True)
-
-
-def schedule_proposals(ctx, graph, kind_of: dict[str, str]) -> dict[str, list[str]]:
-    """``{09 milestone id (now): obligation ids it could schedule}``: the typed ``deliverables`` of the milestone and the FRs of the paired 14 milestones.
-
-    Read from ``capture.json`` (``milestone_links``): the 09 rows are keyed by the id the milestone had when the capture
-    was made, the 14 rows name their 09 milestones in ``legacy_source_milestones`` by the same old ids; ``capture_renames``
-    maps an old 09 id to its id now.  Only ids of a kind the registry lets a 09 milestone schedule are proposed.
-    """
-    renames = capture_renames(ctx).get("design-milestone", {})
-    decl = graph.decls.get("design-milestone")
-    allowed = {k for link in (decl.links if decl else ()) if link.field == "schedules" for k in link.kinds}
-    rows = ctx.documents.load(CAPTURE_REL).data.get("milestone_links") or []
-    paired: dict[str, list[str]] = {}
-    for row in rows:
-        if row.get("step") == "14":
-            for old in row.get("legacy_source_milestones") or []:
-                paired.setdefault(old, []).extend(row.get("legacy_fr_refs") or [])
-    found: dict[str, list[str]] = {}
-    for row in rows:
-        if row.get("step") != "09":
-            continue
-        old = str(row["milestone"])
-        ids = [e.get("id") for e in row.get("legacy_deliverables") or [] if isinstance(e, dict)] + paired.get(old, [])
-        unique = list(dict.fromkeys(i for i in ids if isinstance(i, str) and kind_of.get(i) in allowed))
-        found[renames.get(old, old)] = unique
-    return found
 
 
 def _run(ctx, write: bool) -> tuple[_Plan, list[WorklistItem]]:

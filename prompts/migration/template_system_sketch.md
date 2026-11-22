@@ -15,9 +15,9 @@
 |---|---|---|---|
 | `third-party-proposal` | agent | A `tech_stack` entry of steps 02, 09 or 14 that may be a third party; the item shows a name, a pin and a rationale to judge | Add it: `specdev json insert --step 02 .third_parties '{"third_party_id":"<id>","name":"<name>","pin":"<exact version>","derives_from":["<seed-or-constraint-id>"]}'`; link each user: `specdev json insert --id <node-id> .relies_on '"<third-party-id>"'`; or drop the entry |
 | `external-component` | agent | An external component became a `third_parties` entry with no pin and no `derives_from` (E520 until filled); what used it may now lack a component (E590) | `specdev third-party pin <third-party-id> <exact version>`, `specdev json patch --id <third-party-id> .derives_from '["<seed-or-constraint-id>"]'`; point its users at it (`connects_to`, `relies_on`); name a component for the capability |
-| `external-dependency` | agent | A step-09 dependency named an external party; the entry was copied nowhere | Relate it to the third-party node: `specdev json insert --id <api-id> .relies_on '"<third-party-id>"'` or `specdev json insert --id <connection-id> .connects_to '"<third-party-id>"'`; or drop it |
-| `connection-external` | agent | A connection pointed at an external component; the third-party node replaces it | Once the node exists: `specdev json insert --id <connection-id> .connects_to '"<third-party-id>"'` |
-| `host-pin-source` | operator | No tracked file states the version of a third party, so no pin source could be derived | Add where the repository states it under `pin_sources` of `spec/common/host_declarations.json` (the item prints the shape; `docs/developers/host_declarations.md`): `specdev json patch spec/common/host_declarations.json '.pin_sources["<third-party-id>"]' '[<source>]'` |
+| `external-dependency` | agent | A step-09 dependency named an external party; the entry was copied nowhere | Relate it to the third-party node: `specdev json insert --id <api-id> .relies_on '"<third-party-id>"'` or, for a connection that has no `connects_to` yet, `specdev json patch --id <connection-id> .connects_to '["<third-party-id>"]'` (`json insert` refuses there with E767; once the connection lists a destination, `specdev json insert --id <connection-id> .connects_to '"<third-party-id>"'` adds another); or drop it |
+| `connection-external` | agent | A connection pointed at an external component; the third-party node replaces it | Once the node exists: `specdev json patch --id <connection-id> .connects_to '["<third-party-id>"]'` (the connection has no `connects_to` yet; `json insert` refuses there with E767) |
+| `host-pin-source` | operator | No tracked file states the version of a third party, so no pin source could be derived | Add where the repository states it under `pin_sources` of `spec/common/host_declarations.json` (the item prints the two commands, with the shape of a source when none could be derived; `docs/developers/host_declarations.md`): `specdev json insert spec/common/host_declarations.json . '{}' --create-schema vc:host-declarations` creates the file when it does not exist and changes nothing when it does, then `specdev json patch spec/common/host_declarations.json '.pin_sources["<third-party-id>"]' '[<source>]'` sets the entry of this third party and leaves the others |
 
 ### Items any step can carry
 
@@ -63,7 +63,7 @@
 - `connections`: Required when 2 or more components exist (minItems: 1). Each entry requires:
   - `connection_id`: kebab-case identifier of the connection.
   - `derives_from`: Array of component ids (minItems: 1) naming the source component.
-  - `connects_to`: Array of component or third-party ids (minItems: 1) naming the destination.
+  - `connects_to`: Array of component or third-party ids (minItems: 1) naming the destination. (`specdev json schema spec/02_system_sketch.json .connections[0]` cannot answer for this step and prints `Could not navigate to path`: a fault of the toolkit older than this release; read the toolkit's `schema/02_system_sketch.schema.json` instead.)
   - `protocol`: Must be one of `http | grpc | event | rpc | db | file`.
   - `trust_boundary`: Must be one of `internal | partner | public`.
   - When `trust_boundary` is `partner` or `public`: `auth` and `rate_limit` are also required.

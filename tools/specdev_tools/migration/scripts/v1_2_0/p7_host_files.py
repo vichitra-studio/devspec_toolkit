@@ -32,7 +32,7 @@ from specdev_tools.host_install import PRE_COMMIT_FILE, host_workflow_files, ret
 from specdev_tools.migration.context import GitReadError, MigrationContext
 from specdev_tools.migration.registry import PHASE_HOST_FILES, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.spec_reads import step_data
-from specdev_tools.migration.worklist import AUDIENCE_OPERATOR, WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.worklist import AUDIENCE_OPERATOR, WorklistItem, add_items, changed_but_worklist, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p7_host_files", phase=PHASE_HOST_FILES, touches=("extras",))
 
@@ -200,19 +200,38 @@ def _json_pointer_for(host: Path, lock: str, entry: dict[str, Any]) -> tuple[str
     return None
 
 
+_UNDERIVED_SOURCES = '[{"type": "json-pointer", "file": "<file>", "pointer": "<JSON pointer to the version>"}]'
+_REGEX_SHAPE = '{"type": "regex", "file": "<file>", "pattern": "<regex with one capture group around the version>"}'
+
+
+def _pin_proposal(ctx: MigrationContext, third_party: str, sources: str) -> str:
+    """The two commands that declare *sources* for *third_party*, safe after any other proposal of the run, in any order, one third party after another.
+
+    The first creates ``host_declarations.json`` when it does not exist and changes nothing when it does (it inserts an empty object); the second
+    sets this one id under ``pin_sources`` and leaves every other key and every other id as it is.  (One ``json insert`` of a whole ``pin_sources``
+    object per third party would replace the key, so each later one would delete the earlier ones.)
+    """
+    path = _declarations_path(ctx)
+    pointer = shlex.quote(f".pin_sources[{json.dumps(third_party)}]")
+    return (
+        f"declare where the repository states the version of {third_party} (the migration does not write {path}; the first command creates the file when it does not exist and changes nothing when it does, "
+        f"the second sets the entry of {third_party} and leaves the other entries): "
+        f"specdev json insert {path} . '{{}}' --create-schema vc:host-declarations && specdev json patch {path} {pointer} {shlex.quote(sources)}"
+    )
+
+
 def _pin_item(ctx: MigrationContext, host: Path, entry: dict[str, Any], locks: list[str]) -> WorklistItem:
     third_party = entry["third_party_id"]
     pin = entry.get("pin")
     seen = f"lock or requirement files tracked by the repository: {', '.join(locks)}" if locks else "no lock or requirement file is tracked by the repository"
     found = next((hit for lock in locks if lock == JSON_LOCK_FILE for hit in [_json_pointer_for(host, lock, entry)] if hit), None)
     if found is None:
-        evidence = f"the pin is {pin!r}; {seen}; no source could be derived, so write one by hand (see docs/developers/host_declarations.md)"
-        return make_item(STEP_SYSTEM_SKETCH, KIND_PIN_SOURCE, third_party, audience=AUDIENCE_OPERATOR, blocking=False, evidence=evidence,
-                         proposal=f"declare where the repository states the version of {third_party} under pin_sources of {_declarations_path(ctx)}; the migration does not write that file")
+        evidence = f"the pin is {pin!r}; {seen}; no source could be derived, so the command below spells out the shape of a source: replace the <...> parts (for a text file give {_REGEX_SHAPE} instead; docs/developers/host_declarations.md)"
+        return make_item(STEP_SYSTEM_SKETCH, KIND_PIN_SOURCE, third_party, audience=AUDIENCE_OPERATOR, blocking=False, evidence=evidence, proposal=_pin_proposal(ctx, third_party, _UNDERIVED_SOURCES))
     pointer, version = found
     evidence = f"the pin is {pin!r}; {JSON_LOCK_FILE} lists the package at {version!r}"
     source = {"type": "json-pointer", "file": JSON_LOCK_FILE, "pointer": pointer}
-    return _declaration_item(ctx, third_party, evidence, {"pin_sources": {third_party: [source]}}, step=STEP_SYSTEM_SKETCH, kind=KIND_PIN_SOURCE)
+    return make_item(STEP_SYSTEM_SKETCH, KIND_PIN_SOURCE, third_party, audience=AUDIENCE_OPERATOR, blocking=False, evidence=evidence, proposal=_pin_proposal(ctx, third_party, _fragment_text([source])))
 
 
 def _declaration_items(ctx: MigrationContext, host: Path) -> list[WorklistItem]:
@@ -261,6 +280,4 @@ def apply(ctx) -> ScriptResult:
 
 def verify(before, after) -> list[Problem]:
     """Only the worklist file changed: a host's declarations and every other spec file are as they were."""
-    listed = WORKLIST_FILE.replace(os.sep, "/")
-    changed = sorted(rel for rel in set(before.files) | set(after.files) if before.files.get(rel) != after.files.get(rel) and rel != listed)
-    return [Problem(f"changed {rel}; this script adds worklist items only", rel) for rel in changed]
+    return [Problem(f"changed {rel}; this script adds worklist items only", rel) for rel in changed_but_worklist(before, after)]

@@ -448,3 +448,27 @@ def test_the_field_lists_of_steps_00_to_05_name_fields_of_their_schema(template_
         fields = {n for i, n in enumerate(names) if i == 0 or "_" in n}
         unknown |= {n for n in fields if n not in known and n not in replaced and n not in SHAPE_EXCEPTIONS.get(template_name, set())}
     assert unknown == set()
+
+
+def test_open_item_rows_say_the_merge_check_wants_the_item_deleted() -> None:
+    """A row that offers an `about` or raising an item again says E631 and the deletion: neither finishes the migration."""
+    for name in ("template_impl_context.md", "template_impl_coder.md", "template_impl_planner.md"):
+        rows = [line for line in _text(name).splitlines() if re.match(r"\| `(ambiguity-about|anchor-open-item|legacy-open-item|duplicate-promoted-item)`", line)]
+        assert rows, name
+        for row in rows:
+            assert "E631" in row, row
+    assert "json delete --id <item-id>" in _text("template_impl_context.md")
+
+
+def test_status_conflict_row_reopens_in_the_1_1_1_spec() -> None:
+    """A milestone closed by mistake is reopened by undoing the migration and correcting the 1.1.1 sources, not in the migrated spec."""
+    row = next(line for line in _text("template_roadmap.md").splitlines() if line.startswith("| `status-conflict`"))
+    assert "git revert" in row and "align apply spec --auto" in row and ".review.verdict" in row
+    assert "delete the row's `close`" not in row
+
+
+def test_connection_external_rows_patch_the_first_destination() -> None:
+    """A connection with no `connects_to` takes its first destination by `json patch`: `json insert` refuses there (E767)."""
+    rows = [line for line in _text("template_system_sketch.md").splitlines() if line.startswith(("| `external-dependency`", "| `connection-external`"))]
+    assert len(rows) == 2
+    assert all(".connects_to '[\"<third-party-id>\"]'" in row for row in rows)

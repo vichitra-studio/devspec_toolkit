@@ -19,8 +19,7 @@ The id of an item is unique across the spec (E704): of two items with one id the
 ``-3`` name and the rename is recorded in the capture's ``renames`` section (kind ``ambiguity-item``).  There is no bound on the number of items (the plan-size warning covers volume).
 Closed plans change only by the removal of their open items; every other legacy field of a closed plan stays history.
 
-``add_open_item`` is the one writer of a NEW unified item into an array; ``p4_plan_dispositions`` and
-``p4_plan_security_items`` call it.
+``spec_reads.add_open_item`` is the one writer of a NEW unified item into an array; ``p4_plan_security_items`` calls it.
 """
 
 from __future__ import annotations
@@ -33,21 +32,16 @@ from typing import Any
 from specdev_tools.core.ambiguity_items import ANCHOR_STEP, AmbiguityItem, is_open, iter_ambiguity_items
 from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.ids import first_free_id, mint_slug
+from specdev_tools.graph.ids import first_free_id
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.names import ABOUT
-from specdev_tools.graph.resolve import link_target_allowed
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_id_collisions import AMBIGUITY
-from specdev_tools.migration.spec_reads import capture_renames, closed_plan_files, plan_milestones, RENAMES_KEY
-from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.spec_reads import AMBIGUITY, PLAN_HOLDER_STEP, RENAMES_KEY, about_allowed, array_at, capture_renames, closed_plan_files, ensure_array, plan_milestones
+from specdev_tools.migration.worklist import OPEN_ITEM_RULE, WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_ambiguities", phase=PHASE_CONTENT, requires=("p3_remove",), touches=("16", "extras"))
 
 KIND_FROZEN_ITEM = "legacy-open-item"
 KIND_ABOUT = "ambiguity-about"
-ID_PREFIX = "amb-"
-PLAN_HOLDER_STEP = "16a"
 _LEGACY_STEPS = frozenset({ANCHOR_STEP, "16a", "16b"})
 _ITEM_FIELDS = ("id", "description", "about", "decision", "proposed_assumption")
 _LOCATION_TAG = {"16": "anchor", "16a": "plan", "16b": "emergent"}
@@ -67,60 +61,21 @@ class Planned:
     milestone: str | None
 
 
-def array_at(data: dict[str, Any], location: str) -> list[Any] | None:
-    """The list at a dotted ``.a.b`` location of *data*, ``None`` when a key or the list is missing."""
-    node: Any = data
-    for key in location.lstrip(".").split("."):
-        node = node.get(key) if isinstance(node, dict) else None
-    return node if isinstance(node, list) else None
-
-
-def ensure_array(data: dict[str, Any], location: str) -> list[Any]:
-    """The list at a dotted ``.a.b`` location of *data*; the missing keys and the list are made (a key after the last one holds the list)."""
-    *walk, last = location.lstrip(".").split(".")
-    node = data
-    for key in walk:
-        node = node.setdefault(key, {})
-    return node.setdefault(last, [])
-
-
-def has_open_item(array: list[Any], description: str, about: list[str]) -> bool:
-    """Whether *array* holds an item with this description and ``about``."""
-    return any(isinstance(entry, dict) and entry.get("description") == description and entry.get("about") == about for entry in array)
-
-
-def add_open_item(array: list[Any], description: str, about: list[str], taken: set[str], label: str) -> bool:
-    """Append a unified open item to *array* unless ``has_open_item``; its id is minted from *label*, free of *taken* (and added to it).  Returns whether it added one."""
-    if has_open_item(array, description, about):
-        return False
-    new_id = mint_slug(label, taken, prefix=ID_PREFIX)
-    taken.add(new_id)
-    array.append({"id": new_id, "description": description, "about": about})
-    return True
-
-
 def _flat_renames(ctx) -> dict[str, str]:
     return {old: new for by_kind in capture_renames(ctx).values() for old, new in by_kind.items()}
 
 
 def _legacy_entries(ctx) -> list[tuple[AmbiguityItem, int]]:
-    """Every legacy item of the three locations in file order, with its index in its array."""
+    """Every legacy item of the three locations in file order, with its index in its array (counted over every entry, converted ones included, so a rerun finds the right one)."""
     seen: Counter[tuple[str, str]] = Counter()
     entries = []
     for item in iter_ambiguity_items(ctx.spec_root):
-        if item.step not in _LEGACY_STEPS or item.shape != "legacy":
-            continue
         key = (item.artifact_path, item.location)
-        entries.append((item, seen[key]))
+        index = seen[key]
         seen[key] += 1
+        if item.step in _LEGACY_STEPS and item.shape == "legacy":
+            entries.append((item, index))
     return entries
-
-
-def about_allowed(graph: Graph, holder_step: str, target_id: str) -> bool:
-    """Whether an open item of step *holder_step* may name *target_id* in ``about``: the node exists and is in an earlier step (E700, E701, E702 stay quiet)."""
-    decl = next(link for link in graph.decls[AMBIGUITY].links if link.field == ABOUT)
-    target = graph.by_id.get(target_id)
-    return target is not None and link_target_allowed(decl, holder_step, target, graph.shape)
 
 
 def _about_of(raw: dict[str, Any], graph: Graph, holder_step: str, renames: dict[str, str]) -> tuple[str, ...]:
@@ -178,13 +133,13 @@ def _worklist(plans: list[Planned]) -> list[WorklistItem]:
             items.append(make_item(
                 plan.item.step, KIND_FROZEN_ITEM, about, audience="operator", blocking=False, key=f"{tag}-{plan.item.id}",
                 evidence=f"{plan.item.id} in the closed plan {plan.rel}: {_legacy_text(plan.item.raw)}",
-                proposal="raise it again in the right artifact, or drop it; the item was removed from the closed plan (the capture and git hold it)",
+                proposal=f"raise it again in the right artifact after the migration, or drop it; the item was removed from the closed plan (the capture and git hold it); {OPEN_ITEM_RULE}",
             ))
         elif plan.action == "keep":
             items.append(make_item(
                 plan.item.step, KIND_ABOUT, plan.new_id, audience="operator", blocking=True, key=f"{tag}-{plan.rel}",
                 evidence=f"{plan.new_id} in {plan.rel}: {_legacy_text(plan.item.raw)}; its impact does not name exactly one node of an earlier step (or it has no description)",
-                proposal="rewrite the item by hand as {id, description, about: [node ids]} and delete the old fields; about must name the nodes it concerns",
+                proposal=f"rewrite the item as {{id, description, about: [node ids]}} and delete the old fields (about must name the nodes it concerns); that repairs its shape (E520) and nothing more: {OPEN_ITEM_RULE}",
             ))
     return items
 

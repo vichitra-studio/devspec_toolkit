@@ -91,7 +91,7 @@ class _Work:
     def _rename_file(self, rel: str, document: dict[str, Any], renamed: dict[str, str]) -> None:
         target = f"{KINDS_DIR}/{renamed[document['kind']]}.json"
         if self.exists(target):
-            self.residue.append(f"{rel}: kind {document['kind']} is renamed {renamed[document['kind']]}, but {target} exists; left as it is")
+            self.residue.append(f"{rel}: kind {document['kind']} is renamed {renamed[document['kind']]}, but {target} exists, so {rel} is not moved and the run ends in E881: merge its entries into {target} and delete {rel}, commit, and run again")
             return
         moved = copy.deepcopy(document)
         moved["kind"] = renamed[document["kind"]]
@@ -145,12 +145,19 @@ def apply(ctx) -> ScriptResult:
     return ScriptResult(edits=work.edits + len(work.remove_files), residue=tuple(work.residue))
 
 
+def _target_note(rel: str, document: dict[str, Any], renamed: dict[str, str], documents: dict[str, Any]) -> str:
+    """Why a renamed kind's file was not moved, when the file of the new name already exists: what a person does about it."""
+    target = f"{KINDS_DIR}/{renamed[document['kind']]}.json" if document.get("kind") in renamed else None
+    return f" ({target} exists, so it was not moved: merge its entries into {target}, delete {rel}, commit, and run again)" if target in documents else ""
+
+
 def verify(before, after) -> list[Problem]:
     """No kind file of a retired or renamed kind is left, and the manifest has no entry of a retired kind."""
     config = shape_map()["host_canon"]
     gone = set(config["retired_kinds"]) | set(config["renamed_kinds"])
+    renamed = config["renamed_kinds"]
     problems = [
-        Problem(f"{rel}: a canon kind file of the kind {document.get('kind')} is left", rel)
+        Problem(f"{rel}: a canon kind file of the kind {document.get('kind')} is left" + _target_note(rel, document, renamed, after.documents), rel)
         for rel, document in sorted(after.documents.items())
         if rel.startswith(KINDS_DIR + "/") and isinstance(document, dict) and document.get("kind") in gone
     ]

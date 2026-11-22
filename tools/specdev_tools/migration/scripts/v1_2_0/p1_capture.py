@@ -26,12 +26,12 @@ from specdev_tools.core.ambiguity_items import ANCHOR_STEP, is_open, iter_ambigu
 from specdev_tools.migration.context import CAPTURE_FILE, CAPTURE_REL, MigrationContext, Snapshot
 from specdev_tools.migration.registry import PHASE_CAPTURE, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.spec_reads import LEGACY, anchor_rows, plan_rels, step_data
-from specdev_tools.migration.worklist import WORKLIST_FILE, new_worklist_data
+from specdev_tools.migration.worklist import WORKLIST_FILE, WORKLIST_REL, new_worklist_data
 
 SCRIPT = ScriptSpec("p1_capture", PHASE_CAPTURE, touches=("extras",))
 
 CAPTURE_SCHEMA = "vc:infra:migration-capture"
-_OWN_FILES = frozenset({CAPTURE_REL, WORKLIST_FILE.replace(os.sep, "/")})
+_OWN_FILES = frozenset({CAPTURE_REL, WORKLIST_REL})
 _MIGRATION_DIR = os.path.dirname(CAPTURE_FILE).replace(os.sep, "/") + "/"
 _OPEN_ITEM_STEPS = frozenset({ANCHOR_STEP, "16a", "16b"})
 _ITEM_FIELDS = ("linked_test_expectation", "fixture_ref", "checklist_status", "deferred_reason", "wont_do_reason")

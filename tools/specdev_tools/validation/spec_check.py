@@ -50,6 +50,13 @@ from .open_items import check_open_items
 from .validators.step_14_milestones import check_milestone_numbers
 
 
+_STAMP_ADVICE = (
+    "If the spec was written with this toolkit version, `specdev update` stamps it. "
+    "If it was written with an older one, write that version into spec/specdev_version "
+    '(`toolkit_version: "<version>"`), commit, and run `specdev update`, which then says a migration is needed.'
+)
+
+
 def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
     """Return [] if versions match, or [E608] on any error condition.
 
@@ -73,13 +80,13 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
                 make_error(
                     "E608",
                     "spec/specdev_version exists but is malformed or missing the `toolkit_version` key. "
-                    "Re-stamp it by running `specdev update` or fix the file manually.",
+                    + _STAMP_ADVICE,
                 )
             ]
         return [
             make_error(
                 "E608",
-                "No toolkit version recorded in spec/specdev_version. Run `specdev update` to stamp the project's toolkit version.",
+                "No toolkit version recorded in spec/specdev_version. " + _STAMP_ADVICE,
             )
         ]
 

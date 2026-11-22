@@ -31,7 +31,7 @@ from specdev_tools.core.step_paths import PLAN_DIR_NAME
 from specdev_tools.graph.build import build_graph
 from specdev_tools.migration.registry import PHASE_CLOSE, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.spec_reads import closed_milestones, LEGACY, plan_milestones, ROADMAP_STEP, step_data, step_file
-from specdev_tools.migration.worklist import WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.worklist import OPEN_ITEM_RULE, WorklistItem, add_items, changed_but_worklist, make_item, missing_items
 from specdev_tools.validation.graph_checks.context import SEED_MANIFEST_PATH, GraphCheckContext
 from specdev_tools.validation.graph_checks.seed_routes import STEP_REQUIREMENTS, TRINITY_KEYS, check_seed_routes
 
@@ -50,7 +50,6 @@ OPEN_TASK_STATUSES = ("pending", "in_progress")
 DECOMMISSIONED = "decommissioned-at-production-go-live"
 UNROUTED = "unrouted"
 _DECISION = re.compile(r"decision", re.IGNORECASE)
-_WORKLIST_REL = WORKLIST_FILE.replace("\\", "/")
 
 
 def _manifest(ctx) -> dict[str, Any]:
@@ -85,7 +84,7 @@ def _anchor_items(ctx) -> list[WorklistItem]:
         items.append(make_item(
             ANCHOR_STEP, KIND_ANCHOR_ITEM, held["id"], audience="operator", blocking=True,
             evidence=f"{held.get('description', '')} (status {held.get('status', 'none')}, about {', '.join(map(str, impact)) or 'nothing named'}); an open item in the anchor is not exempt from the open-item rule",
-            proposal="raise it again in the artifact it is about as an open item with `about`, or drop it",
+            proposal=f"answer it in the spec and delete the item, or drop it; giving it an `about` repairs its shape and nothing more: {OPEN_ITEM_RULE}",
         ))
     return items
 
@@ -204,8 +203,4 @@ def apply(ctx) -> ScriptResult:
 
 def verify(before, after) -> list[Problem]:
     """No file changed but the worklist."""
-    return [
-        Problem(f"{rel}: changed, and this script writes only the worklist", rel)
-        for rel in sorted(set(before.files) | set(after.files))
-        if before.files.get(rel) != after.files.get(rel) and rel != _WORKLIST_REL
-    ]
+    return [Problem(f"{rel}: changed, and this script writes only the worklist", rel) for rel in changed_but_worklist(before, after)]

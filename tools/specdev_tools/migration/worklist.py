@@ -26,10 +26,17 @@ from specdev_tools.migration.context import CAPTURE_FILE, MigrationContext
 from specdev_tools.migration.writer import StyledDocument
 
 WORKLIST_FILE = os.path.join(os.path.dirname(CAPTURE_FILE), "worklist.json")
+WORKLIST_REL = WORKLIST_FILE.replace(os.sep, "/")
+"""The worklist's path in the form a snapshot keys its files by (always ``/``)."""
 WORKLIST_SCHEMA = "vc:infra:migration-worklist"
 AUDIENCE_AGENT = "agent"
 AUDIENCE_OPERATOR = "operator"
 AUDIENCES = (AUDIENCE_AGENT, AUDIENCE_OPERATOR)
+OPEN_ITEM_RULE = (
+    "an open item does not survive the merge check: `specdev align validate` reports E631 for every open item outside a frozen plan until its answer is written "
+    "into the spec and the item is deleted (`specdev json delete --id <item-id>`); a question that is still open is deleted here and raised again after the migration"
+)
+"""The sentence every proposal that offers an ``about`` or "raise it again" as a way to finish carries (ruling R-a of M10 round 2)."""
 
 _ITEMS = "items"
 _SLUG_LIMIT = 60
@@ -140,6 +147,12 @@ def read_items(ctx: MigrationContext) -> list[WorklistItem]:
     if not _exists(ctx):
         return []
     return [_item_from(raw) for raw in _items_of(ctx.documents.load(WORKLIST_FILE))]
+
+
+def changed_but_worklist(before: Any, after: Any, *allowed: str) -> list[str]:
+    """The spec files (sorted, relative, ``/``-separated) whose bytes differ between two snapshots, except the worklist and *allowed*: the one test of "this script wrote nothing but the worklist"."""
+    skipped = {WORKLIST_REL, *allowed}
+    return sorted(rel for rel in set(before.files) | set(after.files) if before.files.get(rel) != after.files.get(rel) and rel not in skipped)
 
 
 def missing_items(ctx: MigrationContext, items: Iterable[WorklistItem]) -> list[WorklistItem]:

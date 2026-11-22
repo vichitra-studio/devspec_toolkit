@@ -4,7 +4,7 @@
 schedules (FR to FR and API to API ``depends_on``).  For every captured pair "A after B" (``capture.json``,
 ``milestone_ordering.pairs``; the ids are mapped through the capture's ``renames``) this script reports ``implied: true`` when an
 obligation A schedules reaches, over those ``depends_on`` links, an obligation B schedules, else ``implied: false``.  What A
-schedules is the ``schedules`` of the milestone once someone confirmed it, else the proposal of ``p3_convert.schedule_proposals``.
+schedules is the ``schedules`` of the milestone once someone confirmed it, else the proposal of ``spec_reads.schedule_proposals``.
 
 It edits no spec file and adds no check or command.  The report is the script's residue (one line per pair); each pair that
 is NOT implied is a worklist item for the step that authors the missing link (04 for an FR pair, 05 for an API pair, 09 when
@@ -18,15 +18,13 @@ from dataclasses import dataclass
 from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.spec_reads import capture_renames
-from specdev_tools.migration.scripts.v1_2_0.p3_convert import schedule_proposals
-from specdev_tools.migration.worklist import WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.spec_reads import capture_renames, schedule_proposals
+from specdev_tools.migration.worklist import WorklistItem, add_items, changed_but_worklist, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p3_ordering", phase=PHASE_SHAPES, requires=("p2_id_collisions", "p3_convert"), touches=("extras",))
 
 KIND_ORDER = "milestone-order"
 _STEP_OF_KIND = {"fr": "04", "api": "05"}
-_WORKLIST_REL = WORKLIST_FILE.replace("\\", "/")
 
 
 @dataclass(frozen=True)
@@ -103,8 +101,4 @@ def apply(ctx) -> ScriptResult:
 
 def verify(before, after) -> list[Problem]:
     """No file changed but the worklist."""
-    return [
-        Problem(f"{rel}: changed, and this script writes only the worklist", rel)
-        for rel in sorted(set(before.files) | set(after.files))
-        if before.files.get(rel) != after.files.get(rel) and rel != _WORKLIST_REL
-    ]
+    return [Problem(f"{rel}: changed, and this script writes only the worklist", rel) for rel in changed_but_worklist(before, after)]

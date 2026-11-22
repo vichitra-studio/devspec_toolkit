@@ -201,6 +201,33 @@ def _fragment(item: dict) -> dict:
     return json.loads(item["proposal"][item["proposal"].index("{") : item["proposal"].rindex("}") + 1])
 
 
+def _commands(item: dict) -> list[list[str]]:
+    """The command lines of a proposal (the text after its first ``): ``), split on ``&&``), each as an argument list."""
+    words = shlex.split(item["proposal"].split("): ", 1)[1])
+    lines, current = [], []
+    for word in words:
+        if word == "&&":
+            lines.append(current)
+            current = []
+        else:
+            current.append(word)
+    return [*lines, current]
+
+
+def _run_command(host: Path, toolkit: Path, line: list[str]) -> None:
+    """One printed ``specdev ...`` line through the real CLI, from the host root (the paths of a proposal are relative to it)."""
+    previous = os.getcwd()
+    os.chdir(host)
+    try:
+        with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", [*line, "--repo-root", str(toolkit)]):
+            try:
+                cli.main()
+            except SystemExit as exit_:
+                assert exit_.code in (None, 0), line
+    finally:
+        os.chdir(previous)
+
+
 def test_the_proposal_is_a_command_that_creates_the_declarations_file_when_it_does_not_exist(host, toolkit):
     _run(host, toolkit)
     item = next(item for item in _of_kind(host, script.KIND_DECLARATION) if item["about"] == "setup_command")
@@ -263,12 +290,13 @@ def test_proposed_declaration_values_are_evidence_only_and_never_written_to_host
         git(host, "tag", tag)
     _run(host, toolkit)
     assert not (host / "spec" / HOST_DECLARATIONS_FILE).exists()
-    fragments = [_fragment(item) for item in _items(host) if item["kind"] in (script.KIND_DECLARATION, script.KIND_PIN_SOURCE)]
+    fragments = [_fragment(item) for item in _items(host) if item["kind"] == script.KIND_DECLARATION]
     merged: dict = {"$schema": "vc:host-declarations", "pin_sources": {}}
     for fragment in fragments:
-        pins = fragment.pop("pin_sources", {})
-        merged["pin_sources"].update(pins)
         merged.update(fragment)
+    for item in _of_kind(host, script.KIND_PIN_SOURCE):
+        *_, patch_line = _commands(item)
+        merged["pin_sources"][item["about"]] = json.loads(patch_line[-1])
     assert merged["release_tag_pattern"] == script.TAG_PATTERN_EXAMPLE
     assert merged["setup_command"] == "npm ci --ignore-scripts"  # the toolkit's own install line is left out
     assert merged["pin_sources"] == {"tp-argon2": [{"type": "json-pointer", "file": "package-lock.json", "pointer": "/packages/node_modules~1argon2/version"}]}
@@ -283,13 +311,50 @@ def test_proposed_declaration_values_are_evidence_only_and_never_written_to_host
     assert pin_item["step"] == "02" and "0.41.1" in pin_item["evidence"]
 
 
-def test_a_pin_without_a_derivable_source_is_an_item_without_a_fragment(host, toolkit):
+def test_a_pin_without_a_derivable_source_prints_the_command_with_the_shape_of_a_source(host, toolkit):
     _with_third_party(host)
     _commit(host, "third party without a lock file")
     _run(host, toolkit)
     item = _of_kind(host, script.KIND_PIN_SOURCE)[0]
-    assert item["about"] == "tp-argon2" and "{" not in item["proposal"]
-    assert "no lock or requirement file is tracked" in item["evidence"]
+    assert item["about"] == "tp-argon2" and "no lock or requirement file is tracked" in item["evidence"]
+    assert "by hand" not in item["evidence"] and "by hand" not in item["proposal"]
+    insert, patch_line = _commands(item)
+    assert patch_line[:5] == ["specdev", "json", "patch", "spec/common/host_declarations.json", '.pin_sources["tp-argon2"]']
+    assert json.loads(patch_line[5]) == [{"type": "json-pointer", "file": "<file>", "pointer": "<JSON pointer to the version>"}]
+    assert '"regex"' in item["evidence"]
+
+
+def test_every_pin_proposal_is_safe_in_any_order_whether_or_not_the_declarations_file_exists(tmp_path):
+    """Four cases through the real CLI: file absent or present, first or second third party; each id ends up declared and nothing else is lost."""
+    second = {"third_party_id": "tp-hasher", "name": "Hasher", "pin": "2.0.0", "derives_from": ["seed-x"]}
+    lock = {"lockfileVersion": 3, "packages": {"node_modules/argon2": {"version": "0.41.1"}, "node_modules/hasher": {"version": "2.0.0"}}}
+    for order in ((0, 1), (1, 0)):
+        for present in (False, True):
+            root = tmp_path / f"case-{order[0]}-{int(present)}"
+            root.mkdir()
+            host, toolkit = make_host(root), make_toolkit(root)
+            _overlay(host, "pins")
+            (host / "package-lock.json").write_text(json.dumps(lock), encoding="utf-8")
+            path = next((host / "spec").glob("02_*.json"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["third_parties"] = [THIRD_PARTY, second]
+            path.write_text(json.dumps(data, indent=4) + "\n", encoding="utf-8")
+            target = host / "spec" / HOST_DECLARATIONS_FILE
+            if present:
+                target.write_text(json.dumps({"$schema": "vc:host-declarations", "release_tag_pattern": "^v$", "pin_sources": {"tp-old": [{"type": "regex", "file": "a.txt", "pattern": "(1)"}]}}), encoding="utf-8")
+            _commit(host, "case")
+            _run(host, toolkit)
+            pins = {item["about"]: item for item in _of_kind(host, script.KIND_PIN_SOURCE)}
+            assert sorted(pins) == ["tp-argon2", "tp-hasher"]
+            ids = ["tp-argon2", "tp-hasher"]
+            for index in order:
+                for line in _commands(pins[ids[index]]):
+                    _run_command(host, toolkit, line)
+            held = json.loads(target.read_text(encoding="utf-8"))
+            assert {"tp-argon2", "tp-hasher"} <= set(held["pin_sources"]) and held["$schema"] == "vc:host-declarations"
+            assert held["pin_sources"]["tp-argon2"][0]["pointer"] == "/packages/node_modules~1argon2/version"
+            assert ("tp-old" in held["pin_sources"] and held["release_tag_pattern"] == "^v$") == present
+            assert load_host_declarations(str(host / "spec")).pin_sources.keys() == held["pin_sources"].keys()
 
 
 def test_a_rerun_adds_nothing_and_a_resolved_item_stays_resolved(host, toolkit):

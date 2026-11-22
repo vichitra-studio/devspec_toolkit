@@ -28,8 +28,8 @@ from specdev_tools.graph.model import Graph, Node
 from specdev_tools.migration.context import CAPTURE_REL, file_key
 from specdev_tools.migration.maps import LEGACY_STEP_IDS, legacy_ref_fields
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.spec_reads import RENAMES_KEY
-from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.spec_reads import AMBIGUITY, RENAMES_KEY
+from specdev_tools.migration.worklist import OPEN_ITEM_RULE, WorklistItem, add_items, make_item, missing_items
 from specdev_tools.validation.linter_utils import graph_known_ids
 
 SCRIPT = ScriptSpec(id="p2_id_collisions", phase=PHASE_IDS, touches=(*LEGACY_STEP_IDS, "extras"))
@@ -37,7 +37,6 @@ SCRIPT = ScriptSpec(id="p2_id_collisions", phase=PHASE_IDS, touches=(*LEGACY_STE
 ANCHOR_FILE = "16_impl_context.json"
 KIND_CITATION = "collided-id-citation"
 KIND_PROMOTED = "duplicate-promoted-item"
-AMBIGUITY = "ambiguity-item"
 _TYPED = "type:"
 
 Path = tuple[Any, ...]
@@ -155,7 +154,7 @@ class _Plan:
             if rule and rule.get("triage_when_files") and ANCHOR_FILE in {n.file for n in nodes} and len({n.file for n in nodes}) > 1:
                 item = make_item("16", KIND_PROMOTED, old, audience="operator", blocking=True,
                                  evidence=f"the open item {old} is in the anchor and in a plan ({', '.join(sorted({n.file for n in nodes}))}): one item promoted from a plan to the anchor",
-                                 proposal="keep the live copy, delete the other (or give it carried_from the live one)")
+                                 proposal=f"keep the live copy and delete the other with `specdev json delete <file> '<jq path of the copy>'` (the id is defined twice, so `--id` refuses it); the copy you keep is an open item too: {OPEN_ITEM_RULE}")
                 self.items[item.id] = item
             return
         if rule and rule.get("rename"):

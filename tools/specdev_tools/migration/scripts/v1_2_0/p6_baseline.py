@@ -21,7 +21,6 @@ missing).  The lock is written into the scratch spec folder; the runner installs
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from specdev_tools.core.constants import TRACE_LOCK_FILENAME
@@ -30,7 +29,7 @@ from specdev_tools.graph.model import Graph
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.migration.context import MigrationContext
 from specdev_tools.migration.registry import PHASE_BASELINE, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.worklist import AUDIENCE_OPERATOR, WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.worklist import AUDIENCE_OPERATOR, WorklistItem, add_items, changed_but_worklist, make_item, missing_items
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import containers_of, historical_node_ids
 from specdev_tools.trace.lockfile import Lock, LockEntry, read_lock, write_lock
@@ -128,12 +127,7 @@ def _entries(snapshot: Any) -> dict[tuple[Any, Any, Any], dict[str, Any]]:
 
 def verify(before: Any, after: Any) -> list[Problem]:
     """Only ``extras/`` changed; no entry of the lock was changed or removed; each entry added carries the baseline marker."""
-    worklist = WORKLIST_FILE.replace(os.sep, "/")
-    problems = [
-        Problem(f"changed {rel}; this script writes the lock and the worklist only", rel)
-        for rel in sorted(set(before.files) | set(after.files))
-        if before.files.get(rel) != after.files.get(rel) and rel not in (LOCK_REL, worklist)
-    ]
+    problems = [Problem(f"changed {rel}; this script writes the lock and the worklist only", rel) for rel in changed_but_worklist(before, after, LOCK_REL)]
     old, new = _entries(before), _entries(after)
     problems += [Problem(f"the lock entry {key} was changed or removed; an existing entry is never restamped", LOCK_REL) for key, entry in old.items() if new.get(key) != entry]
     problems += [Problem(f"the lock entry {key} was added without the baseline marker", LOCK_REL) for key, entry in new.items() if key not in old and entry.get("baseline") is not True]

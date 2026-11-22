@@ -7,7 +7,7 @@ is walked in every file of the row's step; ``[]`` is each object of a list and `
 
 Plan files: the row says ``closed_plans``.  A legacy-closed plan (the rule of ``spec_reads.closed_milestones``,
 ruling P13) loses only the rows marked ``strip`` (the stored computed names, E768) and keeps the rest as history; an open
-plan gets every row.  Stored ``content_hash`` / ``chain_stamp`` (``COMPUTED_VIEWS``) go from every file.  The retired
+plan gets every row.  Stored ``content_hash`` / ``chain_stamp`` (``COMPUTED_VIEWS``) go from the node objects of every file (the objects E768 judges; a key of that name inside a fixture's ``input`` or any other payload stays).  The retired
 files of the map (step 13a, ``extras/trace_matrix.json``) are deleted.  Row counts go to the report as residue lines.
 """
 
@@ -17,6 +17,8 @@ import copy
 import os
 from typing import Any
 
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.contract import item_at
 from specdev_tools.migration.maps import LEGACY_STEP_IDS, shape_map, shape_rows
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.spec_reads import closed_plan_files, files_of_row, last_key, parents_at, plan_rels, step_json_names
@@ -33,17 +35,12 @@ SCRIPT = ScriptSpec(
 _EVERYWHERE = tuple(name for view in COMPUTED_VIEWS if view.scope is None for name in view.names)
 
 
-def _strip_everywhere(value: Any, names: tuple[str, ...]) -> int:
-    removed = 0
-    if isinstance(value, dict):
-        for name in names:
-            if name in value:
-                del value[name]
-                removed += 1
-        removed += sum(_strip_everywhere(held, names) for held in value.values())
-    elif isinstance(value, list):
-        removed += sum(_strip_everywhere(held, names) for held in value)
-    return removed
+def _strip_on_node(holder: dict[str, Any], names: tuple[str, ...]) -> int:
+    """Delete each of *names* from the node object *holder* (not from anything nested in it); returns how many were there."""
+    stored = [name for name in names if name in holder]
+    for name in stored:
+        del holder[name]
+    return len(stored)
 
 
 def _retired_paths(ctx) -> list[str]:
@@ -111,12 +108,16 @@ class _Work:
                         self.changed.add(rel)
 
     def computed(self) -> int:
+        """Strip the stored computed names from the node objects of the files (where E768 judges them); a key of that name in a payload (a fixture's ``input``) stays."""
+        graph = build_graph(self.ctx.spec_root, self.ctx.toolkit_root)
+        files = set(_step_files(self.ctx))
         removed = 0
-        for rel in _step_files(self.ctx):
-            count = _strip_everywhere(self.data(rel), _EVERYWHERE)
+        for node in graph.nodes:
+            holder = item_at(self.data(node.file), node.jq_path) if node.file in files else None
+            count = _strip_on_node(holder, _EVERYWHERE) if holder is not None else 0
             removed += count
             if count:
-                self.changed.add(rel)
+                self.changed.add(node.file)
         return removed
 
     def prune(self) -> int:

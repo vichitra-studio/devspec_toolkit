@@ -13,8 +13,8 @@
 
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
-| `ambiguity-about` | operator | An emergent ambiguity of a plan does not name exactly one node | `specdev json patch --id <item-id> .about '["<node-id>"]'`, then remove each old field with `specdev json delete <file> '<item path>.<field>'` |
-| `legacy-open-item` | operator | An open item of a closed plan was removed from it (the capture and git hold it) | Raise it again in the right artifact (`specdev json insert --step <NN> .ambiguities '{...}'`), or drop it |
+| `ambiguity-about` | operator | An emergent ambiguity of a plan does not name exactly one node | Answer it in the spec, then delete the item: `specdev json delete --id <item-id>`. An `about` (`specdev json patch --id <item-id> .about '["<node-id>"]'`, then `specdev json delete <file> '<item path>.<field>'` for each old field) repairs the item's shape (E520) and nothing more: the merge check (`align validate`) reports E631 for every open item outside a frozen plan until it is deleted. A question that is still open is deleted here and raised again after the migration |
+| `legacy-open-item` | operator | An open item of a closed plan was removed from it (the capture and git hold it) | Answer it in the spec if the question was answered; a question that is still open is raised again after `align validate` is clean (`specdev json insert --step <NN> .ambiguities '{...}'`), because an open item outside a frozen plan fails the merge check (E631) |
 
 ### Items any step can carry
 
