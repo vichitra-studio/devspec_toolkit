@@ -1,0 +1,10 @@
+name: build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m venv devspec_env && ./devspec_env/bin/pip install ./devspec_toolkit/tools
+      - run: npm ci --ignore-scripts
+      - run: npm test

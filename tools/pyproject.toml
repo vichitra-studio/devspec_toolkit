@@ -44,7 +44,7 @@ specdev = "specdev_tools.cli:main"
 include = ["specdev_tools*"]
 
 [tool.setuptools.package-data]
-specdev_tools = ["guides/*.yaml"]
+specdev_tools = ["guides/*.yaml", "migration/maps/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

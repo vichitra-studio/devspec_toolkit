@@ -1,0 +1,25 @@
+repos:
+  - repo: local
+    hooks:
+      - id: wrapper-matrix
+        name: refresh the matrix
+        entry: ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit
+        language: system
+      - id: chained
+        name: check then say ok
+        entry: bash -c "specdev traceability-check spec && echo ok"
+        language: system
+      # entry: specdev forward-replay-check spec --repo-root ./devspec_toolkit
+      - id: continued
+        name: a command on the line after a backslash
+        entry: specdev \
+          completeness-check spec
+        language: system
+      - id: dag
+        name: dependency order
+        entry: specdev dag-lint --repo-root ./devspec_toolkit
+        language: system
+      - id: gate
+        name: spec check
+        entry: specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+        language: system

@@ -1,0 +1,16 @@
+name: ci
+on: [pull_request]
+jobs:
+  validate:
+    strategy:
+      matrix:
+        python: ["3.12"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: ./devspec_env/bin/specdev validate-all spec --repo-root ./devspec_toolkit
+      - run: ./devspec_env/bin/specdev matrix spec --out spec/extras/trace_matrix.json
+      - run: ./devspec_env/bin/specdev dag-lint spec --repo-root ./devspec_toolkit
+      # - run: ./devspec_env/bin/specdev completeness-check spec
+      - run: ./devspec_env/bin/specdev spec-check spec --repo-root ./devspec_toolkit
