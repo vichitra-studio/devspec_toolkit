@@ -95,6 +95,24 @@ def test_release_refuses_dirty_tree_E910(tmp_path: Path, dirty: str) -> None:
     assert "not clean" in out and _tags(host) == []
 
 
+def test_release_refuses_an_untracked_file_whatever_the_host_sets_for_untracked_display_E910(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+    git(host, "config", "status.showUntrackedFiles", "no")
+    write(host / "src" / "untracked_code.ts", "export {};\n")
+    assert git(host, "status", "--porcelain") == "", "the setting hides the file from a plain status"
+    out = _refused(host, "E910", "release", "--tag", "v1.0.0")
+    assert "untracked_code.ts" in out and _tags(host) == []
+
+
+@pytest.mark.parametrize("name", ["v1..0", "v1 2", "v1.0.lock", "-v1.0.0"])
+def test_release_refuses_a_name_git_does_not_accept_for_a_tag_even_when_the_pattern_matches_it_E912(tmp_path: Path, name: str) -> None:
+    host = release_host(tmp_path)
+    write(host / "spec" / "common" / "host_declarations.json", json.dumps({"$schema": "vc:host-declarations", "release_tag_pattern": "v1"}))
+    commit_all(host, "a loose pattern")
+    out = _refused(host, "E912", "release", f"--tag={name}")
+    assert "is not a name git accepts for a tag" in out and _tags(host) == []
+
+
 def test_release_ignores_a_file_git_ignores(tmp_path: Path) -> None:
     host = release_host(tmp_path)
     write(host / ".gitignore", "scratch/\n")

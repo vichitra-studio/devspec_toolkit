@@ -18,26 +18,14 @@ from pathlib import Path
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.git_base import BaselineProvider, BaselineResult, BaseResolution, resolve_baseline
 from specdev_tools.generation.schema_differ import get_user_version
-from specdev_tools.graph.gitview import GitViewError, archive_ref, spec_path_in_repo
+from specdev_tools.graph.gitview import GitViewError, toolkit_stamp_at
 
 BASELINE_MARKER_CODE = "E882"
 """The finding that says a step still carries a migration baseline marker: the step is not passed."""
-_STAMP_FILE = "specdev_version"
 MIGRATION_NOTE = (
     "migration mode: the toolkit stamp differs from the merge-base's, so an error of a step that still carries "
     "migration baseline markers is debt and an error of any other earlier step is new"
 )
-
-
-def _stamp_at(commit: str, git_root: str, spec_dir: Path) -> str | None:
-    """The ``toolkit_version`` of the spec folder at *commit*; ``None`` when the stamp file is absent there or has no version."""
-    relative = spec_path_in_repo(str(spec_dir), git_root)
-    try:
-        with archive_ref(commit, git_root, [f"{relative}/{_STAMP_FILE}"]) as archive:
-            stamp = get_user_version(Path(archive) / relative)
-    except GitViewError:
-        return None
-    return None if stamp is None else str(stamp)
 
 
 def migration_resolution(spec_dir: Path, git_root: str, base_ref: str | None = None) -> BaseResolution | None:
@@ -54,7 +42,7 @@ def migration_resolution(spec_dir: Path, git_root: str, base_ref: str | None = N
     if resolution.commit is None:
         return None
     try:
-        base_stamp = _stamp_at(resolution.commit, git_root, spec_dir)
+        base_stamp = toolkit_stamp_at(resolution.commit, git_root, str(spec_dir))
     except GitViewError:
         return None
     return resolution if base_stamp != str(tree_stamp) else None

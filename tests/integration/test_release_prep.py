@@ -15,7 +15,7 @@ from unit.graph._synth import git
 from unit.lifecycle._milestone_support import cli_run
 from unit.proof._support import GUARD, PASSING
 from unit.release._support import release_host
-from unit.verify._support import commit_all
+from unit.verify._support import commit_all, edit_doc
 from integration._release_support import BINDING, identity, snapshot  # noqa: F401  (the fixture ``identity``)
 
 pytestmark = pytest.mark.usefixtures("identity")
@@ -43,7 +43,8 @@ def test_prep_runs_unproven_bindings_and_writes_records(tmp_path: Path) -> None:
     code, out, err = cli_run(host, "release", "prep")
     assert code == 0, out + err
     assert "1 binding(s) run, 1 passed, 0 failed; 0 already proven" in out and f"PASS {BINDING}" in out
-    assert "nothing blocks the release" in out and "not committed" in out
+    assert "not committed" in out and "left for the release gate: nothing, once the evidence is committed" in out
+    assert "nothing blocks the release" not in out, "the cut refuses a tree with uncommitted evidence (E910)"
     assert (host / EVIDENCE).is_file()
     assert git(host, "status", "--porcelain").split() == ["??", "spec/extras/verification/evd-password-reset-expired-token-ci.json"], "the evidence is the only change"
 
@@ -56,12 +57,28 @@ def test_prep_second_run_on_same_tree_runs_nothing(tmp_path: Path) -> None:
     code, out, err = cli_run(host, "release", "prep")
     assert code == 0, out + err
     assert "0 binding(s) run" in out and f"already proven: {BINDING}" in out
+    assert "left for the release gate: nothing blocks the release" in out, "nothing was written: the sentence is true"
     assert (host / EVIDENCE).read_text(encoding="utf-8") == first, "a proven binding is not run again"
     document = json.loads(cli_run(host, "release", "prep", "--json")[1])
     assert document["run"] == [] and document["already_proven"] == [BINDING] and document["evidence"] == [] and document["failed"] == []
+    code, out, err = cli_run(host, "release", "--tag", "v1.0.0")
+    assert code == 1 and "E910" in out + err, "the evidence prep wrote is not committed yet: the cut refuses"
     commit_all(host, "evidence")
     code, out, err = cli_run(host, "release", "--tag", "v1.0.0")
     assert code == 0 and "annotated tag created" in out, out + err
+
+
+def test_prep_lists_what_the_gate_still_finds(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+    _bind(host, PASSING)
+    edit_doc(host, "impl_context/ms_account_recovery_plan.json", lambda doc: doc.setdefault("execution", {}).__setitem__("emergent_ambiguities", [{"id": "amb-x", "description": "which clock?", "about": ["tc-confirm-expired-token"]}]))
+    commit_all(host, "an open item")
+    code, out, err = cli_run(host, "release", "prep")
+    assert code == 0, out + err  # what the gate still finds does not change the exit
+    assert "left for the release gate: 1 error(s)" in out and "E631" in out and "amb-x" in out
+    assert "nothing blocks the release" not in out and "nothing, once the evidence" not in out
+    code, out, _ = cli_run(host, "release", "prep", "--json")
+    assert code == 0 and [line for line in json.loads(out)["left"] if "E631" in line]
 
 
 def test_prep_failure_exit_nonzero(tmp_path: Path) -> None:

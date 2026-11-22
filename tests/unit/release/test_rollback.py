@@ -53,6 +53,13 @@ def test_rollback_unknown_tag_E925(tmp_path: Path) -> None:
     assert not (host / "spec" / "extras" / "releases").exists()
 
 
+def test_rollback_of_a_branch_that_is_not_a_tag_E925(tmp_path: Path) -> None:
+    host = _tagged(tmp_path)
+    git(host, "branch", "v2.0.0")
+    assert "names no commit" in _refused(host, "E925", "v2.0.0")
+    assert not (host / "spec" / "extras" / "releases").exists()
+
+
 def test_rollback_blank_reason_E926(tmp_path: Path) -> None:
     host = _tagged(tmp_path)
     for reason in ("", "   \n"):
@@ -85,7 +92,7 @@ def test_a_slash_in_the_tag_becomes_an_underscore_in_the_file_name(tmp_path: Pat
     assert rollback_path("spec", "rel/v1.0.0").endswith("rollback-rel_v1.0.0.json") and rollback_id("rel/v1.0.0") == "rollback-rel_v1.0.0"
 
 
-@pytest.mark.parametrize("damage", ["missing-key", "blank-reason", "other-tag", "not-an-object", "not-json"])
+@pytest.mark.parametrize("damage", ["missing-key", "blank-reason", "other-tag", "other-id", "reason-not-text", "not-an-object", "not-json"])
 def test_rollback_record_missing_key_or_blank_reason_rejected(tmp_path: Path, damage: str) -> None:
     host = _tagged(tmp_path)
     path = Path(_write(host))
@@ -96,6 +103,10 @@ def test_rollback_record_missing_key_or_blank_reason_rejected(tmp_path: Path, da
         record["reason"] = " "
     elif damage == "other-tag":
         record["tag"] = "v2.0.0"
+    elif damage == "other-id":
+        record["id"] = rollback_id("v2.0.0")
+    elif damage == "reason-not-text":
+        record["reason"] = 5
     path.write_text("{" if damage == "not-json" else json.dumps([] if damage == "not-an-object" else record), encoding="utf-8")
     with pytest.raises(FindingError) as caught:
         read_rollback(str(host / "spec"), "v1.0.0")

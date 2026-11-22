@@ -8,28 +8,19 @@ from __future__ import annotations
 
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 
 from specdev_tools import host_install as hi
+from unit._host_install_support import host, make_ctx as shared_make_ctx  # noqa: F401  (the fixture ``host``)
 
 REPO = Path(__file__).resolve().parents[2]
 TEMPLATES = REPO / "templates"
 FIXTURES = REPO / "tests" / "fixtures" / "hosts"
 CONFIG = ".pre-commit-config.yaml"
 SPEC_CHECK_ENTRY_TAIL = "spec-check spec --repo-root ./{root} --spec-root ./spec --git-root . --paths"
-
-
-@pytest.fixture
-def host(tmp_path: Path) -> Path:
-    root = tmp_path / "host"
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    (root / "spec").mkdir()
-    return root
 
 
 @pytest.fixture
@@ -45,19 +36,7 @@ def make_ctx(host: Path, *, venv: str = ".venv", dry_run: bool = False, adopt: b
     if with_binary:
         (prefix / "bin").mkdir(parents=True, exist_ok=True)
         (prefix / "bin" / "pre-commit").write_text("#!/bin/sh\n")
-    return hi.InstallContext(
-        spec_dir=host / "spec",
-        spec_rel="spec",
-        git_root=host,
-        toolkit_root=host / "devspec_toolkit",
-        templates_dir=TEMPLATES,
-        toolkit_version="1.2.3",
-        venv_prefix=prefix,
-        venv_name=venv,
-        dry_run=dry_run,
-        adopt=adopt,
-        force_claude=False,
-    )
+    return shared_make_ctx(host, venv_prefix=prefix, venv_name=venv, dry_run=dry_run, adopt=adopt)
 
 
 def use_fixture(host: Path, name: str) -> str:

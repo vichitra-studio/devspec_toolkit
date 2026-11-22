@@ -16,6 +16,7 @@ from specdev_tools.graph.names import BINDING_KIND, ENVIRONMENT, JOB, NFR, REALI
 STAGES = ("dev", "ci", "staging", "prod")
 DEFAULT_STAGE = "dev"
 CI_STAGE = "ci"
+PROD_STAGE = STAGES[-1]
 DEPLOY_ENVIRONMENTS = ("staging", "prod")  # the environments a deploy job runs for: what an at-deploy record or attestation may name
 COMMAND_RULE_STAGE = CI_STAGE  # a rule enforced by a toolkit command, when the host chose to bind one
 

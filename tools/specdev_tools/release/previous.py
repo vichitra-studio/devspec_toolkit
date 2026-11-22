@@ -15,12 +15,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 from specdev_tools.core.errors import SpecError, make_error
-from specdev_tools.generation.schema_differ import get_user_version
-from specdev_tools.graph.gitview import GitViewError, archive_ref, git_reason, resolve_ref, run_git, spec_path_in_repo
-from specdev_tools.graph.stages import CI_STAGE, STAGES
+from specdev_tools.graph.gitview import git_stdout, resolve_ref, toolkit_stamp_at
+from specdev_tools.graph.ownership import RELEASE_OWNER
+from specdev_tools.graph.stages import CI_STAGE, PROD_STAGE
 from specdev_tools.lifecycle import executed
 from specdev_tools.lifecycle.anchor_store import read_statuses
 from specdev_tools.proof.built_evidence import built_at_cap, relieved_nodes
@@ -34,10 +33,6 @@ from specdev_tools.verify.code_tree import declarations_of
 FIRST_SPEC_VERSION = (1, 2, 0)
 """The first toolkit version whose spec declares production bindings and ``at_deploy`` actions."""
 _VERSION = re.compile(r"\s*(\d+)\.(\d+)\.(\d+)")
-_STAMP_FILE = "specdev_version"
-_RELEASE_OWNER = "release-gate"
-PROD_STAGE = STAGES[-1]
-"""The last stage of ``graph.stages.STAGES``: production."""
 
 
 @dataclass(frozen=True)
@@ -57,28 +52,21 @@ class NextReleaseResult:
     warnings: tuple[SpecError, ...] = ()
 
 
-def _git_lines(git_root: str, args: list[str]) -> list[str]:
-    process = run_git(git_root, args)
-    if process.returncode != 0:
-        raise GitViewError(make_error("E708", f"git {args[0]} failed while the previous release was looked up: {git_reason(process)}"))
-    return process.stdout.decode("utf-8", errors="replace").splitlines()
-
-
 def previous_release(git_root: str, ref: str, pattern: str) -> PreviousRelease | None:
     """The previous release of the commit *ref* names: among the tags that are ancestors of it and match *pattern*, the one the fewest commits behind it (a tie goes to the newest tag).
 
     Lightweight and annotated tags both count.  A tag on the commit itself is left out.
 
     Raises:
-        GitViewError: E708 when *ref* does not resolve or git fails.
+        FindingError: E708 when *ref* does not resolve or git fails.
     """
     commit = resolve_ref(ref, git_root)
-    listed = [line.split("\t") for line in _git_lines(git_root, ["tag", "--merged", commit, "--format=%(refname:strip=2)\t%(creatordate:unix)"])]
+    listed = [line.split("\t") for line in git_stdout(git_root, ["tag", "--merged", commit, "--format=%(refname:strip=2)\t%(creatordate:unix)"]).splitlines()]
     found: list[tuple[int, int, str, str]] = []
     for tag, stamp in (row for row in listed if len(row) == 2 and tag_matches(pattern, row[0])):
         tagged = resolve_ref(tag, git_root)
         if tagged != commit:
-            found.append((int(_git_lines(git_root, ["rev-list", "--count", f"{tagged}..{commit}"])[0]), -int(stamp or 0), tag, tagged))
+            found.append((int(git_stdout(git_root, ["rev-list", "--count", f"{tagged}..{commit}"])), -int(stamp or 0), tag, tagged))
     if not found:
         return None
     _, _, tag, tagged = min(found)
@@ -86,17 +74,15 @@ def previous_release(git_root: str, ref: str, pattern: str) -> PreviousRelease |
 
 
 def predates_1_2_0(git_root: str, spec_root: str, commit: str) -> bool:
-    """Whether the spec at *commit* is not a 1.2.0 spec: its ``specdev_version`` is absent there, unreadable, has no ``toolkit_version`` or reads below 1.2.0.
+    """Whether the spec at *commit* is not a 1.2.0 spec: its ``specdev_version`` is absent there, has no ``toolkit_version`` or reads below 1.2.0.
 
     A pre-release suffix (``1.2.0rc1``) reads as 1.2.0.
+
+    Raises:
+        FindingError: E708 when git cannot answer (a failing read is not "predates").
     """
-    relative = spec_path_in_repo(spec_root, git_root)
-    try:
-        with archive_ref(commit, git_root, [f"{relative}/{_STAMP_FILE}"]) as archive:
-            stamp = get_user_version(Path(archive) / relative)
-    except GitViewError:
-        return True
-    matched = _VERSION.match(str(stamp)) if stamp else None
+    stamp = toolkit_stamp_at(commit, git_root, spec_root)
+    matched = _VERSION.match(stamp) if stamp else None
     return matched is None or tuple(int(part) for part in matched.groups()) < FIRST_SPEC_VERSION
 
 
@@ -115,9 +101,9 @@ def _missing_in_production(git_root: str, spec_root: str, repo_root: str, releas
         built = built_at_cap(state.checks, PROD_STAGE) if waiting else {}
         missing += [f"{node.id} is not built at prod ({built[node.id].reason})" for node in waiting if built[node.id].state is not BuiltState.BUILT]
         missing += [error.message for error in proof_errors(state.graph, state.proof, [node.id for node in waiting], PROD_STAGE)]
-    for item, action, env in executed.at_deploy_required(spec_root, _closed_at(git_root, spec_root, release, pattern)):
-        if not executed.at_deploy_recorded(spec_root, item, action, env):
-            missing.append(f"at-deploy action {item}/{action} has no done record for {env}")
+        for item, action, env in executed.at_deploy_required(state.spec_dir, _closed_at(git_root, spec_root, release, pattern)):
+            if not executed.at_deploy_recorded(spec_root, item, action, env):
+                missing.append(f"at-deploy action {item}/{action} has no done record for {env}")
     return list(dict.fromkeys(missing))
 
 
@@ -131,9 +117,9 @@ def check_next_release(git_root: str, spec_root: str, repo_root: str, ref: str =
     pattern = release_tag_pattern(declarations_of(spec_root))
     previous = previous_release(git_root, ref, pattern)
     if previous is None:
-        return NextReleaseResult(None, warnings=(make_error("W937", "this is the first release: no earlier release tag matches the release tag pattern, so there is nothing to verify", owner=_RELEASE_OWNER),))
+        return NextReleaseResult(None, warnings=(make_error("W937", "this is the first release: no earlier release tag matches the release tag pattern, so there is nothing to verify", owner=RELEASE_OWNER),))
     if predates_1_2_0(git_root, spec_root, previous.commit):
-        return NextReleaseResult(previous, warnings=(make_error("W938", f"the previous release {previous.tag} predates the 1.2.0 spec, which declared no production bindings or at-deploy actions, so there is nothing to verify", owner=_RELEASE_OWNER),))
+        return NextReleaseResult(previous, warnings=(make_error("W938", f"the previous release {previous.tag} predates the 1.2.0 spec, which declared no production bindings or at-deploy actions, so there is nothing to verify", owner=RELEASE_OWNER),))
     if read_rollback(spec_root, previous.tag) is not None:
         return NextReleaseResult(previous)
     missing = _missing_in_production(git_root, spec_root, repo_root, previous, pattern)
@@ -143,7 +129,7 @@ def check_next_release(git_root: str, spec_root: str, repo_root: str, ref: str =
         "E920",
         f"the previous release {previous.tag} is not verified in production: {'; '.join(missing)}; "
         f"verify it, or waive it with `specdev release rollback {previous.tag} --reason \"...\"`",
-        owner=_RELEASE_OWNER,
+        owner=RELEASE_OWNER,
     )
     return NextReleaseResult(previous, errors=(shortfall,))
 

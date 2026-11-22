@@ -102,13 +102,16 @@ _PRECEDENCE = (UNPROVEN, UNBOUND, NO_VERIFIER, PENDING_STAGE)
 
 
 def _combine(obligation: str, outcomes: Sequence[_Outcome]) -> ProofResult:
-    """One result from the outcomes of all the verifiers: failures first (``_PRECEDENCE``), then proven, then not required."""
+    """One result from the outcomes of all the verifiers: failures first (``_PRECEDENCE``), then proven, then not required.
+
+    A shortfall two outcomes share (one binding reached by two mitigations of the node) is listed once.
+    """
     if not outcomes:
         return ProofResult(obligation, NO_VERIFIER, (Shortfall(obligation, None, REASON_NO_VERIFIER),))
     for status in _PRECEDENCE:
         matching = [outcome for outcome in outcomes if outcome.status == status]
         if matching:
-            return ProofResult(obligation, status, tuple(shortfall for outcome in matching for shortfall in outcome.shortfalls))
+            return ProofResult(obligation, status, tuple(dict.fromkeys(shortfall for outcome in matching for shortfall in outcome.shortfalls)))
     return ProofResult(obligation, PROVEN if any(outcome.status == PROVEN for outcome in outcomes) else NOT_REQUIRED)
 
 

@@ -15,8 +15,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from specdev_tools.core.errors import FindingError
-from specdev_tools.lifecycle.status import MERGE_RELEASE_SECTION, PRODUCTION_SECTION, Section, StatusContext, register_status_section
-from specdev_tools.release.gate import RELEASE_OWNER, run_release_gate
+from specdev_tools.lifecycle.status import MERGE_RELEASE_SECTION, MERGE_RELEASE_TITLE, PRODUCTION_SECTION, PRODUCTION_TITLE, Section, StatusContext, register_status_section
+from specdev_tools.graph.ownership import RELEASE_OWNER
+from specdev_tools.release.gate import run_release_gate
 from specdev_tools.release.previous import check_next_release
 from specdev_tools.release.records import read_rollback
 
@@ -28,8 +29,6 @@ NOT_VERIFIED = "not verified"
 PREDATES = "none (previous tag predates 1.2.0)"
 NONE = "none"
 _PREDATES_CODE = "W938"
-_MERGE_RELEASE_TITLE = "Merge-check and release-gate errors"
-_PRODUCTION_TITLE = "Production verification"
 
 
 @dataclass(frozen=True)
@@ -64,10 +63,10 @@ def _production(sc: StatusContext) -> Section:
     try:
         found = production_verification(sc.git_root, sc.spec_root, sc.repo_root)
     except FindingError as error:
-        return Section(PRODUCTION_SECTION, _PRODUCTION_TITLE, (f"not read: {error.error.render()}",), None)
+        return Section(PRODUCTION_SECTION, PRODUCTION_TITLE, (f"not read: {error.error.render()}",), None)
     shown = f"{found.state} (released, awaiting production proof)" if found.state == NOT_VERIFIED else found.state
     lines = (f"previous release: {found.tag or NONE}", f"state: {shown}", *found.missing)
-    return Section(PRODUCTION_SECTION, _PRODUCTION_TITLE, lines, {"tag": found.tag, "state": found.state, "missing": list(found.missing)})
+    return Section(PRODUCTION_SECTION, PRODUCTION_TITLE, lines, {"tag": found.tag, "state": found.state, "missing": list(found.missing)})
 
 
 def _merge_release(canon_dir_of: CanonDirOf) -> Callable[[StatusContext], Section]:
@@ -76,7 +75,7 @@ def _merge_release(canon_dir_of: CanonDirOf) -> Callable[[StatusContext], Sectio
         try:
             result = run_release_gate(sc.repo_root, sc.spec_root, sc.git_root, sc.spec_root, canon)
         except FindingError as error:
-            return Section(MERGE_RELEASE_SECTION, _MERGE_RELEASE_TITLE, (f"the release gate was not run: {error.error.render()}",), None)
+            return Section(MERGE_RELEASE_SECTION, MERGE_RELEASE_TITLE, (f"the release gate was not run: {error.error.render()}",), None)
         by_owner: dict[str, list[str]] = defaultdict(list)
         for found in result.errors:
             by_owner[found.owner or RELEASE_OWNER].append(found.render())
@@ -89,7 +88,7 @@ def _merge_release(canon_dir_of: CanonDirOf) -> Callable[[StatusContext], Sectio
             "listed": [listed.render() for listed in result.listed],
             "notes": list(result.notes),
         }
-        return Section(MERGE_RELEASE_SECTION, _MERGE_RELEASE_TITLE, tuple(lines), data)
+        return Section(MERGE_RELEASE_SECTION, MERGE_RELEASE_TITLE, tuple(lines), data)
 
     return section
 

@@ -14,11 +14,11 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
 import yaml
 
 from specdev_tools import cli
 from specdev_tools import host_install as hi
+from unit._host_install_support import host, make_ctx as shared_make_ctx  # noqa: F401  (the fixture ``host``)
 
 REPO = Path(__file__).resolve().parents[2]
 TEMPLATES = REPO / "templates"
@@ -27,29 +27,11 @@ WORKFLOW = ".github/workflows/specdev-merge-check.yml"
 VERSION = "1.2.3"
 
 
-@pytest.fixture
-def host(tmp_path: Path) -> Path:
-    root = tmp_path / "host"
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    (root / "spec").mkdir()
-    return root
-
-
 def make_ctx(host: Path, *, venv: str = "devspec_env", dry_run: bool = False, adopt: bool = False, spec_rel: str = "spec", toolkit: Path | None = None) -> hi.InstallContext:
     (host / spec_rel).mkdir(parents=True, exist_ok=True)
-    return hi.InstallContext(
-        spec_dir=host / spec_rel,
-        spec_rel=spec_rel,
-        git_root=host,
-        toolkit_root=toolkit or host / "devspec_toolkit",
-        templates_dir=TEMPLATES,
-        toolkit_version=VERSION,
-        venv_prefix=host / venv,
-        venv_name=venv,
-        dry_run=dry_run,
-        adopt=adopt,
-        force_claude=False,
+    return shared_make_ctx(
+        host, spec_dir=host / spec_rel, spec_rel=spec_rel, toolkit_root=toolkit or host / "devspec_toolkit", toolkit_version=VERSION,
+        venv_prefix=host / venv, venv_name=venv, dry_run=dry_run, adopt=adopt,
     )
 
 

@@ -178,7 +178,7 @@ def test_the_four_person_decisions_are_left_to_a_person() -> None:
         "**sign-off** (`specdev milestone sign-off <ms-id>`) and **defer**",
         "`specdev verify attest <node-id>...`; not `specdev attest`, which re-accepts links",
         "**release**, the cut (`specdev release --tag <name>`): not a step of a milestone's loop; the person runs it and the skill never does.",
-        "Before each of them: show `specdev status --milestone <ms-id>` first, ask the person in the conversation, and run the command only on an explicit yes.",
+        "Before each of them except the release: show `specdev status --milestone <ms-id>` first, ask the person in the conversation, and run the command only on an explicit yes.",
         "that prompt is the person's and the skill never answers it",
         "The skill never runs one of these commands on its own judgement.",
     ):

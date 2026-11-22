@@ -21,14 +21,14 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error
-from specdev_tools.graph.gitview import GitViewError, resolve_ref
+from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.graph.model import Node
 from specdev_tools.graph.names import DELIVERY_ROLE, ENVIRONMENT, OBLIGATION_ROLES
 from specdev_tools.graph.stages import CI_STAGE, DEPLOY_ENVIRONMENTS
 from specdev_tools.proof.built_evidence import built_at_cap, relieved_nodes
 from specdev_tools.proof.proof import proof_errors
-from specdev_tools.release.gate import RELEASE_OWNER
-from specdev_tools.release.tag_state import TagState, tag_state
+from specdev_tools.graph.ownership import RELEASE_OWNER
+from specdev_tools.release.tag_state import TagState, resolve_tag, tag_state
 from specdev_tools.trace.coverage import PARKED_SCOPES
 from specdev_tools.validation.graph_checks.built import BuiltResult, BuiltState
 
@@ -54,7 +54,7 @@ class ProdGateResult:
 
 def _commit_of(git_root: str, tag: str) -> str:
     try:
-        return resolve_ref(tag, git_root)
+        return resolve_tag(tag, git_root)
     except GitViewError as error:
         raise FindingError(make_error("E921", f"'{tag}' names no commit in this repository; fetch the tags (`git fetch --tags`) or name an existing release tag")) from error
 

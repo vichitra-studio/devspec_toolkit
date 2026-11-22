@@ -47,6 +47,15 @@ def release_tag_pattern(declarations: HostDeclarations) -> str:
     return pattern
 
 
+def resolve_tag(tag: str, git_root: str) -> str:
+    """The commit the release tag *tag* names: only a tag (``refs/tags/<tag>``) resolves, not ``HEAD``, a branch or a commit id.
+
+    Raises:
+        GitViewError: E708 when *tag* is not a tag of the repository or git fails.
+    """
+    return resolve_ref(f"refs/tags/{tag}", git_root)
+
+
 def tag_matches(pattern: str, tag: str) -> bool:
     """Whether *tag* is a release tag: *pattern* is found in it (``re.search``)."""
     return re.search(pattern, tag) is not None

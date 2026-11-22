@@ -20,6 +20,7 @@ from specdev_tools.core.errors import SpecError
 from specdev_tools.core.json_output import format_errors_json
 from specdev_tools.graph.commands import add_root_flags, resolve_git_root, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
+from specdev_tools.graph.stages import PROD_STAGE
 from specdev_tools.release.prep import run_release_prep
 from specdev_tools.release.prod_gate import ProdGateResult, run_prod_gate
 from specdev_tools.release.records import write_rollback
@@ -29,7 +30,6 @@ from specdev_tools.release.tagging import CutResult, cut_release
 from specdev_tools.verify.code_tree import declarations_of
 
 EXIT_REFUSED = 1
-PROD_STAGE = "prod"
 
 RELEASE_DESCRIPTION = (
     "Cut a release: `specdev release --tag <name> [--message TEXT]` creates the annotated git tag <name> on HEAD when the release gate "

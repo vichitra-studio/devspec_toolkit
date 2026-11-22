@@ -122,7 +122,7 @@ def test_row_1_release_prep_writes_dev_and_ci_evidence_on_a_release_prep_branch(
     git(host, "checkout", "-q", "-b", "release-prep/x")
     assert not (host / PREP_EVIDENCE).exists() and untracked(host) == []
     out = run(host, "release", "prep")
-    assert "1 binding(s) run, 1 passed, 0 failed; 0 already proven" in out and f"PASS {BINDING}" in out and "nothing blocks the release" in out
+    assert "1 binding(s) run, 1 passed, 0 failed; 0 already proven" in out and f"PASS {BINDING}" in out and "nothing, once the evidence is committed" in out
     assert untracked(host) == [PREP_EVIDENCE], "prep writes the evidence of the binding and nothing else, and does not stage it"
     record = evidence(host, PREP_EVIDENCE)
     assert (record["stage"], record["exit_code"], record["guard_matched"], record["about"]) == ("ci", 0, True, [BINDING])

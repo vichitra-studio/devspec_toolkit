@@ -5,6 +5,7 @@ back at a time.  The gate runs on the checkout and never walks history.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -240,3 +241,36 @@ def test_gate_does_not_walk_history(tmp_path: Path) -> None:
     assert result.previous is not None and result.previous.tag == "v1.0.0"
     assert "log" not in verbs and verbs.count("tag") == 2  # the previous release, and the release before it (which tells what P closed)
     assert all("--count" in call for call in seen if call[:1] == ["rev-list"]) and "rev-list" in verbs  # rev-list only to place the previous tag
+
+
+# --- the merge-mode checks the gate runs ------------------------------------------------------------------------------------------
+
+
+def test_open_item_blocks_the_release(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+    assert not codes(gate(host))
+    edit_doc(host, "impl_context/ms_account_recovery_plan.json", lambda doc: doc.setdefault("execution", {}).__setitem__("emergent_ambiguities", [{"id": "amb-x", "description": "which clock?", "about": ["tc-confirm-expired-token"]}]))
+    result = gate(host)
+    assert nodes_of(result, "E631") or "E631" in codes(result)
+    assert [error.owner for error in result.errors if error.code == "E631"] == ["merge-check"] and "amb-x" in [e.message for e in result.errors if e.code == "E631"][0]
+
+
+def test_pin_mismatch_blocks_the_release(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+
+    def declare_pin(lock_version: str) -> None:
+        (host / "package-lock.json").write_text(json.dumps({"packages": {"node_modules/argon2": {"version": lock_version}}}), encoding="utf-8")
+        edit_doc(host, "common/host_declarations.json", lambda doc: doc.update(pin_sources={"tp-argon2": [{"type": "json-pointer", "file": "package-lock.json", "pointer": "/packages/node_modules~1argon2/version"}]}))
+
+    declare_pin("0.41.1")
+    assert "E337" not in codes(gate(host))
+    declare_pin("0.99.0")
+    result = gate(host)
+    assert "E337" in codes(result) and "0.99.0" in [e.message for e in result.errors if e.code == "E337"][0]
+
+
+def test_a_finding_two_mitigations_of_one_node_both_raise_is_listed_once(tmp_path: Path) -> None:
+    """The edge case is mitigated by a criterion and by the fixture the criterion lists: each path finds the same binding without evidence."""
+    host = release_host(tmp_path, "ec-token-at-expiry-second")
+    found = [error for error in gate(host).errors if error.code == "E347" and error.node_id == "ec-token-at-expiry-second"]
+    assert len(found) == 1, [error.message for error in found]

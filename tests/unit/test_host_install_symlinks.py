@@ -6,7 +6,6 @@ The toolkit here is a small invented folder with a ``.claude`` tree; the hosts a
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 from unittest import mock
@@ -15,6 +14,7 @@ import pytest
 
 from specdev_tools import cli
 from specdev_tools import host_install as hi
+from unit._host_install_support import host, make_ctx as shared_make_ctx  # noqa: F401  (the fixture ``host``)
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
@@ -32,29 +32,8 @@ def build_toolkit(folder: Path, skills=("specdev-context", "specdev-step"), agen
     return folder
 
 
-@pytest.fixture
-def host(tmp_path: Path) -> Path:
-    root = tmp_path / "host"
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    (root / "spec").mkdir()
-    return root
-
-
 def make_ctx(host: Path, toolkit: Path, *, force: bool = False, dry_run: bool = False) -> hi.InstallContext:
-    return hi.InstallContext(
-        spec_dir=host / "spec",
-        spec_rel="spec",
-        git_root=host,
-        toolkit_root=toolkit,
-        templates_dir=toolkit / "templates",
-        toolkit_version="1.2.3",
-        venv_prefix=host / "devspec_env",
-        venv_name="devspec_env",
-        dry_run=dry_run,
-        adopt=False,
-        force_claude=force,
-    )
+    return shared_make_ctx(host, toolkit_root=toolkit, templates_dir=toolkit / "templates", force_claude=force, dry_run=dry_run)
 
 
 def links(host: Path) -> dict[str, str]:

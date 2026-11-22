@@ -17,9 +17,9 @@ from typing import Any
 
 from specdev_tools.core.errors import refusal
 from specdev_tools.core.json_utils import JQ_INDENT
-from specdev_tools.graph.gitview import GitViewError, resolve_ref
+from specdev_tools.graph.gitview import GitViewError
 from specdev_tools.lifecycle.records import now_utc
-from specdev_tools.release.tag_state import tag_matches
+from specdev_tools.release.tag_state import resolve_tag, tag_matches
 from specdev_tools.trace.lockfile import replace_file_atomically
 
 ROLLBACK_DIR = os.path.join("extras", "releases")
@@ -86,7 +86,7 @@ def write_rollback(git_root: str, spec_root: str, tag: str, reason: str, pattern
     if not tag_matches(pattern, tag):
         raise refusal("E925", f"'{tag}' does not match the release tag pattern {pattern}; name a release tag")
     try:
-        commit = resolve_ref(tag, git_root)
+        commit = resolve_tag(tag, git_root)
     except GitViewError as error:
         raise refusal("E925", f"'{tag}' names no commit in this repository; name an existing release tag") from error
     if not reason.strip():

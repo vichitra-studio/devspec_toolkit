@@ -28,6 +28,7 @@ GIT_TIMEOUT_SECONDS = 30
 PREVIOUS_COMMIT = "HEAD~1"
 _TREE_ENTRY = "040000 tree "
 _MAX_REASON_CHARS = 240
+_STAMP_FILE = "specdev_version"
 
 
 class GitViewError(FindingError):
@@ -221,12 +222,43 @@ def archive_ref(ref: str, git_root: str, paths: Sequence[str]) -> tempfile.Tempo
     return directory
 
 
-def _git_stdout(git_root: str, args: Sequence[str]) -> str:
-    """The stdout of ``git -C <git_root> <args>``; E708 when git is missing, too slow or fails."""
+def git_stdout(git_root: str, args: Sequence[str]) -> str:
+    """The stdout of ``git -C <git_root> <args>``, decoded; the one helper for "run git, E708 when it fails".
+
+    Raises:
+        GitViewError: E708 when git is missing, too slow or fails.
+    """
     process = run_git(git_root, args)
     if process.returncode != 0:
         raise _fail("E708", f"git {args[0]} failed in {git_root}: {git_reason(process)}")
     return process.stdout.decode("utf-8", errors="replace")
+
+
+def status_lines(git_root: str) -> list[str]:
+    """The non-blank lines of ``git status --porcelain`` of *git_root*: a changed or staged path, or an untracked one git does not ignore.
+
+    The untracked mode is named here (``--untracked-files=all``), so a host's ``status.showUntrackedFiles no`` cannot hide a file.
+
+    Raises:
+        GitViewError: E708 when git is missing, too slow or fails.
+    """
+    return [line for line in git_stdout(git_root, ["status", "--porcelain", "--untracked-files=all"]).splitlines() if line.strip()]
+
+
+def toolkit_stamp_at(ref: str, git_root: str, spec_root: str) -> str | None:
+    """The ``toolkit_version`` the spec folder *spec_root* is stamped with at *ref*; ``None`` when the stamp file is absent there or holds no version.
+
+    The one reader of "the toolkit stamp at a commit": absent is told by ``path_exists_at``, every other failure raises.
+
+    Raises:
+        GitViewError: E708 when *ref* does not resolve, *spec_root* is outside *git_root*, or git fails.
+    """
+    relative = spec_path_in_repo(spec_root, git_root)
+    if not path_exists_at(ref, git_root, f"{relative}/{_STAMP_FILE}"):
+        return None
+    with archive_ref(ref, git_root, [f"{relative}/{_STAMP_FILE}"]) as archive:
+        stamp = get_user_version(Path(archive) / relative)
+    return None if stamp is None else str(stamp)
 
 
 def commits_touching(git_root: str, path: str, max_count: int) -> list[str]:
@@ -235,7 +267,7 @@ def commits_touching(git_root: str, path: str, max_count: int) -> list[str]:
     Raises:
         GitViewError: E708 when git is missing, too slow, or *git_root* is not a repository.
     """
-    return _git_stdout(git_root, ["log", "--format=%H", f"--max-count={max_count}", "--", path]).split()
+    return git_stdout(git_root, ["log", "--format=%H", f"--max-count={max_count}", "--", path]).split()
 
 
 def is_shallow_repository(git_root: str) -> bool:
@@ -244,7 +276,7 @@ def is_shallow_repository(git_root: str) -> bool:
     Raises:
         GitViewError: E708 when git is missing, too slow, or *git_root* is not a repository.
     """
-    return _git_stdout(git_root, ["rev-parse", "--is-shallow-repository"]).strip() == "true"
+    return git_stdout(git_root, ["rev-parse", "--is-shallow-repository"]).strip() == "true"
 
 
 def read_seed_texts(graph: Graph, host_root: str) -> dict[str, str]:

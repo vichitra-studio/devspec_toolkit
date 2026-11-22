@@ -15,11 +15,13 @@ import pytest
 
 from specdev_tools.graph import gitview
 from specdev_tools.release.prod_gate import run_prod_gate
+from specdev_tools.trace.lockfile import write_lock
 from unit.graph._synth import ROOT, git
 from unit.lifecycle._milestone_support import cli_run
 from unit.proof._support import run
 from unit.release._support import advance, commit, release_host, set_scope, tag
-from unit.verify._support import commit_all
+from unit.trace._lock_support import lock_for
+from unit.verify._support import commit_all, edit_doc, graph_of
 from integration._release_support import BINDING, SECOND_BINDING, THREAT, run_staging, snapshot, staged_host
 
 DELIVERY = "secret-mailrelay-api-key"
@@ -50,7 +52,7 @@ def test_prod_gate_passes_with_staging_evidence_on_descendant_commit(tmp_path: P
     assert snapshot(host) == before, "release check writes nothing"
 
 
-def test_prod_gate_fails_without_staging_evidence_E922(tmp_path: Path) -> None:
+def test_prod_gate_fails_without_staging_evidence_with_E347_owned_by_the_release_gate(tmp_path: Path) -> None:
     host = staged_host(tmp_path)
     tag(host, TAG)
     result = _gate(host)
@@ -95,6 +97,23 @@ def test_staging_delivery_obligation_unbuilt_E923(tmp_path: Path) -> None:
     assert error.node_id == DELIVERY and error.owner == "release-gate" and "not built at staging" in error.message
     assert "E924" not in _codes(result), "a delivery obligation E923 names is not named again"
     assert {"E347", "E348"}.isdisjoint(_codes(result)), "a delivery obligation is E923's, not the proof findings'"
+
+
+def test_a_relieved_delivery_obligation_that_staging_did_not_build_is_E923_and_not_E924(tmp_path: Path) -> None:
+    host = staged_host(tmp_path, DELIVERY)
+
+    def verify_the_secret(document: dict) -> None:
+        for fixture in document["fixtures"]:
+            if fixture["fixture_id"] == "fix-password-reset-reused-token":
+                fixture["verifies"].append(DELIVERY)
+
+    edit_doc(host, "08_fixtures.json", verify_the_secret)  # the secret now waits for staging proof, as the threat does
+    write_lock(str(host / "spec"), lock_for(graph_of(host), host))
+    commit_all(host, "the secret is verified at staging")
+    tag(host, TAG)
+    result = _gate(host)
+    assert [(error.code, error.node_id) for error in result.errors if error.code in {"E923", "E924"} and error.node_id == DELIVERY] == [("E923", DELIVERY)]
+    assert ("E924", THREAT) in [(error.code, error.node_id) for error in result.errors], "the threat, relieved the same way, is E924's"
 
 
 def test_relieved_node_failing_at_prod_E924(tmp_path: Path) -> None:
@@ -172,6 +191,15 @@ def test_unknown_tag_is_E921(tmp_path: Path) -> None:
     before = snapshot(host)
     code, out, err = cli_run(host, "release", "check", "--stage", "prod", "--tag", "v9.9.9")
     assert code == 1 and "E921" in out + err and "v9.9.9" in out + err and snapshot(host) == before
+
+
+def test_a_ref_that_is_not_a_tag_is_E921(tmp_path: Path) -> None:
+    host = staged_host(tmp_path)
+    git(host, "branch", "v2.0.0")
+    before = snapshot(host)
+    for name in ("HEAD", "main", "v2.0.0", git(host, "rev-parse", "HEAD")):
+        code, out, err = cli_run(host, "release", "check", "--stage", "prod", "--tag", name)
+        assert code == 1 and "E921" in out + err and name in out + err and snapshot(host) == before
 
 
 def test_release_check_json(tmp_path: Path) -> None:

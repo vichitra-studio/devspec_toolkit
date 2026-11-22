@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from specdev_tools.core.errors import FindingError, make_error, refusal
-from specdev_tools.graph.gitview import GitViewError, git_reason, resolve_ref, run_git
+from specdev_tools.graph.gitview import GitViewError, git_stdout, resolve_ref, run_git, status_lines
 from specdev_tools.release.gate import ReleaseGateResult, run_release_gate
 from specdev_tools.release.tag_state import release_tag_pattern, tag_matches
 from specdev_tools.verify.code_tree import declarations_of
@@ -34,16 +34,9 @@ def default_message(tag: str) -> str:
     return f"release {tag}"
 
 
-def _git_text(git_root: str, args: list[str]) -> str:
-    process = run_git(git_root, args)
-    if process.returncode != 0:
-        raise FindingError(make_error("E708", f"git {args[0]} failed: {git_reason(process)}"))
-    return process.stdout.decode("utf-8", errors="replace")
-
-
 def _refuse_dirty(git_root: str) -> None:
     """E910 when ``git status --porcelain`` lists anything: a changed or staged file, or an untracked one git does not ignore."""
-    lines = [line for line in _git_text(git_root, ["status", "--porcelain"]).splitlines() if line.strip()]
+    lines = status_lines(git_root)
     if lines:
         shown = ", ".join(line[3:] for line in lines[:_SHOWN_PATHS]) + (", ..." if len(lines) > _SHOWN_PATHS else "")
         raise refusal("E910", f"the working tree is not clean ({len(lines)} path(s): {shown}); commit or remove them, so the tag names the state that was checked")
@@ -80,5 +73,5 @@ def cut_release(git_root: str, spec_root: str, repo_root: str, tag: str, message
     text = message or default_message(tag)
     if not gate.passed:
         return CutResult(tag, commit, text, gate, False)
-    _git_text(git_root, ["tag", "-a", "-m", text, "--", tag, commit])
+    git_stdout(git_root, ["tag", "-a", "-m", text, "--", tag, commit])
     return CutResult(tag, commit, text, gate, True)

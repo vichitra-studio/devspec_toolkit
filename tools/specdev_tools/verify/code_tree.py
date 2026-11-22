@@ -19,7 +19,7 @@ from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.host_declarations import HostDeclarations, HostDeclarationsError, load_host_declarations
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.seed_routing import resolve_seed_paths
-from specdev_tools.graph.gitview import GitViewError, git_reason, relative_inside, resolve_ref, run_git
+from specdev_tools.graph.gitview import GitViewError, git_reason, relative_inside, resolve_ref, run_git, status_lines
 
 SEED_MANIFEST_FILE = "common/seed_manifest.json"
 """The seed manifest, relative to the spec folder."""
@@ -121,6 +121,14 @@ def code_tree_for_host(git_root: str, spec_root: str, commit: str | None = None,
     return code_tree_id(git_root, spec_in_host or spec_root, seed_pathspecs(git_root, spec_root), declarations.code_tree_exclusions, commit)
 
 
+def _has_changes(folder: str) -> bool:
+    """Whether the repository at *folder* lists a changed or untracked path; a repository git cannot ask counts as clean."""
+    try:
+        return bool(status_lines(folder))
+    except GitViewError:
+        return False
+
+
 def dirty_submodules(git_root: str) -> list[str]:
     """The paths (relative to *git_root*) of the initialised submodules that hold uncommitted content, sorted.
 
@@ -131,7 +139,7 @@ def dirty_submodules(git_root: str) -> list[str]:
         return []
     lines = process.stdout.decode("utf-8", errors="replace").splitlines()
     paths = [line[1:].split(" ", 1)[1].rsplit(" (", 1)[0] for line in lines if line and line[0] != "-"]
-    return sorted(path for path in paths if run_git(os.path.join(git_root, path), ["status", "--porcelain"]).stdout.strip())
+    return sorted(path for path in paths if _has_changes(os.path.join(git_root, path)))
 
 
 def submodule_warnings(git_root: str) -> list[SpecError]:

@@ -46,6 +46,8 @@ from .milestone import ProviderFactory, gate_context, require_row, run_gate
 RELEASE_NOT_INSTALLED = "release gate not installed"
 MERGE_RELEASE_SECTION = "merge_release_gates"
 PRODUCTION_SECTION = "production_verification"
+MERGE_RELEASE_TITLE = "Merge-check and release-gate errors"
+PRODUCTION_TITLE = "Production verification"
 _TRINITY_STEPS = frozenset({"16a", "16b", "16c"})
 
 
@@ -82,7 +84,10 @@ SECTIONS: dict[str, SectionFn] = {}
 
 
 def register_status_section(name: str, fn: SectionFn) -> None:
-    """Register the section *name*: ``fn(context)`` returns its ``Section``.  A name that is registered already is replaced in place."""
+    """Register the section *name*: ``fn(context)`` returns its ``Section``.  A name that is registered already is replaced in place.
+
+    The two release sections hold placeholders until ``cli.build_parser`` installs the real ones (``release.status_sections.install``): a caller of ``run_status`` that builds no parser prints the placeholders.
+    """
     SECTIONS[name] = fn
 
 
@@ -192,8 +197,8 @@ register_status_section("awaiting_signoff", _awaiting_signoff)
 register_status_section("realisations", _realisations)
 register_status_section("next_step", _next_step)
 register_status_section("gate_owned_errors", _gate_owned)
-register_status_section(MERGE_RELEASE_SECTION, _release_not_installed(MERGE_RELEASE_SECTION, "Merge-check and release-gate errors"))
-register_status_section(PRODUCTION_SECTION, _release_not_installed(PRODUCTION_SECTION, "Production verification"))
+register_status_section(MERGE_RELEASE_SECTION, _release_not_installed(MERGE_RELEASE_SECTION, MERGE_RELEASE_TITLE))
+register_status_section(PRODUCTION_SECTION, _release_not_installed(PRODUCTION_SECTION, PRODUCTION_TITLE))
 
 
 def build_status(sc: StatusContext) -> list[Section]:

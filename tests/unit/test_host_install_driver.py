@@ -13,6 +13,7 @@ from unittest import mock
 import pytest
 
 from specdev_tools import host_install as hi
+from unit._host_install_support import host, make_ctx as shared_make_ctx  # noqa: F401  (the fixture ``host``)
 from specdev_tools.trace.merge_driver import DRIVER_DESCRIPTION, DRIVER_NAME
 
 REPO = Path(__file__).resolve().parents[2]
@@ -25,30 +26,9 @@ def git(root: Path, *args: str) -> str:
     return done.stdout.strip() if done.returncode == 0 else f"<exit {done.returncode}>"
 
 
-@pytest.fixture
-def host(tmp_path: Path) -> Path:
-    root = tmp_path / "host"
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    (root / "spec").mkdir()
-    return root
-
-
 def make_ctx(root: Path, *, venv_prefix: Path | None = None, venv: str | None = None, dry_run: bool = False) -> hi.InstallContext:
     prefix = venv_prefix or root / ".venv"
-    return hi.InstallContext(
-        spec_dir=root / "spec",
-        spec_rel="spec",
-        git_root=root,
-        toolkit_root=root / "devspec_toolkit",
-        templates_dir=REPO / "templates",
-        toolkit_version="1.2.3",
-        venv_prefix=prefix,
-        venv_name=venv or prefix.name,
-        dry_run=dry_run,
-        adopt=False,
-        force_claude=False,
-    )
+    return shared_make_ctx(root, venv_prefix=prefix, venv_name=venv or prefix.name, dry_run=dry_run)
 
 
 def info_attributes(root: Path) -> Path:

@@ -22,7 +22,8 @@ from specdev_tools.graph.model import Node
 STEP_PREFIX = "step:"
 FIXED_STEP_PREFIX = "fixed_step:"
 CLOSE_OWNER = "close-gate"
-GATE_OWNERS = frozenset({"merge-check", CLOSE_OWNER, "release-gate"})
+RELEASE_OWNER = "release-gate"
+GATE_OWNERS = frozenset({"merge-check", CLOSE_OWNER, RELEASE_OWNER})
 _NODE_STEP_RULES = frozenset({"holder_step", "node_step", "consumer_step", "binding_step"})
 _FURTHEST_STEP_RULE = "furthest_usable_step"
 _UNKNOWN_STEP = "unknown"

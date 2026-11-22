@@ -26,6 +26,7 @@ from ..core.git_base import resolve_baseline
 from ..graph.gitview import GitViewError, resolve_ref
 from ..graph.model import Graph
 from ..graph.names import ROW_DONE
+from ..graph.stages import CI_STAGE
 from ..lifecycle.anchor_store import AnchorState, is_legacy_close, read_statuses
 from ..thirdparty.check import check_pins
 from ..trace.lockfile import MERGE_CHECK_OWNER
@@ -40,7 +41,6 @@ MERGE_PINS = "merge-pins"
 MERGE_BINDINGS = "merge-bindings"
 
 _FULL_SHA = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
-_BINDING_STAGE = "ci"
 _NO_GRAPH = "no spec graph"
 
 
@@ -132,7 +132,7 @@ def _binding_ids(graph: Graph, milestones: list[str]) -> dict[str, str]:
     """``{binding id: the first closed milestone that names it}`` for the dev and CI bindings of *milestones*."""
     owners: dict[str, str] = {}
     for milestone in milestones:
-        for binding_id in selected_ids(graph, every=False, milestone=milestone, stage=_BINDING_STAGE, only_stage=False):
+        for binding_id in selected_ids(graph, every=False, milestone=milestone, stage=CI_STAGE, only_stage=False):
             owners.setdefault(binding_id, milestone)
     return owners
 
@@ -158,7 +158,7 @@ def _bindings_check(ctx: CheckContext, base_ref: str | None) -> dict[str, Any]:
         return skip("this branch closes no milestone with a dev or CI binding")
     evidence = run_bindings(
         list(owners), ctx.spec_dir, records_folder(spec_root), ctx.project_root, record=False,
-        stage=_BINDING_STAGE, only_stage=False, repo_root=ctx.repo_root, graph=ctx.check_graph,
+        stage=CI_STAGE, only_stage=False, repo_root=ctx.repo_root, graph=ctx.check_graph,
     )
     return check_result([
         _failed_binding(item.about[0], owners[item.about[0]], item.exit_code, item.guard_matched)

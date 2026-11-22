@@ -16,6 +16,7 @@ The module sits beside ``update.py`` outside the layer chain: only ``update.py``
 """
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import posixpath
@@ -150,8 +151,8 @@ class InstallReport:
     skipped: str = ""
 
     def warnings(self) -> list[str]:
-        """The warning strings of every finding of every piece, in piece order."""
-        return [finding.render() for _, result in self.pieces for finding in result.findings]
+        """The warning strings of the findings of the pieces, in piece order; a finding every piece repeats (the host could not be resolved) is listed once."""
+        return list(dict.fromkeys(finding.render() for _, result in self.pieces for finding in result.findings))
 
     def summary(self) -> str:
         """The lines printed for a person: the skip reason, or one line per piece."""
@@ -894,7 +895,7 @@ def retired_command_findings(host_root: Path, *, removed_commands: dict[str, str
     ``core.constants.REMOVED_COMMANDS`` and for ``validate-all`` when they stand as the command after ``specdev``,
     ``specdev_tools.cli`` or ``run_specdev.sh`` (so a ``matrix:`` job strategy is not one), and for any mention of
     ``trace_matrix.json``; a comment line is not read.  ``dag-lint`` is not a retired command.  Nothing is rewritten.
-    *removed_commands* replaces the table of ``cli``.
+    *removed_commands* replaces the table ``core.constants.REMOVED_COMMANDS``.
     """
     table = REMOVED_COMMANDS if removed_commands is None else removed_commands
     replacements = {**table, _VALIDATE_ALL: _VALIDATE_ALL_REPLACEMENT}
@@ -989,8 +990,6 @@ def render_wrapper(template: str, *, toolkit_rel: str, venv_name: str) -> str:
 
 
 def _wrapper_diff(existing: str, rendered: str) -> str:
-    import difflib
-
     diff = list(difflib.unified_diff(existing.splitlines(), rendered.splitlines(), "the host's file", "the toolkit's wrapper", lineterm="", n=1))
     if len(diff) > _DIFF_LINE_LIMIT:
         diff = [*diff[:_DIFF_LINE_LIMIT], "..."]
@@ -1184,13 +1183,8 @@ ASK_COMMAND_PATTERNS = ("milestone sign-off *", "milestone defer *", "release", 
 check``, ``release prep`` and ``release rollback`` do not ask (rollback is a plain record command)."""
 
 
-def ask_rules_for(toolkit_version: str) -> list[str]:
-    """The Claude Code ``ask`` rules a host gets: every command pattern in every launch form, in a fixed order.
-
-    The list is the same for every toolkit of the 1.2 line; *toolkit_version* is the place a later version adds or
-    retires a form without changing the piece.
-    """
-    del toolkit_version
+def ask_rules_for() -> list[str]:
+    """The Claude Code ``ask`` rules a host gets: every command pattern in every launch form, in a fixed order."""
     return [f"Bash({form} {pattern})" for form in ASK_LAUNCH_FORMS for pattern in ASK_COMMAND_PATTERNS]
 
 
@@ -1216,10 +1210,10 @@ def _read_settings(path: Path) -> dict | None:
         raise HostInstallError(f"{SETTINGS_LOCAL} is not valid JSON ({exc.msg}, line {exc.lineno})") from exc
     if not isinstance(data, dict):
         raise HostInstallError(f"{SETTINGS_LOCAL} is not a JSON object")
-    permissions = data.get("permissions")
-    if permissions is not None and not isinstance(permissions, dict):
+    permissions = data.get("permissions", {})
+    if not isinstance(permissions, dict):
         raise HostInstallError(f"'permissions' in {SETTINGS_LOCAL} is not an object")
-    if isinstance(permissions, dict) and not isinstance(permissions.get("ask", []), list):
+    if not isinstance(permissions.get("ask", []), list):
         raise HostInstallError(f"'permissions.ask' in {SETTINGS_LOCAL} is not a list")
     return data
 
@@ -1251,21 +1245,21 @@ def install_ask_rules(ctx: InstallContext) -> PieceResult:
     it), then written.  An unreadable or malformed file is refused (W931) and left as it is, with the fragment to merge
     by hand; a write that the system refuses is W931 with the command the person runs themselves.
     """
-    rules = ask_rules_for(ctx.toolkit_version)
+    rules = ask_rules_for()
     path = ctx.git_root / SETTINGS_LOCAL
     fragment = _ask_fragment(rules)
     try:
         data = _read_settings(path)
         asked = [] if data is None else list(data.get("permissions", {}).get("ask", []))
         missing = [rule for rule in rules if rule not in asked]
-        # a dry run runs no git command but rev-parse, so it does not ask whether the exclude line is needed
-        needs_exclude = not ctx.dry_run and not _settings_ignored(ctx)
+        needs_exclude = not _settings_ignored(ctx)  # a read-only question: a dry run asks it as the real run does
     except HostInstallError as exc:
         return refused(f"{exc}; merge this by hand: {fragment}", file=SETTINGS_LOCAL)
     if not missing and not needs_exclude:
         return PieceResult(CURRENT, "up to date")
     if ctx.dry_run:
-        return PieceResult(WOULD_INSTALL, f"would add {len(missing)} ask rule(s) to {SETTINGS_LOCAL}")
+        would = ([f"would add {len(missing)} ask rule(s) to {SETTINGS_LOCAL}"] if missing else []) + ([f"would exclude {SETTINGS_LOCAL} from git"] if needs_exclude else [])
+        return PieceResult(WOULD_INSTALL, "; ".join(would))
     try:
         if needs_exclude:
             _append_line(_git_path(ctx, "info/exclude"), SETTINGS_LOCAL)

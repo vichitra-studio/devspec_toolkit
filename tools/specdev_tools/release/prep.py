@@ -19,13 +19,13 @@ from typing import Any
 
 from specdev_tools.graph.commands import print_json, resolve_git_root, run_on_graph
 from specdev_tools.graph.model import Graph
+from specdev_tools.graph.stages import CI_STAGE
 from specdev_tools.proof.validity import ProofContext, evidence_for, evidence_valid
 from specdev_tools.release.gate import ReleaseGateResult, run_release_gate
 from specdev_tools.release.status_sections import CanonDirOf
 from specdev_tools.verify.records import Evidence, all_bindings, records_folder
 from specdev_tools.verify.run import run_bindings, selected_ids
 
-PREP_STAGE = "ci"
 EXIT_FAILED = 1
 
 
@@ -56,6 +56,8 @@ def _text(proven: list[str], results: list[Evidence], gate: ReleaseGateResult) -
     if gate.errors:
         lines.append(f"left for the release gate: {len(gate.errors)} error(s)")
         lines.extend(f"  {error.render()}" for error in gate.errors)
+    elif results:
+        lines.append("left for the release gate: nothing, once the evidence is committed (the cut refuses a tree that is not clean, E910)")
     else:
         lines.append("left for the release gate: nothing blocks the release")
     return "\n".join(lines)
@@ -64,7 +66,7 @@ def _text(proven: list[str], results: list[Evidence], gate: ReleaseGateResult) -
 def _json(proven: list[str], todo: list[str], results: list[Evidence], gate: ReleaseGateResult) -> dict[str, Any]:
     return {
         "command": "release prep",
-        "stage": PREP_STAGE,
+        "stage": CI_STAGE,
         "run": todo,
         "already_proven": proven,
         "evidence": [item.evidence_id for item in results],
@@ -80,10 +82,10 @@ def _prep(args: argparse.Namespace, graph: Graph, canon_dir_of: CanonDirOf) -> i
     spec_root, repo_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
     evidence_dir = records_folder(spec_root)
     ctx = ProofContext(git_root, spec_root, evidence_dir)
-    ids = selected_ids(graph, every=True, milestone=None, stage=PREP_STAGE, only_stage=False)
+    ids = selected_ids(graph, every=True, milestone=None, stage=CI_STAGE, only_stage=False)
     holding = _already_proven(graph, ctx)
     proven, todo = [i for i in ids if i in holding], [i for i in ids if i not in holding]
-    results = run_bindings(todo, spec_root, evidence_dir, git_root, True, PREP_STAGE, False, repo_root=repo_root, graph=graph) if todo else []
+    results = run_bindings(todo, spec_root, evidence_dir, git_root, record=True, stage=CI_STAGE, only_stage=False, repo_root=repo_root, graph=graph) if todo else []
     canon = canon_dir_of(git_root=git_root, spec_root=spec_root, spec_dir=spec_root)
     gate = run_release_gate(repo_root, spec_root, git_root, spec_root, canon)
     if args.json_output:

@@ -27,8 +27,8 @@ from typing import NamedTuple
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.graph.model import Node
 from specdev_tools.graph.names import ENVIRONMENT, OBLIGATION_ROLES, ROW_DONE, RULE
-from specdev_tools.graph.ownership import CLOSE_OWNER
-from specdev_tools.graph.stages import STAGES
+from specdev_tools.graph.ownership import CLOSE_OWNER, RELEASE_OWNER
+from specdev_tools.graph.stages import CI_STAGE, STAGES
 from specdev_tools.lifecycle import anchor_store
 from specdev_tools.lifecycle.attest import review_rule_attested
 from specdev_tools.lifecycle.close_gate import verify_close_record
@@ -43,10 +43,8 @@ from specdev_tools.validation.graph_checks.built import SATISFIED, BuiltState
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
 from specdev_tools.validation.graph_checks.design_milestones import unrealised_design_milestones
 from specdev_tools.validation.graph_checks.scaffold import scaffold_scan
-from specdev_tools.validation.merge_gate import open_items_check, pins_check
+from specdev_tools.validation.merge_gate import MERGE_OPEN_ITEMS, MERGE_PINS, open_items_check, pins_check
 
-RELEASE_OWNER = "release-gate"
-_CI = "ci"
 _SCOPE_OUT = PARKED_SCOPES[-1]
 _RELEASE_MODE: Mode = "release"
 _NO_GRAPH = "no spec graph could be built, so the release checks that read the graph did not run; correct the errors above"
@@ -113,8 +111,8 @@ def _static_state(ctx: CheckContext, run: _Run) -> list[SpecError]:
     if not ctx.quiet:
         spec_check.warn_ignored_promotions()
     checks = run_registered_checks(ctx)
-    checks["merge-open-items"] = open_items_check(ctx)
-    checks["merge-pins"] = pins_check(ctx)
+    checks[MERGE_OPEN_ITEMS] = open_items_check(ctx)
+    checks[MERGE_PINS] = pins_check(ctx)
     return list(dict.fromkeys(spec_check.check_findings(checks)))
 
 
@@ -130,7 +128,7 @@ def _unsigned(gctx: GraphCheckContext) -> list[SpecError]:
 
 def _not_built(gctx: GraphCheckContext, scope: list[Node], run: _Run) -> list[SpecError]:
     """E914 for each obligation of *scope* that is not built at ``ci``; the relieved ones go to ``run.relieved``."""
-    built = built_at_cap(gctx, _CI)
+    built = built_at_cap(gctx, CI_STAGE)
     found: list[SpecError] = []
     for node in scope:
         result = built[node.id]
@@ -188,7 +186,7 @@ def _graph_steps(gctx: GraphCheckContext, run: _Run) -> None:
     run.step(lambda: [gctx.finding("E928", node, f"design milestone {node.id} is realised by no roadmap milestone; schedule it into one, or set its scope to later or out with a scope_reason") for node in unrealised_design_milestones(gctx)])
     run.step(lambda: _unsigned(gctx))
     run.step(lambda: _not_built(gctx, scope, run))
-    run.step(lambda: proof_errors(gctx.graph, proof, [node.id for node in scope], _CI) if proof is not None else [])
+    run.step(lambda: proof_errors(gctx.graph, proof, [node.id for node in scope], CI_STAGE) if proof is not None else [])
     run.step(lambda: _realisations(gctx, run))
     run.step(lambda: _unattested(gctx))
     run.listed.extend(_listed(gctx))

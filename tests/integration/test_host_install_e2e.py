@@ -216,7 +216,7 @@ def test_update_installs_every_piece_into_the_w_fixture_and_a_second_run_changes
     merged = settings_of(host)
     assert {key: value for key, value in merged.items() if key != "permissions"} == {key: value for key, value in own_settings.items() if key != "permissions"}
     assert merged["permissions"]["allow"] == own_settings["permissions"]["allow"] and merged["permissions"]["deny"] == own_settings["permissions"]["deny"]
-    assert merged["permissions"]["ask"][:1] == own_settings["permissions"]["ask"] and len(merged["permissions"]["ask"]) == 1 + len(hi.ask_rules_for("1.2.0"))
+    assert merged["permissions"]["ask"][:1] == own_settings["permissions"]["ask"] and len(merged["permissions"]["ask"]) == 1 + len(hi.ask_rules_for())
     assert (host / "tools" / "run_specdev.sh").is_file() and (host / WORKFLOW_OF_THE_TOOLKIT).is_file()
     assert (host / ".claude" / "skills" / "specdev-step").is_symlink() and ".specdev/" in (host / ".gitignore").read_text(encoding="utf-8").splitlines()
     driver = subprocess.run(["git", "config", "merge.specdev-trace-lock.driver"], cwd=host, capture_output=True, text=True).stdout.strip()
@@ -262,7 +262,7 @@ def test_update_installs_every_piece_into_the_p_fixture_and_a_second_run_changes
     assert own_lines_outside_the_block((host / CONFIG).read_text(encoding="utf-8")) == own_config_lines, "outside the marked block the config is the host's, line for line"
     assert (host / ".github" / "workflows" / "ci.yml").read_bytes() == own_workflow
     merged = settings_of(host)
-    assert merged["permissions"]["allow"] == own_settings["permissions"]["allow"] and merged["permissions"]["ask"] == hi.ask_rules_for("1.2.0"), "p had no ask list: it gets the rules, its allow list is untouched"
+    assert merged["permissions"]["allow"] == own_settings["permissions"]["allow"] and merged["permissions"]["ask"] == hi.ask_rules_for(), "p had no ask list: it gets the rules, its allow list is untouched"
     assert set(merged) == set(own_settings) == {"permissions"} and set(merged["permissions"]) == {"allow", "ask"}
     assert len(pre_commit_runs) >= 1
 
@@ -292,7 +292,7 @@ def test_update_on_a_fresh_init_layout_is_a_noop_the_second_time(tmp_path: Path,
     assert_only_the_installer_wrote(before, after, CONFIG)
     gitignore = (host / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert ".specdev/" in gitignore and "devspec_env/" in gitignore, "init's line stays, the installer's is added"
-    assert settings_of(host) == {"permissions": {"ask": hi.ask_rules_for("1.2.0")}}
+    assert settings_of(host) == {"permissions": {"ask": hi.ask_rules_for()}}
     assert len(pre_commit_runs) >= 1
 
     second = second_run_changes_nothing(host, first, toolkit=REPO)

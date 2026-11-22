@@ -177,7 +177,8 @@ class TestRefusals:
         spec.mkdir(parents=True)
         report = hi.run_host_install(spec, toolkit, pieces=(_writing_piece("a"), _writing_piece("b")))
         assert [(n, r.status) for n, r in report.pieces] == [("a", hi.REFUSED), ("b", hi.REFUSED)]
-        assert all("not inside a git repository" in w for w in report.warnings())
+        [warning] = report.warnings()  # one W931 for the run, not one per piece
+        assert "not inside a git repository" in warning
 
     def test_a_spec_dir_outside_the_named_git_root_is_refused(self, tmp_path, host, toolkit):
         other = tmp_path / "other"
@@ -218,7 +219,8 @@ class TestDryRun:
             hi.run_host_install(host / "spec", toolkit, dry_run=True, pieces=(_writing_piece(),))
             run_update(host / "spec", toolkit, dry_run=True, install_only=True)
         assert commands
-        assert all(c[0] == "git" and c[3] == "rev-parse" for c in commands), commands
+        # read-only questions only: where the repository is, and (ask-rules) whether git ignores the settings file
+        assert all(c[0] == "git" and c[3] in {"rev-parse", "check-ignore"} for c in commands), commands
 
 
 class TestResultShape:
