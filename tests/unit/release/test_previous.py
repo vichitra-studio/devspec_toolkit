@@ -258,6 +258,14 @@ def test_a_spec_with_no_stamp_file_at_the_commit_predates_1_2_0(tmp_path: Path) 
     assert toolkit_stamp_at("HEAD~1", str(host), str(host / "spec")) is not None
 
 
+def test_a_stamp_file_that_cannot_be_parsed_reads_as_no_stamp(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+    write(host / "spec" / "specdev_version", "toolkit_version: [\n")
+    commit(host, "damaged stamp")
+    assert toolkit_stamp_at("HEAD", str(host), str(host / "spec")) is None
+    assert predates_1_2_0(str(host), str(host / "spec"), "HEAD")
+
+
 def test_a_git_failure_reading_the_stamp_is_E708_not_a_release_that_predates(tmp_path: Path) -> None:
     host = _released(tmp_path)
     real = gitview.run_git
