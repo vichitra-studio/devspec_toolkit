@@ -74,10 +74,10 @@ def test_a_dry_run_prints_the_proposals_and_adds_no_item(host):
 
 
 def test_unknown_kind_is_a_usage_error(host):
-    for argv in (("--kind", "bindings"), ("--kind", "refine"), ()):
+    for argv in (("--kind", "binding"), ("--kind", "refine"), ()):
         code, out, err = propose(host, *argv)
         assert code == 2 and out == ""
-        assert "align propose needs --kind {refines,prose-ids}" in err
+        assert "align propose needs --kind {refines,prose-ids,bindings}" in err
 
 
 def test_a_spec_folder_that_is_not_in_migration_is_refused_in_one_line(host):

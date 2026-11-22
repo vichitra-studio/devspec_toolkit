@@ -33,8 +33,9 @@ from specdev_tools.validation.graph_checks.context import GraphCheckContext
 
 KIND_REFINES = "refines"
 KIND_PROSE_IDS = "prose-ids"
-KINDS = (KIND_REFINES, KIND_PROSE_IDS)
-_MODULES = {KIND_REFINES: "refines", KIND_PROSE_IDS: "prose_ids"}
+KIND_BINDINGS = "bindings"
+KINDS = (KIND_REFINES, KIND_PROSE_IDS, KIND_BINDINGS)
+_MODULES = {KIND_REFINES: "refines", KIND_PROSE_IDS: "prose_ids", KIND_BINDINGS: "bindings"}
 
 
 class ProposeError(Exception):
@@ -135,7 +136,12 @@ def load_tree(ctx: MigrationContext) -> MigratedTree:
     return MigratedTree(ctx, graph, checks, capture, capture_renames(ctx))
 
 
-def _context(spec_dir: Path, toolkit_root: Path, git_root: Path | None) -> MigrationContext:
+def context_of(spec_dir: Path, toolkit_root: Path, git_root: Path | None) -> MigrationContext:
+    """The migration context of *spec_dir* (the host root is *git_root*, else the folder that holds it).
+
+    Raises:
+        ProposeError: the folder is not in migration (it has no capture).
+    """
     if not os.path.isfile(spec_dir / CAPTURE_FILE):
         raise ProposeError(
             f"{spec_dir} is not in migration: it has no {CAPTURE_FILE}; run `specdev align apply --auto` first "
@@ -153,7 +159,7 @@ def propose(spec_dir: Path, *, kind: str, toolkit_root: Path, git_root: Path | N
     Raises:
         ProposeError: the folder is not in migration, the tree cannot be read, or the worklist is not a worklist.
     """
-    ctx = _context(spec_dir, toolkit_root, git_root)
+    ctx = context_of(spec_dir, toolkit_root, git_root)
     tree = load_tree(ctx)
     result = importlib.import_module(f"{__name__}.{_MODULES[kind]}").propose(tree)
     items = [proposal.item for proposal in result.proposals]

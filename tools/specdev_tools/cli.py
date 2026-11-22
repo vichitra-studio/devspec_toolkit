@@ -415,13 +415,14 @@ def build_parser() -> _SpecdevParser:
 
     # Align commands (Phase 3-6: Schema Differ + Apply + Prompts)
     al = sub.add_parser("align", help="Toolkit alignment and migration")
-    al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "triage", "prompts", "rollback", "validate"],
-                    help="Alignment action: apply (the mechanical migration), propose, triage (the worklist), validate (finish "
-                         "the migration), status/diff/plan/prompts (read the structural differences), rollback (a pre-1.2.0 backup)")
+    al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "triage", "bind-legacy", "prompts", "rollback", "validate"],
+                    help="Alignment action: apply (the mechanical migration), propose, triage (the worklist), bind-legacy (bind "
+                         "the legacy fixtures), validate (finish the migration), status/diff/plan/prompts (read the structural "
+                         "differences), rollback (a pre-1.2.0 backup)")
     al.add_argument("spec_dir", help="Path to user spec/ directory")
     al.add_argument("--repo-root", default=".", help="Toolkit root directory")
     al.add_argument("--git-root", default=None,
-                    help="Host git work tree (apply, propose, triage, validate; default: the folder that holds spec_dir)")
+                    help="Host git work tree (apply, propose, triage, bind-legacy, validate; default: the folder that holds spec_dir)")
     al.add_argument("--auto", action="store_true", help="Apply only auto-fixable changes")
     al.add_argument("--dry-run", action="store_true",
                     help="apply: run the migration on a scratch copy and print the diff, write nothing; "
@@ -430,7 +431,10 @@ def build_parser() -> _SpecdevParser:
                     help="apply: do not refuse a spec/ with uncommitted changes")
     al.add_argument("--kind", metavar="KIND",
                     help="propose: what to propose: refines (a legacy task criterion's refines link) or prose-ids "
-                         "(the ids a node's text names); propose writes only spec/extras/migration/worklist.json")
+                         "(the ids a node's text names) or bindings (the command that ran each legacy fixture, as a "
+                         "`verify bind` line); propose writes only spec/extras/migration/worklist.json")
+    al.add_argument("--summary", action="store_true",
+                    help="bind-legacy: print the counts only (bindings written, fixtures covered, made manual, still open)")
     al.add_argument("--step", metavar="NN", help="triage: list only the items of this step (4 and 04 are the same)")
     al.add_argument("--audience", choices=["operator", "agent"], help="triage: list only the items for this audience")
     al.add_argument("--legacy", metavar="NN",
@@ -448,7 +452,8 @@ def build_parser() -> _SpecdevParser:
                     help="Prompt generation mode (default: upgrade)")
     al.add_argument("--backup-dir", help="Backup directory to restore from (for rollback)")
     al.add_argument("--yes", "-y", action="store_true",
-                    help="Skip confirmation prompts (for non-interactive use; apply never asks, so it is a no-op there)")
+                    help="Skip confirmation prompts (for non-interactive use; apply never asks, so it is a no-op there; "
+                         "bind-legacy writes the lines of every certain group without asking)")
     al.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     upd = sub.add_parser(
@@ -1424,6 +1429,34 @@ def main():
                 print(f"align triage: {error}", file=sys.stderr)
                 sys.exit(1)
             print(json.dumps({"status": "PASS", "error_count": 0, "warning_count": 0, "command": "align", "errors": [], **outcome}, indent=2) if getattr(args, "json_output", False) else line)
+        elif args.action == "bind-legacy":
+            from .migration.legacy_bindings import PassOutcome, run_pass, summary_of
+            from .migration.proposers.bindings import BindGroup
+            from .migration.proposers import ProposeError
+
+            git_arg = Path(os.path.abspath(args.git_root)) if args.git_root else None
+
+            def ask(group: BindGroup) -> bool:
+                if args.yes:
+                    return True
+                try:
+                    return input(f"Write the {sum(len(m.lines) for m in group.members)} binding line(s) of {' && '.join(group.commands)}? [y/N]: ").strip().lower() == "y"
+                except (EOFError, KeyboardInterrupt):
+                    return False
+
+            try:
+                if args.summary:
+                    legacy = summary_of(spec_dir, toolkit_root=repo_root, git_root=git_arg)
+                else:
+                    legacy = run_pass(spec_dir, toolkit_root=repo_root, git_root=git_arg, answer=ask if (args.yes or sys.stdin.isatty()) else None, dry_run=args.dry_run)
+            except ProposeError as error:
+                if getattr(args, "json_output", False):
+                    _json_exit([f"E520 UNRESOLVED_INPUT {error}"], "align", {"action": "bind-legacy"})
+                print(f"align bind-legacy: {error}", file=sys.stderr)
+                sys.exit(1)
+            print(json.dumps(legacy.to_json(), indent=2) if getattr(args, "json_output", False) else legacy.render())
+            if isinstance(legacy, PassOutcome) and legacy.refused:
+                sys.exit(1)
         elif args.action == "prompts":
             # Generate AI prompts for semantic migrations
             prompts = generate_prompts(

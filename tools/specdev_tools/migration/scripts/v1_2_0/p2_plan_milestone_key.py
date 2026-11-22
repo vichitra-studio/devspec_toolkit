@@ -7,7 +7,7 @@ file that no anchor row names, or whose key disagrees with the row, is a worklis
 
 This module also holds the two readers the action-id script shares: which plan file belongs to which milestone and
 which milestones are legacy-closed (the rule of the legacy close: 14 status ``done``, anchor status ``done`` or a
-close record, or a plan review verdict ``verified``).
+close record, or a plan review verdict ``verified``; read from ``capture.json``, ruling P23).
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
 from specdev_tools.graph.names import ROW_DONE
 from specdev_tools.lifecycle.anchor_store import is_legacy_close
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
+from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
 from specdev_tools.migration.worklist import add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p2_plan_milestone_key", phase=PHASE_IDS, touches=("16", "extras"))
@@ -28,6 +29,11 @@ SCRIPT = ScriptSpec(id="p2_plan_milestone_key", phase=PHASE_IDS, touches=("16", 
 ANCHOR_STEP = "16"
 ROADMAP_STEP = "14"
 VERDICT_VERIFIED = "verified"
+CAPTURE_STATUS = "milestone_status"
+SOURCE_ROADMAP = "14.status"
+SOURCE_ANCHOR = "anchor.status"
+SOURCE_VERDICT = "16c.verdict"
+_SOURCE_ORDER = (SOURCE_ROADMAP, SOURCE_ANCHOR, SOURCE_VERDICT)
 KIND_NO_ROW = "plan-without-row"
 KIND_KEY_MISMATCH = "plan-milestone-mismatch"
 
@@ -88,22 +94,35 @@ def plan_milestones(ctx) -> dict[str, str]:
     return found
 
 
-def closed_milestones(ctx) -> set[str]:
-    """The 14 milestones that are legacy-closed now: 14 or the anchor says ``done`` (or holds a close), or the plan's verdict is ``verified``."""
-    closed = {
-        m["milestone_id"]
-        for m in step_data(ctx, ROADMAP_STEP).get("milestones", [])
-        if isinstance(m, dict) and m.get("status") == ROW_DONE and isinstance(m.get("milestone_id"), str)
-    }
+def closed_sources(ctx) -> dict[str, list[str]]:
+    """``{milestone id: the evidence names that say it is closed}`` for the 14 milestones that are legacy-closed, read from ``capture.json``.
+
+    The three ways a milestone was closed in 1.1.1, each from the capture's ``milestone_status`` (the values as they were
+    before phase 3 removed them): the roadmap says ``done`` (``14.status``), the anchor row says ``done``
+    (``anchor.status``; a live legacy close record of the row counts too), or the plan's review verdict is ``verified``
+    (``16c.verdict``).  The names are listed in that order.
+    """
+    held = ctx.documents.load(CAPTURE_REL).data.get(CAPTURE_STATUS) or {}
+    found: dict[str, list[str]] = {}
+    for name, section in ((SOURCE_ROADMAP, "roadmap"), (SOURCE_ANCHOR, "anchor")):
+        for entry in held.get(section) or []:
+            if entry.get(LEGACY + "status") == ROW_DONE:
+                found.setdefault(entry["milestone"], []).append(name)
     for row in anchor_rows(ctx):
         milestone = row_milestone(row)
-        if milestone and (row.get("status") == ROW_DONE or is_legacy_close(row.get("close"))):
-            closed.add(milestone)
-    for rel, milestone in plan_milestones(ctx).items():
-        verdict = (ctx.documents.load(rel).data.get("review") or {}).get("verdict")
-        if verdict == VERDICT_VERIFIED:
-            closed.add(milestone)
-    return closed
+        if milestone and is_legacy_close(row.get("close")) and SOURCE_ANCHOR not in found.get(milestone, []):
+            found.setdefault(milestone, []).append(SOURCE_ANCHOR)
+    by_plan = plan_milestones(ctx)
+    for entry in held.get("plans") or []:
+        milestone = by_plan.get(entry["file"])
+        if milestone and entry.get("review_verdict") == VERDICT_VERIFIED:
+            found.setdefault(milestone, []).append(SOURCE_VERDICT)
+    return {milestone: sorted(names, key=_SOURCE_ORDER.index) for milestone, names in found.items()}
+
+
+def closed_milestones(ctx) -> set[str]:
+    """The 14 milestones that are legacy-closed: the keys of ``closed_sources`` (they read the capture, so the answer does not change when a later phase removes the 14 ``status``)."""
+    return set(closed_sources(ctx))
 
 
 def insert_key(data: dict[str, Any], name: str, value: Any, *, after: str | None = None) -> None:

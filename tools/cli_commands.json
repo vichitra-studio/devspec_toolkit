@@ -13,6 +13,9 @@
       "path": "align apply"
     },
     {
+      "path": "align bind-legacy"
+    },
+    {
       "path": "align diff"
     },
     {

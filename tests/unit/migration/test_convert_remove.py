@@ -23,6 +23,7 @@ from specdev_tools.migration.report import STATUS_OK
 from specdev_tools.migration.scripts.v1_2_0.p3_remove import closed_plan_files, files_of_row, last_key, parents_at
 from specdev_tools.migration.writer import DocumentSet
 from specdev_tools.trace.computed_fields import check_stored_computed
+from specdev_tools.trace.lockfile import lock_path
 
 from .test_runner_core import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
 
@@ -174,7 +175,8 @@ def test_stored_computed_names_are_removed_everywhere(tmp_path):
 
     host, toolkit, _ = migrate(tmp_path, ("04_fr_list.json", stamp_fr), ("impl_context/ms_catalog_plan.json", stamp_closed_plan))
     assert check_stored_computed(build_graph(str(host / "spec"), str(toolkit))) == []
-    text = "".join(path.read_text(encoding="utf-8") for path in (host / "spec").rglob("*.json"))
+    lock = Path(lock_path(str(host / "spec")))  # the trace lock holds hashes by design (``p6_baseline`` writes it)
+    text = "".join(path.read_text(encoding="utf-8") for path in (host / "spec").rglob("*.json") if path != lock)
     assert "content_hash" not in text and "chain_stamp" not in text
     closed = read(host, "impl_context/ms_catalog_plan.json")["plan"]["spec_alignment"]["checklist"][0]
     assert "milestone_ref" not in closed and "linked_test_expectation" in closed, "a closed plan loses the E768 names only"
@@ -303,9 +305,17 @@ def test_a_file_no_script_needs_to_change_is_byte_identical(migrated):
     assert (host / "spec" / "08_fixtures.json").read_text(encoding="utf-8").startswith('{\n  "$schema"'), "a file keeps its own indent (2)"
 
 
-def test_the_14_milestone_status_stays_until_the_legacy_close(migrated):
-    host, _, _ = migrated
+def test_the_14_milestone_status_stays_until_the_legacy_close(migrated, tmp_path):
+    """Phase 3 leaves the roadmap `status` (map row SC-14-09 belongs to `p5_legacy_close`); the legacy close removes it, the capture keeps the values (ruling P23)."""
+    from specdev_tools.migration import registry
+
+    host, toolkit = make_host(tmp_path), make_toolkit(tmp_path)
+    shapes = [s for s in registry.discover_scripts() if s.spec.phase < registry.PHASE_CLOSE]
+    assert runner.run_migration(host / "spec", toolkit_root=toolkit, git_root=host, scripts=shapes).status == STATUS_OK
     assert [m["status"] for m in read(host, "14_roadmap.json")["milestones"]] == ["done", "pending", "done"]
+    done, _, _ = migrated
+    assert all("status" not in m for m in read(done, "14_roadmap.json")["milestones"])
+    assert [e["legacy_status"] for e in read(done, "extras/migration/capture.json")["milestone_status"]["roadmap"]] == ["done", "pending", "done"]
 
 
 def test_no_schema_uri_or_file_rename_is_needed(migrated):
