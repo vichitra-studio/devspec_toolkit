@@ -13,12 +13,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.ids import mint_slug, suggest_prefix
+from specdev_tools.graph.ids import suggest_prefix
 from specdev_tools.graph.names import TASK_CRITERION
+from specdev_tools.migration.minting import mint_id
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import ROADMAP_STEP, step_data
+from specdev_tools.migration.spec_reads import LEGACY, ROADMAP_STEP, step_data
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_exit_conditions", phase=PHASE_CONTENT, requires=("p3_remove",), touches=("14", "extras"))
@@ -76,7 +77,7 @@ def apply(ctx) -> ScriptResult:
     for task, position, text in _conditions(ctx):
         if _item(task, position, text, None, found=True).id not in todo or task not in tasks:
             continue
-        new_id = mint_slug(text, taken, prefix=prefix)
+        new_id = mint_id(text, taken, prefix=prefix)
         taken.add(new_id)
         tasks[task].setdefault(_CRITERIA, []).append({"criterion_id": new_id, "text": text})
         minted[(task, position)] = new_id

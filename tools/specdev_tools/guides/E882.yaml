@@ -16,7 +16,11 @@ resolution: |
   1. Read the node and the link: `specdev node show <node id>`. If the link is
      wrong, change it with `specdev json patch --id <node id> .<field> '<json>'`
      (writing a link field writes a fresh lock entry; no E882 is left for it).
-  2. Accept a correct link, node by node:
+  2. The `note` that a 1.1.1 `trace[]` entry of the node gave for a link is not
+     carried into 1.2.0 (it has no place for the note of a link). Read it in the
+     old file before you accept the link:
+         specdev align triage <spec> --legacy NN     # NN is the step of the node
+     Accept a correct link, node by node:
        specdev attest <node id>          # prints what would be written
        specdev attest <node id> --yes    # writes it and clears the marker
   3. `specdev attest --step NN` lists only SUSPECT links (a link whose target

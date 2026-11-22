@@ -1849,7 +1849,9 @@ changes:
       object without an id gets its id field; step 00 in_scope / out_of_scope
       become scope_items and step 10 pr_rules become rules. An out scope item
       (it needs a scope_reason) and a gate string that is not a kebab name are
-      worklist items; an item that has an id is not touched.
+      worklist items; an item that has an id is not touched. A text with no
+      ASCII letter or digit (a risk written in Japanese, say) gets a numbered id
+      from the kind's prefix (risk-1).
     migration:
       action: auto
       script: p2_id_mint
@@ -1896,9 +1898,12 @@ changes:
       to, typed trace / targets / target_ids / mitigations entries, requires,
       interface_ref, criterion fixture_ref; future and wont-have become scope
       later / out; out_of_scope lists become scope: out; environment host keys
-      move into config; scope: in is set where the schema requires it. What no
-      single field fits is a worklist item, and the old value stays in
-      capture.json.
+      move into config; scope: in is set where the schema requires it. A node
+      that two out_of_scope entries name keeps both reasons in scope_reason,
+      joined with ; . The note of a converted trace entry is not carried (1.2.0
+      has no place for a link's note): read it in the old file with specdev
+      align triage <spec> --legacy NN. What no single field fits is a worklist
+      item, and the old value stays in capture.json.
     migration:
       action: auto
       script: p3_convert
@@ -1909,8 +1914,13 @@ changes:
       Migration script p3_remove (mechanical). Removes the fields 1.2.0 dropped
       (the *_refs_ingested lists, tech_stack, task status and assumptions,
       stored computed names, ...) after capture.json holds the values a later
-      pass reads; a plan that was done before 1.2.0 loses only the stored
-      computed names; deletes step 13a and extras/trace_matrix.json.
+      pass reads; a plan that was done before 1.2.0 loses from this script only
+      the stored computed names (content_hash, chain_stamp, and the
+      milestone_ref, nfr_refs and fixture_ref of a checklist item); the
+      migration changes such a plan in two more things, the milestone key
+      (p2_plan_milestone_key) and its open items, which p4_ambiguities removes
+      and lists as legacy-open-item worklist items; deletes step 13a and
+      extras/trace_matrix.json.
     migration:
       action: auto
       script: p3_remove
@@ -1998,7 +2008,11 @@ changes:
       Migration script p4_plan_dispositions (mechanical). plan.status and the
       item dispositions are removed from open plans; a deferred or won't-do item
       of an open plan becomes an operator worklist item plan-item-disposition
-      (not blocking). A plan that was done before 1.2.0 keeps them as history.
+      (not blocking). An open plan whose own plan.status was deferred gets one
+      more operator worklist item of that kind: it quotes the plan's
+      deferred_reason and names specdev milestone defer <milestone-id> --reason,
+      which holds a deferral in 1.2.0. A plan that was done before 1.2.0 keeps
+      them as history.
     migration:
       action: auto
       script: p4_plan_dispositions
@@ -2031,7 +2045,8 @@ changes:
       Migration script p4_ambiguities (mechanical). Resolved open items are
       deleted; those of a closed plan are listed and removed; those of the
       anchor and open plans get the unified shape where impact names one node,
-      else a worklist item; duplicate ids are renamed.
+      else a worklist item; duplicate ids are renamed, and each rename is
+      recorded in the renames section of capture.json.
     migration:
       action: auto
       script: p4_ambiguities

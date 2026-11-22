@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from specdev_tools.core import changelog_parser
 from unit.graph._synth import ROOT, git
 from unit.lifecycle._record_support import action, closed_row
 from unit.lifecycle._support import PLAN
@@ -37,12 +36,6 @@ def identity(monkeypatch: pytest.MonkeyPatch) -> None:
     """Git has the identity a tag needs (the hosts of the tests carry no git configuration of their own)."""
     for name, value in IDENTITY.items():
         monkeypatch.setenv(name, value)
-
-
-@pytest.fixture
-def toolkit_1_2_0(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The active toolkit reads as 1.2.0 (it is 1.1.1 until the release), so a host stamped 1.2.0 raises no E608."""
-    monkeypatch.setattr(changelog_parser, "get_toolkit_version", lambda *_args, **_kwargs: "1.2.0")
 
 
 def _stage_the_binding(host: Path) -> None:

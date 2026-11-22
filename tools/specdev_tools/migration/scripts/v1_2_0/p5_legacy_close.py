@@ -1,6 +1,6 @@
 """``p5_legacy_close``: a milestone that was done before 1.2.0 gets a legacy close record, and the 14 ``status`` leaves the roadmap (phase 5).
 
-Which milestones are legacy-closed is ``p2_plan_milestone_key.closed_sources`` (the capture's three ways a milestone was closed in 1.1.1: the roadmap
+Which milestones are legacy-closed is ``spec_reads.closed_sources`` (the capture's three ways a milestone was closed in 1.1.1: the roadmap
 says ``done``, the anchor row says ``done``, the plan's review verdict is ``verified``; any one suffices).  The close is M8's own: the
 anchor store writes ``{signed_off_by: legacy-migration, source, signoff: null, plan_hash}`` and sets the row ``done``, and the plan is
 frozen from then on.  ``source`` names the evidence in that order (``14.status``, ``anchor.status``, ``16c.verdict``).  The hash is taken
@@ -19,21 +19,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.names import ROW_DONE
 from specdev_tools.lifecycle import anchor_store
 from specdev_tools.migration.maps import shape_rows
 from specdev_tools.migration.registry import PHASE_CLOSE, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import (
-    CAPTURE_STATUS,
-    ROADMAP_STEP,
-    VERDICT_VERIFIED,
-    anchor_rows,
-    closed_sources,
-    plan_milestones,
-    row_milestone,
-)
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import files_of_row, last_key, parents_at
+from specdev_tools.migration.spec_reads import anchor_rows, CAPTURE_STATUS, closed_sources, files_of_row, last_key, LEGACY, parents_at, plan_milestones, ROADMAP_STEP, row_milestone, VERDICT_VERIFIED
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p5_legacy_close", phase=PHASE_CLOSE, touches=("14", "16", "extras"))

@@ -15,7 +15,7 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import mint_slug, suggest_prefix
 from specdev_tools.graph.names import ABOUT
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import anchor_rows
+from specdev_tools.migration.spec_reads import anchor_rows
 from specdev_tools.validation.linter_utils import graph_known_ids
 
 SCRIPT = ScriptSpec(id="p2_anchor_rows", phase=PHASE_IDS, requires=("p2_plan_milestone_key", "p2_id_mint"), touches=("16",))

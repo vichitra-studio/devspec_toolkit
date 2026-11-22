@@ -25,7 +25,7 @@ from integration.test_migration_no_git_writes import (
 )
 from specdev_tools.migration.report import mask_stamp_timestamps
 from specdev_tools.migration.writer import diff_trees
-from unit.migration.test_runner_core import git, tree_digest
+from unit.migration._support import git, tree_digest
 
 ISO_DATE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d")
 SCRIPT_LINE = re.compile(r"^  p(\d+) (\S+): (?:nothing to do|(\d+) edit\(s\), (\d+) worklist item\(s\))$")

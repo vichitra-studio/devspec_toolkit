@@ -2,7 +2,7 @@
 
 The cases of the commands run in process through ``cli.main`` on a git copy of the mini host.  ``spec-check --merge`` is
 stubbed (``stub_merge_check``) wherever a case is about what validate does with its answer; the end-to-end class runs
-it for real on a temp toolkit root at 1.2.0 (the live toolkit says 1.1.1 until the release commit, P1).
+it for real on the live toolkit (the ``toolkit_1_2_0`` fixture: it says 1.2.0).
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import shutil
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -24,10 +23,10 @@ from specdev_tools.core.errors import make_error
 from specdev_tools.generation.schema_differ import KEEP_STATUS, stamp_specdev_version
 from specdev_tools.migration import runner, triage
 from specdev_tools.migration.registry import PHASE_IDS
-from specdev_tools.migration.worklist import WORKLIST_FILE, make_item
+from specdev_tools.migration.worklist import make_item
 from specdev_tools.core.changelog_parser import get_toolkit_version
 
-from .test_runner_core import MINI_HOST, REAL_ROOT, git, make_host, make_script, make_toolkit
+from ._support import REAL_ROOT, git, make_host, make_script, make_toolkit
 
 SPEC = "spec"
 CAPTURE = "extras/migration/capture.json"
@@ -419,18 +418,6 @@ def test_the_runner_and_update_and_validate_all_write_the_stamp_through_the_one_
 # ---------------------------------------------------------------------------
 # The whole procedure on the mini host, through the commands
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="module")
-def toolkit_1_2_0(tmp_path_factory):
-    """A copy of the toolkit's tools, schemas, canon and changelog that says 1.2.0 (so ``spec-check`` runs for real)."""
-    root = tmp_path_factory.mktemp("toolkit_1_2_0")
-    for name in ("tools", "schema", "canon", "changelog"):
-        shutil.copytree(REAL_ROOT / name, root / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
-    pyproject = root / "tools" / "pyproject.toml"
-    pyproject.write_text(pyproject.read_text(encoding="utf-8").replace(f'version = "{LIVE_VERSION}"', 'version = "1.2.0"', 1), encoding="utf-8")
-    (root / "changelog" / "v1.2.0.yaml").write_text("version: 1.2.0\nbreaking: true\nchanges: []\n", encoding="utf-8")
-    return root
 
 
 class TestMiniHostEndToEnd:

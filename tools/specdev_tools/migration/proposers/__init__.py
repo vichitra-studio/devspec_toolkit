@@ -23,10 +23,10 @@ from typing import Any
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.errors import FindingError
 from specdev_tools.graph.build import build_graph
+from specdev_tools.generation.schema_differ import read_stamp
 from specdev_tools.graph.model import Graph
-from specdev_tools.migration.context import MigrationContext
-from specdev_tools.migration.runner import CAPTURE_FILE, read_stamp
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, capture_renames
+from specdev_tools.migration.context import CAPTURE_FILE, CAPTURE_REL, MigrationContext
+from specdev_tools.migration.spec_reads import capture_renames
 from specdev_tools.migration.worklist import WorklistError, WorklistItem, add_items
 from specdev_tools.migration.writer import DocumentSet, WriterError
 from specdev_tools.validation.graph_checks.context import GraphCheckContext

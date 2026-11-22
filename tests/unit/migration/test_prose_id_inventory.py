@@ -18,7 +18,7 @@ from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.prose_ids import check_prose_ids
 
 from ._proposer_support import copy_gold, edit, task_criterion, tree_of
-from .test_runner_core import REAL_ROOT, tree_digest
+from ._support import REAL_ROOT, tree_digest
 
 CRITERION_1, CRITERION_2, CRITERION_3 = "tc-borrow-packet-1", "tc-borrow-packet-2", "tc-borrow-packet-3"
 

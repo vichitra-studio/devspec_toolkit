@@ -4,6 +4,9 @@
 ``wont_do_reason`` are removed (the capture holds them: sections ``milestone_status.plans`` and ``plan_items``).  Only an
 OPEN plan is edited: a legacy-closed plan keeps them as history (ruling P13: the map's ``closed_plans`` default).
 
+An OPEN plan whose own ``plan.status`` was ``deferred`` gets one such item as well (evidence: the plan's ``deferred_reason``,
+captured as ``legacy_plan_deferred_reason``; proposal: ``specdev milestone defer``, which keeps the reason on the anchor row).
+
 An item that was not ``active`` in an open plan says that a task may need to be deferred.  The migration does not write
 that decision: each such item becomes ONE worklist item (kind ``plan-item-disposition``, audience ``operator``, not
 blocking, so no close blocker is added to a milestone in flight) that names the plan file, the item, the old disposition
@@ -15,18 +18,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from specdev_tools.graph.build import build_graph
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.migration.maps import shape_rows
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import plan_milestones
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import closed_plan_files, files_of_row, last_key, parents_at
+from specdev_tools.migration.spec_reads import closed_plan_files, files_of_row, last_key, LEGACY, parents_at, plan_milestones
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_plan_dispositions", phase=PHASE_CONTENT, requires=("p3_remove", "p4_ambiguities"), touches=("16", "extras"))
 
 KIND = "plan-item-disposition"
 _ACTIVE = "active"
+_DEFERRED = "deferred"
 _REASON_FIELD = {"deferred": "deferred_reason", "wont_do": "wont_do_reason"}
 _WORDS = {"deferred": "deferred", "wont_do": "won't do"}
 
@@ -59,14 +61,30 @@ def _wanted(ctx) -> list[WorklistItem]:
     return found
 
 
+def _deferred_plans(ctx) -> list[WorklistItem]:
+    """One item for each OPEN plan whose legacy ``plan.status`` was ``deferred``: 1.2.0 holds a deferral on the milestone's anchor row, and the migration does not write that decision."""
+    closed = closed_plan_files(ctx)
+    milestones = {rel: m for rel, m in plan_milestones(ctx).items() if rel not in closed}
+    found = []
+    for row in ctx.documents.load(CAPTURE_REL).data.get("milestone_status", {}).get("plans") or []:
+        milestone = milestones.get(row.get("file"))
+        if milestone is None or row.get(LEGACY + "plan_status") != _DEFERRED:
+            continue
+        reason = row.get(LEGACY + "plan_deferred_reason") or "no reason was recorded"
+        evidence = f"{row['file']}: the plan of milestone {milestone} was deferred as a whole (plan.status deferred): {reason.rstrip('.')}."
+        proposal = f'If the milestone waits, put it aside with `specdev milestone defer {milestone} --reason "<why it waits>"` (the reason is kept on its anchor row); otherwise leave it.'
+        found.append(make_item("16", KIND, milestone, audience="operator", blocking=False, evidence=evidence, proposal=proposal, key="plan-deferred"))
+    return found
+
+
 def detect(ctx) -> int:
     """Legacy fields still in an open plan, plus worklist items still to add."""
-    return len(_removals(ctx)) + len(missing_items(ctx, _wanted(ctx)))
+    return len(_removals(ctx)) + len(missing_items(ctx, [*_wanted(ctx), *_deferred_plans(ctx)]))
 
 
 def apply(ctx) -> ScriptResult:
     """List the dispositions (from the capture), then remove the legacy fields of the open plans."""
-    listed = add_items(ctx, _wanted(ctx))
+    listed = add_items(ctx, [*_wanted(ctx), *_deferred_plans(ctx)])
     counts: dict[str, int] = {}
     for holder, key, row_id in _removals(ctx):
         del holder[key]

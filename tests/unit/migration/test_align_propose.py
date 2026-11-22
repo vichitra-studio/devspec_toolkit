@@ -20,7 +20,7 @@ from specdev_tools.migration.worklist import WORKLIST_FILE
 from specdev_tools.registry.cli_commands import collect_command_paths, generate_cli_commands
 
 from ._proposer_support import copy_gold
-from .test_runner_core import REAL_ROOT, tree_digest
+from ._support import REAL_ROOT, tree_digest
 
 
 def propose(host: Path, *argv: str, spec: Path | None = None) -> tuple[int, str, str]:

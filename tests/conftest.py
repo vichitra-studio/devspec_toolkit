@@ -10,6 +10,16 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 
+@pytest.fixture(scope="session")
+def toolkit_1_2_0() -> Path:
+    """The toolkit root a migration test runs against: this checkout, which says 1.2.0 (real schemas, canon, registries and changelog).
+
+    A test that needs a root with other content (another version, an empty changelog) builds the fake one:
+    ``unit.migration._support.make_toolkit``.
+    """
+    return REPO_ROOT
+
+
 @pytest.fixture(autouse=True)
 def _reset_specdev_config_singleton():
     """Reset the global SpecdevConfig singleton around every test.

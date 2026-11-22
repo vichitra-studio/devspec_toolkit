@@ -23,7 +23,7 @@ from integration.test_migration_no_git_writes import (
     make_cli,
     stamp_of,
 )
-from unit.migration.test_runner_core import tree_digest
+from unit.migration._support import tree_digest
 
 CAPTURE = f"{SPEC}/extras/migration/capture.json"
 DIRTY_FILE = f"{SPEC}/00_charter.json"

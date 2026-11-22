@@ -60,13 +60,14 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
     """
     import os as _os
     from pathlib import Path as _Path
+    from ..core.constants import STAMP_FILE
     from ..generation.schema_differ import get_user_version
     from ..core.changelog_parser import get_toolkit_version
     from ..core.errors import make_error
 
     host_version = get_user_version(_Path(_os.path.abspath(spec_dir)))
     if host_version is None:
-        _sv_file = _Path(_os.path.abspath(spec_dir)) / "specdev_version"
+        _sv_file = _Path(_os.path.abspath(spec_dir)) / STAMP_FILE
         if _sv_file.exists():
             return [
                 make_error(

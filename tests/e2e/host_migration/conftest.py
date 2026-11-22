@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from .harness import Report, build_toolkit_1_2_0, check_end_state, compare_expect, run_mechanical_stage
+from .harness import Report, check_end_state, compare_expect, run_mechanical_stage
 
 HOST_VARIABLES = {"test_w.py": "SPECDEV_HOST_W", "test_p.py": "SPECDEV_HOST_P"}
 
@@ -42,12 +42,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         named = os.environ.get(variable)
         if not named or not Path(named).is_dir():
             item.add_marker(pytest.mark.skip(reason=f"{variable} does not name a host copy"))
-
-
-@pytest.fixture(scope="session")
-def toolkit_1_2_0(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A copy of this checkout's toolkit that says 1.2.0, built once per session."""
-    return build_toolkit_1_2_0(tmp_path_factory.mktemp("toolkit_1_2_0"))
 
 
 @pytest.fixture

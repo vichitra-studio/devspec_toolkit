@@ -37,6 +37,7 @@ import shlex
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 import yaml
 
@@ -44,7 +45,7 @@ from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.names import FIXTURE, MANUAL_MODE
 from specdev_tools.graph.stages import DEFAULT_STAGE, STAGES, UnknownStageForEnvironment, bindings_of, is_retired_binding
-from specdev_tools.host_install import WORKFLOWS_DIR, read_managed_header
+from specdev_tools.host_install import host_workflow_files
 from specdev_tools.migration.context import GitReadError
 from specdev_tools.migration.proposers import KIND_BINDINGS, MigratedTree, Proposal, ProposeResult
 from specdev_tools.migration.worklist import AUDIENCE_AGENT, WorklistItem, item_id, make_item
@@ -60,7 +61,6 @@ MANUAL = "manual"
 BOUND = "bound"
 CLASSES = (CERTAIN, JUDGEMENT, MANUAL, BOUND)
 UNTRUSTED_STATUSES = ("deferred", "wont_do")
-MIN_REASON = 10
 PROSE_LIMIT = 120
 PROVES_NOTHING_NOTE = "a binding proves nothing until `specdev verify run` has run it on the migrated tree and the guard matched real output"
 
@@ -174,26 +174,19 @@ class CiLine:
 
 
 def _workflow_steps(host_root: str) -> Iterator[tuple[str, str, int, str]]:
-    folder = os.path.join(host_root, WORKFLOWS_DIR)
-    if not os.path.isdir(folder):
-        return
-    for name in sorted(os.listdir(folder)):
-        if not name.endswith((".yml", ".yaml")):
-            continue
+    for rel, text in host_workflow_files(Path(host_root)):
         try:
-            with open(os.path.join(folder, name), encoding="utf-8") as handle:
-                text = handle.read()
             document = yaml.safe_load(text)
-        except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        except yaml.YAMLError:
             continue
         jobs = document.get("jobs") if isinstance(document, dict) else None
-        if read_managed_header(text) is not None or not isinstance(jobs, dict):
+        if not isinstance(jobs, dict):
             continue
         for job, body in jobs.items():
             steps = body.get("steps") if isinstance(body, dict) else None
             for number, step in enumerate(steps if isinstance(steps, list) else (), start=1):
                 if isinstance(step, dict) and isinstance(step.get("run"), str):
-                    yield f"{WORKFLOWS_DIR}/{name}", str(job), number, step["run"]
+                    yield rel, str(job), number, step["run"]
 
 
 def ci_test_lines(host_root: str) -> tuple[CiLine, ...]:

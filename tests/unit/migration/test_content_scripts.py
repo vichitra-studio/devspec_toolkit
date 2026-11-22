@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -30,8 +29,8 @@ from specdev_tools.migration.scripts.v1_2_0 import (
 )
 from specdev_tools.validation.open_items import delete_resolved_items
 
-from .test_convert_remove import context, edit, items, migrate, read
-from .test_runner_core import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
+from .test_convert_remove import context, items, migrate, read
+from ._support import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
 
 P4 = (p4_ambiguities, p4_assumptions, p4_exit_conditions, p4_mixed_jobs, p4_nfr_verifiers, p4_plan_dispositions, p4_plan_security_items, p4_step10_rules, p4_third_party)
 P4_FILES = tuple(Path(module.__file__) for module in P4)

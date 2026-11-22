@@ -25,7 +25,7 @@ from specdev_tools.migration.scripts.v1_2_0 import p1_capture
 from specdev_tools.migration.worklist import WorklistError, add_items, make_item, missing_items, read_items
 from specdev_tools.validation.spec_check import run_spec_check_json
 
-from .test_runner_core import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
+from ._support import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
 
 CAPTURE = "spec/extras/migration/capture.json"
 WORKLIST = "spec/extras/migration/worklist.json"

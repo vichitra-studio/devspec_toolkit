@@ -25,7 +25,7 @@ import pytest
 
 from specdev_tools.graph import names
 
-from .host_migration.harness import Cli, build_toolkit_1_2_0, make_git_copy, run_mechanical_stage
+from .host_migration.harness import Cli, make_git_copy, run_mechanical_stage
 
 REAL_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REAL_ROOT / "tests" / "fixtures" / "migration" / "worked_example_1_1_1"
@@ -51,12 +51,6 @@ SCHEMA_NAMES = [
 
 def load(host: Path, name: str):
     return json.loads((host / "spec" / name).read_text(encoding="utf-8"))
-
-
-@pytest.fixture(scope="module")
-def toolkit_1_2_0(tmp_path_factory):
-    """A copy of the toolkit that says 1.2.0 (the one in ``host_migration/conftest.py`` is not visible from this folder)."""
-    return build_toolkit_1_2_0(tmp_path_factory.mktemp("toolkit_1_2_0"))
 
 
 @pytest.fixture(scope="module")

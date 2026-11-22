@@ -29,7 +29,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from .migration.runner import STATUS_IN_PROGRESS, read_stamp
+from .core.changelog_parser import get_changes_between, list_versions
+from .generation.schema_differ import read_stamp
+from .migration.context import STATUS_IN_PROGRESS
+from .migration import registry
 
 if TYPE_CHECKING:
     from .host_install import InstallReport
@@ -146,10 +149,7 @@ def _data_migration_reason(host_version: str, toolkit_version: str, repo_root: P
     ``kind: mechanical``; the changelog lists releases and the host's version is not one of them (the scripts that
     apply to it cannot be told).  A toolkit root with no changelog gives the last two nothing to read.
     """
-    from .core.changelog_parser import get_changes_between, list_versions
-    from .migration.registry import chain_for, discover_scripts
-
-    chain = chain_for(discover_scripts(), host_version, toolkit_version)
+    chain = registry.chain_for(registry.discover_scripts(), host_version, toolkit_version)
     if chain:
         return f"{len(chain)} migration script(s) are registered for v{host_version} -> v{toolkit_version}: {', '.join(script.id for script in chain)}"
     changelog = repo_root / "changelog"
@@ -289,7 +289,6 @@ def _run_update_core(
     from .core.changelog_parser import get_toolkit_version
     from .generation.schema_differ import (
         diff_spec_directory,
-        get_user_version,
         stamp_specdev_version,
     )
 
@@ -297,9 +296,9 @@ def _run_update_core(
     if toolkit_version is None:
         return _toolkit_version_error(repo_root)
 
-    host_version = get_user_version(spec_dir)
+    stamp = read_stamp(spec_dir) or {}
+    host_version = stamp.get("toolkit_version")
 
-    stamp = read_stamp(str(spec_dir)) or {}
     if stamp.get("migration_status") == STATUS_IN_PROGRESS:
         return _migration_in_progress(spec_dir, repo_root, host_version, toolkit_version)
 

@@ -18,6 +18,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from specdev_tools.migration.context import MigrationContext, Snapshot
+
 # The phases a script may name.  P0 (preflight) and P8 (the version stamp) belong to the runner and have no script.
 PHASE_CAPTURE = 1
 PHASE_IDS = 2
@@ -93,9 +95,9 @@ class Script:
 
     spec: ScriptSpec
     version: str
-    detect: Callable[[Any], int]
-    apply: Callable[[Any], ScriptResult]
-    verify: Callable[[Any, Any], list[Problem]]
+    detect: Callable[[MigrationContext], int]
+    apply: Callable[[MigrationContext], ScriptResult]
+    verify: Callable[[Snapshot, Snapshot], list[Problem]]
 
     @property
     def id(self) -> str:

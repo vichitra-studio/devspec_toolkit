@@ -17,7 +17,7 @@ from unit.lifecycle._milestone_support import cli_run
 from unit.lifecycle._record_support import no_identity  # noqa: F401  (the fixture ``no_identity``)
 from unit.release._support import advance, commit, release_host, tag
 from unit.verify._support import commit_all, write
-from integration._release_support import DEPLOY_ACTION, DEPLOY_ITEM, IDENTITY, at_deploy_host, identity, snapshot, toolkit_1_2_0  # noqa: F401
+from integration._release_support import DEPLOY_ACTION, DEPLOY_ITEM, IDENTITY, at_deploy_host, identity, snapshot  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures("identity")
 LEFT_IN_SCOPE = "inv-reset-token-single-use"
@@ -184,7 +184,7 @@ def test_release_without_a_git_identity_is_refused_and_writes_nothing(tmp_path: 
 # --- the next-release check on a second cut ---------------------------------------------------------------------------------
 
 
-def test_second_release_waits_for_the_first_to_be_verified_or_waived(tmp_path: Path, toolkit_1_2_0: None) -> None:
+def test_second_release_waits_for_the_first_to_be_verified_or_waived(tmp_path: Path) -> None:
     host = at_deploy_host(tmp_path)
     assert cli_run(host, "release", "--tag", "v1.0.0")[0] == 0
     advance(host)
@@ -197,7 +197,7 @@ def test_second_release_waits_for_the_first_to_be_verified_or_waived(tmp_path: P
     assert cli_run(host, "release", "--tag", "v1.1.0")[0] == 0 and _tags(host) == ["v1.0.0", "v1.1.0"]
 
 
-def test_second_release_goes_through_after_a_rollback_record(tmp_path: Path, toolkit_1_2_0: None) -> None:
+def test_second_release_goes_through_after_a_rollback_record(tmp_path: Path) -> None:
     host = at_deploy_host(tmp_path)
     assert cli_run(host, "release", "--tag", "v1.0.0")[0] == 0
     advance(host)

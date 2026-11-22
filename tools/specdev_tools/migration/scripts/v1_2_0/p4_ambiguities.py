@@ -16,7 +16,7 @@ Three arrays held legacy items (``severity``, ``status``, ``impact``): the ancho
    stays readable in ``capture.json``).
 
 The id of an item is unique across the spec (E704): of two items with one id the later one gets the next free ``-2``,
-``-3`` name and the rename is recorded.  There is no bound on the number of items (the plan-size warning covers volume).
+``-3`` name and the rename is recorded in the capture's ``renames`` section (kind ``ambiguity-item``).  There is no bound on the number of items (the plan-size warning covers volume).
 Closed plans change only by the removal of their open items; every other legacy field of a closed plan stays history.
 
 ``add_open_item`` is the one writer of a NEW unified item into an array; ``p4_plan_dispositions`` and
@@ -30,7 +30,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
-from specdev_tools.core.ambiguity_items import AmbiguityItem, iter_ambiguity_items, is_open
+from specdev_tools.core.ambiguity_items import ANCHOR_STEP, AmbiguityItem, is_open, iter_ambiguity_items
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import first_free_id, mint_slug
 from specdev_tools.graph.model import Graph
@@ -38,9 +39,7 @@ from specdev_tools.graph.names import ABOUT
 from specdev_tools.graph.resolve import link_target_allowed
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.scripts.v1_2_0.p2_id_collisions import AMBIGUITY
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import capture_renames
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import ANCHOR_STEP, plan_milestones
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import closed_plan_files
+from specdev_tools.migration.spec_reads import capture_renames, closed_plan_files, plan_milestones, RENAMES_KEY
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_ambiguities", phase=PHASE_CONTENT, requires=("p3_remove",), touches=("16", "extras"))
@@ -50,7 +49,6 @@ KIND_ABOUT = "ambiguity-about"
 ID_PREFIX = "amb-"
 PLAN_HOLDER_STEP = "16a"
 _LEGACY_STEPS = frozenset({ANCHOR_STEP, "16a", "16b"})
-_LEGACY_FIELDS = ("severity", "status", "source", "impact", "mitigation", "resolved")
 _ITEM_FIELDS = ("id", "description", "about", "decision", "proposed_assumption")
 _LOCATION_TAG = {"16": "anchor", "16a": "plan", "16b": "emergent"}
 
@@ -223,10 +221,22 @@ def _rewrite(ctx, plans: list[Planned]) -> None:
             del array[index]
 
 
+def _record_renames(ctx, plans: list[Planned]) -> None:
+    """Append each renamed duplicate to the capture's ``renames`` section (as ``p2_id_collisions`` does), so the old id stays readable; an entry already there is not added twice."""
+    held = None
+    for plan in plans:
+        if plan.new_id != plan.item.id:
+            held = ctx.documents.load(CAPTURE_REL).data.setdefault(RENAMES_KEY, []) if held is None else held
+            entry = {"old": plan.item.id, "new": plan.new_id, "kind": AMBIGUITY, "file": plan.rel}
+            if entry not in held:
+                held.append(entry)
+
+
 def apply(ctx) -> ScriptResult:
     """Delete the resolved items, remove, convert and rename the rest, and list what needs a person."""
     plans = _plan(ctx)
     _rewrite(ctx, plans)
+    _record_renames(ctx, plans)
     listed = add_items(ctx, _worklist(plans))
     deleted = [p for p in plans if p.action == "delete"]
     removed = [p for p in plans if p.action == "freeze"]

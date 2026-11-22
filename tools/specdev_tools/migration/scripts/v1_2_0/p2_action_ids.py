@@ -4,7 +4,7 @@
 The id is minted by the one minter of the action ids, ``lifecycle.records.mint_action_id`` (one past the highest
 number among the ids the item's actions already hold), so a rerun mints nothing and an id that exists is never
 changed.  A legacy-closed plan (ruling P13) gets no action ids: it is history, the schema does not judge it and no
-command records into it.  "Closed" is the rule of ``p2_plan_milestone_key.closed_milestones``.
+command records into it.  "Closed" is the rule of ``spec_reads.closed_milestones``.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 
 from specdev_tools.lifecycle.records import mint_action_id
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import closed_milestones, insert_key, plan_milestones, plan_rels
+from specdev_tools.migration.spec_reads import closed_milestones, insert_key, plan_milestones, plan_rels
 
 SCRIPT = ScriptSpec(id="p2_action_ids", phase=PHASE_IDS, requires=("p2_plan_milestone_key",), touches=("16",))
 

@@ -58,6 +58,7 @@ MUST_CLEAR: Mapping[str, str] = {
     "W608": "p2_plan_milestone_key",
 }
 OPEN_ITEM_KIND = "ambiguity-item"
+FROZEN_ITEM_KIND = "legacy-open-item"
 """The kind of a legacy open item; one that was resolved in 1.1.1 is deleted by ``p4_ambiguities`` (its ``deleted_ids``), so its id may vanish."""
 FAMILIES = ("errors_before.", "errors_after.", "errors_merge.", "edits.", "worklist_kind.")
 """Metric families where a name that was never counted reads 0 (an error code that did not occur)."""
@@ -262,22 +263,6 @@ def refuse(copy: Path, toolkit: Path) -> None:
         raise HarnessRefusal(f"{SPEC_DIR}/ of {copy} has uncommitted changes ({len(dirty.splitlines())} path(s)); commit or discard them first")
 
 
-def build_toolkit_1_2_0(destination: Path, source: Path = LIVE_ROOT) -> Path:
-    """A copy of the toolkit's tools, schema, canon and changelog under *destination* that says 1.2.0.
-
-    The live pyproject says 1.1.1 until the version commit (ruling P1); a migration needs a toolkit that says 1.2.0, so the
-    copy gets the version and an empty ``changelog/v1.2.0.yaml`` when it has none.
-    """
-    for name in ("tools", "schema", "canon", "changelog"):
-        shutil.copytree(source / name, destination / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
-    pyproject = destination / "tools" / "pyproject.toml"
-    pyproject.write_text(re.sub(r'^version\s*=\s*"[^"]+"', f'version = "{TARGET_VERSION}"', pyproject.read_text(encoding="utf-8"), count=1, flags=re.MULTILINE), encoding="utf-8")
-    released = destination / "changelog" / f"v{TARGET_VERSION}.yaml"
-    if not released.exists():
-        released.write_text(f"version: {TARGET_VERSION}\nbreaking: true\nchanges: []\n", encoding="utf-8")
-    return destination
-
-
 def make_git_copy(source: Path, destination: Path, *, drop: Iterable[str] = ("README.md",)) -> Path:
     """A git work tree at *destination* holding a copy of *source* (the files in *drop* left out), one commit on ``main``."""
     shutil.copytree(source, destination)
@@ -332,6 +317,24 @@ def read_json(path: Path) -> Any:
 def worklist_items(spec: Path) -> list[dict[str, Any]]:
     path = spec / "extras" / "migration" / "worklist.json"
     return list(read_json(path).get("items") or []) if path.is_file() else []
+
+
+def split_lost_ids(lost: Iterable[str], ids_before: Mapping[str, Any], capture: Mapping[str, Any], items: Iterable[Mapping[str, Any]]) -> tuple[list[str], list[str]]:
+    """``(resolved, gone)`` of the definition ids a run removed without a rename.
+
+    An id is ``resolved`` (deleted by design) when every place that defined it was an open-item node and the capture does
+    NOT list it among the open items it kept (``ambiguities`` holds every item that was not resolved, whole), or when it
+    is listed there and a ``legacy-open-item`` worklist item names it (the item was removed from a frozen plan and handed
+    to a person).  Any other lost id is ``gone``: a loss.
+    """
+    still_open = {entry["legacy_item"]["id"] for entry in capture.get("ambiguities") or [] if isinstance(entry.get("legacy_item"), dict) and isinstance(entry["legacy_item"].get("id"), str)}
+    listed = " ".join(str(item.get("evidence", "")) for item in items if item.get("kind") == FROZEN_ITEM_KIND)
+
+    def named(node_id: str) -> bool:
+        return re.search(rf"(?<![\w-]){re.escape(node_id)}(?![\w-])", listed) is not None
+
+    resolved = [i for i in lost if all(kind == OPEN_ITEM_KIND for _file, kind in ids_before[i]) and (i not in still_open or named(i))]
+    return resolved, sorted(set(lost) - set(resolved))
 
 
 def plan_paths(spec: Path) -> list[Path]:
@@ -439,8 +442,8 @@ def _mechanical(report: Report, cli: Cli, spec: Path, scratch: Path) -> None:
         renamed = {r["old"] for r in renames}
         metrics["renames"] = len(renames)
         lost = [i for i in ids_before if i not in ids_after and i not in renamed and any((spec / file).exists() for file, _kind in ids_before[i])]
-        resolved = [i for i in lost if all(kind == OPEN_ITEM_KIND for _file, kind in ids_before[i])]
-        gone = sorted(set(lost) - set(resolved))
+        capture = read_json(spec / "extras" / "migration" / "capture.json") if (spec / "extras" / "migration" / "capture.json").is_file() else {}
+        resolved, gone = split_lost_ids(lost, ids_before, capture, worklist_items(spec))
         doubled = sorted(i for i, places in ids_after.items() if len(places) > 1)
         report.check("2", "every definition id of before exists after, except the recorded renames, the deleted files and the resolved open items", not gone, f"{len(ids_before)} id(s) before, {len(ids_after)} after, {len(renames)} rename(s), {len(resolved)} resolved open item(s) deleted by design" + (f"; lost: {', '.join(gone[:5])}" if gone else ""))
         report.check("2", "no id is defined twice after", not doubled, f"{len(doubled)} defined twice" + (f": {', '.join(doubled[:5])}" if doubled else ""))

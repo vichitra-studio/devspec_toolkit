@@ -1,7 +1,7 @@
 """``specdev update`` made migration-aware (WI-M10-12 item 3): a spec that needs a data migration is never silently re-stamped.
 
-The live toolkit says 1.1.1 until the release commit (P1), so each test builds a temp toolkit root (``make_toolkit`` of
-``test_runner_core``) that says what the case needs.  The structural differ and the venv refresh are patched, as in
+Each test builds a temp toolkit root (``make_toolkit`` of ``_support``) that says what the case needs (a version, the changelog
+entries it lists).  The structural differ and the venv refresh are patched, as in
 ``tests/unit/test_update_command.py``: the host has no schema to diff and a real refresh would re-point the live venv.
 """
 
@@ -18,7 +18,7 @@ import yaml
 from specdev_tools.migration import registry
 from specdev_tools.update import run_update
 
-from .test_runner_core import make_toolkit
+from ._support import make_toolkit
 
 CLEAN_DIFF = SimpleNamespace(summary={"steps_missing": 0, "steps_needs_update": 0, "steps_needs_rename": 0, "paradigm_shifts": 0})
 SCRIPTED_ENTRY = (

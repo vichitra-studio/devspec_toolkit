@@ -1,12 +1,11 @@
 """The migration runner core (WI-M10-01a): script order, preflight, invariants, the scratch copy, the stamp.
 
-The scripts here are test-only (``Script`` values built in the test); a toolkit root with the version 1.2.0 is built in
-``tmp_path`` because the real toolkit says 1.1.1 until the release commit (ruling P1).
+The scripts here are test-only (``Script`` values built in the test); the toolkit root is ``_support.make_toolkit`` (a fake
+that says what the test needs) or the live checkout, which says 1.2.0.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -21,7 +20,6 @@ from specdev_tools.migration.context import GitReadError, read_git
 from specdev_tools.migration.registry import (
     PHASE_BASELINE,
     PHASE_CAPTURE,
-    PHASE_CLOSE,
     PHASE_CONTENT,
     PHASE_IDS,
     Problem,
@@ -37,89 +35,14 @@ from specdev_tools.migration.report import STATUS_FAILED, STATUS_NOOP, STATUS_OK
 from specdev_tools.lifecycle import plans
 from specdev_tools.core.changelog_parser import get_toolkit_version
 
-REAL_ROOT = Path(__file__).resolve().parents[3]
-MINI_HOST = REAL_ROOT / "tests" / "fixtures" / "migration" / "mini_host_1_1_1"
+from ._support import REAL_ROOT, git, make_host, make_script, make_toolkit, tree_digest
+
 FR_FILE = "04_fr_list.json"
 
 
 # ---------------------------------------------------------------------------
-# Support
+# Support (the shared helpers are in ``_support.py``)
 # ---------------------------------------------------------------------------
-
-
-def make_toolkit(tmp_path: Path, version: str = "1.2.0", listed: tuple[str, ...] = ("1.0.0", "1.1.0", "1.1.1", "1.2.0")) -> Path:
-    """A toolkit root that says *version*: a pyproject, a changelog folder and the two registries the graph reads."""
-    root = tmp_path / "toolkit"
-    (root / "tools").mkdir(parents=True)
-    (root / "changelog").mkdir()
-    (root / "tools" / "pyproject.toml").write_text(f'[project]\nname = "specdev-tools"\nversion = "{version}"\n', encoding="utf-8")
-    for name in ("entry_key_registry.json", "step_order.json"):
-        shutil.copy(REAL_ROOT / "tools" / name, root / "tools" / name)
-    for listed_version in listed:
-        (root / "changelog" / f"v{listed_version}.yaml").write_text(f"version: {listed_version}\nbreaking: false\nchanges: []\n", encoding="utf-8")
-    return root
-
-
-def git(cwd: Path, *args: str) -> str:
-    done = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, check=True)
-    return done.stdout
-
-
-def make_host(tmp_path: Path, *, version: str = "1.1.1", commit: bool = True) -> Path:
-    """A git work tree holding a copy of the mini host (without its README), stamped *version*."""
-    host = tmp_path / "host"
-    shutil.copytree(MINI_HOST, host)
-    (host / "README.md").unlink()
-    stamp = host / "spec" / "specdev_version"
-    data = yaml.safe_load(stamp.read_text(encoding="utf-8"))
-    data["toolkit_version"] = version
-    stamp.write_text(yaml.dump(data, default_flow_style=False), encoding="utf-8")
-    git(host, "init", "-q")
-    git(host, "config", "user.email", "t@example.invalid")
-    git(host, "config", "user.name", "t")
-    if commit:
-        git(host, "add", "-A")
-        git(host, "commit", "-q", "-m", "host")
-    return host
-
-
-def tree_digest(root: Path) -> dict[str, str]:
-    return {
-        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and ".git" not in path.relative_to(root).parts
-    }
-
-
-def make_script(
-    script_id: str,
-    phase: int,
-    *,
-    requires: tuple[str, ...] = (),
-    touches: tuple[str, ...] = ("*",),
-    edit=None,
-    log: list[str] | None = None,
-    version: str = "1.2.0",
-    verify=None,
-    result: ScriptResult | None = None,
-) -> Script:
-    """A script that runs *edit(ctx)* once: ``detect`` is 1 until the edit has been made (it looks for the mark)."""
-    mark = f"migrated-by-{script_id}"
-
-    def detect(ctx) -> int:
-        return 0 if os.path.exists(os.path.join(ctx.spec_root, "extras", mark)) else 1
-
-    def apply(ctx) -> ScriptResult:
-        if log is not None:
-            log.append(script_id)
-        if edit is not None:
-            edit(ctx)
-        os.makedirs(os.path.join(ctx.spec_root, "extras"), exist_ok=True)
-        with open(os.path.join(ctx.spec_root, "extras", mark), "w", encoding="utf-8") as handle:
-            handle.write("done\n")
-        return result or ScriptResult(edits=1)
-
-    return Script(ScriptSpec(script_id, phase, requires, touches), version, detect, apply, verify or (lambda before, after: []))
 
 
 def run(host: Path, toolkit: Path, scripts, **kwargs):
@@ -230,6 +153,17 @@ def test_preflight_refuses_a_missing_stamp_and_an_unreadable_toolkit_version(tmp
     (host / "spec" / "specdev_version").unlink()
     report = run(host, toolkit, [])
     assert report.status == STATUS_REFUSED and "records no toolkit_version" in report.errors[0].message
+    _assert_names_the_hand_stamp(report.errors[0].message)
+    (host / "spec" / "specdev_version").write_text("created_at: x\nmigration_history: []\n", encoding="utf-8")
+    report = run(host, toolkit, [])
+    assert report.status == STATUS_REFUSED and "records no toolkit_version" in report.errors[0].message
+    _assert_names_the_hand_stamp(report.errors[0].message)
+
+
+def _assert_names_the_hand_stamp(message: str) -> None:
+    """The refusal tells the person to write the old version into the stamp, and not to run ``update`` (which would stamp the new one)."""
+    assert 'toolkit_version: "1.1.1"' in message and "commit it, and run again" in message
+    assert "do not run `specdev update` first" in message and "to stamp the host first" not in message
 
 
 def test_dirty_spec_is_refused_unless_allowed(host, toolkit):

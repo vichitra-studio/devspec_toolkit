@@ -20,7 +20,6 @@ from .harness import (
     Cli,
     HarnessRefusal,
     Report,
-    build_toolkit_1_2_0,
     check_end_state,
     compare_expect,
     git,
@@ -78,7 +77,7 @@ def test_the_mechanical_stage_on_the_mini_host_writes_only_under_spec(stage):
     paths = [line[3:] for line in git(copy, "status", "--porcelain=v1", "-uall").splitlines()]
     assert paths and all(path.startswith("spec/") for path in paths)
     assert git(copy, "rev-list", "--count", "HEAD").strip() == "1"  # the stage commits nothing
-    assert report.metrics["files_deleted"] == 3 and report.metrics["renames"] == 3
+    assert report.metrics["files_deleted"] == 3 and report.metrics["renames"] == 5
 
 
 def test_the_second_run_makes_no_edit(stage, toolkit_1_2_0):
@@ -163,7 +162,7 @@ def test_the_harness_refuses_the_toolkit_root_and_a_dirty_spec(tmp_path, toolkit
 def test_expect_file_metrics_are_compared_by_name(stage):
     report = stage[0]
     probe = Report("mechanical", "mini", "x", metrics=dict(report.metrics))
-    compare_expect(probe, {"renames": 3, "worklist_items": {"min": 1, "max": 10**6}, "errors_after.E768": 0, "errors_after.E999": 0})
+    compare_expect(probe, {"renames": 5, "worklist_items": {"min": 1, "max": 10**6}, "errors_after.E768": 0, "errors_after.E999": 0})
     assert [check.ok for check in probe.checks] == [True, True, True, True]
     bad = Report("mechanical", "mini", "x", metrics=dict(report.metrics))
     compare_expect(bad, {"renames": 4, "worklist_items": {"max": 1}, "no_such_metric": 1, "kind": "w"})

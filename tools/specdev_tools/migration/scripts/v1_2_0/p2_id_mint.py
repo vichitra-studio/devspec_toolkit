@@ -22,14 +22,20 @@ import copy
 import re
 from typing import Any
 
+from specdev_tools.core.ambiguity_items import ANCHOR_STEP
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.ids import first_free_id, mint_slug, suggest_prefix
+from specdev_tools.graph.ids import first_free_id, suggest_prefix
 from specdev_tools.graph.kinds import KindDecl
+from specdev_tools.migration.maps import LEGACY_STEP_IDS
+from specdev_tools.migration.minting import mint_id
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.worklist import add_items, make_item, missing_items
 from specdev_tools.validation.linter_utils import graph_known_ids
 
-STEPS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15")
+# Step 16 (the anchor file) is left out on purpose: its only collections are nested (``plan.ambiguities``,
+# ``plan.milestone_index``), which ``_run`` does not reach, and an anchor row gets its id from its milestone in
+# ``p2_anchor_rows``, never from this script's label rule.
+STEPS = tuple(step for step in LEGACY_STEP_IDS if step != ANCHOR_STEP)
 SCRIPT = ScriptSpec(id="p2_id_mint", phase=PHASE_IDS, requires=("p2_id_collisions",), touches=(*STEPS, "extras"))
 
 # Legacy list name -> (collection it becomes, fields every converted item gets), per step file.
@@ -71,7 +77,7 @@ class _Minter:
         self.renames: list[str] = []
 
     def new_id(self, decl: KindDecl, text: str) -> str:
-        minted = mint_slug(text, self.taken, prefix=suggest_prefix(decl.kind))
+        minted = mint_id(text, self.taken, prefix=suggest_prefix(decl.kind))
         self.taken.add(minted)
         return minted
 

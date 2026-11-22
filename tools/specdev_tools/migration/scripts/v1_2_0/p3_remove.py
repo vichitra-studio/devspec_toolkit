@@ -5,7 +5,7 @@ A ``capture-then-remove`` row names the section of ``capture.json`` that holds t
 a ``remove`` row is a field nothing replaces and no later pack reads.  The path of a row (``milestones[].tasks[].status``)
 is walked in every file of the row's step; ``[]`` is each object of a list and ``{}`` each value of a map.
 
-Plan files: the row says ``closed_plans``.  A legacy-closed plan (the rule of ``p2_plan_milestone_key.closed_milestones``,
+Plan files: the row says ``closed_plans``.  A legacy-closed plan (the rule of ``spec_reads.closed_milestones``,
 ruling P13) loses only the rows marked ``strip`` (the stored computed names, E768) and keeps the rest as history; an open
 plan gets every row.  Stored ``content_hash`` / ``chain_stamp`` (``COMPUTED_VIEWS``) go from every file.  The retired
 files of the map (step 13a, ``extras/trace_matrix.json``) are deleted.  Row counts go to the report as residue lines.
@@ -15,85 +15,22 @@ from __future__ import annotations
 
 import copy
 import os
-import re
-from collections.abc import Iterator
 from typing import Any
 
-from specdev_tools.core.step_paths import STEP_JSON_RE
-from specdev_tools.migration.maps import shape_map, shape_rows
+from specdev_tools.migration.maps import LEGACY_STEP_IDS, shape_map, shape_rows
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import closed_milestones, plan_milestones, plan_rels, step_file
+from specdev_tools.migration.spec_reads import closed_plan_files, files_of_row, last_key, parents_at, plan_rels, step_json_names
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 
-STEPS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16")
 SCRIPT = ScriptSpec(
     id="p3_remove",
     phase=PHASE_SHAPES,
     requires=("p2_action_ids", "p2_anchor_rows", "p2_id_collisions", "p3_convert", "p3_ordering"),
-    touches=(*STEPS, "extras"),
+    touches=(*LEGACY_STEP_IDS, "extras"),
 )
 
-ANCHOR_STEP = "16_anchor"
-PLAN_STEP = "16_impl_context"
-STRIP = "strip"
-_ROW_STEP = re.compile(r"^SC-(.+)-\d+$")
-_TOKEN = re.compile(r"^([^\[\]{}]+)(\[\]|\{\})?$")
 # Names stored on any node that the toolkit computes (every ``COMPUTED_VIEWS`` row that is not limited to some kinds).
 _EVERYWHERE = tuple(name for view in COMPUTED_VIEWS if view.scope is None for name in view.names)
-
-
-def row_step(row: dict[str, Any]) -> str:
-    """The step part of a row id: ``SC-14-09`` gives ``14``, ``SC-16_impl_context-13`` gives ``16_impl_context``."""
-    match = _ROW_STEP.match(row["id"])
-    return match.group(1) if match else ""
-
-
-def _step_into(nodes: list[Any], token: str) -> list[Any]:
-    """The objects one path token leads to from each of *nodes*."""
-    match = _TOKEN.match(token)
-    if not match:
-        return []
-    name, suffix = match.groups()
-    reached: list[Any] = []
-    for node in nodes:
-        held = node.get(name) if isinstance(node, dict) else None
-        if suffix == "[]" and isinstance(held, list):
-            reached.extend(held)
-        elif suffix == "{}" and isinstance(held, dict):
-            reached.extend(held.values())
-        elif suffix is None and isinstance(held, dict):
-            reached.append(held)
-    return reached
-
-
-def parents_at(data: Any, path: str) -> Iterator[dict[str, Any]]:
-    """The objects of *data* that would hold the last key of *path*; ``[]`` steps into each object of a list, ``{}`` into each map value."""
-    current: list[Any] = [data]
-    *walk, _last = path.split(".")
-    for token in walk:
-        current = _step_into(current, token)
-    yield from (node for node in current if isinstance(node, dict))
-
-
-def last_key(path: str) -> str:
-    """The key a row path ends in (its last segment)."""
-    return path.rsplit(".", 1)[-1]
-
-
-def files_of_row(ctx, row: dict[str, Any], closed_rels: set[str]) -> list[str]:
-    """The spec files a row applies to (relative paths): the step's file, the anchor, or the plan files its ``closed_plans`` admits."""
-    step = row_step(row)
-    if step == PLAN_STEP:
-        keep_closed = row.get("closed_plans", "keep") != STRIP
-        return [rel for rel in plan_rels(ctx) if not (keep_closed and rel in closed_rels)]
-    name = step_file(ctx, "16" if step == ANCHOR_STEP else step)
-    return [name] if name else []
-
-
-def closed_plan_files(ctx) -> set[str]:
-    """The plan files of legacy-closed milestones."""
-    closed = closed_milestones(ctx)
-    return {rel for rel, milestone in plan_milestones(ctx).items() if milestone in closed}
 
 
 def _strip_everywhere(value: Any, names: tuple[str, ...]) -> int:
@@ -116,9 +53,7 @@ def _retired_paths(ctx) -> list[str]:
             if os.path.isfile(os.path.join(ctx.spec_root, entry["path"])):
                 found.append(entry["path"])
         else:
-            found.extend(
-                name for name in sorted(os.listdir(ctx.spec_root)) if (m := STEP_JSON_RE.match(name)) and m.group(1) == entry["step"]
-            )
+            found.extend(name for step, name in step_json_names(ctx.spec_root) if step == entry["step"])
     return found
 
 
@@ -190,7 +125,7 @@ class _Work:
 
 def _step_files(ctx) -> list[str]:
     retired = set(_retired_paths(ctx))
-    names = [n for n in sorted(os.listdir(ctx.spec_root)) if STEP_JSON_RE.match(n) and n not in retired]
+    names = [name for _step, name in step_json_names(ctx.spec_root) if name not in retired]
     return names + plan_rels(ctx)
 
 

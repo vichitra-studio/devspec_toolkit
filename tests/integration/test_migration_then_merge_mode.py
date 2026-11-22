@@ -13,8 +13,7 @@ runs what a person or an agent runs, in the generated step order, through the sa
 
 Every answer is INVENTED content about the invented host.  Nothing is deleted to get to zero: the only nodes that leave
 are the open items the answers closed (their answer is applied to the text first) and one plan item that was dropped, and
-that set is pinned below.  The toolkit root is a temp root that says 1.2.0 (the live toolkit says 1.1.1 until the release
-commit, ruling P1); its schemas, canon and tools are the live ones (symlinks).
+that set is pinned below.  The toolkit root is the live checkout (it says 1.2.0).
 
 The pass runs ONCE per session (a module-scoped fixture); every test reads what it recorded.
 """
@@ -27,8 +26,8 @@ from dataclasses import dataclass, field
 import pytest
 import yaml
 
-from integration._mini_host_pass import PASS_DIR, SPEC, Host, digest, error_codes, run_scripted_pass, toolkit_saying_1_2_0
-from unit.migration.test_runner_core import MINI_HOST, git, make_host
+from integration._mini_host_pass import PASS_DIR, SPEC, Host, digest, error_codes, run_scripted_pass
+from unit.migration._support import MINI_HOST, REAL_ROOT, git, make_host
 
 WORKLIST = f"{SPEC}/extras/migration/worklist.json"
 CAPTURE = f"{SPEC}/extras/migration/capture.json"
@@ -74,7 +73,7 @@ class Recorded:
 def recorded(tmp_path_factory) -> Recorded:
     tmp = tmp_path_factory.mktemp("scripted_pass")
     fixture_before = digest(MINI_HOST)
-    toolkit = toolkit_saying_1_2_0(tmp)
+    toolkit = REAL_ROOT
     host = Host(make_host(tmp, version="1.1.1"), toolkit)
 
     # 1. the mechanical stage, committed

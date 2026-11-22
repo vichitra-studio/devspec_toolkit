@@ -15,13 +15,11 @@ import os
 import re
 from typing import Any
 
-from specdev_tools.core.step_paths import STEP_JSON_RE
-from specdev_tools.migration.maps import shape_map
+from specdev_tools.migration.maps import LEGACY_STEP_IDS, shape_map
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import plan_rels
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import STEPS
+from specdev_tools.migration.spec_reads import plan_rels, step_json_names
 
-SCRIPT = ScriptSpec(id="p3_host_canon", phase=PHASE_SHAPES, requires=("p2_id_collisions",), touches=("canon", *STEPS))
+SCRIPT = ScriptSpec(id="p3_host_canon", phase=PHASE_SHAPES, requires=("p2_id_collisions",), touches=("canon", *LEGACY_STEP_IDS))
 
 KINDS_DIR = "canon/kinds"
 MANIFEST = "canon/manifest.json"
@@ -118,7 +116,7 @@ class _Work:
             self.residue.append(f"{MANIFEST}: {count} renamed kind values and ids rewritten")
 
     def _step_files(self) -> list[str]:
-        return [n for n in sorted(os.listdir(self.ctx.spec_root)) if STEP_JSON_RE.match(n)] + plan_rels(self.ctx)
+        return [name for _step, name in step_json_names(self.ctx.spec_root)] + plan_rels(self.ctx)
 
     def _rewrite_files(self, rels: list[str], renamed: dict[str, str]) -> None:
         for rel in rels:

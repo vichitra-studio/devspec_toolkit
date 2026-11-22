@@ -9,11 +9,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shlex
 import shutil
+import sys
+from unittest.mock import patch
 from pathlib import Path
 
 import pytest
 
+from specdev_tools import cli
 from specdev_tools.core.host_declarations import HOST_DECLARATIONS_FILE, load_host_declarations
 from specdev_tools.host_install import retired_command_findings
 from specdev_tools.migration import runner
@@ -24,7 +29,7 @@ from specdev_tools.migration.scripts.v1_2_0 import p7_host_files as script
 from specdev_tools.migration.worklist import WORKLIST_FILE
 from specdev_tools.migration.writer import DocumentSet
 
-from .test_runner_core import MINI_HOST, git, make_host, make_toolkit, tree_digest
+from ._support import MINI_HOST, git, make_host, make_toolkit, tree_digest
 
 OVERLAYS = MINI_HOST.parent / "host_files"
 HOOK = ".pre-commit-config.yaml"
@@ -191,12 +196,38 @@ def test_a_missing_declaration_becomes_one_operator_worklist_item(host, toolkit)
     assert len({item["id"] for item in _items(host)}) == len(_items(host))
 
 
+def _fragment(item: dict) -> dict:
+    """The JSON object a declaration item proposes: the argument of the `specdev json insert` line in its proposal."""
+    return json.loads(item["proposal"][item["proposal"].index("{") : item["proposal"].rindex("}") + 1])
+
+
+def test_the_proposal_is_a_command_that_creates_the_declarations_file_when_it_does_not_exist(host, toolkit):
+    _run(host, toolkit)
+    item = next(item for item in _of_kind(host, script.KIND_DECLARATION) if item["about"] == "setup_command")
+    assert not (host / "spec" / HOST_DECLARATIONS_FILE).exists()
+    line = shlex.split(item["proposal"].split("): ", 1)[1])
+    assert line[:5] == ["specdev", "json", "insert", "spec/common/host_declarations.json", "."] and line[-2:] == ["--create-schema", "vc:host-declarations"]
+    previous = os.getcwd()
+    os.chdir(host)  # the command's path is relative to the host root
+    try:
+        with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", [*line, "--repo-root", str(toolkit)]):
+            try:
+                cli.main()
+            except SystemExit as exit_:
+                assert exit_.code in (None, 0)
+    finally:
+        os.chdir(previous)
+    written = json.loads((host / "spec" / HOST_DECLARATIONS_FILE).read_text(encoding="utf-8"))
+    assert written["setup_command"] == _fragment(item)["setup_command"] and written["$schema"] == "vc:host-declarations"
+    assert load_host_declarations(str(host / "spec")).setup_command == written["setup_command"]
+
+
 def test_the_toolkit_folder_inside_the_repository_is_proposed_as_an_exclusion(host, tmp_path):
     inside = make_toolkit(host, "1.2.0")  # host/toolkit
     _commit(host, "toolkit inside")
     _run(host, inside)
     item = next(item for item in _of_kind(host, script.KIND_DECLARATION) if item["about"] == "code_tree_exclusions")
-    assert json.loads(item["proposal"][item["proposal"].index("{"):]) == {"code_tree_exclusions": ["toolkit"]}
+    assert _fragment(item) == {"code_tree_exclusions": ["toolkit"]}
 
 
 def test_a_declared_item_gets_no_item_and_a_complete_file_gets_none(host, toolkit):
@@ -232,7 +263,7 @@ def test_proposed_declaration_values_are_evidence_only_and_never_written_to_host
         git(host, "tag", tag)
     _run(host, toolkit)
     assert not (host / "spec" / HOST_DECLARATIONS_FILE).exists()
-    fragments = [json.loads(item["proposal"][item["proposal"].index("{"):]) for item in _items(host) if item["kind"] in (script.KIND_DECLARATION, script.KIND_PIN_SOURCE)]
+    fragments = [_fragment(item) for item in _items(host) if item["kind"] in (script.KIND_DECLARATION, script.KIND_PIN_SOURCE)]
     merged: dict = {"$schema": "vc:host-declarations", "pin_sources": {}}
     for fragment in fragments:
         pins = fragment.pop("pin_sources", {})

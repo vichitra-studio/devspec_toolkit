@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from .test_convert_remove import items, migrate, read
 
 
@@ -57,7 +55,7 @@ def test_the_script_writes_no_spec_file_but_the_worklist(tmp_path):
     from specdev_tools.migration.registry import script_from_module
     from specdev_tools.migration.scripts.v1_2_0 import p1_capture, p2_id_collisions, p3_ordering
 
-    from .test_runner_core import make_host, make_toolkit, tree_digest
+    from ._support import make_host, make_toolkit, tree_digest
 
     toolkit, host = make_toolkit(tmp_path), make_host(tmp_path)
     chain = [script_from_module(m, "1.2.0") for m in (p1_capture, p2_id_collisions, p3_ordering)]

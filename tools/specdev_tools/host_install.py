@@ -887,6 +887,26 @@ def _scan_lines(text: str, *, skip_block: bool) -> list[tuple[int, str]]:
     return kept
 
 
+def host_workflow_files(host_root: Path) -> list[tuple[str, str]]:
+    """``(path relative to *host_root*, text)`` of the host's OWN workflow files, in path order.
+
+    Every ``.github/workflows/*.yml`` and ``*.yaml`` whose first line is not the toolkit's managed header.  A file that
+    cannot be read as UTF-8 is left out (the one rule for every reader: the install report, the retired-command report,
+    the migration's CI readers).
+    """
+    workflows = host_root / WORKFLOWS_DIR
+    paths = sorted(p for pattern in ("*.yml", "*.yaml") for p in workflows.glob(pattern)) if workflows.is_dir() else []
+    found: list[tuple[str, str]] = []
+    for path in paths:
+        try:
+            text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        except (OSError, UnicodeDecodeError):
+            continue
+        if text and read_managed_header(text) is None:
+            found.append((path.relative_to(host_root).as_posix(), text))
+    return found
+
+
 def retired_command_findings(host_root: Path, *, removed_commands: dict[str, str] | None = None) -> list[Finding]:
     """W932 findings for the host's own files that still call a command 1.2.0 retired (ruling N9).
 
@@ -900,19 +920,17 @@ def retired_command_findings(host_root: Path, *, removed_commands: dict[str, str
     table = REMOVED_COMMANDS if removed_commands is None else removed_commands
     replacements = {**table, _VALIDATE_ALL: _VALIDATE_ALL_REPLACEMENT}
     patterns = {name: re.compile(rf"{_INVOCATION}\s+{re.escape(name)}(?![\w-])") for name in replacements}
-    workflows = host_root / WORKFLOWS_DIR
-    files = sorted(p for pattern in ("*.yml", "*.yaml") for p in workflows.glob(pattern)) if workflows.is_dir() else []
-    files.append(host_root / PRE_COMMIT_FILE)
+    files = host_workflow_files(host_root)
+    pre_commit = host_root / PRE_COMMIT_FILE
+    try:
+        files.append((PRE_COMMIT_FILE, pre_commit.read_text(encoding="utf-8") if pre_commit.is_file() else ""))
+    except (OSError, UnicodeDecodeError):
+        pass
     findings: list[Finding] = []
-    for path in files:
-        try:
-            text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        except (OSError, UnicodeDecodeError):
+    for rel, text in files:
+        if not text:
             continue
-        if not text or (path.parent == workflows and read_managed_header(text) is not None):
-            continue
-        rel = path.relative_to(host_root).as_posix()
-        for number, line in _scan_lines(text, skip_block=path.name == PRE_COMMIT_FILE):
+        for number, line in _scan_lines(text, skip_block=rel == PRE_COMMIT_FILE):
             for name, pattern in patterns.items():
                 if pattern.search(line):
                     findings.append(Finding(W_RETIRED_COMMAND, rel, number, name, f"'{name}' was removed in 1.2.0; {replacements[name]}"))

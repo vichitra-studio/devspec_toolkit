@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import step_data
+from specdev_tools.migration.spec_reads import step_data
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_mixed_jobs", phase=PHASE_CONTENT, requires=("p3_remove",), touches=("extras",))

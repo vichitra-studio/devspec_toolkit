@@ -22,24 +22,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from specdev_tools.core.changelog_parser import (
     compare_versions,
     get_changes_between,
     get_toolkit_version,
     list_versions,
 )
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.constants import STAMP_FILE
+from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.core.plan_files import plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
-from specdev_tools.generation.schema_differ import stamp_specdev_version
+from specdev_tools.generation.schema_differ import read_stamp, stamp_specdev_version
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.gitview import STAMP_FILE, GitViewError, status_lines
+from specdev_tools.graph.gitview import GitViewError, status_lines
 from specdev_tools.graph.kinds import KindRegistryError, load_kind_registry
 from specdev_tools.lifecycle import plans
 from specdev_tools.lifecycle.frozen import check_frozen_plans
-from specdev_tools.migration.context import GitReadError, MigrationContext, read_git
+from specdev_tools.migration.context import CAPTURE_FILE, STATUS_IN_PROGRESS, GitReadError, MigrationContext, Snapshot, file_key, read_git
 from specdev_tools.migration.registry import (
     PHASE_CLOSE,
     PHASE_NAMES,
@@ -63,27 +62,12 @@ from specdev_tools.migration.writer import DocumentSet, diff_trees
 
 MIN_SOURCE_VERSION = "1.0.0"
 SEED_MANIFEST = os.path.join("common", "seed_manifest.json")
-CAPTURE_FILE = os.path.join("extras", "migration", "capture.json")
-STATUS_IN_PROGRESS = "in_progress"
 ANY_FILE = "*"
 
 
 # ---------------------------------------------------------------------------
 # Snapshots of the spec folder
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Snapshot:
-    """The spec folder at one moment: a digest of every file, the parsed JSON files, the plan hashes.
-
-    ``documents`` holds the parsed content of each ``*.json`` file that parses; treat it as read-only.
-    """
-
-    root: str
-    files: Mapping[str, str]
-    documents: Mapping[str, Any]
-    plan_hashes: Mapping[str, str]
 
 
 def _walk_files(root: str) -> dict[str, str]:
@@ -119,15 +103,6 @@ def take_snapshot(root: str, previous: Snapshot | None = None) -> Snapshot:
         except FindingError:
             continue
     return Snapshot(root, files, documents, hashes)
-
-
-def file_key(rel: str) -> str:
-    """The key a script's ``touches`` names for the file *rel*: its step id, its first folder, or ``specdev_version``."""
-    head, _, tail = rel.partition("/")
-    if not tail:
-        stem = head.split("_", 1)[0]
-        return stem if stem and stem[0].isdigit() else head
-    return "16" if head == PLAN_DIR_NAME else head
 
 
 def definition_ids(snapshot: Snapshot, toolkit_root: str) -> Counter[str]:
@@ -194,16 +169,6 @@ def _refusal(message: str) -> MigrationReport:
     return MigrationReport(STATUS_REFUSED, False, errors=[make_error("E880", message)])
 
 
-def read_stamp(spec_dir: str) -> dict[str, Any] | None:
-    """The mapping in ``<spec_dir>/specdev_version``; ``None`` when the file is missing or is not a mapping."""
-    try:
-        with open(os.path.join(spec_dir, STAMP_FILE), encoding="utf-8") as handle:
-            data = yaml.safe_load(handle)
-    except (OSError, yaml.YAMLError):
-        return None
-    return data if isinstance(data, dict) else None
-
-
 def _history_from(stamp: Mapping[str, Any]) -> str:
     history = stamp.get("migration_history")
     if isinstance(history, list) and history and isinstance(history[-1], dict):
@@ -237,7 +202,11 @@ def _preflight(spec_dir: str, git_root: str, toolkit_root: str, dry_run: bool, a
     stamp = read_stamp(spec_dir)
     host_version = stamp.get("toolkit_version") if stamp else None
     if not isinstance(host_version, str):
-        return _refusal(f"{spec_dir}/{STAMP_FILE} records no toolkit_version; run `specdev update` to stamp the host first")
+        return _refusal(
+            f"{spec_dir}/{STAMP_FILE} records no toolkit_version (or the file does not exist); write the version the spec was built with "
+            'into it (`toolkit_version: "1.1.1"` for a 1.1.1 spec), commit it, and run again; do not run `specdev update` first, '
+            "it would stamp the spec with the new version and the migration would never run"
+        )
     target = get_toolkit_version(Path(toolkit_root))
     if target is None:
         return _refusal(f"the toolkit version cannot be read from {toolkit_root}/tools/pyproject.toml")

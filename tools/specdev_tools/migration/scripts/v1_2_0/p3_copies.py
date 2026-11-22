@@ -11,12 +11,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from specdev_tools.migration.maps import shape_rows
+from specdev_tools.migration.maps import LEGACY_STEP_IDS, shape_rows
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import step_file
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import STEPS, last_key, row_step
+from specdev_tools.migration.spec_reads import last_key, row_step, step_file
 
-SCRIPT = ScriptSpec(id="p3_copies", phase=PHASE_SHAPES, requires=("p3_convert", "p3_ordering"), touches=STEPS)
+SCRIPT = ScriptSpec(id="p3_copies", phase=PHASE_SHAPES, requires=("p3_convert", "p3_ordering"), touches=LEGACY_STEP_IDS)
 
 _LONG_NOTE = 50
 

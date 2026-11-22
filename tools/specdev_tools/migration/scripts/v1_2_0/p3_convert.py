@@ -24,15 +24,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.contract import path_steps
 from specdev_tools.graph.model import LIFECYCLES, Node
-from specdev_tools.graph.names import ABOUT, CONNECTS_TO, DERIVES_FROM
-from specdev_tools.migration.maps import legacy_ref_fields, shape_rows
+from specdev_tools.graph.names import ABOUT, CONNECTS_TO
+from specdev_tools.migration.maps import LEGACY_STEP_IDS, legacy_ref_fields, shape_rows
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, capture_renames
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import step_file
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import STEPS, closed_plan_files, row_step
+from specdev_tools.migration.spec_reads import capture_renames, closed_plan_files, row_step, step_file
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 from specdev_tools.migration.writer import WriterError
 
@@ -40,7 +39,7 @@ SCRIPT = ScriptSpec(
     id="p3_convert",
     phase=PHASE_SHAPES,
     requires=("p2_action_ids", "p2_anchor_rows", "p2_id_collisions", "p2_id_mint", "p2_plan_milestone_key"),
-    touches=(*STEPS, "extras"),
+    touches=(*LEGACY_STEP_IDS, "extras"),
 )
 
 KIND_TRACE_LINK = "trace-link"
@@ -55,7 +54,6 @@ SCOPE_IN, SCOPE_LATER, SCOPE_OUT = "in", "later", "out"
 _WILDCARD_VERBS = frozenset({"replaces", "removes", ABOUT})
 _CONFIG_KEY = re.compile(r"^[a-z][a-z0-9_-]*$")
 _NODE_EXTRAS = frozenset({"lifecycle", "aliases"})
-_PRIORITY_WONT = "wont-have"
 
 
 @dataclass
@@ -301,7 +299,12 @@ class _Pass:
         item["scope"] = SCOPE_OUT
         reason = entry.get("rationale")
         if isinstance(reason, str) and reason.strip():
-            item["scope_reason"] = reason
+            held = item.get("scope_reason")
+            if not isinstance(held, str) or not held.strip():
+                item["scope_reason"] = reason
+            elif reason != held and reason not in held.split("; "):
+                # A node two steps put out of scope keeps both reasons, the first one first; the same text twice is written once.
+                item["scope_reason"] = f"{held}; {reason}"
         self.plan.edits += 1
 
     def _rule_scope(self, row: dict[str, Any]) -> None:

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from specdev_tools.core.errors import SpecError
-from specdev_tools.graph.gitview import STAMP_FILE
+from specdev_tools.core.constants import STAMP_FILE
 
 STATUS_OK = "ok"
 STATUS_NOOP = "noop"
@@ -89,7 +89,7 @@ class MigrationReport:
         if self.scripts:
             lines.append(f"total: {self.total_edits} edit(s), {self.worklist_items} worklist item(s), {len(self.changed_files)} file(s) changed")
         lines.extend(f"residue: {line}" for line in self.residue)
-        if self.not_run:
+        if self.not_run and self.changed_files:
             lines.append("not run by the runner (do these by hand or with `align prompts`):")
             lines.extend(f"  - {entry}" for entry in self.not_run)
         if self.dry_run:
@@ -97,6 +97,12 @@ class MigrationReport:
         elif self.changed_files:
             lines.append(f"review: git diff --stat {self.spec_dir}")
             lines.append(f"undo:   git checkout -- {self.spec_dir} && git clean -fd {self.spec_dir}  (the second removes the files the run created)")
+            version = f" to toolkit v{self.to_version}" if self.to_version else ""
+            lines.append(
+                f'commit: git add {self.spec_dir} && git commit --no-verify -m "Migrate the spec{version}"'
+                "  (--no-verify: your old hooks still name commands the new release removed)"
+            )
+            lines.append(f"next:   specdev align triage {self.spec_dir}  (the decisions the run left for a person)")
         return "\n".join(lines)
 
 

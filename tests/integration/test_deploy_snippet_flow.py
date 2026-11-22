@@ -23,13 +23,13 @@ from unit.graph._synth import ROOT, git
 from unit.lifecycle._milestone_support import cli_run
 from unit.trace._lock_support import git_copy_of_example, run_on_example
 from unit.verify._support import commit_all, write_json
-from integration._release_support import DEPLOY_ACTION, DEPLOY_ITEM, LOCKED_PIN, flow_host, identity, toolkit_1_2_0  # noqa: F401  (the fixtures)
+from integration._release_support import DEPLOY_ACTION, DEPLOY_ITEM, LOCKED_PIN, flow_host, identity  # noqa: F401  (the fixtures)
 
 PREAMBLE = ROOT / "templates" / "workflows" / "deploy-preamble.snippet.yml"
 TAG = "v1.0.0"
 ROOT_FLAGS = ("--repo-root", "--spec-root", "--git-root")
 RECORDS = Path("spec") / "extras" / "verification"
-pytestmark = pytest.mark.usefixtures("identity", "toolkit_1_2_0")
+pytestmark = pytest.mark.usefixtures("identity")
 
 
 @dataclass(frozen=True)

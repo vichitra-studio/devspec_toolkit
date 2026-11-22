@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from specdev_tools.core.changelog_parser import compare_versions
-from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES
+from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES, STAMP_FILE
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
 from specdev_tools.graph.kinds import SEED_KIND
@@ -29,8 +29,6 @@ GIT_TIMEOUT_SECONDS = 30
 PREVIOUS_COMMIT = "HEAD~1"
 _TREE_ENTRY = "040000 tree "
 _MAX_REASON_CHARS = 240
-STAMP_FILE = "specdev_version"
-"""The name of the file that stamps a spec folder with the toolkit version it was built with."""
 FIRST_NODE_MODEL_VERSION = "1.2.0"
 """The first toolkit version whose spec has the graph node model; a spec stamped below it is refused by ``diff`` (E709)."""
 

@@ -13,6 +13,9 @@ from typing import Any
 
 import yaml
 
+# The step ids of a 1.1.1 spec: the files ``<id>_*.json`` the migration may touch (``tools/step_order.json`` lists the 1.2.0
+# steps: it has no ``13a`` file and splits ``16`` into ``16a``/``16b``/``16c``, so the migration needs its own list).
+LEGACY_STEP_IDS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16")
 LEGACY_REF_FIELDS_FILE = "legacy_ref_fields.yaml"
 SHAPE_MAP_FILE = "v1_2_0.yaml"
 

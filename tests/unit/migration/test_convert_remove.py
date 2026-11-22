@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import copy
 import json
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -20,12 +19,12 @@ from specdev_tools.migration import runner
 from specdev_tools.migration.context import MigrationContext
 from specdev_tools.migration.maps import shape_map, shape_rows
 from specdev_tools.migration.report import STATUS_OK
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import closed_plan_files, files_of_row, last_key, parents_at
+from specdev_tools.migration.spec_reads import closed_plan_files, files_of_row, last_key, parents_at
 from specdev_tools.migration.writer import DocumentSet
 from specdev_tools.trace.computed_fields import check_stored_computed
 from specdev_tools.trace.lockfile import lock_path
 
-from .test_runner_core import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
+from ._support import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
 
 WORKLIST = "extras/migration/worklist.json"
 CONVERT_TYPES_WITH_A_SOURCE = {"rename", "refs", "typed"}

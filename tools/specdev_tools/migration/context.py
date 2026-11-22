@@ -7,11 +7,23 @@ script keeps a path it writes into a spec file relative, and does not store ``sp
 
 from __future__ import annotations
 
+import os
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
+
+from specdev_tools.core.step_paths import PLAN_DIR_NAME
 
 from specdev_tools.graph.kinds import KindRegistry, load_kind_registry
 from specdev_tools.migration.writer import DocumentSet
+
+CAPTURE_FILE = os.path.join("extras", "migration", "capture.json")
+"""The capture file, relative to the spec folder, in the platform's own separators."""
+CAPTURE_REL = CAPTURE_FILE.replace(os.sep, "/")
+"""The same path with ``/``, the form a spec file's ``rel`` and a worklist item use."""
+STATUS_IN_PROGRESS = "in_progress"
+"""The ``migration_status`` the stamp holds between the runner's install and the close of the triage."""
 
 # The git subcommands the migration may call: all of them only read.
 READ_ONLY_GIT = frozenset({"rev-parse", "status", "merge-base", "ls-files", "log", "show", "cat-file", "diff"})
@@ -38,6 +50,28 @@ def read_git(git_root: str, *args: str) -> str:
     if done.returncode != 0:
         raise GitReadError(f"git {' '.join(args)} failed: {done.stderr.strip() or done.stdout.strip()}")
     return done.stdout
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """The spec folder at one moment: a digest of every file, the parsed JSON files, the plan hashes.
+
+    ``documents`` holds the parsed content of each ``*.json`` file that parses; treat it as read-only.
+    """
+
+    root: str
+    files: Mapping[str, str]
+    documents: Mapping[str, Any]
+    plan_hashes: Mapping[str, str]
+
+
+def file_key(rel: str) -> str:
+    """The key a script's ``touches`` names for the file *rel*: its step id, its first folder, or ``specdev_version``."""
+    head, _, tail = rel.partition("/")
+    if not tail:
+        stem = head.split("_", 1)[0]
+        return stem if stem and stem[0].isdigit() else head
+    return "16" if head == PLAN_DIR_NAME else head
 
 
 @dataclass

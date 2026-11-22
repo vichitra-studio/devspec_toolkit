@@ -25,9 +25,10 @@ from specdev_tools.migration.scripts.v1_2_0 import (
     p2_id_mint,
     p2_plan_milestone_key,
 )
+from specdev_tools.migration.spec_reads import capture_renames
 from specdev_tools.validation.spec_check import run_spec_check_json
 
-from .test_runner_core import REAL_ROOT, git, make_host, make_toolkit, tree_digest
+from ._support import REAL_ROOT, git, make_host, make_toolkit, tree_digest
 
 ID_SCRIPTS = [script_from_module(m, "1.2.0") for m in (p1_capture, p2_id_collisions, p2_id_mint, p2_plan_milestone_key, p2_anchor_rows, p2_action_ids)]
 CATALOG = "impl_context/ms_catalog_plan.json"
@@ -166,7 +167,7 @@ def test_capture_renames_reader_maps_old_ids_per_kind(host, toolkit):
 
     _migrate(host, toolkit)
     ctx = MigrationContext(str(host / "spec"), str(host), str(host), str(toolkit), True, DocumentSet(str(host / "spec")), "1.1.1", "1.2.0")
-    assert p1_capture.capture_renames(ctx)["design-milestone"] == {"ms-late-fees": "milestone-late-fees"}
+    assert capture_renames(ctx)["design-milestone"] == {"ms-late-fees": "milestone-late-fees"}
 
 
 def test_typed_reference_moves_with_its_definition(migrated):

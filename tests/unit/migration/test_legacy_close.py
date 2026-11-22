@@ -22,13 +22,19 @@ from specdev_tools.migration import registry, runner
 from specdev_tools.migration.registry import PHASE_CAPTURE, PHASE_CLOSE, PHASE_CONTENT
 from specdev_tools.migration.report import STATUS_OK
 from specdev_tools.migration.scripts.v1_2_0 import p5_legacy_close, p5_triage
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import SOURCE_ANCHOR, SOURCE_ROADMAP, SOURCE_VERDICT, closed_milestones, closed_sources
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import closed_plan_files
+from specdev_tools.migration.spec_reads import (
+    SOURCE_ANCHOR,
+    SOURCE_ROADMAP,
+    SOURCE_VERDICT,
+    closed_milestones,
+    closed_plan_files,
+    closed_sources,
+)
 from specdev_tools.release.gate import _unsigned
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 
 from .test_convert_remove import context, edit, items, read
-from .test_runner_core import REAL_ROOT, make_host, make_toolkit, tree_digest
+from ._support import REAL_ROOT, make_host, make_toolkit, tree_digest
 
 CATALOG, RESERVATIONS, LATE_FEES = "ms-catalog-basics", "ms-reservations", "ms-late-fees"
 PLAN_OF = {CATALOG: "impl_context/ms_catalog_plan.json", RESERVATIONS: "impl_context/ms_reservations_plan.json", LATE_FEES: "impl_context/ms_late_fees_plan.json"}
@@ -257,7 +263,7 @@ def test_seed_route_cleanup_items(migrated):
 
 def legacy_rule(ctx) -> set[str]:
     """The closed rule as it read the live tree before P23: 14 ``done``, the anchor ``done`` or a legacy close, a plan verdict ``verified``."""
-    from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import anchor_rows, plan_milestones, row_milestone, step_data
+    from specdev_tools.migration.spec_reads import anchor_rows, plan_milestones, row_milestone, step_data
 
     closed = {m["milestone_id"] for m in step_data(ctx, "14")["milestones"] if m.get("status") == ROW_DONE}
     closed |= {row_milestone(r) for r in anchor_rows(ctx) if r.get("status") == ROW_DONE or anchor_store.is_legacy_close(r.get("close"))}

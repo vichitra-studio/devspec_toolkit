@@ -25,12 +25,12 @@ from collections import defaultdict
 from collections.abc import Iterator
 from typing import Any
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import mint_slug, suggest_prefix
 from specdev_tools.graph.names import THIRD_PARTY
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import insert_key, step_data
+from specdev_tools.migration.spec_reads import insert_key, LEGACY, step_data
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_third_party", phase=PHASE_CONTENT, requires=("p3_convert", "p3_remove"), touches=("02", "extras"))
@@ -41,7 +41,6 @@ KIND_EXTERNAL_COMPONENT = "external-component"
 KIND_EXTERNAL_DEPENDENCY = "external-dependency"
 KIND_API_VERSION = "api-relies-on"
 EXTERNAL_TYPE = "external"
-EXTERNAL_TAG = "external-dependency"
 _SEMVER = re.compile(r"^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 _MIN_NAME = 4
 

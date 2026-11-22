@@ -17,7 +17,7 @@ from specdev_tools import cli
 from specdev_tools.migration.proposers import MigratedTree, context_of, load_tree
 
 from .test_convert_remove import edit as _edit_and_commit
-from .test_runner_core import MINI_HOST, REAL_ROOT, git
+from ._support import MINI_HOST, REAL_ROOT, git
 
 OVERLAY = MINI_HOST.parent / "legacy_bindings" / "ci"
 CAPTURE = "extras/migration/capture.json"

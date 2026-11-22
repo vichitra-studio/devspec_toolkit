@@ -682,7 +682,8 @@ def main():
     # --version must bypass venv check so it works in any environment.
     # We short-circuit here before check_venv() and before argparse, because
     # required=True on add_subparsers would otherwise reject bare --version.
-    if "--version" in sys.argv[1:]:
+    # Only as the first argument: `specdev changelog --version X` is that subcommand's own flag.
+    if sys.argv[1:2] == ["--version"]:
         _toolkit_root = Path(__file__).resolve().parent.parent.parent
         from .core.changelog_parser import get_toolkit_version as _gtv
         _ver = _gtv(_toolkit_root) or "unknown"

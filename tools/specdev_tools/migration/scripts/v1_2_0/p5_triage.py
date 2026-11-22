@@ -25,11 +25,12 @@ import os
 import re
 from typing import Any
 
+from specdev_tools.core.ambiguity_items import ANCHOR_STEP
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
 from specdev_tools.graph.build import build_graph
 from specdev_tools.migration.registry import PHASE_CLOSE, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import ANCHOR_STEP, ROADMAP_STEP, closed_milestones, plan_milestones, step_data, step_file
+from specdev_tools.migration.spec_reads import closed_milestones, LEGACY, plan_milestones, ROADMAP_STEP, step_data, step_file
 from specdev_tools.migration.worklist import WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
 from specdev_tools.validation.graph_checks.context import SEED_MANIFEST_PATH, GraphCheckContext
 from specdev_tools.validation.graph_checks.seed_routes import STEP_REQUIREMENTS, TRINITY_KEYS, check_seed_routes

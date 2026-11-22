@@ -16,16 +16,17 @@ from typing import Any
 
 from specdev_tools.core.plan_files import plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
+from specdev_tools.migration.maps import LEGACY_STEP_IDS
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
+from specdev_tools.migration.spec_reads import step_json_names
 
 FIELD = "status_ref"
 REFS_FIELD = "canonical_refs_used"
 _STATUS_ID = re.compile(r"^cn:[^:]+:status:")
 
 # Every step id a spec file can carry (``file_key`` of ``runner``): the script reads them all, edits the ones that have a ``status_ref``.
-STEP_IDS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16")
 
-SCRIPT = ScriptSpec(id="p3_strip_status_ref", phase=PHASE_SHAPES, touches=STEP_IDS)
+SCRIPT = ScriptSpec(id="p3_strip_status_ref", phase=PHASE_SHAPES, touches=LEGACY_STEP_IDS)
 
 
 def _is_status_ref_entry(entry: Any) -> bool:
@@ -74,7 +75,7 @@ def strip(node: Any) -> int:
 
 def _spec_files(spec_root: str) -> list[str]:
     """The step files and the plan files of the spec folder, as paths relative to it, in path order."""
-    names = [name for name in os.listdir(spec_root) if STEP_JSON_RE.match(name) and os.path.isfile(os.path.join(spec_root, name))]
+    names = [name for _step, name in step_json_names(spec_root) if os.path.isfile(os.path.join(spec_root, name))]
     plans = [f"{PLAN_DIR_NAME}/{path.name}" for path in plan_files(spec_root)]
     return sorted(names) + sorted(plans)
 

@@ -26,7 +26,7 @@ import pytest
 import yaml
 
 from unit.migration.test_align_apply_cli import VARIANT
-from unit.migration.test_runner_core import git, make_host, make_toolkit, tree_digest
+from unit.migration._support import git, make_host, make_toolkit, tree_digest
 
 # Verbs that read only.  The runner's own list (``migration.context.READ_ONLY_GIT``) is the same set; it is repeated
 # here on purpose, so a verb added to the product without a decision shows up as a red test.

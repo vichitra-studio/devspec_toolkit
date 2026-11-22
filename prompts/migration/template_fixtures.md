@@ -42,7 +42,7 @@
 
 ### Context
 
-- A fixture with no binding is no merge error; it is E348 at a milestone close and at a release, so the legacy pass ends when `specdev align bind-legacy spec --summary --repo-root ./devspec_toolkit --git-root .` reports no fixture left without a binding or an attestation.
+- A fixture with no binding is no merge error; the close gate of a milestone prints it as E811 and the release gate as E348, so the legacy pass ends when `specdev align bind-legacy spec --summary --repo-root ./devspec_toolkit --git-root .` reports no fixture left without a binding or an attestation.
 - A binding proves nothing until `specdev verify run <binding-id>` has run it at the binding's stage and its guard matched the output.
 
 ## Shape in 1.2.0

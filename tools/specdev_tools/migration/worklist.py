@@ -22,8 +22,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from specdev_tools.migration.context import MigrationContext
-from specdev_tools.migration.runner import CAPTURE_FILE
+from specdev_tools.migration.context import CAPTURE_FILE, MigrationContext
 from specdev_tools.migration.writer import StyledDocument
 
 WORKLIST_FILE = os.path.join(os.path.dirname(CAPTURE_FILE), "worklist.json")

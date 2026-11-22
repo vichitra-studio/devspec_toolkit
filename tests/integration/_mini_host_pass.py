@@ -1,7 +1,7 @@
 """The scripted judgement pass of the mini host as a callable (WI-M10-15b): ``run_scripted_pass(host, toolkit)``.
 
 ``host`` is a tmp git copy of the mini host already past ``align apply --auto`` and committed; ``toolkit`` is a toolkit root that
-says 1.2.0 (``toolkit_saying_1_2_0``).  The answers are ``tests/fixtures/migration/mini_host_pass/``.  The function runs every
+says 1.2.0 (the live checkout: the ``toolkit_1_2_0`` fixture).  The answers are ``tests/fixtures/migration/mini_host_pass/``.  The function runs every
 step, closes the worklist items, commits ("Judgement pass") and leaves the copy ready for ``spec-check --merge`` and ``align validate``.
 """
 
@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 from specdev_tools import cli
 from specdev_tools.graph.build import build_graph
-from unit.migration.test_runner_core import REAL_ROOT, git
+from unit.migration._support import REAL_ROOT, git
 
 PASS_DIR = REAL_ROOT / "tests" / "fixtures" / "migration" / "mini_host_pass"
 SPEC = "spec"
@@ -26,25 +26,6 @@ WORKLIST = f"{SPEC}/extras/migration/worklist.json"
 
 
 # ---------------------------------------------------------------------------
-
-
-def toolkit_saying_1_2_0(tmp: Path) -> Path:
-    """A toolkit root that says 1.2.0 and reads the live schemas, canon, registries and changelog through symlinks."""
-    root = tmp / "toolkit"
-    (root / "tools").mkdir(parents=True)
-    (root / "changelog").mkdir()
-    for entry in (REAL_ROOT / "tools").iterdir():
-        if entry.name != "pyproject.toml":
-            (root / "tools" / entry.name).symlink_to(entry)
-    pyproject = (REAL_ROOT / "tools" / "pyproject.toml").read_text(encoding="utf-8")
-    (root / "tools" / "pyproject.toml").write_text(pyproject.replace('version = "1.1.1"', 'version = "1.2.0"', 1), encoding="utf-8")
-    for name in ("schema", "canon"):
-        (root / name).symlink_to(REAL_ROOT / name)
-    for entry in (REAL_ROOT / "changelog").iterdir():
-        (root / "changelog" / entry.name).symlink_to(entry)
-    if not (root / "changelog" / "v1.2.0.yaml").exists():
-        (root / "changelog" / "v1.2.0.yaml").write_text("version: 1.2.0\nbreaking: true\nchanges: []\n", encoding="utf-8")
-    return root
 
 
 @dataclass

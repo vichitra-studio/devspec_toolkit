@@ -18,7 +18,7 @@ from specdev_tools.migration.proposers import ProposeResult, refines
 from specdev_tools.migration.worklist import WORKLIST_FILE
 
 from ._proposer_support import copy_gold, edit, labels, task_criterion, tree_of
-from .test_runner_core import REAL_ROOT, tree_digest
+from ._support import REAL_ROOT, tree_digest
 
 SCORED, TUNE = "scored", "tune"
 MIN_SCORED_PROPOSALS = 20

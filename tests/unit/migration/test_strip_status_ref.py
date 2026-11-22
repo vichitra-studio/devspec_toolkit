@@ -19,7 +19,7 @@ from specdev_tools.migration.report import STATUS_OK
 from specdev_tools.migration.scripts.v1_1_0 import p3_strip_status_ref as script
 from specdev_tools.migration.writer import DocumentSet
 
-from .test_runner_core import MINI_HOST, git, make_host, make_toolkit, tree_digest
+from ._support import MINI_HOST, git, make_host, make_toolkit, tree_digest
 
 VARIANT = MINI_HOST / "variants" / "status_ref_1_0_x" / "04_fr_list.json"
 STATUS = {"id": "cn:core:status:active", "kind": "status", "version": "1.0.0"}

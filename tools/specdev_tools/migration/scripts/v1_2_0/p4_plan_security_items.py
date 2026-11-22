@@ -13,11 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import plan_milestones
-from specdev_tools.migration.scripts.v1_2_0.p3_remove import closed_plan_files
+from specdev_tools.migration.spec_reads import closed_plan_files, LEGACY, plan_milestones
 from specdev_tools.migration.scripts.v1_2_0.p4_ambiguities import PLAN_HOLDER_STEP, about_allowed, add_open_item, array_at, ensure_array, has_open_item
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 

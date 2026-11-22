@@ -22,14 +22,15 @@ import os
 import re
 from typing import Any
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.ids import mint_slug, suggest_prefix
+from specdev_tools.graph.ids import suggest_prefix
 from specdev_tools.graph.names import REVIEW_ENFORCER, RULE
 from specdev_tools.migration.maps import shape_rows
+from specdev_tools.migration.minting import mint_id
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import insert_key, step_data, step_file
+from specdev_tools.migration.spec_reads import insert_key, LEGACY, step_data, step_file
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_step10_rules", phase=PHASE_CONTENT, requires=("p2_id_mint",), touches=("10", "extras"))
@@ -115,7 +116,7 @@ def _review_rules(ctx, taken: set[str]) -> list[dict[str, Any]]:
     made = []
     for text in _review_texts(ctx):
         if text not in held:
-            new_id = mint_slug(text, taken, prefix=suggest_prefix(RULE))
+            new_id = mint_id(text, taken, prefix=suggest_prefix(RULE))
             taken.add(new_id)
             made.append({"rule_id": new_id, "text": text, "enforcer": REVIEW_ENFORCER, "scope": "in"})
     return made
@@ -128,7 +129,10 @@ def _stale_keys(ctx) -> list[str]:
 
 def _planned_reasons(ctx) -> list[dict[str, Any]]:
     """The review rules the script would add, for the reason items of a first run (ids are only for the items' keys; the rules are made again in ``apply``)."""
-    return [{"rule_id": mint_slug(text, set(), prefix=suggest_prefix(RULE)), "text": text} for text in _review_texts(ctx)]
+    planned: list[dict[str, Any]] = []
+    for text in _review_texts(ctx):
+        planned.append({"rule_id": mint_id(text, {r["rule_id"] for r in planned}, prefix=suggest_prefix(RULE)), "text": text})
+    return planned
 
 
 def detect(ctx) -> int:

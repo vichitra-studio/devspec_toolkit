@@ -34,7 +34,7 @@ from specdev_tools.trace.writing import seed_texts_for_write
 from specdev_tools.validation.migration_mode import not_passed_owners
 
 from .test_convert_remove import context, items
-from .test_runner_core import REAL_ROOT, make_host, make_toolkit, tree_digest
+from ._support import REAL_ROOT, make_host, make_toolkit, tree_digest
 
 EXAMPLE_HOST = REAL_ROOT / "tests" / "fixtures" / "graph_example"
 LOCK_REL = "extras/trace.lock.json"

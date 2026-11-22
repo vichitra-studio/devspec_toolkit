@@ -7,7 +7,7 @@ trigger: |
     - "is not a git work tree": the host is not a git repository, or --git-root
       names a folder that is not one.
     - "records no toolkit_version": spec/specdev_version has no
-      toolkit_version.
+      toolkit_version, or the file does not exist.
     - "older than 1.0.0", "newer than this toolkit", or "is not a version
       listed in <toolkit>/changelog": the stamp names a version the migration
       cannot start from.
@@ -17,9 +17,12 @@ trigger: |
 resolution: |
   1. Not a git work tree: run `git init` in the host, commit the spec, run again.
      Pass --git-root <host root> when the spec folder is not at the top.
-  2. No toolkit_version: run `specdev update spec --repo-root ./devspec_toolkit`
-     once to stamp the host, or write the version the spec was built with into
-     spec/specdev_version by hand.
+  2. No toolkit_version (or no spec/specdev_version at all): write the version
+     the spec was built with into spec/specdev_version, for a 1.1.1 spec
+         toolkit_version: "1.1.1"
+     commit it, and run again. Do not run `specdev update` first: on a spec
+     with no stamp it stamps the new version, and the migration then reads the
+     spec as already migrated and never runs.
   3. A version the migration cannot start from: update the toolkit submodule to
      the release you migrate to ("newer than this toolkit"); for a version the
      changelog does not list, put the version the spec was really built with

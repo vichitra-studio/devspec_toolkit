@@ -16,6 +16,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from ..core.constants import STAMP_FILE
 from ..core.changelog_parser import (
     ChangelogEntry,
     VersionChangelog,
@@ -279,26 +280,32 @@ def apply_step16_anchor_mapping(toolkit_schemas: Dict[str, Path]) -> Dict[str, P
     return remapped
 
 
+def read_stamp(spec_dir: str | Path) -> Optional[Dict[str, Any]]:
+    """The mapping in ``<spec_dir>/specdev_version`` (the one reader of the stamp).
+
+    Returns:
+        The mapping, or ``None`` when the file is missing, cannot be read or parsed, or is not a mapping.
+    """
+    import yaml  # lazy import: yaml is only needed when a stamp is read or written
+
+    try:
+        with open(Path(spec_dir) / STAMP_FILE, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except (OSError, ValueError, yaml.YAMLError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def get_user_version(spec_dir: Path) -> Optional[str]:
     """Get user's toolkit version from spec/specdev_version.
-    
+
     Args:
         spec_dir: Path to user's spec/ directory
-        
+
     Returns:
-        Version string or None if not found
+        The ``toolkit_version`` of the stamp, or None when there is no readable stamp or it has no such key
     """
-    version_file = spec_dir / "specdev_version"
-    if not version_file.exists():
-        return None
-    
-    try:
-        import yaml
-        with open(version_file, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        return data.get("toolkit_version") if data else None
-    except Exception:
-        return None
+    return (read_stamp(spec_dir) or {}).get("toolkit_version")
 
 
 # -----------------------------------------------------------------------------
@@ -1054,7 +1061,7 @@ def stamp_specdev_version(
     import yaml  # lazy import — yaml is only needed at stamp time
 
     clock = now or _get_timestamp
-    version_file = spec_dir / "specdev_version"
+    version_file = spec_dir / STAMP_FILE
     try:
         stamped = clock()
         existed = version_file.exists()

@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import re
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
-from specdev_tools.migration.scripts.v1_2_0.p2_plan_milestone_key import step_data
+from specdev_tools.migration.spec_reads import LEGACY, step_data
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_assumptions", phase=PHASE_CONTENT, requires=("p2_id_mint",), touches=("extras",))

@@ -12,7 +12,7 @@ from specdev_tools.migration.context import MigrationContext
 from specdev_tools.migration.proposers import MigratedTree, load_tree
 from specdev_tools.migration.writer import DocumentSet
 
-from .test_runner_core import REAL_ROOT
+from ._support import REAL_ROOT
 
 GOLD = REAL_ROOT / "tests" / "fixtures" / "migration" / "refines_gold"
 

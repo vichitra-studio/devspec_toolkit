@@ -48,10 +48,11 @@ def test_the_context_skill_lists_triage_as_auto_invocable_and_apply_and_validate
     text = _flat(CONTEXT_SKILL)
     auto = text[text.index("**Auto-invocable**") : text.index("**Human required**")]
     human = text[text.index("**Human required**") : text.index("## Error handling")]
-    assert "`align triage`" in auto and "`align triage`" not in human
-    for command in ("`align apply`", "`align validate`"):
+    for command in ("`align triage`", "`align propose`"):  # they write the worklist only
+        assert command in auto and command not in human, command
+    for command in ("`align apply`", "`align validate`", "`align bind-legacy`"):  # they write the spec, the stamp, the bindings
         assert command in human and command not in auto, command
-    assert {"align triage", "align apply", "align validate"} <= _cli_paths()
+    assert {"align triage", "align propose", "align apply", "align validate", "align bind-legacy"} <= _cli_paths()
 
 
 def test_the_trinity_skill_says_the_migration_writes_the_milestone_key() -> None:

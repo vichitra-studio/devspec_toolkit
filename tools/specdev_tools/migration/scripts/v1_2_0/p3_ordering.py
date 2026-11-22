@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, capture_renames
+from specdev_tools.migration.spec_reads import capture_renames
 from specdev_tools.migration.scripts.v1_2_0.p3_convert import schedule_proposals
 from specdev_tools.migration.worklist import WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
 

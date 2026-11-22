@@ -16,7 +16,6 @@ and the step's check.  The tests pin facts, never wording:
 
 from __future__ import annotations
 
-import argparse
 import contextlib
 import importlib
 import io
@@ -25,7 +24,6 @@ import pkgutil
 import re
 import shlex
 import warnings
-from pathlib import Path
 
 import pytest
 
@@ -40,7 +38,7 @@ from specdev_tools.migration.scripts.v1_2_0 import p3_ordering
 from specdev_tools.migration.worklist import WORKLIST_FILE
 from specdev_tools.trace.id_write_commands import build_id_write_parser, is_id_write
 
-from .test_runner_core import REAL_ROOT, make_host, make_toolkit
+from ._support import REAL_ROOT, make_host, make_toolkit
 
 EXPECTED_TEMPLATES = [
     "template_capabilities.md",

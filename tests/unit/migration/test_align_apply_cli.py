@@ -1,8 +1,8 @@
 """``specdev align apply --auto`` runs the migration runner (WI-M10-01b): the command, not only the function.
 
 Each test copies the mini host into ``tmp_path`` (a git work tree) and runs ``cli.main`` with the argv of a real call
-against a temp toolkit root: the live toolkit says 1.1.1 and has no ``v1.2.0.yaml`` until the release commit (P1).
-Scripts are the test-only ones of ``test_runner_core`` or the real ``p3_strip_status_ref``.
+against a temp toolkit root (``_support.make_toolkit``).
+Scripts are the test-only ones of ``_support.make_script`` or the real ``p3_strip_status_ref``.
 """
 
 from __future__ import annotations
@@ -21,8 +21,9 @@ import yaml
 from specdev_tools import cli
 from specdev_tools.migration import runner
 from specdev_tools.migration.registry import PHASE_IDS, discover_scripts
+from specdev_tools.migration.report import STATUS_NOOP, STATUS_OK, MigrationReport, ScriptReport
 
-from .test_runner_core import MINI_HOST, git, make_host, make_script, make_toolkit, tree_digest
+from ._support import MINI_HOST, git, make_host, make_script, make_toolkit, tree_digest
 
 VARIANT = MINI_HOST / "variants" / "status_ref_1_0_x" / "04_fr_list.json"
 MARK = "extras/migrated-by-p2_mark"
@@ -84,6 +85,8 @@ def test_real_run_writes_stamps_and_prints_review_and_undo(host, toolkit):
     assert code == 0, err
     assert "migration 1.1.1 -> 1.2.0" in out and "dry run" not in out
     assert "review: git diff --stat spec" in out and "undo:   git checkout -- spec && git clean -fd spec" in out
+    assert 'commit: git add spec && git commit --no-verify -m "Migrate the spec to toolkit v1.2.0"' in out and "your old hooks still name commands" in out
+    assert out.rstrip().splitlines()[-1].startswith("next:   specdev align triage spec")
     assert (host / "spec" / MARK).is_file()
     stamp = yaml.safe_load((host / "spec" / "specdev_version").read_text(encoding="utf-8"))
     assert stamp["toolkit_version"] == "1.2.0" and stamp["migration_status"] == "in_progress"
@@ -208,3 +211,13 @@ def test_a_host_at_the_toolkit_version_is_a_noop_that_does_not_stamp(tmp_path):
     assert code == 0, err
     assert out.strip() == "migration 1.1.1 -> 1.1.1\nthe spec is already at toolkit version 1.1.1; nothing to do"
     assert tree_digest(host) == before
+
+
+def test_the_list_of_changes_no_script_makes_is_printed_only_when_the_run_changed_something():
+    notes = ["change_schema: a step file changed shape"]
+    ran = MigrationReport(STATUS_OK, False, "1.1.1", "1.2.0", scripts=[ScriptReport("p1_a", 1, 1, 1)], not_run=notes, changed_files=["spec/a.json"])
+    assert "not run by the runner" in ran.render() and "  - change_schema: a step file changed shape" in ran.render()
+    nothing = MigrationReport(STATUS_NOOP, False, "1.2.0", "1.2.0", scripts=[ScriptReport("p1_a", 1, 0, 0)], not_run=notes)
+    assert "not run by the runner" not in nothing.render() and "change_schema" not in nothing.render()
+    dry = MigrationReport(STATUS_OK, True, "1.1.1", "1.2.0", scripts=[ScriptReport("p1_a", 1, 1, 1)], not_run=notes, changed_files=["spec/a.json"])
+    assert "not run by the runner" in dry.render()

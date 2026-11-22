@@ -8,12 +8,12 @@ of a step (``git show`` of the commit the capture names).  It writes the worklis
 
 1. the stamp records the toolkit's own version (a spec that was never migrated is refused, not stamped);
 2. ``spec-check --merge`` (the whole spec in merge mode, against the merge base) has no error;
-3. the files ``capture.json`` and ``worklist.json`` are deleted when no item is open (``keep_worklist`` keeps them);
-   otherwise they are kept and the number of open items, and of those marked blocking, is told (information only: an
-   open item, blocking or not, never fails validate; merge mode is the gate);
-4. the stamp is finished: ``migration_status`` is cleared and ``last_migration`` refreshed, through
+3. the stamp is finished: ``migration_status`` is cleared and ``last_migration`` refreshed, through
    ``schema_differ.stamp_specdev_version``, the one writer of the stamp.  No history entry is added: the runner wrote
-   the one entry of this migration.
+   the one entry of this migration.  When this write fails the run stops here and nothing else is touched;
+4. the files ``capture.json`` and ``worklist.json`` are deleted when no item is open (``keep_worklist`` keeps them);
+   otherwise they are kept and the number of open items, and of those marked blocking, is told (information only: an
+   open item, blocking or not, never fails validate; merge mode is the gate).
 
 Nothing is written before step 3, so a refused validate leaves the tree as it was.
 """
@@ -28,12 +28,11 @@ from pathlib import Path
 
 from specdev_tools.core.changelog_parser import compare_versions, get_toolkit_version
 from specdev_tools.core.config import get_config
+from specdev_tools.core.constants import STAMP_FILE
 from specdev_tools.core.errors import FindingError, SpecError
 from specdev_tools.core.step_paths import get_step_from_path
-from specdev_tools.generation.schema_differ import stamp_specdev_version
-from specdev_tools.graph.gitview import STAMP_FILE
-from specdev_tools.migration.context import GitReadError, MigrationContext, read_git
-from specdev_tools.migration.runner import CAPTURE_FILE, STATUS_IN_PROGRESS, read_stamp
+from specdev_tools.generation.schema_differ import read_stamp, stamp_specdev_version
+from specdev_tools.migration.context import CAPTURE_FILE, STATUS_IN_PROGRESS, GitReadError, MigrationContext, read_git
 from specdev_tools.migration.worklist import (
     AUDIENCE_AGENT,
     AUDIENCE_OPERATOR,
@@ -284,7 +283,18 @@ def validate_migration(
 
 
 def _finish(spec: str, version: str, stamp: dict, report: ValidateReport, keep_worklist: bool) -> None:
-    """Delete the migration files (no item open, ``keep_worklist`` not given) and clear ``migration_status``."""
+    """Clear ``migration_status`` first, then delete the migration files (no item open, ``keep_worklist`` not given).
+
+    The stamp goes first: when its write fails the run stops with the capture and the worklist still in place.
+    """
+    if stamp.get("migration_status") == STATUS_IN_PROGRESS:
+        error = stamp_specdev_version(Path(spec), version, is_migration=True, migration_status=None)
+        if error:
+            report.refused = error
+            return
+        report.stamp_finished = True
+    else:
+        report.notes.append(f"{STAMP_FILE} has no migration_status: in_progress, so the stamp was not rewritten")
     folder = os.path.dirname(os.path.join(spec, WORKLIST_FILE))
     present = [rel for rel in (CAPTURE_FILE, WORKLIST_FILE) if os.path.isfile(os.path.join(spec, rel))]
     if report.unresolved:
@@ -297,11 +307,3 @@ def _finish(spec: str, version: str, stamp: dict, report: ValidateReport, keep_w
             report.deleted.append(rel)
         if os.path.isdir(folder) and not os.listdir(folder):
             os.rmdir(folder)
-    if stamp.get("migration_status") == STATUS_IN_PROGRESS:
-        error = stamp_specdev_version(Path(spec), version, is_migration=True, migration_status=None)
-        if error:
-            report.refused = error
-            return
-        report.stamp_finished = True
-    else:
-        report.notes.append(f"{STAMP_FILE} has no migration_status: in_progress, so the stamp was not rewritten")

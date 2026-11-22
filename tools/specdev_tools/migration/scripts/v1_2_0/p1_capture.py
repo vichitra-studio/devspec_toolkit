@@ -22,28 +22,22 @@ import os
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from specdev_tools.core.ambiguity_items import is_open, iter_ambiguity_items
-from specdev_tools.core.plan_files import plan_files
-from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
-from specdev_tools.migration.context import MigrationContext
+from specdev_tools.core.ambiguity_items import ANCHOR_STEP, is_open, iter_ambiguity_items
+from specdev_tools.migration.context import CAPTURE_FILE, CAPTURE_REL, MigrationContext, Snapshot
 from specdev_tools.migration.registry import PHASE_CAPTURE, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.runner import CAPTURE_FILE, Snapshot
+from specdev_tools.migration.spec_reads import LEGACY, anchor_rows, plan_rels, step_data
 from specdev_tools.migration.worklist import WORKLIST_FILE, new_worklist_data
 
 SCRIPT = ScriptSpec("p1_capture", PHASE_CAPTURE, touches=("extras",))
 
 CAPTURE_SCHEMA = "vc:infra:migration-capture"
-LEGACY = "legacy_"
-CAPTURE_REL = CAPTURE_FILE.replace(os.sep, "/")
 _OWN_FILES = frozenset({CAPTURE_REL, WORKLIST_FILE.replace(os.sep, "/")})
 _MIGRATION_DIR = os.path.dirname(CAPTURE_FILE).replace(os.sep, "/") + "/"
-_ANCHOR_STEP = "16"
-_OPEN_ITEM_STEPS = frozenset({_ANCHOR_STEP, "16a", "16b"})
+_OPEN_ITEM_STEPS = frozenset({ANCHOR_STEP, "16a", "16b"})
 _ITEM_FIELDS = ("linked_test_expectation", "fixture_ref", "checklist_status", "deferred_reason", "wont_do_reason")
 _GOVERNANCE_KEYS = ("pr_rules", "review_policy", "reviewers", "spec_first_policy", "policy_ref", "command_ref")
 _LINK_KEYS = ("source_milestones", "deliverables", "fr_refs", "capability_refs")
 _COMPONENT_DROPPED = "trace"
-RENAMES_KEY = "renames"
 
 
 def _legacy(source: dict[str, Any], names: Iterable[str]) -> dict[str, Any]:
@@ -76,17 +70,10 @@ class _Reader:
 
     def __init__(self, ctx: MigrationContext) -> None:
         self.ctx = ctx
-        self._steps = {
-            match.group(1): name
-            for name in sorted(os.listdir(ctx.spec_root))
-            if (match := STEP_JSON_RE.match(name))
-        }
 
     def step(self, step: str) -> dict[str, Any]:
         """The data of the file of *step* (``{}`` when the host has none)."""
-        name = self._steps.get(step)
-        data = self.ctx.documents.load(name).data if name else None
-        return data if isinstance(data, dict) else {}
+        return step_data(self.ctx, step)
 
     def milestones(self, step: str) -> Iterator[dict[str, Any]]:
         """The ``milestones[]`` objects of *step* that have a ``milestone_id``."""
@@ -94,13 +81,11 @@ class _Reader:
 
     def anchor_rows(self) -> Iterator[dict[str, Any]]:
         """The ``plan.milestone_index[]`` objects of the anchor that have a ``milestone_id``."""
-        rows = _get(self.step(_ANCHOR_STEP), "plan", "milestone_index")
-        return (row for row in _objects(rows) if isinstance(row.get("milestone_id"), str))
+        return (row for row in anchor_rows(self.ctx) if isinstance(row.get("milestone_id"), str))
 
     def plans(self) -> Iterator[tuple[str, dict[str, Any]]]:
         """Each plan file as ``(path relative to the spec folder, its data)``, in name order."""
-        for path in plan_files(self.ctx.spec_root):
-            rel = f"{PLAN_DIR_NAME}/{path.name}"
+        for rel in plan_rels(self.ctx):
             data = self.ctx.documents.load(rel).data
             yield rel, data if isinstance(data, dict) else {}
 
@@ -128,7 +113,12 @@ def _source(ctx: MigrationContext) -> dict[str, Any]:
 def _milestone_status(reader: _Reader) -> dict[str, Any]:
     """Status per source: step 14, step 09, the anchor rows, and for each plan its review verdict and ``plan.status``."""
     plans = [
-        {"file": rel, "review_verdict": _get(data, "review", "verdict"), "legacy_plan_status": _get(data, "plan", "status")}
+        {
+            "file": rel,
+            "review_verdict": _get(data, "review", "verdict"),
+            "legacy_plan_status": _get(data, "plan", "status"),
+            **({"legacy_plan_deferred_reason": reason} if isinstance(reason := _get(data, "plan", "deferred_reason"), str) else {}),
+        }
         for rel, data in reader.plans()
     ]
     return {
@@ -229,7 +219,7 @@ def _milestone_links(reader: _Reader) -> list[dict[str, Any]]:
         for m in reader.milestones(step)
     ]
     rows.extend(
-        {"step": _ANCHOR_STEP, "milestone": row["milestone_id"], **_legacy(row, ("fr_refs", "context_path"))}
+        {"step": ANCHOR_STEP, "milestone": row["milestone_id"], **_legacy(row, ("fr_refs", "context_path"))}
         for row in reader.anchor_rows()
     )
     return rows
@@ -254,19 +244,6 @@ def _environments(reader: _Reader) -> list[dict[str, Any]]:
     if not isinstance(environments, dict):
         return []
     return [{"environment": name, "legacy_environment": value} for name, value in environments.items() if isinstance(value, dict)]
-
-
-def capture_renames(ctx: MigrationContext) -> dict[str, dict[str, str]]:
-    """The ids phase 2 renamed, as ``{kind: {old id: new id}}`` (empty when the capture holds no ``renames`` section).
-
-    The capture keys 09 records by the id they had when it was made; a reader that matches one of them by id maps the
-    old id through this (``p2_id_collisions`` writes the section in the run that renames).
-    """
-    data = ctx.documents.load(CAPTURE_REL).data
-    found: dict[str, dict[str, str]] = {}
-    for entry in _objects(data.get(RENAMES_KEY)):
-        found.setdefault(entry["kind"], {})[entry["old"]] = entry["new"]
-    return found
 
 
 def build_capture(ctx: MigrationContext) -> dict[str, Any]:

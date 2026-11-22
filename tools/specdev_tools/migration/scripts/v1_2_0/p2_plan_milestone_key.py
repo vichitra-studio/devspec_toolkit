@@ -5,137 +5,23 @@ A 1.1.1 plan is found from its anchor row (``context_path``) and carries no key;
 file, set in every plan file, closed or open, and nothing else of the plan changes: no plan file is renamed.  A plan
 file that no anchor row names, or whose key disagrees with the row, is a worklist item (the script never guesses).
 
-This module also holds the two readers the action-id script shares: which plan file belongs to which milestone and
-which milestones are legacy-closed (the rule of the legacy close: 14 status ``done``, anchor status ``done`` or a
-close record, or a plan review verdict ``verified``; read from ``capture.json``, ruling P23).
+The readers this script and others share (which plan file belongs to which milestone, which milestones are legacy-closed:
+14 status ``done``, anchor status ``done`` or a close record, or a plan review verdict ``verified``; read from
+``capture.json``, ruling P23) are in ``migration/spec_reads.py``.
 """
 
 from __future__ import annotations
 
-import os
-from collections.abc import Iterator
-from typing import Any
-
-from specdev_tools.core.plan_files import MILESTONE_KEY, plan_files
-from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
-from specdev_tools.graph.names import ROW_DONE
-from specdev_tools.lifecycle.anchor_store import is_legacy_close
+from specdev_tools.core.plan_files import MILESTONE_KEY
+from specdev_tools.core.step_paths import PLAN_DIR_NAME
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, LEGACY
+from specdev_tools.migration.spec_reads import anchor_rows, insert_key, plan_rel_of_row, plan_rels, row_milestone
 from specdev_tools.migration.worklist import add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p2_plan_milestone_key", phase=PHASE_IDS, touches=("16", "extras"))
 
-ANCHOR_STEP = "16"
-ROADMAP_STEP = "14"
-VERDICT_VERIFIED = "verified"
-CAPTURE_STATUS = "milestone_status"
-SOURCE_ROADMAP = "14.status"
-SOURCE_ANCHOR = "anchor.status"
-SOURCE_VERDICT = "16c.verdict"
-_SOURCE_ORDER = (SOURCE_ROADMAP, SOURCE_ANCHOR, SOURCE_VERDICT)
 KIND_NO_ROW = "plan-without-row"
 KIND_KEY_MISMATCH = "plan-milestone-mismatch"
-
-
-def step_file(ctx, step: str) -> str | None:
-    """The file name of *step* in the spec folder (``None`` when the host has none)."""
-    for name in sorted(os.listdir(ctx.spec_root)):
-        match = STEP_JSON_RE.match(name)
-        if match and match.group(1) == step:
-            return name
-    return None
-
-
-def step_data(ctx, step: str) -> dict[str, Any]:
-    """The data of the file of *step* (``{}`` when the host has none)."""
-    name = step_file(ctx, step)
-    data = ctx.documents.load(name).data if name else None
-    return data if isinstance(data, dict) else {}
-
-
-def anchor_rows(ctx) -> Iterator[dict[str, Any]]:
-    """The objects of the anchor's ``plan.milestone_index`` (legacy or converted)."""
-    rows = (step_data(ctx, ANCHOR_STEP).get("plan") or {}).get("milestone_index")
-    return (row for row in rows if isinstance(row, dict)) if isinstance(rows, list) else iter(())
-
-
-def row_milestone(row: dict[str, Any]) -> str | None:
-    """The 14 milestone id of an anchor row: the legacy ``milestone_id``, or the one id of ``about``."""
-    legacy = row.get("milestone_id")
-    if isinstance(legacy, str):
-        return legacy
-    about = row.get("about")
-    return about[0] if isinstance(about, list) and len(about) == 1 and isinstance(about[0], str) else None
-
-
-def plan_rel_of_row(row: dict[str, Any]) -> str | None:
-    """The plan file a legacy row names, as a path relative to the spec folder (``impl_context/<file>``)."""
-    path = row.get("context_path")
-    if not isinstance(path, str) or not path:
-        return None
-    return f"{PLAN_DIR_NAME}/{path.replace(chr(92), '/').rsplit('/', 1)[-1]}"
-
-
-def plan_rels(ctx) -> list[str]:
-    """Every plan file, relative to the spec folder, in name order."""
-    return [f"{PLAN_DIR_NAME}/{path.name}" for path in plan_files(ctx.spec_root)]
-
-
-def plan_milestones(ctx) -> dict[str, str]:
-    """``{plan file: milestone id}``: the plan's own key when it has one, else the anchor row that names the file."""
-    named = {rel: row_milestone(row) for row in anchor_rows(ctx) if (rel := plan_rel_of_row(row))}
-    found: dict[str, str] = {}
-    for rel in plan_rels(ctx):
-        key = ctx.documents.load(rel).data.get(MILESTONE_KEY)
-        milestone = key if isinstance(key, str) else named.get(rel)
-        if milestone:
-            found[rel] = milestone
-    return found
-
-
-def closed_sources(ctx) -> dict[str, list[str]]:
-    """``{milestone id: the evidence names that say it is closed}`` for the 14 milestones that are legacy-closed, read from ``capture.json``.
-
-    The three ways a milestone was closed in 1.1.1, each from the capture's ``milestone_status`` (the values as they were
-    before phase 3 removed them): the roadmap says ``done`` (``14.status``), the anchor row says ``done``
-    (``anchor.status``; a live legacy close record of the row counts too), or the plan's review verdict is ``verified``
-    (``16c.verdict``).  The names are listed in that order.
-    """
-    held = ctx.documents.load(CAPTURE_REL).data.get(CAPTURE_STATUS) or {}
-    found: dict[str, list[str]] = {}
-    for name, section in ((SOURCE_ROADMAP, "roadmap"), (SOURCE_ANCHOR, "anchor")):
-        for entry in held.get(section) or []:
-            if entry.get(LEGACY + "status") == ROW_DONE:
-                found.setdefault(entry["milestone"], []).append(name)
-    for row in anchor_rows(ctx):
-        milestone = row_milestone(row)
-        if milestone and is_legacy_close(row.get("close")) and SOURCE_ANCHOR not in found.get(milestone, []):
-            found.setdefault(milestone, []).append(SOURCE_ANCHOR)
-    by_plan = plan_milestones(ctx)
-    for entry in held.get("plans") or []:
-        milestone = by_plan.get(entry["file"])
-        if milestone and entry.get("review_verdict") == VERDICT_VERIFIED:
-            found.setdefault(milestone, []).append(SOURCE_VERDICT)
-    return {milestone: sorted(names, key=_SOURCE_ORDER.index) for milestone, names in found.items()}
-
-
-def closed_milestones(ctx) -> set[str]:
-    """The 14 milestones that are legacy-closed: the keys of ``closed_sources`` (they read the capture, so the answer does not change when a later phase removes the 14 ``status``)."""
-    return set(closed_sources(ctx))
-
-
-def insert_key(data: dict[str, Any], name: str, value: Any, *, after: str | None = None) -> None:
-    """Add *name* to *data* in place, right after the key *after* (first when *after* is absent), keeping the other keys in order."""
-    rest = list(data.items())
-    data.clear()
-    placed = False
-    if after is None or after not in dict(rest):
-        data[name], placed = value, True
-    for key, held in rest:
-        data[key] = held
-        if key == after and not placed:
-            data[name], placed = value, True
 
 
 def _plan(ctx) -> tuple[list[tuple[str, str]], list]:

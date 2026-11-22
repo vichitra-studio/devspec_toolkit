@@ -25,15 +25,14 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.contract import path_steps
 from specdev_tools.graph.ids import first_free_id
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.migration.maps import legacy_ref_fields
+from specdev_tools.migration.context import CAPTURE_REL, file_key
+from specdev_tools.migration.maps import LEGACY_STEP_IDS, legacy_ref_fields
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.runner import file_key
-from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, RENAMES_KEY
+from specdev_tools.migration.spec_reads import RENAMES_KEY
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 from specdev_tools.validation.linter_utils import graph_known_ids
 
-STEPS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16")
-SCRIPT = ScriptSpec(id="p2_id_collisions", phase=PHASE_IDS, touches=(*STEPS, "extras"))
+SCRIPT = ScriptSpec(id="p2_id_collisions", phase=PHASE_IDS, touches=(*LEGACY_STEP_IDS, "extras"))
 
 ANCHOR_FILE = "16_impl_context.json"
 KIND_CITATION = "collided-id-citation"

@@ -23,14 +23,15 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 from pathlib import Path
 from typing import Any
 
 from specdev_tools.core.host_declarations import HOST_DECLARATIONS_FILE, HostDeclarations, HostDeclarationsError, load_host_declarations
-from specdev_tools.core.step_paths import STEP_JSON_RE
-from specdev_tools.host_install import PRE_COMMIT_FILE, WORKFLOWS_DIR, read_managed_header, retired_command_findings
+from specdev_tools.host_install import PRE_COMMIT_FILE, host_workflow_files, retired_command_findings
 from specdev_tools.migration.context import GitReadError, MigrationContext
 from specdev_tools.migration.registry import PHASE_HOST_FILES, Problem, ScriptResult, ScriptSpec
+from specdev_tools.migration.spec_reads import step_data
 from specdev_tools.migration.worklist import AUDIENCE_OPERATOR, WORKLIST_FILE, WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p7_host_files", phase=PHASE_HOST_FILES, touches=("extras",))
@@ -96,20 +97,11 @@ def _lock_files(ctx: MigrationContext) -> list[str]:
     return sorted(path for path in listed if os.path.basename(path) in LOCK_FILES)
 
 
-def _workflow_files(host: Path) -> list[str]:
-    """The host's own workflow files (not the toolkit's, which start with its header), relative to the host root."""
-    folder = host / WORKFLOWS_DIR
-    if not folder.is_dir():
-        return []
-    rels = sorted(p.relative_to(host).as_posix() for pattern in ("*.yml", "*.yaml") for p in folder.glob(pattern))
-    return [rel for rel in rels if read_managed_header("\n".join(_read_lines(host, rel))) is None]
-
-
 def _install_lines(host: Path) -> list[tuple[str, int, str]]:
     """``(file, line, command)`` of the host's workflow lines that install dependencies; the toolkit's own install is left out."""
     found: list[tuple[str, int, str]] = []
-    for rel in _workflow_files(host):
-        for number, line in enumerate(_read_lines(host, rel), start=1):
+    for rel, text in host_workflow_files(host):
+        for number, line in enumerate(text.splitlines(), start=1):
             command = _RUN_PREFIX.sub("", line.strip()).strip().strip("\"'")
             if _INSTALL.search(command) and "specdev" not in command and "devspec" not in command and not command.startswith("#"):
                 found.append((rel, number, command))
@@ -118,10 +110,7 @@ def _install_lines(host: Path) -> list[tuple[str, int, str]]:
 
 def _third_parties(ctx: MigrationContext) -> list[dict[str, Any]]:
     """The ``third_parties[]`` entries of step 02 as the spec folder holds them now (the earlier scripts have run)."""
-    names = sorted(name for name in os.listdir(ctx.spec_root) if (match := STEP_JSON_RE.match(name)) and match.group(1) == STEP_SYSTEM_SKETCH)
-    if not names:
-        return []
-    entries = ctx.documents.load(names[0]).data.get("third_parties")
+    entries = step_data(ctx, STEP_SYSTEM_SKETCH).get("third_parties")
     return [entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("third_party_id"), str)] if isinstance(entries, list) else []
 
 
@@ -133,7 +122,11 @@ def _fragment_text(fragment: dict[str, Any]) -> str:
 
 
 def _declaration_item(ctx: MigrationContext, about: str, evidence: str, fragment: dict[str, Any], *, step: str = STEP_CI_GATES, kind: str = KIND_DECLARATION, key: str = "") -> WorklistItem:
-    proposal = f"add this to the top-level object of {_declarations_path(ctx)} (the migration does not write that file): {_fragment_text(fragment)}"
+    path = _declarations_path(ctx)
+    proposal = (
+        f"add this to the top-level object of {path} (the migration does not write that file; this command writes it, and creates the file when it does not exist): "
+        f"specdev json insert {path} . {shlex.quote(_fragment_text(fragment))} --create-schema vc:host-declarations"
+    )
     return make_item(step, kind, about, audience=AUDIENCE_OPERATOR, blocking=False, evidence=evidence, proposal=proposal, key=key)
 
 
