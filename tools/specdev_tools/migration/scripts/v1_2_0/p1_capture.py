@@ -34,7 +34,8 @@ SCRIPT = ScriptSpec("p1_capture", PHASE_CAPTURE, touches=("extras",))
 
 CAPTURE_SCHEMA = "vc:infra:migration-capture"
 LEGACY = "legacy_"
-_OWN_FILES = frozenset({CAPTURE_FILE.replace(os.sep, "/"), WORKLIST_FILE.replace(os.sep, "/")})
+CAPTURE_REL = CAPTURE_FILE.replace(os.sep, "/")
+_OWN_FILES = frozenset({CAPTURE_REL, WORKLIST_FILE.replace(os.sep, "/")})
 _MIGRATION_DIR = os.path.dirname(CAPTURE_FILE).replace(os.sep, "/") + "/"
 _ANCHOR_STEP = "16"
 _OPEN_ITEM_STEPS = frozenset({_ANCHOR_STEP, "16a", "16b"})
@@ -42,6 +43,7 @@ _ITEM_FIELDS = ("linked_test_expectation", "fixture_ref", "checklist_status", "d
 _GOVERNANCE_KEYS = ("pr_rules", "review_policy", "reviewers", "spec_first_policy", "policy_ref", "command_ref")
 _LINK_KEYS = ("source_milestones", "deliverables", "fr_refs", "capability_refs")
 _COMPONENT_DROPPED = "trace"
+RENAMES_KEY = "renames"
 
 
 def _legacy(source: dict[str, Any], names: Iterable[str]) -> dict[str, Any]:
@@ -252,6 +254,19 @@ def _environments(reader: _Reader) -> list[dict[str, Any]]:
     if not isinstance(environments, dict):
         return []
     return [{"environment": name, "legacy_environment": value} for name, value in environments.items() if isinstance(value, dict)]
+
+
+def capture_renames(ctx: MigrationContext) -> dict[str, dict[str, str]]:
+    """The ids phase 2 renamed, as ``{kind: {old id: new id}}`` (empty when the capture holds no ``renames`` section).
+
+    The capture keys 09 records by the id they had when it was made; a reader that matches one of them by id maps the
+    old id through this (``p2_id_collisions`` writes the section in the run that renames).
+    """
+    data = ctx.documents.load(CAPTURE_REL).data
+    found: dict[str, dict[str, str]] = {}
+    for entry in _objects(data.get(RENAMES_KEY)):
+        found.setdefault(entry["kind"], {})[entry["old"]] = entry["new"]
+    return found
 
 
 def build_capture(ctx: MigrationContext) -> dict[str, Any]:

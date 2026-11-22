@@ -415,7 +415,7 @@ def build_parser() -> _SpecdevParser:
 
     # Align commands (Phase 3-6: Schema Differ + Apply + Prompts)
     al = sub.add_parser("align", help="Toolkit alignment and migration")
-    al.add_argument("action", choices=["status", "diff", "plan", "apply", "prompts", "rollback", "validate"],
+    al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "prompts", "rollback", "validate"],
                     help="Alignment action")
     al.add_argument("spec_dir", help="Path to user spec/ directory")
     al.add_argument("--repo-root", default=".", help="Toolkit root directory")
@@ -423,9 +423,13 @@ def build_parser() -> _SpecdevParser:
                     help="Host git work tree (apply; default: the folder that holds spec_dir)")
     al.add_argument("--auto", action="store_true", help="Apply only auto-fixable changes")
     al.add_argument("--dry-run", action="store_true",
-                    help="apply: run the migration on a scratch copy and print the diff, write nothing")
+                    help="apply: run the migration on a scratch copy and print the diff, write nothing; "
+                         "propose: print the proposals, add no item to the worklist")
     al.add_argument("--allow-dirty", action="store_true",
                     help="apply: do not refuse a spec/ with uncommitted changes")
+    al.add_argument("--kind", metavar="KIND",
+                    help="propose: what to propose: refines (a legacy task criterion's refines link) or prose-ids "
+                         "(the ids a node's text names); propose writes only spec/extras/migration/worklist.json")
     al.add_argument("--output", help="Output directory for generated prompts")
     al.add_argument("--mode", choices=["bootstrap", "upgrade"], default="upgrade",
                     help="Prompt generation mode (default: upgrade)")
@@ -1355,6 +1359,25 @@ def main():
                 print(report.render(), file=sys.stderr if report.errors else sys.stdout)
             if report.errors:
                 sys.exit(1)
+        elif args.action == "propose":
+            from .migration.proposers import KINDS, ProposeError, propose
+
+            if args.kind not in KINDS:
+                p.error(f"align propose needs --kind {{{','.join(KINDS)}}}" + (f" (not {args.kind!r})" if args.kind else ""))
+            try:
+                outcome = propose(
+                    spec_dir,
+                    kind=args.kind,
+                    toolkit_root=repo_root,
+                    git_root=Path(os.path.abspath(args.git_root)) if args.git_root else None,
+                    dry_run=args.dry_run,
+                )
+            except ProposeError as error:
+                if getattr(args, "json_output", False):
+                    _json_exit([f"E520 UNRESOLVED_INPUT {error}"], "align", {"action": "propose"})
+                print(f"align propose: {error}", file=sys.stderr)
+                sys.exit(1)
+            print(json.dumps(outcome.to_json(), indent=2) if getattr(args, "json_output", False) else outcome.render())
         elif args.action == "prompts":
             # Generate AI prompts for semantic migrations
             prompts = generate_prompts(

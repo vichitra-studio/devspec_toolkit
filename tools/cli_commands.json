@@ -22,6 +22,9 @@
       "path": "align prompts"
     },
     {
+      "path": "align propose"
+    },
+    {
       "path": "align rollback"
     },
     {

@@ -1,0 +1,231 @@
+{
+    "$schema": "vc:infra:migration-capture",
+    "task_status": [
+        {
+            "milestone": "ms-first-season",
+            "task": "task-borrow-packet",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-borrow-packet"
+            ],
+            "legacy_invariant_refs": [
+                "inv-six-packet-limit"
+            ]
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-return-packet",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-return-packet"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-seed-donation",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-seed-donation"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-membership-renewal",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-membership-renewal"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-germination-notes",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-germination-notes"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-volunteer-shifts",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-volunteer-shifts"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-plant-sale",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-plant-sale"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-workshop-booking",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-workshop-booking"
+            ],
+            "legacy_invariant_refs": [
+                "inv-waitlist-order"
+            ]
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-lost-packet",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-lost-packet"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-newsletter",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-newsletter"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-catalog-browse",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-catalog-browse"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-packet-labels",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-packet-labels"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-overdue-reminders",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-overdue-reminders"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-grower-profiles",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-grower-profiles"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-desk-checkout",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-desk-checkout"
+            ],
+            "legacy_invariant_refs": [
+                "inv-single-active-loan"
+            ]
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-variety-search",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-variety-search"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-seed-swap-event",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-seed-swap-event"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-fee-waivers",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-fee-waivers"
+            ],
+            "legacy_invariant_refs": [
+                "inv-no-negative-fees"
+            ]
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-packet-photos",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-packet-photos"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-annual-report",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-annual-report"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-seed-quarantine",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-seed-quarantine"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-member-directory",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-member-directory"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-workshop-feedback",
+            "legacy_status": "pending",
+            "legacy_fr_refs": [
+                "fr-workshop-feedback"
+            ],
+            "legacy_invariant_refs": []
+        },
+        {
+            "milestone": "ms-first-season",
+            "task": "task-board-deck",
+            "legacy_status": "pending",
+            "legacy_fr_refs": []
+        },
+        {
+            "milestone": "ms-second-season",
+            "task": "task-site-hosting",
+            "legacy_status": "pending"
+        }
+    ]
+}

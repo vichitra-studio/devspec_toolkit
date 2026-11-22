@@ -1,0 +1,537 @@
+{
+    "$schema": "vc:04-fr-list",
+    "id": "fr-list-seed-library",
+    "owner": "product",
+    "created_at": "2026-11-15T00:00:00Z",
+    "functional_requirements": [
+        {
+            "fr_id": "fr-borrow-packet",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A member can borrow a seed packet from the library catalog.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-borrow-packet-1",
+                    "scope": "in",
+                    "text": "Given a member in good standing, when they borrow an available seed packet, then the packet is marked as on loan to that member."
+                },
+                {
+                    "criterion_id": "ac-borrow-packet-2",
+                    "scope": "in",
+                    "text": "Given a member who already holds six packets, when they try to borrow another, then the loan is refused with a message naming the limit."
+                },
+                {
+                    "criterion_id": "ac-borrow-packet-3",
+                    "scope": "in",
+                    "text": "Given a packet that is on loan, when a second member searches the catalog, then the packet shows as unavailable with its due date."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-return-packet",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A member can return a borrowed seed packet at the desk or the drop box.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-return-packet-1",
+                    "scope": "in",
+                    "text": "Given a packet on loan, when it is returned at the desk, then the loan is closed and the packet is available again."
+                },
+                {
+                    "criterion_id": "ac-return-packet-2",
+                    "scope": "in",
+                    "text": "Given a packet returned after its due date, when the loan is closed, then the overdue days are recorded on the member's account."
+                },
+                {
+                    "criterion_id": "ac-return-packet-3",
+                    "scope": "in",
+                    "text": "Given a packet returned through the drop box, when the volunteer checks the box, then the return is confirmed by scanning the packet label."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-seed-donation",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A grower can donate saved seed to the library with notes on the variety.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-seed-donation-1",
+                    "scope": "in",
+                    "text": "Given a grower with saved seed, when they fill in the donation form with the variety name and year, then a donation record is created for review."
+                },
+                {
+                    "criterion_id": "ac-seed-donation-2",
+                    "scope": "in",
+                    "text": "Given a donation record, when a librarian approves it, then a new packet is added to the catalog with the grower credited."
+                },
+                {
+                    "criterion_id": "ac-seed-donation-3",
+                    "scope": "in",
+                    "text": "Given a donation of a restricted species, when the form is submitted, then it is rejected with a reference to the restricted species list."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-membership-renewal",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A member can renew their annual membership online.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-membership-renewal-1",
+                    "scope": "in",
+                    "text": "Given a member whose membership expires within thirty days, when they pay the renewal fee, then the expiry date moves forward by one year."
+                },
+                {
+                    "criterion_id": "ac-membership-renewal-2",
+                    "scope": "in",
+                    "text": "Given a failed card payment, when the renewal is attempted, then the membership is unchanged and the member sees the reason."
+                },
+                {
+                    "criterion_id": "ac-membership-renewal-3",
+                    "scope": "in",
+                    "text": "Given a successful renewal, when the payment clears, then a receipt is emailed to the member."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-germination-notes",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A member can record germination results for a borrowed variety.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-germination-notes-1",
+                    "scope": "in",
+                    "text": "Given a member with a returned loan, when they submit germination counts, then the result is attached to the variety page."
+                },
+                {
+                    "criterion_id": "ac-germination-notes-2",
+                    "scope": "in",
+                    "text": "Given germination counts where sprouted exceeds sown, when they are submitted, then the form is rejected with a validation message."
+                },
+                {
+                    "criterion_id": "ac-germination-notes-3",
+                    "scope": "in",
+                    "text": "Given several germination results for one variety, when the variety page loads, then the average germination rate is shown."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-volunteer-shifts",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A volunteer can sign up for desk shifts.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-volunteer-shifts-1",
+                    "scope": "in",
+                    "text": "Given an open desk shift, when a volunteer signs up, then the shift lists the volunteer and the open count drops by one."
+                },
+                {
+                    "criterion_id": "ac-volunteer-shifts-2",
+                    "scope": "in",
+                    "text": "Given a volunteer already signed up for a shift, when they cancel more than a day ahead, then the shift reopens."
+                },
+                {
+                    "criterion_id": "ac-volunteer-shifts-3",
+                    "scope": "in",
+                    "text": "Given a shift within a day, when a volunteer cancels, then the coordinator is notified by text message."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-plant-sale",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "The library runs a spring plant sale with a list of seedlings.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-plant-sale-1",
+                    "scope": "in",
+                    "text": "Given the sale calendar, when the sale opens, then the seedling list is published on the public page."
+                },
+                {
+                    "criterion_id": "ac-plant-sale-2",
+                    "scope": "in",
+                    "text": "Given a seedling with no remaining stock, when a visitor views the list, then it is marked sold out."
+                },
+                {
+                    "criterion_id": "ac-plant-sale-3",
+                    "scope": "in",
+                    "text": "Given a sale order, when the visitor confirms it, then the order total includes the member discount for members."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-workshop-booking",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A member can book a place at a seed-saving workshop.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-workshop-booking-1",
+                    "scope": "in",
+                    "text": "Given a workshop with free places, when a member books, then a place is held and a confirmation is shown."
+                },
+                {
+                    "criterion_id": "ac-workshop-booking-2",
+                    "scope": "in",
+                    "text": "Given a full workshop, when a member tries to book, then they are offered the waiting list."
+                },
+                {
+                    "criterion_id": "ac-workshop-booking-3",
+                    "scope": "in",
+                    "text": "Given a booked place, when the member cancels, then the place goes to the first person on the waiting list."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-lost-packet",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A librarian can mark a packet as lost and charge the member.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-lost-packet-1",
+                    "scope": "in",
+                    "text": "Given a packet overdue by more than sixty days, when the librarian marks it lost, then the member is charged the replacement fee."
+                },
+                {
+                    "criterion_id": "ac-lost-packet-2",
+                    "scope": "in",
+                    "text": "Given a lost packet that is later returned, when the librarian reverses the loss, then the replacement fee is refunded."
+                },
+                {
+                    "criterion_id": "ac-lost-packet-3",
+                    "scope": "in",
+                    "text": "Given a packet marked lost, when the catalog is searched, then the packet no longer appears."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-newsletter",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Members receive a monthly newsletter by email.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-newsletter-1",
+                    "scope": "in",
+                    "text": "Given a member who has opted in, when the monthly send runs, then the newsletter is emailed to that member."
+                },
+                {
+                    "criterion_id": "ac-newsletter-2",
+                    "scope": "in",
+                    "text": "Given a member who unsubscribes, when the next send runs, then they are not emailed."
+                },
+                {
+                    "criterion_id": "ac-newsletter-3",
+                    "scope": "in",
+                    "text": "Given a bounced address, when the send completes, then the member is flagged for the librarians to follow up."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-catalog-browse",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Visitors can browse the catalog by plant family.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-catalog-browse-1",
+                    "scope": "in",
+                    "text": "Given the public catalog, when a visitor picks a plant family, then only packets of that family are listed."
+                },
+                {
+                    "criterion_id": "ac-catalog-browse-2",
+                    "scope": "in",
+                    "text": "Given a family with no packets, when a visitor picks it, then an empty-state message suggests the donation form."
+                },
+                {
+                    "criterion_id": "ac-catalog-browse-3",
+                    "scope": "in",
+                    "text": "Given a long list of packets, when the visitor scrolls past twenty packets, then the next twenty are loaded."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-packet-labels",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "The library prints a label for every packet with its variety and sowing season.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-packet-labels-1",
+                    "scope": "in",
+                    "text": "Given a packet in the catalog, when a librarian prints its label, then the label shows the variety name and the sowing season."
+                },
+                {
+                    "criterion_id": "ac-packet-labels-2",
+                    "scope": "in",
+                    "text": "Given a label, when it is scanned at the desk, then the packet record opens."
+                },
+                {
+                    "criterion_id": "ac-packet-labels-3",
+                    "scope": "in",
+                    "text": "Given a variety with no sowing season, when a label is printed, then the season line is left blank."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-overdue-reminders",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Members with overdue packets receive reminders.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-overdue-reminders-1",
+                    "scope": "in",
+                    "text": "Given a loan one day overdue, when the nightly job runs, then the member is sent a reminder by email."
+                },
+                {
+                    "criterion_id": "ac-overdue-reminders-2",
+                    "scope": "in",
+                    "text": "Given a loan fourteen days overdue, when the nightly job runs, then the member is sent a second reminder and a librarian is notified."
+                },
+                {
+                    "criterion_id": "ac-overdue-reminders-3",
+                    "scope": "in",
+                    "text": "Given a member who returns the packet, when the next nightly job runs, then no reminder is sent."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-grower-profiles",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Donating growers can have a public profile page.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-grower-profiles-1",
+                    "scope": "in",
+                    "text": "Given a grower with at least one approved donation, when they enable their profile, then a public page lists their donated varieties."
+                },
+                {
+                    "criterion_id": "ac-grower-profiles-2",
+                    "scope": "in",
+                    "text": "Given a grower who disables their profile, when the page is requested, then it returns not found."
+                },
+                {
+                    "criterion_id": "ac-grower-profiles-3",
+                    "scope": "in",
+                    "text": "Given a profile page, when it is shown, then no email address or phone number appears."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-desk-checkout",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Volunteers check packets out to members at the desk with a barcode scanner.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-desk-checkout-1",
+                    "scope": "in",
+                    "text": "Given a member card and a packet label, when the volunteer scans both, then the loan is created and the due date is shown."
+                },
+                {
+                    "criterion_id": "ac-desk-checkout-2",
+                    "scope": "in",
+                    "text": "Given a member card that has expired, when the volunteer scans it, then the desk screen blocks the loan and shows the expiry date."
+                },
+                {
+                    "criterion_id": "ac-desk-checkout-3",
+                    "scope": "in",
+                    "text": "Given a scanner that fails to read a label, when the volunteer types the packet code, then the loan is created the same way."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-variety-search",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Members can search varieties by name or by a growing trait.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-variety-search-1",
+                    "scope": "in",
+                    "text": "Given the search box, when a member types part of a variety name, then matching varieties are listed with their packet counts."
+                },
+                {
+                    "criterion_id": "ac-variety-search-2",
+                    "scope": "in",
+                    "text": "Given a growing trait filter, when a member picks drought tolerance, then only varieties with that trait are listed."
+                },
+                {
+                    "criterion_id": "ac-variety-search-3",
+                    "scope": "in",
+                    "text": "Given a search with no results, when it completes, then the member is offered the donation request form."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-seed-swap-event",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "The library hosts a yearly seed swap where members trade packets.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-seed-swap-event-1",
+                    "scope": "in",
+                    "text": "Given the swap date, when registration opens, then members can register with a count of packets they will bring."
+                },
+                {
+                    "criterion_id": "ac-seed-swap-event-2",
+                    "scope": "in",
+                    "text": "Given a member who registered, when they arrive, then the volunteer checks them in against the list."
+                },
+                {
+                    "criterion_id": "ac-seed-swap-event-3",
+                    "scope": "in",
+                    "text": "Given the end of the swap, when the volunteer closes the event, then leftover packets are added to the catalog."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-fee-waivers",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "A librarian can waive fees for a member in hardship.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-fee-waivers-1",
+                    "scope": "in",
+                    "text": "Given a member with outstanding fees, when a librarian grants a waiver with a reason, then the fees are cleared."
+                },
+                {
+                    "criterion_id": "ac-fee-waivers-2",
+                    "scope": "in",
+                    "text": "Given a waiver, when it is granted, then the librarian and the reason are recorded on the account."
+                },
+                {
+                    "criterion_id": "ac-fee-waivers-3",
+                    "scope": "in",
+                    "text": "Given a waiver request without a reason, when the librarian submits it, then it is rejected."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-packet-photos",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Donors can add a photo of the plant to a packet record.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-packet-photos-1",
+                    "scope": "in",
+                    "text": "Given a packet record, when a librarian uploads a photo, then the photo appears on the packet page."
+                },
+                {
+                    "criterion_id": "ac-packet-photos-2",
+                    "scope": "in",
+                    "text": "Given a photo larger than five megabytes, when it is uploaded, then it is rejected with the size limit."
+                },
+                {
+                    "criterion_id": "ac-packet-photos-3",
+                    "scope": "in",
+                    "text": "Given a photo that is not an image, when it is uploaded, then it is rejected."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-annual-report",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "The board receives an annual report of loans and donations.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-annual-report-1",
+                    "scope": "in",
+                    "text": "Given the end of the year, when the report is generated, then it lists the number of loans and the number of donations."
+                },
+                {
+                    "criterion_id": "ac-annual-report-2",
+                    "scope": "in",
+                    "text": "Given the report, when the board opens it, then each figure is compared with the year before."
+                },
+                {
+                    "criterion_id": "ac-annual-report-3",
+                    "scope": "in",
+                    "text": "Given a year with no donations, when the report is generated, then the donation figure shows zero rather than being omitted."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-seed-quarantine",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Donated seed is held in quarantine before it joins the catalog.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-seed-quarantine-1",
+                    "scope": "in",
+                    "text": "Given an approved donation, when the packet is created, then it is held in quarantine for fourteen days before it can be borrowed."
+                },
+                {
+                    "criterion_id": "ac-seed-quarantine-2",
+                    "scope": "in",
+                    "text": "Given a packet in quarantine, when a member searches the catalog, then the packet is shown with the date it will become available."
+                },
+                {
+                    "criterion_id": "ac-seed-quarantine-3",
+                    "scope": "in",
+                    "text": "Given a packet whose quarantine has ended, when the nightly job runs, then the packet becomes available for loan."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-member-directory",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Members can opt in to a directory of local growers.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-member-directory-1",
+                    "scope": "in",
+                    "text": "Given a member who opts in, when the directory page loads, then their first name and neighbourhood are listed."
+                },
+                {
+                    "criterion_id": "ac-member-directory-2",
+                    "scope": "in",
+                    "text": "Given a member who opts out, when the directory page loads, then they no longer appear."
+                },
+                {
+                    "criterion_id": "ac-member-directory-3",
+                    "scope": "in",
+                    "text": "Given the directory, when a member contacts a grower, then the message is relayed without revealing either email address."
+                }
+            ]
+        },
+        {
+            "fr_id": "fr-workshop-feedback",
+            "priority": "must-have",
+            "scope": "in",
+            "statement": "Attendees can leave feedback after a workshop.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-workshop-feedback-1",
+                    "scope": "in",
+                    "text": "Given a workshop that has ended, when an attendee opens the feedback form, then they can rate it from one to five and add a comment."
+                },
+                {
+                    "criterion_id": "ac-workshop-feedback-2",
+                    "scope": "in",
+                    "text": "Given an attendee who already left feedback, when they open the form again, then their earlier answer is shown for editing."
+                },
+                {
+                    "criterion_id": "ac-workshop-feedback-3",
+                    "scope": "in",
+                    "text": "Given the feedback of a workshop, when the organiser opens the summary, then the average rating and the comments are listed."
+                }
+            ]
+        }
+    ]
+}

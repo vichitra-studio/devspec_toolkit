@@ -1,0 +1,40 @@
+{
+    "$schema": "vc:06-invariants",
+    "id": "invariants-seed-library",
+    "owner": "engineering",
+    "created_at": "2026-11-15T00:00:00Z",
+    "rules": [
+        {
+            "inv_id": "inv-six-packet-limit",
+            "language": "text",
+            "severity": "error",
+            "enforcement_point": "service",
+            "description": "A member never holds more than six seed packets on loan at the same time.",
+            "expression": "A member never holds more than six seed packets on loan at the same time."
+        },
+        {
+            "inv_id": "inv-waitlist-order",
+            "language": "text",
+            "severity": "error",
+            "enforcement_point": "service",
+            "description": "Waiting list places are offered in the order in which people joined the list.",
+            "expression": "Waiting list places are offered in the order in which people joined the list."
+        },
+        {
+            "inv_id": "inv-single-active-loan",
+            "language": "text",
+            "severity": "error",
+            "enforcement_point": "service",
+            "description": "A seed packet is on loan to at most one member at any moment.",
+            "expression": "A seed packet is on loan to at most one member at any moment."
+        },
+        {
+            "inv_id": "inv-no-negative-fees",
+            "language": "text",
+            "severity": "error",
+            "enforcement_point": "service",
+            "description": "The fee balance of a member is never below zero.",
+            "expression": "The fee balance of a member is never below zero."
+        }
+    ]
+}

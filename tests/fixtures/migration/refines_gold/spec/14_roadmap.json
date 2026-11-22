@@ -1,0 +1,586 @@
+{
+    "$schema": "vc:14-roadmap",
+    "id": "roadmap-seed-library",
+    "owner": "product",
+    "created_at": "2026-11-15T00:00:00Z",
+    "milestones": [
+        {
+            "milestone_id": "ms-first-season",
+            "name": "First season",
+            "tasks": [
+                {
+                    "task_id": "task-borrow-packet",
+                    "description": "A member can borrow a seed packet from the library catalog.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-borrow-packet-1",
+                            "text": "The borrow endpoint marks the seed packet as on loan to the member when the member is in good standing"
+                        },
+                        {
+                            "criterion_id": "tc-borrow-packet-2",
+                            "text": "A member holding six packets who borrows another is refused and the message names the limit of six"
+                        },
+                        {
+                            "criterion_id": "tc-borrow-packet-3",
+                            "text": "The catalog search result lists the due date for packets on loan"
+                        },
+                        {
+                            "criterion_id": "tc-borrow-packet-4",
+                            "text": "Borrowing records the librarian who handed the packet over"
+                        },
+                        {
+                            "criterion_id": "tc-borrow-packet-5",
+                            "text": "Two borrow requests for the sixth and the seventh packet of one member made at the same moment cannot both succeed"
+                        },
+                        {
+                            "criterion_id": "tc-borrow-packet-6",
+                            "text": "Borrowing past the limit returns HTTP 409 with the code limit-reached"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-return-packet",
+                    "description": "A member can return a borrowed seed packet at the desk or the drop box.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-return-packet-1",
+                            "text": "Closing a loan at the desk makes the returned packet available again"
+                        },
+                        {
+                            "criterion_id": "tc-return-packet-2",
+                            "text": "A loan closed after its due date records the number of overdue days on the member's account"
+                        },
+                        {
+                            "criterion_id": "tc-return-packet-3",
+                            "text": "Volunteers scan the packet label to confirm a drop box return"
+                        },
+                        {
+                            "criterion_id": "tc-return-packet-4",
+                            "text": "The drop box is emptied every evening by the closing volunteer"
+                        },
+                        {
+                            "criterion_id": "tc-return-packet-5",
+                            "text": "Closing a loan at the desk completes in under one second for ninety-five requests in a hundred"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-seed-donation",
+                    "description": "A grower can donate saved seed to the library with notes on the variety.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-seed-donation-1",
+                            "text": "Submitting the donation form with variety name and year creates a donation record awaiting review"
+                        },
+                        {
+                            "criterion_id": "tc-seed-donation-2",
+                            "text": "Approving a donation adds a packet to the catalog and credits the donating grower"
+                        },
+                        {
+                            "criterion_id": "tc-seed-donation-3",
+                            "text": "A donation naming a species on the restricted list is rejected"
+                        },
+                        {
+                            "criterion_id": "tc-seed-donation-4",
+                            "text": "Donation forms are available in large print at the desk"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-membership-renewal",
+                    "description": "A member can renew their annual membership online.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-membership-renewal-1",
+                            "text": "A payment of the renewal fee by a member within thirty days of expiry moves the expiry date forward by one year"
+                        },
+                        {
+                            "criterion_id": "tc-membership-renewal-2",
+                            "text": "A declined card leaves the membership as it was and shows the member the decline reason"
+                        },
+                        {
+                            "criterion_id": "tc-membership-renewal-3",
+                            "text": "The receipt email is sent once the payment has cleared"
+                        },
+                        {
+                            "criterion_id": "tc-membership-renewal-4",
+                            "text": "Renewal reminders go out sixty days before expiry"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-germination-notes",
+                    "description": "A member can record germination results for a borrowed variety.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-germination-notes-1",
+                            "text": "Germination counts submitted by a member with a returned loan are attached to the variety page"
+                        },
+                        {
+                            "criterion_id": "tc-germination-notes-2",
+                            "text": "Sprouted counts above sown counts are rejected with a validation message"
+                        },
+                        {
+                            "criterion_id": "tc-germination-notes-3",
+                            "text": "The variety page shows the average germination rate over all results"
+                        },
+                        {
+                            "criterion_id": "tc-germination-notes-4",
+                            "text": "Germination photos are resized to fit the variety page"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-volunteer-shifts",
+                    "description": "A volunteer can sign up for desk shifts.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-volunteer-shifts-1",
+                            "text": "Signing up for an open desk shift lists the volunteer on it and reduces the open count by one"
+                        },
+                        {
+                            "criterion_id": "tc-volunteer-shifts-2",
+                            "text": "A cancellation made more than a day before reopens the shift"
+                        },
+                        {
+                            "criterion_id": "tc-volunteer-shifts-3",
+                            "text": "A late cancellation notifies the coordinator"
+                        },
+                        {
+                            "criterion_id": "tc-volunteer-shifts-4",
+                            "text": "Shift lists are sorted by date"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-plant-sale",
+                    "description": "The library runs a spring plant sale with a list of seedlings.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-plant-sale-1",
+                            "text": "The seedling list is published on the public page when the sale opens"
+                        },
+                        {
+                            "criterion_id": "tc-plant-sale-2",
+                            "text": "Seedlings with no stock remaining are marked sold out on the list"
+                        },
+                        {
+                            "criterion_id": "tc-plant-sale-3",
+                            "text": "The order total applies the member discount when the visitor is a member"
+                        },
+                        {
+                            "criterion_id": "tc-plant-sale-4",
+                            "text": "Seedling photos load lazily"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-workshop-booking",
+                    "description": "A member can book a place at a seed-saving workshop.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-workshop-booking-1",
+                            "text": "Booking a workshop with free places holds a place and shows a confirmation"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-booking-2",
+                            "text": "A member trying to book a full workshop is offered the waiting list"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-booking-3",
+                            "text": "A cancelled place is given to the first person on the waiting list"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-booking-4",
+                            "text": "Workshop dates display in the member's time zone"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-booking-5",
+                            "text": "The joining time of the waiting list decides who is offered a freed place first"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-lost-packet",
+                    "description": "A librarian can mark a packet as lost and charge the member.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-lost-packet-1",
+                            "text": "Marking an overdue packet lost after sixty days charges the member the replacement fee"
+                        },
+                        {
+                            "criterion_id": "tc-lost-packet-2",
+                            "text": "Reversing the loss of a returned packet refunds the replacement fee"
+                        },
+                        {
+                            "criterion_id": "tc-lost-packet-3",
+                            "text": "Lost packets are hidden from catalog search"
+                        },
+                        {
+                            "criterion_id": "tc-lost-packet-4",
+                            "text": "The replacement fee is set by the board each January"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-newsletter",
+                    "description": "Members receive a monthly newsletter by email.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-newsletter-1",
+                            "text": "The monthly send emails the newsletter to every member who has opted in"
+                        },
+                        {
+                            "criterion_id": "tc-newsletter-2",
+                            "text": "A member who unsubscribed is skipped by the next send"
+                        },
+                        {
+                            "criterion_id": "tc-newsletter-3",
+                            "text": "Members whose address bounced are flagged for the librarians after the send"
+                        },
+                        {
+                            "criterion_id": "tc-newsletter-4",
+                            "text": "Newsletter issues are archived on the public page"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-board-deck",
+                    "description": "Housekeeping for the season",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-board-deck-1",
+                            "text": "The board slide deck is exported as a PDF"
+                        },
+                        {
+                            "criterion_id": "tc-board-deck-2",
+                            "text": "The deck lists the three budget scenarios"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "milestone_id": "ms-second-season",
+            "name": "Second season",
+            "tasks": [
+                {
+                    "task_id": "task-catalog-browse",
+                    "description": "Visitors can browse the catalog by plant family.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-catalog-browse-1",
+                            "text": "Picking a plant family lists only the packets of that family"
+                        },
+                        {
+                            "criterion_id": "tc-catalog-browse-2",
+                            "text": "A family with no packets shows an empty-state message that suggests the donation form"
+                        },
+                        {
+                            "criterion_id": "tc-catalog-browse-3",
+                            "text": "The next twenty packets are loaded when the visitor scrolls past the first twenty"
+                        },
+                        {
+                            "criterion_id": "tc-catalog-browse-4",
+                            "text": "Picking a plant family on the donation form lists the families a donor can donate in"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-packet-labels",
+                    "description": "The library prints a label for every packet with its variety and sowing season.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-packet-labels-1",
+                            "text": "Printing a packet label shows the variety name and the sowing season"
+                        },
+                        {
+                            "criterion_id": "tc-packet-labels-2",
+                            "text": "Scanning a label at the desk opens the packet record"
+                        },
+                        {
+                            "criterion_id": "tc-packet-labels-3",
+                            "text": "A variety with no sowing season prints a label with the season line blank"
+                        },
+                        {
+                            "criterion_id": "tc-packet-labels-4",
+                            "text": "Printing a donation receipt shows the variety name and the year the grower donated it"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-overdue-reminders",
+                    "description": "Members with overdue packets receive reminders.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-overdue-reminders-1",
+                            "text": "The nightly job emails a reminder to the member of a loan that is one day overdue"
+                        },
+                        {
+                            "criterion_id": "tc-overdue-reminders-2",
+                            "text": "A loan fourteen days overdue gets a second reminder and notifies a librarian"
+                        },
+                        {
+                            "criterion_id": "tc-overdue-reminders-3",
+                            "text": "No reminder is sent for a loan that has been returned"
+                        },
+                        {
+                            "criterion_id": "tc-overdue-reminders-4",
+                            "text": "The nightly job emails the treasurer the total of the fees charged that day"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-grower-profiles",
+                    "description": "Donating growers can have a public profile page.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-grower-profiles-1",
+                            "text": "A grower with an approved donation who enables a profile gets a public page that lists the donated varieties"
+                        },
+                        {
+                            "criterion_id": "tc-grower-profiles-2",
+                            "text": "Requesting the page of a disabled profile returns not found"
+                        },
+                        {
+                            "criterion_id": "tc-grower-profiles-3",
+                            "text": "The profile page shows neither an email address nor a phone number"
+                        },
+                        {
+                            "criterion_id": "tc-grower-profiles-4",
+                            "text": "A grower who enables their newsletter subscription receives the monthly newsletter by email"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-desk-checkout",
+                    "description": "Volunteers check packets out to members at the desk with a barcode scanner.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-desk-checkout-1",
+                            "text": "Scanning a member card and a packet label creates the loan and shows the due date on the desk screen"
+                        },
+                        {
+                            "criterion_id": "tc-desk-checkout-2",
+                            "text": "An expired member card blocks the loan and the desk screen shows the expiry date"
+                        },
+                        {
+                            "criterion_id": "tc-desk-checkout-3",
+                            "text": "Typing the packet code creates the loan the same way as a scan"
+                        },
+                        {
+                            "criterion_id": "tc-desk-checkout-4",
+                            "text": "Scanning a member card at the desk shows the member's name on the screen"
+                        },
+                        {
+                            "criterion_id": "tc-desk-checkout-5",
+                            "text": "Two desks scanning the same packet label at the same moment create one loan only"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-variety-search",
+                    "description": "Members can search varieties by name or by a growing trait.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-variety-search-1",
+                            "text": "Typing part of a variety name lists the matching varieties with their packet counts"
+                        },
+                        {
+                            "criterion_id": "tc-variety-search-2",
+                            "text": "Picking the drought tolerance trait lists only varieties with that trait"
+                        },
+                        {
+                            "criterion_id": "tc-variety-search-3",
+                            "text": "A search with no result offers the donation request form to the member"
+                        },
+                        {
+                            "criterion_id": "tc-variety-search-4",
+                            "text": "Typing part of a volunteer's name in the roster lists the matching volunteers"
+                        },
+                        {
+                            "criterion_id": "tc-variety-search-5",
+                            "text": "The first page of search results arrives in under 800 milliseconds for ninety-five searches in a hundred"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-seed-swap-event",
+                    "description": "The library hosts a yearly seed swap where members trade packets.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-seed-swap-event-1",
+                            "text": "Registration opens on the swap date and lets members register with the count of packets they will bring"
+                        },
+                        {
+                            "criterion_id": "tc-seed-swap-event-2",
+                            "text": "The volunteer checks an arriving member in against the registration list"
+                        },
+                        {
+                            "criterion_id": "tc-seed-swap-event-3",
+                            "text": "Closing the event adds the leftover packets to the catalog"
+                        },
+                        {
+                            "criterion_id": "tc-seed-swap-event-4",
+                            "text": "Registration for a workshop opens when the workshop is published"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-fee-waivers",
+                    "description": "A librarian can waive fees for a member in hardship.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-fee-waivers-1",
+                            "text": "Granting a waiver with a reason clears the outstanding fees of the member"
+                        },
+                        {
+                            "criterion_id": "tc-fee-waivers-2",
+                            "text": "A granted waiver records the librarian and the reason on the account"
+                        },
+                        {
+                            "criterion_id": "tc-fee-waivers-3",
+                            "text": "Submitting a waiver without a reason is rejected"
+                        },
+                        {
+                            "criterion_id": "tc-fee-waivers-4",
+                            "text": "The librarian can print a statement of the fees charged to a member"
+                        },
+                        {
+                            "criterion_id": "tc-fee-waivers-5",
+                            "text": "Waiving more than the balance leaves the fee balance at zero, never below it"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-packet-photos",
+                    "description": "Donors can add a photo of the plant to a packet record.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-packet-photos-1",
+                            "text": "A photo uploaded by a librarian appears on the packet page"
+                        },
+                        {
+                            "criterion_id": "tc-packet-photos-2",
+                            "text": "A photo over five megabytes is rejected and the message gives the size limit"
+                        },
+                        {
+                            "criterion_id": "tc-packet-photos-3",
+                            "text": "Uploading a file that is not an image is rejected"
+                        },
+                        {
+                            "criterion_id": "tc-packet-photos-4",
+                            "text": "A photo of the library building appears on the public home page"
+                        },
+                        {
+                            "criterion_id": "tc-packet-photos-5",
+                            "text": "Uploading a six megabyte photo returns HTTP 413 with the code photo-too-large"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-annual-report",
+                    "description": "The board receives an annual report of loans and donations.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-annual-report-1",
+                            "text": "The generated report lists the number of loans and the number of donations for the year"
+                        },
+                        {
+                            "criterion_id": "tc-annual-report-2",
+                            "text": "Each figure in the report is compared with the figure of the year before"
+                        },
+                        {
+                            "criterion_id": "tc-annual-report-3",
+                            "text": "A year without donations shows a donation figure of zero rather than leaving it out"
+                        },
+                        {
+                            "criterion_id": "tc-annual-report-4",
+                            "text": "The board receives a monthly summary of the number of new members"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-seed-quarantine",
+                    "description": "Donated seed is held in quarantine before it joins the catalog.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-seed-quarantine-1",
+                            "text": "A packet created from an approved donation is held in quarantine for fourteen days and cannot be borrowed"
+                        },
+                        {
+                            "criterion_id": "tc-seed-quarantine-2",
+                            "text": "Catalog search shows a packet in quarantine with the date it will become available"
+                        },
+                        {
+                            "criterion_id": "tc-seed-quarantine-3",
+                            "text": "The nightly job makes a packet available for loan once its quarantine has ended"
+                        },
+                        {
+                            "criterion_id": "tc-seed-quarantine-4",
+                            "text": "The quarantine shelf is cleaned every Friday by the closing volunteer"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-member-directory",
+                    "description": "Members can opt in to a directory of local growers.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-member-directory-1",
+                            "text": "The directory page lists the first name and neighbourhood of a member who opted in"
+                        },
+                        {
+                            "criterion_id": "tc-member-directory-2",
+                            "text": "A member who opted out no longer appears on the directory page"
+                        },
+                        {
+                            "criterion_id": "tc-member-directory-3",
+                            "text": "A message to a grower is relayed without revealing either email address"
+                        },
+                        {
+                            "criterion_id": "tc-member-directory-4",
+                            "text": "The directory page can be printed as a flyer for the notice board"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-workshop-feedback",
+                    "description": "Attendees can leave feedback after a workshop.",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-workshop-feedback-1",
+                            "text": "An attendee of a workshop that has ended can rate it from one to five and add a comment on the feedback form"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-feedback-2",
+                            "text": "Opening the form again shows the earlier answer of an attendee who already left feedback for editing"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-feedback-3",
+                            "text": "The organiser's summary lists the average rating and the comments of the workshop"
+                        },
+                        {
+                            "criterion_id": "tc-workshop-feedback-4",
+                            "text": "Workshop organisers can duplicate last year's workshop as a draft"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-site-hosting",
+                    "description": "Housekeeping for the season",
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "tc-site-hosting-1",
+                            "text": "The static site is deployed over HTTPS"
+                        },
+                        {
+                            "criterion_id": "tc-site-hosting-2",
+                            "text": "The deploy job posts its result in the volunteers chat"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -28,6 +28,7 @@ from specdev_tools.graph.model import Graph, Node
 from specdev_tools.migration.maps import legacy_ref_fields
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.runner import file_key
+from specdev_tools.migration.scripts.v1_2_0.p1_capture import CAPTURE_REL, RENAMES_KEY
 from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 from specdev_tools.validation.linter_utils import graph_known_ids
 
@@ -219,9 +220,22 @@ def _set_at(data: Any, path: Path, value: Any) -> None:
     data[path[-1]] = value
 
 
+def _record_renames(ctx, renames: list[Rename]) -> None:
+    """Append the renames to the ``renames`` section of the capture (P20); an entry already there is not added twice."""
+    if not renames:
+        return
+    capture = ctx.documents.load(CAPTURE_REL).data
+    held = capture.setdefault(RENAMES_KEY, [])
+    for rename in renames:
+        entry = {"old": rename.old, "new": rename.new, "kind": rename.node.kind, "file": rename.node.file}
+        if entry not in held:
+            held.append(entry)
+
+
 def apply(ctx) -> ScriptResult:
-    """Rename the later definitions, rewrite the references their field fixes, list the rest."""
+    """Rename the later definitions, rewrite the references their field fixes, list the rest, record the renames in the capture."""
     plan = _Plan(ctx)
+    _record_renames(ctx, plan.renames)
     for rename in plan.renames:
         steps = tuple(path_steps(rename.node.jq_path) or ()) + (rename.id_field,)
         _set_at(ctx.documents.load(rename.node.file).data, steps, rename.new)

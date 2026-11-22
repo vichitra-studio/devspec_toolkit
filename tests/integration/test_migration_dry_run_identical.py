@@ -2,12 +2,13 @@
 
 Run as a subprocess on a ``git clone`` of the mini host, with the helpers of ``test_migration_no_git_writes.py``.  The one
 clock value of the run, the dates of the stamp hunk, is printed masked (``<timestamp>``) by the runner; ``masked`` here
-masks the real ``git diff`` the same way, with the runner's own function.
+masks the diff of the tree the real run leaves the same way, with the runner's own function.
 """
 
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ from integration.test_migration_no_git_writes import (
     make_cli,
 )
 from specdev_tools.migration.report import mask_stamp_timestamps
+from specdev_tools.migration.writer import diff_trees
 from unit.migration.test_runner_core import git, tree_digest
 
 ISO_DATE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d")
@@ -44,11 +46,14 @@ def hunks_by_file(diff: str, strip: str = "") -> dict[str, list[str]]:
     """``{path: [the @@ and the +, - and context lines of its diff]}`` of a unified diff (trailing blank lines dropped); *strip* is cut off the paths."""
     files: dict[str, list[str]] = {}
     current: list[str] | None = None
+    removed_from = ""
     for line in diff.splitlines():
-        if line.startswith("+++ "):
+        if line.startswith("--- "):
+            removed_from = line[4:].removeprefix("a/").removeprefix(strip)
+        elif line.startswith("+++ "):
             path = line[4:].removeprefix("b/").removeprefix(strip)
-            current = files.setdefault(path, [])
-        elif line.startswith(("--- ", "diff --git", "index ", "new file mode", "deleted file mode", "similarity", "rename ")):
+            current = files.setdefault(removed_from if path == "/dev/null" else path, [])  # a deleted file keeps its name
+        elif line.startswith(("diff --git", "index ", "new file mode", "deleted file mode", "similarity", "rename ")):
             continue
         elif current is not None:
             current.append(line)
@@ -80,21 +85,28 @@ def test_dry_run_json_is_identical_on_repeat(cli, host):
     assert first.stdout == second.stdout and json_of(first)["dry_run"] is True
 
 
-def test_dry_run_then_real_run_gives_the_same_diff(cli, host):
+def test_dry_run_then_real_run_gives_the_same_diff(cli, host, tmp_path):
+    """The promised diff is the diff of the tree the real run leaves, made the way the runner makes it.
+
+    ``git diff`` cuts the hunks of a large rewrite at other lines than the runner's ``diff_trees`` does (two diff
+    algorithms, the same change), so git is asked only WHICH files changed.
+    """
+    before = tmp_path / "spec_before"
+    shutil.copytree(host / SPEC, before)
     dry = cli.apply(host, "--dry-run")
     assert dry.returncode == 0, dry.stderr
     promised = hunks_by_file(dry.stdout)
     assert promised, "the dry run promised no change: the test would prove nothing"
     real = cli.apply(host)
     assert real.returncode == 0, real.stderr
+    done = mask_stamp_timestamps(diff_trees(str(before), str(host / SPEC)))
+    assert hunks_by_file(done) == promised
     git(host, "add", "-A")  # the test's own index: puts the new files into `git diff`
-    done = mask_stamp_timestamps(git(host, "diff", "--cached", "--no-color"))
-    assert hunks_by_file(done, strip=f"{SPEC}/") == promised
     assert sorted(promised) == sorted(real_changed_files(host))
 
 
 def real_changed_files(host: Path) -> list[str]:
-    return [line.removeprefix(f"{SPEC}/") for line in git(host, "diff", "--cached", "--name-only").splitlines()]
+    return [line.removeprefix(f"{SPEC}/") for line in git(host, "diff", "--cached", "--name-only", "--no-renames").splitlines()]
 
 
 def test_dry_run_then_real_run_then_dry_run_says_no_change(cli, host):

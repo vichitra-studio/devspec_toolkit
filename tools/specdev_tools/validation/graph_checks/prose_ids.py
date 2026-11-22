@@ -58,12 +58,12 @@ def _all_fixed(alternatives: list[dict[str, Any]]) -> bool:
     return bool(alternatives) and all(_is_fixed(alternative) for alternative in alternatives)
 
 
-def _is_fixed_leaf(ctx: GraphCheckContext, node: Node, leaf_path: str) -> bool:
+def is_fixed_leaf(ctx: GraphCheckContext, node: Node, leaf_path: str) -> bool:
     """Whether the schema slot of the leaf at *leaf_path* of *node* fixes its value (``_is_fixed`` on every branch of an ``anyOf`` or ``oneOf``, ``$ref`` resolved); ``False`` when the slot cannot be resolved (a leaf with no schema slot, such as the free-form ``input`` of a fixture, is read as prose)."""
     return _all_fixed(ctx.slots.alternatives(ctx.graph, node, leaf_path))
 
 
-def _mentions(text: str, tokens: dict[str, str]) -> list[str]:
+def mentions(text: str, tokens: dict[str, str]) -> list[str]:
     """The distinct names of *tokens* that *text* holds as whole tokens, in order of first appearance."""
     found: list[str] = []
     for match in TOKEN.finditer(text):
@@ -92,7 +92,7 @@ def check_prose_ids(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
     findings: list[SpecError] = []
     for node in sorted(ctx.graph.gated_nodes(), key=ctx.graph.shape.order_key):
         for leaf_path, text in own_leaves(ctx.graph, node):
-            names = [name for name in _mentions(text, tokens) if tokens[name] != node.id]
-            if names and not _is_fixed_leaf(ctx, node, leaf_path):
+            names = [name for name in mentions(text, tokens) if tokens[name] != node.id]
+            if names and not is_fixed_leaf(ctx, node, leaf_path):
                 findings.extend(_finding(ctx, node, leaf_path, name, tokens[name]) for name in names)
     return findings

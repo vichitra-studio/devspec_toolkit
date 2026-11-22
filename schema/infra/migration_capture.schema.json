@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:infra:migration-capture",
   "title": "infra_migration_capture",
-  "description": "What the 1.1.1 to 1.2.0 migration copied before it removed anything, kept in spec/extras/migration/capture.json: the values a later judgement step cannot get from the migrated tree, grouped by the work that reads them, and the commit everything else is read from. Written once by the first migration script (migration/scripts/v1_2_0/p1_capture.py) and never rewritten. Every value copied from a 1.1.1 file sits under a key that starts with legacy_; the other keys are the capture's own. Committed and tool-owned; not a step artifact and not read by the graph.",
+  "description": "What the 1.1.1 to 1.2.0 migration copied before it removed anything, kept in spec/extras/migration/capture.json: the values a later judgement step cannot get from the migrated tree, grouped by the work that reads them, and the commit everything else is read from. Written once by the first migration script (migration/scripts/v1_2_0/p1_capture.py); the only later write is the renames section, appended by the script that renames an id. Every value copied from a 1.1.1 file sits under a key that starts with legacy_; the other keys are the capture's own. Committed and tool-owned; not a step artifact and not read by the graph.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -461,6 +461,41 @@
           "legacy_environment": {
             "type": "object",
             "description": "The environment object whole, as the file carried it."
+          }
+        }
+      }
+    },
+    "renames": {
+      "description": "The definitions phase 2 gave a new id (a collision), written by the script that renamed them in the same run. The sections above key old 1.1.1 records by the id they had when the capture was made: a reader maps an old id to its new one through this list. Optional: absent until a rename happens.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "old",
+          "new",
+          "kind",
+          "file"
+        ],
+        "properties": {
+          "old": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id the definition had."
+          },
+          "new": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id it has now."
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The kind of the renamed node (criterion, design-milestone, ...)."
+          },
+          "file": {
+            "$ref": "#/$defs/path",
+            "description": "The file that holds the renamed definition."
           }
         }
       }

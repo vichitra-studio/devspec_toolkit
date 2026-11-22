@@ -145,6 +145,30 @@ def test_milestone_collision_renames_the_09_copy(migrated):
     assert "ms-late-fees" in [m["milestone_id"] for m in _json(migrated, "14_roadmap.json")["milestones"]]
 
 
+def test_capture_records_the_renames_of_phase_2_once(host, toolkit):
+    """P20: the capture keeps the old id -> new id of every rename, in the run that renamed; a second run adds nothing."""
+    _migrate(host, toolkit)
+    renames = _json(host, "extras/migration/capture.json")["renames"]
+    assert {(r["old"], r["new"], r["kind"]) for r in renames} == {
+        ("ms-late-fees", "milestone-late-fees", "design-milestone"),
+        ("ac-catalog-search-1", "tc-catalog-search-1", "task-criterion"),
+        ("ac-reserve-tool-1", "tc-reserve-tool-1", "task-criterion"),
+    }
+    assert all(r["file"] for r in renames)
+    before = tree_digest(host / "spec")
+    _migrate(host, toolkit)
+    assert tree_digest(host / "spec") == before
+
+
+def test_capture_renames_reader_maps_old_ids_per_kind(host, toolkit):
+    from specdev_tools.migration.context import MigrationContext
+    from specdev_tools.migration.writer import DocumentSet
+
+    _migrate(host, toolkit)
+    ctx = MigrationContext(str(host / "spec"), str(host), str(host), str(toolkit), True, DocumentSet(str(host / "spec")), "1.1.1", "1.2.0")
+    assert p1_capture.capture_renames(ctx)["design-milestone"] == {"ms-late-fees": "milestone-late-fees"}
+
+
 def test_typed_reference_moves_with_its_definition(migrated):
     """14 ``source_milestones`` fixes the kind (a 09 milestone): it follows the renamed 09 copy; the fields that name the 14 milestone stay."""
     late = next(m for m in _json(migrated, "14_roadmap.json")["milestones"] if m["milestone_id"] == "ms-late-fees")
