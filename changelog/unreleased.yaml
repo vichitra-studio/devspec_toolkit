@@ -107,8 +107,9 @@ changes:
       criteria. A stakeholder needs at least one need.  Every
       node accepts aliases, lifecycle and replaces; every node except an
       assumption and a glossary term also accepts assumes. Existing host specs do
-      not validate until migrated; the migration passes for steps 00 to 05 land
-      later in this release, and the specdev align status / diff / plan
+      not validate until migrated; specdev align apply SPEC_DIR --auto migrates
+      them (the migration scripts of this release are listed below), and the
+      specdev align status / diff / plan
       commands report nothing for a 1.1.1 spec of steps 00 to 05 against the
       new schemas, top-level renames such as in_scope to scope_items included,
       because the differ reads only a schema's own top-level required,
@@ -178,15 +179,16 @@ changes:
   - type: paradigm_shift
     description: >
       Steps 06 to 16 move to the spec-graph shape, with the core schemas they
-      share; existing host specs do not validate until migrated. No migration path
-      exists yet for a 1.1.1 spec to this shape: the align migration passes land
-      in a later 1.2.0 change, and specdev align status / diff / plan read only a
+      share; existing host specs do not validate until migrated. specdev align
+      apply SPEC_DIR --auto migrates a 1.1.1 spec to this shape (the migration
+      scripts of this release are listed below), but specdev align status / diff
+      / plan read only a
       schema's own top-level required, properties and additionalProperties, while
       the step schemas keep most or all of their properties under allOf, so they
       miss the changes below, top-level ones included (align diff reports a 1.1.1
-      file of step 07, 08, 11 or 14 as OK). specdev update decides with the same
-      comparison, so it re-stamps spec/specdev_version on such a spec as if
-      nothing had changed.
+      file of step 07, 08, 11 or 14 as OK). specdev update does not rely on that
+      comparison alone: it does not re-stamp spec/specdev_version on a spec that
+      needs a migration, and prints the commands to run instead.
     migration:
       action: ai_assisted
 
@@ -497,15 +499,17 @@ changes:
       calls specdev matrix or forward-replay-check fails with exit 2 after the
       toolkit is updated. A host whose plans have no milestone key gets E803,
       which says to add the key with specdev json patch <plan file> '.milestone'
-      '"<milestone-id>"'; specdev align does not write that key in this release,
-      the migration of a later 1.2.0 work item does. specdev update installs the
+      '"<milestone-id>"'; on a host that is not migrated yet, specdev align apply
+      --auto writes it (p2_plan_milestone_key); a plan without the key in a
+      migrated host was written by hand. specdev update installs the
       Claude Code ask rules into a host's clone (.claude/settings.local.json);
       in a clone where it has not run, specdev milestone sign-off, specdev
       milestone defer, specdev verify attest and specdev release run without a
       prompt unless the host wrote its own rule. A host whose project canon holds entries of
       kind completeness_dimension, or that still has
-      spec/13a_completeness_assessment.json, is migrated by a later 1.2.0 change
-      (see the step 13a entry). Shown by specdev milestone-state --batch-id
+      spec/13a_completeness_assessment.json, is migrated by specdev align apply --auto
+      (p3_remove deletes the file, p3_host_canon the canon kind; see the step 13a
+      entry). Shown by specdev milestone-state --batch-id
       account_recovery --repo-root ./devspec_toolkit --spec-root ./spec --git-root
       ..
     migration:
@@ -1078,8 +1082,8 @@ changes:
       validate-all (run on a copy of the worked example with such a file). A
       project canon entry of kind completeness_dimension does nothing now (on a
       copy of the worked example with one added, spec-check reported the same
-      findings and canonical-lint printed OK); delete it. A later 1.2.0 change
-      migrates both.
+      findings and canonical-lint printed OK); delete it. specdev align apply --auto
+      migrates both (p3_remove deletes the file, p3_host_canon the canon kind).
     migration:
       action: none
 
@@ -1418,8 +1422,9 @@ changes:
       field, is reported by specdev spec-check and specdev validate as E520 ('id'
       is a required property; Additional properties are not allowed); the plan of
       a milestone closed by a migration (a close whose signed_off_by is
-      legacy-migration) is exempt. The migration of a later 1.2.0 work item adds
-      the action ids and the plan's milestone key; until it has run, a 1.1.1 plan
+      legacy-migration) is exempt. specdev align apply --auto adds
+      the action ids and the plan's milestone key (p2_action_ids,
+      p2_plan_milestone_key); until it has run, a 1.1.1 plan
       is read only through specdev status and is not driven through
       /specdev-trinity. Shown by specdev spec-check spec --repo-root
       ./devspec_toolkit --spec-root ./spec --git-root ., which lists the E520.
@@ -1717,7 +1722,8 @@ changes:
   - type: add_module
     description: >
       specdev update SPEC_DIR installs the toolkit's files into the host before
-      it re-stamps spec/specdev_version: seven pieces, each reported as created,
+      it re-stamps spec/specdev_version (only when no migration is needed: a
+      spec that needs one keeps its stamp and is told what to run): seven pieces, each reported as created,
       refreshed, current, drift, refused or would_install. They are the
       toolkit's pre-commit hooks between # >>> specdev-managed and # <<<
       specdev-managed in .pre-commit-config.yaml (and pre-commit install in the
@@ -1801,5 +1807,346 @@ changes:
       gives a wrapper that uses X: on a host with a .venv, the wrapper printed
       VENV_DIR="${ROOT}/.venv" and ran the real CLI through it. Shown by grep -n
       VENV_DIR= tools/run_specdev.sh in a host.
+    migration:
+      action: none
+
+  - type: add_script
+    description: >
+      Migration script p1_capture (mechanical). Runs first. It copies what a
+      later script removes or a person still needs (the statuses the close
+      compares, tech_stack entries, the rules of step 10, exit_conditions, open
+      ambiguity items, ...) into spec/extras/migration/capture.json, with the
+      source commit, and creates an empty spec/extras/migration/worklist.json
+      for the scripts that follow. specdev align validate deletes both files
+      when no worklist item is open. A later run captures nothing again.
+    migration:
+      action: auto
+      script: p1_capture
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_id_collisions (mechanical). An id that two nodes
+      define is renamed once, and only a real collision is renamed: a step-14
+      task criterion that reused a step-04 criterion id becomes tc-..., the
+      step-09 copy of a milestone id that step 14 also defines becomes
+      milestone-..., any other pair gives the later definition the id E704
+      suggests. A reference to the old id is rewritten only where its field
+      fixes the kind it points at; every other mention is a worklist item that
+      names both candidates.
+    migration:
+      action: auto
+      script: p2_id_collisions
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_id_mint (mechanical). Every item that had no id gets
+      one. A string in a list of nodes (a charter risk, a stakeholder need, an
+      02a gate or secret, ...) becomes an object with an id and the text, and an
+      object without an id gets its id field; step 00 in_scope / out_of_scope
+      become scope_items and step 10 pr_rules become rules. An out scope item
+      (it needs a scope_reason) and a gate string that is not a kebab name are
+      worklist items; an item that has an id is not touched.
+    migration:
+      action: auto
+      script: p2_id_mint
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_plan_milestone_key (mechanical). Every plan file gets
+      the file-level milestone key that names its roadmap milestone (found from
+      the anchor row that names the plan file); nothing else of the plan changes
+      and no plan file is renamed. A plan that no anchor row names, or whose key
+      disagrees with its row, is a worklist item.
+    migration:
+      action: auto
+      script: p2_plan_milestone_key
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_anchor_rows (mechanical). Each anchor row
+      (plan.milestone_index[] of step 16) gets an id of its own, anchor_id
+      (anchor-<milestone id>), and a one-element about that names its roadmap
+      milestone; milestone_id, context_path and fr_refs are taken out by
+      p3_remove.
+    migration:
+      action: auto
+      script: p2_anchor_rows
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_action_ids (mechanical). Every action of an open plan
+      gets an id (a01, a02, ... per plan item); an id that exists is never
+      changed, and a plan that was done before 1.2.0 gets none.
+    migration:
+      action: auto
+      script: p2_action_ids
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_convert (mechanical). Legacy reference fields become
+      the declared link fields: goal_id / success_metric_refs, connection from /
+      to, typed trace / targets / target_ids / mitigations entries, requires,
+      interface_ref, criterion fixture_ref; future and wont-have become scope
+      later / out; out_of_scope lists become scope: out; environment host keys
+      move into config; scope: in is set where the schema requires it. What no
+      single field fits is a worklist item, and the old value stays in
+      capture.json.
+    migration:
+      action: auto
+      script: p3_convert
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_remove (mechanical). Removes the fields 1.2.0 dropped
+      (the *_refs_ingested lists, tech_stack, task status and assumptions,
+      stored computed names, ...) after capture.json holds the values a later
+      pass reads; a plan that was done before 1.2.0 loses only the stored
+      computed names; deletes step 13a and extras/trace_matrix.json.
+    migration:
+      action: auto
+      script: p3_remove
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_copies (mechanical). Removes the artifact-level trace
+      (its notes held copies of FR statements); the typed entries of a node's
+      own trace are converted by p3_convert first.
+    migration:
+      action: auto
+      script: p3_copies
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_host_canon (mechanical). Renames the host canon kind
+      inv to invariant (kind file, entry ids, manifest and the cn: references in
+      the step files) and removes the canon kinds the toolkit retired
+      (completeness_dimension, trace_type).
+    migration:
+      action: auto
+      script: p3_host_canon
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_ordering (judgement). Reports which step-09 milestone
+      orderings the FR / API depends_on links already imply; each ordering that
+      is not implied is a worklist item for the step that authors the missing
+      link. It edits no spec file.
+    migration:
+      action: auto
+      script: p3_ordering
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p4_assumptions (judgement). Assumptions that hold more
+      than one claim, or that name a technology the host declared, are listed
+      for the step-00 pass; none is split or moved.
+    migration:
+      action: auto
+      script: p4_assumptions
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p4_step10_rules (mechanical). pr_rules strings are rules
+      with a cli_command (validate-all becomes spec-check, matrix becomes
+      coverage); review_policy.verdict_requirements become review rules;
+      reviewers, review_policy and spec_first_policy are removed; a rule that is
+      not a toolkit command, and every rule without an upstream reason, is a
+      worklist item.
+    migration:
+      action: auto
+      script: p4_step10_rules
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_mixed_jobs (judgement). Step-12 jobs that mix a
+      one-time action with a check are listed; none is split.
+    migration:
+      action: auto
+      script: p4_mixed_jobs
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p4_third_party (mechanical). An external component of
+      step 02 becomes a third_parties entry with the same id (no pin, no
+      derives_from); tech_stack entries, typed external dependencies and API
+      version strings become worklist proposals.
+    migration:
+      action: auto
+      script: p4_third_party
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_plan_dispositions (mechanical). plan.status and the
+      item dispositions are removed from open plans; a deferred or won't-do item
+      of an open plan becomes an operator worklist item plan-item-disposition
+      (not blocking). A plan that was done before 1.2.0 keeps them as history.
+    migration:
+      action: auto
+      script: p4_plan_dispositions
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_exit_conditions (mechanical). Each task's
+      exit_conditions become task criteria with tc- ids (the field itself is
+      taken out by p3_remove), each with a worklist item so the criterion is not
+      mistaken for a second list; specdev align propose --kind refines offers
+      their refines candidates.
+    migration:
+      action: auto
+      script: p4_exit_conditions
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_plan_security_items (mechanical). plan.security
+      entries become open items of an open plan, or informational worklist items
+      for a closed one.
+    migration:
+      action: auto
+      script: p4_plan_security_items
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_ambiguities (mechanical). Resolved open items are
+      deleted; those of a closed plan are listed and removed; those of the
+      anchor and open plans get the unified shape where impact names one node,
+      else a worklist item; duplicate ids are renamed.
+    migration:
+      action: auto
+      script: p4_ambiguities
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_nfr_verifiers (judgement). Each in-play NFR that
+      nothing verifies gets a worklist item with a candidate job.
+    migration:
+      action: auto
+      script: p4_nfr_verifiers
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p5_legacy_close (mechanical). A milestone that was done
+      before 1.2.0 (the roadmap says done, the anchor row says done, or the
+      plan's review verdict is verified) is closed with a legacy-migration close
+      record and its plan is frozen; the roadmap milestone status is removed;
+      milestones the sources disagree about, and ones that cannot be closed, are
+      worklist items.
+    migration:
+      action: auto
+      script: p5_legacy_close
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p5_triage (judgement). Open items of the anchor, a
+      decisions seed, seed routes to trinity steps, unused or missing seed
+      routes, pending tasks of closed milestones and a decommissioned staging
+      environment without a job are listed for the operator.
+    migration:
+      action: auto
+      script: p5_triage
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p6_baseline (mechanical). The trace lock of the host is
+      written once, with one entry per link that resolves, each marked baseline:
+      the hashes are the ones the migrated spec has, nobody has accepted them
+      yet. A link that does not resolve gets no entry and one worklist item.
+      Check a link, then clear its marker (E882) with specdev attest <holder id>
+      --yes; the links of a milestone that was closed keep theirs.
+    migration:
+      action: auto
+      script: p6_baseline
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p7_host_files (judgement). Reads the host's own workflow,
+      hook and lock files and lists, as worklist items, the retired commands
+      found in them (validate-all, matrix, ... with file and line) and the host
+      declarations the host lacks (release_tag_pattern, setup_command,
+      code_tree_exclusions, a pin source for each third party). It writes
+      nothing outside spec/, and no file of the host.
+    migration:
+      action: auto
+      script: p7_host_files
+      kind: judgement
+
+  - type: add_module
+    description: >
+      specdev align propose <spec_dir> --kind refines|prose-ids|bindings adds
+      worklist items to spec/extras/migration/worklist.json for the judgement
+      pass and writes nothing else: refines (the candidate refines link of each
+      task criterion, with a class: auto-eligible, needs-judgement or none),
+      prose-ids (the ids a node's text names, resolved or not) and bindings
+      (kinds legacy-binding and legacy-fixture in step 08: the specdev verify
+      bind line of each legacy fixture, proposed from the commands the 1.1.1
+      plans and CI workflows recorded). A rerun adds no item; --dry-run prints
+      only; --json. It refuses (exit 1) a folder that has no
+      spec/extras/migration/capture.json. Shown by specdev align propose spec
+      --kind refines --repo-root ./devspec_toolkit --git-root ..
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev align bind-legacy <spec_dir> prints the specdev verify bind line
+      of each legacy fixture whose command is certain, writes them when a person
+      confirms (a prompt, or --yes) through the writer of verify bind, and
+      closes the settled worklist items. --summary counts the fixtures that are
+      still without a binding or an attestation (the count must be zero before
+      the first release). Shown by specdev align bind-legacy spec --summary
+      --repo-root ./devspec_toolkit --git-root ..
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev align triage <spec_dir> lists the open worklist items by audience
+      (operator first), blocking first, then step, kind and id (--step,
+      --audience operator|agent, --json); --legacy NN prints the files of step
+      NN as they were before the migration, and --resolve ID --note TEXT closes
+      a worklist item. specdev align validate <spec_dir> is rewritten for the
+      migration: it stamps the spec at the toolkit's version, runs spec-check
+      --merge (--base-ref REF) and changes nothing when that finds an error,
+      deletes capture.json and worklist.json when no worklist item is open
+      (--keep-worklist keeps them; an open blocking item is reported as
+      information, not as a failure) and clears migration_status. It refuses a
+      spec that is stamped below the toolkit and was never migrated. Shown by
+      specdev align triage spec --repo-root ./devspec_toolkit.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev update no longer re-stamps spec/specdev_version on a spec that
+      needs a migration (a migration script is registered for a version above
+      the host's, the changelog between the two has an entry with a script or
+      kind: mechanical, or the host's version is not one the changelog lists):
+      it prints the migration commands in the order they are run and leaves the
+      stamp as it is. While the stamp says migration_status: in_progress it
+      points to specdev align validate. A spec with no stamp is re-stamped as
+      before. Shown by specdev update spec --repo-root ./devspec_toolkit
+      --no-install --dry-run.
     migration:
       action: none

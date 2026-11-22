@@ -1,65 +1,58 @@
-# Migration: Extension Generator (Step 13)
+<!-- Migration template: step {{STEP_ID}}, {{SOURCE_VERSION}} to {{TARGET_VERSION}} -->
+# Migration: Extension Manifest (Step 13)
 
 ## Schema URI
 
 `vc:13-extension-manifest`
 
-## Required Changes
+## Judgement pass
 
-**Step-base fields (required in every artifact)**
+`specdev align apply spec --auto` has run and been committed. What it could not decide is a worklist item. This pass settles the items of step 13, clears the step's baseline entries and ends with the step's check. Do it after the steps above 13 have passed. `blocking` on an item is a display hint; nothing gates on it.
 
-- `id`: Unique kebab-case identifier for this artifact instance (`$ref: vc:core:atoms#kebabId`).
-- `owner`: Owner of this spec artifact. Must be one of: `api | ui | system | ops | data | product | business | engineering`.
-- `created_at`: ISO 8601 timestamp of when this artifact was generated or last regenerated (`$ref: vc:core:atoms#timestamp`).
-- `canonical_refs_used`: array of canonical reference objects used in this artifact
+### Items of step 13
 
-- `$schema`: Must reference the URI above for the target toolkit version.
-- `extension_decision`: Required object with `status` (enum: `extensions-required`, `none-required`) and `rationale` (string, minLength: 40).
-- `extensions`: Array of extension descriptor objects (minItems: 0). When `status` is `none-required`, must be empty. Each entry requires:
-  - `extension_id`: String matching pattern `^ext-[0-9]{2}-[a-z0-9-]+$` (e.g., `ext-01-database`). Output filename is derived: hyphens → underscores + `.json`.
-  - `title`: String — Title Case human-readable name (e.g., `Database Layer Extension`).
-  - `area_of_concern`: String — canonical domain category (e.g., `AI`, `ML`, `Payments`, `Data`, `Security`, `Notifications`, `Infrastructure`).
-  - `justification`: String — rationale citing upstream FRs, NFRs, or components.
-  - `required_schema_sections`: Array of section name strings — must include `trace` and `validation_rules` at minimum.
-  - `schema_design_guidelines`: String (minLength: 40) — must contain at least one verification keyword (verif, test, check, validat, assert).
-  - `governance_label_ref`: Canonical reference object with `kind` structurally pinned to `governance_label`. Example: `{"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}`.
+No script or proposer writes an item of its own for step 13; the items below and the step's check are the pass.
+
+### Items any step can carry
+
+| Kind | Who | What it asks | Answer with |
+|---|---|---|---|
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry |
+| `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
+| `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
+| `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |
+| `gate-text` | agent | A gate that was free text got a minted id | Name it: `specdev node rename <minted-id> <gate-id>` |
+| `prose-ids` | agent | Text names ids (the evidence lists each); a field of the node may take them as links. Written by `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, not by `apply` | Link the id (`specdev json insert --id <node-id> .<field> '"<target-id>"'`) or reword the text: `specdev json patch --id <node-id> .<text-field> '"<new text>"'` |
+| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'`; or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
+| `unresolved-link` | operator | A link the resolver refused (E700 to E702) got no lock entry | Fix or drop the link with `specdev json patch --id <node-id> .<field> '["<target-id>"]'`; `specdev attest <node-id> --yes` then writes its entry |
+
+### Procedure
+
+1. Once per migration, before the first step pass, run the proposers; they add the items `apply` does not write (`refines`, `prose-ids`, `legacy-binding`, `legacy-fixture`), write only the worklist, and a rerun adds none: `specdev align propose spec --kind refines --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind bindings --repo-root ./devspec_toolkit --git-root .`.
+2. List the open items of the step: `specdev align triage spec --step 13 --repo-root ./devspec_toolkit --git-root .` (add `--audience agent` for the ones an agent settles; an operator item is decided by a person).
+3. Read each item's evidence and proposal, and the node it names: `specdev node show <node-id>`. A proposal says what the script would do; it has not been applied.
+4. Make the edit with the id-keyed commands of the table. Nothing is written into a file under `spec/` by hand; read through `specdev json read <file> '<jq path>'`, not the file.
+5. Close the item: `specdev align triage spec --resolve <item-id> --note "<what was decided>" --repo-root ./devspec_toolkit --git-root .`.
+6. Clear the step's baseline entries one node at a time. The check lists one E882 per entry: review the node's links, then `specdev attest <node-id>` previews what would be written and `specdev attest <node-id> --yes` writes it. A node of a closed milestone keeps its marker (E765).
+7. Check the step: `specdev spec-check spec --step 13 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` ends `RESULT: CLEAR` when the step has no error of its own and no new error of an earlier step. Debt of an earlier step that still has E882 entries is listed and does not block. `specdev guide <code>` explains an error code.
+
+### Context
+
+- Step 13a no longer exists: its file was deleted by the migration. For the link counts and the ids that are not linked use `specdev coverage`; for what is still to re-read upstream use `specdev stale`.
+
+## Shape in 1.2.0
+
+The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
+
+- `extension_decision` (object, required): requires `rationale`, `status`
+- `extensions` (array, required): each item requires `area_of_concern`, `extension_id`, `governance_label_ref`, `justification`, `required_schema_sections`, `schema_design_guidelines`, `title`
 
 ## Output Contract
 
 The migrated artifact MUST include:
 
-- `$schema`: Set to the canonical URI above.
-- `canonical_refs_used`: Array of canonical reference objects.
-
-## Optional Fields
-
-- `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `extensions[].justification`: String explaining why this extension is needed.
-- `extensions[].schema_design_guidelines`: String with schema authoring guidance.
-- `extensions[].tag_ref`: Canonical reference to a classification tag.
-- `extensions[].policy_ref`: Canonical reference to a governing policy.
-- `extensions[].id_pattern_ref`: Canonical reference to the ID naming convention.
-
-## Validation
-
-After migration, run:
-
-```bash
-./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-
-## Context
-
-The extension generator manifest declares all domain-specific spec extensions
-(e.g., database schema, session management) that supplement the core pipeline.
-Each extension produces an `ext_NN_*.json` file that must conform to the
-`required_schema_sections` listed here. During migration, verify that every
-`extension_id` values still adhere to their strict regex pattern —
-re-number them if the ordering has changed. File names are derived from extension_id (hyphens → underscores + `.json`). The `governance_label_ref` must
-resolve in the canonical registry; check that the referenced label still exists
-in the target toolkit version. Extension IDs should not change after the
-extension manifest (Step 13) has been generated.
-
+- `$schema`: `vc:13-extension-manifest`.
+- `canonical_refs_used`: array of canonical reference objects (`[]` when there are none).
 
 ## Full Generation Reference
 

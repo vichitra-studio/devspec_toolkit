@@ -1,58 +1,57 @@
+<!-- Migration template: step {{STEP_ID}}, {{SOURCE_VERSION}} to {{TARGET_VERSION}} -->
 # Migration: Scaffold (Step 15)
 
 ## Schema URI
 
 `vc:15-scaffold`
 
-## Required Changes
+## Judgement pass
 
-**Step-base fields (required in every artifact)**
+`specdev align apply spec --auto` has run and been committed. What it could not decide is a worklist item. This pass settles the items of step 15, clears the step's baseline entries and ends with the step's check. Do it after the steps above 15 have passed. `blocking` on an item is a display hint; nothing gates on it.
 
-- `id`: Unique kebab-case identifier for this artifact instance (`$ref: vc:core:atoms#kebabId`).
-- `owner`: Owner of this spec artifact. Must be one of: `api | ui | system | ops | data | product | business | engineering`.
-- `created_at`: ISO 8601 timestamp of when this artifact was generated or last regenerated (`$ref: vc:core:atoms#timestamp`).
-- `canonical_refs_used`: array of canonical reference objects used in this artifact
+### Items of step 15
 
-- `$schema`: Must reference the URI above for the target toolkit version.
-- `project_skeleton`: Object requiring `language` (lowercase string, no version suffix). Optional: `framework` (lowercase kebab-case), `modules` (array of directory path strings).
-- `validators`: Array of validator identifier strings — must be non-empty when `build_status` is `green`.
-- `build_status`: Must be one of `pending | green | red`.
+No script or proposer writes an item of its own for step 15; the items below and the step's check are the pass.
+
+### Items any step can carry
+
+| Kind | Who | What it asks | Answer with |
+|---|---|---|---|
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry |
+| `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
+| `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
+| `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |
+| `gate-text` | agent | A gate that was free text got a minted id | Name it: `specdev node rename <minted-id> <gate-id>` |
+| `prose-ids` | agent | Text names ids (the evidence lists each); a field of the node may take them as links. Written by `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, not by `apply` | Link the id (`specdev json insert --id <node-id> .<field> '"<target-id>"'`) or reword the text: `specdev json patch --id <node-id> .<text-field> '"<new text>"'` |
+| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'`; or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
+| `unresolved-link` | operator | A link the resolver refused (E700 to E702) got no lock entry | Fix or drop the link with `specdev json patch --id <node-id> .<field> '["<target-id>"]'`; `specdev attest <node-id> --yes` then writes its entry |
+
+### Procedure
+
+1. Once per migration, before the first step pass, run the proposers; they add the items `apply` does not write (`refines`, `prose-ids`, `legacy-binding`, `legacy-fixture`), write only the worklist, and a rerun adds none: `specdev align propose spec --kind refines --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind bindings --repo-root ./devspec_toolkit --git-root .`.
+2. List the open items of the step: `specdev align triage spec --step 15 --repo-root ./devspec_toolkit --git-root .` (add `--audience agent` for the ones an agent settles; an operator item is decided by a person).
+3. Read each item's evidence and proposal, and the node it names: `specdev node show <node-id>`. A proposal says what the script would do; it has not been applied.
+4. Make the edit with the id-keyed commands of the table. Nothing is written into a file under `spec/` by hand; read through `specdev json read <file> '<jq path>'`, not the file.
+5. Close the item: `specdev align triage spec --resolve <item-id> --note "<what was decided>" --repo-root ./devspec_toolkit --git-root .`.
+6. Clear the step's baseline entries one node at a time. The check lists one E882 per entry: review the node's links, then `specdev attest <node-id>` previews what would be written and `specdev attest <node-id> --yes` writes it. A node of a closed milestone keeps its marker (E765).
+7. Check the step: `specdev spec-check spec --step 15 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` ends `RESULT: CLEAR` when the step has no error of its own and no new error of an earlier step. Debt of an earlier step that still has E882 entries is listed and does not block. `specdev guide <code>` explains an error code.
+
+## Shape in 1.2.0
+
+The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
+
+- `project_skeleton` (object, required): requires `language`
+- `interface_map` (array, optional): each item requires `path`, `realises`, `row_id`
+- `validators` (array, required)
+- `command_ref` (object, optional): requires `id`, `kind`
+- `build_status` (string, required)
 
 ## Output Contract
 
 The migrated artifact MUST include:
 
-- `$schema`: Set to the canonical URI above.
-- `canonical_refs_used`: Array of canonical reference objects.
-
-## Optional Fields
-
-- `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `interface_map`: Array of route objects; each requires `interface_ref` (kebab-case api_id from Step 05, no duplicates), `path` (relative forward-slash path), and `method` (one of `GET | POST | PUT | DELETE | PATCH | OPTIONS | HEAD`).
-- `command_ref`: Canonical reference (kind: `action`) to the scaffold build/generate command.
-- `trace`: Array of trace reference objects — use `type: implements` pointing to `fr-*` or `api-*` IDs.
-- `links`: Array of link objects pointing to generated code or documentation.
-
-## Validation
-
-After migration, run:
-
-```bash
-./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-
-## Context
-
-The scaffold artifact maps interface contracts (Step 05) onto a concrete
-service skeleton that the Trinity Loop (Steps 16a–16c) iterates over. The
-`interface_map` must have one entry per API defined in Step 05 — add or remove
-entries to stay in sync after any interface changes. Duplicate `interface_ref` values
-are rejected by the validator. If `build_status` is `green`, at least one
-validator must be listed; downgrade to `pending` during migration if validators
-have not yet been confirmed. The `project_skeleton.language` and `framework`
-values drive code generation in Step 16b, so ensure they accurately reflect the
-target tech stack from the seeds listed for step "15" in `spec/common/seed_manifest.json`.
-
+- `$schema`: `vc:15-scaffold`.
+- `canonical_refs_used`: array of canonical reference objects (`[]` when there are none).
 
 ## Full Generation Reference
 

@@ -1,65 +1,63 @@
+<!-- Migration template: step {{STEP_ID}}, {{SOURCE_VERSION}} to {{TARGET_VERSION}} -->
 # Migration: Implementation Reviewer (Step 16c)
 
 ## Schema URI
 
 `vc:16-impl-context`
 
-## Required Changes
+## Judgement pass
 
-**Step-base fields (required in every artifact)**
+`specdev align apply spec --auto` has run and been committed. What it could not decide is a worklist item. This pass settles the items of step 16c, clears the step's baseline entries and ends with the step's check. Do it after the steps above 16c have passed. `blocking` on an item is a display hint; nothing gates on it.
 
-- `id`: Unique kebab-case identifier for this artifact instance (`$ref: vc:core:atoms#kebabId`).
-- `owner`: Owner of this spec artifact. Must be one of: `api | ui | system | ops | data | product | business | engineering`.
-- `created_at`: ISO 8601 timestamp of when this artifact was generated or last regenerated (`$ref: vc:core:atoms#timestamp`).
-- `canonical_refs_used`: array of canonical reference objects used in this artifact
+### Items of step 16c
 
-- `$schema`: Must reference the URI above for the target toolkit version.
-- `review.ratings`: Object with integer scores (0–5) for `spec_completeness`, `code_quality`, `tests_completeness`, `docs_completeness`, and `metadata_usage`.
-- `review.findings`: Array of structured finding objects; each requires `id`, `type` (one of `bug`, `gap`, `scope_creep`, `style`, `design`, `tests`, `docs`), `severity` (one of `blocking`, `major`, `minor`, `nit`), `spec_ref`, `description` (≥40 chars naming file:line, impact, and violated requirement), and `metadata` (with `source` and `impact`). When `severity` is `blocking` or `major`, `remediation_task` is also required.
-- `review.verdict`: One of `verified`, `needs_work`, `blocked`, or `deferred`.
+No script or proposer writes an item of its own for step 16c; the items below and the step's check are the pass.
+
+### Items any step can carry
+
+| Kind | Who | What it asks | Answer with |
+|---|---|---|---|
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry |
+| `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
+| `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
+| `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |
+| `gate-text` | agent | A gate that was free text got a minted id | Name it: `specdev node rename <minted-id> <gate-id>` |
+| `prose-ids` | agent | Text names ids (the evidence lists each); a field of the node may take them as links. Written by `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, not by `apply` | Link the id (`specdev json insert --id <node-id> .<field> '"<target-id>"'`) or reword the text: `specdev json patch --id <node-id> .<text-field> '"<new text>"'` |
+| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'`; or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
+| `unresolved-link` | operator | A link the resolver refused (E700 to E702) got no lock entry | Fix or drop the link with `specdev json patch --id <node-id> .<field> '["<target-id>"]'`; `specdev attest <node-id> --yes` then writes its entry |
+
+### Procedure
+
+1. Once per migration, before the first step pass, run the proposers; they add the items `apply` does not write (`refines`, `prose-ids`, `legacy-binding`, `legacy-fixture`), write only the worklist, and a rerun adds none: `specdev align propose spec --kind refines --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind bindings --repo-root ./devspec_toolkit --git-root .`.
+2. List the open items of the step: `specdev align triage spec --step 16c --repo-root ./devspec_toolkit --git-root .` (add `--audience agent` for the ones an agent settles; an operator item is decided by a person).
+3. Read each item's evidence and proposal, and the node it names: `specdev node show <node-id>`. A proposal says what the script would do; it has not been applied.
+4. Make the edit with the id-keyed commands of the table. Nothing is written into a file under `spec/` by hand; read through `specdev json read <file> '<jq path>'`, not the file.
+5. Close the item: `specdev align triage spec --resolve <item-id> --note "<what was decided>" --repo-root ./devspec_toolkit --git-root .`.
+6. Clear the step's baseline entries one node at a time. The check lists one E882 per entry: review the node's links, then `specdev attest <node-id>` previews what would be written and `specdev attest <node-id> --yes` writes it. A node of a closed milestone keeps its marker (E765).
+7. Check the step: `specdev spec-check spec --step 16c --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` ends `RESULT: CLEAR` when the step has no error of its own and no new error of an earlier step. Debt of an earlier step that still has E882 entries is listed and does not block. `specdev guide <code>` explains an error code.
+
+### Context
+
+- A closed plan keeps its review as history. An open plan's review is recorded when the milestone's review phase runs (`specdev review record <milestone-id> --verdict <verdict>`).
+
+## Shape in 1.2.0
+
+The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
+
+- `extensions` (object, optional): fields `execution_context`
+- `plan` (object, required): requires `review_requirements`
+- `execution` (object, optional): fields `config_validation`, `emergent_ambiguities`, `files_touched`, `records`
+- `review` (object, optional): fields `delivery_status`, `findings`, `next_actions`, `ratings`, `recorded_at`, `security_status`, `semantic_review`, `verdict`
+- `policy_ref` (object, optional): requires `id`, `kind`
+- `risk_category_ref` (object, optional): requires `id`, `kind`
+- `milestone` (string, required)
 
 ## Output Contract
 
 The migrated artifact MUST include:
 
-- `$schema`: Set to `vc:16-impl-context`.
-- `id`: Kebab-case identifier for this artifact.
-- `owner`: One of the allowed owner enum values.
-- `created_at`: ISO 8601 timestamp.
-- `canonical_refs_used`: Array of canonical reference objects (e.g. `[{ "id": "cn:core:unit:ms", "kind": "unit" }]`).
-- `plan`: Object with at minimum `status` populated.
-- `review`: Populated object with at minimum `findings`, `ratings`, and `verdict`.
-
-## Optional Fields
-
-- `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `review.fixture_status`: Required by the schema when `review.verdict == "verified"`. Object with `implemented_interfaces`, `test_results` (each entry requires `fixture_ref` and `status`), and `ci_status` (`green` or `red`). When `verdict == "verified"`, `ci_status` must be `"green"`.
-- `review.semantic_review`: Required by the schema when `review.verdict == "verified"`. Object with `fr_coverage` (array — each entry requires `fr_id`, `satisfied`, `evidence_summary`, and `checklist_ids`) and `hallucinated_features` (array — use `[]` to assert none). Include `scope_delta` when unplanned features are detected.
-- `review.security_status`: Security gate result (`green` or `red`).
-- `review.delivery_status`: Deployment status with `deployments` array.
-- `review.next_actions`: Concrete follow-up actions (name the responsible party and prerequisite condition).
-- `extensions`: Structured data that does not fit in core schema fields.
-
-## Validation
-
-After migration, run:
-
-```bash
-./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-
-## Context
-
-Step 16c is the Review phase of the Trinity Loop. It audits the implementation against the plan
-and spec, closing the cycle or spawning remediation tasks. During migration, ensure `review.verdict`
-reflects the actual evidence state: `verified` is forbidden if any `blocking` finding exists or
-any active checklist item lacks evidence. When `verdict == "verified"`, the schema additionally
-requires `review.fixture_status` (with `ci_status == "green"`) and `review.semantic_review`
-(with `fr_coverage` and `hallucinated_features`). The `fr_coverage` array must include an entry
-for every FR referenced in the active milestone's `fr_refs` — no FR may be silently omitted.
-If the previous artifact approved implementation without concrete evidence content, downgrade
-the verdict and add findings. When `verdict` is `verified`, also update `spec/14_roadmap.json`
-and `spec/09_impl_plan.json` to set the corresponding milestone status to `done`.
+- `$schema`: `vc:16-impl-context`.
+- `canonical_refs_used`: array of canonical reference objects (`[]` when there are none).
 
 ## Full Generation Reference
 

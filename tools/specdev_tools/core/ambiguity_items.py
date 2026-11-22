@@ -7,7 +7,8 @@ Locations are the arrays of kind ``ambiguity-item`` in ``tools/entry_key_registr
 files 00 to 15 (with 02a), ``.plan.ambiguities`` of the anchor ``16_impl_context.json`` and, in each
 ``impl_context/ms_*_plan.json``, ``.plan.ambiguities`` (step 16a) and ``.execution.emergent_ambiguities`` (step 16b).
 
-Two item shapes are read until the hosts are migrated (the legacy branch goes with that migration):
+Two item shapes are read (the legacy one stays: a spec that is not migrated yet, and an item the migration leaves in
+its 1.1.1 shape for a person to rewrite, still carry it):
 ``unified`` (has ``about``, no ``severity``) and ``legacy`` (the 1.1.1 shapes with ``severity``/``status``/``impact``).
 """
 

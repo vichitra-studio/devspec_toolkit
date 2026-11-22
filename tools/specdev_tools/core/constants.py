@@ -1,7 +1,7 @@
 """Shared constants and utilities for the DevSpec Toolkit.
 
 Centralises lookup tables that were previously duplicated across
-``generation.prompt_generator`` and ``migration.planner``.
+``generation.prompt_generator`` and the old migration planner (deleted in 1.2.0).
 
 Created by FIX-027 (Batch 2).
 """
