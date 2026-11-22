@@ -1,0 +1,26 @@
+code: E704
+subcode: DUPLICATE_NODE_ID
+title: "Two nodes define the same id"
+trigger: |
+  An id is defined by more than one node, in one file or in several:
+    E704 Duplicate node id 'gate-setup': defined at 12_ci_gates.json .jobs[0]
+    (job) and again at 12_ci_gates.json .jobs[5] (job); rename the later one,
+    for example to 'gate-setup-2'
+  The migration renames a real collision itself (the capture's `renames`
+  section lists the old and new id) and never leaves E704; it appears after a
+  hand edit or a copied node.
+resolution: |
+  1. Rename the LATER definition, the one the message names second. An id that
+     two nodes define cannot be addressed by id, and `specdev node rename`
+     refuses it (E770), so use the path the message prints:
+       specdev json patch spec/12_ci_gates.json '.jobs[5].job_id' '"gate-setup-2"'
+     (the id field is the one of the node's kind: job_id, fr_id, criterion_id,
+     ...). If the later definition is a copy that should not exist, delete it:
+       specdev json delete spec/12_ci_gates.json '.jobs[5]'
+  2. A link that meant the later definition still names the shared id: look at
+     `specdev trace --up <id>` and `specdev trace --down <id>` and rewrite the
+     ones that belong to the renamed node with `specdev json patch --id`.
+  3. `specdev spec-check spec ...` prints no E704.
+see_also:
+  - E700
+  - E703

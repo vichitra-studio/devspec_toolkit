@@ -26,11 +26,15 @@ Detailed usage guide: **[Workflow: System Alignment & Migration](./workflow_alig
 
 ### Quick Summary
 
-1.  **Check Status**: `specdev align status`
-2.  **See Changes**: `specdev align diff`
-3.  **Auto-Fix**: `specdev align apply --auto` (Renames files, updates schemas)
-4.  **AI-Assist**: `specdev align prompts` (Generates prompts for complex changes)
-5.  **Validate**: `specdev align validate`
+A migration has two stages. The first is mechanical and is one command; the second is a pass of judgement that you do with a list of decisions.
+
+1.  **Ask `update`**: `specdev update spec --repo-root ./devspec_toolkit --git-root . --no-install --dry-run`. A spec that needs a migration is not re-stamped; `update` exits 1 and prints the commands below in order.
+2.  **Mechanical stage**: `specdev align apply spec --auto --dry-run`, then `specdev align apply spec --auto`. It rewrites `spec/` only (ids, link fields, removed fields, the trace lock), writes the list of decisions it could not take, commits nothing and makes no backup branch; git is the undo (`git checkout -- spec && git clean -fd spec`).
+3.  **Commit** the result by hand (`git add spec && git commit --no-verify`: the old hooks still name retired commands), then `specdev update spec --adopt` to install the host files.
+4.  **Judgement pass**: `specdev align triage spec` lists the decisions; `specdev align propose spec --kind refines|prose-ids|bindings` adds candidates; each step is edited with the id-keyed commands (`specdev json patch --id`), its links are accepted with `specdev attest`, and `specdev spec-check spec --step NN` says when the step is clear. The per-step templates in `prompts/migration/template_<name>.md` are opened by hand: `align prompts` renders none of them for a 1.1.1 to 1.2.0 migration.
+5.  **Finish**: `specdev align validate spec` runs `spec-check --merge`, removes the migration files and clears `migration_status`.
+
+For a 1.1.1 host moving to 1.2.0 the whole procedure, with the commands as they print and the size of the work, is **[Migrating a 1.1.1 host to 1.2.0](./workflow_migrate_1_2_0.md)**. The read-only actions `align status`, `diff`, `plan` and `prompts` compare only the top level of each schema, so on a 1.1.1 host they report almost nothing about this release.
 
 ---
 
@@ -55,7 +59,7 @@ Since updates can be breaking, updating the toolkit is a strategic decision.
 If the `specdev align` tool is unavailable or failing for your specific case, use this manual loop.
 
 ### 1. Update & Validate
-First, update the toolkit and run the full validation suite to see what broke.
+First, update the toolkit and run the full validation suite to see what broke. (`validate-all` alone does not load your project canon and can print false `E110`s: prefer `spec-check`.)
 
 ```bash
 # Update the submodule

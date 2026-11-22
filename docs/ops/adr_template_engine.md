@@ -16,9 +16,9 @@ The question was whether to replace this with a Python-native template engine (J
 
 ## Current Implementation Status
 
-**The renderer is implemented but templates are currently static.** The `render_template()` function fully supports `{{VAR}}` substitution and `{{#each}}` iteration, and the `PromptContext` dataclass populates variables such as `SOURCE_VERSION`, `TARGET_VERSION`, `STEP_ID`, `REQUIRED_FIELDS`, `CONTEXT_SOURCES`, and field-level variables (`FIELD_PATH`, `OLD_TYPE`, `NEW_TYPE`, etc.).
+**The renderer is implemented and the templates use it only for three values.** The `render_template()` function fully supports `{{VAR}}` substitution and `{{#each}}` iteration, and the `PromptContext` dataclass populates variables such as `SOURCE_VERSION`, `TARGET_VERSION`, `STEP_ID`, `REQUIRED_FIELDS`, `CONTEXT_SOURCES`, and field-level variables (`FIELD_PATH`, `OLD_TYPE`, `NEW_TYPE`, etc.).
 
-However, the 22 templates in `prompts/migration/` do not currently contain any `{{VAR}}` placeholders — they are static Markdown documents authored for each pipeline step. The renderer runs on every template render call but performs no substitutions because no placeholders are present.
+The 21 templates in `prompts/migration/` carry only `{{STEP_ID}}`, `{{SOURCE_VERSION}}` and `{{TARGET_VERSION}}`, in their first line; the rest of each is static Markdown authored for its pipeline step (the judgement pass of a 1.1.1 to 1.2.0 migration). `{{#each}}` is not used by any template.
 
 **When interpolation would be used:** If a future template needs to embed context-specific content (e.g., the actual source file contents, a list of required fields extracted from the target schema, or the version numbers being migrated), authors can insert `{{SOURCE_CONTENT}}`, `{{#each REQUIRED_FIELDS}}...{{/each}}`, or any other supported placeholder directly in the template. The renderer will substitute them automatically without any code changes.
 
@@ -36,14 +36,14 @@ However, the 22 templates in `prompts/migration/` do not currently contain any `
 
 4. **Predictable output.** Migration prompts must be deterministic and auditable. A minimal renderer with no implicit coercion or filter chains reduces the surface area for unexpected behavior.
 
-5. **Low maintenance burden.** The template set is small (22 templates) and changes infrequently. The cost of maintaining a custom renderer is negligible at this scale.
+5. **Low maintenance burden.** The template set is small (21 templates) and changes infrequently. The cost of maintaining a custom renderer is negligible at this scale.
 
 ## Alternatives Considered
 
 ### Jinja2
 - **Pros:** Full-featured, well-tested, supports conditionals/filters/inheritance
 - **Cons:** New dependency, more complex than needed, Python-specific syntax
-- **Verdict:** Over-engineered for 22 simple templates
+- **Verdict:** Over-engineered for 21 simple templates
 
 ### Python f-strings / str.format()
 - **Pros:** Zero dependency, native Python

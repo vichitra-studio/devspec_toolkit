@@ -96,7 +96,7 @@ class MigrationReport:
             lines.append(self.diff if self.diff else "no change")
         elif self.changed_files:
             lines.append(f"review: git diff --stat {self.spec_dir}")
-            lines.append(f"undo:   git checkout -- {self.spec_dir}")
+            lines.append(f"undo:   git checkout -- {self.spec_dir} && git clean -fd {self.spec_dir}  (the second removes the files the run created)")
         return "\n".join(lines)
 
 

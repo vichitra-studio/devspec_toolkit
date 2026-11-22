@@ -75,7 +75,7 @@ M8_CHANGELOG_MARKERS = (
     "`specdev milestone-state --batch-id <batch>` prints a new key `milestone`",
     "Error codes retired into the removed set",
     "The step 16 prompts (`prompt_16_impl_context.md`",
-    "Interim states until later 1.2.0 changes",
+    "While a host migrates it meets these states",
     "`docs/developers/reference.md` documents the commands above",
 )
 # Wordings that M8 made untrue; none may be left in the catalogue, the reference, the workflow pages or the changelog.

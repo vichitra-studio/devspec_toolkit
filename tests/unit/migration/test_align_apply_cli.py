@@ -83,7 +83,7 @@ def test_real_run_writes_stamps_and_prints_review_and_undo(host, toolkit):
     code, out, err = align(args(host, toolkit), [mark_script()])
     assert code == 0, err
     assert "migration 1.1.1 -> 1.2.0" in out and "dry run" not in out
-    assert "review: git diff --stat spec" in out and "undo:   git checkout -- spec" in out
+    assert "review: git diff --stat spec" in out and "undo:   git checkout -- spec && git clean -fd spec" in out
     assert (host / "spec" / MARK).is_file()
     stamp = yaml.safe_load((host / "spec" / "specdev_version").read_text(encoding="utf-8"))
     assert stamp["toolkit_version"] == "1.2.0" and stamp["migration_status"] == "in_progress"

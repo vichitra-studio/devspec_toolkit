@@ -54,7 +54,7 @@ def test_dirty_spec_gives_e880(cli, host):
     assert done.stdout == ""
     assert "E880" in done.stderr
     assert f"{host / SPEC} has uncommitted changes; commit them first" in done.stderr
-    assert "git checkout -- spec" in done.stderr and "or pass --allow-dirty" in done.stderr
+    assert "git checkout -- spec && git clean -fd spec" in done.stderr and "or pass --allow-dirty" in done.stderr
     assert tree_digest(host) == before and git_state(host) == state
     assert not (host / CAPTURE).exists()
 

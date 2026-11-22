@@ -62,8 +62,8 @@ specdev update spec --repo-root ./devspec_toolkit
 ```
 
 *   **No schema changes**: `specdev_version` is re-stamped and the host files are refreshed (what changed is printed, piece by piece); commit what `update` wrote.
-*   **Schema changes required**: The command directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`). `align validate` runs full post-migration validation and stamps `specdev_version` with a migration-history entry.
-*   See the [Migration Workflow](workflows/workflow_align.md) for the full align walkthrough.
+*   **A migration is needed**: `update` does not re-stamp. It exits 1 and prints the commands of the migration in order (`align apply --auto`, a commit, `update --adopt`, `align triage`, `align validate`). `align validate` runs `spec-check --merge` and, when it is clean, clears `migration_status` in `specdev_version`.
+*   See [Migrating a 1.1.1 host to 1.2.0](workflows/workflow_migrate_1_2_0.md) for that migration, and the [Migration Workflow](workflows/workflow_align.md) for the general flow.
 
 ```yaml
 # Example spec/specdev_version

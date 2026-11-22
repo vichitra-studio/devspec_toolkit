@@ -1,0 +1,35 @@
+code: E880
+subcode: MIGRATION_PREFLIGHT
+title: "The migration refuses to start"
+trigger: |
+  `specdev align apply --auto` stopped before it wrote anything. The message
+  names the reason:
+    - "is not a git work tree": the host is not a git repository, or --git-root
+      names a folder that is not one.
+    - "records no toolkit_version": spec/specdev_version has no
+      toolkit_version.
+    - "older than 1.0.0", "newer than this toolkit", or "is not a version
+      listed in <toolkit>/changelog": the stamp names a version the migration
+      cannot start from.
+    - "has uncommitted changes": spec/ is not committed.
+  A dry run (--dry-run) is allowed on a dirty spec/, and a run that resumes (the
+  stamp says migration_status: in_progress) is allowed too.
+resolution: |
+  1. Not a git work tree: run `git init` in the host, commit the spec, run again.
+     Pass --git-root <host root> when the spec folder is not at the top.
+  2. No toolkit_version: run `specdev update spec --repo-root ./devspec_toolkit`
+     once to stamp the host, or write the version the spec was built with into
+     spec/specdev_version by hand.
+  3. A version the migration cannot start from: update the toolkit submodule to
+     the release you migrate to ("newer than this toolkit"); for a version the
+     changelog does not list, put the version the spec was really built with
+     back into the stamp.
+  4. Uncommitted changes: commit them (the migration is reviewed with
+     `git diff spec` and undone with `git checkout -- spec && git clean -fd
+     spec`), or pass --allow-dirty when the changes are the ones you want migrated.
+  Then run again:
+       specdev align apply spec --auto --dry-run \
+         --repo-root ./devspec_toolkit --git-root .
+see_also:
+  - E881
+  - E882

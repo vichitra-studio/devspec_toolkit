@@ -376,7 +376,7 @@
 
 **Trigger**: Fires in any of three cases: (1) `spec/specdev_version` is absent or is present but malformed / missing the `toolkit_version` key; (2) the active toolkit version cannot be read from `tools/pyproject.toml` (file missing or unparseable); (3) the `toolkit_version` recorded in `spec/specdev_version` differs from the active toolkit version.
 
-**Resolution**: Run `specdev update <spec_dir>` to sync your project to the current toolkit version. When there are no schema changes, `update` re-stamps `spec/specdev_version` instantly. When schema changes are required, it directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`), finalizing with `specdev align validate <spec_dir>` — which runs full post-migration validation and stamps the new version with a migration-history entry.
+**Resolution**: Run `specdev update <spec_dir>` to sync your project to the current toolkit version. When the spec needs no migration, `update` re-stamps `spec/specdev_version` instantly. When it needs one (a migration script is registered for a version above the host's, the changelog between the two versions holds a `script` or `kind: mechanical`, or the host's version is not a release the changelog lists), `update` does not re-stamp: it exits 1 and prints the commands of the migration in order (`align apply --auto --dry-run`, `align apply --auto`, the commit, `update --adopt`, `align triage`, `align validate`; the full procedure is in [`workflows/workflow_migrate_1_2_0.md`](workflows/workflow_migrate_1_2_0.md)). `specdev align apply --auto` stamps the toolkit's version with `migration_status: in_progress` and a migration-history entry, and `specdev align validate` clears the status once `spec-check --merge` is clean.
 
 **Promotable**: No (error only).
 
@@ -1236,14 +1236,6 @@ The trace lock is `spec/extras/trace.lock.json`: one entry per link, holding the
 
 **Promotable**: No (error only).
 
-### E882 MIGRATION_BASELINE_NOT_REATTESTED
-
-**Trigger**: A trace lock entry still carries the `baseline` marker that a migration stamps, and its holder is not a historical node. Reported by `spec-check` (check `trace-lock`). Entries of historical holders keep the marker without error. Example: `E882 trace lock entry (PWRESET_CONFIRM_EXPIRED_01, field realises, target 'tc-confirm-expired-token') still carries the migration baseline marker; check the link, then clear it: `specdev attest PWRESET_CONFIRM_EXPIRED_01` shows what would be written, `specdev attest PWRESET_CONFIRM_EXPIRED_01 --yes` writes it`.
-
-**Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id> --yes`: it writes the current stored hashes and clears the marker.
-
-**Promotable**: No (error only).
-
 ## Milestone Lifecycle (80x / 81x / 82x / 83x)
 
 A milestone's life is written by commands, never by hand: `specdev milestone start|defer|sign-off|close`, `specdev plan record`, `specdev review record` and `specdev verify attest`. Each of them reads the state first and refuses with one of the codes below, writing nothing. The 80x codes are refusals of the `milestone` commands, E820 to E824 are refusals of the record commands, and E810 to E814 are the findings of the close gate (owner `close-gate`): `specdev milestone close <id>` runs the gate and writes the close only when it finds nothing, `specdev milestone close <id> --check` runs it and writes nothing, and `specdev status --milestone <id>` prints the same findings as a dry run. E827, W825 and W826 are findings of `spec-check` (E827 of the check `frozen-plans`; W825 and W826 of the check `plan-records`). W837 is a warning of the step 16 validator. E830 is a finding of the release gate (see [Merge and Release Gates](#merge-and-release-gates-90x--91x--92x--93x)).
@@ -1278,7 +1270,7 @@ Exit codes of the commands: 0 written (or, for `--check`, the gate passes), 1 re
 
 **Trigger**: A command that takes a milestone id cannot find the plan file of it. Three reasons, each printed by a run; two lookups print them, so the same wrong id gets different texts from different commands. (1) The id given is a batch id, the name of a plan file; `milestone start|defer|sign-off|close [--check]`, `status --milestone`, `review record` and `plan record --prune` print: `E803 account_recovery is a batch id (the plan file impl_context/ms_account_recovery_plan.json), not a milestone id (ms-...); `specdev milestone-state --batch-id account_recovery` prints the milestone of that plan under `milestone``. Given the same batch id, `verify run --milestone` prints E706 and `verify attest` E824 (no node with that id). (2) No plan names the milestone in its file-level `milestone` key: `E803 no plan names milestone ms-nope in its `milestone` key; a plan file is impl_context/ms_*_plan.json with the `milestone` key (a plan saved under another name is not found): give the id of a milestone that has one` (also printed for a plan that carries the key but is saved as `impl_context/account_recovery_plan.json`; renamed back to `ms_account_recovery_plan.json` it is found; printed by `review record` and `plan record --prune`; `milestone start|defer|sign-off|close` and `status --milestone` for an id with no anchor row print E800 instead). (3) A plan file (`impl_context/ms_<batch>_plan.json`) exists and none has a `milestone` key at all, which is how a 1.1.1 plan looks: `E803 no plan names milestone ms-account-recovery: add it with `specdev json patch <plan file> '.milestone' '"<milestone-id>"'` (the plan has no `milestone` key)` (printed by `review record`, `plan record --prune` and `status --milestone` for a row in any status, by `milestone start` for a `pending` or `deferred` row, and by `milestone sign-off` and `milestone close [--check]` for an `in_progress` row; a `pending` or `deferred` row is refused with E801 by `sign-off` and `close` before the plan is looked up, a start of an `in_progress` row prints `already in progress, nothing written`, and `milestone defer` reads only the anchor row and does not meet it). `plan record --at-deploy` and `verify attest <ITEM>/<action-id> --env` meet the same missing key through the item and print `E803 plan impl_context/ms_account_recovery_plan.json has no `milestone` key: add it with `specdev json patch <plan file> '.milestone' '"<milestone-id>"'`` (nothing is written); `verify run --milestone` does not read the key. A plan is found only under the name `ms_<batch>_plan.json` in `impl_context/`: another JSON file there is no plan. `milestone start ms-nope` is E800 (no row), not E803.
 
-**Resolution**: (1) Use the id `specdev milestone-state --batch-id <batch>` prints under `milestone` (followed: `ms-account-recovery`, accepted). (2) Give the id of a milestone that has a plan, or save the plan as `impl_context/ms_<batch>_plan.json`. (3) Add the key, as the message says: `specdev json patch spec/impl_context/ms_account_recovery_plan.json .milestone '"ms-account-recovery"'` printed `Updated .milestone` and `review record ms-account-recovery --verdict verified` then printed `recorded the review`. For a host with many plans the migration of a later 1.2.0 work item writes the key; `specdev align` does not write it in this release.
+**Resolution**: (1) Use the id `specdev milestone-state --batch-id <batch>` prints under `milestone` (followed: `ms-account-recovery`, accepted). (2) Give the id of a milestone that has a plan, or save the plan as `impl_context/ms_<batch>_plan.json`. (3) Add the key, as the message says: `specdev json patch spec/impl_context/ms_account_recovery_plan.json .milestone '"ms-account-recovery"'` printed `Updated .milestone` and `review record ms-account-recovery --verdict verified` then printed `recorded the review`. On a host that is not migrated yet, `specdev align apply --auto` writes the key in every plan (script `p2_plan_milestone_key`), so the step needs doing by hand only for a plan written after the migration.
 
 **Promotable**: No (error only).
 
@@ -1401,6 +1393,42 @@ Exit codes of the commands: 0 written (or, for `--check`, the gate passes), 1 re
 **Resolution**: Split the milestone so each plan stays small. Followed only as far as the size: with the plan back under the threshold, `schema-validation` printed `0 warnings`.
 
 **Promotable**: No (warning only; not in `PROMOTABLE_PAIRS`).
+
+## Migration (88x)
+
+Four codes belong to the migration of a 1.1.1 host to 1.2.0 (the procedure is in [`workflows/workflow_migrate_1_2_0.md`](workflows/workflow_migrate_1_2_0.md)). E880 and E881 are printed by `specdev align apply --auto`, E882 by `spec-check`, and E884 by `specdev changelog --validate` and the changelog tests of the toolkit. E880 and E881 refuse a command, so they carry no owner. E883 is unused.
+
+### E880 MIGRATION_PREFLIGHT
+
+**Trigger**: `specdev align apply --auto` refuses to start, and writes nothing, for one of these reasons. Each text below was printed by a run. (1) The host is not a git work tree: `E880 <path> is not a git work tree (git rev-parse --is-inside-work-tree failed: ...); the migration needs git to review and undo what it writes: run `git init` and commit the spec first`. (2) `spec/specdev_version` has no `toolkit_version`: `E880 <spec>/specdev_version records no toolkit_version; run `specdev update` to stamp the host first`. (3) The spec's version is older than 1.0.0, the oldest the migration starts from (`E880 spec was built with toolkit 0.9.0, older than 1.0.0, the oldest the migration starts from`), newer than the toolkit (`E880 spec was built with toolkit 1.3.0, newer than this toolkit (1.2.0); update the toolkit first`), or not a version the toolkit's changelog lists (`E880 toolkit 1.1.5 is not a version listed in <toolkit>/changelog (1.0.0, 1.1.0, 1.1.1, 1.2.0); the migration cannot tell which scripts apply`). (4) `spec/` has uncommitted changes: `E880 <spec> has uncommitted changes; commit them first (the migration is reviewed with `git diff` and undone with `git checkout -- spec && git clean -fd spec`), or pass --allow-dirty`. A dry run (`--dry-run`) is allowed on a dirty `spec/`, and so is a run that resumes (the stamp says `migration_status: in_progress`).
+
+**Resolution**: (1) `git init`, commit the spec, run again (followed: the run then started). (2) Run `specdev update spec --repo-root <toolkit>` on the host to stamp it, or write the version the spec was built with into `toolkit_version` by hand. (3) Update the toolkit submodule to the version that is the target, or, for a version the changelog does not list, restore the stamp to the version the spec was really built with. (4) Commit or stash the changes (followed: after the commit the run printed `migration 1.1.1 -> 1.2.0`), or pass `--allow-dirty` when the changes are yours to migrate with.
+
+**Promotable**: No (error only).
+
+### E881 MIGRATION_SCRIPT_INVARIANT
+
+**Trigger**: A migration script failed a rule the runner holds every script to. The run works on a scratch copy and installs the result only when every script passed, so a failure writes nothing to the host. The rules: a script does not raise; a script changes only the steps it declares; the definition ids of the spec are the same before and after, except the ids a script renamed or deleted and recorded; a second `detect` after the script finds nothing to do; a plan file does not change after the legacy-close phase; a closed plan still matches its close hash. Printed: `E881 script <script id> (phase <n>, <name>): <problem>; nothing was written`; the CLI prints it and exits 1.
+
+**Resolution**: The host is byte for byte as it was (`git status` is clean). The message names the script and the problem. It is a fault of the toolkit or of a shape the scripts do not know, not of your spec: report the script id and the problem, and run again with the fixed toolkit. (Shown by the tests of the runner with a script that breaks an invariant on purpose; the resolution was followed there, on a scratch host: the host was unchanged after the failure.)
+
+**Promotable**: No (error only).
+
+### E882 MIGRATION_BASELINE_NOT_REATTESTED
+
+**Trigger**: A trace lock entry still carries the `baseline` marker that a migration stamps, and its holder is not a historical node. Reported by `spec-check` (check `trace-lock`). Entries of historical holders keep the marker without error. Example: `E882 trace lock entry (PWRESET_CONFIRM_EXPIRED_01, field realises, target 'tc-confirm-expired-token') still carries the migration baseline marker; check the link, then clear it: `specdev attest PWRESET_CONFIRM_EXPIRED_01` shows what would be written, `specdev attest PWRESET_CONFIRM_EXPIRED_01 --yes` writes it`.
+
+**Resolution**: Owner `step:<holder step>`. Check the link, then run `specdev attest <holder id> --yes`: it writes the current stored hashes and clears the marker (followed on the migrated invented host: `specdev attest fr-catalog-search` printed `would write 1 link on 1 node`, with `--yes` it printed `wrote 1 link on 1 node`). The migration writes every link of the spec as a baseline entry, so a migrated host has one E882 for each, and the pass clears them node by node. `specdev attest --step NN` lists only suspect links and prints `attest: nothing to attest` when only baseline entries are left. `attest <id>` writes the lock entry of a link that has none; `attest --step` does not. A holder in a closed milestone keeps its marker without error, and `specdev attest` refuses it with E765. The migration pull request cannot merge while an E882 of a step is live (merge mode).
+
+**Promotable**: No (error only).
+
+### E884 MIGRATION_CHANGELOG_SCRIPT_MISSING
+
+**Trigger**: A changelog entry of a version above 1.1.1 (and of `unreleased`) has `migration: {action: auto, kind: mechanical}` and either names no `script`, or names a `script` that no module under `migration/scripts/` defines. Checked by `specdev changelog --validate <version>` and by the toolkit's changelog tests. Printed (run on a copy of the changelog): `E884 Change 126 (fix) of unreleased: migration is `auto` with kind `mechanical` but names no script. Add `script: <script id>`, or mark the entry `kind: none` when no host data is touched.` and `E884 Change 127 (fix) of unreleased: migration names script 'p2_nowhere', which no migration script module of this toolkit defines. Registered scripts: p1_capture, p2_action_ids, ...`. An entry with another kind, or with `action` other than `auto`, is not asked for a script; a kind that is not `mechanical`, `judgement` or `none` is `E520`. Versions up to 1.1.1 are exempt (a released changelog is never edited).
+
+**Resolution**: Add `script: <id>` with the id of a module of `migration/scripts/` (the error lists the registered ids), or set `kind: none` when the entry touches no host data (followed: both findings gone and `specdev changelog --validate unreleased` printed `OK`).
+
+**Promotable**: No (error only).
 
 ## Merge and Release Gates (90x / 91x / 92x / 93x)
 

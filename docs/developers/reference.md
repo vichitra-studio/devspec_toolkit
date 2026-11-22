@@ -601,35 +601,43 @@ specdev update spec --repo-root ./devspec_toolkit --no-install
 
 The install runs first, then the version logic, so a host that needs a migration is installed too (the migration runbook uses `--no-install` for that reason). `--adopt` or `--force-claude` with `--no-install` is accepted and does nothing. `host_install` is `{"skipped": null | "--no-install", "pieces": {"<piece>": {"status", "detail", "findings": [{"code", "file", "line", "command", "text"}]}}}`; the pieces are `pre-commit`, `merge-driver`, `workflows`, `wrappers`, `claude-links`, `ask-rules` and `gitignore`, in that order, and a status is `created`, `refreshed`, `current`, `drift`, `refused` or `would_install`. With `--install-only` the `update_status` is `installed` (or `would_install` with `--dry-run`). The warnings (W930, W931, W932, W935) are the findings of the pieces: they never change the exit code and are never promoted. What each piece writes, what it never touches and what `drift` means is in [host_setup.md](host_setup.md) and [tools/update.md](tools/update.md).
 
-When `specdev update` reports schema changes, run the migration workflow first:
+**`update` on a host that needs a migration.** A spec that records a toolkit version and needs a data migration is not re-stamped. `update` exits 1 (status `needs_migration`, the same `E608` envelope under `--json`), leaves `spec/specdev_version` as it is, and prints the seven commands of the migration in the order they run. A migration is needed when any of three things holds: a migration script is registered for a version above the host's; the changelog entries between the host's version and the toolkit's hold a `script` or `kind: mechanical`; or the toolkit's changelog lists releases and the host's version is not one of them. A spec with no `specdev_version` is re-stamped as before. After `align apply --auto` the stamp says `migration_status: in_progress`: `update` then prints that a migration is in progress, names `align triage` and `align validate`, and re-stamps nothing (exit 0 when the host's version equals the toolkit's, exit 1 when it differs; status `migration_in_progress`). The pieces are installed or not exactly as before. The whole procedure is in [`workflow_migrate_1_2_0.md`](workflows/workflow_migrate_1_2_0.md).
+
+#### `align`: the 1.1.1 to 1.2.0 migration
+
 ```bash
-# Check status of spec vs toolkit version
-specdev align status spec --repo-root ./devspec_toolkit
+# 1. The mechanical stage. Runs the migration scripts of the release on a scratch copy of spec/ and prints the diff
+specdev align apply spec --auto --dry-run --repo-root ./devspec_toolkit --git-root .
+# ... then for real. Writes under spec/ only, commits nothing, makes no backup branch; a rerun changes no byte
+specdev align apply spec --auto --repo-root ./devspec_toolkit --git-root .
 
-# Show diff of what needs to change
-specdev align diff spec --repo-root ./devspec_toolkit
+# 2. The list of decisions the scripts left, and what closes one
+specdev align triage spec --repo-root ./devspec_toolkit --git-root . [--step NN] [--audience operator|agent] [--json]
+specdev align triage spec --resolve <item id> --note "<what was decided>" --repo-root ./devspec_toolkit --git-root .
+specdev align triage spec --legacy NN --repo-root ./devspec_toolkit --git-root .      # a step's files as they were before
 
-# Generate an execution plan
-specdev align plan spec --repo-root ./devspec_toolkit
+# 3. Proposals for the pass: items that carry a candidate each
+specdev align propose spec --kind refines|prose-ids|bindings [--dry-run] --repo-root ./devspec_toolkit --git-root .
 
-# Apply mechanical fixes (auto-mode)
-specdev align apply spec --auto --repo-root ./devspec_toolkit
+# 4. The legacy fixtures: bind them, and count what is still unbound
+specdev align bind-legacy spec [--yes] --repo-root ./devspec_toolkit --git-root .
+specdev align bind-legacy spec --summary --repo-root ./devspec_toolkit --git-root .
 
-# Generate prompts for AI-assisted migration
-specdev align prompts spec --output prompts/migration/ --mode upgrade --repo-root ./devspec_toolkit
-
-# Finalize: full post-migration validation + version stamp (with migration history)
-specdev align validate spec --repo-root ./devspec_toolkit
-
-# Restore spec/ from a migration backup (non-interactive)
-specdev align rollback spec --repo-root ./devspec_toolkit --backup-dir <backup-name> --yes
+# 5. Finish: runs spec-check --merge, then deletes the migration files and clears the migration status
+specdev align validate spec --repo-root ./devspec_toolkit --git-root . [--base-ref REF] [--keep-worklist]
 ```
 
-> Finalize a migration with `align validate`, not by re-running `specdev update`. `validate` stamps `spec/specdev_version` only after schema + trace-integrity checks pass and records a `migration_history` entry; `update` re-stamps after a weaker structural-diff check and omits the audit trail.
+| Action | What it does |
+|---|---|
+| `apply --auto` | The mechanical stage: scripts in phases (capture, ids, shapes, removed fields, content, the legacy close, the trace-lock baseline, host files), each idempotent, each declaring the steps it touches. It refuses with `E880` (not a git work tree, no or an unreadable `toolkit_version` stamp, a spec older than 1.0.0 or newer than the toolkit or not a listed version, uncommitted changes in `spec/` unless `--allow-dirty` or a run already in progress) and with `E881` (a script raised, broke an invariant, was not idempotent, wrote outside `spec/`, or a closed plan no longer matches its close hash: nothing is written). `--dry-run` writes nothing, also on a dirty `spec/`. `--json` prints `status`, `dry_run`, `edits_by_script`, `worklist_items`, `residue` and `errors`. `--yes` is accepted and does nothing (`apply` never asks). On a spec that is already at the toolkit's version it prints that there is nothing to do and stamps nothing. The git history is the undo: review with `git diff --stat spec`, undo with `git checkout -- spec && git clean -fd spec` (`clean` removes the files the run created) |
+| `triage` | Lists the open items of `spec/extras/migration/worklist.json` by audience (operator first), blocking first, then step and kind; `--json` prints every item of the selection. `--resolve ID --note TEXT` sets `resolved: true` and the note, and changes only the worklist; an unknown id exits 1 and lists the ids; `--note` without `--resolve` is exit 2. `--legacy NN` prints `git show` of every file of step NN as the capture's commit has it (a deleted file, such as 13a, too). Exit 0 whatever is open |
+| `propose --kind K` | Adds worklist items from the migrated tree: `refines` (a candidate `refines` per task criterion of step 14, with a class and a score), `prose-ids` (the ids a node's text names, which are to become links), `bindings` (the command that ran each legacy fixture as a `verify bind` line). `--dry-run` prints and adds nothing; a rerun adds no item twice. A folder with no `extras/migration/capture.json` is refused in one line: run `align apply --auto` first. A kind not in the list is exit 2 |
+| `bind-legacy` | Prints the `specdev verify bind` line of each `certain` group of legacy fixtures and writes them through the writer of `verify bind` after a prompt (or with `--yes`, which answers for every certain group); closes the items it settled; `--summary` prints the four counts (`fixtures still without a binding or attestation: N (must be 0 before the first release)`). It gives the refusals of `verify bind` (`E330` to `E334`, `E767`) unchanged |
+| `validate` | In order: the stamp records the toolkit's own version (a spec stamped below it is refused: the migration has not been run); `spec-check --merge` against `--base-ref` (the merge base with the default branch when absent, `E900` when there is none) has no error; then, only then, it deletes `capture.json` and `worklist.json` when no item is open (items still open are counted as information, none refuses; `--keep-worklist` keeps them), clears `migration_status` and refreshes `last_migration`. Merge mode is the gate; nothing is written before it passes. Exit 0 or 1 |
 
-> `align rollback` restores `spec/` from a backup in `spec/migration_backups/`. Without `--backup-dir` it lists available backups and prompts interactively for a selection — `--yes` alone does **not** make this non-interactive-safe; it only skips the early guard and the final confirmation prompt, not the backup-selection `input()` call, which still raises on non-interactive stdin. Pass `--backup-dir <name>` as well to bypass interactive backup selection entirely and restore that backup directly. `--json` is not yet supported for this action.
+`align` takes `--repo-root`, `--git-root` (default: the folder that holds `spec_dir`) and `--json`, and no `--spec-root`. The actions that read `--git-root` run read-only git calls only. Retired flags: `--only` and `--report` do not exist (a rerun is the partial run; redirect the dry run's output to keep it).
 
-
+Older actions, as they behave today. `align status`, `align diff` and `align plan` compare the top level of each step schema (its own `required`, `properties` and `additionalProperties`) between the host's version and the toolkit's, and on a 1.1.1 host they report almost nothing about this release, because the changes are nested; `align prompts` (`--output DIR`, `--mode bootstrap|upgrade`) renders a prompt for each structural difference, and for 1.1.1 to 1.2.0 that is one prompt for the removed step 13a file, made from the charter template: the per-step templates are opened by hand (`prompts/migration/template_<name>.md`; see the guide). `align rollback` (`--backup-dir NAME`, `--yes`) lists or restores a backup folder under `spec/migration_backups/` that an earlier toolkit made; the migration of this release makes none. Use `apply --auto`, `triage`, `propose` and `validate` instead of these.
 
 ### Step-Specific Verification
 The toolkit's own step tests run with `pytest`. Most of the step test files are also scripts that check one file given as the argument (for example step 12: DAG and cycles; step 15: `validate`). Run them from the toolkit root, because the `validate` scripts read the argument relative to it; each line below changes directory only for its own command:

@@ -222,7 +222,7 @@ def _dirty_refusal(spec_dir: str, git_root: str) -> MigrationReport | None:
     if dirty:
         return _refusal(
             f"{spec_dir} has uncommitted changes; commit them first (the migration is reviewed with `git diff` and undone with "
-            "`git checkout -- spec`), or pass --allow-dirty"
+            "`git checkout -- spec && git clean -fd spec`), or pass --allow-dirty"
         )
     return None
 

@@ -1,0 +1,21 @@
+code: E884
+subcode: MIGRATION_CHANGELOG_SCRIPT_MISSING
+title: "A changelog entry says a script migrates, and names none that exists"
+trigger: |
+  `specdev changelog --validate <version>` (and the toolkit's changelog tests)
+  found a changelog entry whose migration is `action: auto` with `kind:
+  mechanical` and that
+    - names no `script`, or
+    - names a `script` that no module under migration/scripts/ defines.
+  Versions up to 1.1.1 are exempt (a released changelog is not edited).
+resolution: |
+  1. Read the message: it gives the change number and, for an unknown script,
+     the registered script ids.
+  2. Add `script: <id>` to the entry's migration block, with an id from that
+     list, or set `kind: none` when the entry touches no host data.
+  3. Check:
+       specdev changelog --validate unreleased --repo-root .
+     prints OK.
+see_also:
+  - E880
+  - E881

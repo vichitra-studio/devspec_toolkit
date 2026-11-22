@@ -1,0 +1,21 @@
+code: E703
+subcode: LINK_CYCLE_SAME_STEP
+title: "Nodes of one step link to each other in a cycle"
+trigger: |
+  Links among nodes of a single step form a loop (a node that links to itself
+  counts). One finding per cycle:
+    E703 Link cycle within step 12: gate-setup, gate-lint (field depends_on)
+  The usual holders are job `depends_on` (step 12) and task `depends_on` (step
+  14); the tasks of the whole roadmap are checked together.
+resolution: |
+  1. The message lists the members and the field. Read each:
+       specdev node show <id>
+  2. Decide which link is wrong: a `depends_on` means "must run or be done
+     before". Remove the one that is not true:
+       specdev json patch --id <holder id> .depends_on '["<remaining ids>"]'
+     ('[]' removes every dependency of the holder; followed: the cycle of two
+     jobs was gone after one patch and the E703 count was 0).
+  3. `specdev spec-check spec --step NN ...` prints no E703.
+see_also:
+  - E702
+  - E704

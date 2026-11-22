@@ -484,34 +484,33 @@ changes:
 
   - type: change_schema
     description: >
-      Interim states until later 1.2.0 changes: the migration templates
-      prompts/migration/template_impl_context.md, template_impl_coder.md and
-      template_impl_reviewer.md (and specdev align prompts output made from them)
-      still tell a migrating agent to write the removed fields execution_results,
-      fixture_status and fr_coverage and a milestone status and context_path, so
-      their output fails specdev spec-check with E520 until a later 1.2.0 change
-      re-points them; prompts/migration/template_frs.md and template_nfrs.md say
-      to regenerate the trace matrix (no command does), template_governance.md
-      lists matrix as an allowed pr_rules value (step 10 has had no pr_rules since
-      this release began), and docs/developers/workflows/workflow_migration.md,
-      docs/developers/design/migration_system_spec.md and
-      tests/fixtures/spec_corpus still describe the 1.1.1 shape; host CI that
-      calls specdev matrix or forward-replay-check fails with exit 2 after the
-      toolkit is updated. A host whose plans have no milestone key gets E803,
-      which says to add the key with specdev json patch <plan file> '.milestone'
-      '"<milestone-id>"'; on a host that is not migrated yet, specdev align apply
-      --auto writes it (p2_plan_milestone_key); a plan without the key in a
-      migrated host was written by hand. specdev update installs the
-      Claude Code ask rules into a host's clone (.claude/settings.local.json);
-      in a clone where it has not run, specdev milestone sign-off, specdev
-      milestone defer, specdev verify attest and specdev release run without a
-      prompt unless the host wrote its own rule. A host whose project canon holds entries of
-      kind completeness_dimension, or that still has
-      spec/13a_completeness_assessment.json, is migrated by specdev align apply --auto
-      (p3_remove deletes the file, p3_host_canon the canon kind; see the step 13a
-      entry). Shown by specdev milestone-state --batch-id
-      account_recovery --repo-root ./devspec_toolkit --spec-root ./spec --git-root
-      ..
+      While a host migrates it meets these states: the 21 migration templates
+      prompts/migration/template_*.md describe the 1.2.0 shape of each step and
+      the judgement pass of that step; specdev align prompts renders none of
+      them for a 1.1.1 to 1.2.0 migration (on a 1.1.1 host its only output is a
+      prompt for the removed step 13a file), so a person opens
+      prompts/migration/template_<name>.md of the step they work on, and the
+      last instructions of the align prompts report name the id-keyed edit
+      commands (specdev json patch|insert|delete --id) instead of pasting output
+      into a spec file. The migration writes under spec/ only: host CI and hooks
+      that call specdev matrix, forward-replay-check, completeness-check or
+      traceability-check fail with exit 2 after the toolkit is updated, specdev
+      update and W932 list those lines, and the host edits them by hand before
+      the pass. A host whose plans have no milestone key gets E803, which says
+      to add the key with specdev json patch <plan file> '.milestone'
+      '"<milestone-id>"'; on a host that is not migrated yet, specdev align
+      apply --auto writes it (p2_plan_milestone_key); a plan without the key in
+      a migrated host was written by hand. specdev update installs the Claude
+      Code ask rules into a host's clone (.claude/settings.local.json); in a
+      clone where it has not run, specdev milestone sign-off, specdev milestone
+      defer, specdev verify attest and specdev release run without a prompt
+      unless the host wrote its own rule. A host whose project canon holds
+      entries of kind completeness_dimension, or that still has
+      spec/13a_completeness_assessment.json, is migrated by specdev align apply
+      --auto (p3_remove deletes the file, p3_host_canon the canon kind; see the
+      step 13a entry). Shown by specdev milestone-state --batch-id
+      account_recovery --repo-root ./devspec_toolkit --spec-root ./spec
+      --git-root ..
     migration:
       action: none
 
@@ -1379,6 +1378,9 @@ changes:
       forms (anyOf or oneOf) when every form is fixed, such as a node id in
       kebab-case or SCREAMING_SNAKE_CASE: the proves of a verification record
       gives no finding. Shown by specdev spec-check after specdev verify bind.
+      E752 does not read the nodes of a frozen plan (the plan of a milestone whose
+      anchor row is done): a frozen plan is never edited, so its text cannot be
+      reworded; the closed nodes of step 14 are still read.
     migration:
       action: none
 
@@ -1983,7 +1985,9 @@ changes:
       Migration script p4_third_party (mechanical). An external component of
       step 02 becomes a third_parties entry with the same id (no pin, no
       derives_from); tech_stack entries, typed external dependencies and API
-      version strings become worklist proposals.
+      version strings become worklist proposals. A step-09 dependencies entry
+      that is a sentence, not an object, becomes one external-dependency worklist
+      item.
     migration:
       action: auto
       script: p4_third_party
@@ -2127,13 +2131,19 @@ changes:
       --audience operator|agent, --json); --legacy NN prints the files of step
       NN as they were before the migration, and --resolve ID --note TEXT closes
       a worklist item. specdev align validate <spec_dir> is rewritten for the
-      migration: it stamps the spec at the toolkit's version, runs spec-check
-      --merge (--base-ref REF) and changes nothing when that finds an error,
+      migration: it requires the stamp to record the toolkit's version, runs
+      spec-check --merge (--base-ref REF) and changes nothing when that finds an
+      error,
       deletes capture.json and worklist.json when no worklist item is open
       (--keep-worklist keeps them; an open blocking item is reported as
       information, not as a failure) and clears migration_status. It refuses a
-      spec that is stamped below the toolkit and was never migrated. Shown by
-      specdev align triage spec --repo-root ./devspec_toolkit.
+      spec that is stamped below the toolkit and was never migrated. The skill
+      /specdev-step reads the worklist first when
+      spec/extras/migration/worklist.json exists (align triage --step NN, the
+      agent items as input to the step, each item closed with --resolve), and
+      the skills list align triage as auto-invocable and align validate as
+      human-required. Shown by specdev align triage spec --repo-root
+      ./devspec_toolkit.
     migration:
       action: none
 

@@ -3,6 +3,8 @@
 > **Version**: 0.1.0-draft  
 > **Status**: Design Specification  
 > **Last Updated**: 2026-01-14
+>
+> **Superseded for 1.2.0 data migrations.** This draft is kept as history. The 1.1.1 to 1.2.0 migration is done by a script runner (`specdev align apply --auto`: scripts in phases on a scratch copy, no backup branch, no commit), a worklist (`align triage`) and `align validate`, not by the flow described below; see [`workflow_migrate_1_2_0.md`](../workflows/workflow_migrate_1_2_0.md) and [`tools/align.md`](../tools/align.md). Where this draft names `create_backup`, `apply_auto_fixes`, `validate_post_migration` or a backup branch, those no longer exist.
 
 ---
 

@@ -1,0 +1,31 @@
+code: E882
+subcode: MIGRATION_BASELINE_NOT_REATTESTED
+title: "A link the migration wrote has not been accepted"
+trigger: |
+  spec/extras/trace.lock.json holds an entry marked `baseline` for a link of a
+  node that is not in a closed milestone. The migration writes one such entry
+  for every link that resolves; the marker says nobody has checked the link
+  since. `spec-check` reports one E882 per entry, owned by the step of the node
+  that holds the link:
+    E882 trace lock entry (fr-x, field derives_from, target 'cap-y') still
+    carries the migration baseline marker; check the link, then clear it:
+    `specdev attest fr-x` shows what would be written, `specdev attest fr-x
+    --yes` writes it
+  The migration pull request cannot merge while one is live (merge mode).
+resolution: |
+  1. Read the node and the link: `specdev node show <node id>`. If the link is
+     wrong, change it with `specdev json patch --id <node id> .<field> '<json>'`
+     (writing a link field writes a fresh lock entry; no E882 is left for it).
+  2. Accept a correct link, node by node:
+       specdev attest <node id>          # prints what would be written
+       specdev attest <node id> --yes    # writes it and clears the marker
+  3. `specdev attest --step NN` lists only SUSPECT links (a link whose target
+     changed). It prints "attest: nothing to attest" when only baseline entries
+     are left, so it does not clear them.
+  4. A link of a closed milestone keeps its marker for good and is not an
+     error; `specdev attest` refuses it with E765.
+  5. Check the step: `specdev spec-check spec --step NN ...` ends RESULT: CLEAR
+     when nothing of the step blocks.
+see_also:
+  - E765
+  - E761

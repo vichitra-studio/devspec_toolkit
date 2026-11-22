@@ -17,6 +17,7 @@ Detailed breakdowns of the spec lifecycle phases:
 - **[Spec → Impl Bridge](developers/workflows/spec_to_impl.md)**: Connecting the two phases.
 
 ### Workflows (additional)
+- **[Migrating a 1.1.1 host to 1.2.0](developers/workflows/workflow_migrate_1_2_0.md)**: The step-by-step guide for hosts: the mechanical stage, the judgement pass, finishing with `align validate`.
 - **[Alignment & Migration](developers/workflows/workflow_align.md)**: Upgrading specs to a new toolkit version.
 - **[Migration Guide](developers/workflows/workflow_migration.md)**: Detailed migration options including manual fallback.
 - **[Feature Extension](developers/workflows/workflow_feature_extension.md)**: Adding new spec extensions.

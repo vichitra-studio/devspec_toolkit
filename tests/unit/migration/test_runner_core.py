@@ -294,7 +294,7 @@ def test_a_real_run_installs_the_edits_and_stamps_once(host, toolkit):
     changed = git(host, "status", "--porcelain").split("\n")
     assert all(line[3:].startswith("spec/") for line in changed if line)
     assert git(host, "log", "--oneline").count("\n") == 1  # no commit was made
-    assert f"git checkout -- spec" in report.render()
+    assert "git checkout -- spec && git clean -fd spec" in report.render()
 
 
 def test_stamp_writes_one_history_entry_on_resume(host, toolkit):
