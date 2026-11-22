@@ -84,6 +84,12 @@ def apply(ctx) -> ScriptResult:
     return ScriptResult(edits=listed, worklist_items=listed, residue=(f"exit conditions turned into task criteria: {len(minted)}; not matched to a task: {listed - len(minted)}",))
 
 
+def _has_key(data: Any, name: str) -> bool:
+    if isinstance(data, dict):
+        return name in data or any(_has_key(value, name) for value in data.values())
+    return isinstance(data, list) and any(_has_key(value, name) for value in data)
+
+
 def verify(before, after) -> list[Problem]:
-    """No task gained a field named ``exit_conditions``."""
-    return [Problem(f"{rel}: exit_conditions is back", rel) for rel, doc in sorted(after.documents.items()) if rel[:2] == ROADMAP_STEP and "exit_conditions" in str(doc)]
+    """No task gained a field named ``exit_conditions`` (a key; a text that mentions the word is not one)."""
+    return [Problem(f"{rel}: exit_conditions is back", rel) for rel, doc in sorted(after.documents.items()) if rel[:2] == ROADMAP_STEP and _has_key(doc, "exit_conditions")]

@@ -52,6 +52,23 @@ def test_id_in_a_description_gives_e752(tmp_path: Path) -> None:
     assert "cap-account-recovery" in error.message and "reword" in error.message
 
 
+PLAN_FILE, ANCHOR_FILE = "impl_context/ms_account_recovery_plan.json", "16_impl_context.json"
+
+
+def _plan_item_mentions(doc: dict[str, Any]) -> None:
+    doc["plan"]["spec_alignment"]["checklist"][0]["description"] += " It serves cap-account-recovery."
+
+
+def test_a_plan_item_of_an_open_plan_is_read_and_one_of_a_frozen_plan_is_not(tmp_path: Path) -> None:
+    open_plan = edited_example(tmp_path / "open", **{PLAN_FILE: _plan_item_mentions})
+    assert [error.target for error in _findings(open_plan)] == [link_target("description", "cap-account-recovery")]
+    frozen = edited_example(
+        tmp_path / "frozen",
+        **{PLAN_FILE: _plan_item_mentions, ANCHOR_FILE: lambda doc: doc["plan"]["milestone_index"][0].__setitem__("status", "done")},
+    )
+    assert _findings(frozen) == [], "a frozen plan is history: nobody may reword it"
+
+
 def test_unresolved_id_shaped_token_is_not_flagged(tmp_path: Path) -> None:
     assert _findings(edited_example(tmp_path / "spec", **{FR_FILE: _statement("It replaces fr-old-export and fr-password-reset-requests.")})) == []
 

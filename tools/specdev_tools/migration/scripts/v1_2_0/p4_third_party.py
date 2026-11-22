@@ -134,9 +134,18 @@ def _items(ctx) -> list[WorklistItem]:
                       + (f"; a third party derives from no capability, so {', '.join(lost)} has no component deriving from it now (E590)" if lost else "")),
             proposal="give it its name, an exact pin and a derives_from (a seed or constraint); point what used it (a connection `connects_to`, an API `relies_on`) at it" + ("; add or name the component that covers the capability" if lost else ""),
         ))
+    notes: dict[str, int] = {}
     for row in (ctx.documents.load(CAPTURE_REL).data.get("milestone_ordering") or {}).get("typed_dependencies") or []:
         entry = row.get(LEGACY + "dependency") or {}
-        if entry.get("type") == EXTERNAL_TYPE:
+        step = str(row.get("step"))
+        if isinstance(entry, str):  # a dependency written as a sentence: it names no node, so a person places it
+            notes[step] = notes.get(step, 0) + 1
+            items.append(make_item(
+                SYSTEM_STEP, KIND_EXTERNAL_DEPENDENCY, f"dependency-note-{notes[step]}", audience="agent", blocking=False, key=step,
+                evidence=f"the step {step} dependencies held the note {entry!r}",
+                proposal="a third party, a constraint or an assumption of step 00, or nothing; the note is copied to no field",
+            ))
+        elif isinstance(entry, dict) and entry.get("type") == EXTERNAL_TYPE:
             items.append(make_item(
                 SYSTEM_STEP, KIND_EXTERNAL_DEPENDENCY, str(entry.get("id")), audience="agent", blocking=False, key=str(row.get("step")),
                 evidence=f"the step {row.get('step')} dependencies named the external {entry.get('id')}: owner {entry.get('owner')!r}, note {entry.get('note')!r}",

@@ -32,6 +32,7 @@ from specdev_tools.graph.model import Node
 from specdev_tools.graph.resolve import HISTORY_FIELDS
 from specdev_tools.migration.proposers import KIND_PROSE_IDS, MigratedTree, Proposal, ProposeResult
 from specdev_tools.migration.worklist import AUDIENCE_AGENT, make_item, read_items
+from specdev_tools.trace.history import frozen_plan_node_ids
 from specdev_tools.trace.label_rename import own_leaves
 from specdev_tools.validation.graph_checks.prose_ids import TOKEN, id_tokens, is_fixed_leaf, mentions
 
@@ -196,7 +197,10 @@ def propose(tree: MigratedTree) -> ProposeResult:
     scan = build_scan(tree)
     proposals: list[Proposal] = []
     classes: Counter[str] = Counter()
+    frozen = frozen_plan_node_ids(graph)  # as the check: a frozen plan is never edited
     for holder in sorted(graph.gated_nodes(), key=graph.shape.order_key):
+        if holder.id in frozen:
+            continue
         found = node_mentions(tree, scan, holder)
         if found:
             proposals.append(_proposal(tree, holder, found))

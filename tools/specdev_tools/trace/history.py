@@ -92,8 +92,14 @@ def historical_node_ids(graph: Graph) -> set[str]:
     historical: set[str] = set()
     for milestone in milestones:
         historical |= contained(graph, milestone)
-    historical |= {node.id for node in graph.nodes if node.milestone is not None and graph.canonical_id(node.milestone) in milestones}
+    historical |= frozen_plan_node_ids(graph)
     return historical & {node.id for node in graph.gated_nodes()}
+
+
+def frozen_plan_node_ids(graph: Graph) -> set[str]:
+    """Ids of the nodes of frozen plans: the nodes whose plan file names a milestone whose anchor row status is ``done``."""
+    milestones = done_milestones(graph)
+    return {node.id for node in graph.nodes if node.milestone is not None and graph.canonical_id(node.milestone) in milestones}
 
 
 # --- old text of a changed node ---------------------------------------------------------------------------------------

@@ -231,6 +231,25 @@ def test_exit_conditions_become_task_criteria_count_equal(migrated):
     assert len(items(host, "legacy-exit-condition")) == 3
 
 
+def test_a_criterion_text_that_mentions_the_removed_field_does_not_fail_the_run(tmp_path):
+    def mention(data: dict) -> None:
+        data["milestones"][0]["tasks"][0]["acceptance_criteria"][0]["text"] += " (was listed under exit_conditions)"
+
+    host, _toolkit, report = migrate(tmp_path, ("14_roadmap.json", mention))
+    assert report.status == STATUS_OK
+    assert "exit_conditions" in (host / "spec" / "14_roadmap.json").read_text(encoding="utf-8")
+
+
+def test_a_dependency_written_as_a_sentence_becomes_one_item(tmp_path):
+    def add_note(data: dict) -> None:
+        data.setdefault("dependencies", []).append("The SMS vendor contract is signed before launch")
+
+    host, _toolkit, report = migrate(tmp_path, ("09_impl_plan.json", add_note))
+    assert report.status == STATUS_OK
+    [note] = [i for i in items(host, "external-dependency") if i["about"].startswith("dependency-note-")]
+    assert "The SMS vendor contract is signed before launch" in note["evidence"] and note["id"].endswith("-09")
+
+
 def test_exit_conditions_script_runs_after_p3_from_capture(migrated, tmp_path):
     host, toolkit, _report = migrated
     spare = tmp_path / "spare"

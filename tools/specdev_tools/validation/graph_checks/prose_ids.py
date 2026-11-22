@@ -20,6 +20,7 @@ from typing import Any
 
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.graph.model import Graph, Node
+from specdev_tools.trace.history import frozen_plan_node_ids
 from specdev_tools.trace.label_rename import own_leaves
 
 from .codes import NODE_ID_IN_PROSE
@@ -85,12 +86,17 @@ def _finding(ctx: GraphCheckContext, node: Node, leaf_path: str, name: str, curr
 def check_prose_ids(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
     """E752 for each id a string leaf of a node that is not ``not_applicable`` mentions, one per leaf and id, in step then id order of the node.
 
+    The nodes of a frozen plan (its milestone is ``done``) are not read: the plan is history and is never edited.
+
     A node's own id (or a retired name of it) is not reported: a link to itself cannot be written.  A finding carries the node that holds the leaf (a child of a nested array is its own node), the leaf's path and
     ``<leaf field>-><id>`` as target.
     """
     tokens = id_tokens(ctx.graph)
+    frozen = frozen_plan_node_ids(ctx.graph)  # a frozen plan is never edited, so its text cannot be reworded
     findings: list[SpecError] = []
     for node in sorted(ctx.graph.gated_nodes(), key=ctx.graph.shape.order_key):
+        if node.id in frozen:
+            continue
         for leaf_path, text in own_leaves(ctx.graph, node):
             names = [name for name in mentions(text, tokens) if tokens[name] != node.id]
             if names and not is_fixed_leaf(ctx, node, leaf_path):
