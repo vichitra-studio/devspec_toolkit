@@ -980,7 +980,7 @@ A finding about the spec carries an `owner` (`step:<id>`, `merge-check`, `close-
 
 ### E709 DIFF_REF_PREDATES_GRAPH_MODEL
 
-**Trigger**: The tree at a ref given to `diff` has no graph node (seeds do not count), which is what a tree from before the 1.2.0 node model can look like. The message says the tree may predate the model and names the toolkit version its spec is stamped with, or says it carries no stamp (it says so also when the stamp file cannot be read). A tree from before 1.2.0 that has ids the registry reads is not refused: it is compared as it is, and the result is not meaningful.
+**Trigger**: The spec at a ref given to `diff` is stamped (`specdev_version`) with a toolkit version below 1.2.0: the ref is refused whatever its tree holds, because a tree from before the 1.2.0 node model that has ids the registry reads would give a diff that is not meaningful. The message names the stamp (`stamped toolkit 1.1.1, below 1.2.0`). A spec with no stamp (or a stamp file that cannot be read) is judged by its tree as before: it is refused when the tree has no graph node (seeds do not count), the message then says that the tree may predate the model and that it carries no toolkit stamp, and a stamp-less tree that has ids the registry reads is compared as it is, and the result is not meaningful.
 
 **Resolution**: Command usage error: no owner, no node id. Give a ref whose spec folder has graph nodes.
 

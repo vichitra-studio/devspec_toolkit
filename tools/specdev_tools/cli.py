@@ -415,12 +415,13 @@ def build_parser() -> _SpecdevParser:
 
     # Align commands (Phase 3-6: Schema Differ + Apply + Prompts)
     al = sub.add_parser("align", help="Toolkit alignment and migration")
-    al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "prompts", "rollback", "validate"],
-                    help="Alignment action")
+    al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "triage", "prompts", "rollback", "validate"],
+                    help="Alignment action: apply (the mechanical migration), propose, triage (the worklist), validate (finish "
+                         "the migration), status/diff/plan/prompts (read the structural differences), rollback (a pre-1.2.0 backup)")
     al.add_argument("spec_dir", help="Path to user spec/ directory")
     al.add_argument("--repo-root", default=".", help="Toolkit root directory")
     al.add_argument("--git-root", default=None,
-                    help="Host git work tree (apply; default: the folder that holds spec_dir)")
+                    help="Host git work tree (apply, propose, triage, validate; default: the folder that holds spec_dir)")
     al.add_argument("--auto", action="store_true", help="Apply only auto-fixable changes")
     al.add_argument("--dry-run", action="store_true",
                     help="apply: run the migration on a scratch copy and print the diff, write nothing; "
@@ -430,6 +431,18 @@ def build_parser() -> _SpecdevParser:
     al.add_argument("--kind", metavar="KIND",
                     help="propose: what to propose: refines (a legacy task criterion's refines link) or prose-ids "
                          "(the ids a node's text names); propose writes only spec/extras/migration/worklist.json")
+    al.add_argument("--step", metavar="NN", help="triage: list only the items of this step (4 and 04 are the same)")
+    al.add_argument("--audience", choices=["operator", "agent"], help="triage: list only the items for this audience")
+    al.add_argument("--legacy", metavar="NN",
+                    help="triage: print the files of step NN as they were before the migration (git show of the commit "
+                         "the capture names; writes nothing)")
+    al.add_argument("--resolve", metavar="ID",
+                    help="triage: close the worklist item ID (resolved: true plus --note); edits spec/extras/migration/worklist.json only")
+    al.add_argument("--note", help="triage: what was decided, the note that closes the item given to --resolve")
+    al.add_argument("--base-ref", default=None, metavar="REF",
+                    help="validate: the ref spec-check --merge measures against (default: the merge base with the default branch)")
+    al.add_argument("--keep-worklist", action="store_true",
+                    help="validate: keep spec/extras/migration/ even when no item is open")
     al.add_argument("--output", help="Output directory for generated prompts")
     al.add_argument("--mode", choices=["bootstrap", "upgrade"], default="upgrade",
                     help="Prompt generation mode (default: upgrade)")
@@ -440,7 +453,7 @@ def build_parser() -> _SpecdevParser:
 
     upd = sub.add_parser(
         "update",
-        help="Sync project to current toolkit version (re-stamp or direct to align)",
+        help="Sync project to current toolkit version (re-stamp, or say that a migration is needed and name the commands)",
     )
     upd.add_argument("spec_dir", help="Path to project spec/ directory")
     upd.add_argument("--repo-root", default=".", help="Toolkit root directory")
@@ -1378,6 +1391,39 @@ def main():
                 print(f"align propose: {error}", file=sys.stderr)
                 sys.exit(1)
             print(json.dumps(outcome.to_json(), indent=2) if getattr(args, "json_output", False) else outcome.render())
+        elif args.action == "triage":
+            from .migration.triage import TriageError, legacy_text, read_worklist, render_triage, resolve_item, select
+
+            if args.resolve and not args.note:
+                p.error("align triage --resolve needs --note: what was decided")
+            if args.note and not args.resolve:
+                p.error("align triage --note closes the item named by --resolve")
+            if args.resolve and (args.legacy or args.step or args.audience):
+                p.error("align triage --resolve closes one item; it takes no --legacy, --step or --audience")
+            git_root = args.git_root
+            try:
+                if args.resolve:
+                    line = resolve_item(spec_dir, repo_root, args.resolve, args.note, git_root)
+                    outcome = {"action": "triage", "resolved": args.resolve}
+                elif args.legacy:
+                    line = legacy_text(spec_dir, repo_root, args.legacy, git_root)
+                    outcome = {"action": "triage", "legacy": args.legacy, "output": line}
+                else:
+                    items = select(read_worklist(spec_dir, repo_root, git_root), args.step, args.audience)
+                    still_open = [item for item in items if not item.resolved]
+                    outcome = {
+                        "status": "PASS", "error_count": 0, "warning_count": 0, "command": "align", "action": "triage", "errors": [],
+                        "open": len(still_open), "blocking_open": sum(1 for item in still_open if item.blocking),
+                        "items": [item.to_json() for item in items],
+                    }
+                    selected = "".join(f" [{name} {value}]" for name, value in (("step", args.step), ("audience", args.audience)) if value)
+                    line = render_triage(items, spec_dir, selection=selected)
+            except TriageError as error:
+                if getattr(args, "json_output", False):
+                    _json_exit([f"E520 UNRESOLVED_INPUT {error}"], "align", {"action": "triage"})
+                print(f"align triage: {error}", file=sys.stderr)
+                sys.exit(1)
+            print(json.dumps({"status": "PASS", "error_count": 0, "warning_count": 0, "command": "align", "errors": [], **outcome}, indent=2) if getattr(args, "json_output", False) else line)
         elif args.action == "prompts":
             # Generate AI prompts for semantic migrations
             prompts = generate_prompts(
@@ -1479,49 +1525,49 @@ def main():
                     log_operation(spec_dir, f"Restored from {selected.backup_dir.name}", "success")
                     print(f"\u2705 Restored from {selected.backup_dir.name}")
         elif args.action == "validate":
-             # Post-migration validation
-            from .generation.schema_differ import validate_post_migration, get_toolkit_version
+            from .migration.triage import git_root_of, validate_migration
 
-            toolkit_version = get_toolkit_version(repo_root)
-            if not toolkit_version:
-                if getattr(args, "json_output", False):
-                    _json_exit(
-                        ["E520 UNRESOLVED_INPUT could_not_determine_toolkit_version"],
-                        "align",
-                    )
-                else:
-                    print("Error: Could not determine toolkit version", file=sys.stderr)
-                    sys.exit(1)
-
-            assert toolkit_version is not None  # guarded by sys.exit above
-            result = validate_post_migration(spec_dir, repo_root, toolkit_version)
-
+            git_root = git_root_of(spec_dir, args.git_root)
+            outcome = validate_migration(
+                spec_dir,
+                repo_root,
+                git_root=git_root,
+                project_canon_dir=_discover_project_canon_dir(git_root=git_root, spec_root=str(spec_dir), spec_dir=str(spec_dir)),
+                base_ref=args.base_ref,
+                keep_worklist=args.keep_worklist,
+            )
             if getattr(args, "json_output", False):
-                err_items = [f"E520 {e}" for e in result.errors]
-                warn_items = [f"W570 {w}" for w in result.warnings]
-                _json_exit(err_items + warn_items, "align")
-            else:
-                print("\U0001f50d Post-Migration Validation")
-                print("\u2501" * 27)
-
-                # Print warnings
-                if result.warnings:
-                    print("\n\u26a0\ufe0f  Warnings:")
-                    for w in result.warnings:
-                        print(f"  - {w}")
-
-                # Print errors
-                if result.errors:
-                    print("\n\u274c Errors:")
-                    for e in result.errors:
-                        print(f"  - {e}")
-                    print("\nResult: \u274c FAILED")
-                    sys.exit(1)
-
-                print("\n\u2705 Trace Integrity: OK")
-                print(f"\u2705 Toolkit Version: {toolkit_version}")
-                print("\nResult: \u2705 PASSED")
-                print("Migration complete. spec/specdev_version updated.")
+                items = [f"E520 UNRESOLVED_INPUT {outcome.refused}"] if outcome.refused else list(outcome.errors)
+                _json_exit(items, "align", {
+                    "action": "validate",
+                    "unresolved": outcome.unresolved,
+                    "blocking": outcome.blocking,
+                    "deleted": outcome.deleted,
+                    "stamp_finished": outcome.stamp_finished,
+                })
+            if outcome.refused:
+                print(f"align validate: refused: {outcome.refused}", file=sys.stderr)
+                sys.exit(1)
+            for finding in outcome.errors:
+                print(finding.render(), file=sys.stderr)
+            if outcome.failed_errors:
+                print(
+                    f"align validate: spec-check --merge reports {len(outcome.failed_errors)} error(s); the migration is not finished "
+                    "and nothing was changed. Fix them (specdev spec-check explains each), then run validate again.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            print(f"align validate: spec-check --merge: no error ({len(outcome.errors)} warning(s)).")
+            print(f"worklist: {outcome.unresolved} item(s) not resolved, {outcome.blocking} of them marked blocking (information, not a failure)." if outcome.unresolved else "worklist: every item is resolved.")
+            if outcome.deleted:
+                print(f"deleted: {', '.join('spec/' + rel for rel in outcome.deleted)}")
+            if outcome.kept:
+                print(outcome.kept)
+            for note in outcome.notes:
+                print(note)
+            if outcome.stamp_finished:
+                print("stamp: migration_status cleared, last_migration refreshed (spec/specdev_version).")
+            print("Migration finished. Commit the result.")
 
     elif args.cmd == "update":
         from .update import run_update, UpdateResult
@@ -1551,7 +1597,7 @@ def main():
             status_str = "PASS" if result.exit_code == 0 else "FAIL"
             errors_list = (
                 [{"code": "E608", "message": result.message, "severity": "error"}]
-                if result.exit_code != 0 and result.status in ("error", "needs_migration")
+                if result.exit_code != 0 and result.status in ("error", "needs_migration", "migration_in_progress")
                 else []
             )
             out = {

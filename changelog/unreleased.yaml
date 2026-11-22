@@ -537,9 +537,10 @@ changes:
       E706 for an unknown id, kind,
       link field or recipe role, E707 for a recipe start node of the wrong kind,
       E708 for a ref that does not resolve or a spec folder that cannot be read at
-      it, E709 for a ref whose tree has no graph node (a tree from before 1.2.0 that
-      has ids the registry reads is compared as it is, and the result is not
-      meaningful), E520 for a spec folder that is missing. When a spec file cannot be read, node, node candidates, node status
+      it, E709 for a ref whose spec is stamped with a toolkit version below 1.2.0,
+      whatever its tree holds, or, when it has no stamp, whose tree has no graph
+      node (a tree with no stamp that has ids the registry reads is compared as
+      it is, and the result is not meaningful), E520 for a spec folder that is missing. When a spec file cannot be read, node, node candidates, node status
       and trace print one more line on stderr that names the file and says the
       answer may be incomplete, and an unknown id then says the node may be in one
       of those files. The commands are listed in tools/cli_commands.json.

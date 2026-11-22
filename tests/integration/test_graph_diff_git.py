@@ -447,3 +447,43 @@ def test_diff_submodule_flags(host: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines()[0] == "diff v1 -> v2: 2 node(s) changed"
     assert spec_path_in_repo(str(nested), str(host)) == "spec"
+
+
+def _stamped_host_with_nodes(host: Path, stamp: str | None) -> None:
+    """A tree that has a node (so it LOOKS like a 1.2.0 spec), stamped *stamp* (no stamp file when ``None``), committed as tag ``t``."""
+    spec = host / "spec"
+    write_spec(spec, {_FR_FILE: _fr_doc("The system shall do a.", "It works.")})
+    if stamp is not None:
+        (spec / "specdev_version").write_text(f"toolkit_version: {stamp}\n", encoding="utf-8")
+    _commit(host, "t")
+
+
+def test_a_ref_stamped_below_1_2_0_is_e709_even_when_it_has_nodes(host: Path) -> None:
+    _stamped_host_with_nodes(host, "1.1.1")
+    with pytest.raises(GitViewError) as raised:
+        load_graph_at("t", str(host), "spec", str(ROOT))
+    assert raised.value.error.code == "E709"
+    assert "stamped toolkit 1.1.1" in raised.value.error.message and "below 1.2.0" in raised.value.error.message
+    result = run_specdev("diff", "t", "t", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+    assert result.returncode == 1 and "E709" in result.stderr
+
+
+def test_a_ref_with_no_stamp_is_judged_by_structure_as_before(host: Path) -> None:
+    _stamped_host_with_nodes(host, None)
+    assert "fr-a" in load_graph_at("t", str(host), "spec", str(ROOT)).by_id
+    write_spec(host / "spec", {_FR_FILE: {"functional_requirements": []}})
+    _commit(host, "empty")
+    with pytest.raises(GitViewError) as raised:
+        load_graph_at("empty", str(host), "spec", str(ROOT))
+    assert raised.value.error.code == "E709" and "no toolkit stamp" in raised.value.error.message
+
+
+def test_a_ref_stamped_1_2_0_or_later_is_read(host: Path) -> None:
+    _stamped_host_with_nodes(host, "1.2.0")
+    assert "fr-a" in load_graph_at("t", str(host), "spec", str(ROOT)).by_id
+    write_spec(host / "spec", {_FR_FILE: {"functional_requirements": []}})
+    (host / "spec" / "specdev_version").write_text("toolkit_version: 1.3.0\n", encoding="utf-8")
+    _commit(host, "later")
+    with pytest.raises(GitViewError) as raised:  # a 1.3.0 stamp does not excuse a tree with no node
+        load_graph_at("later", str(host), "spec", str(ROOT))
+    assert raised.value.error.code == "E709" and "stamped toolkit 1.3.0" in raised.value.error.message

@@ -33,6 +33,7 @@ from specdev_tools.core.changelog_parser import (
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.plan_files import plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
+from specdev_tools.generation.schema_differ import stamp_specdev_version
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.gitview import STAMP_FILE, GitViewError, status_lines
 from specdev_tools.graph.kinds import KindRegistryError, load_kind_registry
@@ -330,28 +331,30 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-def stamp_migrated(spec_dir: str, from_version: str, to_version: str, script_ids: Iterable[str], now: Callable[[], str]) -> bool:
+def stamp_migrated(spec_dir: str, to_version: str, script_ids: Iterable[str], now: Callable[[], str]) -> bool:
     """Record the migration in ``<spec_dir>/specdev_version``; ``False`` (file untouched) when it already names *to_version*.
 
-    Sets ``toolkit_version``, ``last_migration``, ``migration_status: in_progress`` and appends one ``migration_history``
-    entry ``{from, to, date, notes}``; every other key is kept.  A rerun after the stamp finds the version already
-    current and writes nothing, so a resumed run never adds a second entry.
+    Calls ``schema_differ.stamp_specdev_version``, the one writer of the stamp: it sets ``toolkit_version``,
+    ``last_migration`` and ``migration_status: in_progress``, appends one ``migration_history`` entry
+    ``{from, to, date, notes}`` and keeps every other key.  A rerun after the stamp finds the version already
+    current and writes nothing, so a resumed run never adds a second entry.  ``specdev align validate`` clears the status.
+
+    Raises:
+        OSError: the stamp cannot be written.
     """
     data = read_stamp(spec_dir) or {}
     if data.get("toolkit_version") == to_version:
         return False
-    history = list(data.get("migration_history") or [])
-    date = now()
-    history.append({
-        "from": data.get("toolkit_version", from_version),
-        "to": to_version,
-        "date": date,
-        "notes": f"mechanical migration (runner); scripts: {', '.join(script_ids)}",
-    })
-    data.setdefault("created_at", date)
-    data.update(toolkit_version=to_version, last_migration=date, migration_history=history, migration_status=STATUS_IN_PROGRESS)
-    with open(os.path.join(spec_dir, STAMP_FILE), "w", encoding="utf-8") as handle:
-        yaml.dump(data, handle, default_flow_style=False)
+    error = stamp_specdev_version(
+        Path(spec_dir),
+        to_version,
+        is_migration=True,
+        migration_status=STATUS_IN_PROGRESS,
+        history_notes=f"mechanical migration (runner); scripts: {', '.join(script_ids)}",
+        now=now,
+    )
+    if error:
+        raise OSError(error)
     return True
 
 
@@ -503,7 +506,7 @@ def _run_chain(
         drift = [e for e in check_frozen_plans(scratch_spec).errors if e.code == "E827"]
         if drift:
             return _failed(None, "a closed plan no longer has the hash of its close record: " + "; ".join(e.message for e in drift), report)
-    stamp_migrated(scratch_spec, start.from_version, start.target, [s.id for s in chain], now)
+    stamp_migrated(scratch_spec, start.target, [s.id for s in chain], now)
     real, copy = _walk_files(spec), _walk_files(scratch_spec)
     changed = sorted(rel for rel in copy if real.get(rel) != copy[rel])
     removed = sorted(rel for rel in real if rel not in copy)

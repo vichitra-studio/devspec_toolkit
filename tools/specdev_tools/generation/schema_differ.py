@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from ..core.changelog_parser import (
     ChangelogEntry,
@@ -919,14 +919,6 @@ def format_plan_report(diff: MigrationDiff) -> str:
 # Validation result (shared with the post-migration check)
 # -----------------------------------------------------------------------------
 
-@dataclass
-class ValidationResult:
-    """Result of a migration validation (``validate_post_migration``)."""
-    can_proceed: bool
-    warnings: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-
-
 def log_operation(spec_dir: Path, operation: str, status: str) -> None:
     """Log operation to spec/migration_log.
     
@@ -1026,57 +1018,73 @@ def restore_backup(spec_dir: Path, backup: BackupResult) -> None:
 # Version Stamp
 # -----------------------------------------------------------------------------
 
+KEEP_STATUS: Any = object()
+"""``stamp_specdev_version(migration_status=KEEP_STATUS)``: leave the ``migration_status`` key as it is."""
+
+
 def stamp_specdev_version(
     spec_dir: Path,
     toolkit_version: str,
     is_migration: bool = False,
+    *,
+    migration_status: Any = KEEP_STATUS,
+    history_notes: Optional[str] = None,
+    now: Optional[Callable[[], str]] = None,
 ) -> Optional[str]:
     """Write or update spec/specdev_version to record the current toolkit version.
+
+    The ONE writer of the stamp: ``specdev update`` (a plain re-stamp), the migration runner (the start of a migration)
+    and ``specdev align validate`` (its end) all call it.  The file is read first and every key it holds is kept,
+    whether this function knows the key or not; only the keys named below change.
 
     Args:
         spec_dir: Path to the project's spec/ directory.
         toolkit_version: The toolkit version string to record.
-        is_migration: When True, appends a history entry ("Migrated to vX.Y.Z").
-                      When False (plain version bump), no history entry is added.
+        is_migration: When True, sets ``last_migration`` and appends a history entry when the recorded version differs
+                      from *toolkit_version* (a re-run at the same version appends none).
+                      When False (plain version bump), no history entry is added and ``last_migration`` is kept.
+        migration_status: ``KEEP_STATUS`` (default) leaves the key as it is; a string sets it (the runner writes
+                      ``in_progress``); ``None`` removes the key (``align validate`` does, at the end of a migration).
+        history_notes: The ``notes`` of the history entry (default ``Migrated to v<version>``).
+        now: The clock of the stamp's dates (default: the current UTC time).
 
     Returns:
         None on success, or an error message string on failure.
     """
     import yaml  # lazy import — yaml is only needed at stamp time
 
+    clock = now or _get_timestamp
     version_file = spec_dir / "specdev_version"
     try:
-        version_data: Dict[str, Any] = {
-            "toolkit_version": toolkit_version,
-            "created_at": _get_timestamp(),
-            # last_migration tracks the last *schema* migration via `specdev align`.
-            # Only update it when is_migration=True; plain version bumps preserve the
-            # existing value (or leave null for new files, matching init_project.py).
-            "last_migration": _get_timestamp() if is_migration else None,
-            "migration_history": [],
-        }
-
-        if version_file.exists():
+        stamped = clock()
+        existed = version_file.exists()
+        existing: Dict[str, Any] = {}
+        if existed:
             with open(version_file, "r", encoding="utf-8") as f:
                 existing = yaml.safe_load(f) or {}
 
-            # Preserve created_at (bootstrap timestamp)
-            version_data["created_at"] = existing.get("created_at", _get_timestamp())
-            version_data["migration_history"] = existing.get("migration_history", [])
-            if not is_migration:
-                # Plain re-stamp: preserve last_migration so it still reflects the
-                # most recent actual schema migration rather than this bump.
-                version_data["last_migration"] = existing.get("last_migration", None)
-
-            if is_migration and existing.get("toolkit_version") != toolkit_version:
-                version_data["migration_history"].append(
-                    {
-                        "from": existing.get("toolkit_version", "unknown"),
-                        "to": toolkit_version,
-                        "date": _get_timestamp(),
-                        "notes": f"Migrated to v{toolkit_version}",
-                    }
-                )
+        version_data: Dict[str, Any] = dict(existing)
+        # created_at is the bootstrap timestamp: kept once written.
+        version_data["created_at"] = existing.get("created_at", stamped)
+        version_data["toolkit_version"] = toolkit_version
+        # last_migration tracks the last *schema* migration (`specdev align`): only a migration moves it; a plain
+        # bump keeps the value (null for a new file, matching init_project.py).
+        version_data["last_migration"] = stamped if is_migration else existing.get("last_migration", None)
+        history = list(existing.get("migration_history") or [])
+        if is_migration and existed and existing.get("toolkit_version") != toolkit_version:
+            history.append(
+                {
+                    "from": existing.get("toolkit_version", "unknown"),
+                    "to": toolkit_version,
+                    "date": stamped,
+                    "notes": history_notes or f"Migrated to v{toolkit_version}",
+                }
+            )
+        version_data["migration_history"] = history
+        if migration_status is None:
+            version_data.pop("migration_status", None)
+        elif migration_status is not KEEP_STATUS:
+            version_data["migration_status"] = migration_status
 
         with open(version_file, "w", encoding="utf-8") as f:
             yaml.dump(version_data, f, default_flow_style=False)
@@ -1085,68 +1093,6 @@ def stamp_specdev_version(
     except Exception as e:
         return f"Could not update specdev_version: {e}"
 
-
-# -----------------------------------------------------------------------------
-# Post-Migration Validation (Phase 9)
-# -----------------------------------------------------------------------------
-
-def validate_post_migration(
-    spec_dir: Path, 
-    toolkit_root: Path,
-    toolkit_version: str
-) -> ValidationResult:
-    """Validate migrated specs and trace integrity.
-    
-    Args:
-        spec_dir: Path to user's spec/ directory
-        toolkit_root: Path to toolkit root
-        toolkit_version: The target toolkit version
-        
-    Returns:
-        ValidationResult with status and messages
-    """
-    from ..validation.validate import validate_dir
-    warnings = []
-    errors = []
-    
-    # 1. Schema Validation
-    schema_failures = validate_dir(str(toolkit_root), str(spec_dir), git_root=str(spec_dir.parent), spec_root=str(spec_dir))
-    if schema_failures:
-        for fail in schema_failures:
-            errors.append(f"Schema Validation Failed: {fail}")
-
-    # 2. Trace Integrity: the link errors `spec-check` reports (one resolver run over the spec folder)
-    from ..graph.check import run_graph_check
-    from ..core.errors import render_errors as _render_errors
-    trace_errors = run_graph_check(str(spec_dir), str(toolkit_root))
-    if trace_errors:
-        errors.extend(_render_errors(trace_errors))
-    
-    # 3. Migration Notes Check
-    notes_file = spec_dir / "_migration_notes.md"
-    if notes_file.exists():
-        warnings.append(f"_migration_notes.md exists. Please review manually for unmapped data.")
-    
-    # Check checks for in-file _migration_notes objects
-    for f in spec_dir.iterdir():
-        if f.suffix == ".json":
-            try:
-                with open(f, "r", encoding="utf-8") as file:
-                    data = json.load(file)
-                if "_migration_notes" in data:
-                    warnings.append(f"{f.name} contains '_migration_notes'. Review required.")
-            except Exception:
-                pass
-
-    if errors:
-        return ValidationResult(can_proceed=False, warnings=warnings, errors=errors)
-
-    # 4. Update Version File on Success
-    stamp_err = stamp_specdev_version(spec_dir, toolkit_version, is_migration=True)
-    if stamp_err:
-        warnings.append(stamp_err)
-
-    return ValidationResult(can_proceed=True, warnings=warnings, errors=errors)
 
 def _get_timestamp():
     from datetime import datetime, timezone

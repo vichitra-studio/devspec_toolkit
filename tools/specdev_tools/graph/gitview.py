@@ -18,6 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from specdev_tools.core.changelog_parser import compare_versions
 from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
@@ -30,6 +31,8 @@ _TREE_ENTRY = "040000 tree "
 _MAX_REASON_CHARS = 240
 STAMP_FILE = "specdev_version"
 """The name of the file that stamps a spec folder with the toolkit version it was built with."""
+FIRST_NODE_MODEL_VERSION = "1.2.0"
+"""The first toolkit version whose spec has the graph node model; a spec stamped below it is refused by ``diff`` (E709)."""
 
 
 class GitViewError(FindingError):
@@ -355,28 +358,41 @@ def _read_archived_seeds(commit: str, git_root: str, graph: Graph, paths: Sequen
         return read_seed_texts(graph, root)
 
 
-def _predates_message(ref: str, spec_dir: str) -> str:
-    stamp = get_user_version(Path(spec_dir))
+def _predates_message(ref: str, stamp: str | None, *, by_stamp: bool) -> str:
     seen = f"its spec is stamped toolkit {stamp}" if stamp else "its spec carries no toolkit stamp"
-    return f"the tree at ref '{ref}' has no graph nodes (it may predate the 1.2.0 node model; {seen})"
+    if by_stamp:
+        return f"the tree at ref '{ref}' predates the 1.2.0 node model: its spec is stamped toolkit {stamp}, below {FIRST_NODE_MODEL_VERSION}"
+    return f"the tree at ref '{ref}' has no graph nodes (it may predate the {FIRST_NODE_MODEL_VERSION} node model; {seen})"
+
+
+def _stamped_before_node_model(stamp: str | None) -> bool:
+    """Whether *stamp* is a version below ``FIRST_NODE_MODEL_VERSION``; an absent or unreadable stamp is not."""
+    if stamp is None:
+        return False
+    try:
+        return compare_versions(stamp, FIRST_NODE_MODEL_VERSION) < 0
+    except ValueError:
+        return False
 
 
 def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) -> Snapshot:
     """The ``Snapshot`` of the spec folder *spec_path* (relative to *git_root*) at *ref*, built with the toolkit at *repo_root*.
 
     Raises:
-        GitViewError: E708 when the ref or the spec folder at the ref cannot be read; E709 when the tree at the ref has
-            no graph node (seeds do not count); a tree from before 1.2.0 that has ids the registry reads is compared as
-            it is.
+        GitViewError: E708 when the ref or the spec folder at the ref cannot be read; E709 when the spec at the ref is
+            stamped with a toolkit version below 1.2.0 (whatever its tree looks like), or, when it has no stamp, when
+            its tree has no graph node (seeds do not count).
         KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
     """
     from specdev_tools.graph.build import build_graph  # not at the top: the git merge driver imports this module and builds no graph
 
+    stamp = toolkit_stamp_at(ref, git_root, os.path.join(git_root, spec_path))
+    if _stamped_before_node_model(stamp):
+        raise _fail("E709", _predates_message(ref, stamp, by_stamp=True))
     with archive_ref(ref, git_root, [spec_path]) as archived:
-        spec_dir = os.path.join(archived, spec_path)
-        graph = build_graph(spec_dir, repo_root)
+        graph = build_graph(os.path.join(archived, spec_path), repo_root)
         if all(node.kind == SEED_KIND for node in graph.nodes):
-            raise _fail("E709", _predates_message(ref, spec_dir))
+            raise _fail("E709", _predates_message(ref, stamp, by_stamp=False))
         return Snapshot(graph, read_seed_texts_at(ref, git_root, graph))
 
 

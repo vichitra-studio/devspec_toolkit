@@ -528,11 +528,12 @@ class TestRunUpdate:
 
     def test_migration_finalizer_is_align_validate_not_rerun_update(self, tmp_path):
         """The migration remediation must finalize with `align validate`, NOT a re-run
-        of `update`.  validate runs full post-migration validation (schema + trace
-        integrity) and stamps with a migration_history entry (is_migration=True); a
-        re-run of update would only re-stamp after a weaker structural-diff check
-        (is_migration=False), dropping the audit trail and risking marking a
-        half-migrated spec as current."""
+        of `update`.  validate runs merge mode, checks the worklist and finishes the stamp
+        (clears migration_status); a re-run of update would only re-stamp after a weaker
+        structural-diff check, losing the audit trail and risking marking a
+        half-migrated spec as current.  `update` appears twice in the flow, both times
+        as something other than the finalizer: the detection (`--no-install --dry-run`)
+        and the host-file install (`--adopt`)."""
         from specdev_tools.update import run_update
 
         toolkit_root = _make_toolkit_root(tmp_path / "tk", "1.0.0")
@@ -545,15 +546,11 @@ class TestRunUpdate:
         ):
             result = run_update(spec_dir, toolkit_root)
 
-        assert "align validate" in result.message, (
-            "Migration message must finalize with `align validate` so the version is "
-            "stamped only after full post-migration validation"
-        )
-        # The finalizer must not be a re-run of `update` (would drop migration_history).
-        assert "specdev update" not in result.message, (
-            "Migration message must not direct the user to re-run `specdev update` as "
-            "the finalizer — that re-stamps without a migration_history entry"
-        )
+        commands = [line.strip() for line in result.message.splitlines() if "specdev " in line or "git " in line]
+        assert "align validate" in commands[-1], "the last command of the flow must be `align validate`"
+        update_lines = [c for c in commands if "specdev update" in c]
+        assert len(update_lines) == 2
+        assert "--no-install --dry-run" in update_lines[0] and "--adopt" in update_lines[1]
 
     def test_only_unknown_and_extension_steps_does_not_block_stamp(self, tmp_path):
         """steps_unknown and steps_extension must never trigger migration requirement."""
