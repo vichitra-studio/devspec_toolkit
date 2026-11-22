@@ -163,3 +163,18 @@ def test_invalid_json_is_reported_with_its_path(spec):
 def test_ascii_text_with_a_literal_escape_sequence_is_regular():
     text = json.dumps({"k": "\\u0041"}, indent=4) + "\n"
     assert not detect_style(text, json.loads(text)).irregular
+
+
+def test_create_writes_a_new_file_in_the_default_style_and_refuses_one_that_exists(tmp_path):
+    documents = DocumentSet(str(tmp_path))
+    document = documents.create("extras/migration/new.json", {"name": "é", "items": []})
+    path = tmp_path / "extras" / "migration" / "new.json"
+    assert path.read_text(encoding="utf-8") == '{\n    "name": "é",\n    "items": []\n}\n'
+    document.data["items"].append(1)
+    assert documents.write() == ["extras/migration/new.json"]
+    assert json.loads(path.read_text(encoding="utf-8"))["items"] == [1]
+    with pytest.raises(WriterError, match="the file exists"):
+        documents.create("extras/migration/new.json", {})
+    with pytest.raises(WriterError, match="leaves the spec folder"):
+        documents.create("../outside.json", {})
+    assert not (tmp_path.parent / "outside.json").exists()

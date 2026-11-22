@@ -39,5 +39,7 @@
   "vc:extras:signoff-record": "schema/extras/signoff_record.schema.json",
   "vc:extras:at-deploy-record": "schema/extras/at_deploy_record.schema.json",
   "vc:infra:findings": "schema/infra/findings.schema.json",
-  "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json"
+  "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json",
+  "vc:infra:migration-capture": "schema/infra/migration_capture.schema.json",
+  "vc:infra:migration-worklist": "schema/infra/migration_worklist.schema.json"
 }

@@ -19,6 +19,8 @@ import yaml
 from specdev_tools.core.changelog_parser import (
     get_toolkit_version,
     list_versions,
+    load_format,
+    load_version,
     validate_changelog,
 )
 
@@ -552,3 +554,21 @@ class TestOSErrorHardening:
             assert False, "expected FileNotFoundError"
         except FileNotFoundError:
             pass
+
+
+class TestMigrationScriptAndKind:
+    def test_migration_info_reads_script_and_kind(self, tmp_path):
+        _write_format(tmp_path)
+        content = _valid_base("1.2.0")
+        content["changes"] = [
+            {"type": "fix", "migration": {"action": "auto", "script": "p2_id_mint", "kind": "mechanical"}},
+            {"type": "fix", "migration": {"action": "none"}},
+        ]
+        _write_version(tmp_path, "1.2.0", content)
+        first, second = load_version(tmp_path, "1.2.0").changes
+        assert (first.migration.script, first.migration.kind) == ("p2_id_mint", "mechanical")
+        assert (second.migration.script, second.migration.kind) == (None, None)
+
+    def test_format_yaml_lists_kind_values(self):
+        real = Path(__file__).resolve().parents[3] / "changelog"
+        assert load_format(real).migration_kinds == ["mechanical", "judgement", "none"]

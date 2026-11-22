@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:infra:migration-worklist",
+  "title": "infra_migration_worklist",
+  "description": "The worklist of a 1.1.1 to 1.2.0 migration, kept in spec/extras/migration/worklist.json: one item per decision a migration script could not make. The scripts add items (migration/worklist.py); a person closes one by setting resolved to true and writing a note. Committed and tool-owned; not a step artifact and not read by the graph.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "description": "The items, in the order step, kind, id.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "step", "kind", "audience", "blocking", "about", "evidence", "proposal", "resolved", "note"],
+      "properties": {
+        "id": {
+          "description": "wl-<step>-<kind>-<slug of about and key>; the same case always gets the same id, so a rerun adds nothing twice.",
+          "type": "string",
+          "pattern": "^wl-[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "step": {
+          "description": "The step the decision belongs to: 00 to 15 with 02a and 13a, or 16.",
+          "type": "string",
+          "pattern": "^[0-9]{2}[a-z]?$"
+        },
+        "kind": {
+          "description": "A kebab-case name of the sort of decision (status-conflict, scope-reason, ...).",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "audience": {
+          "description": "agent: an agent proposes in the step pass and a person confirms; operator: a person decides.",
+          "enum": ["agent", "operator"]
+        },
+        "blocking": {
+          "description": "A display hint (sort order and wording on the triage list). Nothing gates on it.",
+          "type": "boolean"
+        },
+        "about": {
+          "description": "The node id or the spec file path the case is about.",
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "description": "What the script saw.",
+          "type": "string"
+        },
+        "proposal": {
+          "description": "What the script would do; empty when it has no proposal.",
+          "type": "string"
+        },
+        "resolved": {
+          "description": "True once a person has settled the item. A rerun never reopens it.",
+          "type": "boolean"
+        },
+        "note": {
+          "description": "What was decided (empty while the item is open).",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

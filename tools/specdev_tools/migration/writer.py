@@ -94,6 +94,9 @@ class StyledDocument:
         return render(self.data, self.style)
 
 
+NEW_FILE_STYLE = FileStyle(DEFAULT_INDENT, ensure_ascii=False, final_newline=True, line_ending="\n", irregular=False)
+
+
 class DocumentSet:
     """The spec JSON files of one folder, loaded once each, written back only when their data changed."""
 
@@ -110,6 +113,22 @@ class DocumentSet:
         if rel not in self._documents:
             self._documents[rel] = self._read(rel)
         return self._documents[rel]
+
+    def create(self, rel: str, data: Any) -> StyledDocument:
+        """Create the spec file *rel*, which does not exist yet, holding *data*; return it loaded.
+
+        The file is written at once in the default style (indent 4, non-ASCII kept, a final newline) through the same
+        atomic replace ``write`` uses; later edits of the returned document are written by ``write``.
+
+        Raises:
+            WriterError: *rel* leaves the spec folder, or the file exists.
+        """
+        path = self._path(rel)
+        if os.path.exists(path):
+            raise WriterError(f"{rel}: the file exists")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        replace_file_atomically(path, render(data, NEW_FILE_STYLE))
+        return self.load(rel)
 
     def changed(self) -> list[StyledDocument]:
         """The loaded documents whose data changed, in path order."""

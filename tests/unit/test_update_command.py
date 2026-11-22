@@ -505,7 +505,7 @@ class TestRunUpdate:
 
     def test_steps_needs_update_includes_align_prompts_in_message(self, tmp_path):
         """steps_needs_update may include TYPE_MISMATCH/MISSING_REQUIRED/EXTRA_FIELD diffs that
-        apply_auto_fixes cannot clear (auto_fixable=False).  The message must include 'align prompts'
+        the migration runner behind `align apply --auto` does not clear (auto_fixable=False).  The message must include 'align prompts'
         so the user is not stuck in an apply-then-re-run loop with no exit."""
         from specdev_tools.update import run_update
 

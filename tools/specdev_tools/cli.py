@@ -419,14 +419,19 @@ def build_parser() -> _SpecdevParser:
                     help="Alignment action")
     al.add_argument("spec_dir", help="Path to user spec/ directory")
     al.add_argument("--repo-root", default=".", help="Toolkit root directory")
+    al.add_argument("--git-root", default=None,
+                    help="Host git work tree (apply; default: the folder that holds spec_dir)")
     al.add_argument("--auto", action="store_true", help="Apply only auto-fixable changes")
-    al.add_argument("--dry-run", action="store_true", help="Show what would be done")
+    al.add_argument("--dry-run", action="store_true",
+                    help="apply: run the migration on a scratch copy and print the diff, write nothing")
+    al.add_argument("--allow-dirty", action="store_true",
+                    help="apply: do not refuse a spec/ with uncommitted changes")
     al.add_argument("--output", help="Output directory for generated prompts")
     al.add_argument("--mode", choices=["bootstrap", "upgrade"], default="upgrade",
                     help="Prompt generation mode (default: upgrade)")
     al.add_argument("--backup-dir", help="Backup directory to restore from (for rollback)")
     al.add_argument("--yes", "-y", action="store_true",
-                    help="Skip confirmation prompts (for non-interactive use)")
+                    help="Skip confirmation prompts (for non-interactive use; apply never asks, so it is a no-op there)")
     al.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     upd = sub.add_parser(
@@ -1225,7 +1230,9 @@ def main():
                     sys.exit(1)
         elif args.validate:
             # Validate a version's changelog
-            errs = validate_changelog(changelog_dir, args.validate)
+            from .migration.registry import discover_scripts
+
+            errs = validate_changelog(changelog_dir, args.validate, known_scripts={script.id for script in discover_scripts()})
             if getattr(args, "json_output", False):
                 _json_exit(errs, "changelog")
             else:
@@ -1252,11 +1259,8 @@ def main():
             format_status_report,
             format_diff_report,
             format_plan_report,
-            apply_auto_fixes,
-            format_apply_report,
             list_backups,
             restore_backup,
-            validate_pre_migration,
             log_operation,
         )
         from .generation.prompt_generator import (
@@ -1275,7 +1279,8 @@ def main():
                 print(f"Error: Spec directory not found: {spec_dir}", file=sys.stderr)
                 sys.exit(1)
 
-        diff = diff_spec_directory(spec_dir, repo_root)
+        if args.action in ("status", "diff", "plan", "prompts"):
+            diff = diff_spec_directory(spec_dir, repo_root)
 
         if args.action == "status":
             if getattr(args, "json_output", False):
@@ -1335,40 +1340,21 @@ def main():
                     print("       Full apply (including AI-assisted) is not yet supported")
                     sys.exit(1)
 
-            # Pre-migration validation
-            validation = validate_pre_migration(spec_dir, repo_root)
-            if not validation.can_proceed:
-                if getattr(args, "json_output", False):
-                    err_items = [f"E520 {e}" for e in validation.errors]
-                    _json_exit(err_items, "align")
-                else:
-                    for warning in validation.warnings:
-                        print(f"\u26a0\ufe0f  Warning: {warning}", file=sys.stderr)
-                    for error in validation.errors:
-                        print(f"\u274c Error: {error}", file=sys.stderr)
-                    sys.exit(1)
-            else:
-                if not getattr(args, "json_output", False):
-                    for warning in validation.warnings:
-                        print(f"\u26a0\ufe0f  Warning: {warning}", file=sys.stderr)
+            from .migration.runner import run_migration
 
-            result = apply_auto_fixes(diff, spec_dir, repo_root, dry_run=args.dry_run)
+            report = run_migration(
+                spec_dir,
+                toolkit_root=repo_root,
+                git_root=Path(os.path.abspath(args.git_root)) if args.git_root else None,
+                dry_run=args.dry_run,
+                allow_dirty=args.allow_dirty,
+            )
             if getattr(args, "json_output", False):
-                report = format_apply_report(result)
-                pre_warnings = list(validation.warnings) if validation.warnings else []
-                output = {
-                    "status": "PASS",
-                    "error_count": 0,
-                    "warning_count": len(pre_warnings),
-                    "command": "align",
-                    "action": "apply",
-                    "errors": [],
-                    "warnings": pre_warnings,
-                    "output": report,
-                }
-                print(json.dumps(output, indent=2))
+                print(json.dumps(report.to_json(), indent=2))
             else:
-                print(format_apply_report(result))
+                print(report.render(), file=sys.stderr if report.errors else sys.stdout)
+            if report.errors:
+                sys.exit(1)
         elif args.action == "prompts":
             # Generate AI prompts for semantic migrations
             prompts = generate_prompts(

@@ -8,8 +8,6 @@ The `schema_differ` module is the core engine behind the migration system. It co
 ```python
 from specdev_tools.generation.schema_differ import (
     diff_spec_directory,
-    validate_pre_migration,
-    apply_auto_fixes,
     format_diff_report
 )
 
@@ -18,10 +16,9 @@ diff = diff_spec_directory(user_spec_dir, toolkit_root)
 
 # 2. Print Report
 print(format_diff_report(diff))
-
-# 3. Apply Mechanical Fixes
-apply_auto_fixes(diff, user_spec_dir, toolkit_root)
 ```
+
+The module only reads and reports (`align status | diff | plan | prompts`). It no longer applies anything: `specdev align apply --auto` runs the migration runner (`specdev_tools.migration.runner.run_migration`), which works on a scratch copy of the spec folder, never commits and keeps no backup folder (git is the backup). `list_backups` and `restore_backup` remain only for the `spec/migration_backups/` folders that earlier toolkits wrote (`align rollback`).
 
 ## Data Structures
 
@@ -90,9 +87,3 @@ class FieldDiff:
 3.  **Changelog Lookup**: Loads `changelog/` to find explicit rename rules.
 4.  **Schema Validation**: Validates each existing file against target schema.
 5.  **Gap Analysis**: correlated inventory with requirements to find missing steps.
-
-### `validate_pre_migration`
-Checks safety preconditions:
-- Git repository exists and is clean (warns if dirty).
-- `spec/` directory exists.
-- `specdev_version` file is parseable.
