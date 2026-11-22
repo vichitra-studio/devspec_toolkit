@@ -7,6 +7,10 @@ from pathlib import Path
 import pytest
 
 from specdev_tools import cli
+from specdev_tools.core.errors import make_error
+from specdev_tools.graph.ownership import RELEASE_OWNER
+from specdev_tools.release import status_sections
+from specdev_tools.release.gate import ReleaseGateResult
 from specdev_tools.lifecycle import status as status_module
 from specdev_tools.release import records
 from specdev_tools.release.status_sections import NONE, NOT_VERIFIED, PREDATES, ROLLBACK, VERIFIED, ProductionVerification, production_verification
@@ -93,6 +97,18 @@ def test_status_section6_lists_the_errors_by_owner(tmp_path: Path) -> None:
     section = out.split("Merge-check and release-gate errors\n")[1].split("\n\n")[0]
     assert code == 0 and "E914 invariant inv-reset-token-single-use" in section
     assert any(line.startswith("  step:06 (") for line in section.splitlines())
+
+
+def test_a_release_gate_finding_without_an_owner_is_listed_under_the_release_owner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    host = release_host(tmp_path)
+    ownerless = make_error("E914", "a finding no step claims")
+    assert ownerless.owner is None
+    monkeypatch.setattr(status_sections, "run_release_gate", lambda *args: ReleaseGateResult((ownerless,), (), (), (), (), None))
+    code, out, _ = cli_run(host, "status")
+    section = out.split("Merge-check and release-gate errors\n")[1].split("\n\n")[0]
+    assert code == 0 and f"  {RELEASE_OWNER} (1):" in section and "a finding no step claims" in section
+    code, out, _ = cli_run(host, "status", "--json")
+    assert list(json.loads(out)["sections"]["merge_release_gates"]["data"]["errors"]) == [RELEASE_OWNER]
 
 
 def test_status_for_a_milestone_has_no_release_sections(tmp_path: Path) -> None:

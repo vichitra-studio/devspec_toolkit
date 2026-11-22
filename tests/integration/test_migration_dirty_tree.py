@@ -6,6 +6,7 @@ assertions do not depend on which scripts are registered.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -148,3 +149,26 @@ def test_after_a_refusal_committing_the_spec_lets_the_run_proceed(cli, host):
     done = cli.apply(host)
     assert done.returncode == 0, done.stderr
     assert stamp_of(host)["toolkit_version"] == "1.2.0"
+
+
+def test_a_host_that_hides_untracked_files_still_gets_e880_for_an_untracked_spec_file(cli, host):
+    """``status.showUntrackedFiles no`` in the host's git config must not hide a new file under ``spec/`` from the dirty check."""
+    subprocess.run(["git", "-C", str(host), "config", "status.showUntrackedFiles", "no"], check=True)
+    (host / SPEC / "extras" / "scratch-note.txt").write_text("not committed\n", encoding="utf-8")
+    assert subprocess.run(["git", "-C", str(host), "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip() == ""
+    done = cli.apply(host)
+    assert done.returncode == 1 and "E880" in done.stderr and "uncommitted changes" in done.stderr
+    assert not (host / CAPTURE).exists()
+
+
+def test_a_host_already_at_the_target_with_a_dirty_spec_is_a_no_op_not_e880(cli, host):
+    """The answer "already at the target, nothing to do" comes before the dirty check (no resume marker, no capture file)."""
+    (host / SPEC / "specdev_version").write_text("toolkit_version: 1.2.0\n", encoding="utf-8")
+    commit_all(host, "stamped at the target")
+    dirty = make_dirty(host)
+    before = tree_digest(host)
+    done = cli.apply(host)
+    assert done.returncode == 0, done.stderr
+    assert "nothing to do" in done.stdout and "E880" not in done.stderr
+    assert (host / DIRTY_FILE).read_bytes() == dirty and tree_digest(host) == before
+

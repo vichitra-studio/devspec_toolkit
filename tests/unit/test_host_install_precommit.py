@@ -7,7 +7,6 @@ replaced the way a test replaces any command.
 from __future__ import annotations
 
 import re
-import shutil
 from pathlib import Path
 
 import pytest

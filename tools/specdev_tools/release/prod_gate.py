@@ -56,7 +56,7 @@ def _commit_of(git_root: str, tag: str) -> str:
     try:
         return resolve_tag(tag, git_root)
     except GitViewError as error:
-        raise FindingError(make_error("E921", f"'{tag}' names no commit in this repository; fetch the tags (`git fetch --tags`) or name an existing release tag")) from error
+        raise FindingError(make_error("E921", f"'{tag}' is not a tag of this clone; fetch the tags (`git fetch --tags`) or name an existing release tag")) from error
 
 
 def _in_play_obligations(state: TagState) -> list[Node]:

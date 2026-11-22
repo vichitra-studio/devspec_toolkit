@@ -24,6 +24,8 @@ class GitReadError(Exception):
 def read_git(git_root: str, *args: str) -> str:
     """Run ``git -C <git_root> <args>`` and return its stdout; only the subcommands of ``READ_ONLY_GIT`` are allowed.
 
+    This is not ``gitview.git_stdout`` because the whitelist is the point: it is what the no-git-writes test pins.
+
     Raises:
         GitReadError: the subcommand is not read-only, git is missing, or git exits non-zero (the message holds its stderr).
     """

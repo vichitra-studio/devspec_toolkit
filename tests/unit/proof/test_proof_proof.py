@@ -57,6 +57,15 @@ def test_obligation_with_two_fixtures_one_failing_is_unproven(tmp_path: Path) ->
     assert [(s.verifier, s.reason) for s in result.shortfalls] == [(SECOND, NONZERO_EXIT)]
 
 
+def test_obligation_with_two_failing_fixtures_lists_both_shortfalls(tmp_path: Path) -> None:
+    host = host_with(tmp_path, binding_item(ALPHA, commands=(FAILING,)), binding_item("ver-second", verifier=SECOND, proves=(CRITERION,), commands=(FAILING,)))
+    add_fixture(host, fixture_id=SECOND, verifies=[CRITERION])
+    run(host, [ALPHA, "ver-second"])
+    result = prove(host, CRITERION)
+    assert result.status == UNPROVEN
+    assert [(s.binding, s.reason) for s in result.shortfalls] == [(ALPHA, NONZERO_EXIT), ("ver-second", NONZERO_EXIT)]
+
+
 def test_nfr_prod_at_cap_ci_is_pending_stage(tmp_path: Path) -> None:
     host = host_with(tmp_path, binding_item("ver-latency", verifier="fix-latency", proves=(NFR,), stage="prod"))
     add_fixture(host, fixture_id="fix-latency", verifies=[NFR])

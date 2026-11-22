@@ -88,7 +88,7 @@ def write_rollback(git_root: str, spec_root: str, tag: str, reason: str, pattern
     try:
         commit = resolve_tag(tag, git_root)
     except GitViewError as error:
-        raise refusal("E925", f"'{tag}' names no commit in this repository; name an existing release tag") from error
+        raise refusal("E925", f"'{tag}' is not a tag of this clone; fetch the tags (`git fetch --tags`) or name an existing release tag") from error
     if not reason.strip():
         raise refusal("E926", "the rollback reason is blank; say why the release is not verified in production")
     path = rollback_path(spec_root, tag)

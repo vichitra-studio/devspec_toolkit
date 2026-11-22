@@ -7,13 +7,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from specdev_tools.core.errors import SpecError
+from specdev_tools.graph.gitview import STAMP_FILE
 
 STATUS_OK = "ok"
 STATUS_NOOP = "noop"
 STATUS_REFUSED = "refused"  # E880: the runner did not start
 STATUS_FAILED = "failed"  # E881: a script broke an invariant, nothing was written
 
-_STAMP_FILE = "specdev_version"
 _TIMESTAMP = re.compile(r"\d{4}-\d\d-\d\dT[\d:.]+Z?")
 
 
@@ -109,6 +109,6 @@ def mask_stamp_timestamps(diff: str) -> str:
     in_stamp = False
     for line in diff.splitlines(keepends=True):
         if line.startswith("+++ "):
-            in_stamp = line.rstrip("\n").endswith(f"/{_STAMP_FILE}")
+            in_stamp = line.rstrip("\n").endswith(f"/{STAMP_FILE}")
         out.append(_TIMESTAMP.sub("<timestamp>", line) if in_stamp and not line.startswith(("--- ", "+++ ")) else line)
     return "".join(out)

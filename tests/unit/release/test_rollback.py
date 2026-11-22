@@ -47,7 +47,7 @@ def test_rollback_record_waives_previous(tmp_path: Path) -> None:
 
 def test_rollback_unknown_tag_E925(tmp_path: Path) -> None:
     host = _tagged(tmp_path)
-    assert "names no commit" in _refused(host, "E925", "v7.7.7")
+    assert "is not a tag of this clone" in _refused(host, "E925", "v7.7.7")
     tag(host, "v1.1.0-stage")
     assert "does not match the release tag pattern" in _refused(host, "E925", "v1.1.0-stage")
     assert not (host / "spec" / "extras" / "releases").exists()
@@ -56,7 +56,7 @@ def test_rollback_unknown_tag_E925(tmp_path: Path) -> None:
 def test_rollback_of_a_branch_that_is_not_a_tag_E925(tmp_path: Path) -> None:
     host = _tagged(tmp_path)
     git(host, "branch", "v2.0.0")
-    assert "names no commit" in _refused(host, "E925", "v2.0.0")
+    assert "is not a tag of this clone" in _refused(host, "E925", "v2.0.0")
     assert not (host / "spec" / "extras" / "releases").exists()
 
 

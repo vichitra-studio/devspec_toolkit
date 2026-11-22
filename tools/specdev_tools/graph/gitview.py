@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import Graph, Node, collapse_whitespace
@@ -28,7 +28,8 @@ GIT_TIMEOUT_SECONDS = 30
 PREVIOUS_COMMIT = "HEAD~1"
 _TREE_ENTRY = "040000 tree "
 _MAX_REASON_CHARS = 240
-_STAMP_FILE = "specdev_version"
+STAMP_FILE = "specdev_version"
+"""The name of the file that stamps a spec folder with the toolkit version it was built with."""
 
 
 class GitViewError(FindingError):
@@ -234,29 +235,31 @@ def git_stdout(git_root: str, args: Sequence[str]) -> str:
     return process.stdout.decode("utf-8", errors="replace")
 
 
-def status_lines(git_root: str) -> list[str]:
-    """The non-blank lines of ``git status --porcelain`` of *git_root*: a changed or staged path, or an untracked one git does not ignore.
+def status_lines(git_root: str, path: str | None = None) -> list[str]:
+    """The non-blank lines of ``git status --porcelain`` of *git_root*, limited to *path* when given: a changed or staged path, or an untracked one git does not ignore.
 
     The untracked mode is named here (``--untracked-files=all``), so a host's ``status.showUntrackedFiles no`` cannot hide a file.
 
     Raises:
         GitViewError: E708 when git is missing, too slow or fails.
     """
-    return [line for line in git_stdout(git_root, ["status", "--porcelain", "--untracked-files=all"]).splitlines() if line.strip()]
+    args = ["status", "--porcelain", "--untracked-files=all", *([] if path is None else ["--", path])]
+    return [line for line in git_stdout(git_root, args).splitlines() if line.strip()]
 
 
 def toolkit_stamp_at(ref: str, git_root: str, spec_root: str) -> str | None:
     """The ``toolkit_version`` the spec folder *spec_root* is stamped with at *ref*; ``None`` when the stamp file is absent there or holds no version.
 
-    The one reader of "the toolkit stamp at a commit": absent is told by ``path_exists_at``, every other failure raises.
+    The one reader of "the toolkit stamp at a commit": a stamp file that is absent (told by ``path_exists_at``) or present and cannot be
+    parsed (``get_user_version`` returns ``None``) reads as no stamp; only a git failure raises.
 
     Raises:
         GitViewError: E708 when *ref* does not resolve, *spec_root* is outside *git_root*, or git fails.
     """
     relative = spec_path_in_repo(spec_root, git_root)
-    if not path_exists_at(ref, git_root, f"{relative}/{_STAMP_FILE}"):
+    if not path_exists_at(ref, git_root, f"{relative}/{STAMP_FILE}"):
         return None
-    with archive_ref(ref, git_root, [f"{relative}/{_STAMP_FILE}"]) as archive:
+    with archive_ref(ref, git_root, [f"{relative}/{STAMP_FILE}"]) as archive:
         stamp = get_user_version(Path(archive) / relative)
     return None if stamp is None else str(stamp)
 

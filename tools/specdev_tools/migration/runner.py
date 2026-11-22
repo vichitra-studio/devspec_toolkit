@@ -34,6 +34,7 @@ from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.plan_files import plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
 from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.gitview import STAMP_FILE, GitViewError, status_lines
 from specdev_tools.graph.kinds import KindRegistryError, load_kind_registry
 from specdev_tools.lifecycle import plans
 from specdev_tools.lifecycle.frozen import check_frozen_plans
@@ -60,7 +61,6 @@ from specdev_tools.migration.report import (
 from specdev_tools.migration.writer import DocumentSet, diff_trees
 
 MIN_SOURCE_VERSION = "1.0.0"
-STAMP_FILE = "specdev_version"
 SEED_MANIFEST = os.path.join("common", "seed_manifest.json")
 CAPTURE_FILE = os.path.join("extras", "migration", "capture.json")
 STATUS_IN_PROGRESS = "in_progress"
@@ -212,6 +212,20 @@ def _history_from(stamp: Mapping[str, Any]) -> str:
     return "0.0.0"
 
 
+def _dirty_refusal(spec_dir: str, git_root: str) -> MigrationReport | None:
+    """E880 when ``git status`` lists a changed, staged or untracked path under *spec_dir* (all untracked files, whatever the host's ``status.showUntrackedFiles`` says); ``None`` when it lists none."""
+    try:
+        dirty = status_lines(git_root, spec_dir)
+    except GitViewError as error:
+        return _refusal(error.error.message)
+    if dirty:
+        return _refusal(
+            f"{spec_dir} has uncommitted changes; commit them first (the migration is reviewed with `git diff` and undone with "
+            "`git checkout -- spec`), or pass --allow-dirty"
+        )
+    return None
+
+
 def _preflight(spec_dir: str, git_root: str, toolkit_root: str, dry_run: bool, allow_dirty: bool) -> _Start | MigrationReport:
     try:
         inside = read_git(git_root, "rev-parse", "--is-inside-work-tree").strip()
@@ -243,16 +257,6 @@ def _preflight(spec_dir: str, git_root: str, toolkit_root: str, dry_run: bool, a
     if host_version not in listed:
         return _refusal(f"toolkit {host_version} is not a version listed in {toolkit_root}/changelog ({', '.join(listed)}); the migration cannot tell which scripts apply")
     resume = bool(stamp and stamp.get("migration_status") == STATUS_IN_PROGRESS) or os.path.isfile(os.path.join(spec_dir, CAPTURE_FILE))
-    if not (resume or allow_dirty or dry_run):
-        try:
-            dirty = read_git(git_root, "status", "--porcelain", "--", spec_dir).strip()
-        except GitReadError as error:
-            return _refusal(str(error))
-        if dirty:
-            return _refusal(
-                f"{spec_dir} has uncommitted changes; commit them first (the migration is reviewed with `git diff` and undone with "
-                "`git checkout -- spec`), or pass --allow-dirty"
-            )
     from_version = _history_from(stamp or {}) if host_version == target else host_version
     return _Start(host_version, target, resume, from_version)
 
@@ -430,6 +434,10 @@ def run_migration(
         report.status = STATUS_NOOP
         report.notes.append(f"the spec is already at toolkit version {start.target}; nothing to do")
         return report
+    if not (start.resume or allow_dirty or dry_run):
+        refusal = _dirty_refusal(spec, git)
+        if refusal is not None:
+            return refusal
     try:
         chain = chain_for(discover_scripts() if scripts is None else scripts, start.from_version, start.target)
     except RegistryError as error:

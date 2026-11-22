@@ -345,6 +345,13 @@ def check_close_gate(
     )
 
 
+_REOPEN = (
+    f"`specdev milestone close` did not write this row and the milestone commands refuse a done row (E801): set its status back to `in_progress` "
+    f"and delete its `close` (`specdev json patch` and `specdev json delete` on {anchor_store.ANCHOR_FILE}), then run `specdev milestone sign-off` and `specdev milestone close`"
+)
+"""The way out of a ``done`` row that no close record backs, as run on a copy: the row is reopened with the two ``json`` commands, then signed off and closed again."""
+
+
 def verify_close_record(row: anchor_store.AnchorRow | anchor_store.AnchorState) -> list[SpecError]:
     """E814 findings for an anchor row that is not closed with a close record the release gate can accept; empty when it is.
 
@@ -357,11 +364,13 @@ def verify_close_record(row: anchor_store.AnchorRow | anchor_store.AnchorState) 
     milestone = row.milestone_id if isinstance(row, anchor_store.AnchorRow) else None
     subject = f"milestone {milestone}" if milestone else "a milestone"
     close = state.close
-    if state.status != ROW_DONE or close is None:
+    if state.status != ROW_DONE:
         return [_finding("E814", f"{subject} is not closed with a close record (status {state.status}); close it with `specdev milestone close`", node_id=milestone)]
+    if close is None:
+        return [_finding("E814", f"{subject} is not closed with a close record (status done, no `close` key); {_REOPEN}", node_id=milestone)]
     if anchor_store.is_legacy_close(close):
         return []
     signoff = close.get("signoff")
     if not state.signed_off_by or not isinstance(signoff, str) or not signoff:
-        return [_finding("E814", f"{subject} has a close record that names no sign-off record (signed_off_by {state.signed_off_by!r}, signoff {signoff!r}); sign it off with `specdev milestone sign-off`, then close it again", node_id=milestone)]
+        return [_finding("E814", f"{subject} has a close record that names no sign-off record (signed_off_by {state.signed_off_by!r}, signoff {signoff!r}); {_REOPEN}", node_id=milestone)]
     return []

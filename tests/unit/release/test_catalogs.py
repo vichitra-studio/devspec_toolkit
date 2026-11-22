@@ -218,8 +218,34 @@ def test_the_quoted_message_of_a_close_record_with_no_sign_off_is_what_the_comma
     code, out, err = cli_run(host, "release", "--tag", "v1.0.0")
     assert code == 1
     printed = _message("E913", out, err)
-    assert "names no sign-off record" in printed
+    assert "names no sign-off record" in printed and "set its status back to `in_progress`" in printed
     _in_entry("E913", printed)
+
+
+def test_the_quoted_message_of_a_done_row_with_no_close_record_is_what_the_command_prints(tmp_path):
+    """The first E913 text (a row that is done and has no ``close`` key: only a hand edit leaves it) is quoted as the command prints it, and the way out it names is the one the Resolution ran."""
+    host = release_host(tmp_path)
+    edit_doc(host, "16_impl_context.json", lambda doc: doc["plan"]["milestone_index"][0].update(status="done"))
+    commit_all(host, "a done row with no close record")
+    code, out, err = cli_run(host, "release", "--tag", "v1.0.0")
+    assert code == 1
+    printed = _message("E913", out, err)
+    assert "no `close` key" in printed and "set its status back to `in_progress`" in printed
+    _in_entry("E913", printed)
+
+
+def test_the_quoted_dirty_tree_message_names_the_file_of_a_rollback_record(tmp_path):
+    """E910 names the file git lists (``rollback-v1.0.0.json``), not its folder; the entry and the host guide quote it."""
+    host = release_host(tmp_path)
+    tag(host, "v1.0.0")
+    code, out, err = cli_run(host, "release", "rollback", "v1.0.0", "--reason", "x")
+    assert code == 0, out + err
+    code, out, err = cli_run(host, "release", "--tag", "v1.0.1")
+    assert code == 1
+    printed = _message("E910", out, err)
+    assert "(1 path(s): spec/extras/releases/rollback-v1.0.0.json)" in printed
+    _in_entry("E910", printed)
+    assert "(1 path(s): spec/extras/releases/rollback-v1.0.0.json)" in (ROOT / "docs" / "developers" / "host_setup.md").read_text(encoding="utf-8")
 
 
 def test_the_quoted_message_of_an_undeclared_pattern_is_what_the_command_prints(tmp_path):

@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from specdev_tools.graph.gitview import archive_ref
+import pytest
+
+from specdev_tools.core.errors import make_error
+from specdev_tools.graph.gitview import GitViewError, archive_ref
+from specdev_tools.verify import code_tree
 from specdev_tools.verify.code_tree import code_tree_for_host, submodule_warnings
 from unit.graph._synth import git
 
@@ -197,3 +201,17 @@ def test_a_commit_whose_spec_differs_from_head_gives_the_id_of_its_clean_checkou
     git(tmp_path, "clone", "-q", str(repo), str(clone))
     git(clone, "checkout", "-q", tagged)
     assert _id(clone) == clean
+
+
+def test_a_submodule_git_cannot_ask_counts_as_clean(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_has_changes`` answers ``False`` when git cannot list the submodule's status: no W350 for it (pinned as built)."""
+    repo, theme = _repo_with_submodule(tmp_path)
+    write(theme / "lib.py", "uncommitted\n")
+    assert [error.code for error in submodule_warnings(str(repo))] == ["W350"]
+
+    def cannot_ask(folder: str) -> list[str]:
+        raise GitViewError(make_error("E708", "git cannot answer"))
+
+    monkeypatch.setattr(code_tree, "status_lines", cannot_ask)
+    assert submodule_warnings(str(repo)) == []
+
