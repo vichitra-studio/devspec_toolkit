@@ -1,475 +1,510 @@
-"""Migration runner for DevSpec Toolkit.
+"""The migration runner behind ``specdev align apply --auto``: scripts in phases on a scratch copy, then an install.
 
-Executes migration plans produced by ``planner.py`` with backup/rollback
-support.  Automatic fixes are applied in-place; AI-assisted steps generate
-prompt files for manual review.
+``run_migration`` checks the host (P0, E880), runs the scripts of the versions between the host's and the toolkit's in
+their fixed order (P1 to P7) on a scratch copy of the spec folder and of the seed documents, checks the invariants
+after every script (E881), writes the version stamp (P8) and, unless it is a dry run, installs the changed files into
+the spec folder.  Nothing in the host changes before every script and invariant has passed, so a failed run leaves the
+host as it was; a dry run never changes it.  The runner makes only read-only git calls and writes under the spec
+folder only.
 """
+
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import shutil
-from dataclasses import dataclass, field
+import tempfile
+from collections import Counter
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from ..generation.schema_differ import (
-    MigrationDiff,
-    apply_auto_fixes,
-    log_operation,
-    validate_post_migration,
-    validate_pre_migration,
+import yaml
+
+from specdev_tools.core.changelog_parser import (
+    compare_versions,
+    get_changes_between,
+    get_toolkit_version,
+    list_versions,
 )
-from .planner import MigrationPlan, MigrationStep
+from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.plan_files import plan_files
+from specdev_tools.core.step_paths import PLAN_DIR_NAME
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.kinds import KindRegistryError, load_kind_registry
+from specdev_tools.lifecycle import plans
+from specdev_tools.lifecycle.frozen import check_frozen_plans
+from specdev_tools.migration.context import GitReadError, MigrationContext, read_git
+from specdev_tools.migration.registry import (
+    PHASE_CLOSE,
+    PHASE_NAMES,
+    Problem,
+    RegistryError,
+    Script,
+    ScriptResult,
+    chain_for,
+    discover_scripts,
+)
+from specdev_tools.migration.report import (
+    STATUS_FAILED,
+    STATUS_NOOP,
+    STATUS_OK,
+    STATUS_REFUSED,
+    MigrationReport,
+    ScriptReport,
+    mask_stamp_timestamps,
+)
+from specdev_tools.migration.writer import DocumentSet, diff_trees
+
+MIN_SOURCE_VERSION = "1.0.0"
+STAMP_FILE = "specdev_version"
+SEED_MANIFEST = os.path.join("common", "seed_manifest.json")
+CAPTURE_FILE = os.path.join("extras", "migration", "capture.json")
+STATUS_IN_PROGRESS = "in_progress"
+ANY_FILE = "*"
 
 
-# -----------------------------------------------------------------------------
-# Data Classes
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Snapshots of the spec folder
+# ---------------------------------------------------------------------------
 
-@dataclass
-class MigrationTransaction:
-    """Result of a migration plan execution.
 
-    Attributes:
-        backup_path: Path where pre-migration backups were stored,
-            or None if ``dry_run`` was True.
-        operations_completed: List of human-readable descriptions of
-            successfully completed operations.
-        operations_failed: List of human-readable descriptions of
-            operations that failed.
-        rolled_back: Whether a rollback was performed due to failure.
-        dry_run: Whether this was a dry-run (no files modified).
+@dataclass(frozen=True)
+class Snapshot:
+    """The spec folder at one moment: a digest of every file, the parsed JSON files, the plan hashes.
+
+    ``documents`` holds the parsed content of each ``*.json`` file that parses; treat it as read-only.
     """
-    backup_path: Optional[Path] = None
-    operations_completed: List[str] = field(default_factory=list)
-    operations_failed: List[str] = field(default_factory=list)
-    rolled_back: bool = False
-    dry_run: bool = False
 
-
-@dataclass
-class TransactionBoundary:
-    """A group of migration steps that should be applied atomically.
-
-    Steps targeting the same spec file are grouped together so they
-    can be committed (or rolled back) as a single unit.
-
-    Attributes:
-        steps: The migration steps in this boundary.
-        description: Human-readable summary of the grouped operations.
-    """
-    steps: List[MigrationStep] = field(default_factory=list)
-    description: str = ""
-
-
-# -----------------------------------------------------------------------------
-# Backup / Restore
-# -----------------------------------------------------------------------------
-
-def _create_backup(spec_dir: Path) -> Path:
-    """Create a timestamped backup of the spec directory.
-
-    Copies all JSON spec files from ``spec_dir`` into a backup
-    subdirectory at ``spec_dir/migration_backups/<timestamp>/``.
-
-    Args:
-        spec_dir: Path to the user's spec directory.
-
-    Returns:
-        Path to the created backup directory.
-    """
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    backup_dir = spec_dir / "migration_backups" / timestamp
-    backup_dir.mkdir(parents=True, exist_ok=True)
-
-    for f in spec_dir.iterdir():
-        if f.is_file() and f.suffix == ".json":
-            shutil.copy2(f, backup_dir / f.name)
-
-    return backup_dir
-
-
-def _restore_backup(spec_dir: Path, backup_path: Path) -> None:
-    """Restore spec files from a backup directory.
-
-    Overwrites current spec JSON files with their backed-up versions.
-
-    Args:
-        spec_dir: Path to the user's spec directory.
-        backup_path: Path to the backup directory created by
-            ``_create_backup``.
-    """
-    for f in backup_path.iterdir():
-        if f.is_file() and f.suffix == ".json":
-            shutil.copy2(f, spec_dir / f.name)
-
-
-# -----------------------------------------------------------------------------
-# Single Step Execution
-# -----------------------------------------------------------------------------
-
-def execute_single_step(
-    step: MigrationStep,
-    spec_dir: Path,
-    toolkit_root: Path,
-) -> Tuple[bool, str]:
-    """Execute a single migration step.
-
-    For ``AUTO`` actions, applies fixes directly to the spec files
-    using ``apply_auto_fixes``.  For ``AI_ASSISTED`` actions, generates
-    a prompt file under ``spec_dir/prompts/migration/`` and returns
-    a message indicating manual intervention is needed.
-
-    Args:
-        step: The migration step to execute.
-        spec_dir: Path to the user's spec directory.
-        toolkit_root: Path to the devspec_toolkit root.
-
-    Returns:
-        Tuple of (success: bool, message: str) describing the outcome.
-    """
-    from ..generation.schema_differ import MigrationAction
-
-    step_desc = f"[{step.step_id}] {step.action.value}"
-
-    try:
-        if step.action == MigrationAction.AUTO:
-            # Apply automatic fix — reconstruct a MigrationDiff from step context
-            raw_diff = step.context.get("migration_diff") if isinstance(step.context, dict) else None
-            if isinstance(raw_diff, dict) and not isinstance(raw_diff, MigrationDiff):
-                diff = MigrationDiff(
-                    source_version=raw_diff.get("source_version"),
-                    target_version=raw_diff.get("target_version", "unknown"),
-                    steps=[],
-                )
-            elif isinstance(raw_diff, MigrationDiff):
-                diff = raw_diff
-            else:
-                diff = MigrationDiff(
-                    source_version=step.context.get("source_version") if isinstance(step.context, dict) else None,
-                    target_version=step.context.get("target_version", "unknown") if isinstance(step.context, dict) else "unknown",
-                )
-            result = apply_auto_fixes(
-                diff=diff,
-                spec_dir=spec_dir,
-                toolkit_root=toolkit_root,
-            )
-            fixed_count = len(result.operations)
-            message = (
-                f"{step_desc}: auto-fix applied "
-                f"({fixed_count} fix(es))"
-            )
-            log_operation(spec_dir, f"auto_fix:{step.step_id}", "success")
-            return (True, message)
-
-        elif step.action == MigrationAction.AI_ASSISTED:
-            # Generate prompt file for manual/AI intervention
-            prompts_dir = spec_dir / "prompts" / "migration"
-            prompts_dir.mkdir(parents=True, exist_ok=True)
-
-            prompt_filename = f"migrate_{step.step_id}.md"
-            prompt_path = prompts_dir / prompt_filename
-
-            prompt_content = _render_prompt(step, toolkit_root)
-            prompt_path.write_text(prompt_content, encoding="utf-8")
-
-            message = (
-                f"{step_desc}: prompt generated at {prompt_path}. "
-                "Manual or AI-assisted intervention required."
-            )
-            log_operation(spec_dir, f"prompt_gen:{step.step_id}", "pending")
-            return (True, message)
-
-        else:
-            # MERGE / ARCHIVE — log but mark as needing manual review
-            message = (
-                f"{step_desc}: action '{step.action.value}' requires manual review."
-            )
-            log_operation(spec_dir, f"{step.action.value}:{step.step_id}", "pending")
-            return (True, message)
-
-    except Exception as exc:
-        message = f"{step_desc}: FAILED — {exc}"
-        log_operation(spec_dir, f"error:{step.step_id}", "failed")
-        return (False, message)
-
-
-def _load_render_context(step: MigrationStep, toolkit_root: Path) -> Dict[str, str]:
-    """Build the interpolation context dict for a migration prompt.
-
-    Collects ``project_name`` from ``spec/00_charter.json`` (if present),
-    ``spec_version`` from the ``spec/specdev_version`` file (if present),
-    and ``step_id`` from the step itself.  Unknown variables are replaced
-    with empty strings rather than raising an error.
-
-    Args:
-        step: The migration step being rendered.
-        toolkit_root: Path to the devspec_toolkit root.
-
-    Returns:
-        Dict mapping variable names to string values.
-    """
-    ctx: Dict[str, str] = {
-        "project_name": "",
-        "spec_version": "",
-        "step_id": step.step_id or "",
-    }
-
-    # Attempt to read project_name from spec/00_charter.json
-    charter_path = toolkit_root / "spec" / "00_charter.json"
-    if not charter_path.exists():
-        # Support submodule deployments where spec lives beside toolkit_root
-        charter_path = toolkit_root.parent / "spec" / "00_charter.json"
-    if charter_path.exists():
-        try:
-            charter_data = json.loads(charter_path.read_text(encoding="utf-8"))
-            ctx["project_name"] = charter_data.get("title", "") or ""
-        except Exception:
-            pass
-
-    # Attempt to read spec_version from spec/specdev_version
-    version_path = toolkit_root / "spec" / "specdev_version"
-    if not version_path.exists():
-        version_path = toolkit_root.parent / "spec" / "specdev_version"
-    if version_path.exists():
-        try:
-            ctx["spec_version"] = version_path.read_text(encoding="utf-8").strip()
-        except Exception:
-            pass
-
-    return ctx
-
-
-def _interpolate_template(template: str, ctx: Dict[str, str]) -> str:
-    """Replace ``{{VAR_NAME}}`` placeholders in *template* using *ctx*.
-
-    Only simple ``{{IDENTIFIER}}`` patterns are substituted; ``{{#each}}``
-    blocks and other Handlebars-style constructs are left unchanged so that
-    the generation-subsystem renderer (``render_template()`` in
-    ``prompt_generator.py``) can handle them if needed.
-
-    If a placeholder refers to a key that is not in *ctx*, the placeholder
-    is left as-is (backward-compatible: static templates are unaffected).
-
-    Args:
-        template: Raw template string, possibly containing ``{{VAR}}`` tokens.
-        ctx: Mapping from variable names to their string values.
-
-    Returns:
-        Template string with known placeholders substituted.
-    """
-    import re
-
-    def _replace(match: "re.Match[str]") -> str:
-        var_name = match.group(1)
-        if var_name in ctx:
-            return ctx[var_name]
-        # Unknown variable — leave placeholder intact (backward-compatible)
-        return match.group(0)
-
-    return re.sub(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}", _replace, template)
-
-
-def _render_prompt(step: MigrationStep, toolkit_root: Path) -> str:
-    """Render a migration prompt file for an AI-assisted step.
-
-    If a template file exists at ``toolkit_root/prompts/migration/<template>``,
-    its contents are used as the base with ``{{VAR}}`` interpolation applied.
-    The interpolation context contains at minimum:
-
-    - ``project_name`` — from ``spec/00_charter.json`` ``title`` field
-    - ``spec_version`` — from ``spec/specdev_version``
-    - ``step_id`` — the step being migrated
-
-    Unknown placeholders are left as-is (backward-compatible with static
-    templates).  If no template file is found, a minimal prompt is
-    generated from the step context.
-
-    Args:
-        step: The migration step to render a prompt for.
-        toolkit_root: Path to the devspec_toolkit root.
-
-    Returns:
-        Rendered prompt content as a string.
-    """
-    lines: List[str] = [
-        f"# Migration Prompt: {step.step_id}",
-        "",
-        f"**Action**: {step.action.value}",
-        "",
-    ]
-
-    # Build interpolation context
-    ctx = _load_render_context(step, toolkit_root)
-
-    # Try to load template
-    if step.template:
-        template_path = toolkit_root / "prompts" / "migration" / step.template
-        if template_path.exists():
-            raw_template = template_path.read_text(encoding="utf-8")
-            rendered_template = _interpolate_template(raw_template, ctx)
-            lines.append("## Template")
-            lines.append("")
-            lines.append(rendered_template)
-            lines.append("")
-
-    # Include context
-    lines.append("## Context")
-    lines.append("")
-    lines.append("```json")
-    lines.append(json.dumps(step.context, indent=2, default=str))
-    lines.append("```")
-    lines.append("")
-
-    # Include depends_on if any
-    if step.depends_on:
-        lines.append("## Dependencies")
-        lines.append("")
-        for dep in step.depends_on:
-            lines.append(f"- {dep}")
-        lines.append("")
-
-    return "\n".join(lines)
-
-
-# -----------------------------------------------------------------------------
-# Transaction Boundaries
-# -----------------------------------------------------------------------------
-
-def group_transaction_boundaries(plan: MigrationPlan) -> List[TransactionBoundary]:
-    """Group migration steps by step_id for atomic transactions.
-
-    Steps targeting the same pipeline step (e.g., multiple field fixes
-    within ``04_frs``) are grouped into a single ``TransactionBoundary``
-    so they can be applied and committed (or rolled back) atomically.
-
-    Args:
-        plan: The migration plan to partition.
-
-    Returns:
-        Ordered list of transaction boundaries.
-    """
-    groups: Dict[str, List[MigrationStep]] = {}
-    order: List[str] = []
-
-    for step in plan.steps:
-        if step.step_id not in groups:
-            groups[step.step_id] = []
-            order.append(step.step_id)
-        groups[step.step_id].append(step)
-
-    boundaries: List[TransactionBoundary] = []
-    for step_id in order:
-        group_steps = groups[step_id]
-        actions = {s.action.value for s in group_steps}
-        desc = f"Migrate {step_id} ({len(group_steps)} operation(s), actions: {', '.join(sorted(actions))})"
-        boundaries.append(TransactionBoundary(steps=group_steps, description=desc))
-
-    return boundaries
-
-
-# -----------------------------------------------------------------------------
-# Plan Execution
-# -----------------------------------------------------------------------------
-
-def execute_plan(
-    plan: MigrationPlan,
-    spec_dir: Path,
-    toolkit_root: Path,
-    dry_run: bool = False,
-) -> MigrationTransaction:
-    """Execute a full migration plan with backup and rollback support.
-
-    Creates a backup of the current spec files before applying any
-    changes.  If any step fails, all changes are rolled back from the
-    backup and the transaction is marked as rolled back.
-
-    In ``dry_run`` mode no files are modified; the plan is walked and
-    each step is reported without side effects.
-
-    Args:
-        plan: The migration plan to execute.
-        spec_dir: Path to the user's spec directory.
-        toolkit_root: Path to the devspec_toolkit root.
-        dry_run: If True, simulate execution without modifying files.
-
-    Returns:
-        A ``MigrationTransaction`` summarising the outcome.
-    """
-    tx = MigrationTransaction(dry_run=dry_run)
-
-    if not plan.steps:
-        tx.operations_completed.append("No migration steps to execute.")
-        return tx
-
-    # Pre-migration validation
-    pre_result = validate_pre_migration(spec_dir, toolkit_root)
-    if not pre_result.can_proceed:
-        tx.operations_failed.append(
-            f"Pre-migration validation failed: {'; '.join(pre_result.errors)}"
-        )
-        return tx
-
-    # Create backup (unless dry run)
-    if not dry_run:
-        tx.backup_path = _create_backup(spec_dir)
-        log_operation(spec_dir, "backup_created", str(tx.backup_path))
-
-    # Execute steps grouped by transaction boundaries
-    boundaries = group_transaction_boundaries(plan)
-    for boundary in boundaries:
-        if dry_run:
-            for step in boundary.steps:
-                desc = (
-                    f"[DRY RUN] [{step.step_id}] {step.action.value}"
-                    f"{f' (template: {step.template})' if step.template else ''}"
-                )
-                tx.operations_completed.append(desc)
+    root: str
+    files: Mapping[str, str]
+    documents: Mapping[str, Any]
+    plan_hashes: Mapping[str, str]
+
+
+def _walk_files(root: str) -> dict[str, str]:
+    """``{slash-separated path relative to root: sha256 of the bytes}`` of every file under *root*."""
+    digests: dict[str, str] = {}
+    for folder, _dirs, names in os.walk(root):
+        for name in names:
+            path = os.path.join(folder, name)
+            with open(path, "rb") as handle:
+                digests[os.path.relpath(path, root).replace(os.sep, "/")] = hashlib.sha256(handle.read()).hexdigest()
+    return digests
+
+
+def take_snapshot(root: str, previous: Snapshot | None = None) -> Snapshot:
+    """The ``Snapshot`` of *root*; a file whose digest equals the one in *previous* reuses its parsed content."""
+    files = _walk_files(root)
+    documents: dict[str, Any] = {}
+    for rel, digest in files.items():
+        if not rel.endswith(".json"):
             continue
+        if previous is not None and previous.files.get(rel) == digest and rel in previous.documents:
+            documents[rel] = previous.documents[rel]
+            continue
+        try:
+            with open(os.path.join(root, rel), encoding="utf-8") as handle:
+                documents[rel] = json.load(handle)
+        except (OSError, ValueError):
+            continue
+    hashes: dict[str, str] = {}
+    for path in plan_files(root):
+        try:
+            hashes[f"{PLAN_DIR_NAME}/{path.name}"] = plans.plan_hash(path)
+        except FindingError:
+            continue
+    return Snapshot(root, files, documents, hashes)
 
-        # Per-boundary file backup for granular rollback
-        boundary_files: dict[str, str] = {}
-        for step in boundary.steps:
-            spec_file = spec_dir / f"{step.step_id}.json"
-            if spec_file.exists():
-                boundary_files[step.step_id] = spec_file.read_text(encoding="utf-8")
 
-        boundary_failed = False
-        for step in boundary.steps:
-            success, message = execute_single_step(step, spec_dir, toolkit_root)
+def file_key(rel: str) -> str:
+    """The key a script's ``touches`` names for the file *rel*: its step id, its first folder, or ``specdev_version``."""
+    head, _, tail = rel.partition("/")
+    if not tail:
+        stem = head.split("_", 1)[0]
+        return stem if stem and stem[0].isdigit() else head
+    return "16" if head == PLAN_DIR_NAME else head
 
-            if success:
-                tx.operations_completed.append(message)
-            else:
-                tx.operations_failed.append(message)
-                boundary_failed = True
-                break
 
-        if boundary_failed:
-            # Rollback this boundary's files
-            for step_id, content in boundary_files.items():
-                (spec_dir / f"{step_id}.json").write_text(content, encoding="utf-8")
-            tx.operations_failed.append(
-                f"Boundary '{boundary.description}' rolled back"
+def definition_ids(snapshot: Snapshot, toolkit_root: str) -> Counter[str]:
+    """How many times each definition id occurs in the graph of *snapshot* (built from the snapshot's documents alone)."""
+    graph = build_graph(snapshot.root, toolkit_root, files=set(snapshot.documents), overrides=snapshot.documents)
+    return Counter(node.id for node in graph.nodes)
+
+
+# ---------------------------------------------------------------------------
+# Invariants (E881)
+# ---------------------------------------------------------------------------
+
+
+def check_invariants(
+    script: Script, result: ScriptResult, before: Snapshot, after: Snapshot, toolkit_root: str
+) -> list[Problem]:
+    """The invariants every script keeps, as problems.
+
+    Files changed, added or removed are only those whose ``file_key`` the script lists in ``touches`` (or all, for
+    ``"*"``); no definition id the script did not record as renamed or deleted disappears or is defined once more;
+    after the legacy close (a script of a phase above 5) no plan file changes its hash.
+    """
+    problems: list[Problem] = []
+    touches = set(script.spec.touches)
+    if ANY_FILE not in touches:
+        for rel in sorted(set(before.files) | set(after.files)):
+            if before.files.get(rel) != after.files.get(rel) and file_key(rel) not in touches:
+                problems.append(Problem(f"changed {rel}, which is outside its touches {sorted(touches)}", rel))
+    before_ids = definition_ids(before, toolkit_root)
+    expected = Counter(before_ids)
+    for old, new in result.renames:
+        expected[old] -= 1
+        expected[new] += 1
+    for gone in result.deleted_ids:
+        expected[gone] -= 1
+    now = definition_ids(after, toolkit_root)
+    for node_id in sorted(set(before_ids) | {new for _old, new in result.renames}):
+        wanted = max(expected[node_id], 0)
+        if now[node_id] < wanted:
+            problems.append(Problem(f"definition id {node_id} was lost without a recorded rename or deletion"))
+        elif now[node_id] > wanted:
+            problems.append(Problem(f"definition id {node_id} is defined {now[node_id]} times, expected {wanted}"))
+    if script.spec.phase > PHASE_CLOSE:
+        for rel in sorted(set(before.plan_hashes) | set(after.plan_hashes)):
+            if before.plan_hashes.get(rel) != after.plan_hashes.get(rel):
+                problems.append(Problem(f"changed the plan {rel} after the legacy close; a plan changes then only through a recorded close migration", rel))
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# Preflight (P0, E880)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _Start:
+    host_version: str
+    target: str
+    resume: bool
+    from_version: str
+
+
+def _refusal(message: str) -> MigrationReport:
+    return MigrationReport(STATUS_REFUSED, False, errors=[make_error("E880", message)])
+
+
+def read_stamp(spec_dir: str) -> dict[str, Any] | None:
+    """The mapping in ``<spec_dir>/specdev_version``; ``None`` when the file is missing or is not a mapping."""
+    try:
+        with open(os.path.join(spec_dir, STAMP_FILE), encoding="utf-8") as handle:
+            data = yaml.safe_load(handle)
+    except (OSError, yaml.YAMLError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _history_from(stamp: Mapping[str, Any]) -> str:
+    history = stamp.get("migration_history")
+    if isinstance(history, list) and history and isinstance(history[-1], dict):
+        value = history[-1].get("from")
+        if isinstance(value, str) and value.count(".") == 2 and all(p.isdigit() for p in value.split("-", 1)[0].split(".")):
+            return value
+    return "0.0.0"
+
+
+def _preflight(spec_dir: str, git_root: str, toolkit_root: str, dry_run: bool, allow_dirty: bool) -> _Start | MigrationReport:
+    try:
+        inside = read_git(git_root, "rev-parse", "--is-inside-work-tree").strip()
+    except GitReadError as error:
+        return _refusal(f"{git_root} is not a git work tree ({error}); the migration needs git to review and undo what it writes: run `git init` and commit the spec first")
+    if inside != "true":
+        return _refusal(f"{git_root} is not inside a git work tree; run `git init` and commit the spec first")
+    stamp = read_stamp(spec_dir)
+    host_version = stamp.get("toolkit_version") if stamp else None
+    if not isinstance(host_version, str):
+        return _refusal(f"{spec_dir}/{STAMP_FILE} records no toolkit_version; run `specdev update` to stamp the host first")
+    target = get_toolkit_version(Path(toolkit_root))
+    if target is None:
+        return _refusal(f"the toolkit version cannot be read from {toolkit_root}/tools/pyproject.toml")
+    try:
+        load_kind_registry(toolkit_root)
+    except KindRegistryError as error:
+        return _refusal(f"the toolkit at {toolkit_root} has no readable kind registry: {error.error.message}")
+    listed = list_versions(Path(toolkit_root) / "changelog")
+    try:
+        too_old = compare_versions(host_version, MIN_SOURCE_VERSION) < 0
+        too_new = compare_versions(host_version, target) > 0
+    except ValueError:
+        return _refusal(f"toolkit_version {host_version!r} in {spec_dir}/{STAMP_FILE} is not a version number")
+    if too_old:
+        return _refusal(f"spec was built with toolkit {host_version}, older than {MIN_SOURCE_VERSION}, the oldest the migration starts from")
+    if too_new:
+        return _refusal(f"spec was built with toolkit {host_version}, newer than this toolkit ({target}); update the toolkit first")
+    if host_version not in listed:
+        return _refusal(f"toolkit {host_version} is not a version listed in {toolkit_root}/changelog ({', '.join(listed)}); the migration cannot tell which scripts apply")
+    resume = bool(stamp and stamp.get("migration_status") == STATUS_IN_PROGRESS) or os.path.isfile(os.path.join(spec_dir, CAPTURE_FILE))
+    if not (resume or allow_dirty or dry_run):
+        try:
+            dirty = read_git(git_root, "status", "--porcelain", "--", spec_dir).strip()
+        except GitReadError as error:
+            return _refusal(str(error))
+        if dirty:
+            return _refusal(
+                f"{spec_dir} has uncommitted changes; commit them first (the migration is reviewed with `git diff` and undone with "
+                "`git checkout -- spec`), or pass --allow-dirty"
             )
-            # Full rollback from backup
-            if tx.backup_path is not None:
-                _restore_backup(spec_dir, tx.backup_path)
-                tx.rolled_back = True
-                log_operation(spec_dir, "rollback", str(tx.backup_path))
-                tx.operations_failed.append(
-                    f"Rolled back to backup at {tx.backup_path}"
-                )
-            break
+    from_version = _history_from(stamp or {}) if host_version == target else host_version
+    return _Start(host_version, target, resume, from_version)
 
-    # Post-migration validation (only if not dry run and not rolled back)
-    if not dry_run and not tx.rolled_back:
-        post_result = validate_post_migration(spec_dir, toolkit_root, plan.target_version)
-        if not post_result.can_proceed:
-            warnings = "; ".join(post_result.errors)
-            tx.operations_completed.append(
-                f"Post-migration validation warnings: {warnings}"
-            )
 
-    return tx
+# ---------------------------------------------------------------------------
+# Scratch copy and install
+# ---------------------------------------------------------------------------
+
+
+def _seed_paths(spec_dir: str) -> list[str]:
+    """The seed document paths (relative to the host root) of the seed manifest, when it lists any."""
+    try:
+        with open(os.path.join(spec_dir, SEED_MANIFEST), encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    seeds = manifest.get("seeds") if isinstance(manifest, dict) else None
+    paths = [seed.get("path") for seed in seeds if isinstance(seed, dict)] if isinstance(seeds, list) else []
+    return [p for p in paths if isinstance(p, str) and not os.path.isabs(p) and ".." not in Path(p).parts]
+
+
+def _make_scratch(spec_dir: str, host_root: str, spec_rel: str, seed_paths: Iterable[str]) -> tuple[str, str]:
+    """Copy the spec folder and the seed documents to a temp folder with the host's layout; return (host root, spec folder)."""
+    scratch = tempfile.mkdtemp(prefix="specdev-migrate-")
+    scratch_spec = os.path.join(scratch, spec_rel)
+    shutil.copytree(spec_dir, scratch_spec, symlinks=True)
+    for rel in seed_paths:
+        source = os.path.join(host_root, rel)
+        if os.path.isfile(source):
+            os.makedirs(os.path.dirname(os.path.join(scratch, rel)), exist_ok=True)
+            shutil.copy2(source, os.path.join(scratch, rel))
+    return scratch, scratch_spec
+
+
+def _outside_spec(scratch: str, spec_rel: str) -> dict[str, str]:
+    """Digests of every file of the scratch host that is not inside its spec folder."""
+    return {rel: digest for rel, digest in _walk_files(scratch).items() if not (rel == spec_rel or rel.startswith(spec_rel.replace(os.sep, "/") + "/"))}
+
+
+def _install(source: str, destination: str) -> None:
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    descriptor, temp = tempfile.mkstemp(dir=os.path.dirname(destination), prefix=".specdev-migrate-", suffix=".tmp")
+    os.close(descriptor)
+    try:
+        shutil.copyfile(source, temp)
+        shutil.copymode(source, temp)
+        os.replace(temp, destination)
+    except BaseException:
+        if os.path.exists(temp):
+            os.unlink(temp)
+        raise
+
+
+def _install_changes(real_spec: str, scratch_spec: str, changed: Iterable[str], removed: Iterable[str]) -> None:
+    for rel in changed:
+        _install(os.path.join(scratch_spec, rel), os.path.join(real_spec, rel))
+    for rel in removed:
+        os.remove(os.path.join(real_spec, rel))
+        folder = os.path.dirname(os.path.join(real_spec, rel))
+        while folder != real_spec and not os.listdir(folder):
+            os.rmdir(folder)
+            folder = os.path.dirname(folder)
+
+
+# ---------------------------------------------------------------------------
+# Stamp (P8)
+# ---------------------------------------------------------------------------
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def stamp_migrated(spec_dir: str, from_version: str, to_version: str, script_ids: Iterable[str], now: Callable[[], str]) -> bool:
+    """Record the migration in ``<spec_dir>/specdev_version``; ``False`` (file untouched) when it already names *to_version*.
+
+    Sets ``toolkit_version``, ``last_migration``, ``migration_status: in_progress`` and appends one ``migration_history``
+    entry ``{from, to, date, notes}``; every other key is kept.  A rerun after the stamp finds the version already
+    current and writes nothing, so a resumed run never adds a second entry.
+    """
+    data = read_stamp(spec_dir) or {}
+    if data.get("toolkit_version") == to_version:
+        return False
+    history = list(data.get("migration_history") or [])
+    date = now()
+    history.append({
+        "from": data.get("toolkit_version", from_version),
+        "to": to_version,
+        "date": date,
+        "notes": f"mechanical migration (runner); scripts: {', '.join(script_ids)}",
+    })
+    data.setdefault("created_at", date)
+    data.update(toolkit_version=to_version, last_migration=date, migration_history=history, migration_status=STATUS_IN_PROGRESS)
+    with open(os.path.join(spec_dir, STAMP_FILE), "w", encoding="utf-8") as handle:
+        yaml.dump(data, handle, default_flow_style=False)
+    return True
+
+
+def _not_run(toolkit_root: str, from_version: str, to_version: str) -> list[str]:
+    """The changelog entries between the versions that are ``ai_assisted``: the runner does not do them."""
+    try:
+        changes = get_changes_between(Path(toolkit_root) / "changelog", from_version, to_version)
+    except (FileNotFoundError, ValueError):
+        return []
+    entries = []
+    for change in changes:
+        if change.migration is not None and change.migration.action == "ai_assisted":
+            text = (change.description or change.type).strip().splitlines()[0]
+            entries.append(f"{change.type}: {text}")
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# The run
+# ---------------------------------------------------------------------------
+
+
+def _failed(
+    script: Script | None, message: str, report: MigrationReport, file: str | None = None, *, written: bool = False
+) -> MigrationReport:
+    label = f"script {script.id} (phase {script.spec.phase}, {PHASE_NAMES[script.spec.phase]}): " if script else ""
+    report.status = STATUS_FAILED
+    report.errors.append(make_error("E881", f"{label}{message}" + ("" if written else "; nothing was written"), file=file))
+    report.changed_files = []
+    report.diff = ""
+    return report
+
+
+def _describe(error: BaseException) -> str:
+    if isinstance(error, FindingError):
+        return error.error.render()
+    return f"raised {type(error).__name__}: {error}"
+
+
+def run_migration(
+    spec_dir: str | os.PathLike[str],
+    *,
+    toolkit_root: str | os.PathLike[str],
+    git_root: str | os.PathLike[str] | None = None,
+    dry_run: bool = False,
+    allow_dirty: bool = False,
+    scripts: Iterable[Script] | None = None,
+    now: Callable[[], str] = _utc_now,
+) -> MigrationReport:
+    """Migrate the spec folder *spec_dir* from the version it records to the version of the toolkit at *toolkit_root*.
+
+    Args:
+        spec_dir: the host's spec folder.
+        toolkit_root: the toolkit (``tools/pyproject.toml``, ``changelog/``, ``tools/entry_key_registry.json``); the target
+            version is its version.
+        git_root: the host's git work tree (default: the folder that holds *spec_dir*); seed documents are read from it.
+        dry_run: run on the scratch copy only and report the diff; the host is not changed.
+        allow_dirty: do not refuse a spec folder with uncommitted changes.
+        scripts: the scripts to choose from (default: every script module of the toolkit, ``discover_scripts``).
+        now: the clock of the stamp.
+
+    Returns:
+        A ``MigrationReport``: status ``ok`` or ``noop``, ``refused`` (E880: the runner did not start) or ``failed``
+        (E881: a script or an invariant failed; the host is unchanged).
+    """
+    spec = os.path.abspath(spec_dir)
+    toolkit = os.path.abspath(toolkit_root)
+    git = os.path.abspath(git_root) if git_root is not None else os.path.dirname(spec)
+    spec_rel = os.path.relpath(spec, git)
+    if spec_rel == "." or spec_rel.startswith(".."):
+        git, spec_rel = os.path.dirname(spec), os.path.basename(spec)
+    host_root = git
+
+    start = _preflight(spec, git, toolkit, dry_run, allow_dirty)
+    if isinstance(start, MigrationReport):
+        start.dry_run = dry_run
+        return start
+    report = MigrationReport(STATUS_OK, dry_run, start.host_version, start.target, spec_dir=spec_rel)
+    if compare_versions(start.host_version, start.target) == 0 and not start.resume:
+        report.status = STATUS_NOOP
+        report.notes.append(f"the spec is already at toolkit version {start.target}; nothing to do")
+        return report
+    try:
+        chain = chain_for(discover_scripts() if scripts is None else scripts, start.from_version, start.target)
+    except RegistryError as error:
+        return _failed(None, str(error), report)
+    report.not_run = _not_run(toolkit, start.from_version, start.target)
+    if not chain:
+        report.status = STATUS_NOOP
+        report.notes.append(f"no migration script is registered for {start.from_version} -> {start.target}; nothing changed")
+        return report
+
+    scratch, scratch_spec = _make_scratch(spec, host_root, spec_rel, _seed_paths(spec))
+    try:
+        return _run_chain(report, chain, start, spec, scratch, scratch_spec, spec_rel, git, toolkit, now)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+def _run_chain(
+    report: MigrationReport,
+    chain: list[Script],
+    start: _Start,
+    spec: str,
+    scratch: str,
+    scratch_spec: str,
+    spec_rel: str,
+    git: str,
+    toolkit: str,
+    now: Callable[[], str],
+) -> MigrationReport:
+    outside = _outside_spec(scratch, spec_rel)
+    snapshot = take_snapshot(scratch_spec)
+    applied_any = False
+    for script in chain:
+        context = MigrationContext(scratch_spec, scratch, git, toolkit, report.dry_run, DocumentSet(scratch_spec), start.from_version, start.target)
+        try:
+            detected = int(script.detect(context))
+        except Exception as error:  # a script bug must fail the run, never leave it half done
+            return _failed(script, f"detect {_describe(error)}", report)
+        if detected == 0:
+            report.scripts.append(ScriptReport(script.id, script.spec.phase, 0, 0))
+            continue
+        try:
+            result = script.apply(context)
+            context.documents.write()
+            after = take_snapshot(scratch_spec, snapshot)
+            problems = check_invariants(script, result, snapshot, after, toolkit)
+            problems += list(script.verify(snapshot, after))
+            rerun = int(script.detect(MigrationContext(scratch_spec, scratch, git, toolkit, report.dry_run, DocumentSet(scratch_spec), start.from_version, start.target)))
+        except Exception as error:
+            return _failed(script, _describe(error), report)
+        if rerun:
+            problems.append(Problem(f"a second detect still finds {rerun} edit(s); the script is not idempotent"))
+        for rel, digest in _outside_spec(scratch, spec_rel).items():
+            if outside.get(rel) != digest:
+                problems.append(Problem(f"wrote {rel}, which is outside the spec folder", rel))
+        if problems:
+            _failed(script, "; ".join(problem.message for problem in problems), report, problems[0].file)
+            return report
+        report.scripts.append(ScriptReport(script.id, script.spec.phase, detected, result.edits, result.worklist_items, tuple(result.residue)))
+        applied_any = True
+        snapshot = after
+    if applied_any:
+        drift = [e for e in check_frozen_plans(scratch_spec).errors if e.code == "E827"]
+        if drift:
+            return _failed(None, "a closed plan no longer has the hash of its close record: " + "; ".join(e.message for e in drift), report)
+    stamp_migrated(scratch_spec, start.from_version, start.target, [s.id for s in chain], now)
+    real, copy = _walk_files(spec), _walk_files(scratch_spec)
+    changed = sorted(rel for rel in copy if real.get(rel) != copy[rel])
+    removed = sorted(rel for rel in real if rel not in copy)
+    report.changed_files = sorted(changed + removed)
+    if report.dry_run:
+        report.diff = mask_stamp_timestamps(diff_trees(spec, scratch_spec))
+        return report
+    try:
+        _install_changes(spec, scratch_spec, changed, removed)
+    except OSError as error:
+        return _failed(None, f"the changes could not be installed into {spec} ({error}); the spec folder may be partly changed, review `git status`", report, written=True)
+    return report

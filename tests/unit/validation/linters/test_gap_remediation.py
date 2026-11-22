@@ -4,7 +4,7 @@ Covers:
 - ``get_step_from_path`` handling of ``impl_context/`` directories
 - ``DEEP_VALIDATORS`` entries for steps 16a, 16b, 16c
 - ``validators`` sub-package importability
-- Migration runner ``execute_single_step`` importability
+- Migration runner ``run_migration`` importability
 - ``init_project.py`` support for ``--venv-name`` argument
 - the verb-named property rule on the step 16 plan schema
 """
@@ -106,10 +106,10 @@ class TestValidatorsPackage:
 class TestMigrationRunner:
     """Verify that the migration runner module imports without errors."""
 
-    def test_execute_single_step_importable(self):
-        from specdev_tools.migration.runner import execute_single_step
+    def test_run_migration_importable(self):
+        from specdev_tools.migration.runner import run_migration
 
-        assert callable(execute_single_step)
+        assert callable(run_migration)
 
 
 # ---------------------------------------------------------------------------
