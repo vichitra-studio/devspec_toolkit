@@ -25,13 +25,14 @@ from specdev_tools.generation.schema_differ import KEEP_STATUS, stamp_specdev_ve
 from specdev_tools.migration import runner, triage
 from specdev_tools.migration.registry import PHASE_IDS
 from specdev_tools.migration.worklist import WORKLIST_FILE, make_item
+from specdev_tools.core.changelog_parser import get_toolkit_version
 
 from .test_runner_core import MINI_HOST, REAL_ROOT, git, make_host, make_script, make_toolkit
 
 SPEC = "spec"
 CAPTURE = "extras/migration/capture.json"
 WORKLIST = "extras/migration/worklist.json"
-LIVE_VERSION = "1.1.1"
+LIVE_VERSION = get_toolkit_version(REAL_ROOT) or ""  # the version the live toolkit says
 
 
 def specdev(*argv: str) -> tuple[int, str, str]:
@@ -329,7 +330,7 @@ def test_validate_refuses_a_spec_that_was_not_migrated(tmp_path):
     with stub_merge_check() as stub:
         code, out, err = specdev("validate", str(root / SPEC), "--repo-root", str(REAL_ROOT))
     assert code == 1 and not stub.called
-    assert "the spec records toolkit v1.0.0 and this toolkit is v1.1.1: the migration has not been run" in err
+    assert f"the spec records toolkit v1.0.0 and this toolkit is v{LIVE_VERSION}: the migration has not been run" in err
     assert digest(root) == before
 
 

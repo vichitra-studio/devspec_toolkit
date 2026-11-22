@@ -118,8 +118,8 @@ def test_changelog_md_and_yaml_carry_the_same_m7_entry(marker):
     bullets, descriptions = _changelog_texts()
     md = next((b for b in bullets if plain in _normalised(b)), "")
     entry = next((d for d in descriptions if plain in _normalised(d)), "")
-    assert md, f"changelog/unreleased.md has no bullet with {marker!r}"
-    assert entry, f"changelog/unreleased.yaml has no change with {marker!r}"
+    assert md, f"changelog/v1.2.0.md has no bullet with {marker!r}"
+    assert entry, f"changelog/v1.2.0.yaml has no change with {marker!r}"
     assert _normalised(md) == _normalised(entry)
 
 

@@ -5,7 +5,7 @@ Which property lives where:
 * ``test_migration_dispositions.py`` (WI-M10-05): the checklist and the map agree row for row, every removed row has a
   disposition and a script, the map's counts. It lets a row name a script of a bundle that did not exist yet.
 * ``test_changelog_scripts.py`` (WI-M10-14a): the E884 rule itself, on temp changelogs, and over every real changelog.
-* this file: the three-way agreement of the registry, the map and ``changelog/unreleased.yaml`` (the 1.2.0 changelog in
+* this file: the three-way agreement of the registry, the map and ``changelog/v1.2.0.yaml`` (the 1.2.0 changelog in
   waiting, P1), now that every script exists: each registered 1.2.0 script has exactly one entry, each entry names a
   registered script, each script a map row names is registered and has an entry.
 """
@@ -32,8 +32,8 @@ def _scripts_of_the_release() -> dict[str, object]:
 
 
 def _entries() -> list:
-    """Every ``migration`` block of ``unreleased.yaml`` that names a script."""
-    return [change.migration for change in load_version(CHANGELOG, "unreleased").changes if change.migration is not None and change.migration.script]
+    """Every ``migration`` block of ``v1.2.0.yaml`` that names a script."""
+    return [change.migration for change in load_version(CHANGELOG, "1.2.0").changes if change.migration is not None and change.migration.script]
 
 
 def _map_rows() -> list[dict]:
@@ -50,10 +50,10 @@ def test_every_registered_script_has_exactly_one_entry_and_every_entry_names_a_r
 
 
 def test_every_auto_entry_names_a_script():
-    """Over ``unreleased.yaml``: an ``auto`` entry that migrates host data (kind mechanical or judgement) names a script and a known kind; a ``none`` entry is toolkit-internal."""
+    """Over ``v1.2.0.yaml``: an ``auto`` entry that migrates host data (kind mechanical or judgement) names a script and a known kind; a ``none`` entry is toolkit-internal."""
     kinds = set(load_format(CHANGELOG).migration_kinds)
     assert {"mechanical", "judgement", "none"} <= kinds
-    for change in load_version(CHANGELOG, "unreleased").changes:
+    for change in load_version(CHANGELOG, "1.2.0").changes:
         migration = change.migration
         if migration is None or migration.action != "auto":
             continue

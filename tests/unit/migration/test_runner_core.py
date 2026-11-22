@@ -35,6 +35,7 @@ from specdev_tools.migration.registry import (
 )
 from specdev_tools.migration.report import STATUS_FAILED, STATUS_NOOP, STATUS_OK, STATUS_REFUSED
 from specdev_tools.lifecycle import plans
+from specdev_tools.core.changelog_parser import get_toolkit_version
 
 REAL_ROOT = Path(__file__).resolve().parents[3]
 MINI_HOST = REAL_ROOT / "tests" / "fixtures" / "migration" / "mini_host_1_1_1"
@@ -262,7 +263,8 @@ def test_host_at_target_without_capture_is_noop(tmp_path, toolkit):
     assert tree_digest(host) == before
 
 
-def test_host_at_the_real_toolkit_version_is_noop(host):
+def test_host_at_the_real_toolkit_version_is_noop(tmp_path):
+    host = make_host(tmp_path, version=get_toolkit_version(REAL_ROOT) or "")
     report = runner.run_migration(host / "spec", toolkit_root=REAL_ROOT, git_root=host)
     assert report.status == STATUS_NOOP
 

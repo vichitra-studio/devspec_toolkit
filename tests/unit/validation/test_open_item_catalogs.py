@@ -19,8 +19,8 @@ from ..core.test_error_code_registry import REGISTERED_WITHOUT_EMITTER
 _ROOT = Path(__file__).resolve().parents[3]
 _ERROR_CODES_MD = _ROOT / "docs" / "developers" / "error-codes.md"
 _REFERENCE_MD = _ROOT / "docs" / "developers" / "reference.md"
-_CHANGELOG_MD = _ROOT / "changelog" / "unreleased.md"
-_CHANGELOG_YAML = _ROOT / "changelog" / "unreleased.yaml"
+_CHANGELOG_MD = _ROOT / "changelog" / "v1.2.0.md"
+_CHANGELOG_YAML = _ROOT / "changelog" / "v1.2.0.yaml"
 _SOURCE = _ROOT / "tools" / "specdev_tools"
 _OPEN_ITEMS_SOURCE = _SOURCE / "validation" / "open_items.py"
 
@@ -123,8 +123,8 @@ def test_changelog_md_and_yaml_carry_the_m6a_entries(marker):
     plain = _normalised(marker)
     md = next((b for b in _md_bullets() if plain in _normalised(b)), "")
     entry = next((d for d in _yaml_descriptions() if plain in _normalised(d)), "")
-    assert md, f"changelog/unreleased.md has no bullet with {marker!r}"
-    assert entry, f"changelog/unreleased.yaml has no change with {marker!r}"
+    assert md, f"changelog/v1.2.0.md has no bullet with {marker!r}"
+    assert entry, f"changelog/v1.2.0.yaml has no change with {marker!r}"
     assert _normalised(md) == _normalised(entry)
 
 

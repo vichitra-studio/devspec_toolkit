@@ -20,8 +20,8 @@ _ERROR_CODES_MD = _ROOT / "docs" / "developers" / "error-codes.md"
 _REFERENCE_MD = _ROOT / "docs" / "developers" / "reference.md"
 _SHARED_MD = _ROOT / "docs" / "prompts" / "shared_expectations.md"
 _GOVERNANCE_MD = _ROOT / "docs" / "architecture" / "governance_architecture.md"
-_CHANGELOG_MD = _ROOT / "changelog" / "unreleased.md"
-_CHANGELOG_YAML = _ROOT / "changelog" / "unreleased.yaml"
+_CHANGELOG_MD = _ROOT / "changelog" / "v1.2.0.md"
+_CHANGELOG_YAML = _ROOT / "changelog" / "v1.2.0.yaml"
 _CLI_COMMANDS = _ROOT / "tools" / "cli_commands.json"
 
 # E766 was withdrawn: no entry and no registration.
@@ -142,8 +142,8 @@ def test_error_codes_md_describes_w595_and_w720_as_the_trace_lock_emits_them():
 @pytest.mark.parametrize("marker", M5_CHANGELOG_MARKERS)
 def test_changelog_md_and_yaml_carry_the_same_m5_entry(marker):
     (_, md, entry), = [p for p in _changelog_pairs() if p[0] == marker]
-    assert md, f"changelog/unreleased.md has no bullet with {marker!r}"
-    assert entry, f"changelog/unreleased.yaml has no change with {marker!r}"
+    assert md, f"changelog/v1.2.0.md has no bullet with {marker!r}"
+    assert entry, f"changelog/v1.2.0.yaml has no change with {marker!r}"
     assert _normalised(md) == _normalised(entry)
 
 
