@@ -1,0 +1,248 @@
+{
+    "$schema": "vc:12-ci-gates",
+    "id": "ci-gates-lantern",
+    "owner": "ops",
+    "created_at": "2026-03-02T09:00:00Z",
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-checkout-return"
+        }
+    ],
+    "jobs": [
+        {
+            "job_id": "gate-setup",
+            "name": "Setup",
+            "steps": [
+                {
+                    "id": "install-deps",
+                    "name": "Install dependencies",
+                    "command": "npm ci",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-ci",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            ],
+            "environment_ref": {
+                "id": "cn:core:environment:ci",
+                "kind": "environment",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "job_id": "gate-lint",
+            "name": "Lint",
+            "requires": [
+                "gate-setup"
+            ],
+            "steps": [
+                {
+                    "id": "run-linter",
+                    "name": "Run the linter",
+                    "command": "npm run lint",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-run-lint",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            ],
+            "environment_ref": {
+                "id": "cn:core:environment:ci",
+                "kind": "environment",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "job_id": "gate-unit-tests",
+            "name": "Unit tests",
+            "requires": [
+                "gate-setup"
+            ],
+            "steps": [
+                {
+                    "id": "run-tests",
+                    "name": "Run the test suite",
+                    "command": "npm test",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-test",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            ],
+            "environment_ref": {
+                "id": "cn:core:environment:ci",
+                "kind": "environment",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "job_id": "gate-spec-check",
+            "name": "Spec checks",
+            "requires": [
+                "gate-setup"
+            ],
+            "steps": [
+                {
+                    "id": "validate-all",
+                    "name": "Validate the spec",
+                    "command": "specdev validate-all spec",
+                    "command_ref": {
+                        "id": "cn:project:command:specdev-validate-all-spec",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                },
+                {
+                    "id": "matrix",
+                    "name": "Build the matrix",
+                    "command": "specdev matrix spec",
+                    "command_ref": {
+                        "id": "cn:project:command:specdev-matrix-spec",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                },
+                {
+                    "id": "governance",
+                    "name": "Check governance",
+                    "command": "specdev governance-check spec",
+                    "command_ref": {
+                        "id": "cn:project:command:specdev-governance-check-spec",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                },
+                {
+                    "id": "fixtures-lint",
+                    "name": "Lint fixtures",
+                    "command": "specdev fixtures-lint spec",
+                    "command_ref": {
+                        "id": "cn:project:command:specdev-fixtures-lint-spec",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            ],
+            "environment_ref": {
+                "id": "cn:core:environment:ci",
+                "kind": "environment",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "job_id": "gate-go-live-staging-teardown",
+            "name": "Go-live and staging teardown",
+            "requires": [
+                "gate-lint",
+                "gate-unit-tests"
+            ],
+            "steps": [
+                {
+                    "id": "run-smoke",
+                    "name": "Run the smoke suite",
+                    "command": "npm run smoke",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-run-smoke",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                },
+                {
+                    "id": "delete-staging",
+                    "name": "Delete the staging stack",
+                    "command": "bash ./scripts/delete_staging.sh",
+                    "command_ref": {
+                        "id": "cn:project:command:bash-scripts-delete-staging-sh",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                },
+                {
+                    "id": "migrate-prod-db",
+                    "name": "Migrate the production database",
+                    "command": "npm run migrate -- --env prod",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-run-migrate-env-prod",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            ],
+            "environment_ref": {
+                "id": "cn:core:environment:prod",
+                "kind": "environment",
+                "version": "1.0.0"
+            }
+        }
+    ],
+    "coverage_thresholds": {
+        "lines": 80,
+        "branches": 70
+    },
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:environment:ci",
+            "kind": "environment",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:environment:prod",
+            "kind": "environment",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:bash-scripts-delete-staging-sh",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:npm-ci",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:npm-run-lint",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:npm-run-migrate-env-prod",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:npm-run-smoke",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:npm-test",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:specdev-fixtures-lint-spec",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:specdev-governance-check-spec",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:specdev-matrix-spec",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:specdev-validate-all-spec",
+            "kind": "command",
+            "version": "1.0.0"
+        }
+    ]
+}

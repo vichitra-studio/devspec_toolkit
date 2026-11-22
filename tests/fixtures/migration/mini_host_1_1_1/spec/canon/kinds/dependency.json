@@ -1,0 +1,22 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "dependency",
+    "entries": [
+        {
+            "id": "cn:project:dependency:textline-sms",
+            "kind": "dependency",
+            "preferred_label": "Textline SMS",
+            "definition": "The hosted text message service that sends pickup reminders.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

@@ -1,0 +1,162 @@
+{
+    "$schema": "vc:16-impl-context",
+    "id": "plan-ms-late-fees",
+    "owner": "api",
+    "created_at": "2026-06-01T10:00:00Z",
+    "plan": {
+        "status": "active",
+        "summary": {
+            "functional_summary": "The fee calculator for the late fees milestone.",
+            "scope_in": [
+                "fee-calculator"
+            ],
+            "scope_out": [],
+            "target_file_patterns": [
+                "src/fee.ts"
+            ]
+        },
+        "spec_alignment": {
+            "requirements_summary": [
+                {
+                    "theme": "Fees",
+                    "summary": "A late loan owes 50 cents a full day."
+                }
+            ],
+            "checklist": [
+                {
+                    "id": "FEE_CALC_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-fee-calculator",
+                        "line_range": "L1-L20",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Compute the fee for a loan returned late.",
+                    "type": "behavior",
+                    "layer": "service",
+                    "linked_test_expectation": "npx jest tests/fee.spec.ts",
+                    "nfr_refs": [
+                        "nfr-fee-accuracy"
+                    ],
+                    "fixture_ref": "fix-late-fee-two-days",
+                    "milestone_ref": "ms-late-fees",
+                    "implementation": {
+                        "status": "verified",
+                        "files_touched": [
+                            "src/fee.ts"
+                        ],
+                        "actions": [
+                            {
+                                "type": "file_create",
+                                "target": "src/fee.ts",
+                                "description": "Create the fee calculator",
+                                "evidence": {
+                                    "type": "log",
+                                    "content": "PASSED two days late yielded 100 cents in the unit test for fr-late-fee-calc"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "FEE_ENDPOINT_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-fee-endpoint",
+                        "line_range": "L21-L30",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Expose the fee through GET /fees/{id}.",
+                    "type": "behavior",
+                    "layer": "api",
+                    "linked_test_expectation": "bash scripts/check_fees.sh",
+                    "nfr_refs": [
+                        "nfr-fee-accuracy"
+                    ],
+                    "fixture_ref": "fix-late-fee-two-days",
+                    "milestone_ref": "ms-late-fees",
+                    "checklist_status": "deferred",
+                    "deferred_reason": "The desk reads fees off the loan screen first; the endpoint waits for the next release.",
+                    "implementation": {
+                        "status": "deferred",
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Read a fee through the endpoint"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "docs_impact": {
+            "status": "required",
+            "rationale": "The fee rule is documented for the desk.",
+            "docs_touched": [
+                "README.md"
+            ]
+        },
+        "review_requirements": {
+            "test_commands": [
+                "npm test"
+            ]
+        }
+    },
+    "execution": {
+        "execution_results": [
+            {
+                "command": "npm test",
+                "command_ref": {
+                    "id": "cn:project:command:npm-test",
+                    "kind": "command",
+                    "version": "1.0.0"
+                },
+                "status": "passed",
+                "outcome_description": "The fee tests passed.",
+                "reasoning": "The suite covers the two-day case.",
+                "evidence": "PASSED 3 tests in 0.8s for the fee suite",
+                "evidence_ref": "external:ci-run-102",
+                "evidence_binding": {
+                    "timestamp": "2026-06-10T16:00:00Z",
+                    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "exit_code": 0,
+                    "command": "npm test",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-test",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+        ],
+        "critical_evidence": {
+            "passed_test_commands": [
+                "npm test"
+            ],
+            "satisfied_checklist_ids": [
+                "FEE_CALC_01"
+            ]
+        },
+        "emergent_ambiguities": [
+            {
+                "id": "amb-pickup-hours",
+                "description": "Saturday hours change the due time of a loan.",
+                "severity": "low",
+                "impact": [
+                    "fr-late-fee-calc"
+                ],
+                "status": "tracking"
+            }
+        ],
+        "final_status": {
+            "ci_status": "green"
+        }
+    },
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:command:npm-test",
+            "kind": "command",
+            "version": "1.0.0"
+        }
+    ]
+}

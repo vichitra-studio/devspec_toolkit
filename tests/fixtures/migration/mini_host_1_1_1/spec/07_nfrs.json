@@ -1,0 +1,203 @@
+{
+    "$schema": "vc:07-nfrs",
+    "id": "nfrs-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "nfrs": [
+        {
+            "nfr_id": "nfr-search-latency",
+            "category": "latency",
+            "metric": "p95 search response time",
+            "target": 400,
+            "unit": "ms",
+            "metric_ref": {
+                "id": "cn:core:metric:p95-response-time",
+                "kind": "metric",
+                "version": "1.0.0"
+            },
+            "unit_ref": {
+                "id": "cn:core:unit:ms",
+                "kind": "unit",
+                "version": "1.0.0"
+            },
+            "environment_ref": {
+                "id": "cn:core:environment:dev",
+                "kind": "environment",
+                "version": "1.0.0"
+            },
+            "measurement_method": "Timing assertion in the search integration test",
+            "stage": "dev",
+            "stage_ref": {
+                "id": "cn:core:stage:dev",
+                "kind": "stage",
+                "version": "1.0.0"
+            },
+            "owner": "api",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-catalog-search"
+                }
+            ]
+        },
+        {
+            "nfr_id": "nfr-checkout-latency",
+            "category": "latency",
+            "metric": "p95 checkout response time",
+            "target": 800,
+            "unit": "ms",
+            "metric_ref": {
+                "id": "cn:core:metric:p95-response-time",
+                "kind": "metric",
+                "version": "1.0.0"
+            },
+            "unit_ref": {
+                "id": "cn:core:unit:ms",
+                "kind": "unit",
+                "version": "1.0.0"
+            },
+            "environment_ref": {
+                "id": "cn:core:environment:staging",
+                "kind": "environment",
+                "version": "1.0.0"
+            },
+            "measurement_method": "Load script against the staging environment",
+            "stage": "staging",
+            "stage_ref": {
+                "id": "cn:core:stage:staging",
+                "kind": "stage",
+                "version": "1.0.0"
+            },
+            "owner": "api",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-checkout-tool"
+                },
+                {
+                    "type": "api",
+                    "id": "api-checkout-create"
+                }
+            ]
+        },
+        {
+            "nfr_id": "nfr-desk-availability",
+            "category": "availability",
+            "metric": "uptime during desk hours",
+            "target": 99,
+            "unit": "percent",
+            "metric_ref": {
+                "id": "cn:core:metric:p95-response-time",
+                "kind": "metric",
+                "version": "1.0.0"
+            },
+            "unit_ref": {
+                "id": "cn:core:unit:percent",
+                "kind": "unit",
+                "version": "1.0.0"
+            },
+            "environment_ref": {
+                "id": "cn:core:environment:prod",
+                "kind": "environment",
+                "version": "1.0.0"
+            },
+            "measurement_method": "Uptime monitor on the production health endpoint",
+            "stage": "prod",
+            "stage_ref": {
+                "id": "cn:core:stage:prod",
+                "kind": "stage",
+                "version": "1.0.0"
+            },
+            "owner": "ops",
+            "trace": [
+                {
+                    "type": "inv",
+                    "id": "inv-no-double-checkout"
+                }
+            ]
+        },
+        {
+            "nfr_id": "nfr-fee-accuracy",
+            "category": "durability",
+            "metric": "fee mismatches against the paper ledger",
+            "target": 0,
+            "unit": "percent",
+            "metric_ref": {
+                "id": "cn:core:metric:p95-response-time",
+                "kind": "metric",
+                "version": "1.0.0"
+            },
+            "unit_ref": {
+                "id": "cn:core:unit:percent",
+                "kind": "unit",
+                "version": "1.0.0"
+            },
+            "environment_ref": {
+                "id": "cn:core:environment:prod",
+                "kind": "environment",
+                "version": "1.0.0"
+            },
+            "measurement_method": "Monthly comparison with the ledger kept at the desk",
+            "stage": "prod",
+            "stage_ref": {
+                "id": "cn:core:stage:prod",
+                "kind": "stage",
+                "version": "1.0.0"
+            },
+            "owner": "business",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-late-fee-calc"
+                }
+            ]
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:environment:dev",
+            "kind": "environment",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:environment:prod",
+            "kind": "environment",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:environment:staging",
+            "kind": "environment",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:metric:p95-response-time",
+            "kind": "metric",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:stage:dev",
+            "kind": "stage",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:stage:prod",
+            "kind": "stage",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:stage:staging",
+            "kind": "stage",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:unit:ms",
+            "kind": "unit",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:unit:percent",
+            "kind": "unit",
+            "version": "1.0.0"
+        }
+    ]
+}

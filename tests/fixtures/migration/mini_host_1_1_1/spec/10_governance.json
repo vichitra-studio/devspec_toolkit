@@ -1,0 +1,57 @@
+{
+    "$schema": "vc:10-governance",
+    "id": "governance-lantern",
+    "owner": "system",
+    "created_at": "2026-03-02T09:00:00Z",
+    "spec_first_policy": true,
+    "versioning": "semver",
+    "pr_rules": ["validate-all", "matrix", "governance-check", "fixtures-lint", "test", "lint"],
+    "commit_message_rules": {
+        "require_spec_ids": true,
+        "pattern": "^(feat|fix|chore|docs)\\(.+\\): .+$",
+        "error_message": "Use a conventional commit message."
+    },
+    "review_policy": {
+        "evidence_source_by_phase": {
+            "dev": "unit-test-report",
+            "staging": "integration-test-report",
+            "prod": "uptime-monitor-report"
+        },
+        "verdict_requirements": [
+            "A reviewer reads every changed checklist item before a milestone is signed off",
+            "A failing fixture blocks the verdict until it is fixed or deferred with a reason"
+        ],
+        "required_metadata": [
+            "reviewer",
+            "date"
+        ]
+    },
+    "reviewers": [
+        "desk-lead",
+        "repair-table-lead"
+    ],
+    "policy_ref": {
+        "id": "cn:core:policy:spec-first",
+        "kind": "policy",
+        "version": "1.0.0"
+    },
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-checkout-return"
+        }
+    ],
+    "links": [
+        {
+            "rel": "documentation",
+            "href": "https://example.org/lantern/governance"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:policy:spec-first",
+            "kind": "policy",
+            "version": "1.0.0"
+        }
+    ]
+}

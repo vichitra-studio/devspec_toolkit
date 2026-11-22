@@ -24,6 +24,7 @@ from ..graph.kinds import SEED_KIND
 from ..graph.model import Graph
 from ..graph.queries import require_known_step_in
 from .check_registry import CheckContext, run_registered_checks
+from .migration_mode import migration_aware_provider
 from .spec_check import check_findings, run_checks, warn_ignored_promotions
 from .step_gate import StepGateResult, WaitingOn, classify_for_steps, declared_owner, same_id
 from .touched_steps import (
@@ -159,8 +160,9 @@ def run_step_gate(
     """Run every check once and the baseline once, and sort the findings into the buckets of each of *steps*.
 
     The step gate is the check for finishing a step: a finding of the step blocks it, a new finding of an earlier step
-    blocks it, everything else is listed (see ``validation.step_gate``).  The baseline comes from *provider* (the
-    migration-mode gate passes its own); without one it is ``merge_base_provider`` against *base_ref* (``--base-ref``).
+    blocks it, everything else is listed (see ``validation.step_gate``).  The baseline comes from *provider*; without one it is
+    ``merge_base_provider`` against *base_ref* (``--base-ref``), or, while the toolkit stamp differs from the merge-base's,
+    the migration baseline of ``validation.migration_mode``.
     *ranks* is the step order, read from ``tools/step_order.json`` when absent.  Nothing is printed except what the
     checks print themselves; the caller prints the notes and the report.
 
@@ -177,7 +179,8 @@ def run_step_gate(
     )
     warn_ignored_promotions()
     errors = check_findings(run_registered_checks(ctx))
-    measure = provider or merge_base_provider(_baseline_checks(repo_root, with_project_canon=project_canon_dir is not None), _seed_paths_of(ctx.check_graph), base_ref)
+    default = merge_base_provider(_baseline_checks(repo_root, with_project_canon=project_canon_dir is not None), _seed_paths_of(ctx.check_graph), base_ref)
+    measure = provider or migration_aware_provider(errors, default, base_ref)
     baseline = measure(Path(ctx.spec_dir), host_root_of(ctx.effective_spec_root, ctx.git_root))
     graph = ctx.check_graph
     results = classify_for_steps(

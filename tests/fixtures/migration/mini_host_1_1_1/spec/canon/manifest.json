@@ -1,0 +1,442 @@
+{
+    "$schema": "vc:core:canon",
+    "registry_version": "1.0.0",
+    "entries": [
+        {
+            "id": "cn:project:command:bash-scripts-delete-staging-sh",
+            "kind": "command",
+            "preferred_label": "bash-scripts-delete-staging-sh",
+            "definition": "The command line `bash ./scripts/delete_staging.sh`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:npm-ci",
+            "kind": "command",
+            "preferred_label": "npm-ci",
+            "definition": "The command line `npm ci`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:npm-run-lint",
+            "kind": "command",
+            "preferred_label": "npm-run-lint",
+            "definition": "The command line `npm run lint`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:npm-run-migrate",
+            "kind": "command",
+            "preferred_label": "npm-run-migrate",
+            "definition": "The command line `npm run migrate`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:npm-run-migrate-env-prod",
+            "kind": "command",
+            "preferred_label": "npm-run-migrate-env-prod",
+            "definition": "The command line `npm run migrate -- --env prod`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:npm-run-smoke",
+            "kind": "command",
+            "preferred_label": "npm-run-smoke",
+            "definition": "The command line `npm run smoke`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:npm-test",
+            "kind": "command",
+            "preferred_label": "npm-test",
+            "definition": "The command line `npm test`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:specdev-fixtures-lint-spec",
+            "kind": "command",
+            "preferred_label": "specdev-fixtures-lint-spec",
+            "definition": "The command line `specdev fixtures-lint spec`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:specdev-governance-check-spec",
+            "kind": "command",
+            "preferred_label": "specdev-governance-check-spec",
+            "definition": "The command line `specdev governance-check spec`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:specdev-matrix-spec",
+            "kind": "command",
+            "preferred_label": "specdev-matrix-spec",
+            "definition": "The command line `specdev matrix spec`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:command:specdev-validate-all-spec",
+            "kind": "command",
+            "preferred_label": "specdev-validate-all-spec",
+            "definition": "The command line `specdev validate-all spec`.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:browse-catalog",
+            "kind": "capability",
+            "preferred_label": "browse catalog",
+            "definition": "A member looks through the tools the library owns and sees which are on the shelf.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:reserve-tool",
+            "kind": "capability",
+            "preferred_label": "reserve tool",
+            "definition": "A member holds a tool for a pickup day before anyone else can take it.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:checkout-return",
+            "kind": "capability",
+            "preferred_label": "checkout and return",
+            "definition": "A volunteer lends a tool to a member and takes it back.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:late-fees",
+            "kind": "capability",
+            "preferred_label": "late fees",
+            "definition": "The library charges a small fee for each day a tool is returned late.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:repair-queue",
+            "kind": "capability",
+            "preferred_label": "repair queue",
+            "definition": "Broken tools are queued for the Saturday repair table.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:loan",
+            "kind": "term",
+            "preferred_label": "loan",
+            "definition": "One tool lent to one member for a fixed number of days, counted from checkout until the desk records the return.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:reservation",
+            "kind": "term",
+            "preferred_label": "reservation",
+            "definition": "A hold on one tool for one pickup day, kept for the member until the desk closes on that day.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:late-fee",
+            "kind": "term",
+            "preferred_label": "late fee",
+            "definition": "The amount owed for each full day a loan stays open after its due date, in whole cents.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:p95-search-response-time",
+            "kind": "term",
+            "preferred_label": "p95 search response time",
+            "definition": "The time within which 95 percent of catalog searches are answered, measured at the service boundary.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:p95-checkout-response-time",
+            "kind": "term",
+            "preferred_label": "p95 checkout response time",
+            "definition": "The time within which 95 percent of checkout requests are answered, measured at the service boundary.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:desk-uptime",
+            "kind": "term",
+            "preferred_label": "uptime during desk hours",
+            "definition": "The share of desk opening hours in which the lending service answers its health check.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:fee-ledger-mismatch",
+            "kind": "term",
+            "preferred_label": "fee mismatches against the paper ledger",
+            "definition": "The count of loans whose recorded fee differs from the fee written in the desk's paper ledger.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:interface:lending-rest",
+            "kind": "interface",
+            "preferred_label": "lending REST interface",
+            "definition": "The JSON over HTTP interface the desk app and the member site use to reach the lending service.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:role:volunteer-librarian",
+            "kind": "role",
+            "preferred_label": "Volunteer Librarian",
+            "definition": "A volunteer who staffs the pickup desk and lends tools.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:role:neighbourhood-member",
+            "kind": "role",
+            "preferred_label": "Neighbourhood Member",
+            "definition": "A resident who borrows tools from the library.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:dependency:textline-sms",
+            "kind": "dependency",
+            "preferred_label": "Textline SMS",
+            "definition": "The hosted text message service that sends pickup reminders.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:tech_stack:typescript-express",
+            "kind": "tech_stack",
+            "preferred_label": "TypeScript and Express",
+            "definition": "The language and HTTP framework of the lending service.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:inv:no-double-checkout",
+            "kind": "inv",
+            "preferred_label": "no double checkout",
+            "definition": "A tool is never on loan to two members at once.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ],
+    "aliases": []
+}

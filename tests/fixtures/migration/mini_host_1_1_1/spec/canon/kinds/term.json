@@ -1,0 +1,112 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "term",
+    "entries": [
+        {
+            "id": "cn:project:term:loan",
+            "kind": "term",
+            "preferred_label": "loan",
+            "definition": "One tool lent to one member for a fixed number of days, counted from checkout until the desk records the return.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:reservation",
+            "kind": "term",
+            "preferred_label": "reservation",
+            "definition": "A hold on one tool for one pickup day, kept for the member until the desk closes on that day.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:late-fee",
+            "kind": "term",
+            "preferred_label": "late fee",
+            "definition": "The amount owed for each full day a loan stays open after its due date, in whole cents.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:p95-search-response-time",
+            "kind": "term",
+            "preferred_label": "p95 search response time",
+            "definition": "The time within which 95 percent of catalog searches are answered, measured at the service boundary.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:p95-checkout-response-time",
+            "kind": "term",
+            "preferred_label": "p95 checkout response time",
+            "definition": "The time within which 95 percent of checkout requests are answered, measured at the service boundary.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:desk-uptime",
+            "kind": "term",
+            "preferred_label": "uptime during desk hours",
+            "definition": "The share of desk opening hours in which the lending service answers its health check.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:term:fee-ledger-mismatch",
+            "kind": "term",
+            "preferred_label": "fee mismatches against the paper ledger",
+            "definition": "The count of loans whose recorded fee differs from the fee written in the desk's paper ledger.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

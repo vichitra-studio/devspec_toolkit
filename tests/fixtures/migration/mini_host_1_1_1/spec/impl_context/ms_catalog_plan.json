@@ -1,0 +1,361 @@
+{
+    "$schema": "vc:16-impl-context",
+    "id": "plan-ms-catalog-basics",
+    "owner": "api",
+    "created_at": "2026-04-01T10:00:00Z",
+    "extensions": {
+        "review_state": {
+            "outcome": "verified",
+            "verified_by": "@desk-lead"
+        }
+    },
+    "plan": {
+        "status": "active",
+        "summary": {
+            "functional_summary": "Catalog tables and the search endpoint for the catalog basics milestone.",
+            "scope_in": [
+                "catalog-schema",
+                "search-endpoint"
+            ],
+            "scope_out": [
+                "wishlist"
+            ],
+            "target_file_patterns": [
+                "src/catalog.ts",
+                "db/migrations/001_catalog.sql",
+                "tests/catalog.test.ts"
+            ]
+        },
+        "spec_alignment": {
+            "requirements_summary": [
+                {
+                    "theme": "Catalog",
+                    "summary": "Tools can be searched by name.",
+                    "spec_refs": [
+                        {
+                            "type": "fr",
+                            "id": "fr-catalog-search",
+                            "line_range": "L5-L12",
+                            "commit_hash": "b2c3d4e5f6a11234567890123456789012345679"
+                        }
+                    ]
+                }
+            ],
+            "checklist": [
+                {
+                    "id": "CATALOG_SCHEMA_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-catalog-schema",
+                        "line_range": "L1-L20",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Create the tool and loan tables so that `fr-catalog-search` has data to read.",
+                    "type": "behavior",
+                    "layer": "db",
+                    "linked_test_expectation": "npx jest tests/catalog.spec.ts",
+                    "nfr_refs": [
+                        "nfr-search-latency"
+                    ],
+                    "fixture_ref": "fix-search-returns-matches",
+                    "milestone_ref": "ms-catalog-basics",
+                    "implementation": {
+                        "status": "verified",
+                        "files_touched": [
+                            "db/migrations/001_catalog.sql"
+                        ],
+                        "actions": [
+                            {
+                                "type": "file_create",
+                                "target": "db/migrations/001_catalog.sql",
+                                "description": "Create the migration",
+                                "evidence": {
+                                    "type": "log",
+                                    "content": "PASSED migration 001 applied on an empty database; 2 tables created for fr-catalog-search"
+                                }
+                            },
+                            {
+                                "type": "run_command",
+                                "command": "npm run migrate",
+                                "command_ref": {
+                                    "id": "cn:project:command:npm-run-migrate",
+                                    "kind": "command",
+                                    "version": "1.0.0"
+                                },
+                                "description": "Apply the migration",
+                                "evidence": {
+                                    "type": "log",
+                                    "content": "OK migrate: 1 applied, 0 pending, exit code 0 on the fresh database; 0 failures for api-catalog-search"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "CATALOG_SEARCH_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-catalog-search-endpoint",
+                        "line_range": "L21-L40",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Build GET /tools; it satisfies `ac-catalog-search-1` and is checked against `fr-catalog-wishlist`.",
+                    "type": "behavior",
+                    "layer": "api",
+                    "linked_test_expectation": [
+                        "npm test -- catalog-search",
+                        "a search for drill answers 200 with the drill listed"
+                    ],
+                    "nfr_refs": [
+                        "nfr-search-latency"
+                    ],
+                    "fixture_ref": "fix-search-returns-matches",
+                    "milestone_ref": "ms-catalog-basics",
+                    "implementation": {
+                        "status": "verified",
+                        "files_touched": [
+                            "src/catalog.ts"
+                        ],
+                        "actions": [
+                            {
+                                "type": "file_edit",
+                                "target": "src/catalog.ts",
+                                "description": "Add the search route",
+                                "evidence": {
+                                    "type": "log",
+                                    "content": "PASSED tests/catalog.test.ts search by name (0.09s) for fr-catalog-search and api-catalog-search"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "CATALOG_SEARCH_01_VAL",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-catalog-search-endpoint",
+                        "line_range": "L21-L40",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Validate that the search endpoint returns the matches.",
+                    "type": "validation",
+                    "layer": "tests",
+                    "linked_test_expectation": "search returns the first page of matching tools",
+                    "nfr_refs": [
+                        "nfr-search-latency"
+                    ],
+                    "fixture_ref": "fix-search-returns-matches",
+                    "milestone_ref": "ms-catalog-basics",
+                    "implementation": {
+                        "status": "verified",
+                        "files_touched": [
+                            "tests/catalog.test.ts"
+                        ],
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Read the response of a search for a drill",
+                                "evidence": {
+                                    "type": "log",
+                                    "content": "OK response listed the cordless drill with shelf state on-shelf for fr-catalog-search"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "CATALOG_IMPORT_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-catalog-import",
+                        "line_range": "L41-L50",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Import the volunteers' sheet.",
+                    "type": "behavior",
+                    "layer": "service",
+                    "linked_test_expectation": "npx jest tests/import.spec.ts",
+                    "nfr_refs": [
+                        "nfr-search-latency"
+                    ],
+                    "fixture_ref": "fix-search-returns-matches",
+                    "milestone_ref": "ms-catalog-basics",
+                    "checklist_status": "deferred",
+                    "deferred_reason": "The volunteers have not finished the shelf count; import after the count is signed off.",
+                    "implementation": {
+                        "status": "deferred",
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Wait for the shelf count"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "CATALOG_PRINT_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-catalog-schema",
+                        "line_range": "L1-L10",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Print shelf labels from the catalog.",
+                    "type": "docs",
+                    "layer": "docs",
+                    "linked_test_expectation": "labels print from the catalog page",
+                    "nfr_refs": [
+                        "nfr-search-latency"
+                    ],
+                    "fixture_ref": "fix-search-returns-matches",
+                    "milestone_ref": "ms-catalog-basics",
+                    "checklist_status": "wont_do",
+                    "wont_do_reason": "The desk writes labels by hand and no label printer is planned.",
+                    "implementation": {
+                        "status": "deferred",
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Print a label"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "coverage_status": {
+            "total": 5,
+            "verified": 3,
+            "pending": 0,
+            "deferred": 2
+        },
+        "security": {
+            "status": "planned",
+            "spec_mutations": [
+                {
+                    "ref": {
+                        "type": "fr",
+                        "id": "fr-catalog-search"
+                    },
+                    "change": "Add a shelf-state field to every match",
+                    "reason": "Found while building the search endpoint"
+                }
+            ],
+            "new_fixtures": [
+                "fix-search-empty-text"
+            ]
+        },
+        "docs_impact": {
+            "status": "required",
+            "rationale": "The search endpoint is user-visible.",
+            "docs_touched": [
+                "README.md"
+            ]
+        },
+        "review_requirements": {
+            "test_commands": [
+                "npm test"
+            ]
+        }
+    },
+    "execution": {
+        "execution_results": [
+            {
+                "command": "npm test",
+                "command_ref": {
+                    "id": "cn:project:command:npm-test",
+                    "kind": "command",
+                    "version": "1.0.0"
+                },
+                "status": "passed",
+                "outcome_description": "All catalog tests passed.",
+                "reasoning": "The suite covers the schema and the search route.",
+                "evidence": "PASSED 12 tests in 3.4s for the catalog suite",
+                "evidence_ref": "external:ci-run-101",
+                "evidence_binding": {
+                    "timestamp": "2026-04-15T16:00:00Z",
+                    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    "exit_code": 0,
+                    "command": "npm test",
+                    "command_ref": {
+                        "id": "cn:project:command:npm-test",
+                        "kind": "command",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+        ],
+        "final_status": {
+            "ci_status": "green"
+        },
+        "critical_evidence": {
+            "passed_test_commands": [
+                "npm test"
+            ],
+            "satisfied_checklist_ids": [
+                "CATALOG_SCHEMA_01",
+                "CATALOG_SEARCH_01",
+                "CATALOG_SEARCH_01_VAL"
+            ]
+        }
+    },
+    "review": {
+        "verdict": "verified",
+        "fixture_status": {
+            "implemented_interfaces": [
+                "api-catalog-search"
+            ],
+            "test_results": [
+                {
+                    "fixture_ref": "fix-search-returns-matches",
+                    "status": "pass"
+                }
+            ],
+            "ci_status": "green"
+        },
+        "semantic_review": {
+            "fr_coverage": [
+                {
+                    "fr_id": "fr-catalog-search",
+                    "satisfied": true,
+                    "evidence_summary": "Search by name returns matching tools with shelf state, shown by the search test in CI.",
+                    "checklist_ids": [
+                        "CATALOG_SEARCH_01"
+                    ]
+                }
+            ],
+            "hallucinated_features": [],
+            "scope_delta": "No unplanned features detected."
+        },
+        "findings": [
+            {
+                "id": "finding-label-printing",
+                "type": "gap",
+                "severity": "minor",
+                "description": "Label printing was never planned.",
+                "metadata": {
+                    "source": "code review",
+                    "impact": "A reviewer might expect printed labels"
+                },
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "fr-catalog-search",
+                    "line_range": "L5-L12",
+                    "commit_hash": "b2c3d4e5f6a11234567890123456789012345679"
+                }
+            }
+        ]
+    },
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:command:npm-run-migrate",
+            "kind": "command",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:command:npm-test",
+            "kind": "command",
+            "version": "1.0.0"
+        }
+    ]
+}

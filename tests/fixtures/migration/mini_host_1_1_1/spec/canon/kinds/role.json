@@ -1,0 +1,37 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "role",
+    "entries": [
+        {
+            "id": "cn:project:role:volunteer-librarian",
+            "kind": "role",
+            "preferred_label": "Volunteer Librarian",
+            "definition": "A volunteer who staffs the pickup desk and lends tools.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:role:neighbourhood-member",
+            "kind": "role",
+            "preferred_label": "Neighbourhood Member",
+            "definition": "A resident who borrows tools from the library.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

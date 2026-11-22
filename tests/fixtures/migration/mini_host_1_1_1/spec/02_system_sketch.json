@@ -1,0 +1,193 @@
+{
+    "$schema": "vc:02-system-sketch",
+    "id": "system-sketch-lantern",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "components": [
+        {
+            "component_id": "lending-service",
+            "type": "service",
+            "responsibilities": [
+                "Hold the loan and reservation rules",
+                "Serve the member site and the desk app",
+                "Compute late fees"
+            ],
+            "owner": "api",
+            "tags": [
+                "critical-path",
+                "stateless"
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-checkout-return"
+                },
+                {
+                    "type": "capability",
+                    "id": "cap-late-fees"
+                }
+            ]
+        },
+        {
+            "component_id": "catalog-db",
+            "type": "db",
+            "responsibilities": [
+                "Persist tools and their shelf state",
+                "Persist loans and reservations",
+                "Index search text"
+            ],
+            "owner": "data",
+            "tags": [
+                "critical-path",
+                "stateful"
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-browse-catalog"
+                },
+                {
+                    "type": "capability",
+                    "id": "cap-repair-queue"
+                }
+            ]
+        },
+        {
+            "component_id": "desk-app",
+            "type": "ui",
+            "responsibilities": [
+                "Scan a tool and a member card",
+                "Show open loans",
+                "Print a loan receipt"
+            ],
+            "owner": "ui",
+            "tags": [
+                "supporting"
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-checkout-return"
+                }
+            ]
+        },
+        {
+            "component_id": "textline-sms",
+            "type": "external",
+            "responsibilities": [
+                "Deliver pickup reminders by text message",
+                "Report delivery failures",
+                "Accept message batches"
+            ],
+            "owner": "ops",
+            "tags": [
+                "external-dependency",
+                "supporting"
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-reserve-tool"
+                }
+            ]
+        }
+    ],
+    "connections": [
+        {
+            "from": "desk-app",
+            "to": "lending-service",
+            "protocol": "http",
+            "trust_boundary": "internal",
+            "schema_ref": "file://schemas/lending.json",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-checkout-return"
+                }
+            ]
+        },
+        {
+            "from": "lending-service",
+            "to": "catalog-db",
+            "protocol": "db",
+            "trust_boundary": "internal",
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-browse-catalog"
+                }
+            ]
+        },
+        {
+            "from": "lending-service",
+            "to": "textline-sms",
+            "protocol": "http",
+            "trust_boundary": "partner",
+            "reliability": "at-least-once",
+            "auth": "key",
+            "rate_limit": {
+                "rps": 5,
+                "scope": "client"
+            },
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-reserve-tool"
+                }
+            ]
+        }
+    ],
+    "tech_stack": {
+        "languages": [
+            {
+                "name": "TypeScript",
+                "version": "5.4",
+                "rationale": "One language for the service and the desk app"
+            }
+        ],
+        "frameworks": [
+            {
+                "name": "Express",
+                "version": "^4.19",
+                "rationale": "HTTP framework for the lending service"
+            }
+        ],
+        "infrastructure": [
+            {
+                "name": "PostgreSQL",
+                "version": "16",
+                "rationale": "Primary data store for catalog-db"
+            },
+            {
+                "name": "Textline SMS API",
+                "version": "v2",
+                "rationale": "Pickup reminders by text"
+            }
+        ],
+        "tools": [
+            {
+                "name": "ESLint",
+                "version": "Built-in",
+                "rationale": "Linting for the TypeScript code base"
+            }
+        ]
+    },
+    "spec_refs_ingested": [
+        {
+            "step_id": "01",
+            "artifact_id": "capabilities-catalog"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:interface:lending-rest",
+            "kind": "interface",
+            "version": "1.0.0"
+        }
+    ]
+}

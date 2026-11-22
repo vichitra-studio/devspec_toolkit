@@ -1,0 +1,58 @@
+{
+    "$schema": "vc:seed-manifest",
+    "seed_manifest_id": "seed-manifest-lantern",
+    "version": "0.1.0",
+    "created_at": "2026-03-02T00:00:00Z",
+    "last_updated": "2026-03-02T00:00:00Z",
+    "global_seed_order": [
+        "seed-lending-overview",
+        "seed-hosting-plan",
+        "seed-decision-clarifications"
+    ],
+    "seeds": [
+        {
+            "seed_id": "seed-lending-overview",
+            "path": "docs/seed/seed_lending_overview.md",
+            "description": "What the library lends, to whom, and how a loan runs.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-hosting-plan",
+            "path": "docs/seed/seed_hosting_plan.md",
+            "description": "Where the lending service runs and what it may cost.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-decision-clarifications",
+            "path": "docs/seed/seed_decision_clarifications.md",
+            "description": "Decisions the desk lead made while the spec was written.",
+            "required": false,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-volunteer-roster",
+            "path": "docs/seed/seed_volunteer_roster.md",
+            "description": "How volunteers are rostered for the pickup desk.",
+            "required": false,
+            "source_type": "doc"
+        }
+    ],
+    "step_requirements": {
+        "00": [
+            "seed-lending-overview",
+            "seed-decision-clarifications"
+        ],
+        "02": [
+            "seed-hosting-plan"
+        ],
+        "02a": [
+            "seed-hosting-plan"
+        ]
+    },
+    "doc_paths": [
+        "docs/**/*.md",
+        "README.md"
+    ]
+}

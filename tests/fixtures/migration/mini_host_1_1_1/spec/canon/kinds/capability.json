@@ -1,0 +1,82 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "capability",
+    "entries": [
+        {
+            "id": "cn:project:capability:browse-catalog",
+            "kind": "capability",
+            "preferred_label": "browse catalog",
+            "definition": "A member looks through the tools the library owns and sees which are on the shelf.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:reserve-tool",
+            "kind": "capability",
+            "preferred_label": "reserve tool",
+            "definition": "A member holds a tool for a pickup day before anyone else can take it.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:checkout-return",
+            "kind": "capability",
+            "preferred_label": "checkout and return",
+            "definition": "A volunteer lends a tool to a member and takes it back.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:late-fees",
+            "kind": "capability",
+            "preferred_label": "late fees",
+            "definition": "The library charges a small fee for each day a tool is returned late.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        },
+        {
+            "id": "cn:project:capability:repair-queue",
+            "kind": "capability",
+            "preferred_label": "repair queue",
+            "definition": "Broken tools are queued for the Saturday repair table.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

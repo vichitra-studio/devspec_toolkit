@@ -1,0 +1,40 @@
+{
+    "$schema": "vc:02a-delivery-baseline",
+    "id": "delivery-baseline-lantern",
+    "owner": "ops",
+    "created_at": "2026-03-02T09:00:00Z",
+    "environments": {
+        "dev": {
+            "region": "eu-west-1",
+            "log_level": "debug"
+        },
+        "ci": {
+            "runner": "ubuntu-latest"
+        },
+        "staging": {
+            "region": "eu-west-1",
+            "lifecycle": "decommissioned-at-production-go-live"
+        },
+        "prod": {
+            "region": "eu-west-1",
+            "log_level": "warn",
+            "ghost_port": 2368
+        }
+    },
+    "ci_gates": [
+        "lint",
+        "unit-tests",
+        "schema-validate"
+    ],
+    "secrets": [
+        "DATABASE_URL",
+        "TEXTLINE_API_KEY"
+    ],
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-checkout-return"
+        }
+    ],
+    "canonical_refs_used": []
+}
