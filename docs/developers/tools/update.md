@@ -10,7 +10,7 @@ First the host install (below), then the version logic:
 
 | Situation | Action |
 |---|---|
-| `spec/specdev_version` already matches toolkit version | Prints "Already at vX.Y.Z. Nothing to do." and exits 0 |
+| `spec/specdev_version` already matches toolkit version | Prints "Already at toolkit vX.Y.Z. Nothing to do." and exits 0 |
 | Versions differ, no schema changes | Refreshes deps via `uv pip install`, re-stamps `spec/specdev_version`, exits 0 |
 | Versions differ, schema changes required | Refreshes deps via `uv pip install`, prints `specdev align` instructions, exits 1 |
 

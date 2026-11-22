@@ -81,7 +81,7 @@ def write_rollback(git_root: str, spec_root: str, tag: str, reason: str, pattern
     *pattern* is the host's ``release_tag_pattern``.
 
     Raises:
-        FindingError: E925 when *tag* names no commit or does not match *pattern*; E926 when *reason* is blank; E927 when a record of *tag* exists.
+        FindingError: E925 when *tag* is not a tag of this clone or does not match *pattern*; E926 when *reason* is blank; E927 when a record of *tag* exists.
     """
     if not tag_matches(pattern, tag):
         raise refusal("E925", f"'{tag}' does not match the release tag pattern {pattern}; name a release tag")

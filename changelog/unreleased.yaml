@@ -1663,9 +1663,9 @@ changes:
       checkout, and checks that every obligation has valid evidence up to
       staging for the tag's code tree (E347 and E348 with the owner
       release-gate), that every delivery obligation is built at staging (E923)
-      and that every node the release gate relieved holds (E924). A tag that
-      names no commit is E921, a retired staging environment is W934. It writes
-      nothing. Exit 0 passes, 1 blocked. Shown by specdev release check --help.
+      and that every node the release gate relieved holds (E924). A name that is
+      not a tag of this clone (`HEAD`, a branch, a commit id) is E921, a retired
+      staging environment is W934. It writes nothing. Exit 0 passes, 1 blocked. Shown by specdev release check --help.
     migration:
       action: none
 
@@ -1685,8 +1685,8 @@ changes:
     description: >
       specdev release rollback TAG --reason TEXT writes
       spec/extras/releases/rollback-<tag>.json, which waives the production
-      verification of that tag for the next release (E920). It refuses a tag
-      that names no commit or does not match the pattern (E925), a blank reason
+      verification of that tag for the next release (E920). It refuses a name
+      that is not a tag of this clone or does not match the pattern (E925), a blank reason
       (E926) and a second record (E927), and commits nothing; a damaged record
       is E774. Shown by specdev release rollback --help.
     migration:

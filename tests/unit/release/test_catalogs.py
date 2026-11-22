@@ -13,10 +13,13 @@ import pytest
 import yaml
 
 from specdev_tools import cli, host_install
+from specdev_tools.lifecycle import anchor_store
 from specdev_tools.core.errors import ERROR_CODES, PROMOTABLE_PAIRS
 
 from ..core.test_error_code_registry import CODE_LITERAL_RE, ERRORS_MODULE, REGISTERED_WITHOUT_EMITTER, REMOVED_CODES, TOOLS_DIR
+from ..graph._synth import ROOT
 from ..lifecycle._milestone_support import cli_run
+from ..lifecycle._support import closed_record
 from ..trace.test_catalogs import (
     _CHANGELOG_MD, _CHANGELOG_YAML, _CLI_COMMANDS, _ERROR_CODES_MD, _REFERENCE_MD, _ROOT, _entry, _md_bullets, _normalised,
 )
@@ -205,6 +208,18 @@ def test_the_quoted_messages_are_what_the_commands_print(tmp_path):
     code, out, err = cli_run(host, "spec-check", str(host / "spec"), "--merge", "--base-ref", "origin/nowhere")
     assert code == 1
     _in_entry("E900", _message("E900", out, err))
+
+
+def test_the_quoted_message_of_a_close_record_with_no_sign_off_is_what_the_command_prints(tmp_path):
+    """E913 has two messages: the row of a milestone with no close record (first) and a close record that names no sign-off record (second)."""
+    host = release_host(tmp_path)
+    anchor_store.write_row_state(host / "spec", "ms-account-recovery", "done", close=closed_record(signoff=None), repo_root=str(ROOT))
+    commit_all(host, "a close record that names no sign-off")
+    code, out, err = cli_run(host, "release", "--tag", "v1.0.0")
+    assert code == 1
+    printed = _message("E913", out, err)
+    assert "names no sign-off record" in printed
+    _in_entry("E913", printed)
 
 
 def test_the_quoted_message_of_an_undeclared_pattern_is_what_the_command_prints(tmp_path):

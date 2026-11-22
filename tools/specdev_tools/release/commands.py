@@ -45,13 +45,13 @@ CHECK_DESCRIPTION = (
     "from the checkout (the staging evidence reaches the repository after the tag, through the evidence pull request) and checks that "
     "every obligation of the tag has valid evidence up to staging for the tag's code tree (E347, E348, owner release-gate), every "
     "delivery obligation is built at staging (E923) and every node the release gate relieved still holds (E924); a retired staging "
-    "environment is skipped (W934). The tag must name a commit (E921). Nothing about the tag's signature or history is checked. "
+    "environment is skipped (W934). The name must be a tag of this clone (E921). Nothing about the tag's signature or history is checked. "
     "Writes nothing. Exit 0 passes, 1 blocked."
 )
 ROLLBACK_DESCRIPTION = (
     "Record that a release is not verified in production: `specdev release rollback <tag> --reason TEXT` writes "
     "spec/extras/releases/rollback-<tag>.json, which waives the production verification of that tag for the next release check (E920). "
-    "The tag must name a commit and match the release tag pattern (E925), the reason is not blank (E926) and no record of the tag exists "
+    "The name must be a tag of this clone and match the release tag pattern (E925), the reason is not blank (E926) and no record of the tag exists "
     "(E927). The file is written, not committed: commit it through the normal branch. Exit 0 written, 1 refused."
 )
 

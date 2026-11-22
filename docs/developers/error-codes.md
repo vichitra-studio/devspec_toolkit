@@ -1450,7 +1450,7 @@ Five commands print the codes below. `specdev spec-check --merge` runs the merge
 
 ### E913 RELEASE_MILESTONE_UNSIGNED
 
-**Trigger**: The release gate finds a milestone whose anchor row says `done` and that has no close record (the record `specdev milestone close` writes, which names the sign-off): `E913 milestone ms-account-recovery is not closed with a close record (status done); close it with `specdev milestone close``. A row set to `done` by hand also gives the schema's E520 for the missing `close` key (`... plan/milestone_index/0: 'close' is a required property`). Owner `close-gate`.
+**Trigger**: The release gate finds a milestone whose anchor row says `done` and that has no close record (the record `specdev milestone close` writes, which names the sign-off): `E913 milestone ms-account-recovery is not closed with a close record (status done); close it with `specdev milestone close``. A close record that names no sign-off record gives the second text: `E913 milestone ms-account-recovery has a close record that names no sign-off record (signed_off_by 'a@example.invalid', signoff None); sign it off with `specdev milestone sign-off`, then close it again`. A row set to `done` by hand also gives the schema's E520 for the missing `close` key (`... plan/milestone_index/0: 'close' is a required property`). Owner `close-gate`.
 
 **Resolution**: Close the milestone with the command: a person signs it off (`specdev milestone sign-off`), then `specdev milestone close` writes the close record (see [Milestone Lifecycle](#milestone-lifecycle-80x--81x--82x--83x)). Followed on the copy as far as the record: with a close record that names its sign-off in the row (the record the command writes, added with the test helper that mirrors it), `specdev release --tag v2.0.0` printed no E913 and tagged.
 
@@ -1474,7 +1474,7 @@ Five commands print the codes below. `specdev spec-check --merge` runs the merge
 
 ### E921 PROD_TAG_UNRESOLVED
 
-**Trigger**: `specdev release check --stage prod --tag <name>` where the name is no commit of this clone: `E921 'v9.9.9' names no commit in this repository; fetch the tags (`git fetch --tags`) or name an existing release tag`. Nothing is read further. Owner `release-gate`.
+**Trigger**: `specdev release check --stage prod --tag <name>` where the name is not a tag of this clone (a name that is no commit at all, but also `HEAD`, a branch or a commit id): `E921 'v9.9.9' names no commit in this repository; fetch the tags (`git fetch --tags`) or name an existing release tag`. Nothing is read further. Owner `release-gate`.
 
 **Resolution**: Fetch the tags or name a tag that exists. Followed with the existing tag: the gate ran (`release check --stage prod v1.0.0 (commit ..., code tree ...): passes`).
 
@@ -1498,7 +1498,7 @@ Five commands print the codes below. `specdev spec-check --merge` runs the merge
 
 ### E925 ROLLBACK_TAG_UNKNOWN
 
-**Trigger**: `specdev release rollback <tag> --reason <text>` where the tag names no commit, or does not match the release tag pattern. `E925 'v7.7.7' names no commit in this repository; name an existing release tag`. Nothing is written.
+**Trigger**: `specdev release rollback <tag> --reason <text>` where the name is not a tag of this clone (it names no commit, or is a branch or a commit id), or does not match the release tag pattern. `E925 'v7.7.7' names no commit in this repository; name an existing release tag`. Nothing is written.
 
 **Resolution**: Name an existing release tag. Followed: `specdev release rollback v1.0.0 --reason "..."` printed `recorded the rollback of v1.0.0 (.../spec/extras/releases/rollback-v1.0.0.json): its production verification is waived for the next release check` and `the file is written, not committed: commit it through the normal branch`.
 
@@ -1538,7 +1538,7 @@ Five commands print the codes below. `specdev spec-check --merge` runs the merge
 
 ### W931 HOST_INSTALL_REFUSED
 
-**Trigger**: The installer cannot do a piece and writes nothing for it; the status is `refused` and the other pieces go on. A spec folder outside a git repository: `W931 HOST_INSTALL_REFUSED: the spec folder is not inside a git repository (pass --git-root to name the host)` (once for each of the seven pieces). A `.claude/settings.local.json` that is not valid JSON: `W931 HOST_INSTALL_REFUSED: .claude/settings.local.json: .claude/settings.local.json is not valid JSON (Expecting property name enclosed in double quotes, line 1); merge this by hand: {"permissions": {"ask": [...]}}`, with the ten rules in the text; the file is byte for byte as it was. A damaged managed block in the pre-commit file: `W931 HOST_INSTALL_REFUSED: .pre-commit-config.yaml: the managed block is damaged: expected one '# >>> specdev-managed' line followed by one '# <<< specdev-managed' line`. The other refusals the installer knows (a CRLF pre-commit file, a failed `pre-commit install`, an unwritable file, a link that cannot be made) were not run for this entry; they name the file and one way out. The exit code stays 0.
+**Trigger**: The installer cannot do a piece and writes nothing for it; the status is `refused` and the other pieces go on. A spec folder outside a git repository: `W931 HOST_INSTALL_REFUSED: the spec folder is not inside a git repository (pass --git-root to name the host)` (the warning list prints it once; each of the seven pieces still reports `refused` with the same reason, and `--json` carries the finding in each piece). A `.claude/settings.local.json` that is not valid JSON: `W931 HOST_INSTALL_REFUSED: .claude/settings.local.json: .claude/settings.local.json is not valid JSON (Expecting property name enclosed in double quotes, line 1); merge this by hand: {"permissions": {"ask": [...]}}`, with the ten rules in the text; the file is byte for byte as it was. A `permissions` key that is not an object (`null` included) is refused the same way: `W931 HOST_INSTALL_REFUSED: .claude/settings.local.json: 'permissions' in .claude/settings.local.json is not an object; merge this by hand: {"permissions": {"ask": [...]}}`. A damaged managed block in the pre-commit file: `W931 HOST_INSTALL_REFUSED: .pre-commit-config.yaml: the managed block is damaged: expected one '# >>> specdev-managed' line followed by one '# <<< specdev-managed' line`. The other refusals the installer knows (a CRLF pre-commit file, a failed `pre-commit install`, an unwritable file, a link that cannot be made) were not run for this entry; they name the file and one way out. The exit code stays 0.
 
 **Resolution**: Name the host with `--git-root <host root>`: the seven pieces ran (`created`) where the first run had refused all. Fix the settings file (or merge the printed rules by hand) and run `update` again: `ask-rules: current` after the file was restored. Restore the marker line of the pre-commit block: `pre-commit: current (up to date)`.
 

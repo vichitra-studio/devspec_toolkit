@@ -8,7 +8,7 @@ no history, no first-parent rule.  Nothing is written.
 
 In this order:
 
-1. the tag must name a commit (E921);
+1. the name must be a tag of this clone (E921);
 2. every in-play obligation of the tag that is not a delivery obligation has valid evidence for every binding up to ``staging``
    (E347 / E348 from ``proof_errors``, with the owner ``release-gate``: ruling N2, one fact one code);
 3. every in-play delivery obligation is built at ``staging`` (E923);
@@ -97,7 +97,7 @@ def run_prod_gate(git_root: str, spec_root: str, repo_root: str, tag: str) -> Pr
     """The production-deploy gate for *tag* in the host at *git_root* whose checkout spec folder is *spec_root* (see the module text).
 
     Raises:
-        FindingError: E921 when *tag* names no commit; E708 when git cannot answer or the spec folder is absent at the tag;
+        FindingError: E921 when *tag* is not a tag of this clone; E708 when git cannot answer or the spec folder is absent at the tag;
             E760 when the lock at the tag cannot be read; E520 when the declarations cannot be read.
     """
     commit = _commit_of(git_root, tag)
