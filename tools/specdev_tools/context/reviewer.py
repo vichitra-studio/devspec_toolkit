@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..core.registry import SchemaRegistry
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
@@ -468,7 +469,7 @@ def _check_seed_distillation(
 
     # The manifest always lives inside spec_dir (spec_dir/common/seed_manifest.json).
     # project_root is used only to resolve the seeds[].path entries within it.
-    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    manifest_path = os.path.join(spec_dir_abs, SEED_MANIFEST_FILE)
     try:
         with open(manifest_path, "r", encoding="utf-8") as _f:
             manifest: dict = json.load(_f)

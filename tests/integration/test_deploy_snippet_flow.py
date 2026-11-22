@@ -157,17 +157,17 @@ def check_line(out: str, name: str) -> str:
 
 
 def test_merge_mode_runs_the_pin_check_on_the_graph_example(tmp_path: Path) -> None:
-    """DOC 13.7 step 4: ``spec-check --merge`` reads the pin sources; a pin that differs from its declared source fails ``merge-pins`` with E337, and passes when they agree."""
+    """DOC 13.7 step 4: ``spec-check --merge`` reads the pin sources; a pin that differs from its declared source fails ``third-party-pins`` with E337, and passes when they agree."""
     host = git_copy_of_example(tmp_path / "host")
     git(host, "checkout", "-q", "-b", "feature")
     declare_pin(host, "0.41.1")
     out = merge_check(host)
-    assert check_line(out, "merge-pins") == "[PASS]", "the pin equals what its source reads"
+    assert check_line(out, "third-party-pins") == "[PASS]", "the pin equals what its source reads"
     declare_pin(host, "0.40.0")
     out = merge_check(host)
-    assert check_line(out, "merge-pins") == "[FAIL]" and "E337" in out and "'0.41.1' of 'tp-argon2' differs from package-lock.json" in out and "'0.40.0'" in out
+    assert check_line(out, "third-party-pins") == "[FAIL]" and "E337" in out and "'0.41.1' of 'tp-argon2' differs from package-lock.json" in out and "'0.40.0'" in out
     declare_pin(host, "0.41.1")
-    assert check_line(merge_check(host), "merge-pins") == "[PASS]", "making them agree again clears it"
+    assert check_line(merge_check(host), "third-party-pins") == "[PASS]", "making them agree again clears it"
 
 
 def test_the_step_02_gate_and_the_plain_run_report_a_pin_that_differs_from_its_source(tmp_path: Path) -> None:
@@ -196,4 +196,4 @@ def test_the_step_02_gate_refuses_a_range_pin_of_a_third_party_with_no_declared_
     _, gate = run_on_example(host, "spec-check", str(host / "spec"), "--step", "02", "--detail", "all", "--base-ref", "HEAD~1")
     assert re.search(r"E336\s+\[02 own\]\s+tp-argon2", gate) and "RESULT: CLEAR" not in gate, gate
     _, merge = run_on_example(host, "spec-check", str(host / "spec"), "--merge", "--base-ref", "main")
-    assert check_line(merge, "merge-pins") == "[FAIL]" and "E336" in merge
+    assert check_line(merge, "third-party-pins") == "[FAIL]" and "E336" in merge

@@ -1,16 +1,16 @@
 """The merge gate: the checks ``spec-check --merge`` adds to the plain run.
 
-Merge mode is explicit (``--merge``); it is not inferred from git state.  ``run_merge_checks`` returns three checks,
+Merge mode is explicit (``--merge``); it is not inferred from git state.  ``run_merge_checks`` returns two checks,
 appended by ``spec_check.run_checks`` after the registered ones (they are not registered: a registered check would be a
 line of every plain run):
 
 * ``merge-open-items``: open items are errors (E631); an item in the plan of a closed milestone is listed (W633).
-* ``merge-pins``: a third-party pin that differs from the file that declares its source (E336 to E338).
 * ``merge-bindings``: the dev- and CI-stage bindings of every milestone this branch closes run in this run and must
   pass (E901).  Nothing is stored: the run is the proof.
 
 Suspect links and orphan lock entries (E763, E762) are not here: the registered ``trace-lock`` check reports them in
-every mode.  The module must not import ``spec_check``, which imports it.
+every mode, and so does the registered ``third-party-pins`` check for a third-party pin (E336 to E338; ``pins_check`` is its
+reader).  The module must not import ``spec_check``, which imports it.
 """
 from __future__ import annotations
 
@@ -37,7 +37,6 @@ from .check_registry import CheckContext, check_result, skip, with_default_owner
 from .open_items import check_open_items
 
 MERGE_OPEN_ITEMS = "merge-open-items"
-MERGE_PINS = "merge-pins"
 MERGE_BINDINGS = "merge-bindings"
 
 _FULL_SHA = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
@@ -168,14 +167,13 @@ def _bindings_check(ctx: CheckContext, base_ref: str | None) -> dict[str, Any]:
 
 
 def run_merge_checks(ctx: CheckContext, base_ref: str | None) -> OrderedDict[str, dict[str, Any]]:
-    """The three merge checks, in order, as ``spec-check`` results by name; owners are stamped like the registered checks'.
+    """The two merge checks, in order, as ``spec-check`` results by name; owners are stamped like the registered checks'.
 
     A ``FindingError`` of one check (E520 for an unreadable declarations file or a seed document, E706, E332, E708, E801,
     E900) is that check's one finding; the other checks still run.
     """
     merge_checks: tuple[tuple[str, Callable[[CheckContext], dict[str, Any]]], ...] = (
         (MERGE_OPEN_ITEMS, open_items_check),
-        (MERGE_PINS, pins_check),
         (MERGE_BINDINGS, partial(_bindings_check, base_ref=base_ref)),
     )
     checks: OrderedDict[str, dict[str, Any]] = OrderedDict()

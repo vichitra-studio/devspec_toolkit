@@ -17,12 +17,12 @@ the capture (section ``governance``):
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from typing import Any
 
 from specdev_tools.migration.context import CAPTURE_REL
+from specdev_tools.core.cli_commands import CLI_COMMANDS_PATH, known_cli_commands
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.ids import suggest_prefix
@@ -40,14 +40,12 @@ KIND_JOB = "rule-job"
 KIND_REASON = "rule-reason"
 RENAMED_COMMANDS = {"validate-all": "spec-check", "matrix": "coverage"}
 _NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-_COMMANDS_FILE = os.path.join("tools", "cli_commands.json")
 
 
 def known_commands(ctx) -> frozenset[str]:
     """The names of the generated command list of the toolkit being migrated to (the running toolkit's list when the root has none)."""
-    root = ctx.toolkit_root if os.path.isfile(os.path.join(ctx.toolkit_root, _COMMANDS_FILE)) else resolve_effective_toolkit_root(None)
-    with open(os.path.join(root, _COMMANDS_FILE), encoding="utf-8") as handle:
-        return frozenset(entry["path"] for entry in json.load(handle)["commands"])
+    root = ctx.toolkit_root if os.path.isfile(os.path.join(ctx.toolkit_root, CLI_COMMANDS_PATH)) else resolve_effective_toolkit_root(None)
+    return known_cli_commands(root)
 
 
 def _rules(ctx) -> list[dict[str, Any]]:

@@ -15,11 +15,11 @@ from specdev_tools.core.json_utils import json_delete, json_patch
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
 from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, NOT_APPLICABLE, Graph, Node, article
-from specdev_tools.trace.history import historical_node_ids
+from specdev_tools.trace.history import closed_milestone_of
 from specdev_tools.trace.lockfile import with_write_lock
 
 LIFECYCLE_KEY = "lifecycle"
-ROADMAP_STEP = "14"
+CLOSED_STEP_14_VALUES = (NOT_APPLICABLE, DEFAULT_LIFECYCLE)
 NOT_APPLICABLE_GUIDANCE = (
     "not_applicable is only for a closed milestone's historical step-14 nodes (a task, a task criterion or the milestone) whose "
     "built target was deleted; to take any other node out of use, set it to deprecated"
@@ -64,12 +64,19 @@ def plan_lifecycle_change(graph: Graph, node_id: str, value: str) -> LifecycleCh
 
     Raises ``LifecycleRefusedError`` (E705) for a value outside the lifecycle enum, an unknown or duplicated id, and a
     node of role ``record`` or kind ``seed``.  ``not_applicable`` is refused (E705) for a node that is not a historical step-14
-    node (see ``NOT_APPLICABLE_GUIDANCE``); a node that already has it is not refused.  Any other node accepts any other value.
+    node (see ``NOT_APPLICABLE_GUIDANCE``); a node that already has it is not refused.  A step-14 node of a closed milestone
+    takes ``not_applicable`` and ``active`` only (E705 for ``deprecated``).  Any other node accepts any other value.
     """
     if value not in LIFECYCLES:
         raise _refuse(f"lifecycle {value!r} is not one of {', '.join(LIFECYCLES)}")
     node = _node_to_change(graph, node_id)
-    if value == NOT_APPLICABLE and node.lifecycle != NOT_APPLICABLE and not (node.step == ROADMAP_STEP and node.id in historical_node_ids(graph)):
+    closed = closed_milestone_of(graph, node)
+    if closed is not None and value not in CLOSED_STEP_14_VALUES:
+        raise _refuse(
+            f"{node.id!r} is a step-14 node of milestone {closed}, which is closed: it takes only not_applicable, and active to take that back; "
+            f"to change the work, add a new task or milestone"
+        )
+    if value == NOT_APPLICABLE and node.lifecycle != NOT_APPLICABLE and closed is None:
         raise _refuse(f"{node.id!r} cannot be set to not_applicable: {NOT_APPLICABLE_GUIDANCE}")
     return LifecycleChange(node.id, node.lifecycle, value, node.file, node.jq_path)
 

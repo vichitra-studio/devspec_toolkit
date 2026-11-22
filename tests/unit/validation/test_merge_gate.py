@@ -12,13 +12,13 @@ from specdev_tools.validation.check_registry import CHECK_REGISTRY, CheckContext
 from specdev_tools.validation.merge_gate import (
     MERGE_BINDINGS,
     MERGE_OPEN_ITEMS,
-    MERGE_PINS,
     MergeBase,
     closed_by_branch,
     resolve_merge_base,
     run_merge_checks,
 )
 from specdev_tools.validation import merge_gate
+from specdev_tools.validation import spec_check
 from specdev_tools.validation.spec_check import run_checks, run_spec_check_json
 
 from ..graph._synth import ROOT, git
@@ -26,7 +26,7 @@ from ..trace._lock_support import git_copy_of_example
 
 NULL_SHA = "0" * 40
 UNKNOWN_SHA = "1" * 40
-MERGE_CHECK_NAMES = [MERGE_OPEN_ITEMS, MERGE_PINS, MERGE_BINDINGS]
+MERGE_CHECK_NAMES = [MERGE_OPEN_ITEMS, MERGE_BINDINGS]
 
 
 def commit(repo: Path, name: str) -> str:
@@ -74,16 +74,16 @@ def test_merge_mode_off_runs_no_merge_checks(tmp_path: Path) -> None:
 def test_merge_mode_lists_merge_checks_in_summary(tmp_path: Path) -> None:
     ctx = example_context(tmp_path)
     checks = run_checks(ctx.repo_root, ctx.spec_dir, ctx.git_root, ctx.spec_root, quiet=True, merge=True)
-    assert list(checks)[-3:] == MERGE_CHECK_NAMES
-    assert list(checks)[:-3] == [spec.name for spec in CHECK_REGISTRY]
+    assert list(checks)[-2:] == MERGE_CHECK_NAMES
+    assert list(checks)[:-2] == [spec.name for spec in CHECK_REGISTRY]
     _, context = run_spec_check_json(ctx.repo_root, ctx.spec_dir, ctx.git_root, ctx.spec_root, merge=True)
-    assert list(context["checks"])[-3:] == MERGE_CHECK_NAMES
+    assert list(context["checks"])[-2:] == MERGE_CHECK_NAMES
 
 
 def test_the_example_passes_every_merge_check_and_closes_no_milestone(tmp_path: Path) -> None:
     checks = run_merge_checks(example_context(tmp_path), None)
     assert [(name, result["status"]) for name, result in checks.items()] == [
-        (MERGE_OPEN_ITEMS, "PASS"), (MERGE_PINS, "PASS"), (MERGE_BINDINGS, "SKIP"),
+        (MERGE_OPEN_ITEMS, "PASS"), (MERGE_BINDINGS, "SKIP"),
     ]
 
 
@@ -155,9 +155,20 @@ def test_a_finding_error_of_a_check_is_that_checks_one_finding(tmp_path: Path, m
         raise FindingError(make_error("E520", "cannot read the declarations"))
 
     monkeypatch.setattr(merge_gate, "declarations_of", unreadable)
-    checks = run_merge_checks(example_context(tmp_path), None)
-    assert [error.code for error in checks[MERGE_PINS]["errors"]] == ["E520"]
-    assert checks[MERGE_OPEN_ITEMS]["status"] == "PASS"
+    ctx = example_context(tmp_path)
+    assert [error.code for error in spec_check._check_third_party_pins(ctx)["errors"]] == ["E520"]
+    assert run_merge_checks(ctx, None)[MERGE_OPEN_ITEMS]["status"] == "PASS"
+
+
+def test_the_third_party_pins_check_owns_its_own_unreadable_declarations_error_at_step_02(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """E520 (the declarations file cannot be read) is in no ownership row; the check's default owner is the step that owns pins, so the step 02 gate is the one that blocks."""
+    def unreadable(_spec_root: str) -> None:
+        raise FindingError(make_error("E520", "cannot read the declarations"))
+
+    monkeypatch.setattr(merge_gate, "declarations_of", unreadable)
+    ctx = example_context(tmp_path)
+    checks = run_checks(ctx.repo_root, ctx.spec_dir, ctx.git_root, ctx.spec_root, quiet=True)
+    assert [(error.code, error.owner) for error in checks["third-party-pins"]["errors"]] == [("E520", "step:02")]
 
 
 def test_a_binding_failure_is_E901_and_owned_by_the_merge_check(tmp_path: Path) -> None:

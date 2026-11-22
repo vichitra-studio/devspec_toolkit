@@ -141,13 +141,13 @@ def check_release_at(git_root: str, spec_root: str, repo_root: str, ref: str = "
     """
     pattern = release_tag_pattern(declarations_of(spec_root))
     tagged = release_at(git_root, ref, pattern)
-    return _verified_in_production(git_root, spec_root, repo_root, tagged, pattern) if tagged is not None else None
+    return _verified_in_production(git_root, spec_root, repo_root, tagged, pattern, "the release") if tagged is not None else None
 
 
-def _verified_in_production(git_root: str, spec_root: str, repo_root: str, previous: PreviousRelease, pattern: str) -> NextReleaseResult:
-    """The outcome for the release *previous*: the checks 2 to 4 of the module text."""
+def _verified_in_production(git_root: str, spec_root: str, repo_root: str, previous: PreviousRelease, pattern: str, name: str = "the previous release") -> NextReleaseResult:
+    """The outcome for the release *previous*: the checks 2 to 4 of the module text; *name* is how its messages call it (the release at ``HEAD`` is not "previous")."""
     if predates_1_2_0(git_root, spec_root, previous.commit):
-        return NextReleaseResult(previous, warnings=(make_error("W938", f"the previous release {previous.tag} predates the 1.2.0 spec, which declared no production bindings or at-deploy actions, so there is nothing to verify", owner=RELEASE_OWNER),))
+        return NextReleaseResult(previous, warnings=(make_error("W938", f"{name} {previous.tag} predates the 1.2.0 spec, which declared no production bindings or at-deploy actions, so there is nothing to verify", owner=RELEASE_OWNER),))
     if read_rollback(spec_root, previous.tag) is not None:
         return NextReleaseResult(previous)
     missing = _missing_in_production(git_root, spec_root, repo_root, previous, pattern)
@@ -155,7 +155,7 @@ def _verified_in_production(git_root: str, spec_root: str, repo_root: str, previ
         return NextReleaseResult(previous)
     shortfall = make_error(
         "E920",
-        f"the previous release {previous.tag} is not verified in production: {'; '.join(missing)}; "
+        f"{name} {previous.tag} is not verified in production: {'; '.join(missing)}; "
         f"verify it, or waive it with `specdev release rollback {previous.tag} --reason \"...\"`",
         owner=RELEASE_OWNER,
     )

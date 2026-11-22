@@ -7,13 +7,14 @@ from pathlib import Path
 
 import pytest
 
+from specdev_tools.trace.gaps import CoverageGap, register_gap_provider
 from specdev_tools.trace.replay import ReplayPlan, compute_replay
 from specdev_tools.graph.queries import plural
 from specdev_tools.trace.step_ready import Blocker, Readiness, check_ready, first_clause, link_steps, not_ready_error, present_steps, required_spec_inputs
 
 from ..graph._synth import ROOT
 from ._suspects_support import Example
-from ._lock_support import EXAMPLE_HOST
+from ._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (the fixture ``gap_providers``)
 
 
 @pytest.fixture
@@ -115,6 +116,31 @@ def test_the_step_to_replay_first_is_the_earliest_pending_step_above_even_when_i
     assert first_clause(readiness) == "replay step 00 first"
     assert "step 01 (" in not_ready_error(readiness).message and not_ready_error(readiness).message.endswith("replay step 00 first")
     assert check_ready(graph, plan, "01", [], present).replay_first == "00"
+
+
+def test_an_earlier_step_is_named_only_when_the_first_blocker_is_a_suspect_link(example: Example, gap_providers: object) -> None:
+    """The name of a metric is edited: step 07 holds one suspect link and step 08 coverage gaps, none of them linked to step 07's suspect node.  Replaying step 07 does not unblock step 11, so the clause is the gaps of step 08."""
+    register_gap_provider(lambda graph, lock: [CoverageGap("E743", f"ac-{index}", "08") for index in range(5)])
+    example.edit_item("metric-recovery-time", lambda item: item.update(name=item["name"] + " (measured at the 95th percentile)"))
+    graph = example.graph()
+    plan = compute_replay(graph, example.lock(), example.seed_texts(graph))
+    assert [item.step for item in plan.steps] == ["07", "08"]
+    readiness = check_ready(graph, plan, "11", required_spec_inputs(str(ROOT), "11"), present_steps(graph, str(example.spec)))
+    assert [(blocker.step, blocker.reason) for blocker in readiness.blockers[:1]] == [("08", "gap")]
+    assert readiness.earlier == () and readiness.replay_first == "08"
+    assert first_clause(readiness) == "fix the coverage gaps of step 08 first"
+
+
+def test_a_coverage_gap_of_an_unlinked_step_above_does_not_order_the_replay(example: Example, gap_providers: object) -> None:
+    """The first blocker of step 14 is a suspect link of step 06; step 03 (not linked) has only a gap and step 05 a suspect link: step 05 is named, not step 03."""
+    register_gap_provider(lambda graph, lock: [CoverageGap("E743", "term-gap", "03")])
+    example.edit_criterion()
+    graph = example.graph()
+    plan = compute_replay(graph, example.lock(), example.seed_texts(graph))
+    assert "03" in [item.step for item in plan.steps]
+    readiness = check_ready(graph, plan, "14", [], present_steps(graph, str(example.spec)))
+    assert readiness.blockers[0].reason == "suspect" and readiness.replay_first == "05"
+    assert {blocker.step for blocker in readiness.earlier} == {"05"}
 
 
 def test_a_pending_step_above_that_is_not_linked_does_not_block_a_step_whose_own_links_are_clean(example: Example) -> None:

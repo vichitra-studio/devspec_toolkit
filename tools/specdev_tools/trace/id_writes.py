@@ -42,6 +42,7 @@ from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.contract import value_at
 from specdev_tools.graph.ids import check_unique_ids, mint_slug, suggest_prefix
 from specdev_tools.graph.kinds import SEED_KIND, KindDecl, load_kind_registry
+from specdev_tools.graph.lifecycle import LIFECYCLE_KEY
 from specdev_tools.graph.model import Graph, Link, Node, node_label
 from specdev_tools.graph.queries import require_known_step, unknown_node_error
 from specdev_tools.graph.resolve import HISTORY_FIELDS, resolve_graph
@@ -169,6 +170,8 @@ def _field_path(path: str | None, decl: KindDecl | None, node: Node) -> str:
     first = re.match(r"\.([A-Za-z_][A-Za-z0-9_]*)", path)
     if decl is not None and first is not None and first.group(1) == decl.id_field:
         raise _refuse(f"{path} is the id of {node.id!r}; an id is changed with `specdev node rename`", node_id=node.id)
+    if first is not None and first.group(1) == LIFECYCLE_KEY:
+        raise _refuse(f"{path} is the lifecycle of {node.id!r}: the lifecycle is set with `specdev node status <id> <value>`, which checks the value", node_id=node.id)
     return path
 
 

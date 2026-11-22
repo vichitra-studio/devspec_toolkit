@@ -124,6 +124,9 @@ def test_e810_criterion_with_no_plan_item(tmp_path: Path) -> None:
     report = gate(host)
     assert [(error.code, error.node_id, error.owner) for error in report.errors] == [("E810", SECOND_CRITERION, "close-gate")]
     assert "realises" in report.errors[0].message and PLAN.split("/")[1] in report.errors[0].message
+    # `node status ... not_applicable` is refused for a criterion of an open milestone, so the finding does not offer it.
+    assert "not_applicable" not in report.errors[0].message
+    assert "`disposition`" in report.errors[0].message and "delete the criterion" in report.errors[0].message
 
 
 def test_e811_criterion_unproven(tmp_path: Path) -> None:

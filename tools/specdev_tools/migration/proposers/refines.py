@@ -37,7 +37,7 @@ from dataclasses import dataclass
 
 from specdev_tools.graph.contract import path_steps
 from specdev_tools.graph.model import Graph, Node
-from specdev_tools.graph.names import CRITERION, REFINES, REMOVES, TASK, TASK_CRITERION
+from specdev_tools.graph.names import CRITERION, REFINES, REMOVES, ROADMAP_STEP, TASK, TASK_CRITERION
 from specdev_tools.migration.proposers import KIND_REFINES, MigratedTree, Proposal, ProposeResult
 from specdev_tools.migration.worklist import AUDIENCE_AGENT, make_item
 from specdev_tools.trace.label_rename import own_leaves
@@ -47,7 +47,7 @@ MIN_SCORE = 0.6
 """The lowest score of an auto-eligible proposal."""
 TIE_MARGIN = 0.05
 """Candidates within this score of the best one state the same rule as it does."""
-STEP = "14"
+STEP = ROADMAP_STEP
 CLASS_AUTO = "auto-eligible"
 CLASS_JUDGEMENT = "needs-judgement"
 CLASS_NONE = "none"

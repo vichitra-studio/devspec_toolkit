@@ -62,6 +62,14 @@ def test_a_pin_source_keyed_by_an_older_id_is_compared_with_the_pin_of_the_renam
     assert (finding.code, finding.node_id) == ("E337", "tp-argon2-lib")
 
 
+def test_a_third_party_with_no_pin_is_the_schemas_finding_and_not_this_checks(host: Path, code: Path) -> None:
+    """E520 says the pin is missing; an E336 "the pin '' is not an exact version" beside it would name a wrong cause."""
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].pop("pin"))
+    assert check_pins(graph_of(host), _declare(tp_argon2=(pointer_source(),)), code) == []
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(pin=""))
+    assert check_pins(graph_of(host), _declare(), code) == []
+
+
 def test_mismatch_is_e337_naming_file_and_found_value(host: Path, code: Path) -> None:
     write_json(code / LOCK, {"packages": {"node_modules/argon2": {"version": "0.40.0"}}})
     (finding,) = check_pins(graph_of(host), _declare(tp_argon2=(pointer_source(),)), code)

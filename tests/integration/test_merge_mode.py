@@ -138,9 +138,9 @@ def spy(monkeypatch: pytest.MonkeyPatch) -> list[tuple[list[str], dict[str, Any]
 
 def test_the_example_on_a_clean_branch_adds_only_clean_merge_lines(host: Path) -> None:
     report = merge(host, "--base-ref", "main")
-    assert report.status("merge-open-items") == "PASS" and report.status("merge-pins") == "PASS" and report.status("merge-bindings") == "SKIP"
+    assert report.status("merge-open-items") == "PASS" and report.status("third-party-pins") == "PASS" and report.status("merge-bindings") == "SKIP"
     assert report.codes == plain(host).codes, "the merge mode adds no finding to the example"
-    assert "spec-check: 32 checks run, 25 errors, 7 warnings" in report.out
+    assert "spec-check: 31 checks run, 25 errors, 7 warnings" in report.out
 
 
 # --- open items -----------------------------------------------------------------------------------------------------
@@ -206,13 +206,16 @@ def declare_pin(host: Path, lock_version: str) -> None:
 
 def test_pin_mismatch_fails_merge_and_plain(host: Path) -> None:
     declare_pin(host, "0.41.1")
-    assert merge(host, "--base-ref", "main").status("merge-pins") == "PASS", "a matching pin passes"
+    assert merge(host, "--base-ref", "main").status("third-party-pins") == "PASS", "a matching pin passes"
     declare_pin(host, "0.40.0")
     assert plain(host).codes["E337"] == 1, "the plain run reads the pin sources too (the check of step 02, third-party-pins)"
     report = merge(host, "--base-ref", "main")
-    assert report.status("merge-pins") == "FAIL" and report.codes["E337"] == 1 and "0.40.0" in report.out
+    assert report.status("third-party-pins") == "FAIL" and report.codes["E337"] == 1 and "0.40.0" in report.out
+    assert "merge-pins" not in report.out, "one check per fact: the merge run does not read the pin sources a second time"
+    header = re.compile(r"spec-check: (\d+) checks run, (\d+) errors")
+    assert int(header.search(report.out).group(2)) == int(header.search(plain(host).out).group(2)), "the merge run counts the pin finding once"
     declare_pin(host, "0.41.1")
-    assert merge(host, "--base-ref", "main").status("merge-pins") == "PASS", "making them equal clears it"
+    assert merge(host, "--base-ref", "main").status("third-party-pins") == "PASS", "making them equal clears it"
 
 
 # --- the milestones the branch closes and their bindings --------------------------------------------------------------

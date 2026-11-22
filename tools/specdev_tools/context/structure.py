@@ -12,6 +12,7 @@ import os
 from typing import Any
 
 from ..core.registry import SchemaRegistry
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seeds_for_step
 from .canon_extractor import extract_canon
 from ._utils import (
@@ -117,7 +118,7 @@ def _seeds_required(step_id: str, spec_dir: str) -> list[str]:
     ``seed_routing.resolve_seeds_for_step`` for full routing rules).
     """
     spec_dir_abs = os.path.abspath(spec_dir)
-    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    manifest_path = os.path.join(spec_dir_abs, SEED_MANIFEST_FILE)
     if not os.path.exists(manifest_path):
         return []
 

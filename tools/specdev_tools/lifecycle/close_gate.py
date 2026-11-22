@@ -154,7 +154,7 @@ def _unrealised_findings(scope: Scope, realised: Mapping[str, list[Node]], plan_
     return [
         _finding(
             "E810",
-            f"task criterion {node.id} (task {task}) has no plan item that realises it; add a plan item with `realises: [\"{node.id}\"]` to {plan_file}, or mark the criterion not_applicable",
+            f"task criterion {node.id} (task {task}) has no plan item that realises it; add a plan item with `realises: [\"{node.id}\"]` to {plan_file}, or give its task a `disposition` (`deferred` or `wont_do`, with a reason) at step 14, or delete the criterion at step 14",
             node,
         )
         for node, task in scope.criteria

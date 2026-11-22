@@ -6,7 +6,7 @@ keeps (``MERGE_RELEASE_SECTION``, ``PRODUCTION_SECTION``), in the places its def
 (``release.gate``: the merge-mode open-items and pin checks are part of it), the second asks the next-release check.
 
 ``production_verification`` names the state of the previous release: ``verified in production``, ``rollback recorded``, ``not
-verified`` (released, awaiting production proof), ``none (previous tag predates 1.2.0)`` or ``none`` (a first release).
+verified`` (released, awaiting production proof), ``none (previous tag predates 1.2.0)`` (``none (this tag predates 1.2.0)`` for the release at ``HEAD``) or ``none`` (a first release).
 """
 from __future__ import annotations
 
@@ -27,6 +27,8 @@ VERIFIED = "verified in production"
 ROLLBACK = "rollback recorded"
 NOT_VERIFIED = "not verified"
 PREDATES = "none (previous tag predates 1.2.0)"
+PREDATES_HERE = "none (this tag predates 1.2.0)"
+"""What ``PREDATES`` reads when the release is the one tagged on the checkout's own commit."""
 NONE = "none"
 _PREDATES_CODE = "W938"
 
@@ -56,7 +58,7 @@ def production_verification(git_root: str, spec_root: str, repo_root: str) -> Pr
         return ProductionVerification(None, NONE)
     tag, here = result.previous.tag, at_head is not None
     if any(warning.code == _PREDATES_CODE for warning in result.warnings):
-        return ProductionVerification(tag, PREDATES, at_head=here)
+        return ProductionVerification(tag, PREDATES_HERE if here else PREDATES, at_head=here)
     if read_rollback(spec_root, tag) is not None:
         return ProductionVerification(tag, ROLLBACK, at_head=here)
     if result.errors:

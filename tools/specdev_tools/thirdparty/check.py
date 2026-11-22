@@ -49,7 +49,8 @@ def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Pat
     A pin that is not exact is E336, whether or not the third party declares sources (its sources are not read); a source
     that cannot give a version is E338; a source whose version is not the pin is E337.  A third party with no declared
     source has only its pin checked for exactness; a ``pin_sources`` key that names no third-party node is E338 (a mistyped
-    key would otherwise switch the check off).
+    key would otherwise switch the check off).  A node with no pin, or an empty one, is the schema's finding (E520, "'pin' is a
+    required property"), not this check's.
     """
     sources_of = pin_sources_by_id(declarations, graph.canonical_id)
     third_parties = {node.id for node in graph.by_kind.get(THIRD_PARTY, ())}
@@ -60,6 +61,8 @@ def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Pat
     ]
     for node in graph.by_kind.get(THIRD_PARTY, ()):
         sources, pin = sources_of.get(node.id, ()), pin_of(graph, node.id)
+        if not pin:
+            continue
         if not pin_is_exact(pin):
             findings.append(not_exact_error(node.id, pin))
             continue

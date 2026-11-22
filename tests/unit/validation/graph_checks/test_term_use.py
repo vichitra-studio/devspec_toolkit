@@ -117,6 +117,14 @@ def test_term_with_no_match_is_e741_with_owner_step_14(tmp_path: Path) -> None:
     assert (error.code, error.node_id, error.owner) == (TERM_NOT_USED_BY_LABEL, TERM, "step:14")
 
 
+def test_the_message_names_a_remedy_the_tools_accept(tmp_path: Path) -> None:
+    """`node status ... not_applicable` is refused for a term (E705), so the finding does not offer it: it names the label or a delete."""
+    spec = edited_example(tmp_path / "spec", **{GLOSSARY: _relabel})
+    (error,) = check_term_use(_context(spec), "merge")
+    assert f"specdev json delete --id {TERM}" in error.message
+    assert "not_applicable" not in error.message
+
+
 def test_term_matched_by_task_criterion_text_is_used(tmp_path: Path) -> None:
     def criterion_says_marker(doc: dict[str, Any]) -> None:
         doc["milestones"][0]["tasks"][0]["acceptance_criteria"][0]["text"] = f"The {MARKER}s are rejected."

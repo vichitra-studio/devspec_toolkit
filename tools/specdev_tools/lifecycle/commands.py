@@ -266,7 +266,7 @@ STATUS_DESCRIPTION = (
     "removed realisations, the next step that may start, the gate-owned errors of the milestones in progress (the close gate as a "
     "dry run, and the W350 warning for a submodule with uncommitted content), the merge-check and release-gate errors (the release "
     "gate run on the checkout, by owner) and the production verification of the previous release (verified in production, rollback "
-    "recorded, not verified, none (previous tag predates 1.2.0) or none). Reads and writes nothing; "
+    "recorded, not verified, none (previous tag predates 1.2.0; this tag predates 1.2.0 for the release at HEAD) or none). Reads and writes nothing; "
     "exit 0 whatever it lists (1 only when it cannot read what it needs). --milestone <id> prints the view `milestone sign-off` "
     "shows: the code tree, the proof of each criterion, the manual share, deferred and won't-do tasks, open items and the close "
     "gate as a dry run. --json prints the same data with stable keys."

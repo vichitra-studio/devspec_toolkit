@@ -45,7 +45,6 @@ For each upstream artifact ingested, extract the following:
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
 - `spec/07_nfrs.json` is present and contains at least one nfr entry.
-- All seeds listed for step "09" in `spec/common/seed_manifest.json` are present and non-empty (if step_requirements["09"] is non-empty).
 
 ## Negative Constraints
 - **NO Orphan Milestones**: Do not create a milestone whose `schedules` is empty or names only another milestone.

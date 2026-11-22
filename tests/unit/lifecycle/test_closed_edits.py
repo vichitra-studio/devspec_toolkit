@@ -66,6 +66,7 @@ def test_node_status_not_applicable_is_still_the_way_to_park_a_closed_task_crite
     host = _closed_host(tmp_path)
     code, out, err = cli_run(host, "node", "status", OTHER_CRITERION, "not_applicable")
     assert code == 0, err
+    assert f"{OTHER_CRITERION}: active -> not_applicable" in out
 
 
 def test_the_nodes_of_an_open_milestone_are_written(tmp_path: Path) -> None:
@@ -79,6 +80,7 @@ def test_a_node_that_is_not_step_14_is_written_on_a_closed_milestone(tmp_path: P
     host = _closed_host(tmp_path)
     code, _, err = cli_run(host, "json", "patch", "--id", "fr-password-reset", ".statement", '"A reworded statement."')
     assert code == 0, err
+    assert "A reworded statement." in (host / "spec" / "04_fr_list.json").read_text(encoding="utf-8")
 
 
 def test_inside_a_migration_the_edit_is_written_and_the_milestone_gets_one_record(tmp_path: Path) -> None:
@@ -112,3 +114,81 @@ def test_once_the_migration_is_closed_the_refusal_is_back(tmp_path: Path) -> Non
     _stamp(host, None)
     code, _, err = cli_run(host, "json", "patch", "--id", OTHER_CRITERION, ".text", '"The reuse of a token is refused late, after the migration."')
     assert code == 1 and "is closed" in err
+
+
+# --- the other ways to change such a node: a lifecycle by `node status`, a rename, `.lifecycle` by id -----------------
+
+
+@pytest.mark.parametrize("node", [CRITERION, TASK, MILESTONE])
+def test_node_status_deprecated_is_refused_on_a_closed_milestones_step_14_node(tmp_path: Path, node: str) -> None:
+    host = _closed_host(tmp_path)
+    before = _bytes(host)
+    code, _, err = cli_run(host, "node", "status", node, "deprecated")
+    assert code == 1 and "E705" in err and f"'{node}'" in err and "only not_applicable" in err
+    assert _bytes(host) == before
+
+
+def test_a_not_applicable_closed_node_is_taken_back_with_active_and_nothing_else(tmp_path: Path) -> None:
+    host = _closed_host(tmp_path)
+    assert cli_run(host, "node", "status", CRITERION, "not_applicable")[0] == 0
+    code, _, err = cli_run(host, "node", "status", CRITERION, "deprecated")
+    assert code == 1 and "E705" in err
+    code, out, err = cli_run(host, "node", "status", CRITERION, "active")
+    assert code == 0, err
+    assert f"{CRITERION}: not_applicable -> active" in out
+
+
+def test_node_status_deprecated_is_written_on_an_open_milestones_step_14_node(tmp_path: Path) -> None:
+    host = _closed_host(tmp_path, closed=False)
+    code, out, err = cli_run(host, "node", "status", CRITERION, "deprecated")
+    assert code == 0, err
+    assert f"{CRITERION}: active -> deprecated" in out
+
+
+RENAME = ("node", "rename", CRITERION, "tc-confirm-expired-token-renamed")
+
+
+def test_a_rename_of_a_closed_milestones_step_14_node_is_refused_outside_a_migration(tmp_path: Path) -> None:
+    host = _closed_host(tmp_path)
+    before = _bytes(host)
+    for extra in ((), ("--dry-run",)):
+        code, _, err = cli_run(host, *RENAME, *extra)
+        assert code == 1 and "E767" in err and f"'{CRITERION}'" in err and "`node rename`" in err and "is closed" in err
+    assert _bytes(host) == before
+
+
+def test_a_rename_inside_a_migration_is_written_and_recorded_once(tmp_path: Path) -> None:
+    host = _closed_host(tmp_path)
+    _stamp(host, "in_progress")
+    assert cli_run(host, *RENAME, "--dry-run")[0] == 0 and _migrations(host) == []
+    code, _, err = cli_run(host, *RENAME)
+    assert code == 0, err
+    assert "tc-confirm-expired-token-renamed" in (host / "spec" / "14_roadmap.json").read_text(encoding="utf-8")
+    assert len(_migrations(host)) == 1
+    # a second edit of the same milestone, here an id write of another node, adds no second record
+    assert cli_run(host, "json", "patch", "--id", OTHER_CRITERION, ".text", '"The reuse of a token is refused after the close."')[0] == 0
+    assert len(_migrations(host)) == 1
+
+
+def test_a_rename_on_an_open_milestone_is_written(tmp_path: Path) -> None:
+    host = _closed_host(tmp_path, closed=False)
+    code, _, err = cli_run(host, *RENAME)
+    assert code == 0, err
+    assert "tc-confirm-expired-token-renamed" in (host / "spec" / "14_roadmap.json").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("node", [CRITERION, "fr-password-reset", "cap-account-recovery"])
+@pytest.mark.parametrize("action", ["patch", "insert"])
+def test_the_lifecycle_is_not_written_by_an_id_write(tmp_path: Path, node: str, action: str) -> None:
+    host = _closed_host(tmp_path, closed=False)
+    before = _bytes(host)
+    code, _, err = cli_run(host, "json", action, "--id", node, ".lifecycle", '"not_applicable"')
+    assert code == 1 and "E767" in err and "specdev node status <id> <value>" in err and f"'{node}'" in err
+    assert _bytes(host) == before
+
+
+def test_node_status_itself_still_writes_the_lifecycle(tmp_path: Path) -> None:
+    host = _closed_host(tmp_path, closed=False)
+    code, out, err = cli_run(host, "node", "status", "fr-password-reset", "deprecated")
+    assert code == 0, err
+    assert "fr-password-reset: active -> deprecated" in out

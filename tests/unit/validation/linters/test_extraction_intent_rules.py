@@ -12,6 +12,7 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from specdev_tools.validation.extraction_intent_check import check_extraction_intent
 from specdev_tools.core.errors import render_errors
@@ -602,6 +603,11 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self.assertIn("E597", codes, "Missing upstream dep should trigger E597")
             self.assertIn("W597", codes, "Short intent should trigger W597")
             self.assertIn("E598", codes, "Invalid step ref should trigger E598")
+
+    def test_no_e597_on_the_toolkit_prompts(self):
+        """On the generated step order every prompt of the toolkit has an entry for each required input."""
+        repo_root = str(Path(__file__).resolve().parents[4])
+        self.assertEqual(render_errors(check_extraction_intent(repo_root)), [])
 
 
 if __name__ == "__main__":

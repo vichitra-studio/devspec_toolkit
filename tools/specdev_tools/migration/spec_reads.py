@@ -18,7 +18,7 @@ from specdev_tools.core.plan_files import MILESTONE_KEY, plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
 from specdev_tools.graph.ids import mint_slug
 from specdev_tools.graph.model import Graph
-from specdev_tools.graph.names import ABOUT, ROW_DONE
+from specdev_tools.graph.names import ABOUT, ROADMAP_STEP, ROW_DONE
 from specdev_tools.graph.resolve import link_target_allowed
 from specdev_tools.lifecycle.anchor_store import is_legacy_close
 from specdev_tools.migration.context import CAPTURE_REL, MigrationContext
@@ -27,7 +27,6 @@ LEGACY = "legacy_"
 """The prefix of every value the capture copied from a 1.1.1 file."""
 RENAMES_KEY = "renames"
 """The capture section that lists the ids phase 2 renamed."""
-ROADMAP_STEP = "14"
 AMBIGUITY = "ambiguity-item"
 PLAN_HOLDER_STEP = "16a"
 """The step the graph gives every open item of a plan file."""

@@ -90,7 +90,7 @@ Check the result before you go on:
 specdev spec-check spec --repo-root $TK --spec-root ./spec --git-root .
 ```
 
-On the invented host the errors fall from 559 to 281 (the merge check, which reads more, prints 288). [Sizing](#sizing) has the numbers of two real hosts. The codes that mark a shape the scripts must have fixed (`E768`, `E704`, `E761`, `E622`) are gone. What is left is the judgement pass.
+On the invented host the errors fall from 559 to 280 (the merge check, which reads more, prints 287). [Sizing](#sizing) has the numbers of two real hosts. The codes that mark a shape the scripts must have fixed (`E768`, `E704`, `E761`, `E622`) are gone. What is left is the judgement pass.
 
 ## Step 3: the one commit
 
@@ -367,4 +367,4 @@ python -m tests.e2e.host_migration.harness --host-copy <copy> --toolkit <1.2.0 t
 
 The copy must be a `git clone` (a copy that lacks untracked files adds `E530` findings before and after), committed, with `spec/` clean, and the toolkit root must say 1.2.0 in `tools/pyproject.toml` (the harness refuses the live checkout). `--kind` is a label for the report. The run prints the checklist of the mechanical stage (a dry run that changes nothing, a real run, a second run with no edit, nothing outside `spec/`, no id lost, fewer errors) and the table of counts the sizing below is made from (`--stage end` checks the finished state: a clean merge check, no live `E882`, and `align validate` exit 0). Two further tests of the folder, one per real host, are skipped unless an environment variable names a copy (see `tests/e2e/host_migration/conftest.py`).
 
-The same pass as a scripted example is `tests/integration/_mini_host_pass.py` (`run_scripted_pass`), driven by `tests/fixtures/migration/mini_host_pass/pass.json`. It takes the invented host from 288 errors after the mechanical stage to zero in 180 commands: 88 items resolved, about 100 links written, 17 `attest --step` runs, 12 sentences reworded, 13 nodes added and 8 removed; then `spec-check --merge` printed no error and `align validate` exited 0. Read `pass.json` as the model of what each step's answers look like.
+The same pass as a scripted example is `tests/integration/_mini_host_pass.py` (`run_scripted_pass`), driven by `tests/fixtures/migration/mini_host_pass/pass.json`. It takes the invented host from 287 errors after the mechanical stage to zero in 180 commands: 88 items resolved, about 100 links written, 17 `attest --step` runs, 12 sentences reworded, 13 nodes added and 8 removed; then `spec-check --merge` printed no error and `align validate` exited 0. Read `pass.json` as the model of what each step's answers look like.

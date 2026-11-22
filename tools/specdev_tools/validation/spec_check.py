@@ -19,6 +19,7 @@ from dataclasses import replace
 from typing import Any
 
 from ..core.config import reset_config
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.errors import FindingError, SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
@@ -254,7 +255,7 @@ def _check_hallucination_lint(ctx: CheckContext) -> dict[str, Any]:
 
 
 def _check_seed_lint(ctx: CheckContext) -> dict[str, Any]:
-    if not os.path.exists(os.path.join(ctx.project_root, "spec", "common", "seed_manifest.json")):
+    if not os.path.exists(os.path.join(ctx.project_root, "spec", SEED_MANIFEST_FILE)):
         return skip("seed_manifest.json not present")
     from .seed_lint import lint_seeds
 

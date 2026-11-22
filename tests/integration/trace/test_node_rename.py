@@ -137,6 +137,9 @@ def test_rename_leaves_no_suspect_link(host: Example, old: str) -> None:
 
 def test_historical_and_record_links_resolve_through_alias(host: Example) -> None:
     host.close_milestone()
+    code, out = _rename(host, "ms-account-recovery", "ms-account-recovery-v2")
+    assert code == 1 and "E767" in out and "is closed" in out, "a closed milestone's step-14 node is not renamed outside a migration"
+    (host.spec / "specdev_version").write_text("toolkit_version: 1.2.0\nmigration_status: in_progress\n", encoding="utf-8")
     assert _rename(host, "ms-account-recovery", "ms-account-recovery-v2")[0] == 0
     assert _rename(host, CRITERION, NEW)[0] == 0
     graph = host.graph()

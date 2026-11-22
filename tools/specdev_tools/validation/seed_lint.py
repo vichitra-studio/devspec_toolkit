@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from ..core.errors import SpecError, ensure_spec_errors, make_error
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seed_paths
 from .validate import validate_file
 
@@ -142,7 +143,7 @@ _project_root_from_spec_dir = project_root_from_spec_dir
 
 
 def _load_manifest(repo_root: str, project_root: str, errors: List[SpecError]) -> Dict:
-    manifest_path = os.path.join(project_root, "spec", "common", "seed_manifest.json")
+    manifest_path = os.path.join(project_root, "spec", SEED_MANIFEST_FILE)
     if not os.path.exists(manifest_path):
         errors.append(make_error("E520", f"Missing seed manifest: {manifest_path}"))
         return {}

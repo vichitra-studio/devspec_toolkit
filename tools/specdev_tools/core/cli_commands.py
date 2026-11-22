@@ -1,7 +1,9 @@
 """The list of commands a user can type after ``specdev``: the one reader of ``tools/cli_commands.json``.
 
 ``specdev registry-generate`` writes the file; a step-10 rule that names a command in ``cli_command`` is checked against it
-(by the step-10 validator, and by the proof, which counts a rule as built when its command is on the list).
+(by the step-10 validator, and by the proof, which counts a rule as built when its command is on the list).  A caller says what a
+list that cannot be read means: the step-10 validator then reports nothing (there is nothing to compare with), while the proof lets
+the error out (a toolkit without its command list is broken, and a rule must not count as built on a guess).
 """
 from __future__ import annotations
 

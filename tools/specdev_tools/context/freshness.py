@@ -18,6 +18,7 @@ import json
 import os
 from typing import Any
 
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seed_paths
 
 
@@ -116,7 +117,7 @@ def check_freshness(
     #    path) so seeds present in the manifest but ABSENT from the index can
     #    be reported — otherwise they escape drift detection entirely.
     # ------------------------------------------------------------------
-    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    manifest_path = os.path.join(spec_dir_abs, SEED_MANIFEST_FILE)
     seed_file_map: dict[str, str] = {}  # seed_id -> abs path
     manifest_seed_ids: list[str] = []
     if os.path.isfile(manifest_path):

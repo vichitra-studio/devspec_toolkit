@@ -397,7 +397,8 @@ class _Pass:
             elif not link_target_allowed(link, node.step, target, self.graph.shape):
                 why = f"`schedules` takes no {target.kind} here" + (" (the capability of a milestone is computed from the FRs it schedules)" if target.kind == CAPABILITY else "")
             else:
-                written.append(ident)
+                if ident not in written:  # an entry listed twice is one schedule: the evidence counts what is written
+                    written.append(ident)
                 continue
             left.append(f"{entry!r}: {why}")
         return written, left

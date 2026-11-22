@@ -56,7 +56,7 @@ class Readiness:
     upstream: tuple[str, ...]
     blockers: tuple[Blocker, ...]
     earlier: tuple[Blocker, ...] = ()
-    """What is pending in the earliest step above that the blockers' steps do not link to, when it lies above the first blocker's step: not a blocker of *step*, only where the replay has to begin."""
+    """The suspect links of the earliest step above that the blockers' steps do not link to, when it lies above the first blocker's step and the first blocker is itself a suspect link: not a blocker of *step*, only where the replay has to begin."""
 
     @property
     def ready(self) -> bool:
@@ -67,8 +67,9 @@ class Readiness:
     def replay_first(self) -> str | None:
         """The upstream step to deal with first, or ``None`` when ready.
 
-        The earliest step in the waterfall that has a blocker; when a step above all of them, one *step* does not link to, still
-        has something pending, that step (a link cannot be attested while the node it points to is suspect).
+        The earliest step in the waterfall that has a blocker; when the first blocker is a suspect link and a step above it, one
+        *step* does not link to, has a suspect link too, that step (a link cannot be attested while the node it points to is
+        suspect; a coverage gap of such a step is not in the way and is not named).
         """
         if self.earlier:
             return self.earlier[0].step
@@ -150,10 +151,11 @@ def check_ready(
 def _earlier_pending(graph: Graph, plan: replay.ReplayPlan, step: str, blockers: list[Blocker]) -> tuple[Blocker, ...]:
     """The suspect links of the earliest step above the first of *blockers* that has any; empty when there is none, or no blocker.
 
-    A link cannot be attested while the node it points to is suspect, so the replay begins there.  A coverage gap of a step
-    that *step* does not link to is not in the way and is not named.
+    A link cannot be attested while the node it points to is suspect, so the replay begins there.  That holds for a suspect
+    link only: when the first blocker is a coverage gap or a missing file, a replay of an earlier step does not unblock it, so
+    no earlier step is named, and a coverage gap of a step that *step* does not link to is not named either.
     """
-    if not blockers:
+    if not blockers or blockers[0].reason != REASON_SUSPECT:
         return ()
     limit = graph.shape.step_key(blockers[0].step)
     above = {name for name in graph.shape.step_ranks if name != SEED_STEP and graph.shape.step_key(name) < limit}

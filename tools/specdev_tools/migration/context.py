@@ -13,7 +13,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from specdev_tools.core.constants import STATUS_IN_PROGRESS  # noqa: F401  (the stamp's status; also imported from here by the runner, the triage and update)
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
 
 from specdev_tools.graph.kinds import KindRegistry, load_kind_registry

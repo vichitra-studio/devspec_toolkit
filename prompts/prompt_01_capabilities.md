@@ -13,7 +13,6 @@ Translate the charter into a catalog of system capabilities with explicit verbs,
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
-- **Seeds**: per spec/common/seed_manifest.json step_requirements["01"]
 - **00_charter.json**: Project goals, success metrics, `scope_items` (each with its `scope`), and stakeholder needs to anchor capability boundaries; use canonical nouns/verbs from charter language; do not depend on downstream glossary/FR artifacts
 
 ## Operating Flow: Discover → Cross-Cut → Derive → Emit
@@ -42,7 +41,6 @@ Before finalizing, verify these system-level capabilities are considered:
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/00_charter.json` is present and contains at least one `scope_items` entry.
 - `spec/00_charter.json` is present and contains at least one user_segments entry.
-- All seeds listed for step "01" in `spec/common/seed_manifest.json` are present and non-empty.
 
 ## Negative Constraints
 - **DO NOT** overlap capability scopes; each capability must have a clear boundary.

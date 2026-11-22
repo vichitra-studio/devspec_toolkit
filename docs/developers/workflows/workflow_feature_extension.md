@@ -34,7 +34,7 @@ Before starting, ensure your current specs are clean and valid.
     *   *Reference*: `prompts/prompt_00_project_charter.md`.
 2.  **Step 01: Capabilities & Stack**:
     *   **Check**: Does this introduce a new Tech Stack element (e.g., Redis)?
-    *   **Action**: Update the tech-stack seed declared in `spec/common/seed_manifest.json` first, then update `spec/01_capabilities.json`.
+    *   **Action**: Update the tech-stack seed declared in `spec/common/seed_manifest.json` first (the manifest routes it to steps 02 and 02a), then update `spec/01_capabilities.json`.
     *   *Reference*: `prompts/prompt_01_capabilities.md`.
 3.  **Step 02: System Sketch**: Does this add a new Component? Update the diagram.
     *   *Reference*: `prompts/prompt_02_system_sketch.md`.
@@ -48,7 +48,7 @@ Before starting, ensure your current specs are clean and valid.
 **User Action:**
 > **PROMPT:**
 > I am adding feature [Name].
-> 1. Check the seeds declared in `spec/common/seed_manifest.json` for steps 00 and 01. Do they need updates?
+> 1. Check the seeds declared in `spec/common/seed_manifest.json` for steps 00, 02 and 02a (seeds are routed to no other step). Do they need updates?
 > 2. Iterate through Specs 00, 01, 02, 03, and 04.
 > Ask me if updates are needed for each.
 > Use each step's canonical prompt (`prompts/prompt_NN_name.md`) and emit updated JSON directly to `spec/NN_name.json`.

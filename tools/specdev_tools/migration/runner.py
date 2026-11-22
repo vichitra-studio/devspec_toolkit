@@ -28,7 +28,7 @@ from specdev_tools.core.changelog_parser import (
     get_toolkit_version,
     list_versions,
 )
-from specdev_tools.core.constants import SEED_MANIFEST_FILE, STAMP_FILE
+from specdev_tools.core.constants import SEED_MANIFEST_FILE, STAMP_FILE, STATUS_IN_PROGRESS
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.core.plan_files import plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
@@ -38,7 +38,7 @@ from specdev_tools.graph.gitview import GitViewError, status_lines
 from specdev_tools.graph.kinds import KindRegistryError, load_kind_registry
 from specdev_tools.lifecycle import plans
 from specdev_tools.lifecycle.frozen import check_frozen_plans
-from specdev_tools.migration.context import CAPTURE_FILE, STATUS_IN_PROGRESS, GitReadError, MigrationContext, Snapshot, file_key, read_git
+from specdev_tools.migration.context import CAPTURE_FILE, GitReadError, MigrationContext, Snapshot, file_key, read_git
 from specdev_tools.migration.registry import (
     PHASE_CLOSE,
     PHASE_NAMES,

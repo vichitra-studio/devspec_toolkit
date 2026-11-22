@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Optional
 
 from .core.changelog_parser import get_changes_between, list_versions
 from .generation.schema_differ import read_stamp
-from .migration.context import STATUS_IN_PROGRESS
+from .core.constants import STATUS_IN_PROGRESS
 from .migration import registry
 
 if TYPE_CHECKING:

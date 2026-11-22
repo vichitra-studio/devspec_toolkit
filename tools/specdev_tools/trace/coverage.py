@@ -23,7 +23,6 @@ from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import Lock
 from specdev_tools.trace.suspects import EntryIndex, find_suspects
 
-REFINING_STEP = "14"
 PARKED_SCOPES = ("later", "out")
 REFINED_CURRENT, REFINED_STALE, REFINED_NONE = "current", "stale", "none"
 RATIO_DIGITS = 4
@@ -161,7 +160,7 @@ def _group_by_kind(rows: list[LinkRow]) -> tuple[tuple[str, tuple[LinkRow, ...]]
 
 def refined_state(rows: list[LinkRow], graph: Graph) -> str:
     """``current`` when a step-14 node ``refines`` with a current link, ``stale`` when refinements exist and none is, else ``none``."""
-    refinements = [row for row in rows if row.field == names.REFINES and graph.by_id[row.node].step == REFINING_STEP]
+    refinements = [row for row in rows if row.field == names.REFINES and graph.by_id[row.node].step == names.ROADMAP_STEP]
     if not refinements:
         return REFINED_NONE
     return REFINED_CURRENT if any(row.current for row in refinements) else REFINED_STALE

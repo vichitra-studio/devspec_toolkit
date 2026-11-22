@@ -43,7 +43,7 @@ from specdev_tools.validation.graph_checks.built import SATISFIED, BuiltState
 from specdev_tools.validation.graph_checks.context import GraphCheckContext, Mode
 from specdev_tools.validation.graph_checks.design_milestones import unrealised_design_milestones
 from specdev_tools.validation.graph_checks.scaffold import scaffold_scan
-from specdev_tools.validation.merge_gate import MERGE_OPEN_ITEMS, MERGE_PINS, open_items_check, pins_check
+from specdev_tools.validation.merge_gate import MERGE_OPEN_ITEMS, open_items_check
 
 _SCOPE_OUT = PARKED_SCOPES[-1]
 _RELEASE_MODE: Mode = "release"
@@ -112,7 +112,6 @@ def _static_state(ctx: CheckContext, run: _Run) -> list[SpecError]:
         spec_check.warn_ignored_promotions()
     checks = run_registered_checks(ctx)
     checks[MERGE_OPEN_ITEMS] = open_items_check(ctx)
-    checks[MERGE_PINS] = pins_check(ctx)
     return list(dict.fromkeys(spec_check.check_findings(checks)))
 
 

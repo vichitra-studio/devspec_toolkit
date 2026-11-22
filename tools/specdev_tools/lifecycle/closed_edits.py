@@ -2,7 +2,7 @@
 
 A closed milestone's roadmap milestone, tasks and task criteria are history: the only edits they take are ``node status
 <id> not_applicable`` and the edits of a migration, which are recorded on the milestone's ``close`` (``migrations``).
-``specdev json patch|insert|delete --id`` asks ``edit_of_closed_node`` before it writes: outside a migration the answer is
+``specdev json patch|insert|delete --id`` and ``specdev node rename`` ask ``edit_of_closed_node`` before they write: outside a migration the answer is
 a refusal (E767); while the stamp of the spec folder says the migration is in progress the edit is allowed and, once it is
 written, ``record_migration_edit`` adds one record to the close of the milestone (a second edit of the same milestone in the
 same migration adds nothing).
@@ -16,17 +16,8 @@ from ..core.constants import STATUS_IN_PROGRESS
 from ..core.errors import FindingError, make_error
 from ..generation.schema_differ import read_stamp
 from ..graph.model import Graph, Node
-from ..trace.history import contained, done_milestones
+from ..trace.history import closed_milestone_of
 from . import anchor_store, plans
-
-ROADMAP_STEP = "14"
-
-
-def closed_milestone_of(graph: Graph, node: Node) -> str | None:
-    """The id of the closed milestone that holds the step-14 node *node* (the milestone itself, a task or a task criterion); ``None`` for any other node."""
-    if node.step != ROADMAP_STEP:
-        return None
-    return next((milestone for milestone in sorted(done_milestones(graph)) if node.id in contained(graph, milestone)), None)
 
 
 def migration_in_progress(spec_root: str) -> bool:
@@ -43,8 +34,8 @@ def _migration_note(spec_root: str) -> str:
     return f"step-14 nodes edited by the migration from {start} to {end}" if start and end else "step-14 nodes edited by the migration"
 
 
-def edit_of_closed_node(graph: Graph, spec_root: str, node_id: str, action: str) -> str | None:
-    """The closed milestone whose step-14 node *node_id* an id write of *action* would change, when the write is allowed to go on in a migration; ``None`` when the node is not such a node.
+def edit_of_closed_node(graph: Graph, spec_root: str, node_id: str, command: str) -> str | None:
+    """The closed milestone whose step-14 node *node_id* the id-keyed write *command* (for example ``json patch --id``) would change, when the write is allowed to go on in a migration; ``None`` when the node is not such a node.
 
     Raises:
         FindingError: E767 when the node is a step-14 node of a closed milestone and no migration is in progress.
@@ -55,7 +46,7 @@ def edit_of_closed_node(graph: Graph, spec_root: str, node_id: str, action: str)
         return milestone
     raise FindingError(make_error(
         "E767",
-        f"{node.id!r} is a step-14 node ({node.kind}) of milestone {milestone}, which is closed, so `json {action} --id` does not change it: "
+        f"{node.id!r} is a step-14 node ({node.kind}) of milestone {milestone}, which is closed, so `{command}` does not change it: "
         f"a closed milestone's step-14 nodes take `specdev node status {node.id} not_applicable` and the edits of a migration, which are recorded on the milestone's close; "
         f"to change the work, add a new task or milestone",
         node_id=node.id,

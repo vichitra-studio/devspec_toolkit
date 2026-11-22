@@ -13,7 +13,8 @@ from unittest.mock import patch
 import yaml
 
 from specdev_tools.migration import triage
-from specdev_tools.migration.context import CAPTURE_FILE, STATUS_IN_PROGRESS
+from specdev_tools.core.constants import STATUS_IN_PROGRESS
+from specdev_tools.migration.context import CAPTURE_FILE
 from specdev_tools.migration.worklist import WORKLIST_FILE
 
 

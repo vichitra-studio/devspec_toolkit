@@ -65,6 +65,11 @@ def contained(graph: Graph, root: str) -> set[str]:
     return found
 
 
+def closed_milestone_of(graph: Graph, node: Node) -> str | None:
+    """The id of the closed milestone (anchor row ``done``) that is *node* or holds it: its tasks and task criteria are step-14 nodes; ``None`` for any other node."""
+    return next((milestone for milestone in sorted(done_milestones(graph)) if node.id in contained(graph, milestone)), None)
+
+
 def containers_of(graph: Graph, node: Node) -> tuple[str, ...]:
     """The ids of the nodes that enclose *node*: its containment parent, then that node's parent, up to the top.
 

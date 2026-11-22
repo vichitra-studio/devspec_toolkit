@@ -95,7 +95,7 @@ def _request_of(args: argparse.Namespace) -> WriteRequest:
 def _write(args: argparse.Namespace, graph: Graph) -> int:
     spec_root, repo_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
     request = _request_of(args)
-    closed = edit_of_closed_node(graph, spec_root, request.node_id, request.action) if request.node_id else None
+    closed = edit_of_closed_node(graph, spec_root, request.node_id, f"json {request.action} --id") if request.node_id else None
     result = execute_write(graph, spec_root, repo_root, resolve_git_root(args), request, dry_run=args.dry_run)
     if closed is not None and not args.dry_run:
         record_migration_edit(spec_root, repo_root, closed)

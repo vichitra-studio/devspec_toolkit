@@ -554,7 +554,10 @@ changes:
       not_applicable is accepted only for a closed milestone's historical
       step-14 nodes (the roadmap milestone, its tasks and its task criteria)
       and for a node that already has it; any other node is refused with E705,
-      and deprecated takes a node out of use.
+      and deprecated takes a node out of use. The finding of an unused
+      glossary term (E741) and of an unrealised task criterion (E810) name what
+      clears them: use the term's label or delete the term; add a plan item,
+      give the task a disposition or delete the criterion at step 14.
     migration:
       action: none
 
@@ -721,7 +724,13 @@ changes:
       park such a node. While spec/specdev_version says migration_status:
       in_progress the edit is allowed and the first one of a milestone adds
       one record to its close.migrations; a second edit of the same milestone
-      in the same migration adds none. json delete --id lists as now broken
+      in the same migration adds none. specdev node rename of such a node is
+      refused and recorded the same way, and specdev node status takes only
+      not_applicable (and active, to take it back) on it: deprecated is E705.
+      The field .lifecycle is not written by json patch|insert --id (E767: the
+      lifecycle is set with specdev node status <id> <value>). The file form
+      json patch|insert|delete <file> <jq-path> is the same as editing the
+      file by hand and does not guard these nodes. json delete --id lists as now broken
       only the links of live nodes that point at the deleted node, not the
       history links replaces and removes.
     migration:
@@ -744,10 +753,11 @@ changes:
       ready for K = 02, 04 and 05, not ready, 1 blocker (step 07: coverage gap E740:
       metric-reset-completion-rate) for K = 08 and 09, and not ready, 11 blockers
       (steps 07, 08 and 12) for K = 14.
-      The last line names the earliest step that has anything pending, even a
-      step that NN has no link into, because a link cannot be attested while
-      the node it points to is suspect; the blockers listed are still those of
-      the steps NN links to.
+      When the first blocker is a suspect link, the last line names the
+      earliest step above it that holds a suspect link, even a step that NN has
+      no link into, because a link cannot be attested while the node it points
+      to is suspect; a coverage gap of an unlinked step is not named. The
+      blockers listed are still those of the steps NN links to.
     migration:
       action: none
 
@@ -1666,12 +1676,13 @@ changes:
   - type: add_module
     description: >
       specdev spec-check SPEC --merge [--base-ref REF] runs the merge gate:
-      three checks appended after the registered ones (merge-open-items for E631
-      and W633, merge-pins for E336 to E338, merge-bindings for E901 and E900).
+      two checks appended after the registered ones (merge-open-items for E631
+      and W633, merge-bindings for E901 and E900).
       Plain spec-check, --step and --paths do not run them, so a plain run on
       the worked example is unchanged (30 checks run, 25 errors, 7 warnings;
-      with --merge 32 checks run, 25 errors, 7 warnings, the pin finding listed
-      under both third-party-pins and merge-pins and counted once). merge-bindings runs,
+      with --merge 31 checks run, 25 errors, 7 warnings). A pin finding (E336
+      to E338) is the registered check third-party-pins's, which every run
+      makes, and is listed and counted once. merge-bindings runs,
       without recording evidence, the dev and CI bindings of each milestone that
       the branch closes. --merge with --step, --paths or --detail is a usage
       error (exit 2); --base-ref is also accepted with --merge, and a full

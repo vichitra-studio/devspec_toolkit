@@ -355,6 +355,7 @@ def test_a_deliverable_that_cannot_be_written_leaves_one_item_that_names_it(tmp_
         assert left in evidence, left
     assert "fr-checkout-tool" not in evidence.split("Not written:")[1], "an entry that was written is not listed as left"
     assert "note" not in evidence.split("Not written:")[1].replace("the old list, with each note", "")
+    assert "schedules 2 of its deliverables" in evidence, "fr-reserve-tool is listed twice and is one schedule: the evidence counts what was written"
 
 
 def test_a_milestone_whose_deliverables_all_fail_keeps_a_blocking_item_with_the_paired_14_proposal(tmp_path):
@@ -401,3 +402,16 @@ def test_a_borrowed_charter_goal_type_converts_when_the_id_names_one_node_and_st
     assert "trace" not in capability and {"member-borrowers", "m-checkout-time"} <= set(capability["derives_from"])
     left = [i for i in items(host, "trace-link") if i["about"] == "cap-browse-catalog" and "charter-goal" in i["evidence"]]
     assert len(left) == 1 and "nobody-defines-this" in left[0]["evidence"] and "no node has this id" in left[0]["evidence"]
+
+
+def test_a_borrowed_charter_goal_type_whose_id_several_nodes_have_stays_an_item_that_says_so(tmp_path):
+    """``amb-fee-rounding`` is defined twice in the mini host and the migration leaves a duplicated open item to a person: the entry is not guessed."""
+    def borrow(data: dict) -> None:
+        capability = next(c for c in data["capabilities"] if c["capability_id"] == "cap-browse-catalog")
+        capability["trace"] += [{"type": "charter-goal", "id": "amb-fee-rounding"}]
+
+    host, _, _ = migrate(tmp_path, ("01_capabilities.json", borrow))
+    capability = next(c for c in read(host, "01_capabilities.json")["capabilities"] if c["capability_id"] == "cap-browse-catalog")
+    assert "amb-fee-rounding" not in capability.get("derives_from", [])
+    (left,) = [i for i in items(host, "trace-link") if i["about"] == "cap-browse-catalog" and "amb-fee-rounding" in i["evidence"]]
+    assert "several nodes have this id" in left["evidence"] and left["proposal"] == "decide which it is"

@@ -13,7 +13,7 @@ from specdev_tools.release import status_sections
 from specdev_tools.release.gate import ReleaseGateResult
 from specdev_tools.lifecycle import status as status_module
 from specdev_tools.release import records
-from specdev_tools.release.status_sections import NONE, NOT_VERIFIED, PREDATES, ROLLBACK, VERIFIED, ProductionVerification, production_verification
+from specdev_tools.release.status_sections import NONE, NOT_VERIFIED, PREDATES, PREDATES_HERE, ROLLBACK, VERIFIED, ProductionVerification, production_verification
 from unit.lifecycle._milestone_support import cli_run
 from unit.release._support import PATTERN, advance, commit, latency_host, release_host, stamp, tag
 from unit.graph._synth import ROOT
@@ -135,8 +135,22 @@ def test_status_on_the_commit_a_release_tag_points_at_shows_that_release_and_its
     assert out.split("Production verification\n")[1].startswith("  release at HEAD: v1.0.0\n  state: not verified (released, awaiting production proof)\n  E920 ")
     code, out, _ = cli_run(host, "status", "--json")
     assert json.loads(out)["sections"]["production_verification"]["data"]["at_head"] is True
+    assert found.missing[0].startswith("E920 the release v1.0.0 is not verified in production") and "previous" not in found.missing[0], "the release at HEAD is not called previous"
     advance(host)
     assert _state(host).at_head is False
+    assert _state(host).missing[0].startswith("E920 the previous release v1.0.0 is not verified in production")
+
+
+def test_a_tag_at_head_that_predates_1_2_0_is_called_this_tag(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+    (host / "spec" / "specdev_version").unlink()
+    commit(host, "release one")
+    tag(host, "v1.0.0")
+    assert _state(host) == ProductionVerification("v1.0.0", PREDATES_HERE, at_head=True)
+    code, out, _ = cli_run(host, "status")
+    assert code == 0 and "  release at HEAD: v1.0.0\n  state: none (this tag predates 1.2.0)" in out
+    advance(host)
+    assert _state(host) == ProductionVerification("v1.0.0", PREDATES)
 
 
 def test_a_tag_that_does_not_match_the_release_pattern_is_not_a_release_at_head(tmp_path: Path) -> None:

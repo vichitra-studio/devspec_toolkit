@@ -54,6 +54,6 @@ def check_term_use(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
         findings.append(ctx.finding(
             TERM_NOT_USED_BY_LABEL, term,
             f"term {term.id!r} ({label!r}) is not used: no node of steps 04 to 15 mentions its label; use it in the text of a "
-            f"requirement, contract, invariant, task or other non-record node, or mark the term not_applicable",
+            f"requirement, contract, invariant, task or other non-record node, or delete the term (`specdev json delete --id {term.id}`)",
         ))
     return findings

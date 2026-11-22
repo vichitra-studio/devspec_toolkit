@@ -11,11 +11,12 @@ import pytest
 
 from integration._step_gate_support import run_split, step_gate_host
 from specdev_tools.core.errors import SpecError
+from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.validation.graph_checks.codes import SEED_LINK_NOT_ROUTED, SEED_NOT_ROUTED, SEED_ROUTE_UNUSED
 from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
-from specdev_tools.validation.graph_checks.seed_routes import _routes, check_seed_routes
+from specdev_tools.validation.graph_checks.seed_routes import _linkable_steps, _routes, check_seed_routes
 from specdev_tools.validation.seed_lint import lint_seeds
 from unit.graph._synth import HASH_SEEDS, ROOT
 from unit.trace._lock_support import EXAMPLE_HOST
@@ -403,3 +404,10 @@ def test_the_routes_of_the_manifest_leave_out_what_is_not_a_list_of_ids(tmp_path
     context = _context(_host(tmp_path))
     context.__dict__["manifest"] = {"step_requirements": {"00": "s", "02": [SEED, 7]}}
     assert _routes(context) == {"02": [SEED]}
+
+
+def test_every_route_of_the_shipped_seed_manifest_is_to_a_step_that_can_link_a_seed() -> None:
+    """`init_project` copies `seed_templates/seed_manifest.json` into every new host: a route to a step no kind can link a seed from is an E748 nobody can author away."""
+    template = json.loads((ROOT / "seed_templates" / "seed_manifest.json").read_text(encoding="utf-8"))
+    linkable = _linkable_steps(build_graph(str(EXAMPLE_HOST / "spec"), str(ROOT)))
+    assert linkable and set(template["step_requirements"]) <= linkable

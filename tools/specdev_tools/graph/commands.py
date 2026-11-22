@@ -27,6 +27,7 @@ from specdev_tools.graph.diff import render_text as diff_text
 from specdev_tools.graph.gitview import host_root_of
 from specdev_tools.graph.lifecycle import NOT_APPLICABLE_GUIDANCE, LifecycleChange, set_lifecycle
 from specdev_tools.graph.model import LIFECYCLES, Graph
+from specdev_tools.lifecycle.closed_edits import edit_of_closed_node, record_migration_edit
 from specdev_tools.trace.label_rename import LabelRenameResult, rename_label
 from specdev_tools.trace.rename import RenameResult, rename_node
 
@@ -372,7 +373,10 @@ def _node_rename(args: argparse.Namespace, graph: Graph) -> int:
         label = rename_label(spec_root, repo_root, args.old, args.new, apply=not args.dry_run, graph=graph)
         document, lines = asdict(label), _label_lines(label)
     else:
+        closed = edit_of_closed_node(graph, spec_root, args.old, "node rename")
         renamed = rename_node(spec_root, repo_root, args.old, args.new, apply=not args.dry_run, graph=graph)
+        if closed is not None and not args.dry_run:
+            record_migration_edit(spec_root, repo_root, closed)
         document, lines = _rename_json(renamed), _rename_lines(renamed)
     if args.json_output:
         print_json(document)

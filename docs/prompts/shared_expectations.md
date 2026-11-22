@@ -59,7 +59,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 7. If the schema declares link fields (fields marked `x-link`, such as `derives_from`), include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 9. A relation between nodes is a link in a link field, never a node id in prose. A mention of another node's id (or of a retired name of it, or of a seed) in a text field is not a link: the graph never sees it, and `spec-check` reports it as E752. Turn a mention that states a relation into the link and take the id out of the text; reword any other mention.
-10. A glossary term is used by its label: a term of Step 03 that no node of steps 04 to 15 mentions by its label is reported as E741 (use the label in the text of a node, or mark the term `not_applicable`).
+10. A glossary term is used by its label: a term of Step 03 that no node of steps 04 to 15 mentions by its label is reported as E741 (use the label in the text of a node, or delete the term with `specdev json delete --id <term-id>`).
 
 ## 7. Seed Order Protocol
 

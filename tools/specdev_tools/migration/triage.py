@@ -28,12 +28,12 @@ from pathlib import Path
 
 from specdev_tools.core.changelog_parser import compare_versions, get_toolkit_version
 from specdev_tools.core.config import get_config
-from specdev_tools.core.constants import STAMP_FILE
+from specdev_tools.core.constants import STAMP_FILE, STATUS_IN_PROGRESS
 from specdev_tools.core.errors import FindingError, SpecError
 from specdev_tools.core.step_paths import get_step_from_path
 from specdev_tools.generation.schema_differ import read_stamp, stamp_specdev_version
 from specdev_tools.graph.gitview import host_root_of
-from specdev_tools.migration.context import CAPTURE_FILE, STATUS_IN_PROGRESS, GitReadError, MigrationContext, read_git
+from specdev_tools.migration.context import CAPTURE_FILE, GitReadError, MigrationContext, read_git
 from specdev_tools.migration.worklist import (
     AUDIENCE_AGENT,
     AUDIENCE_OPERATOR,
