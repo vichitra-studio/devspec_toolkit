@@ -1,0 +1,30 @@
+{
+    "$schema": "vc:04-fr-list",
+    "id": "functional-requirements-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "functional_requirements": [
+        {
+            "fr_id": "fr-password-reset",
+            "priority": "must-have",
+            "statement": "The system shall let a registered member set a new password by redeeming a single-use reset token emailed to the account address, which expires 30 minutes after it is issued.",
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-password-reset-3",
+                    "text": "Given a reset token that has expired or was already used, when a new password is submitted with it, then the request is rejected and the stored password is unchanged."
+                }
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-account-recovery"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:account-recovery",
+                "kind": "capability"
+            }
+        }
+    ]
+}

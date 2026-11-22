@@ -791,7 +791,7 @@ def format_prompts_report(prompts: List[GeneratedPrompt]) -> str:
         "Instructions:",
         "  1. Review each prompt file",
         "  2. Copy content to your AI assistant",
-        "  3. Paste AI output into the appropriate spec file",
+        "  3. Make the edits it gives with `specdev json patch|insert|delete --id` (a file under spec/ is not written by hand)",
         "  4. Run `specdev align validate` to confirm success",
     ])
     

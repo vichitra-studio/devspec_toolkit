@@ -1,0 +1,35 @@
+{
+    "$schema": "vc:06-invariants",
+    "id": "invariants-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "rules": [
+        {
+            "inv_id": "inv-reset-token-single-use",
+            "language": "text",
+            "severity": "error",
+            "enforcement_point": "service",
+            "description": "The system ensures that a reset token changes a password at most once.",
+            "expression": "redeem(token) succeeds only if token.used_at == null; a successful redeem sets token.used_at",
+            "scope": {
+                "components": [
+                    "identity-service"
+                ],
+                "apis": [
+                    "api-password-reset-confirm"
+                ]
+            },
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-password-reset"
+                }
+            ],
+            "policy_ref": {
+                "id": "cn:project:policy:auth-required",
+                "kind": "policy"
+            }
+        }
+    ]
+}

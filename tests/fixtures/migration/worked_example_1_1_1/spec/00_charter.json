@@ -1,0 +1,57 @@
+{
+    "$schema": "vc:00-charter",
+    "id": "lantern-lending-charter",
+    "title": "Account recovery: charter",
+    "owner": "product",
+    "created_at": "2026-03-02T09:00:00Z",
+    "problem_statement": "Members who forget their password must ask support to get back in.",
+    "canonical_refs_used": [],
+    "in_scope": [
+        "A registered member can reset a forgotten password through an emailed single-use link."
+    ],
+    "out_of_scope": [
+        "Password reset by SMS."
+    ],
+    "assumptions": [
+        "A member's email account is under the member's control."
+    ],
+    "risks": [
+        "Reset links could be replayed or guessed to take over accounts."
+    ],
+    "stakeholders": [
+        {
+            "role": "Support lead",
+            "needs": [
+                "Fewer password-reset tickets"
+            ]
+        }
+    ],
+    "user_segments": [
+        {
+            "segment_id": "seg-registered-member",
+            "description": "People with an account and a verified email address.",
+            "jobs_to_be_done": [
+                "Get back into my account quickly"
+            ],
+            "pains": [
+                "Waiting a day for support"
+            ],
+            "gains": [
+                "Self-service recovery"
+            ]
+        }
+    ],
+    "success_metrics": [
+        {
+            "metric_id": "metric-recovery-time",
+            "name": "Time To Recover",
+            "target": "<= 5 min",
+            "unit": "min",
+            "measurement_method": "Median time from reset request to successful login, from the auth service log.",
+            "unit_ref": {
+                "id": "cn:core:unit:min",
+                "kind": "unit"
+            }
+        }
+    ]
+}

@@ -201,7 +201,7 @@ def test_the_skill_stops_on_a_plan_without_a_milestone_key() -> None:
     assert "`milestone_id` echoes the batch id and is not a milestone id" in text
     assert 'If `milestone` is `null`, the plan has no `milestone` key' in text
     assert 'E803 no plan names milestone <ms-id>: add it with `specdev json patch <plan file> \'.milestone\' \'"<milestone-id>"\'` (the plan has no `milestone` key)' in text
-    assert "the migration which writes the key may not be in this toolkit version yet" in text
+    assert "on a host not yet migrated to 1.2.0 the migration writes the key (`specdev align apply spec --auto`, a person confirms it)" in text
 
 
 # --- the skill and the agent files -----------------------------------------------------------------------------------------

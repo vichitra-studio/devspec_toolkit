@@ -217,10 +217,10 @@ Entries under `unplaced` (W613) have an `about` id that names no node, or are 1.
 ## Permission allow-list
 
 **Auto-invocable** (no human confirmation):
-`context structure`, `context canon`, `node show`, `node candidates`, `trace`, `diff`, `stale`, `coverage`, `step ready`, `json read`, `json read-multi`, `json keys`, `json structure`, `json schema`, `json resolve-pointers`, `json patch`, `json insert`, `json delete`, `spec-check --json`, `upstream-backlog --json`, `guide`, `registry-check`, `registry-generate`. Other read-only diagnostics (`align status`, `env-check`, `prompt-context`, `ai-help`) are auto-invocable by default.
+`context structure`, `context canon`, `node show`, `node candidates`, `trace`, `diff`, `stale`, `coverage`, `step ready`, `json read`, `json read-multi`, `json keys`, `json structure`, `json schema`, `json resolve-pointers`, `json patch`, `json insert`, `json delete`, `spec-check --json`, `upstream-backlog --json`, `guide`, `registry-check`, `registry-generate`. Other read-only diagnostics (`align status`, `env-check`, `prompt-context`, `ai-help`) are auto-invocable by default. During a migration, `align triage` (it lists the worklist, and `--resolve` marks one item done) is auto-invocable too.
 
 **Human required**:
-`canon-accept`, `align apply`, `attest`, `node status`, `node rename`, `step create`, `git commit`, `git push`. (`attest` writes the lock, `node status` and `node rename` write spec files, `step create` writes a new step file; run `attest` only after reading the shown old and new text.)
+`canon-accept`, `align apply`, `align validate`, `attest`, `node status`, `node rename`, `step create`, `git commit`, `git push`. (`attest` writes the lock, `node status` and `node rename` write spec files, `step create` writes a new step file; run `attest` only after reading the shown old and new text.)
 
 ## Error handling
 

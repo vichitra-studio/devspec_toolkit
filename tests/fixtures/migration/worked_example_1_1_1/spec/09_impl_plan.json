@@ -1,0 +1,33 @@
+{
+    "$schema": "vc:09-impl-plan",
+    "id": "impl-plan-lantern",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "tech_stack": {
+        "languages": [
+            "TypeScript 5.x"
+        ],
+        "frameworks": [
+            "argon2 0.41"
+        ],
+        "infrastructure": [
+            "MailRelay"
+        ],
+        "tools": []
+    },
+    "milestones": [
+        {
+            "milestone_id": "milestone-account-recovery",
+            "name": "Account Recovery",
+            "status": "pending",
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-password-reset"
+                }
+            ]
+        }
+    ],
+    "dependencies": []
+}

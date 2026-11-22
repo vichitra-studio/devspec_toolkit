@@ -1,0 +1,10 @@
+{
+    "description": "A step-14 criterion whose TEXT mentions the name of a removed field (exit_conditions). The 1.1.1 hosts carry such a sentence; a script that tested the substring in the whole roadmap took it for a live field.",
+    "edits": [
+        {
+            "file": "spec/14_roadmap.json",
+            "path": ["milestones", 0, "tasks", 0, "acceptance_criteria", 0, "text"],
+            "value": "The migration creates the tool and loan tables on an empty database and leaves the exit_conditions of the task readable as plain text"
+        }
+    ]
+}

@@ -1,0 +1,17 @@
+{
+    "files_deleted": 3,
+    "files_new": 4,
+    "renames": 3,
+    "legacy_closes": 2,
+    "plans": 3,
+    "plans_without_milestone": 0,
+    "errors_after.E768": 0,
+    "errors_after.E704": 0,
+    "errors_after.E761": 0,
+    "errors_after.E622": 0,
+    "worklist_kind.legacy-close-skipped": 0,
+    "lock_entries": {"min": 60, "max": 90},
+    "worklist_items": {"min": 70, "max": 130},
+    "errors_before": {"min": 400, "max": 700},
+    "errors_after": {"min": 100, "max": 400}
+}

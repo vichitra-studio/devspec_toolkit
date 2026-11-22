@@ -458,7 +458,7 @@ class TestMiniHostEndToEnd:
         ids = self.blocking_ids(migrated, toolkit_1_2_0)
         assert ids  # open blocking items do not stop validate
         # the scripts that exist so far leave the tree with errors that later scripts clear: the checks are stubbed
-        # here and the state they leave is pinned in the next test (the harness bundle M10-15 completes it)
+        # here and the state they leave is pinned in the last test; the passing end is in test_migration_then_merge_mode.py
         with stub_merge_check():
             code, out, err = specdev("validate", str(migrated / SPEC), "--repo-root", str(toolkit_1_2_0))
         assert code == 0, err
@@ -467,9 +467,11 @@ class TestMiniHostEndToEnd:
         assert (migrated / SPEC / WORKLIST).is_file()  # items are open: kept, and the counts printed
         assert f"{len(ids)} of them marked blocking" in out
 
-    def test_validate_with_the_checks_unstubbed_fails_while_scripts_of_later_bundles_are_missing(self, migrated, toolkit_1_2_0):
-        """LEFT FOR M10-15 (the harness bundle): once every script exists, ``spec-check --merge`` is clean on the migrated mini host
-        and this test becomes the passing end of the procedure.  Until then validate says what is left and changes nothing."""
+    def test_validate_with_the_checks_unstubbed_refuses_a_host_whose_judgement_pass_is_not_done(self, migrated, toolkit_1_2_0):
+        """The control of the passing end: the passing end (the same host after the scripted judgement pass, ``validate`` exit 0, the
+        worklist and the capture gone, the stamp finished) is ``tests/integration/test_migration_then_merge_mode.py``, which runs the
+        pass once per session.  Here the mechanical stage alone leaves errors only a person can clear, so validate says what is left
+        and changes nothing."""
         before = digest(migrated)
         code, out, err = specdev("validate", str(migrated / SPEC), "--repo-root", str(toolkit_1_2_0))
         assert code == 1

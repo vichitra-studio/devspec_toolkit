@@ -44,6 +44,11 @@ Author mode: emits a fresh artifact. Review mode: uses the same review-fix loop 
 
 ### Step 1 — Author the artifact
 
+**Migration worklist:** If `spec/extras/migration/worklist.json` exists, the host is in the middle of the
+1.2.0 migration. Run `specdev align triage spec --step <NN>` first. Treat the `audience: agent` items as
+input to this step's pass, ask the operator about each `audience: operator` item, and mark each item when
+it is done: `specdev align triage spec --resolve <id> --note "<what was done>"`.
+
 **Pre-dispatch existence check:** Before dispatching `specdev-impl`, probe for an existing artifact:
 ```bash
 ls spec/<NN>_*.json 2>/dev/null

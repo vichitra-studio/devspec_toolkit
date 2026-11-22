@@ -1,0 +1,44 @@
+{
+    "$schema": "vc:11-redteam",
+    "id": "redteam-lantern",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "threats": [
+        {
+            "threat_id": "threat-reset-token-replay",
+            "category": "authn",
+            "severity": "high",
+            "description": "An attacker who obtains a used or expired reset link replays it to set the account password.",
+            "target_ids": [
+                {
+                    "type": "api",
+                    "id": "api-password-reset-confirm"
+                }
+            ],
+            "mitigations": [
+                {
+                    "type": "inv",
+                    "id": "inv-reset-token-single-use",
+                    "note": "Rejects any second redemption."
+                },
+                {
+                    "type": "fixture",
+                    "id": "fix-password-reset-expired-token",
+                    "note": "Proves the late case is rejected."
+                }
+            ],
+            "risk_category_ref": {
+                "id": "cn:project:risk_category:authn",
+                "kind": "risk_category"
+            }
+        }
+    ],
+    "edge_cases": [
+        {
+            "id": "ec-token-at-expiry-second",
+            "description": "A token redeemed in the second it expires.",
+            "trigger": "Clock reaches issued_at + 30 min."
+        }
+    ]
+}

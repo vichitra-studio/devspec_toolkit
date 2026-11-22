@@ -43,6 +43,8 @@ the deliberate ones (collisions, status conflicts) are listed there.
 | `spec/canon/kinds/capability.json`, `command.json`, `dependency.json`, `interface.json`, `inv.json`, `role.json`, `tech_stack.json`, `term.json` | project canon kind files (`interface.json` and `dependency.json` are retired kinds, `inv.json` holds kind `inv`) | 05 |
 | `spec/extras/trace_matrix.json` | the stored trace matrix that 1.2.0 retires, tracked | 05 |
 | `variants/status_ref_1_0_x/04_fr_list.json` | live `status_ref` objects as 1.0.x wrote them (valid under toolkit 1.0.0, not under 1.1.1); NOT part of `spec/` | 01 |
+| `variants/criterion_text_names_removed_field.json` | an edit list (M10-15a): a step-14 criterion TEXT that names the removed field `exit_conditions`; applied to a copy of the host by `tests/e2e/host_migration/test_mini_host.py`; NOT part of `spec/` | 15 |
+| `variants/sentence_dependencies.json` | an edit list (M10-15a): step-09 `dependencies` written as sentences, as both real 1.1.1 hosts wrote them; NOT part of `spec/` | 15 |
 | `docs/seed/seed_lending_overview.md`, `seed_hosting_plan.md`, `seed_decision_clarifications.md`, `seed_volunteer_roster.md` | seed documents of the manifest | 05, 08 |
 | `schemas/lending.json`, `catalog.json`, `sms.json` | files named by connection `schema_ref` | 05 |
 | `scripts/check_desk_flow.sh`, `scripts/check_fees.sh` | commands named by `linked_test_expectation` | 17 |

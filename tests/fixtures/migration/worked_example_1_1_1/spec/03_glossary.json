@@ -1,0 +1,18 @@
+{
+    "$schema": "vc:03-glossary",
+    "id": "glossary-lantern",
+    "owner": "system",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "terms": [
+        {
+            "term_id": "term-reset-token",
+            "term": "reset token",
+            "definition": "A single-use secret, sent by email, that authorises one password change for one account until it expires.",
+            "term_ref": {
+                "id": "cn:project:term:reset-token",
+                "kind": "term"
+            }
+        }
+    ]
+}
