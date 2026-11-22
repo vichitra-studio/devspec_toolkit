@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from specdev_tools.generation import prompt_schema_sync as sync
+from unit.generation._contracts_support import _flags
 from unit.graph._synth import run_cli
 
 ROOT = Path(__file__).parents[3]
@@ -172,24 +173,6 @@ def test_examples_hold_no_field_the_1_2_0_plan_dropped() -> None:
 
 
 # --- every command form a prompt names is one the parser has ----------------------------------------------------
-
-
-def _flags(text: str, command: str) -> set[str]:
-    """The ``--flag`` tokens of every command ``specdev <command> ...`` the text gives: an inline code span or a line of a code block (a backslash continues the line)."""
-    spans = re.findall(r"`(specdev [^`]*)`", text)
-    lines = text.splitlines()
-    for number, line in enumerate(lines):
-        if line.lstrip().startswith("specdev "):
-            chunk = line.strip()
-            while chunk.endswith("\\") and number + 1 < len(lines):
-                number += 1
-                chunk = chunk[:-1] + " " + lines[number].strip()
-            spans.append(chunk)
-    out: set[str] = set()
-    for span in spans:
-        if span.startswith(f"specdev {command}"):
-            out |= set(re.findall(r"(?<![\w-])(--[a-z][a-z-]*)", span))
-    return out
 
 
 @pytest.mark.parametrize(

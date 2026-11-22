@@ -26,7 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from specdev_tools.core.registry import SchemaRegistry
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.registry.annotations import (
     AnnotationDecls,
     SchemaReader,
@@ -39,22 +39,9 @@ _STEP_PREFIX = re.compile(r"^([0-9]{2}[a-z]?)_")
 
 #: The seed manifest is the one external (non-step) host: its kind sits at the top of the graph.
 SEED_SCHEMA_BASENAME = "seed_manifest.schema.json"
-SEED_SOURCE_FILE = "common/seed_manifest.json"
 
 _BRANCH_KEYS = ("allOf", "anyOf", "oneOf")
 _COND_KEYS = ("if", "then", "else")
-
-
-def make_ref_resolver(
-    registry: SchemaRegistry,
-) -> Callable[[str, str], tuple[Any, str, str] | None]:
-    """Return ``resolve(ref, base_uri="")`` over *registry*'s schema store.
-
-    Handles ``vc:...#anchor`` (a ``$anchor``), ``#/json/pointer`` and whole-schema URIs
-    (no fragment).  A ref without a URI part resolves against *base_uri*.  The result is
-    ``(target_schema, target_uri, pointer)`` or ``None`` when the ref does not resolve.
-    """
-    return SchemaRefs(registry).resolve
 
 
 def step_of_schema_file(basename: str) -> str | None:
@@ -188,7 +175,7 @@ class AnnotationScan:
                 if n.value.get("top_of_graph"):
                     out.append({
                         "kind": n.kind,
-                        "source_file": SEED_SOURCE_FILE,
+                        "source_file": SEED_MANIFEST_FILE,
                         "array_path": n.path,
                         "id_field": n.value["id"],
                         "top_of_graph": True,

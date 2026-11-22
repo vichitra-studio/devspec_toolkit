@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -27,33 +26,21 @@ from specdev_tools.graph.diff import (
     render_text,
     suggest_bump,
 )
-from specdev_tools.graph.gitview import Snapshot
 from specdev_tools.graph.model import Graph, Node
 
 from ._synth import docs_graph
-
-_FR_FILE = "04_fr_list.json"
-_TASK_FILE = "14_roadmap.json"
+from ._builders import _FR_FILE, _TASK_FILE, _criterion, _fr, _docs, _snapshot, _diff
 
 
-def _criterion(criterion_id: str, text: str) -> dict[str, Any]:
-    return {"criterion_id": criterion_id, "text": text}
 
 
-def _fr(fr_id: str, statement: str, **extra: Any) -> dict[str, Any]:
-    return {"fr_id": fr_id, "statement": statement, **extra}
 
 
-def _docs(*requirements: dict[str, Any]) -> dict[str, Any]:
-    return {_FR_FILE: {"functional_requirements": list(requirements)}}
 
 
-def _snapshot(docs: Mapping[str, Any]) -> Snapshot:
-    return Snapshot(docs_graph(docs), {})
 
 
-def _diff(old: Mapping[str, Any], new: Mapping[str, Any]) -> GraphDiff:
-    return diff_snapshots(_snapshot(old), _snapshot(new))
+
 
 
 def _changes_by_id(diff: GraphDiff) -> dict[str, tuple[str, ...]]:

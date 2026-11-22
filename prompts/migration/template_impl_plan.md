@@ -13,7 +13,7 @@
 
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
-| `schedules` | agent | A milestone schedules nothing (`schedules` is required; the old deliverables were free text, kept in the capture) | `specdev json insert --id <milestone-id> .schedules '"<fr-or-api-id>"'` for each FR or API it delivers (the proposal names candidates) |
+| `schedules` | agent | A deliverable of the old milestone could not be written to `schedules` (a capability, an id no node has, a free-text entry, a type that disagrees with the id), or the milestone schedules nothing (`schedules` is required); the old list is kept in the capture | `specdev json insert --id <milestone-id> .schedules '"<fr-or-api-id>"'` for each FR or API it delivers (the proposal names candidates) |
 | `milestone-order` | agent | A milestone came after another one and nothing known links them yet | Add the link in step 04 or 05 (see their templates), or drop the pair |
 
 ### Items any step can carry

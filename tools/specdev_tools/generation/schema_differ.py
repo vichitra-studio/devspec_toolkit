@@ -20,10 +20,8 @@ from ..core.constants import STAMP_FILE
 from ..core.changelog_parser import (
     ChangelogEntry,
     VersionChangelog,
-    compare_versions,
     get_changes_between,
     get_toolkit_version,
-    list_versions,
     load_version,
 )
 

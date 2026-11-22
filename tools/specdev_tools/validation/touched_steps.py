@@ -29,17 +29,17 @@ from dataclasses import dataclass
 from typing import Any
 
 from specdev_tools.core.ambiguity_items import PLAN_FILE_RE
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
 from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
+from specdev_tools.graph import names
 from specdev_tools.graph.gitview import git_top_level, host_root_of, relative_inside, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 
-DERIVES_FROM = "derives_from"
 FIRST_STEP = "00"
 PLAN_FILE_STEPS = ("16a", "16b", "16c")
 """The steps a milestone plan file gates (plan, code and review); not the steps whose items live in it."""
-SEED_MANIFEST_FILE = "common/seed_manifest.json"
 SEED_EDIT_NOTE = "seed document edited: run specdev stale to see what became suspect"
 _PARENT = ".."
 
@@ -164,7 +164,7 @@ def _seed_steps(
 
 def _linking_steps(graph: Graph, seed_id: str) -> set[str]:
     """The steps of the nodes that link the seed *seed_id* with ``derives_from``."""
-    sources = (graph.by_id.get(link.source) for link in graph.incoming.get(seed_id, ()) if link.field == DERIVES_FROM)
+    sources = (graph.by_id.get(link.source) for link in graph.incoming.get(seed_id, ()) if link.field == names.DERIVES_FROM)
     return {node.step for node in sources if node is not None and node.step}
 
 

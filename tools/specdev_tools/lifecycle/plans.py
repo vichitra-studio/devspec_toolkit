@@ -54,7 +54,7 @@ def plan_hash(plan_path: str | Path) -> str:
     """``sha256:<hex>`` of the canonical JSON of the plan file (sorted keys, no insignificant whitespace).
 
     Not a lock hash: the snapshot a close record and a recorded migration store.  It is not ``trace.hashing``'s digest
-    (a list of values) and not ``executed.realises_hash`` (sorted pairs): the three recipes differ and a closed milestone's
+    (a list of values) and not ``executed.realises_hash`` (sorted triples): the three recipes differ and a closed milestone's
     stored ``plan_hash`` is compared byte for byte, so only the ``sha256:`` prefix is shared.
 
     Raises:

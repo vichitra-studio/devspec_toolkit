@@ -21,11 +21,11 @@ from specdev_tools.graph.contract import contract_view
 from specdev_tools.graph.gitview import Snapshot, load_snapshot_at, require_git_root_folder, spec_path_in_repo
 from specdev_tools.graph.kinds import SEED_KIND
 from specdev_tools.graph.model import NOT_APPLICABLE, Node, first_name_index
+from specdev_tools.graph.names import REMOVES
 
 ADDED, REMOVED, CHANGED, LIFECYCLE, KIND, RENAMED = "added", "removed", "changed", "lifecycle", "kind", "renamed"
 MAJOR, MINOR, PATCH, NO_BUMP = "major", "minor", "patch", "none"
 OBLIGATION_ROLE = "obligation-system"
-REMOVES_FIELD = "removes"
 NO_ROLE = "(no role)"
 
 
@@ -91,7 +91,7 @@ class _Side:
             (self.names.get(link.source, link.source), self.names.get(link.target, link.target)): (link.source, link.target)
             for node in self.snapshot.graph.gated_nodes()
             for link in node.links
-            if link.field == REMOVES_FIELD
+            if link.field == REMOVES
         }
 
 

@@ -21,12 +21,13 @@ from specdev_tools.trace.lockfile import Lock, LockEntry, lock_path
 from specdev_tools.trace.rename import RenameRefusedError, rename_node
 from specdev_tools.trace.suspects import orphan_entries
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
-from specdev_tools.validation.graph_checks.term_use import check_term_use, label_matches
+from specdev_tools.validation.graph_checks.term_use import check_term_use
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT, load_doc, run_cli, write_json
+from unit.validation.graph_checks._term_support import label_matches
 from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
-from unit.trace.test_suspects import CRITERION, Example
+from unit.trace._suspects_support import CRITERION, Example
 
 NEW = "ac-password-reset-3b"
 FR = "fr-password-reset"

@@ -397,7 +397,7 @@ class TestKindInferenceIdSuffix:
         assert arr["kind"] == "fr"
 
     def test_11_redteam_threats_kind(self) -> None:
-        """11_redteam.json → .threats: threat_id → kind: threat"""
+        """11_redteam.json → .threats: threat_id → kind: threat (the ``_id`` suffix wins over a bare ``id``)"""
         reg_doc, _ = _run_generator()
         entry = reg_doc["registry"]["11_redteam.json"]
         arr = next(a for a in entry["arrays"] if a["array_path"] == ".threats")
@@ -450,14 +450,6 @@ class TestKindInferenceBareId:
         criteria = next(n for n in tasks["nested"] if n["array_path"] == ".acceptance_criteria")
         assert (tasks["kind"], criteria["kind"], criteria["id_field"]) == ("task", "task-criterion", "criterion_id")
 
-    def test_11_redteam_threats_uses_id_suffix_not_bare_id(self) -> None:
-        """Confirm .threats uses threat_id (not bare id), validating Rule A priority."""
-        reg_doc, _ = _run_generator()
-        entry = reg_doc["registry"]["11_redteam.json"]
-        arr = next(a for a in entry["arrays"] if a["array_path"] == ".threats")
-        # id_field must be threat_id (suffix-_id wins over bare 'id')
-        assert arr["id_field"] == "threat_id"
-        assert arr["kind"] == "threat"
 
 
 # ---------------------------------------------------------------------------

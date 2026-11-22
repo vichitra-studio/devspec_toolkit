@@ -140,7 +140,7 @@ def test_the_example_on_a_clean_branch_adds_only_clean_merge_lines(host: Path) -
     report = merge(host, "--base-ref", "main")
     assert report.status("merge-open-items") == "PASS" and report.status("merge-pins") == "PASS" and report.status("merge-bindings") == "SKIP"
     assert report.codes == plain(host).codes, "the merge mode adds no finding to the example"
-    assert "spec-check: 31 checks run, 25 errors, 7 warnings" in report.out
+    assert "spec-check: 32 checks run, 25 errors, 7 warnings" in report.out
 
 
 # --- open items -----------------------------------------------------------------------------------------------------
@@ -204,11 +204,11 @@ def declare_pin(host: Path, lock_version: str) -> None:
     commit_all(host, f"the lock file says {lock_version}")
 
 
-def test_pin_mismatch_fails_merge_only(host: Path) -> None:
+def test_pin_mismatch_fails_merge_and_plain(host: Path) -> None:
     declare_pin(host, "0.41.1")
     assert merge(host, "--base-ref", "main").status("merge-pins") == "PASS", "a matching pin passes"
     declare_pin(host, "0.40.0")
-    assert plain(host).codes["E337"] == 0, "the plain run does not read the pin sources"
+    assert plain(host).codes["E337"] == 1, "the plain run reads the pin sources too (the check of step 02, third-party-pins)"
     report = merge(host, "--base-ref", "main")
     assert report.status("merge-pins") == "FAIL" and report.codes["E337"] == 1 and "0.40.0" in report.out
     declare_pin(host, "0.41.1")

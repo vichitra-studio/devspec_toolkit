@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import copy
 import json
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -20,54 +19,18 @@ from specdev_tools.migration.context import MigrationContext
 from specdev_tools.migration.maps import shape_map, shape_rows
 from specdev_tools.migration.report import STATUS_OK
 from specdev_tools.migration.spec_reads import closed_plan_files, files_of_row, last_key, parents_at
-from specdev_tools.migration.writer import DocumentSet
 from specdev_tools.trace.computed_fields import check_stored_computed
 from specdev_tools.trace.lockfile import lock_path
 
-from ._support import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
+from ._support import MINI_HOST, REAL_ROOT, context, edit, git, items, make_host, make_toolkit, migrate, read, tree_digest
 
-WORKLIST = "extras/migration/worklist.json"
 CONVERT_TYPES_WITH_A_SOURCE = {"rename", "refs", "typed"}
-
-
-def read(host: Path, rel: str):
-    return json.loads((host / "spec" / rel).read_text(encoding="utf-8"))
-
-
-def items(host: Path, kind: str | None = None) -> list[dict]:
-    found = read(host, WORKLIST)["items"]
-    return [i for i in found if kind is None or i["kind"] == kind]
-
-
-def edit(host: Path, rel: str, change: Callable[[dict], None]) -> None:
-    """Edit a file of the host copy and commit it (the migration refuses a dirty spec)."""
-    path = host / "spec" / rel
-    data = json.loads(path.read_text(encoding="utf-8"))
-    change(data)
-    path.write_text(json.dumps(data, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
-    git(host, "add", "-A")
-    git(host, "commit", "-q", "-m", f"edit {rel}")
-
-
-def migrate(tmp_path: Path, *edits: tuple[str, Callable[[dict], None]]):
-    toolkit = make_toolkit(tmp_path)
-    host = make_host(tmp_path)
-    for rel, change in edits:
-        edit(host, rel, change)
-    report = runner.run_migration(host / "spec", toolkit_root=toolkit, git_root=host)
-    assert report.status == STATUS_OK, report.errors
-    return host, toolkit, report
 
 
 @pytest.fixture(scope="module")
 def migrated(tmp_path_factory):
     host, toolkit, report = migrate(tmp_path_factory.mktemp("p3"))
     return host, toolkit, report
-
-
-def context(host: Path, toolkit: Path) -> MigrationContext:
-    spec = str(host / "spec")
-    return MigrationContext(spec, str(host), str(host), str(toolkit), True, DocumentSet(spec), "1.1.1", "1.2.0")
 
 
 def rows_with_data(fixture_spec: Path, ctx: MigrationContext, rows: list[dict]) -> dict[str, int]:
@@ -133,9 +96,7 @@ def test_every_rename_row_is_converted(migrated):
 
 def test_every_worklist_row_has_an_item(migrated):
     host, _, _ = migrated
-    schedules = {i["about"] for i in items(host, "schedules")}
-    assert schedules == {"milestone-catalog-basics", "milestone-reservations", "milestone-late-fees"}
-    assert all(i["step"] == "09" and i["audience"] == "agent" and i["proposal"].startswith("schedule: fr-") for i in items(host, "schedules"))
+    assert items(host, "schedules") == [], "every deliverable of the mini host is a typed FR that resolves: no milestone needs a person"
     plan = read(host, "impl_context/ms_reservations_plan.json")
     wanted = {i["id"] for i in plan["plan"]["spec_alignment"]["checklist"] if "spec_ref" in i}
     assert wanted and wanted <= {i["about"] for i in items(host, "spec-ref-realises")}
@@ -351,3 +312,92 @@ def test_a_trace_entry_that_names_a_node_of_a_later_step_says_the_link_belongs_t
     found = [i for i in items(host, "trace-link") if i["about"] == "cap-reserve-tool" and "fr-reserve-tool" in i["evidence"]]
     assert len(found) == 1
     assert "`derives_from` of fr-reserve-tool takes a capability" in found[0]["proposal"] and "specdev node show fr-reserve-tool" in found[0]["proposal"]
+
+
+# --- step 09 deliverables become schedules ----------------------------------------------------------------------------------
+
+
+def milestone(host: Path, milestone_id: str) -> dict:
+    return next(m for m in read(host, "09_impl_plan.json")["milestones"] if m["milestone_id"] == milestone_id)
+
+
+def set_deliverables(milestone_id: str, deliverables: list):
+    def change(data: dict) -> None:
+        next(m for m in data["milestones"] if m["milestone_id"] == milestone_id)["deliverables"] = deliverables
+
+    return ("09_impl_plan.json", change)
+
+
+def test_typed_deliverables_that_all_resolve_become_schedules_in_order_and_raise_no_item(migrated):
+    host, _, _ = migrated
+    assert milestone(host, "milestone-reservations")["schedules"] == ["fr-reserve-tool", "fr-checkout-tool", "fr-return-tool"]
+    assert milestone(host, "milestone-catalog-basics")["schedules"] == ["fr-catalog-search"]
+    assert all("deliverables" not in m for m in read(host, "09_impl_plan.json")["milestones"])
+    assert items(host, "schedules") == []
+
+
+def test_a_deliverable_that_cannot_be_written_leaves_one_item_that_names_it(tmp_path):
+    deliverables = [
+        {"type": "fr", "id": "fr-reserve-tool", "note": "implements: the reserve call"},
+        {"type": "capability", "id": "cap-reserve-tool"},
+        "Build the reservation screen",
+        {"type": "fr", "id": "fr-nowhere"},
+        {"type": "api", "id": "fr-return-tool"},
+        {"type": "fr", "id": "fr-reserve-tool"},
+        {"type": "fr", "id": "fr-checkout-tool"},
+    ]
+    host, _, _ = migrate(tmp_path, set_deliverables("milestone-reservations", deliverables))
+    assert milestone(host, "milestone-reservations")["schedules"] == ["fr-reserve-tool", "fr-checkout-tool"]
+    (found,) = items(host, "schedules")
+    assert found["about"] == "milestone-reservations" and found["blocking"] is False
+    evidence = found["evidence"]
+    for left in ("cap-reserve-tool", "computed from the FRs", "Build the reservation screen", "free-text", "fr-nowhere", "no node has this id", "fr-return-tool", "fixes api"):
+        assert left in evidence, left
+    assert "fr-checkout-tool" not in evidence.split("Not written:")[1], "an entry that was written is not listed as left"
+    assert "note" not in evidence.split("Not written:")[1].replace("the old list, with each note", "")
+
+
+def test_a_milestone_whose_deliverables_all_fail_keeps_a_blocking_item_with_the_paired_14_proposal(tmp_path):
+    host, _, _ = migrate(tmp_path, set_deliverables("ms-late-fees", [{"type": "capability", "id": "cap-late-fees"}, "late fees"]))
+    assert not milestone(host, "milestone-late-fees").get("schedules")
+    (found,) = items(host, "schedules")
+    assert found["about"] == "milestone-late-fees" and found["blocking"] is True
+    assert "schedules nothing yet" in found["evidence"] and "cap-late-fees" in found["evidence"]
+    assert found["proposal"].startswith("schedule: fr-")
+
+
+def test_a_deliverable_whose_id_was_renamed_is_written_under_the_new_id(tmp_path):
+    def collide(data: dict) -> None:
+        clone = copy.deepcopy(data["nfrs"][0])
+        clone["nfr_id"] = "fr-catalog-search"
+        clone.pop("trace", None)
+        data["nfrs"].append(clone)
+
+    host, _, _ = migrate(
+        tmp_path,
+        ("07_nfrs.json", collide),
+        set_deliverables("milestone-catalog-basics", [{"type": "fr", "id": "fr-catalog-search"}, {"type": "nfr", "id": "fr-catalog-search"}]),
+    )
+    renamed = next(n["nfr_id"] for n in read(host, "07_nfrs.json")["nfrs"] if n["nfr_id"] != "fr-catalog-search" and n["nfr_id"].startswith("fr-catalog-search"))
+    assert milestone(host, "milestone-catalog-basics")["schedules"] == ["fr-catalog-search", renamed]
+    assert items(host, "schedules") == []
+
+
+def test_the_converted_schedules_links_carry_a_baseline_entry_in_the_lock(migrated):
+    host, _, _ = migrated
+    lock = json.loads(Path(lock_path(str(host / "spec"))).read_text(encoding="utf-8"))
+    entries = [e for e in lock["entries"] if e["field"] == "schedules"]
+    assert {(e["source"], e["target"]) for e in entries} >= {("milestone-reservations", "fr-return-tool"), ("milestone-catalog-basics", "fr-catalog-search")}
+    assert all(e.get("baseline") is True for e in entries)
+
+
+def test_a_borrowed_charter_goal_type_converts_when_the_id_names_one_node_and_stays_an_item_otherwise(tmp_path):
+    def borrow(data: dict) -> None:
+        capability = next(c for c in data["capabilities"] if c["capability_id"] == "cap-browse-catalog")
+        capability["trace"] += [{"type": "charter-goal", "id": "member-borrowers"}, {"type": "charter-goal", "id": "m-checkout-time"}, {"type": "charter-goal", "id": "nobody-defines-this"}]
+
+    host, _, _ = migrate(tmp_path, ("01_capabilities.json", borrow))
+    capability = next(c for c in read(host, "01_capabilities.json")["capabilities"] if c["capability_id"] == "cap-browse-catalog")
+    assert "trace" not in capability and {"member-borrowers", "m-checkout-time"} <= set(capability["derives_from"])
+    left = [i for i in items(host, "trace-link") if i["about"] == "cap-browse-catalog" and "charter-goal" in i["evidence"]]
+    assert len(left) == 1 and "nobody-defines-this" in left[0]["evidence"] and "no node has this id" in left[0]["evidence"]

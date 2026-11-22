@@ -10,8 +10,6 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import sys
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,35 +18,19 @@ import yaml
 
 from specdev_tools import cli
 from specdev_tools.core.errors import make_error
+from specdev_tools.graph.gitview import host_root_of
 from specdev_tools.generation.schema_differ import KEEP_STATUS, stamp_specdev_version
 from specdev_tools.migration import runner, triage
 from specdev_tools.migration.registry import PHASE_IDS
 from specdev_tools.migration.worklist import make_item
 from specdev_tools.core.changelog_parser import get_toolkit_version
 
-from ._support import REAL_ROOT, git, make_host, make_script, make_toolkit
+from ._support import REAL_ROOT, git, make_host, make_script, make_toolkit, specdev
 
 SPEC = "spec"
 CAPTURE = "extras/migration/capture.json"
 WORKLIST = "extras/migration/worklist.json"
 LIVE_VERSION = get_toolkit_version(REAL_ROOT) or ""  # the version the live toolkit says
-
-
-def specdev(*argv: str) -> tuple[int, str, str]:
-    """Run ``specdev align ...`` in process; return (exit code, stdout, stderr)."""
-    out, err = io.StringIO(), io.StringIO()
-    code = 0
-    with (
-        patch("specdev_tools.cli.check_venv", return_value=None),
-        patch.object(sys, "argv", ["specdev", "align", *argv]),
-        redirect_stdout(out),
-        redirect_stderr(err),
-    ):
-        try:
-            cli.main()
-        except SystemExit as exit_:
-            code = exit_.code if isinstance(exit_.code, int) else (0 if exit_.code is None else 1)
-    return code, out.getvalue(), err.getvalue()
 
 
 def digest(host: Path) -> dict[str, str]:
@@ -302,6 +284,21 @@ def test_validate_keep_worklist_keeps_it_regardless(host):
     assert "spec/extras/migration/ kept (--keep-worklist)" in out
     assert (host / SPEC / WORKLIST).is_file() and (host / SPEC / CAPTURE).is_file()
     assert "migration_status" not in stamp_of(host)
+
+
+def test_the_host_root_is_the_one_rule_of_every_command_also_for_an_empty_git_root(tmp_path):
+    spec = tmp_path / "host" / "spec"
+    for given in (None, ""):
+        assert host_root_of(spec, given) == str(tmp_path / "host"), given
+    assert host_root_of(spec, tmp_path / "elsewhere") == str(tmp_path / "elsewhere")
+
+
+def test_validate_keep_worklist_on_a_finished_host_says_nothing_is_left_to_keep(host):
+    with stub_merge_check():
+        assert specdev("validate", str(host / SPEC), "--repo-root", str(REAL_ROOT))[0] == 0  # the first run finishes it and deletes the migration folder
+        code, out, err = specdev("validate", str(host / SPEC), "--repo-root", str(REAL_ROOT), "--keep-worklist")
+    assert code == 0, err
+    assert "kept" not in out and "nothing to do: the migration was finished before" in out
 
 
 def test_validate_clears_migration_status(host):

@@ -35,12 +35,6 @@ def label_pattern(label: str) -> re.Pattern[str] | None:
     return re.compile(rf"(?<!\w){re.escape(words)}(?:es|s)?(?!\w)")
 
 
-def label_matches(label: str, text: str) -> bool:
-    """Whether *text* uses *label*: both normalised, the label on token boundaries (``Tag`` is not in ``Tagline``)."""
-    pattern = label_pattern(label)
-    return pattern is not None and pattern.search(normalise(text)) is not None
-
-
 def _user_texts(graph: Graph) -> list[str]:
     """The normalised string leaves of every user of the graph, read once for all terms."""
     return [normalise(text) for node in sorted(label_users(graph), key=graph.shape.order_key) for _path, text in own_leaves(graph, node)]

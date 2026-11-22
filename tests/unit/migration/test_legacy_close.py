@@ -33,8 +33,7 @@ from specdev_tools.migration.spec_reads import (
 from specdev_tools.release.gate import _unsigned
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
 
-from .test_convert_remove import context, edit, items, read
-from ._support import REAL_ROOT, make_host, make_toolkit, tree_digest
+from ._support import context, edit, items, make_host, make_toolkit, read, REAL_ROOT, tree_digest
 
 CATALOG, RESERVATIONS, LATE_FEES = "ms-catalog-basics", "ms-reservations", "ms-late-fees"
 PLAN_OF = {CATALOG: "impl_context/ms_catalog_plan.json", RESERVATIONS: "impl_context/ms_reservations_plan.json", LATE_FEES: "impl_context/ms_late_fees_plan.json"}
@@ -127,6 +126,17 @@ def test_disagreeing_sources_add_a_status_conflict_item(migrated, tmp_path):
     # A verdict that is there and is not `verified` disagrees with a `done` status as well.
     other, _t, _r = migrate_to(tmp_path, (PLAN_OF[CATALOG], set_verdict("changes_requested")))
     assert {i["about"] for i in items(other, "status-conflict")} == {CATALOG, LATE_FEES}
+
+
+def test_a_conflict_with_no_closing_source_names_the_09_entry_and_does_not_tell_the_person_to_close(tmp_path):
+    def reservations_done_in_09(data: dict) -> None:
+        next(m for m in data["milestones"] if m["milestone_id"] == "milestone-reservations")["status"] = ROW_DONE
+
+    host, _toolkit, _report = migrate_to(tmp_path, ("09_impl_plan.json", reservations_done_in_09))
+    conflict = next(i for i in items(host, "status-conflict") if i["about"] == RESERVATIONS)
+    assert "no closing source" in conflict["evidence"] and RESERVATIONS not in closed_ids(host)
+    assert "only 09 milestone-reservations says it is done" in conflict["proposal"] and "correct that entry in the 1.1.1 spec" in conflict["proposal"]
+    assert "A milestone closed by mistake" in conflict["proposal"]
 
 
 def test_open_milestone_is_untouched(migrated, before_close):

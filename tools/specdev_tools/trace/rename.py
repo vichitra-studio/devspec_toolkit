@@ -26,6 +26,7 @@ from typing import Any
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import JsonUtilsError, check_edit, json_write_atomic, patch_text
 from specdev_tools.core.schema_validate import jq_key
+from specdev_tools.graph import names
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.contract import item_of
@@ -44,8 +45,6 @@ from specdev_tools.trace.lockfile import (
     write_lock,
 )
 from specdev_tools.trace.writing import writing_graph
-
-ALIASES_KEY = "aliases"
 
 
 class RenameRefusedError(FindingError):
@@ -220,9 +219,9 @@ def _renamed_value(graph: Graph, value: Any, node_id: str, new_id: str) -> Any:
 
 def _edit_node(editor: FileEditor, graph: Graph, node: Node, decl: KindDecl, new_id: str) -> None:
     """Set the id of *node* and append its old id to its ``aliases``."""
-    held = (item_of(graph, node) or {}).get(ALIASES_KEY)
+    held = (item_of(graph, node) or {}).get(names.ALIASES)
     editor.patch(node.file, f"{node.jq_path}{jq_key(decl.id_field or '')}", new_id)
-    editor.patch(node.file, f"{node.jq_path}{jq_key(ALIASES_KEY)}", [*(held if isinstance(held, list) else []), node.id])
+    editor.patch(node.file, f"{node.jq_path}{jq_key(names.ALIASES)}", [*(held if isinstance(held, list) else []), node.id])
 
 
 def _edit_holders(editor: FileEditor, graph: Graph, node: Node, holders: Mapping[str, tuple[Node, set[str]]], new_id: str) -> tuple[RewrittenLink, ...]:

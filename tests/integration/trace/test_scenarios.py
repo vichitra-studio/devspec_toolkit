@@ -20,7 +20,7 @@ from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT
 from unit.trace._lock_support import gap_providers, git_copy_of_example, run_on_example  # noqa: F401  (gap_providers is a fixture)
-from unit.trace.test_suspects import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
+from unit.trace._suspects_support import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
 
 FR, SUCCESSOR = "fr-password-reset", "fr-account-recovery-link"
 SUCCESSOR_CRITERION = "ac-account-recovery-link-1"
@@ -110,7 +110,8 @@ def test_scenario_retire_and_replace_leaves_resolver_errors_until_the_holders_re
     _add_successor_fr(host)
     deleted = _run(host, "json", "delete", "--id", FR)
     assert "lock entry removed: fr-password-reset.derives_from -> cap-account-recovery" in deleted
-    assert "now broken (9 links point at the deleted node)" in deleted
+    assert "now broken (8 links point at the deleted node)" in deleted
+    assert "replaces" not in deleted.split("now broken", 1)[1]
     assert not any(entry.source == FR for entry in read_lock(str(host.spec)).entries)
 
     broken = [finding for finding in _findings(host, "graph") if finding["code"] == "E700"]

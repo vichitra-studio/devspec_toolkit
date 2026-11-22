@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from unit.generation._contracts_support import _flags, _item_with_findings
 from unit.graph._synth import run_cli
 from unit.trace._lock_support import git_copy_of_example, run_on_example
 
@@ -132,23 +133,6 @@ def test_the_two_open_item_forms_are_the_ones_of_the_16b_prompt() -> None:
 # --- every command form the agents give is one the parser has ------------------------------------------------------
 
 
-def _flags(text: str, command: str) -> set[str]:
-    spans = re.findall(r"`(specdev [^`]*)`", text)
-    lines = text.splitlines()
-    for number, line in enumerate(lines):
-        if line.lstrip().startswith("specdev "):
-            chunk = line.strip()
-            while chunk.endswith("\\") and number + 1 < len(lines):
-                number += 1
-                chunk = chunk[:-1] + " " + lines[number].strip()
-            spans.append(chunk)
-    out: set[str] = set()
-    for span in spans:
-        if span.startswith(f"specdev {command}"):
-            out |= set(re.findall(r"(?<![\w-])(--[a-z][a-z-]*)", span))
-    return out
-
-
 @pytest.mark.parametrize(
     ("key", "command"),
     [("impl", "plan record"), ("impl", "verify run"), ("impl", "trace"), ("impl", "spec-check"), ("reviewer", "verify run"),
@@ -199,14 +183,6 @@ def _plan_path(host: Path) -> str:
 def _with_action_id(host: Path) -> None:
     code, out = run_on_example(host, "json", "patch", "--id", ITEM, ".implementation.actions[0].id", '"a01"')
     assert code == 0, out
-
-
-def _item_with_findings(host: Path, name: str, document: dict) -> str:
-    folder = host / ".specdev" / "findings"
-    folder.mkdir(parents=True, exist_ok=True)
-    path = folder / name
-    path.write_text(json.dumps(document), encoding="utf-8")
-    return str(path)
 
 
 def test_the_impl_text_records_an_action_and_writes_an_open_item_by_both_forms(tmp_path: Path) -> None:

@@ -18,7 +18,7 @@ from specdev_tools.core.errors import FindingError
 from specdev_tools.lifecycle.status import MERGE_RELEASE_SECTION, MERGE_RELEASE_TITLE, PRODUCTION_SECTION, PRODUCTION_TITLE, Section, StatusContext, register_status_section
 from specdev_tools.graph.ownership import RELEASE_OWNER
 from specdev_tools.release.gate import run_release_gate
-from specdev_tools.release.previous import check_next_release
+from specdev_tools.release.previous import check_next_release, check_release_at
 from specdev_tools.release.records import read_rollback
 
 CanonDirOf = Callable[..., str | None]
@@ -33,30 +33,35 @@ _PREDATES_CODE = "W938"
 
 @dataclass(frozen=True)
 class ProductionVerification:
-    """The previous release (``tag``, ``None`` for a first release), its ``state`` (one of the constants above) and what is missing (the E920 text of ``not verified``, else empty)."""
+    """The release (``tag``, ``None`` for a first release), its ``state`` (one of the constants above) and what is missing (the E920 text of ``not verified``, else empty).
+
+    ``at_head`` is true when the release is the one tagged on the commit the checkout is at, not the one before it.
+    """
 
     tag: str | None
     state: str
     missing: tuple[str, ...] = ()
+    at_head: bool = False
 
 
 def production_verification(git_root: str, spec_root: str, repo_root: str) -> ProductionVerification:
-    """The verification state of the release before the checkout's HEAD, from the next-release check.
+    """The verification state of the release tagged on the checkout's HEAD, else of the release before it, from the next-release check.
 
     Raises:
         FindingError: E911 when the host declares no ``release_tag_pattern``; E774 for a damaged rollback record; E708 when git cannot answer.
     """
-    result = check_next_release(git_root, spec_root, repo_root)
+    at_head = check_release_at(git_root, spec_root, repo_root)
+    result = at_head if at_head is not None else check_next_release(git_root, spec_root, repo_root)
     if result.previous is None:
         return ProductionVerification(None, NONE)
-    tag = result.previous.tag
+    tag, here = result.previous.tag, at_head is not None
     if any(warning.code == _PREDATES_CODE for warning in result.warnings):
-        return ProductionVerification(tag, PREDATES)
+        return ProductionVerification(tag, PREDATES, at_head=here)
     if read_rollback(spec_root, tag) is not None:
-        return ProductionVerification(tag, ROLLBACK)
+        return ProductionVerification(tag, ROLLBACK, at_head=here)
     if result.errors:
-        return ProductionVerification(tag, NOT_VERIFIED, tuple(error.render() for error in result.errors))
-    return ProductionVerification(tag, VERIFIED)
+        return ProductionVerification(tag, NOT_VERIFIED, tuple(error.render() for error in result.errors), here)
+    return ProductionVerification(tag, VERIFIED, at_head=here)
 
 
 def _production(sc: StatusContext) -> Section:
@@ -65,8 +70,9 @@ def _production(sc: StatusContext) -> Section:
     except FindingError as error:
         return Section(PRODUCTION_SECTION, PRODUCTION_TITLE, (f"not read: {error.error.render()}",), None)
     shown = f"{found.state} (released, awaiting production proof)" if found.state == NOT_VERIFIED else found.state
-    lines = (f"previous release: {found.tag or NONE}", f"state: {shown}", *found.missing)
-    return Section(PRODUCTION_SECTION, PRODUCTION_TITLE, lines, {"tag": found.tag, "state": found.state, "missing": list(found.missing)})
+    label = "release at HEAD" if found.at_head else "previous release"
+    lines = (f"{label}: {found.tag or NONE}", f"state: {shown}", *found.missing)
+    return Section(PRODUCTION_SECTION, PRODUCTION_TITLE, lines, {"tag": found.tag, "state": found.state, "missing": list(found.missing), "at_head": found.at_head})
 
 
 def _merge_release(canon_dir_of: CanonDirOf) -> Callable[[StatusContext], Section]:

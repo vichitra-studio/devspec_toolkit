@@ -113,8 +113,8 @@ def default_base_ref(git_root: str) -> str:
 def host_root_of(spec_root: str, git_root: str | None = None) -> str:
     """The host repository root: *git_root* when given, else the folder that holds the spec folder (as ``spec-check`` derives it).
 
-    Seed documents are read from here and git history is read here, so every command that takes ``--git-root``
-    resolves an absent flag through this function, never to the current folder.
+    Seed documents are read from here and git history is read here, so every command of the graph, trace, lifecycle,
+    release, verify, third-party and migration packages that takes ``--git-root`` resolves an absent flag through this function, never to the current folder.
     """
     return os.path.abspath(git_root) if git_root else os.path.dirname(os.path.abspath(spec_root))
 

@@ -18,6 +18,7 @@ from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.scope_helpers import as_str, str_in, str_items
 from specdev_tools.core.step_order import load_step_order
 from specdev_tools.core.step_paths import PLAN_FILE_KEY
+from specdev_tools.graph import names
 from specdev_tools.graph.kinds import (
     EXTRAS_STEP,
     SEED_KIND,
@@ -42,7 +43,6 @@ from specdev_tools.graph.model import (
 )
 
 SEED_PATH_FIELD = "path"
-ALIASES_FIELD = "aliases"
 UNREADABLE_MESSAGE = "unreadable or not a JSON object"
 
 
@@ -216,7 +216,7 @@ def _collect(
             links=_links_of(item, decl, node_id),
             label=node_label(item),
             milestone=ctx.milestone,
-            aliases=tuple(str_items(item.get(ALIASES_FIELD))),
+            aliases=tuple(str_items(item.get(names.ALIASES))),
         ))
         nodes.extend(nested)
     return nodes

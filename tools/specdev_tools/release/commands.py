@@ -18,7 +18,7 @@ from typing import Any
 
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.json_output import format_errors_json
-from specdev_tools.graph.commands import add_root_flags, resolve_git_root, run_on_graph, usage_error
+from specdev_tools.graph.commands import add_root_flags, roots, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.stages import PROD_STAGE
 from specdev_tools.release.prep import run_release_prep
@@ -96,11 +96,6 @@ def add_release_parsers(sub: Any, canon_dir_of: CanonDirOf) -> None:
     prep.set_defaults(handler=lambda args: run_release_prep(args, canon_dir_of))
 
 
-def _roots(args: argparse.Namespace) -> tuple[str, str, str]:
-    """The spec folder, the toolkit and the host root, absolute."""
-    return os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
-
-
 def _report(args: argparse.Namespace, command: str, context: dict[str, Any], errors: tuple[SpecError, ...], warnings: tuple[SpecError, ...], text: list[str]) -> None:
     """Print one outcome: the JSON envelope (``status``, counts, findings, *context*) on stdout, else *text* (on stderr when there are errors)."""
     if args.json_output:
@@ -130,7 +125,7 @@ def _cut_text(result: CutResult) -> list[str]:
 def run_release(args: argparse.Namespace, canon_dir_of: CanonDirOf) -> int:
     """Run ``specdev release --tag`` (the cut) on the parsed *args*; returns the exit code (0 tagged, 1 refused, 2 usage)."""
     def cut(_graph: Graph) -> int:
-        spec_root, repo_root, git_root = _roots(args)
+        spec_root, repo_root, git_root = roots(args)
         canon = canon_dir_of(git_root=git_root, spec_root=spec_root, spec_dir=spec_root)
         result = cut_release(git_root, spec_root, repo_root, args.cut_tag, args.cut_message, canon)
         context = {"tag": result.tag, "commit": result.commit, "tagged": result.tagged, "listed": [finding.render() for finding in result.gate.listed], "notes": list(result.gate.notes)}
@@ -150,7 +145,7 @@ def _check_text(result: ProdGateResult) -> list[str]:
 def run_release_check(args: argparse.Namespace) -> int:
     """Run ``specdev release check --stage prod --tag`` on the parsed *args*; returns the exit code (0 passes, 1 blocked)."""
     def check(_graph: Graph) -> int:
-        spec_root, repo_root, git_root = _roots(args)
+        spec_root, repo_root, git_root = roots(args)
         result = run_prod_gate(git_root, spec_root, repo_root, args.check_tag)
         context = {"stage": PROD_STAGE, "tag": result.tag, "commit": result.commit, "code_tree": result.code_tree}
         _report(args, "release check", context, result.errors, result.warnings, _check_text(result))
@@ -162,7 +157,7 @@ def run_release_check(args: argparse.Namespace) -> int:
 def run_release_rollback(args: argparse.Namespace) -> int:
     """Run ``specdev release rollback`` on the parsed *args*; returns the exit code (0 written, 1 refused)."""
     def rollback(_graph: Graph) -> int:
-        spec_root, _repo_root, git_root = _roots(args)
+        spec_root, _repo_root, git_root = roots(args)
         path = write_rollback(git_root, spec_root, args.tag, args.reason, release_tag_pattern(declarations_of(spec_root)))
         text = [f"recorded the rollback of {args.tag} ({path}): its production verification is waived for the next release check", "the file is written, not committed: commit it through the normal branch"]
         _report(args, "release rollback", {"tag": args.tag, "file": path}, (), (), text)

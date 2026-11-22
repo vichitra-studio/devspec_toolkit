@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from specdev_tools.core.toolkit_root import detect_toolkit_root
 from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph
 from specdev_tools.graph.model import Graph
+from specdev_tools.lifecycle.closed_edits import edit_of_closed_node, record_migration_edit
 from specdev_tools.trace.id_writes import ACTIONS, WriteRequest, execute_write
 from specdev_tools.trace.write_report import render_text, result_to_dict
 
@@ -92,14 +93,12 @@ def _request_of(args: argparse.Namespace) -> WriteRequest:
 
 
 def _write(args: argparse.Namespace, graph: Graph) -> int:
-    result = execute_write(
-        graph,
-        os.path.abspath(args.spec_root),
-        os.path.abspath(args.repo_root),
-        resolve_git_root(args),
-        _request_of(args),
-        dry_run=args.dry_run,
-    )
+    spec_root, repo_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
+    request = _request_of(args)
+    closed = edit_of_closed_node(graph, spec_root, request.node_id, request.action) if request.node_id else None
+    result = execute_write(graph, spec_root, repo_root, resolve_git_root(args), request, dry_run=args.dry_run)
+    if closed is not None and not args.dry_run:
+        record_migration_edit(spec_root, repo_root, closed)
     if args.json_output:
         print_json(result_to_dict(result))
     else:

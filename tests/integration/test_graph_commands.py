@@ -70,8 +70,11 @@ def test_status_writes_one_file_and_refuses_a_seed(spec: Path) -> None:
     refused = run_specdev("node", "status", "seed-accounts", "deprecated", *_flags(spec))
     assert refused.returncode == 1 and refused.stderr.startswith("E705") and "seed" in refused.stderr
     assert {path: path.read_bytes() for path in spec.rglob("*.json")} == before
-    done = run_specdev("node", "status", _CRITERION, "not_applicable", *_flags(spec))
-    assert done.returncode == 0 and done.stdout.strip() == f"{_CRITERION}: active -> not_applicable (04_fr_list.json)"
+    parked = run_specdev("node", "status", _CRITERION, "not_applicable", *_flags(spec))
+    assert parked.returncode == 1 and parked.stderr.startswith("E705") and "historical step-14 nodes" in parked.stderr
+    assert {path: path.read_bytes() for path in spec.rglob("*.json")} == before
+    done = run_specdev("node", "status", _CRITERION, "deprecated", *_flags(spec))
+    assert done.returncode == 0 and done.stdout.strip() == f"{_CRITERION}: active -> deprecated (04_fr_list.json)"
     changed = [path.name for path, data in before.items() if path.read_bytes() != data]
     assert changed == ["04_fr_list.json"]
 

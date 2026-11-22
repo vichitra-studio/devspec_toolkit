@@ -25,7 +25,7 @@ from specdev_tools.trace.replay import (
 from unit.graph._synth import run_python_seeded
 
 from ._lock_support import EXAMPLE_HOST, ROOT, gap_providers  # noqa: F401  (gap_providers is a fixture)
-from .test_suspects import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
+from ._suspects_support import CLOSED_HOLDERS, CLOSURE_OF_CRITERION_EDIT, CRITERION, Example
 
 TERM = "quokka"
 UNRELATED_NODE = "cap-account-recovery"

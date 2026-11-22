@@ -1163,7 +1163,7 @@ rows:
   captured_in: milestone_links
   convert:
     type: schedules
-  note: 'deliverables are free text: one schedules item per 09 milestone with a proposal from the paired 14 milestone'
+  note: 'a typed deliverable (type, id, note) whose id resolves to a node `schedules` accepts is written to schedules; a capability, an unknown id, a string or a type that disagrees with the id is not, and the milestone then gets one schedules item naming it, with a proposal from the paired 14 milestone; the note is not carried (the capture has it)'
 - id: SC-09-11
   path: milestones[].depends_on
   change: remove

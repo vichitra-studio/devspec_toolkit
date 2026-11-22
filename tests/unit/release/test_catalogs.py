@@ -16,11 +16,11 @@ from specdev_tools import cli, host_install
 from specdev_tools.lifecycle import anchor_store
 from specdev_tools.core.errors import ERROR_CODES, PROMOTABLE_PAIRS
 
-from ..core.test_error_code_registry import CODE_LITERAL_RE, ERRORS_MODULE, REGISTERED_WITHOUT_EMITTER, REMOVED_CODES, TOOLS_DIR
+from ..core._error_code_support import CODE_LITERAL_RE, ERRORS_MODULE, REGISTERED_WITHOUT_EMITTER, REMOVED_CODES, TOOLS_DIR
 from ..graph._synth import ROOT
 from ..lifecycle._milestone_support import cli_run
 from ..lifecycle._support import closed_record
-from ..trace.test_catalogs import (
+from .._catalog_support import (
     _CHANGELOG_MD, _CHANGELOG_YAML, _CLI_COMMANDS, _ERROR_CODES_MD, _REFERENCE_MD, _ROOT, _entry, _md_bullets, _normalised,
 )
 from ..verify._support import commit_all, edit_doc

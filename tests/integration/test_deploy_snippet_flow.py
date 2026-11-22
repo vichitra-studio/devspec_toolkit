@@ -11,6 +11,7 @@ The host is ``flow_host`` (``integration/_release_support.py``).  Nothing touche
 """
 from __future__ import annotations
 
+import json
 import re
 import shlex
 from dataclasses import dataclass
@@ -165,7 +166,34 @@ def test_merge_mode_runs_the_pin_check_on_the_graph_example(tmp_path: Path) -> N
     declare_pin(host, "0.40.0")
     out = merge_check(host)
     assert check_line(out, "merge-pins") == "[FAIL]" and "E337" in out and "'0.41.1' of 'tp-argon2' differs from package-lock.json" in out and "'0.40.0'" in out
-    _, plain = run_on_example(host, "spec-check", str(host / "spec"))
-    assert "merge-pins" not in plain and "E337" not in plain, "the plain run does not read the pin sources: only the merge gate does"
     declare_pin(host, "0.41.1")
     assert check_line(merge_check(host), "merge-pins") == "[PASS]", "making them agree again clears it"
+
+
+def test_the_step_02_gate_and_the_plain_run_report_a_pin_that_differs_from_its_source(tmp_path: Path) -> None:
+    """The owner of E337 is step 02, so its own gate says it: ``--step 02`` blocks on it (it was ``CLEAR``), the plain run lists the ``third-party-pins`` check as failed, and the lock file edit alone (the pin unchanged) is a new finding against the commit before it."""
+    host = git_copy_of_example(tmp_path / "host")
+    git(host, "checkout", "-q", "-b", "feature")
+    declare_pin(host, "0.41.1")
+    _, plain = run_on_example(host, "spec-check", str(host / "spec"))
+    assert check_line(plain, "third-party-pins") == "[PASS]"
+    declare_pin(host, "0.40.0")
+    _, gate = run_on_example(host, "spec-check", str(host / "spec"), "--step", "02", "--detail", "all", "--base-ref", "HEAD~1")
+    assert "RESULT: CLEAR" not in gate and re.search(r"E337\s+\[02 own\]\s+tp-argon2", gate), gate
+    _, plain = run_on_example(host, "spec-check", str(host / "spec"))
+    assert check_line(plain, "third-party-pins") == "[FAIL]" and "E337" in plain
+
+
+def test_the_step_02_gate_refuses_a_range_pin_of_a_third_party_with_no_declared_source(tmp_path: Path) -> None:
+    """DOC L991: an exact pin always.  A third party that declares no ``pin_sources`` was not tested; its range pin is E336 at step 02 now."""
+    host = git_copy_of_example(tmp_path / "host")
+    git(host, "checkout", "-q", "-b", "feature")
+    sketch = host / "spec" / "02_system_sketch.json"
+    doc = json.loads(sketch.read_text(encoding="utf-8"))
+    doc["third_parties"][0]["pin"] = "^0.41"
+    write_json(sketch, doc)
+    commit_all(host, "a range pin")
+    _, gate = run_on_example(host, "spec-check", str(host / "spec"), "--step", "02", "--detail", "all", "--base-ref", "HEAD~1")
+    assert re.search(r"E336\s+\[02 own\]\s+tp-argon2", gate) and "RESULT: CLEAR" not in gate, gate
+    _, merge = run_on_example(host, "spec-check", str(host / "spec"), "--merge", "--base-ref", "main")
+    assert check_line(merge, "merge-pins") == "[FAIL]" and "E336" in merge

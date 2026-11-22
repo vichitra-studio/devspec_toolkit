@@ -79,7 +79,7 @@ Task `acceptance_criteria` in Step 14 REFINE the obligations of the steps above 
 - **NEVER weaken an upstream AC**: Task acceptance criteria must be equal to or STRICTER than the originating FR acceptance criteria. A task AC that relaxes a threshold, removes a condition, or contradicts a constraint is a regression, not a refinement.
 - **NO Ambiguous Task Scope**: Task `description` must name the specific deliverable artifact (endpoint, template, table, config, module) being created or modified. "Configure dependencies" is too vague — "Configure OAuth2 client credentials in session middleware settings" is specific.
 - If `risk_status` is 'high' or 'critical', the `risks` array MUST contain >=1 entry naming the specific blocker.
-- A task that is deliberately not built now carries a `disposition` (`value` `deferred` or `wont_do`, with a `reason`: for `deferred`, the blocker and the condition to resume). Do not delete the task to dodge a coverage finding.
+- A task that is deliberately not built now carries a `disposition` (`value` `deferred` or `wont_do`, with a `reason`: for `deferred`, the blocker and the condition to resume). Do not delete the task to dodge a coverage finding. The milestone, tasks and task criteria of a closed milestone are not edited by id (`json patch|insert|delete --id` is E767): `specdev node status <id> not_applicable` parks one whose built target was deleted, and a change of the work is a new task or milestone.
 
 ## Coverage Closure
 Before emitting, verify:

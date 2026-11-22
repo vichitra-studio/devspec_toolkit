@@ -108,9 +108,7 @@
       ["attest", "--step", "08", "--yes"]
     ]},
     {"step": "09", "commands": [
-      ["json", "patch", "--id", "milestone-catalog-basics", ".schedules", "[\"fr-catalog-search\", \"nfr-search-latency\", \"risk-volunteer-availability-at-the-cafe-lantern\"]"],
-      ["json", "patch", "--id", "milestone-reservations", ".schedules", "[\"fr-reserve-tool\", \"fr-checkout-tool\", \"fr-return-tool\", \"inv-no-double-checkout\", \"inv-reservation-window\", \"nfr-checkout-latency\", \"nfr-desk-availability\", \"risk-the-hosting-plan-may-not-allow-a-second\"]"],
-      ["json", "patch", "--id", "milestone-late-fees", ".schedules", "[\"fr-late-fee-calc\", \"inv-fee-nonnegative\", \"nfr-fee-accuracy\"]"],
+      ["json", "insert", "--id", "milestone-reservations", ".schedules", "\"risk-the-hosting-plan-may-not-allow-a-second\""],
       ["attest", "--step", "09", "--yes"]
     ]},
     {"step": "10", "commands": [

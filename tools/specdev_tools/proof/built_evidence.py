@@ -236,11 +236,6 @@ def built_at_cap(ctx: GraphCheckContext, cap: str, node_id: str | None = None) -
         restore()
 
 
-def built_state(ctx: GraphCheckContext, node: Node, cap: str) -> BuiltResult:
-    """The built state of *node* at *cap*: ``BUILT``, ``RELIEVED`` (``waits_for`` names the stage) or ``NOT_BUILT`` (see ``built_at_cap``)."""
-    return built_at_cap(ctx, cap, node.id)[node.id]
-
-
 def relieved_nodes(ctx: GraphCheckContext, cap: str) -> list[Node]:
     """The nodes that are ``RELIEVED`` at *cap*, in listing order: what the production-deploy gate and the next-release check must re-check (see ``built_at_cap``)."""
     found = (ctx.graph.by_id[node_id] for node_id, result in built_at_cap(ctx, cap).items() if result.state is BuiltState.RELIEVED)

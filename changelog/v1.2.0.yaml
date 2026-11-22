@@ -173,6 +173,8 @@ changes:
       W555 text no longer cites a charter minItems:3 bound (the threshold is a
       seed-quality heuristic). scripts/generate_fixtures_02a.py removed (stale,
       nothing called it); toolkit-internal.
+      W555 counts the out-of-scope or non-goal bullets of the seeds routed to
+      step 00 and names no retired field.
     migration:
       action: none
 
@@ -267,6 +269,8 @@ changes:
       cli_command, assumes, scope, scope_reason, lifecycle, aliases and replaces;
       a rule with enforcer must not carry cli_command. versioning, policy_ref and
       command_ref stay.
+      A rule's cli_command must be a command of tools/cli_commands.json; any
+      other value is E530 at step 10, owned by step 10.
     migration:
       action: ai_assisted
 
@@ -547,6 +551,10 @@ changes:
       and trace print one more line on stderr that names the file and says the
       answer may be incomplete, and an unknown id then says the node may be in one
       of those files. The commands are listed in tools/cli_commands.json.
+      not_applicable is accepted only for a closed milestone's historical
+      step-14 nodes (the roadmap milestone, its tasks and its task criteria)
+      and for a node that already has it; any other node is refused with E705,
+      and deprecated takes a node out of use.
     migration:
       action: none
 
@@ -707,6 +715,15 @@ changes:
       the node lacks and its schema declares. These forms take --repo-root, --spec-root, --git-root and --json (CLAUDE.md says the
       json subcommands take --repo-root only: that holds for the path forms); json
       delete, json keys and json structure now accept --repo-root too.
+      On a step-14 node (the roadmap milestone, a task or a task criterion) of
+      a closed milestone json patch|insert|delete --id is refused with E767, a
+      dry run included; specdev node status <id> not_applicable is the way to
+      park such a node. While spec/specdev_version says migration_status:
+      in_progress the edit is allowed and the first one of a milestone adds
+      one record to its close.migrations; a second edit of the same milestone
+      in the same migration adds none. json delete --id lists as now broken
+      only the links of live nodes that point at the deleted node, not the
+      history links replaces and removes.
     migration:
       action: none
 
@@ -727,6 +744,10 @@ changes:
       ready for K = 02, 04 and 05, not ready, 1 blocker (step 07: coverage gap E740:
       metric-reset-completion-rate) for K = 08 and 09, and not ready, 11 blockers
       (steps 07, 08 and 12) for K = 14.
+      The last line names the earliest step that has anything pending, even a
+      step that NN has no link into, because a link cannot be attested while
+      the node it points to is suspect; the blockers listed are still those of
+      the steps NN links to.
     migration:
       action: none
 
@@ -1277,6 +1298,10 @@ changes:
       <version>; nothing written (exit 0, no reminder), and writes the value
       without surrounding spaces. Shown by specdev third-party check and specdev
       third-party pin.
+      spec-check runs the pin check in every run (the check third-party-pins,
+      whose findings are step 02's own, so --step 02 blocks on them) and tests
+      the pin of every third party for exactness (E336), whether or not it
+      declares pin_sources; E337 and E338 are reported the same way.
     migration:
       action: none
 
@@ -1454,6 +1479,10 @@ changes:
       criteria whose proof is owed at staging or prod (a binding at staging or
       prod whose proof is not proven). A person decides sign-off and defer. Shown by specdev milestone close
       ms-account-recovery --check.
+      The close gate also reports E761 for a link of the milestone's chain
+      that has no lock entry (a plan item added to the plan file by hand and
+      never attested), because once the milestone is closed attest refuses
+      that link.
     migration:
       action: none
 
@@ -1484,8 +1513,12 @@ changes:
       older than a change of what its item realises) and W826 (an item that
       realises only deferred or won't-do tasks), and the new check frozen-plans
       reports E827 for a plan edited after its milestone closed; spec-check now
-      runs 29 checks. Shown by specdev plan record --help and specdev review
+      runs 30 checks (the third-party-pins check is described with
+      specdev third-party). Shown by specdev plan record --help and specdev review
       record --help.
+      A record is stale (W825) when the item's realises links were attested
+      again after it was written, whether or not the criterion's text changed:
+      the item is carried out and recorded again.
     migration:
       action: none
 
@@ -1605,6 +1638,13 @@ changes:
       spec_ref, milestone_ref, checklist_status, execution_results, fixture_status,
       fr_coverage, the trace matrix or specdev matrix. Shown by specdev status
       --milestone ms-account-recovery.
+      prompt_16b_impl_coder.md says what 16b does with a test it wrote that no
+      binding covers: it binds the test with specdev verify bind, which the
+      agent may run. The seed manifest schema,
+      docs/prompts/shared_expectations.md and docs/agents/agents.md say that a
+      seed is routed only to steps 00, 02 and 02a, the steps whose nodes can
+      link a seed; a route to any other step, the trinity steps included, is
+      E748.
     migration:
       action: none
 
@@ -1629,8 +1669,9 @@ changes:
       three checks appended after the registered ones (merge-open-items for E631
       and W633, merge-pins for E336 to E338, merge-bindings for E901 and E900).
       Plain spec-check, --step and --paths do not run them, so a plain run on
-      the worked example is unchanged (29 checks run, 25 errors, 7 warnings;
-      with --merge 31 checks run, 25 errors, 7 warnings). merge-bindings runs,
+      the worked example is unchanged (30 checks run, 25 errors, 7 warnings;
+      with --merge 32 checks run, 25 errors, 7 warnings, the pin finding listed
+      under both third-party-pins and merge-pins and counted once). merge-bindings runs,
       without recording evidence, the dev and CI bindings of each milestone that
       the branch closes. --merge with --step, --paths or --detail is a usage
       error (exit 2); --base-ref is also accepted with --merge, and a full
@@ -1797,6 +1838,9 @@ changes:
       release and its state: verified in production, rollback recorded, not
       verified (released, awaiting production proof) with the E920 line, none
       (previous tag predates 1.2.0) or none. It still reads and writes nothing.
+      On the commit that a release tag matching release_tag_pattern points at,
+      the section reads release at HEAD: <tag> and that release's own state
+      (--json: data.at_head); on any other commit it is the previous release.
       Shown by specdev status.
     migration:
       action: none
@@ -1895,12 +1939,18 @@ changes:
     description: >
       Migration script p3_convert (mechanical). Legacy reference fields become
       the declared link fields: goal_id / success_metric_refs, connection from /
-      to, typed trace / targets / target_ids / mitigations entries, requires,
+      to, typed trace / targets / target_ids / mitigations entries (a trace
+      entry with the borrowed type charter-goal too, when its id names exactly
+      one node), the typed step 09 deliverables (each one whose id names a node
+      the milestone's schedules accepts is written to schedules, in order; a
+      capability, an unknown id, a free-text string and a type that disagrees
+      with the id are not, and the milestone then gets one schedules worklist
+      item naming them), requires,
       interface_ref, criterion fixture_ref; future and wont-have become scope
       later / out; out_of_scope lists become scope: out; environment host keys
       move into config; scope: in is set where the schema requires it. A node
       that two out_of_scope entries name keeps both reasons in scope_reason,
-      joined with ; . The note of a converted trace entry is not carried (1.2.0
+      joined with ; . The note of a converted trace or deliverables entry is not carried (1.2.0
       has no place for a link's note): read it in the old file with specdev
       align triage <spec> --legacy NN. What no single field fits is a worklist
       item, and the old value stays in capture.json.

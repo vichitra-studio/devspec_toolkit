@@ -286,4 +286,6 @@ def test_row_10_next_release_passes_fails_without_prod_evidence_and_passes_after
     commit_all(host, "rollback record of v1.0.0")
     out = run(host, "release", "--tag", NEXT_TAG)
     assert "annotated tag created" in out and tags(host) == [TAG, NEXT_TAG]
-    assert "state: rollback recorded" in production_section(host)
+    assert f"release at HEAD: {NEXT_TAG}" in production_section(host), "on the commit the tag points at, status shows that release and its own state"
+    advance(host)
+    assert f"previous release: {NEXT_TAG}" in production_section(host)

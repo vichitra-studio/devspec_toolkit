@@ -132,7 +132,7 @@ Allowed verdicts: `verified`, `needs_work`, `blocked`, `deferred` (the `review.v
 ## Audit Checklist (Mandatory)
 For each plan item (`checklist[]`):
 1. ☐ Is every action recorded `done` in `execution.records` (the newest record of an action counts), proven by `specdev verify run`, or marked `at_deploy`?
-2. ☐ Is the record current? `specdev spec-check` reports a stale one as W825 (what the item realises changed after it was written).
+2. ☐ Is the record current? `specdev spec-check` reports a stale one as W825 (the item's `realises` links were attested again after it was written, whether or not the criterion's text changed).
 3. ☐ Are the files changed within `plan.summary.target_file_patterns` (`git diff --name-only <base>`)?
 4. ☐ Do the item's test commands pass when you run them yourself (spot-check at least one test)?
 5. ☐ If code changes exist, do `plan.docs_impact` and the updated docs match?

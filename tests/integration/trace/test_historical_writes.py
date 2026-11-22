@@ -49,10 +49,18 @@ def test_check_ignores_a_deleted_target_of_a_closed_criterion(tmp_path: Path) ->
 
 
 def test_writing_a_dangling_verified_by_into_a_closed_criterion_by_id_is_refused(tmp_path: Path) -> None:
+    """Closed work is written only during a migration; there the write still has to resolve what it adds."""
     host = closed_example(tmp_path)
+    (host / "spec" / "specdev_version").write_text("toolkit_version: 1.2.0\nmigration_status: in_progress\n", encoding="utf-8")
     status, out = run_cli("json", "patch", "--id", FROZEN_HOLDER, ".verified_by", json.dumps(["fix-does-not-exist"]), *_flags(host))
     assert status == 1 and "E767" in out and "E700" in out and "fix-does-not-exist" in out
     assert FROZEN_HOLDER not in _check_e700(host)
+
+
+def test_an_id_keyed_write_of_a_closed_criterion_is_refused_outside_a_migration(tmp_path: Path) -> None:
+    host = closed_example(tmp_path)
+    status, out = run_cli("json", "patch", "--id", FROZEN_HOLDER, ".verified_by", json.dumps(["fix-does-not-exist"]), *_flags(host))
+    assert status == 1 and "E767" in out and "is closed" in out and "E700" not in out
 
 
 def test_an_id_keyed_write_of_an_unrelated_node_succeeds_after_that_deletion(tmp_path: Path) -> None:

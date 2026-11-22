@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from integration.test_migration_no_git_writes import (
+from integration._migration_support import (
     HOST_KINDS,
     SPEC,
     STAMP,

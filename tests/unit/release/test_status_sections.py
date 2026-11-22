@@ -123,3 +123,23 @@ def test_install_is_repeatable_and_keeps_the_places(name: str) -> None:
     before = list(status_module.SECTIONS)
     cli.build_parser()
     assert list(status_module.SECTIONS) == before and name in before
+
+
+def test_status_on_the_commit_a_release_tag_points_at_shows_that_release_and_its_state(tmp_path: Path) -> None:
+    host = latency_host(tmp_path, run_it=False)
+    tag(host, "v1.0.0")
+    found = _state(host)
+    assert (found.tag, found.state, found.at_head) == ("v1.0.0", NOT_VERIFIED, True) and found.missing[0].startswith("E920")
+    code, out, _ = cli_run(host, "status")
+    assert code == 0
+    assert out.split("Production verification\n")[1].startswith("  release at HEAD: v1.0.0\n  state: not verified (released, awaiting production proof)\n  E920 ")
+    code, out, _ = cli_run(host, "status", "--json")
+    assert json.loads(out)["sections"]["production_verification"]["data"]["at_head"] is True
+    advance(host)
+    assert _state(host).at_head is False
+
+
+def test_a_tag_that_does_not_match_the_release_pattern_is_not_a_release_at_head(tmp_path: Path) -> None:
+    host = release_host(tmp_path)
+    tag(host, "v1.0.0-stage")
+    assert _state(host) == ProductionVerification(None, NONE)

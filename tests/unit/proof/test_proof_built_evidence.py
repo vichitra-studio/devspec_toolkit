@@ -11,7 +11,7 @@ import pytest
 from specdev_tools.core.errors import FindingError
 from specdev_tools.graph.model import Node
 from specdev_tools.proof import validity
-from specdev_tools.proof.built_evidence import built_at_cap, built_state, pin_matches, record_users, relieved_nodes, retired_bindings
+from specdev_tools.proof.built_evidence import built_at_cap, pin_matches, record_users, relieved_nodes, retired_bindings
 from specdev_tools.proof.proof import NO_VERIFIER, PENDING_STAGE, PROVEN, UNBOUND, UNPROVEN
 from specdev_tools.trace.lockfile import read_lock
 from specdev_tools.validation.graph_checks.built import BuiltResult, BuiltState, compute_built, register_built_provider
@@ -25,6 +25,11 @@ from ._support import (
     EXAMPLE_BINDING, FIXTURE, INVARIANT, NFR, PASSING, add_fixture, attest, binding_item, ci_host, commit_all, edit_code, edit_doc, graph_of, host_with, prove, run,
 )
 from unit.verify._support import write, write_json
+
+def built_state(ctx: GraphCheckContext, node: Node, cap: str) -> BuiltResult:
+    """The built state of one node at *cap* (the entry of ``built_at_cap`` for that node)."""
+    return built_at_cap(ctx, cap, node.id)[node.id]
+
 
 BUILT, NOT_BUILT, PENDING, RELIEVED = BuiltState.BUILT, BuiltState.NOT_BUILT, BuiltState.PENDING_EVIDENCE, BuiltState.RELIEVED
 JOB, ENVIRONMENT, GATE = "job-contract-tests", "ci", "contract-tests"

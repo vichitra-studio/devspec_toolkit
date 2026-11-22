@@ -12,7 +12,7 @@ from specdev_tools.trace.gaps import CoverageGap
 
 from unit.graph._synth import ROOT, run_cli
 from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
-from unit.trace.test_suspects import Example
+from unit.trace._suspects_support import Example
 
 API = "api-password-reset-confirm"
 API_FILE = "05_interface_contracts.json"

@@ -11,7 +11,7 @@ the removed fields are gone, the link fields a script can derive from a 1.1.1 fi
 ``provided_by``, ``scope`` + ``trace`` of an invariant -> ``constrains``, ``targets`` -> ``verifies``, ``target_ids`` ->
 ``threatens``, ``mitigations`` -> ``mitigated_by``, ``interface_ref`` of a scaffold row -> ``realises``), the ``pr_rules`` became
 rules with the enforcer mapping.  What it marks as judgement (``derives_from`` of a rule, a charter node, a third party; ``refines``;
-the pin of a third party; ``realises`` of a plan item; ``schedules``) is NOT invented: the field is absent and a worklist item or a
+the pin of a third party; ``realises`` of a plan item; the risks a milestone schedules beyond its typed deliverables) is NOT invented: the field is absent and a worklist item or a
 proposal names it.
 """
 
@@ -107,11 +107,11 @@ def test_charter_string_lists_became_nodes_and_the_judgement_links_are_not_inven
     assert "scope_reason" not in charter["scope_items"][1]
 
 
-def test_capability_trace_is_dropped_and_the_link_is_a_worklist_item(migrated):
+def test_capability_charter_goal_trace_became_derives_from_the_one_node_with_that_id(migrated):
     host, _report, items = migrated
     capability = load(host, "01_capabilities.json")["capabilities"][0]
-    assert "trace" not in capability and names.DERIVES_FROM not in capability  # a charter-goal trace has no mechanical target
-    assert "cap-account-recovery" in worklist_about(items, "trace-link")
+    assert "trace" not in capability and capability[names.DERIVES_FROM] == ["seg-registered-member"]  # 12.3: a borrowed type, a bare id
+    assert "cap-account-recovery" not in worklist_about(items, "trace-link")
 
 
 def test_the_external_component_became_a_third_party_without_a_pin_and_tech_stack_went(migrated):
@@ -155,7 +155,8 @@ def test_fr_api_invariant_and_nfr_links_are_written_where_a_1_1_1_field_gives_th
     assert "trace" not in invariant and invariant["scope"] == "in"
     nfr = load(host, "07_nfrs.json")["nfrs"][0]
     assert nfr[names.CONSTRAINS] == ["fr-password-reset"] and nfr["scope"] == "in" and nfr["stage"] == "staging"  # `stage` stays (12.10)
-    assert names.DERIVES_FROM not in nfr and names.RELIES_ON not in nfr and "nfr-latency-reset-email" in worklist_about(items, "trace-link")
+    assert nfr[names.DERIVES_FROM] == ["metric-recovery-time"] and names.RELIES_ON not in nfr  # 12.10: the borrowed charter-goal type
+    assert "nfr-latency-reset-email" not in worklist_about(items, "trace-link")
 
 
 def test_fixture_targets_became_verifies_and_nothing_was_added(migrated):
@@ -166,12 +167,12 @@ def test_fixture_targets_became_verifies_and_nothing_was_added(migrated):
     assert all("targets" not in f for f in fixtures.values())
 
 
-def test_design_milestone_lost_status_and_deliverables_and_schedules_is_a_worklist_item(migrated):
+def test_design_milestone_lost_status_and_deliverables_and_the_typed_deliverable_became_schedules(migrated):
     host, _report, items = migrated
     milestone = load(host, "09_impl_plan.json")["milestones"][0]
-    assert {"status", "deliverables", "depends_on"}.isdisjoint(milestone) and names.SCHEDULES not in milestone
-    listed = [i for i in items if i["kind"] == "schedules" and i["about"] == "milestone-account-recovery"]
-    assert listed and "fr-password-reset" in listed[0]["proposal"]  # proposed from the deliverable, not written
+    assert {"status", "deliverables", "depends_on"}.isdisjoint(milestone)
+    assert milestone[names.SCHEDULES] == ["fr-password-reset"]  # 12.12: the typed deliverable is written
+    assert worklist_about(items, "schedules") == set()  # every deliverable converted: nothing for a person
 
 
 def test_governance_pr_rules_became_rules_with_the_enforcer_mapping(migrated):

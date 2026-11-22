@@ -3,7 +3,7 @@ deleted E590 tests, and the ``graph`` check of ``spec-check``."""
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -13,44 +13,20 @@ import pytest
 from specdev_tools.core.errors import ERROR_CODES, SpecError, make_error
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import check_replaces
-from specdev_tools.graph.kinds import LinkDecl
 from specdev_tools.graph.model import Graph, Link, Node, SpecShape
 from specdev_tools.graph.ownership import OwnerContext, load_ownership_table, owner_for
 from specdev_tools.graph.resolve import NULL_HOOKS, resolve_graph
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from ._synth import EXAMPLE_SPEC, ROOT, copy_example, docs_graph, load_doc, spec_check_graph_findings, write_json, write_spec
-
-_RANKS = {"seed": -1, "s1": 0, "s2": 1, "s3": 2}
-
-
-def _decl(field: str, kinds: Iterable[str], same_step: Iterable[str] = ()) -> LinkDecl:
-    return LinkDecl(field=field, kinds=tuple(kinds), required=False, built=True, same_step_kinds=tuple(same_step))
+from ._builders import _decl, _node, _graph
 
 
-def _node(
-    node_id: str, kind: str, step: str | None, links: Iterable[tuple[LinkDecl, str]] = (), *,
-    role: str = "obligation-system", lifecycle: str = "active",
-) -> Node:
-    return Node(
-        id=node_id, kind=kind, step=step, role=role, file=f"{step}.json", jq_path=f".{kind}[0]", parent=None,
-        children=(), lifecycle=lifecycle, scope=None, links=tuple(Link(node_id, d.field, t, d) for d, t in links),
-        label="",
-    )
 
 
-def _graph(nodes: Sequence[Node], *, files: Mapping[str, tuple[str, ...]] | None = None) -> Graph:
-    kind_steps: dict[str, set[str]] = {}
-    for node in nodes:
-        if node.step:
-            kind_steps.setdefault(node.kind, set()).add(node.step)
-    present = files if files is not None else {step: (f"{step}.json",) for steps in kind_steps.values() for step in steps}
-    shape = SpecShape(
-        step_ranks=_RANKS,
-        kind_steps={kind: tuple(sorted(steps)) for kind, steps in kind_steps.items()},
-        files_by_step=present,
-    )
-    return Graph.from_nodes(list(nodes), shape=shape)
+
+
+
 
 
 def _summary(errors: Sequence[SpecError]) -> list[tuple[str, str | None, str | None]]:

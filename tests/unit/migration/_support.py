@@ -9,17 +9,30 @@ entries, nothing else) for the tests that need a root whose content differs from
 from __future__ import annotations
 
 import hashlib
+import io
+import json
 import os
 import shutil
 import subprocess
+import sys
+from collections.abc import Callable
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
+from specdev_tools import cli
+from specdev_tools.migration import runner
+from specdev_tools.migration.context import MigrationContext
 from specdev_tools.migration.registry import Script, ScriptResult, ScriptSpec
+from specdev_tools.migration.report import STATUS_OK
+from specdev_tools.migration.writer import DocumentSet
 
 REAL_ROOT = Path(__file__).resolve().parents[3]
 MINI_HOST = REAL_ROOT / "tests" / "fixtures" / "migration" / "mini_host_1_1_1"
+VARIANT = MINI_HOST / "variants" / "status_ref_1_0_x" / "04_fr_list.json"
+"""The mini host's ``04_fr_list.json`` of a 1.0.x host: it carries ``status_ref`` keys."""
 
 
 def make_toolkit(tmp_path: Path, version: str = "1.2.0", listed: tuple[str, ...] = ("1.0.0", "1.1.0", "1.1.1", "1.2.0")) -> Path:
@@ -95,3 +108,57 @@ def make_script(
         return result or ScriptResult(edits=1)
 
     return Script(ScriptSpec(script_id, phase, requires, touches), version, detect, apply, verify or (lambda before, after: []))
+
+
+WORKLIST = "extras/migration/worklist.json"
+
+
+def read(host: Path, rel: str):
+    return json.loads((host / "spec" / rel).read_text(encoding="utf-8"))
+
+
+def items(host: Path, kind: str | None = None) -> list[dict]:
+    found = read(host, WORKLIST)["items"]
+    return [i for i in found if kind is None or i["kind"] == kind]
+
+
+def edit(host: Path, rel: str, change: Callable[[dict], None]) -> None:
+    """Edit a file of the host copy and commit it (the migration refuses a dirty spec)."""
+    path = host / "spec" / rel
+    data = json.loads(path.read_text(encoding="utf-8"))
+    change(data)
+    path.write_text(json.dumps(data, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+    git(host, "add", "-A")
+    git(host, "commit", "-q", "-m", f"edit {rel}")
+
+
+def migrate(tmp_path: Path, *edits: tuple[str, Callable[[dict], None]]):
+    toolkit = make_toolkit(tmp_path)
+    host = make_host(tmp_path)
+    for rel, change in edits:
+        edit(host, rel, change)
+    report = runner.run_migration(host / "spec", toolkit_root=toolkit, git_root=host)
+    assert report.status == STATUS_OK, report.errors
+    return host, toolkit, report
+
+
+def context(host: Path, toolkit: Path) -> MigrationContext:
+    spec = str(host / "spec")
+    return MigrationContext(spec, str(host), str(host), str(toolkit), True, DocumentSet(spec), "1.1.1", "1.2.0")
+
+
+def specdev(*argv: str) -> tuple[int, str, str]:
+    """Run ``specdev align ...`` in process; return (exit code, stdout, stderr)."""
+    out, err = io.StringIO(), io.StringIO()
+    code = 0
+    with (
+        patch("specdev_tools.cli.check_venv", return_value=None),
+        patch.object(sys, "argv", ["specdev", "align", *argv]),
+        redirect_stdout(out),
+        redirect_stderr(err),
+    ):
+        try:
+            cli.main()
+        except SystemExit as exit_:
+            code = exit_.code if isinstance(exit_.code, int) else (0 if exit_.code is None else 1)
+    return code, out.getvalue(), err.getvalue()

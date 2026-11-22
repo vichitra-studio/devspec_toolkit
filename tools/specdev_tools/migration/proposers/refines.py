@@ -218,8 +218,10 @@ def _proposal_text(decision: Decision, criterion: Node) -> str:
     klass, target = decision.klass, decision.target
     if target is None:
         return (
-            f"class: {klass}. No obligation to propose: find the one this criterion narrows, or, if it narrows none, "
-            f"`specdev node status {criterion.id} not_applicable`"
+            f"class: {klass}. No obligation to propose: find the one this criterion narrows. If it narrows none: for a "
+            f"criterion of a closed milestone, `specdev node status {criterion.id} not_applicable` (the value is refused "
+            f"on any other node); for one of an open milestone, delete it (`specdev json delete --id {criterion.id}`) "
+            "or reword it at step 14"
         )
     others = f"; other candidates: {', '.join(_describe(other) for other in decision.alternatives)}" if decision.alternatives else ""
     return (

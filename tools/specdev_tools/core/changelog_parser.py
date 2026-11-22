@@ -228,19 +228,6 @@ def list_versions(changelog_dir: Path) -> List[str]:
     return sorted(versions, key=_parse_semver)
 
 
-def get_latest_version(changelog_dir: Path) -> Optional[str]:
-    """Get the latest version from the changelog directory.
-    
-    Args:
-        changelog_dir: Path to the changelog/ directory
-        
-    Returns:
-        Latest version string, or None if no versions found
-    """
-    versions = list_versions(changelog_dir)
-    return versions[-1] if versions else None
-
-
 def compare_versions(v1: str, v2: str) -> int:
     """Compare two semantic version strings.
     

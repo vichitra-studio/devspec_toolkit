@@ -23,9 +23,8 @@ from specdev_tools.migration import runner
 from specdev_tools.migration.registry import PHASE_IDS, discover_scripts
 from specdev_tools.migration.report import STATUS_NOOP, STATUS_OK, MigrationReport, ScriptReport
 
-from ._support import MINI_HOST, git, make_host, make_script, make_toolkit, tree_digest
+from ._support import MINI_HOST, VARIANT, git, make_host, make_script, make_toolkit, tree_digest
 
-VARIANT = MINI_HOST / "variants" / "status_ref_1_0_x" / "04_fr_list.json"
 MARK = "extras/migrated-by-p2_mark"
 
 

@@ -38,16 +38,14 @@ from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
-from ..core.registry import SchemaRegistry, get_shared_registry
+from ..core.registry import get_shared_registry
 from ..graph.build import build_file_graph
 from ..graph.gitview import host_root_of
 from ..graph.ids import check_unique_ids
 from ..graph.kinds import KindRegistryError
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
-    step_01,
     step_02,
-    step_02a,
     step_03,
     step_04,
     step_05,
@@ -61,7 +59,6 @@ from .validators import (
     step_13,
     step_14,
     step_15,
-    step_16,
     step_16a,
     step_16c,
     step_16_anchor,
@@ -452,9 +449,7 @@ DeepValidator = Callable[[dict[str, Any], str, dict[str, Any]], list[SpecError]]
 # package, but the explicit dict keeps startup predictable and avoids import
 # side-effects.  See AUDIT-043 for the auto-discovery proposal.
 DEEP_VALIDATORS: dict[str, DeepValidator] = {
-    "01": lambda instance, root, ctx: step_01.validate_step_01(instance, root),
     "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("spec_root"), ctx.get("artifact_path")),
-    "02a": lambda instance, root, ctx: step_02a.validate_step_02a(instance, root),
     "03": lambda instance, root, ctx: step_03.validate_step_03(
         instance,
         root,

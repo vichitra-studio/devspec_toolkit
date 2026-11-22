@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from specdev_tools.core.ambiguity_items import is_open, iter_ambiguity_items
 from specdev_tools.migration import registry, runner
 from specdev_tools.migration.report import STATUS_OK
 from specdev_tools.migration.scripts.v1_2_0 import (
@@ -27,10 +28,8 @@ from specdev_tools.migration.scripts.v1_2_0 import (
     p4_step10_rules,
     p4_third_party,
 )
-from specdev_tools.validation.open_items import delete_resolved_items
 
-from .test_convert_remove import context, items, migrate, read
-from ._support import MINI_HOST, REAL_ROOT, git, make_host, make_toolkit, tree_digest
+from ._support import context, git, items, make_host, make_toolkit, migrate, MINI_HOST, read, REAL_ROOT, tree_digest
 
 P4 = (p4_ambiguities, p4_assumptions, p4_exit_conditions, p4_mixed_jobs, p4_nfr_verifiers, p4_plan_dispositions, p4_plan_security_items, p4_step10_rules, p4_third_party)
 P4_FILES = tuple(Path(module.__file__) for module in P4)
@@ -295,7 +294,7 @@ def test_plan_security_items_open_and_frozen(tmp_path):
 
 def test_resolved_items_deleted_and_count_equals_probe(tmp_path):
     toolkit, host = make_toolkit(tmp_path), make_host(tmp_path)
-    probe = sum(delete_resolved_items(str(host / "spec"), str(REAL_ROOT)).values())
+    probe = sum(not is_open(item) for item in iter_ambiguity_items(str(host / "spec")))
     assert probe == 2
     report = runner.run_migration(host / "spec", toolkit_root=toolkit, git_root=host)
     assert report.status == STATUS_OK

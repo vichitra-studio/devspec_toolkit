@@ -13,7 +13,7 @@ import pytest
 
 from specdev_tools.registry.annotations import LinkDecl, lint_annotations
 
-from .test_m2_graph_declarations import (  # noqa: F401  (decls and reader are pytest fixtures)
+from ._declarations_support import (
     _EXCLUDED_FROM_CONTRACT,
     _GRAPH,
     _OBLIGATION_ROLES,
@@ -28,8 +28,6 @@ from .test_m2_graph_declarations import (  # noqa: F401  (decls and reader are p
     _props,
     _step_of,
     declared_link_kinds,
-    decls,
-    reader,
 )
 
 _M3_STEPS = frozenset({"06", "07", "08", "09", "10", "11", "12", "14", "15", "16"})

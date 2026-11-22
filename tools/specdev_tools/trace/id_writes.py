@@ -44,7 +44,7 @@ from specdev_tools.graph.ids import check_unique_ids, mint_slug, suggest_prefix
 from specdev_tools.graph.kinds import SEED_KIND, KindDecl, load_kind_registry
 from specdev_tools.graph.model import Graph, Link, Node, node_label
 from specdev_tools.graph.queries import require_known_step, unknown_node_error
-from specdev_tools.graph.resolve import resolve_graph
+from specdev_tools.graph.resolve import HISTORY_FIELDS, resolve_graph
 from specdev_tools.trace.computed_fields import COMPUTED_VIEWS
 from specdev_tools.trace.hashing import compute_all
 from specdev_tools.trace.history import containers_of, contract_lines
@@ -520,7 +520,8 @@ def _newly_suspect(base: Graph, candidate: Graph, lock: Lock, new_lock: Lock, se
 def broken_holders(graph: Graph, deleted: Iterable[str]) -> list[BrokenLink]:
     """The links of live nodes of *graph* that point at one of the ids *deleted*, sorted by holder, field and target.
 
-    A holder whose lifecycle is ``not_applicable`` is not live: the resolver does not check it, so it is not reported.
+    A holder whose lifecycle is ``not_applicable`` is not live: the resolver does not check it, so it is not reported.  A history
+    link (``replaces``, ``removes``) is not either: it names a node that is gone by design and the resolver does not check it.
     """
     gone = set(deleted)
     live = {node.id for node in graph.gated_nodes()} - gone
@@ -528,7 +529,7 @@ def broken_holders(graph: Graph, deleted: Iterable[str]) -> list[BrokenLink]:
         BrokenLink(link.source, link.field, link.target)
         for target in gone
         for link in graph.incoming.get(target, ())
-        if link.source in live
+        if link.source in live and link.field not in HISTORY_FIELDS
     }
     return sorted(found, key=lambda link: (link.holder, link.field, link.target))
 

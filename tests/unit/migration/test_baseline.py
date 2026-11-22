@@ -33,8 +33,7 @@ from specdev_tools.trace.suspects import LockHook, check_lock, find_suspects, lo
 from specdev_tools.trace.writing import seed_texts_for_write
 from specdev_tools.validation.migration_mode import not_passed_owners
 
-from .test_convert_remove import context, items
-from ._support import REAL_ROOT, make_host, make_toolkit, tree_digest
+from ._support import context, items, make_host, make_toolkit, REAL_ROOT, tree_digest
 
 EXAMPLE_HOST = REAL_ROOT / "tests" / "fixtures" / "graph_example"
 LOCK_REL = "extras/trace.lock.json"

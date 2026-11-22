@@ -32,6 +32,7 @@ from specdev_tools.core.constants import STAMP_FILE
 from specdev_tools.core.errors import FindingError, SpecError
 from specdev_tools.core.step_paths import get_step_from_path
 from specdev_tools.generation.schema_differ import read_stamp, stamp_specdev_version
+from specdev_tools.graph.gitview import host_root_of
 from specdev_tools.migration.context import CAPTURE_FILE, STATUS_IN_PROGRESS, GitReadError, MigrationContext, read_git
 from specdev_tools.migration.worklist import (
     AUDIENCE_AGENT,
@@ -57,14 +58,9 @@ class TriageError(Exception):
 # ---------------------------------------------------------------------------
 
 
-def git_root_of(spec_dir: str | os.PathLike[str], git_root: str | os.PathLike[str] | None) -> str:
-    """The host's git work tree: *git_root* when given, else the folder that holds *spec_dir* (as ``align apply`` reads it)."""
-    return os.path.abspath(git_root) if git_root is not None else os.path.dirname(os.path.abspath(spec_dir))
-
-
 def _context(spec_dir: str | os.PathLike[str], toolkit_root: str | os.PathLike[str], git_root: str | os.PathLike[str] | None) -> MigrationContext:
     spec = os.path.abspath(spec_dir)
-    git = git_root_of(spec, git_root)
+    git = host_root_of(spec, git_root)
     version = (read_stamp(spec) or {}).get("toolkit_version", "")
     return MigrationContext(spec, git, git, os.path.abspath(toolkit_root), False, DocumentSet(spec), str(version), str(version))
 
@@ -241,7 +237,7 @@ def validate_migration(
     """
     spec = os.path.abspath(spec_dir)
     toolkit = os.path.abspath(toolkit_root)
-    git = git_root_of(spec, git_root)
+    git = host_root_of(spec, git_root)
     report = ValidateReport()
 
     stamp = read_stamp(spec) or {}
@@ -300,7 +296,8 @@ def _finish(spec: str, version: str, stamp: dict, report: ValidateReport, keep_w
     if report.unresolved:
         report.kept = f"{len(present)} file(s) of spec/extras/migration/ kept: {report.unresolved} item(s) are not resolved"
     elif keep_worklist:
-        report.kept = "spec/extras/migration/ kept (--keep-worklist)"
+        if present:
+            report.kept = "spec/extras/migration/ kept (--keep-worklist)"
     else:
         for rel in present:
             os.remove(os.path.join(spec, rel))

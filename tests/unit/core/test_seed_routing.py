@@ -408,7 +408,7 @@ class TestUmbrellaIsolation:
         _, step_ids = resolve_seeds_for_step("00", manifest)
         assert "s-umbrella" not in step_ids
 
-    def test_16_bare_does_not_leak_into_02a(self):
+    def test_16_bare_does_not_leak_into_02a_with_an_extension_seed(self):
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={

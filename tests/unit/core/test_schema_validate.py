@@ -348,14 +348,14 @@ class TestSchemaDecodeError:
         guards that ordering and the typed family's completeness if a future
         SchemaRegistry change makes the path reachable.
         """
-        import specdev_tools.core.schema_validate as _sv_mod
+        from specdev_tools.core.registry import SchemaRegistry
 
         def _raise_unicode(self, uri):  # noqa: ANN001
             raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
 
         # Bootstrap (SchemaRegistry.__init__) still runs on the real toolkit root;
         # only .load is replaced, so we reach Step 3 and hit the decode clause.
-        monkeypatch.setattr(_sv_mod.SchemaRegistry, "load", _raise_unicode)
+        monkeypatch.setattr(SchemaRegistry, "load", _raise_unicode)
         doc = {"$schema": "vc:anything", "id": "step-test"}
 
         with pytest.raises(SchemaDecodeError) as exc_info:

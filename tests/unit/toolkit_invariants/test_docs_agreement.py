@@ -17,7 +17,7 @@ from specdev_tools import cli
 from specdev_tools.core.errors import ERROR_CODES
 from specdev_tools.core.guide import lookup_guide
 
-from ..core.test_error_code_registry import REMOVED_CODES
+from ..core._error_code_support import REMOVED_CODES
 
 ROOT = Path(__file__).resolve().parents[3]
 DOCS = ROOT / "docs"

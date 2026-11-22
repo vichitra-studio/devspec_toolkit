@@ -8,8 +8,7 @@ from pathlib import Path
 from specdev_tools.migration import runner
 from specdev_tools.migration.report import STATUS_OK
 
-from .test_convert_remove import edit, items, migrate, read
-from ._support import git, make_host, make_toolkit
+from ._support import edit, git, items, make_host, make_toolkit, migrate, read
 
 RESERVATIONS = "ms-reservations"
 ANCHOR = "16_impl_context.json"

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any, Literal, get_args
 
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.scope_helpers import as_dict
@@ -37,7 +38,6 @@ Mode = Literal["merge", "close", "release"]
 """When a rule runs: at merge (the step view ``spec-check`` always runs), at milestone close, at release."""
 MODES: tuple[str, ...] = get_args(Mode)
 GRAPH_NOT_BUILT = "graph could not be built (see the `graph` check)"
-SEED_MANIFEST_PATH = "common/seed_manifest.json"
 PIN_UNKNOWN = "UNKNOWN"
 
 
@@ -186,7 +186,7 @@ class GraphCheckContext:
     @cached_property
     def manifest(self) -> Mapping[str, Any]:
         """The seed manifest as the graph read it; empty when the spec has none."""
-        return as_dict(self.graph.documents.get(SEED_MANIFEST_PATH))
+        return as_dict(self.graph.documents.get(SEED_MANIFEST_FILE))
 
     @cached_property
     def seed_texts(self) -> dict[str, str]:

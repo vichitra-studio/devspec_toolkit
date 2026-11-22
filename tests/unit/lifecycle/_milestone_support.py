@@ -12,12 +12,14 @@ from specdev_tools import cli
 from specdev_tools.lifecycle.commands import gate_providers
 from specdev_tools.lifecycle.plan_records import Address, record_action
 from specdev_tools.lifecycle.signoff import sign_off
+from specdev_tools.graph.gitview import read_seed_texts
+from specdev_tools.trace.attest import apply_attest, plan_node_attest
 from specdev_tools.trace.lockfile import Lock, read_lock, write_lock
 from unit.graph._synth import ROOT
 from unit.lifecycle._record_support import ITEM, alpha_binding, plan_host, roots
 from unit.lifecycle._support import ANCHOR, MILESTONE, PLAN
 from unit.proof._support import INVARIANT, OTHER_FIXTURE, REUSED_BINDING, binding_item, run
-from unit.verify._support import commit_all, edit_doc, write
+from unit.verify._support import commit_all, edit_doc, graph_of, write
 
 SECOND_ITEM = "PWRESET_CONFIRM_REUSED_01"
 SECOND_CRITERION = "tc-confirm-reused-token"
@@ -41,6 +43,15 @@ def set_row(host: Path, status: str, **fields: Any) -> None:
     edit_doc(host, ANCHOR, edit)
 
 
+def attest_nodes(host: Path, *nodes: str) -> None:
+    """The lock entries of the links of *nodes*, one after the other, as ``specdev attest <node> --yes`` writes them."""
+    for node in nodes:
+        graph = graph_of(host)
+        held = read_lock(str(host / "spec"))
+        plan = plan_node_attest(graph, held, read_seed_texts(graph, str(host)), node)
+        write_lock(str(host / "spec"), apply_attest(held, plan))
+
+
 def ready_host(tmp_path: Path, *, signed: bool = False, name: str = "host") -> Path:
     """The worked example with both criteria realised, bound, run and proven, the item executed, a verified review and a tracked scaffold file; with *signed* it holds a sign-off record too."""
     bindings = (alpha_binding(), binding_item(REUSED_BINDING, verifier=OTHER_FIXTURE, proves=(INVARIANT,)))
@@ -54,6 +65,7 @@ def ready_host(tmp_path: Path, *, signed: bool = False, name: str = "host") -> P
         document["review"] = dict(REVIEW)
 
     edit_doc(host, PLAN, edit_plan)
+    attest_nodes(host, SECOND_ITEM)
     write(host / SCAFFOLD_FILE, "export {};\n")
     commit_all(host, "ready")
     spec, repo, git = roots(host)

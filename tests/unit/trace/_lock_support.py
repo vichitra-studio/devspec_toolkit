@@ -1,6 +1,7 @@
 """Helpers that build a trace lock from a graph, for tests; ``python -m`` runs ``regenerate_example_lock``."""
 from __future__ import annotations
 
+import shlex
 import shutil
 import sys
 from collections.abc import Iterable, Iterator
@@ -83,3 +84,7 @@ def regenerate_example_lock() -> None:
 if __name__ == "__main__":
     regenerate_example_lock()
     sys.stdout.write("wrote tests/fixtures/graph_example/spec/extras/trace.lock.json\n")
+
+
+DRIVER_COMMAND = f"{shlex.quote(sys.executable)} -m specdev_tools.cli lock merge"
+"""The command a host's git configuration runs to merge the trace lock."""

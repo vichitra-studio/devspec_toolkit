@@ -13,11 +13,10 @@ attestation record satisfies them.  Nothing here writes a file.
 """
 from __future__ import annotations
 
-import json
-import os
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 
+from specdev_tools.core.cli_commands import known_cli_commands
 from specdev_tools.core.errors import FindingError, SpecError, make_error, refusal
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.contract import item_of
@@ -54,7 +53,6 @@ VERIFIER_NO_VALID_EVIDENCE = "E347"
 CLOSE_IGNORED_STAGES = STAGES[STAGES.index(CI_STAGE) + 1:]
 """The stages above ``ci``: the close gate ignores a binding at one of them."""
 COARSE_STEPS = ("00", "01")
-_CLI_COMMANDS_PATH = os.path.join("tools", "cli_commands.json")
 _CAUSE = {
     NONZERO_EXIT: "the commands failed",
     GUARD_NOT_MATCHED: "the output did not match the guard",
@@ -231,9 +229,7 @@ class _Prover:
 
     def _known_commands(self) -> frozenset[str]:
         if self._commands is None:
-            path = os.path.join(resolve_effective_toolkit_root(None), _CLI_COMMANDS_PATH)
-            with open(path, encoding="utf-8") as handle:
-                self._commands = frozenset(entry["path"] for entry in json.load(handle)["commands"])
+            self._commands = known_cli_commands(resolve_effective_toolkit_root(None))
         return self._commands
 
     def _rule(self, node: Node) -> list[_Outcome]:

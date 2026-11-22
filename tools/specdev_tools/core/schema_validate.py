@@ -52,7 +52,7 @@ from typing import Any, NamedTuple
 
 from jsonschema.exceptions import ValidationError, _WrappedReferencingError  # type: ignore[attr-defined]
 
-from .registry import SchemaRegistry, get_schema_validator, get_shared_registry
+from .registry import get_schema_validator, get_shared_registry
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.core.errors import SpecError, link_target
 from specdev_tools.core.schema_validate import jq_path_of
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
@@ -21,7 +22,7 @@ from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.ownership import STEP_PREFIX
 
 from .codes import SEED_LINK_NOT_ROUTED, SEED_NOT_ROUTED, SEED_ROUTE_UNUSED
-from .context import SEED_MANIFEST_PATH, GraphCheckContext, Mode
+from .context import GraphCheckContext, Mode
 from specdev_tools.graph.names import DERIVES_FROM
 from .removal import links_clause
 
@@ -109,7 +110,7 @@ def _unrouted_seeds(ctx: GraphCheckContext, routes: Routes) -> list[SpecError]:
     for seed in sorted((node for node in ctx.graph.by_kind.get(SEED_KIND, ()) if ctx.in_play(node)), key=ctx.graph.shape.order_key):
         if seed.id in routed:
             continue
-        findings.append(ctx.finding(SEED_NOT_ROUTED, seed, _unrouted_message(seed.id, linking.get(seed.id, []), _seed_parts(ctx, seed.id), _remove_links(ctx, seed.id)), file=SEED_MANIFEST_PATH))
+        findings.append(ctx.finding(SEED_NOT_ROUTED, seed, _unrouted_message(seed.id, linking.get(seed.id, []), _seed_parts(ctx, seed.id), _remove_links(ctx, seed.id)), file=SEED_MANIFEST_FILE))
     return findings
 
 
@@ -152,7 +153,7 @@ def _unused_routes(ctx: GraphCheckContext, routes: Routes) -> list[SpecError]:
             if seed in seed_nodes and (seed, step) not in used:
                 findings.append(ctx.finding(
                     SEED_ROUTE_UNUSED, seed_nodes[seed], _unused_message(seed, step, linkable, _remove_links(ctx, seed) if routed_steps[seed] == 1 else None, _seed_parts(ctx, seed, route=True)), owner=f"{STEP_PREFIX}{step}", route=(seed, step),
-                    file=SEED_MANIFEST_PATH, jq_path=jq_path_of((STEP_REQUIREMENTS, step)),
+                    file=SEED_MANIFEST_FILE, jq_path=jq_path_of((STEP_REQUIREMENTS, step)),
                 ))
     return findings
 

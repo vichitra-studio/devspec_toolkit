@@ -12,9 +12,9 @@ import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
 
 from ..core.config import reset_config
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.errors import FindingError, SpecError, make_error
 from ..core.git_base import BaselineChecks, BaselineProvider, BaselineResult, SeedPaths, merge_base_provider
 from ..core.loaders import read_json_object
@@ -29,7 +29,6 @@ from .spec_check import check_findings, run_checks, warn_ignored_promotions
 from .step_gate import StepGateResult, WaitingOn, classify_for_steps, declared_owner, same_id
 from .touched_steps import (
     SEED_EDIT_NOTE,
-    SEED_MANIFEST_FILE,
     TouchedSteps,
     outside_root_note,
     steps_for_paths,

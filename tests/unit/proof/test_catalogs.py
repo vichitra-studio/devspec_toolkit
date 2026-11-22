@@ -12,8 +12,8 @@ import yaml
 
 from specdev_tools.core.errors import ERROR_CODES
 
-from ..core.test_error_code_registry import CODE_LITERAL_RE, ERRORS_MODULE, REGISTERED_WITHOUT_EMITTER, REMOVED_CODES, TOOLS_DIR
-from ..trace.test_catalogs import (
+from ..core._error_code_support import CODE_LITERAL_RE, ERRORS_MODULE, REGISTERED_WITHOUT_EMITTER, REMOVED_CODES, TOOLS_DIR
+from .._catalog_support import (
     _CHANGELOG_MD, _CHANGELOG_YAML, _CLI_COMMANDS, _ERROR_CODES_MD, _REFERENCE_MD, _ROOT, _entry, _md_bullets, _normalised,
 )
 

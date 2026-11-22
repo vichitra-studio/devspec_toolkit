@@ -120,6 +120,13 @@ def test_range_valued_pin_is_e336_before_the_comparison(host: Path, code: Path) 
     assert _codes(findings) == ["E336"] and findings[0].node_id == ARGON
 
 
+@pytest.mark.parametrize("pin", ["^0.41", "latest", "0.x"])
+def test_a_pin_that_is_not_exact_is_e336_with_no_declared_source_too(host: Path, code: Path, pin: str) -> None:
+    edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(pin=pin))
+    findings = check_pins(graph_of(host), HostDeclarations(), code)
+    assert _codes(findings) == ["E336"] and findings[0].node_id == ARGON
+
+
 def test_check_pins_raises_e336_on_a_hand_edited_latest_pin(host: Path, code: Path) -> None:
     edit_doc(host, "02_system_sketch.json", lambda doc: doc["third_parties"][0].update(pin="latest"))
     assert _codes(check_pins(graph_of(host), _declare(tp_argon2=(pointer_source(),)), code)) == ["E336"]

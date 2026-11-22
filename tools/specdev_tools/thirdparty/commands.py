@@ -13,7 +13,7 @@ from typing import Any
 
 from specdev_tools.core.errors import SpecError
 from specdev_tools.core.json_output import format_errors_json
-from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
+from specdev_tools.graph.commands import add_root_flags, print_json, resolve_git_root, roots, run_on_graph, usage_error
 from specdev_tools.graph.model import Graph
 from specdev_tools.thirdparty.check import check_installed, check_pins, write_install_checks
 from specdev_tools.thirdparty.pin import pin_third_party
@@ -42,9 +42,10 @@ PIN_DESCRIPTION = (
 )
 
 CHECK_DESCRIPTION = (
-    "With no flags, compare the pin of every third party that declares pin_sources (spec/common/host_declarations.json) with "
-    "the version each source reads from the working tree: E336 for a pin that is not exact, E337 for a different version, "
-    "E338 for a source that gives none; exit 1 on any finding. With --installed TP=VERSION (repeat for more) and --env, "
+    "With no flags, check the pin of every third party: E336 for a pin that is not exact, whether or not the third party "
+    "declares pin_sources (spec/common/host_declarations.json); for one that does, compare the pin with the version each "
+    "source reads from the working tree: E337 for a different version, E338 for a source that gives none; exit 1 on any "
+    "finding. With --installed TP=VERSION (repeat for more) and --env, "
     "compare what a deploy installed with the pins: a different version is E339 and exit 1, which stops the deploy; when "
     "all match, one install-check evidence record per third party is written to spec/extras/verification/ "
     "(evd-<name>-<env>-install.json, <name> being the third-party id without its tp- prefix; with --tag when given)."
@@ -71,9 +72,7 @@ def add_thirdparty_parsers(sub: Any) -> None:
 
 
 def _pin(args: argparse.Namespace, graph: Graph) -> int:
-    result = pin_third_party(
-        graph, os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args), args.third_party_id, args.version
-    )
+    result = pin_third_party(graph, *roots(args), args.third_party_id, args.version)
     if result is None:
         node_id, value = graph.canonical_id(args.third_party_id), args.version.strip()
         if args.json_output:
@@ -113,7 +112,7 @@ def _check_sources(args: argparse.Namespace, graph: Graph) -> int:
     if args.json_output:
         print_json({"command": "third-party check", "mode": "sources", "checked": checked, "errors": []})
     else:
-        print("every pin matches its declared sources" if checked else "no pin sources are declared; nothing checked")
+        print("every pin matches its declared sources" if checked else "every pin is exact; no pin sources are declared, so no version was compared")
     return 0
 
 
@@ -125,7 +124,7 @@ def _check_deploy(args: argparse.Namespace, graph: Graph, pairs: list[tuple[str,
     findings = check_installed(graph, installed)
     if findings:
         return _report_findings(findings, args.json_output)
-    files = write_install_checks(os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args), installed, args.env, args.tag)
+    files = write_install_checks(*roots(args), installed, args.env, args.tag)
     records = [f"{RECORDS_DIR}/{name}" for name in files]
     if args.json_output:
         print_json({"command": "third-party check", "mode": "installed", "env": args.env, "tag": args.tag, "installed": installed, "records": records, "errors": []})

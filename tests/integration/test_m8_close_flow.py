@@ -177,6 +177,9 @@ def make_ready(host: Path, *, manual_second: bool = False) -> None:
     else:
         run(host, "verify", "bind", SECOND_FIXTURE, "--command", "python3 src/reused_token_test.py", "--guard", "reused token .*passed")
     run(host, "json", "insert", plan, ".plan.spec_alignment.checklist", (FX / "second_plan_item.json").read_text(encoding="utf-8"))
+    if manual_second:
+        run(host, "attest", SECOND_CRITERION, "--yes")  # the criterion accepts the manual fixture it lists
+    run(host, "attest", SECOND_ITEM, "--yes")  # a plan item inserted by the file form has no lock entry until it is attested
     run(host, "plan", "record", f"{ITEM}/a01", "--outcome", "done")
     run(host, "plan", "record", f"{SECOND_ITEM}/a01", "--outcome", "done")
     if manual_second:
@@ -260,6 +263,8 @@ def test_the_life_of_a_milestone_through_the_commands(template: Path, baseline: 
     run(host, "json", "insert", plan, ".plan.spec_alignment.checklist", (FX / "second_plan_item.json").read_text(encoding="utf-8"))
     by_check, by_code = difference(host, baseline)
     assert by_check == {"graph": (1, 0)} and by_code == {"E761": 1}, f"step 4: the second item is a link with no lock entry, nothing else: {by_check} {by_code}"
+    run(host, "attest", SECOND_ITEM, "--yes")
+    assert difference(host, baseline) == ({}, {}), "step 4: attesting the item clears it"
     out = run(host, "verify", "run", "--all", "--stage", "dev")
     assert "2 run, 2 passed, 0 failed" in out, "step 4: both bindings pass"
     assert {path.name for path in (host / VERIFICATION).glob("evd-*")} == {"evd-password-reset-expired-token-dev.json", "evd-password-reset-reused-token-dev.json"}, "step 4: one evidence file per run"
@@ -315,8 +320,8 @@ def test_the_life_of_a_milestone_through_the_commands(template: Path, baseline: 
     checks, _codes = spec_check(host)
     assert checks["frozen-plans"] == (0, 0) and checks["plan-records"] == (0, 0) and checks["prose-ids"] == (0, 0), "step 9: the closed plan is clean"
     by_check, by_code = difference(host, baseline)
-    assert by_check == {"cross-cutting": (-1, 0), "graph": (1, 0)} and by_code == {"E744": -1, "E761": 1}, \
-        f"step 9: the tasks of a closed milestone are not checked for cross-cutting nodes (E744 goes), and the hand-made second item is left over (E761): {by_check} {by_code}"
+    assert by_check == {"cross-cutting": (-1, 0)} and by_code == {"E744": -1}, \
+        f"step 9: the tasks of a closed milestone are not checked for cross-cutting nodes (E744 goes), and nothing else changes: {by_check} {by_code}"
     assert "E752" not in "".join(by_code), "step 9: no E752 on the anchor row"
 
     # 10. what a closed milestone refuses
@@ -523,6 +528,9 @@ def test_step6_removes_criterion_closes_via_its_fixture(ready: Path, tmp_path: P
         criteria[1] = {"criterion_id": SECOND_CRITERION, "text": "The reuse rule is retired.", "removes": ["fr-password-reset-request"], "verified_by": [SECOND_FIXTURE]}
 
     edit_doc(host, "14_roadmap.json", remove)
+    run(host, "attest", SECOND_CRITERION, "--yes")
+    run(host, "attest", SECOND_ITEM, "--yes")
+    run(host, "plan", "record", f"{SECOND_ITEM}/a01", "--outcome", "done")  # attesting the item again made its record stale
     run(host, "milestone", "sign-off", MS)
     out = run(host, "milestone", "close", MS, "--check", want=None)
     assert "the close gate passes" in out, f"a criterion that removes a node is proven by its fixture's run:\n{out}"
@@ -547,6 +555,8 @@ def test_step6_a_manual_fixture_in_the_chain_holds_close_up_until_it_is_attested
     out = refused(host, "E811", "milestone", "close", MS, "--check")
     assert SECOND_FIXTURE in out and "verify attest" in out, f"the changed fixture needs a new attestation:\n{out}"
     run(host, "attest", SECOND_CRITERION, "--yes")  # the criterion that lists the fixture accepts the edit
+    run(host, "attest", SECOND_ITEM, "--yes")  # and the item that realises the criterion accepts that
+    run(host, "plan", "record", f"{SECOND_ITEM}/a01", "--outcome", "done")  # which made its record stale
     run(host, "verify", "attest", SECOND_FIXTURE)
     run(host, "milestone", "sign-off", MS)
     assert "the close gate passes" in run(host, "milestone", "close", MS, "--check")

@@ -22,7 +22,7 @@ from typing import Any
 
 from ..core.errors import FindingError, SpecError, make_error, refusal
 from ..core.json_utils import resolve_effective_toolkit_root
-from ..graph.commands import print_json, resolve_git_root, run_on_graph, usage_error
+from ..graph.commands import print_json, roots, run_on_graph, usage_error
 from ..graph.contract import item_of
 from ..graph.model import Graph, Node
 from ..graph.names import FIXTURE, PLAN_ITEM, RULE
@@ -265,7 +265,7 @@ def run_verify_attest(args: argparse.Namespace) -> int:
     problem = _usage_problem(args.node_ids, args.env)
     if problem is not None:
         return usage_error("verify attest", problem)
-    spec_root, repo_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
+    spec_root, repo_root, git_root = roots(args)
 
     def announce(plan: AttestPlan) -> None:
         if not args.json_output:

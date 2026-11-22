@@ -1,34 +1,25 @@
-"""Tests for the open-item gates and the deletion of resolved items (WI-M6a-06)."""
+"""Tests for the open-item gates."""
 from __future__ import annotations
 
-import json
-import os
 import shutil
 from pathlib import Path
 
 import pytest
 
 from specdev_tools.core.config import reset_config
-from specdev_tools.core.errors import PROMOTABLE_PAIRS, FindingError, SpecError
-from specdev_tools.trace.lockfile import LockError, with_write_lock
-from specdev_tools.validation.open_items import check_open_items, default_frozen, delete_resolved_items
+from specdev_tools.core.errors import PROMOTABLE_PAIRS, SpecError
+from specdev_tools.validation.open_items import check_open_items, default_frozen
 from specdev_tools.validation.check_registry import check_result
-from specdev_tools.validation.validate import validate_file
 
 from .._ambiguity_support import plan_doc, unified_item
 from ..graph._synth import write_json
 
 ROOT = Path(__file__).resolve().parents[3]
-EXAMPLE_SPEC = ROOT / "tests" / "fixtures" / "graph_example" / "spec"
 SIX_AMBIGUITIES = ROOT / "tests" / "fixtures" / "analysis" / "upstream_backlog" / "plan_with_six_ambiguities.json"
 STEP_FILE = "05_interface_contracts.json"
 ANCHOR_FILE = "16_impl_context.json"
 PLAN_A = "impl_context/ms_alpha_plan.json"
 PLAN_B = "impl_context/ms_beta_plan.json"
-
-
-def _legacy(item_id: str, status: str) -> dict:
-    return {"id": item_id, "description": "old question", "severity": "low", "status": status, "impact": ["x"]}
 
 
 def _is_frozen_only(*names: str):
@@ -48,14 +39,6 @@ def spec(tmp_path: Path) -> Path:
     write_json(folder, PLAN_A, plan_doc(emergent=[unified_item("amb-emergent")]))
     write_json(folder, PLAN_B, plan_doc(plan_items=[unified_item("amb-beta")]))
     return folder
-
-
-@pytest.fixture
-def example_copy(tmp_path: Path) -> Path:
-    """A copy of the worked example's spec folder (the graph a write plans from)."""
-    destination = tmp_path / "example_spec"
-    shutil.copytree(EXAMPLE_SPEC, destination)
-    return destination
 
 
 def test_step_gate_item_is_w630_owned_by_its_step(spec: Path) -> None:
@@ -197,93 +180,6 @@ def test_an_unreadable_file_ends_the_list_with_e520(tmp_path: Path) -> None:
     assert _codes(errors) == ["E631", "E520"]
     assert errors[1].message.startswith("cannot read ")
     assert errors[1].file == STEP_FILE
-
-
-def _legacy_items() -> list[dict]:
-    return [_legacy("amb-done-1", "resolved"), _legacy("amb-open", "tracking"), _legacy("amb-done-2", "resolved")]
-
-
-def _example_with_items(spec_dir: Path) -> None:
-    """Resolved legacy items in the anchor and in both arrays of the example plan, plus items that must stay."""
-    anchor = json.loads((spec_dir / ANCHOR_FILE).read_text(encoding="utf-8"))
-    anchor["plan"]["ambiguities"] = _legacy_items()
-    write_json(spec_dir, ANCHOR_FILE, anchor)
-    plan_file = spec_dir / "impl_context" / "ms_account_recovery_plan.json"
-    plan = json.loads(plan_file.read_text(encoding="utf-8"))
-    plan["plan"]["ambiguities"] = [_legacy("amb-plan-done", "resolved"), unified_item("amb-plan-open")]
-    plan["execution"] = {"emergent_ambiguities": [unified_item("amb-keep"), _legacy("amb-emergent-done", "resolved")]}
-    write_json(plan_file.parent, plan_file.name, plan)
-
-
-def _all_ids(spec_dir: Path, relative: str, *keys: str) -> list[str]:
-    doc = json.loads((spec_dir / relative).read_text(encoding="utf-8"))
-    for key in keys:
-        doc = doc[key]
-    return [item["id"] for item in doc]
-
-
-def test_delete_resolved_items_dry_run_counts_and_changes_nothing(example_copy: Path) -> None:
-    _example_with_items(example_copy)
-    before = {path: path.read_bytes() for path in example_copy.rglob("*.json")}
-
-    counts = delete_resolved_items(example_copy, ROOT)
-
-    assert counts == {ANCHOR_FILE: 2, "impl_context/ms_account_recovery_plan.json": 2}
-    assert {path: path.read_bytes() for path in example_copy.rglob("*.json")} == before
-
-
-def test_delete_resolved_items_apply_keeps_unresolved_and_the_plan_validates(example_copy: Path) -> None:
-    plan_file = example_copy / "impl_context" / "ms_account_recovery_plan.json"
-    baseline = [error.code for error in validate_file(str(ROOT), str(plan_file), include_id_slice=False)]
-    _example_with_items(example_copy)
-
-    counts = delete_resolved_items(example_copy, ROOT, apply=True)
-
-    assert counts == {ANCHOR_FILE: 2, "impl_context/ms_account_recovery_plan.json": 2}
-    assert _all_ids(example_copy, ANCHOR_FILE, "plan", "ambiguities") == ["amb-open"]
-    relative = "impl_context/ms_account_recovery_plan.json"
-    assert _all_ids(example_copy, relative, "plan", "ambiguities") == ["amb-plan-open"]
-    assert _all_ids(example_copy, relative, "execution", "emergent_ambiguities") == ["amb-keep"]
-    assert [error.code for error in validate_file(str(ROOT), str(plan_file), include_id_slice=False)] == baseline
-    assert delete_resolved_items(example_copy, ROOT) == {}
-
-
-def test_delete_resolved_items_refuses_beside_an_unreadable_spec_file(example_copy: Path) -> None:
-    _example_with_items(example_copy)
-    (example_copy / "04_fr_list.json").write_text("{not json", encoding="utf-8")
-
-    for apply in (False, True):
-        with pytest.raises(FindingError) as refused:
-            delete_resolved_items(example_copy, ROOT, apply=apply)
-        assert refused.value.error.code == "E520"
-        assert "04_fr_list.json" in refused.value.error.message
-    assert len(_all_ids(example_copy, ANCHOR_FILE, "plan", "ambiguities")) == 3
-
-
-def test_delete_resolved_items_refuses_while_the_write_lock_is_held(example_copy: Path) -> None:
-    _example_with_items(example_copy)
-
-    with with_write_lock(str(example_copy)), pytest.raises(LockError) as refused:
-        delete_resolved_items(example_copy, ROOT, apply=True)
-
-    assert refused.value.error.code == "E769"
-    assert len(_all_ids(example_copy, ANCHOR_FILE, "plan", "ambiguities")) == 3
-
-
-@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores the read-only mode")
-def test_delete_resolved_items_on_a_read_only_folder_ends_in_e520(example_copy: Path) -> None:
-    _example_with_items(example_copy)
-    original_mode = example_copy.stat().st_mode
-    example_copy.chmod(0o555)
-    try:
-        with pytest.raises(FindingError) as refused:
-            delete_resolved_items(example_copy, ROOT, apply=True)
-    finally:
-        example_copy.chmod(original_mode)
-
-    assert refused.value.error.code == "E520"
-    assert refused.value.error.message.startswith(f"cannot write {ANCHOR_FILE}: ")
-    assert len(_all_ids(example_copy, ANCHOR_FILE, "plan", "ambiguities")) == 3
 
 
 def test_an_item_with_no_id_is_named_so_without_a_double_space(tmp_path: Path) -> None:

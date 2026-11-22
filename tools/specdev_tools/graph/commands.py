@@ -70,6 +70,11 @@ def resolve_git_root(args: argparse.Namespace) -> str:
     return host_root_of(args.spec_root, args.git_root)
 
 
+def roots(args: argparse.Namespace) -> tuple[str, str, str]:
+    """The spec folder, the toolkit folder and the host root of the parsed *args*, all absolute."""
+    return os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
+
+
 # --- parsers --------------------------------------------------------------------------------------------------------
 
 NODE_DESCRIPTION = (
@@ -422,8 +427,9 @@ def _recipe_flags_problem(args: argparse.Namespace) -> str | None:
 
 
 def _trace_pack(args: argparse.Namespace, graph: Graph) -> int:
-    git = recipes.GitContext(resolve_git_root(args), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), args.since)
-    pack = recipes.build_pack(graph, recipes.load_recipes(os.path.abspath(args.repo_root)), args.recipe, args.id, expand=args.expand, git=git)
+    spec_root, repo_root, git_root = roots(args)
+    git = recipes.GitContext(git_root, spec_root, repo_root, args.since)
+    pack = recipes.build_pack(graph, recipes.load_recipes(repo_root), args.recipe, args.id, expand=args.expand, git=git)
     if args.json_output:
         print_json(recipes.pack_to_dict(pack))
     else:
@@ -457,9 +463,8 @@ def run_diff(args: argparse.Namespace) -> int:
     """Run ``specdev diff`` on the parsed *args*; returns the exit code."""
 
     def action() -> int:
-        result = diff_refs(
-            args.ref_a, args.ref_b, resolve_git_root(args), os.path.abspath(args.spec_root), os.path.abspath(args.repo_root)
-        )
+        spec_root, repo_root, git_root = roots(args)
+        result = diff_refs(args.ref_a, args.ref_b, git_root, spec_root, repo_root)
         if args.json_output:
             print_json(diff_to_dict(result))
         else:

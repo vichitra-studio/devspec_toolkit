@@ -184,7 +184,7 @@ specdev spec-check $SPEC_DIR --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --g
 specdev stale --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json
 ```
 
-If `spec-check` is green and `stale` lists nothing pending (`"steps": []`): done. If errors surface, fix the lowest-numbered failing entry first, re-validate. One fix per cycle.
+The gate of an edit is the gate of the step it was made in: for each step `<NN>` you edited, `specdev spec-check $SPEC_DIR --step <NN> --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT` must end `RESULT: CLEAR`. The whole-repo run above also lists errors that other steps own; those are not yours to fix here. When every edited step is clear and `stale` lists nothing pending (`"steps": []`): done. If errors of an edited step surface, fix the lowest-numbered failing entry first, re-validate. One fix per cycle.
 
 ## Writing primitives
 

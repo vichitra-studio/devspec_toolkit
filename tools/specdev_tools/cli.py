@@ -1559,9 +1559,10 @@ def main():
                     log_operation(spec_dir, f"Restored from {selected.backup_dir.name}", "success")
                     print(f"\u2705 Restored from {selected.backup_dir.name}")
         elif args.action == "validate":
-            from .migration.triage import git_root_of, validate_migration
+            from .graph.gitview import host_root_of
+            from .migration.triage import validate_migration
 
-            git_root = git_root_of(spec_dir, args.git_root)
+            git_root = host_root_of(spec_dir, args.git_root)
             outcome = validate_migration(
                 spec_dir,
                 repo_root,

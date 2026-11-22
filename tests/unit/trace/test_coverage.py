@@ -26,7 +26,7 @@ from specdev_tools.trace.lockfile import Lock
 
 from ..graph._synth import ROOT, docs_graph, run_cli
 from ._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
-from .test_suspects import Example
+from ._suspects_support import Example
 
 FR, FR_REQUEST = "fr-password-reset", "fr-password-reset-request"
 FR_FILE = "04_fr_list.json"

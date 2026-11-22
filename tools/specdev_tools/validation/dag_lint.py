@@ -20,7 +20,6 @@ from pathlib import Path
 from ..core.errors import SpecError, make_error
 from ..core.registry import derive_allowed_upstream
 from ._extraction_intent_parser import parse_extraction_intent
-from ._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE  # re-exported for tests
 
 
 # Matches prompt filenames like prompt_04_functional_requirements.md -> "04"

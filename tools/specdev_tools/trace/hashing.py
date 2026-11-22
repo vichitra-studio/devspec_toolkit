@@ -169,15 +169,6 @@ def _hasher_for(node_id: str, graph: Graph, seed_texts: Mapping[str, str]) -> _H
     return _Hasher(graph, seed_texts)
 
 
-def own_hash(node_id: str, graph: Graph) -> str:
-    """``own`` of the node *node_id*: its kind and contract view without the folded criteria.
-
-    Raises:
-        KeyError: *node_id* is not a node of *graph*.
-    """
-    return _hasher_for(node_id, graph, {}).own(node_id).own
-
-
 def compute_all(graph: Graph, seed_texts: Mapping[str, str]) -> dict[str, tuple[str, str]]:
     """``{node id: (content, chain)}`` for every node of *graph* whose lifecycle is not ``not_applicable``.
 

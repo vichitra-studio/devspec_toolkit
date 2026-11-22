@@ -53,10 +53,9 @@ import os
 import re
 from typing import Any
 
-from ..core.entry_key_registry import parse_array_path, is_glob_key, iter_nodes, match_glob_key
+from ..core.entry_key_registry import REGISTRY_FILENAME, parse_array_path, is_glob_key, iter_nodes, match_glob_key
 from ..core.errors import SpecError
 
-_REGISTRY_FILENAME = "entry_key_registry.json"
 _SENTINEL_KEYS = frozenset({"canonical_refs_used", "canonical_proposals"})
 
 # R004: pattern that identifies an entry-id field (e.g. fr_id, capability_id, bare id).
@@ -96,7 +95,7 @@ def _load_registry(repo_root: str) -> dict[str, Any]:
 
     Reads from ``<repo_root>/tools/entry_key_registry.json`` (toolkit-side).
     """
-    path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+    path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
     if not os.path.isfile(path):
         return {}
     data = _load_json(path)
@@ -108,7 +107,7 @@ def _load_registry_doc(repo_root: str) -> dict[str, Any]:
 
     Used by R004 to access ``_sentinels`` alongside ``registry``.
     """
-    path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+    path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
     if not os.path.isfile(path):
         return {}
     return _load_json(path)
@@ -497,7 +496,7 @@ def run_registry_check(
     """
     del git_root  # accepted for API symmetry; not used by registry checks
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json
-    registry_path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+    registry_path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
     if not os.path.isfile(registry_path):
         # No registry file — skip all checks silently (toolkit hasn't generated it yet)
         return []

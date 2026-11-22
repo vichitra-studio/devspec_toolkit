@@ -8,6 +8,7 @@ import pytest
 from specdev_tools.lifecycle import executed
 from specdev_tools.lifecycle.executed import item_reading, naming_bindings
 from specdev_tools.lifecycle.plan_records import Address, record_action
+from specdev_tools.proof.proof import PROVEN
 from specdev_tools.trace.lockfile import read_lock
 from unit.lifecycle._record_support import ALPHA, ITEM, STAGED, STAGED_COMMAND, action, alpha_binding, author, plan_host, roots
 from unit.lifecycle._support import PLAN
@@ -46,7 +47,7 @@ def test_truth_table_a_b_c_and_at_deploy(tmp_path: Path) -> None:
     assert _states(host) == {**owed, "a01": executed.RECORDED}
 
     assert [result.passed for result in run(host, [ALPHA])] == [True]
-    assert _states(host) == {"a01": executed.RECORDED, "a02": executed.PROVEN_BY_EVIDENCE, "a03": executed.LATER_STAGE, "a04": executed.AT_DEPLOY}
+    assert _states(host) == {"a01": executed.RECORDED, "a02": PROVEN, "a03": executed.LATER_STAGE, "a04": executed.AT_DEPLOY}
     graph, ctx, lock = graph_of(host), context(host), read_lock(spec)
     assert item_reading(graph, ctx, ITEM, lock).executed
     assert item_reading(graph, ctx, ITEM, lock).owed == ()

@@ -232,9 +232,17 @@ def test_node_status_roundtrip(spec: Path, toolkit: Path) -> None:
     [(_PROBE, _FR), ("ac-probe-1", _FR), ("LOGIN_ITEM_01", "impl_context/ms_login_plan.json")],
     ids=["top-level", "nested", "plan-item"],
 )
-def test_not_applicable_accepted_for_any_node(spec: Path, toolkit: Path, node_id: str, file: str) -> None:
-    change = set_lifecycle(_graph(spec, toolkit), str(spec), str(toolkit), node_id, "not_applicable")
-    assert (change.new, change.file) == ("not_applicable", file)
-    document = json.dumps(load_doc(spec, file))
-    assert '"lifecycle": "not_applicable"' in document
-    assert _graph(spec, toolkit).by_id[node_id].lifecycle == "not_applicable"
+def test_not_applicable_refused_for_a_node_that_is_not_a_historical_step_14_node(spec: Path, toolkit: Path, node_id: str, file: str) -> None:
+    before = {path: path.read_bytes() for path in spec.rglob("*.json")}
+    with pytest.raises(LifecycleRefusedError) as raised:
+        set_lifecycle(_graph(spec, toolkit), str(spec), str(toolkit), node_id, "not_applicable")
+    assert raised.value.error.code == "E705" and "historical step-14 nodes" in raised.value.error.message and "deprecated" in raised.value.error.message
+    assert {path: path.read_bytes() for path in spec.rglob("*.json")} == before
+
+
+def test_a_node_that_is_already_not_applicable_is_not_refused(spec: Path, toolkit: Path) -> None:
+    document = load_doc(spec, _FR)
+    next(item for item in document["functional_requirements"] if item["fr_id"] == _PROBE)["lifecycle"] = NOT_APPLICABLE
+    write_json(spec, _FR, document)
+    change = set_lifecycle(_graph(spec, toolkit), str(spec), str(toolkit), _PROBE, NOT_APPLICABLE)
+    assert change.old == change.new == NOT_APPLICABLE

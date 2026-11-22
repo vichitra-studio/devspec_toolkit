@@ -18,9 +18,10 @@ from ..graph.names import TASK_CRITERION
 from ..graph.trace import trace_node
 from ..trace.history import contained
 from ..trace.lockfile import Lock
-from ..trace.suspects import check_lock
+from ..trace.suspects import check_lock, missing_entry_errors
 
 SUSPECT_CODE = "E763"
+MISSING_ENTRY_CODE = "E761"
 _LINK_SEPARATOR = "->"
 
 
@@ -60,4 +61,17 @@ def suspect_links_on_chain(graph: Graph, lock: Lock, seed_texts: Mapping[str, st
         for error in check_lock(graph, lock, seed_texts)
         if error.code == SUSPECT_CODE and error.node_id is not None and error.target is not None
         and on_chain(chain, graph, error.node_id, error.target.partition(_LINK_SEPARATOR)[2])
+    ]
+
+
+def missing_entry_links_on_chain(graph: Graph, lock: Lock, chain: frozenset[str]) -> list[SpecError]:
+    """The E761 findings (a link with no lock entry) whose holder is on *chain*.
+
+    A link that was never attested is not suspect (nothing was accepted), so ``suspect_links_on_chain`` does not see it.  The
+    holder must be on the chain: a new node elsewhere that points into the chain is that node's own work.
+    """
+    return [
+        error
+        for error in missing_entry_errors(graph, lock)
+        if error.code == MISSING_ENTRY_CODE and error.node_id is not None and graph.canonical_id(error.node_id) in chain
     ]

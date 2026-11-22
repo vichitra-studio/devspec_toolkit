@@ -19,8 +19,8 @@ from specdev_tools.trace.hashing import (
     HASH_PREFIX,
     chain_stamp,
     compute_all,
+    _hasher_for,
     content_hash,
-    own_hash,
     seed_hash,
 )
 
@@ -35,6 +35,11 @@ FR_FILE, CAP_FILE, SCOPE_FILE = "04_fr_list.json", "01_capabilities.json", "00_c
 _LINK = LinkDecl("derives_from", ("*",), False, True, ())
 
 Edit = Callable[[dict[str, Any]], None]
+
+
+def own_hash(node_id: str, graph: Graph) -> str:
+    """``own`` of one node: its kind and contract view without the folded criteria (``KeyError`` for an id the graph lacks)."""
+    return _hasher_for(node_id, graph, {}).own(node_id).own
 
 
 def _base() -> Graph:

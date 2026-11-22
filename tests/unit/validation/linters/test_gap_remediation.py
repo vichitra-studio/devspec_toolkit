@@ -94,10 +94,6 @@ class TestValidatorsPackage:
         mod = importlib.import_module("specdev_tools.validation.validators")
         assert mod is not None
 
-    def test_step_01_importable(self):
-        mod = importlib.import_module("specdev_tools.validation.validators.step_01")
-        assert hasattr(mod, "validate_step_01")
-
 
 # ---------------------------------------------------------------------------
 # 4. Migration runner importability

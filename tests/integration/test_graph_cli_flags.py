@@ -153,8 +153,8 @@ def test_candidates_text_output_lists_the_ids_and_json_is_not_text(spec: Path) -
 # --- node status ------------------------------------------------------------------------------------------------------
 
 def test_status_id_and_value_choose_the_node_and_the_lifecycle(spec: Path) -> None:
-    code, out = run_cli("node", "status", _CRITERION, "not_applicable", *_flags(spec))
-    assert (code, out.strip()) == (0, f"{_CRITERION}: active -> not_applicable (04_fr_list.json)")
+    code, out = run_cli("node", "status", _CRITERION, "deprecated", *_flags(spec))
+    assert (code, out.strip()) == (0, f"{_CRITERION}: active -> deprecated (04_fr_list.json)")
     code, out = run_cli("node", "status", "fr-password-reset-request", "deprecated", *_flags(spec), "--json")
     document = json.loads(out)
     assert code == 0 and (document["node_id"], document["old"], document["new"]) == ("fr-password-reset-request", "active", "deprecated")

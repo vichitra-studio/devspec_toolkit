@@ -10,17 +10,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.core.json_utils import json_delete, json_patch
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.kinds import SEED_KIND, has_lifecycle
-from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, Graph, Node, article
+from specdev_tools.graph.model import DEFAULT_LIFECYCLE, LIFECYCLES, NOT_APPLICABLE, Graph, Node, article
+from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import with_write_lock
 
 LIFECYCLE_KEY = "lifecycle"
+ROADMAP_STEP = "14"
 NOT_APPLICABLE_GUIDANCE = (
-    "not_applicable parks a node that takes no part: a glossary term no node uses (E741), or a closed milestone's "
-    "historical step-14 node whose built target was deleted"
+    "not_applicable is only for a closed milestone's historical step-14 nodes (a task, a task criterion or the milestone) whose "
+    "built target was deleted; to take any other node out of use, set it to deprecated"
 )
 
 
@@ -61,11 +63,14 @@ def plan_lifecycle_change(graph: Graph, node_id: str, value: str) -> LifecycleCh
     """The change that sets the lifecycle of *node_id* to *value*.
 
     Raises ``LifecycleRefusedError`` (E705) for a value outside the lifecycle enum, an unknown or duplicated id, and a
-    node of role ``record`` or kind ``seed``.  Any other node accepts any lifecycle value.
+    node of role ``record`` or kind ``seed``.  ``not_applicable`` is refused (E705) for a node that is not a historical step-14
+    node (see ``NOT_APPLICABLE_GUIDANCE``); a node that already has it is not refused.  Any other node accepts any other value.
     """
     if value not in LIFECYCLES:
         raise _refuse(f"lifecycle {value!r} is not one of {', '.join(LIFECYCLES)}")
     node = _node_to_change(graph, node_id)
+    if value == NOT_APPLICABLE and node.lifecycle != NOT_APPLICABLE and not (node.step == ROADMAP_STEP and node.id in historical_node_ids(graph)):
+        raise _refuse(f"{node.id!r} cannot be set to not_applicable: {NOT_APPLICABLE_GUIDANCE}")
     return LifecycleChange(node.id, node.lifecycle, value, node.file, node.jq_path)
 
 

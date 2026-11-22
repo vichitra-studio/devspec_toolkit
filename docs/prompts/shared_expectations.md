@@ -66,7 +66,8 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 > **Applies to**: Any step whose `step_requirements["NN"]` is non-empty in the host `spec/common/seed_manifest.json`.
 
 - Read `spec/common/seed_manifest.json` first. The manifest is authoritative for both routing (which seeds apply to which step, via `step_requirements["NN"]`) and location (the resolved file path, via `seeds[].path`). Do not assume `docs/seed/` or any specific filename.
-- Ingest all seeds listed under `step_requirements["NN"]` for this step (resolved via `seeds[].path`, in `global_seed_order` order) before any other context. For steps 16a/16b/16c, also include seeds from `step_requirements["16"]` (the trinity umbrella). `global_seed_order` governs read order only; a step with empty or absent `step_requirements[NN]` ingests no seeds — there is no fallback to `global_seed_order`.
+- Ingest all seeds listed under `step_requirements["NN"]` for this step (resolved via `seeds[].path`, in `global_seed_order` order) before any other context. `global_seed_order` governs read order only; a step with empty or absent `step_requirements[NN]` ingests no seeds — there is no fallback to `global_seed_order`.
+- A seed can be routed only to a step whose nodes can link a seed with `derives_from`: step 00, 02 or 02a. A route to any other step, including 16a, 16b, 16c and the key `16`, is reported by `spec-check` as E748. Every later step reads the nodes that those steps distilled from the seed, not the seed itself.
 - If a required seed is missing or stale, stop and request it before proceeding.
 
 ## 8. Self-Audit Gate Protocol

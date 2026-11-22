@@ -11,11 +11,12 @@ from specdev_tools.graph.build import build_graph
 from specdev_tools.trace.label_rename import label_users, rename_label
 from specdev_tools.validation.graph_checks.codes import TERM_NOT_USED_BY_LABEL
 from specdev_tools.validation.graph_checks.context import GraphCheckContext
-from specdev_tools.validation.graph_checks.term_use import check_term_use, label_matches, normalise
+from specdev_tools.validation.graph_checks.term_use import check_term_use, normalise
 from unit.graph._synth import HASH_SEEDS, ROOT, copy_example
 
 from ._example_support import Edit, context_of_spec, edited_example
 from ._order_support import seeded
+from ._term_support import label_matches
 
 GLOSSARY = "03_glossary.json"
 FR_FILE = "04_fr_list.json"

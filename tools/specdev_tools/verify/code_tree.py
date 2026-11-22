@@ -15,13 +15,13 @@ import subprocess
 import tempfile
 from collections.abc import Sequence
 
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.host_declarations import HostDeclarations, HostDeclarationsError, load_host_declarations
 from specdev_tools.core.loaders import read_json_object
 from specdev_tools.core.seed_routing import resolve_seed_paths
 from specdev_tools.graph.gitview import GitViewError, git_reason, relative_inside, resolve_ref, run_git, status_lines
 
-SEED_MANIFEST_FILE = "common/seed_manifest.json"
 """The seed manifest, relative to the spec folder."""
 
 _INDEX_NAME = "index"

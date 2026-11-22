@@ -62,10 +62,10 @@ def _spec_check_json(capsys: pytest.CaptureFixture[str], host: Path, *flags: str
 
 
 def test_new_check_entries_appear_on_the_example(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """The eight entries come after trace-lock, then ``milestone-numbers`` (M6c) and ``removal-rules`` (M7; their counts are not pinned here), then open-items, frozen-plans and plan-records (M8); none skips, and the counts of the eight are the example's (17, 0, 5, 1, 0, 0, 0, 0)."""
+    """The eight entries come after trace-lock and ``third-party-pins`` (step 02's pin check), then ``milestone-numbers`` (M6c) and ``removal-rules`` (M7; their counts are not pinned here), then open-items, frozen-plans and plan-records (M8); none skips, and the counts of the eight are the example's (17, 0, 5, 1, 0, 0, 0, 0)."""
     code, report, _err = _spec_check_json(capsys, git_copy_of_example(tmp_path / "host"))
     names = list(report["checks"])
-    assert names[names.index("trace-lock") + 1 : -3] == [*GRAPH_CHECKS, "milestone-numbers", "removal-rules"] and names[-3:] == ["open-items", "frozen-plans", "plan-records"]
+    assert names[names.index("trace-lock") + 1 : -3] == ["third-party-pins", *GRAPH_CHECKS, "milestone-numbers", "removal-rules"] and names[-3:] == ["open-items", "frozen-plans", "plan-records"]
     assert report["checks"]["milestone-numbers"]["status"] != "SKIP"
     assert {name: report["checks"][name]["status"] for name in GRAPH_CHECKS} == {
         "no-dangling": "FAIL", "term-use": "PASS", "verifier-rules": "FAIL", "cross-cutting": "FAIL",

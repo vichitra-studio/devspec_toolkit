@@ -13,7 +13,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specdev_tools.validation.dag_lint import _INTENT_ENTRY_RE, lint_dag
+from specdev_tools.validation._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE
+from specdev_tools.validation.dag_lint import lint_dag
 from specdev_tools.core.errors import render_errors
 
 

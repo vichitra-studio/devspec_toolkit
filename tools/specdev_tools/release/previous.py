@@ -118,6 +118,34 @@ def check_next_release(git_root: str, spec_root: str, repo_root: str, ref: str =
     previous = previous_release(git_root, ref, pattern)
     if previous is None:
         return NextReleaseResult(None, warnings=(make_error("W937", "this is the first release: no earlier release tag matches the release tag pattern, so there is nothing to verify", owner=RELEASE_OWNER),))
+    return _verified_in_production(git_root, spec_root, repo_root, previous, pattern)
+
+
+def release_at(git_root: str, ref: str, pattern: str) -> PreviousRelease | None:
+    """The release tagged on the commit *ref* names (the newest tag that matches *pattern*), or ``None`` when no matching tag is on it.
+
+    Raises:
+        FindingError: E708 when *ref* does not resolve or git fails.
+    """
+    commit = resolve_ref(ref, git_root)
+    listed = [line.split("\t") for line in git_stdout(git_root, ["tag", "--points-at", commit, "--format=%(refname:strip=2)\t%(creatordate:unix)"]).splitlines()]
+    found = sorted(((-int(stamp or 0), tag) for tag, stamp in (row for row in listed if len(row) == 2 and tag_matches(pattern, row[0]))))
+    return PreviousRelease(found[0][1], commit) if found else None
+
+
+def check_release_at(git_root: str, spec_root: str, repo_root: str, ref: str = "HEAD") -> NextReleaseResult | None:
+    """The verification state of the release tagged on the commit *ref* names, judged as ``check_next_release`` judges the previous release; ``None`` when no release is tagged there.
+
+    Raises:
+        FindingError: as ``check_next_release``.
+    """
+    pattern = release_tag_pattern(declarations_of(spec_root))
+    tagged = release_at(git_root, ref, pattern)
+    return _verified_in_production(git_root, spec_root, repo_root, tagged, pattern) if tagged is not None else None
+
+
+def _verified_in_production(git_root: str, spec_root: str, repo_root: str, previous: PreviousRelease, pattern: str) -> NextReleaseResult:
+    """The outcome for the release *previous*: the checks 2 to 4 of the module text."""
     if predates_1_2_0(git_root, spec_root, previous.commit):
         return NextReleaseResult(previous, warnings=(make_error("W938", f"the previous release {previous.tag} predates the 1.2.0 spec, which declared no production bindings or at-deploy actions, so there is nothing to verify", owner=RELEASE_OWNER),))
     if read_rollback(spec_root, previous.tag) is not None:

@@ -5,9 +5,6 @@ neighbours: (a) against the step schema, (b) by the step's deep validator, (c) b
 written in prose).  Run alone, the examples' illustrative ids raise only isolation findings (W590, E740 ...), which
 are not asserted on.  The anchor prompt and 16a to 16c are M8's: they are checked in the second half of this module
 (every JSON block under their Output Contract heading, then the commands the prompts name run on the worked example).
-
-``KNOWN_FAILING`` lists the checks a prompt fails today, with the bundle of ``preflight/M6c.md`` that rewrites the
-prompt; each such case is ``xfail(strict=True)`` so that the bundle must remove its line when the example is fixed.
 """
 from __future__ import annotations
 
@@ -30,10 +27,8 @@ PROMPTS = ROOT / "prompts"
 EXAMPLE_SPEC = EXAMPLE_HOST / "spec"
 STEPS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15")
 PROSE_ID_CODE = "E752"
-SCHEMA_CHECK, DEEP_CHECK, PROSE_CHECK = "schema", "deep", "prose"
 
-KNOWN_FAILING: dict[tuple[str, str], str] = {}
-"""``(check, step)`` to the reason and the bundle that fixes it; empty when every prompt passes today."""
+PROMPT_IDS = [f"prompt_{step}" for step in STEPS]
 
 
 def _prompt_path(step: str) -> str:
@@ -86,16 +81,6 @@ def _prose_id_findings(tmp_path: Path, step: str, payload: dict[str, Any]) -> li
     return [f for check in report["checks"].values() for f in check.get("findings", []) if f["code"] == PROSE_ID_CODE]
 
 
-def _cases(check: str) -> list[Any]:
-    """One parameter per prompt step, marked ``xfail(strict=True)`` when ``KNOWN_FAILING`` lists it for *check*."""
-    return [
-        pytest.param(step, id=f"prompt_{step}", marks=pytest.mark.xfail(strict=True, reason=KNOWN_FAILING[(check, step)]))
-        if (check, step) in KNOWN_FAILING
-        else pytest.param(step, id=f"prompt_{step}")
-        for step in STEPS
-    ]
-
-
 def test_prompt_set_is_the_seventeen_in_scope_prompts() -> None:
     names = sorted(Path(p).name for p in glob.glob(str(PROMPTS / "prompt_*.md")))
     in_scope = [n for n in names if re.match(r"prompt_(0\d|1[0-5])[a-z]?_", n)]
@@ -104,18 +89,18 @@ def test_prompt_set_is_the_seventeen_in_scope_prompts() -> None:
     assert len(in_scope) == 17
 
 
-@pytest.mark.parametrize("step", _cases(SCHEMA_CHECK))
+@pytest.mark.parametrize("step", STEPS, ids=PROMPT_IDS)
 def test_example_validates_against_step_schema(step: str) -> None:
     assert _schema_findings(step, _example(step)) == []
 
 
-@pytest.mark.parametrize("step", _cases(DEEP_CHECK))
+@pytest.mark.parametrize("step", STEPS, ids=PROMPT_IDS)
 def test_example_deep_validator_reports_no_error(step: str, tmp_path: Path) -> None:
     """Step 00 has no deep validator: its result is the empty list."""
     assert _deep_findings(tmp_path, step, _example(step)) == []
 
 
-@pytest.mark.parametrize("step", _cases(PROSE_CHECK))
+@pytest.mark.parametrize("step", STEPS, ids=PROMPT_IDS)
 def test_example_writes_no_node_id_in_prose(step: str, tmp_path: Path) -> None:
     assert _prose_id_findings(tmp_path, step, _example(step)) == []
 

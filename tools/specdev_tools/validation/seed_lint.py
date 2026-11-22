@@ -256,7 +256,7 @@ def _check_step00_out_of_scope_thin(
         errors.append(make_error(
             "W555",
             f"STEP00_SEED_OUT_OF_SCOPE_THIN seeds routed to step 00 supply"
-            f" {total_substantive} substantive out_of_scope item(s);"
+            f" {total_substantive} out-of-scope or non-goal bullet(s);"
             " at least 3 are expected",
         ))
 

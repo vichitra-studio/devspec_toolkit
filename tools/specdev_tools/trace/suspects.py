@@ -246,6 +246,11 @@ def _missing_entry_error(holder: Node, link: Link) -> SpecError:
     return _node_error("E761", holder, message, step_owner(holder), link=(link.field, link.target))
 
 
+def missing_entry_errors(graph: Graph, lock: Lock) -> list[SpecError]:
+    """E761 for every link of *graph* that has no entry in *lock*, owned by the holder's step (the ones the ``graph`` check reports)."""
+    return [_missing_entry_error(item.holder, item.link) for item in missing_entries(graph, lock)]
+
+
 def _deprecated_target_warning(holder: Node, link: Link, target: Node) -> SpecError:
     """W720: *link* of *holder* is new (no lock entry) and names the deprecated node *target*; owned by the holder's step."""
     message = (

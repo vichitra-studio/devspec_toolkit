@@ -64,8 +64,6 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
     ("policy", "policy_ref", "policy"),
     ("pattern", "id_pattern_ref", "id_pattern"),
     ("area_of_concern", "governance_label_ref", "governance_label"),
-    ("name", "tech_stack_ref", "tech_stack"),
-    ("id", "dependency_ref", "dependency"),
     ("category", "risk_category_ref", "risk_category"),
     ("risk_category", "risk_category_ref", "risk_category"),
     ("tag", "tag_ref", "tag"),
@@ -97,6 +95,8 @@ def resolve_extras_path(spec_dir: str, filename: str) -> str:
 # Used by the step gate's base ref (core/git_base.py) and the graph's default base ref (graph/gitview.py).
 STAMP_FILE = "specdev_version"
 """The name of the file that stamps a spec folder with the toolkit version it was built with."""
+STATUS_IN_PROGRESS = "in_progress"
+"""The ``migration_status`` the stamp holds between the runner's install and the close of the triage."""
 
 DEFAULT_BRANCH_CANDIDATES: tuple[str, ...] = ("origin/main", "origin/master", "main", "master")
 
@@ -113,3 +113,6 @@ REMOVED_COMMANDS: dict[str, str] = {
     "traceability-check": "use `specdev spec-check` for the role-rule findings (E740 to E745) and broken links",
     "matrix": "use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage",
 }
+
+SEED_MANIFEST_FILE = "common/seed_manifest.json"
+"""The seed manifest, relative to the spec folder (always ``/``-separated)."""

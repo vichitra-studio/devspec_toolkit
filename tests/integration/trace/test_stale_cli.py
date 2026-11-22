@@ -16,10 +16,9 @@ from specdev_tools.trace.lockfile import Lock, lock_path, read_lock, write_lock
 from specdev_tools.trace.merge_driver import install_driver
 
 from unit.graph._synth import ROOT, git, run_cli
-from unit.trace._lock_support import EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
-from unit.trace.test_suspects import CRITERION, Example
+from unit.trace._lock_support import DRIVER_COMMAND, EXAMPLE_HOST, gap_providers  # noqa: F401  (a fixture)
+from unit.trace._suspects_support import CRITERION, Example
 
-from .test_merge_driver_git import DRIVER_COMMAND
 
 FR_FILE = "04_fr_list.json"
 RENAMED = "ac-password-reset-3b"

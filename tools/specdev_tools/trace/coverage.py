@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from specdev_tools.graph import names
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Link, Node
 from specdev_tools.trace.gaps import coverage_gaps
 from specdev_tools.trace.hashing import compute_all
@@ -22,14 +23,6 @@ from specdev_tools.trace.history import historical_node_ids
 from specdev_tools.trace.lockfile import Lock
 from specdev_tools.trace.suspects import EntryIndex, find_suspects
 
-KIND_FR = "fr"
-KIND_CRITERION = "criterion"
-KIND_API = "api"
-KIND_FIXTURE = "fixture"
-KIND_CAPABILITY = "capability"
-FIELD_DERIVES_FROM = "derives_from"
-FIELD_VERIFIES = "verifies"
-FIELD_REFINES = "refines"
 REFINING_STEP = "14"
 PARKED_SCOPES = ("later", "out")
 REFINED_CURRENT, REFINED_STALE, REFINED_NONE = "current", "stale", "none"
@@ -168,7 +161,7 @@ def _group_by_kind(rows: list[LinkRow]) -> tuple[tuple[str, tuple[LinkRow, ...]]
 
 def refined_state(rows: list[LinkRow], graph: Graph) -> str:
     """``current`` when a step-14 node ``refines`` with a current link, ``stale`` when refinements exist and none is, else ``none``."""
-    refinements = [row for row in rows if row.field == FIELD_REFINES and graph.by_id[row.node].step == REFINING_STEP]
+    refinements = [row for row in rows if row.field == names.REFINES and graph.by_id[row.node].step == REFINING_STEP]
     if not refinements:
         return REFINED_NONE
     return REFINED_CURRENT if any(row.current for row in refinements) else REFINED_STALE
@@ -176,7 +169,7 @@ def refined_state(rows: list[LinkRow], graph: Graph) -> str:
 
 def _criteria_of(graph: Graph, fr: Node) -> list[Node]:
     children = (graph.by_id[child] for child in graph.children.get(fr.id, ()) if child in graph.by_id)
-    return sorted((child for child in children if child.kind == KIND_CRITERION), key=graph.shape.order_key)
+    return sorted((child for child in children if child.kind == names.CRITERION), key=graph.shape.order_key)
 
 
 def _in_scope(graph: Graph, kind: str) -> tuple[list[Node], list[Exempt]]:
@@ -210,11 +203,11 @@ def link_counts(graph: Graph) -> tuple[tuple[str, Dimension], ...]:
     FR with an API: an API ``derives_from`` it.  FR with a fixture: a fixture ``verifies`` one of its criteria.
     Capability with an FR: an FR ``derives_from`` it.  Direct links only; ``not_applicable`` holders do not count.
     """
-    frs, _ = _in_scope(graph, KIND_FR)
-    capabilities, _ = _in_scope(graph, KIND_CAPABILITY)
-    with_api = {fr.id: _linked_by(graph, fr, KIND_API, FIELD_DERIVES_FROM) for fr in frs}
-    with_fixture = {fr.id: any(_linked_by(graph, criterion, KIND_FIXTURE, FIELD_VERIFIES) for criterion in _criteria_of(graph, fr)) for fr in frs}
-    with_fr = {cap.id: _linked_by(graph, cap, KIND_FR, FIELD_DERIVES_FROM) for cap in capabilities}
+    frs, _ = _in_scope(graph, names.FR)
+    capabilities, _ = _in_scope(graph, names.CAPABILITY)
+    with_api = {fr.id: _linked_by(graph, fr, names.API, names.DERIVES_FROM) for fr in frs}
+    with_fixture = {fr.id: any(_linked_by(graph, criterion, names.FIXTURE, names.VERIFIES) for criterion in _criteria_of(graph, fr)) for fr in frs}
+    with_fr = {cap.id: _linked_by(graph, cap, names.FR, names.DERIVES_FROM) for cap in capabilities}
     return (
         ("fr_api_coverage", _dimension(frs, with_api)),
         ("fr_fixture_coverage", _dimension(frs, with_fixture)),
@@ -224,7 +217,7 @@ def link_counts(graph: Graph) -> tuple[tuple[str, Dimension], ...]:
 
 def _counted_criteria(graph: Graph) -> list[Node]:
     """The criteria that count: neither they nor the FR that holds them are exempt."""
-    frs, _ = _in_scope(graph, KIND_FR)
+    frs, _ = _in_scope(graph, names.FR)
     return sorted(
         (criterion for fr in frs for criterion in _criteria_of(graph, fr) if exemption(criterion) is None),
         key=graph.shape.order_key,
@@ -241,9 +234,9 @@ def criteria_refined(graph: Graph, index: ReverseIndex) -> Dimension:
 def exempt_nodes(graph: Graph) -> list[Exempt]:
     """Every exempt FR, capability and criterion (a criterion of an exempt FR is exempt with its FR's reason)."""
     found: list[Exempt] = []
-    for kind in (KIND_FR, KIND_CAPABILITY):
+    for kind in (names.FR, names.CAPABILITY):
         found += _in_scope(graph, kind)[1]
-    for fr in graph.by_kind.get(KIND_FR, []):
+    for fr in graph.by_kind.get(names.FR, []):
         fr_reason = exemption(fr)
         for criterion in _criteria_of(graph, fr):
             reason = fr_reason or exemption(criterion)
@@ -278,11 +271,11 @@ def build_fr_matrix(graph: Graph, lock: Lock, seed_texts: Mapping[str, str]) -> 
     that link the criterion and its ``refined`` state.  Each link carries ``current``, ``suspect`` and ``historical``.
     """
     index = ReverseIndex(graph, lock, seed_texts)
-    frs, _ = _in_scope(graph, KIND_FR)
+    frs, _ = _in_scope(graph, names.FR)
     rows = []
     for fr in frs:
         criteria = tuple(_criterion_row(graph, index, criterion) for criterion in _criteria_of(graph, fr) if exemption(criterion) is None)
-        links = [*index.outgoing(fr.id, KIND_CAPABILITY), *index.incoming(fr.id)]
+        links = [*index.outgoing(fr.id, names.CAPABILITY), *index.incoming(fr.id)]
         rows.append(FrRow(fr.id, fr.label, _group_by_kind(links), criteria))
     return tuple(rows)
 

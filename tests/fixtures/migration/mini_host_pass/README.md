@@ -17,5 +17,6 @@ wrong baseline links (a capability that derived from the checkout-time metric) w
 only a command name became one sentence; an open item got its answer written into the spec text and was then deleted; an
 item the old data could not answer got a reason or a deferral (`disposition: deferred`, `scope_reason`), never a blanket
 `not_applicable`; frozen plans are not touched (their items are closed with a note only).
+The milestones' `schedules` are written by the migration from their typed deliverables (no item is raised), so step 09 of the pass adds only the one risk no node used, with one `json insert`.
 
 To change an answer, edit `pass.json`; run the test; `specdev spec-check --step NN` says which step an answer broke.

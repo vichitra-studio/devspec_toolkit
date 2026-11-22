@@ -155,7 +155,10 @@ def test_plain_spec_check_summary_matches_golden(tmp_path: Path, capsys: pytest.
     host = git_copy_of_example(tmp_path / "host")
     spec = str(host / "spec")
     run_plain_spec_check(str(ROOT), spec, git_root=str(host), spec_root=spec, project_canon_dir=f"{spec}/canon")
-    assert capsys.readouterr().err == GOLDEN.read_text(encoding="utf-8")
+    assert capsys.readouterr().err == GOLDEN.read_text(encoding="utf-8"), (
+        "the plain spec-check summary changed; if the change is meant, regenerate the golden file with "
+        "`python scripts/regen_spec_check_summary_golden.py` (repository root, venv active) and review the diff"
+    )
 
 
 def test_baseline_run_prints_no_seed_note(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -404,3 +407,18 @@ def test_a_seed_edit_prints_the_dependants_note(tmp_path: Path, monkeypatch: pyt
     monkeypatch.chdir(host)
     code, out = run_spec_check(host, "--paths", "docs/seed/seed_accounts.md")
     assert code == 0 and SEED_EDIT_NOTE in out
+
+
+def test_a_step_10_rule_naming_an_unknown_command_blocks_step_10_with_that_cause(tmp_path: Path) -> None:
+    """A ``cli_command`` that is not on the command list is E530 at the step-10 gate, not a missing verifier at the close."""
+    host = git_copy_of_example(tmp_path / "host")
+    path = host / "spec" / "10_governance.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    [rule] = [rule for rule in doc["rules"] if rule["rule_id"] == "rule-spec-check-on-every-pr"]
+    rule["cli_command"] = "nonexistent-cmd"
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    code, out = run_spec_check(host, "--step", "10", "--detail", "all")
+    assert code == 1 and re.search(r"E530\s+\[10 own\]", out) and "'nonexistent-cmd' of rule 'rule-spec-check-on-every-pr'" in out, out
+    rule["cli_command"] = "spec-check"
+    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    assert "E530" not in run_spec_check(host, "--step", "10", "--detail", "all")[1]

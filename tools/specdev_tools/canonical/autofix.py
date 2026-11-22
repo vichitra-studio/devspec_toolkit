@@ -125,11 +125,6 @@ def _try_infer_ref(
         explicit_env = obj.get("environment")
         if isinstance(explicit_env, str):
             return
-    # Restrict dependency inference from generic "id" to dependency-item shapes.
-    if source_field == "id" and target_ref_field == "dependency_ref":
-        dep_type = obj.get("type")
-        if dep_type not in {"milestone", "external"}:
-            return
     if target_ref_field in obj and isinstance(obj[target_ref_field], dict):
         return
     resolved = registry.resolve_alias(kind, value)

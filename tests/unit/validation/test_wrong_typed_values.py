@@ -152,7 +152,8 @@ def _call(step: str, document: dict[str, Any], artifact_path: str, spec_root: Pa
         context = _build_validation_context(str(_ROOT), artifact_path, spec_root=str(spec_root))
     else:
         context = {"artifact_path": artifact_path, "spec_root": str(spec_root)}
-    return DEEP_VALIDATORS[step](document, str(_ROOT), context)
+    validator = DEEP_VALIDATORS.get(step)  # steps 01 and 02a have no deep validator: the graph checks own their content
+    return validator(document, str(_ROOT), context) if validator else []
 
 
 def _raise_of(label: str, call: Any) -> list[str]:

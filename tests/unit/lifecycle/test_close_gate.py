@@ -20,6 +20,7 @@ from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.scaffold import ScaffoldScan, scaffold_scan
 from specdev_tools.validation.open_items import check_open_items
 from unit.graph._synth import ROOT
+from unit.lifecycle._milestone_support import attest_nodes
 from unit.lifecycle._record_support import ITEM, action, alpha_binding, author, closed_row, plan_host, roots
 from unit.lifecycle._support import MILESTONE, PLAN, closed_record
 from unit.proof._closed import add_milestone, criterion
@@ -65,6 +66,7 @@ def ready(tmp_path: Path, *extra_actions: dict[str, Any], alpha: dict[str, Any] 
         document["review"] = dict(REVIEW)
 
     edit_doc(host, PLAN, edit_plan)
+    attest_nodes(host, SECOND_ITEM)
     if tracked:
         write(host / SCAFFOLD_FILE, "export {};\n")
     _signoff(host)
@@ -190,6 +192,26 @@ def test_suspect_on_the_chain_blocks_close(tmp_path: Path) -> None:
     assert "suspect link" in report.errors[0].message
 
 
+def test_a_link_with_no_lock_entry_on_the_chain_blocks_close(tmp_path: Path) -> None:
+    """A plan item added by a file edit and never attested has no entry; after the close its link is historical and can no longer be attested."""
+    host = ready(tmp_path)
+    lock = read_lock(str(host / "spec"))
+    kept = tuple(entry for entry in lock.entries if (entry.source, entry.field) != (SECOND_ITEM, "realises"))
+    assert len(kept) == len(lock.entries) - 1
+    write_lock(str(host / "spec"), Lock(kept))
+    report = gate(host)
+    assert [(error.code, error.node_id, error.owner) for error in report.errors] == [("E761", SECOND_ITEM, "close-gate")]
+    assert "no entry for this link" in report.errors[0].message and f"specdev attest {SECOND_ITEM}" in report.errors[0].message
+
+
+def test_a_link_with_no_lock_entry_off_the_chain_does_not_block_close(tmp_path: Path) -> None:
+    host = ready(tmp_path)
+    lock = read_lock(str(host / "spec"))
+    kept = tuple(entry for entry in lock.entries if (entry.source, entry.target) != ("nfr-latency-reset-email", "tp-mailrelay"))
+    write_lock(str(host / "spec"), Lock(kept))
+    assert gate(host).passed
+
+
 def test_a_suspect_off_the_chain_does_not_block_close(tmp_path: Path) -> None:
     host = ready(tmp_path)
     change_stamp(host, "nfr-latency-reset-email", "tp-mailrelay")
@@ -254,6 +276,7 @@ def test_an_item_that_realises_a_paused_and_a_live_criterion_is_still_held_to_ex
     spec, repo, git = roots(host)
     record_action(spec, repo, git, Address(ITEM, "a01"), "failed")
     edit_doc(host, PLAN, lambda document: document["plan"]["spec_alignment"]["checklist"][0]["realises"].append(SECOND_CRITERION))
+    attest_nodes(host, ITEM)
     assert codes(gate(host)) == ["E812"]
 
 
@@ -278,6 +301,7 @@ def test_at_deploy_action_does_not_block(tmp_path: Path) -> None:
 def test_removes_criterion_is_proven_by_its_fixture(tmp_path: Path) -> None:
     host = ready(tmp_path)
     edit_roadmap(host, lambda task: task["acceptance_criteria"].__setitem__(1, {"criterion_id": SECOND_CRITERION, "text": "The reuse rule is retired.", "removes": ["fr-password-reset-request"], "verified_by": [OTHER_FIXTURE]}))
+    attest_nodes(host, SECOND_CRITERION, SECOND_ITEM)
     assert gate(host).passed
 
 
@@ -285,6 +309,7 @@ def test_unattested_manual_fixture_fails_e811(tmp_path: Path) -> None:
     host = ready(tmp_path)
     add_fixture(host, fixture_id="fix-reuse-manual", verifies=[INVARIANT], mode="manual", manual_reason="A person redeems a token twice.")
     edit_roadmap(host, lambda task: task["acceptance_criteria"][1].update(verified_by=["fix-reuse-manual"]))
+    attest_nodes(host, "fix-reuse-manual", SECOND_CRITERION, SECOND_ITEM)
     report = gate(host)
     assert [(error.code, error.node_id) for error in report.errors] == [("E811", SECOND_CRITERION)]
     attest(host, "fix-reuse-manual")
@@ -313,6 +338,7 @@ def test_a_node_whose_stage_cannot_be_told_is_one_finding_and_the_others_are_sti
     edit_doc(host, "02a_delivery_baseline.json", lambda doc: doc["environments"].update(qa={"scope": "in"}))
     edit_doc(host, "12_ci_gates.json", lambda doc: doc["jobs"].append({"job_id": "job-qa-smoke", "name": "QA smoke", "realises": ["qa"]}))
     edit_roadmap(host, lambda task: task["acceptance_criteria"][1].update(refines=[INVARIANT, "qa"]))
+    attest_nodes(host, "job-qa-smoke", SECOND_CRITERION, SECOND_ITEM)
     edit_code(host)
     report = gate(host)
     assert [(error.code, error.node_id) for error in report.errors] == [("E811", "tc-confirm-expired-token"), ("E334", SECOND_CRITERION)]

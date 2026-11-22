@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from specdev_tools.core.constants import STATUS_IN_PROGRESS  # noqa: F401  (the stamp's status; also imported from here by the runner, the triage and update)
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
 
 from specdev_tools.graph.kinds import KindRegistry, load_kind_registry
@@ -22,8 +23,6 @@ CAPTURE_FILE = os.path.join("extras", "migration", "capture.json")
 """The capture file, relative to the spec folder, in the platform's own separators."""
 CAPTURE_REL = CAPTURE_FILE.replace(os.sep, "/")
 """The same path with ``/``, the form a spec file's ``rel`` and a worklist item use."""
-STATUS_IN_PROGRESS = "in_progress"
-"""The ``migration_status`` the stamp holds between the runner's install and the close of the triage."""
 
 # The git subcommands the migration may call: all of them only read.
 READ_ONLY_GIT = frozenset({"rev-parse", "status", "merge-base", "ls-files", "log", "show", "cat-file", "diff"})

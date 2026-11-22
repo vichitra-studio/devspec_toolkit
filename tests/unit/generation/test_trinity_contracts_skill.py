@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from specdev_tools.core.errors import ERROR_CODES
-from unit.generation.test_trinity_contracts_agents import _flags, _item_with_findings
+from unit.generation._contracts_support import _flags, _item_with_findings
 from unit.graph._synth import run_cli
 from unit.trace._lock_support import git_copy_of_example, run_on_example
 

@@ -14,9 +14,9 @@ from specdev_tools.trace.lockfile import CONFLICT_MARKER, Lock, LockEntry, LockE
 from specdev_tools.trace.merge_driver import install_driver
 
 from unit.graph._synth import GIT_IDENTITY, ROOT, git
+from unit.trace._lock_support import DRIVER_COMMAND
 
 LOCK_REL = "spec/extras/trace.lock.json"
-DRIVER_COMMAND = f"{shlex.quote(sys.executable)} -m specdev_tools.cli lock merge"
 GIT_ENV = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
 
 

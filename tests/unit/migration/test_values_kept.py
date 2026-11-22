@@ -10,7 +10,8 @@ import json
 
 from specdev_tools.migration.minting import mint_id
 
-from .test_convert_remove import items, migrate, read
+from ._support import items, migrate, read, specdev
+
 
 JAPANESE = "日本語のリスク"
 ARABIC = "؟؟؟"
@@ -145,8 +146,6 @@ def test_a_renamed_duplicate_open_item_is_recorded_in_the_capture(tmp_path):
 
 
 def test_the_note_of_a_converted_trace_entry_is_read_with_triage_legacy(tmp_path):
-    from .test_align_triage_validate import specdev
-
     host, toolkit, _report = migrate(tmp_path)
     note = "A checkout of a tool on loan is refused"
     assert note not in "".join(p.read_text(encoding="utf-8") for p in (host / "spec").rglob("*.json") if p.name != "capture.json")

@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.graph.kinds import RECORD_ROLE
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
 from specdev_tools.graph.queries import nearest_suffix

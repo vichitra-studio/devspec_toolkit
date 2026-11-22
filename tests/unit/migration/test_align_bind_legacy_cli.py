@@ -15,8 +15,7 @@ import pytest
 from specdev_tools.migration.worklist import WORKLIST_FILE
 
 from ._bindings_support import align, fresh, records, run_line, specdev
-from .test_convert_remove import migrate
-from ._support import REAL_ROOT, make_host, tree_digest
+from ._support import make_host, migrate, REAL_ROOT, tree_digest
 
 FEE = "fix-late-fee-two-days"
 GROUP_ITEM = "wl-08-legacy-binding-npx-jest-tests-fee-spec-ts"

@@ -35,8 +35,8 @@ from specdev_tools.graph.recipes import (
 
 from ._synth import EXAMPLE_SPEC, ROOT
 from ._synth import git as _git
+from ._builders import _raw, _section, _set, _core_16b
 
-TABLE_PATH = ROOT / "tools" / "graph_recipes.json"
 START_16B = "PWRESET_CONFIRM_EXPIRED_01"
 START_16A = "task-implement-password-reset-confirm"
 START_16C = "ms-account-recovery"
@@ -519,24 +519,16 @@ def test_pack_size_w_scale(example: Graph, table: RecipeTable) -> None:
 
 # --- the table and the documents never raise ------------------------------------------------------------------------
 
-def _raw() -> dict[str, Any]:
-    return json.loads(TABLE_PATH.read_text(encoding="utf-8"))
 
 
-def _section(raw: dict[str, Any], name: str, role: str) -> dict[str, Any]:
-    return next(section for section in raw["sections"] if section["name"] == name and role in section["roles"])
 
 
-def _set(path: Callable[[dict[str, Any]], dict[str, Any]], key: str, value: Any) -> Callable[[dict[str, Any]], None]:
-    return lambda raw: path(raw).__setitem__(key, value)
 
 
 def _drop(path: Callable[[dict[str, Any]], dict[str, Any]], key: str) -> Callable[[dict[str, Any]], None]:
     return lambda raw: path(raw).pop(key)
 
 
-def _core_16b(raw: dict[str, Any]) -> dict[str, Any]:
-    return _section(raw, "core criteria", "16b")
 
 
 def _hop(index: int) -> Callable[[dict[str, Any]], dict[str, Any]]:

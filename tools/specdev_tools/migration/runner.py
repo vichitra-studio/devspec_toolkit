@@ -28,7 +28,7 @@ from specdev_tools.core.changelog_parser import (
     get_toolkit_version,
     list_versions,
 )
-from specdev_tools.core.constants import STAMP_FILE
+from specdev_tools.core.constants import SEED_MANIFEST_FILE, STAMP_FILE
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.core.plan_files import plan_files
 from specdev_tools.core.step_paths import PLAN_DIR_NAME
@@ -61,7 +61,6 @@ from specdev_tools.migration.report import (
 from specdev_tools.migration.writer import DocumentSet, diff_trees
 
 MIN_SOURCE_VERSION = "1.0.0"
-SEED_MANIFEST = os.path.join("common", "seed_manifest.json")
 ANY_FILE = "*"
 
 
@@ -239,7 +238,7 @@ def _preflight(spec_dir: str, git_root: str, toolkit_root: str, dry_run: bool, a
 def _seed_paths(spec_dir: str) -> list[str]:
     """The seed document paths (relative to the host root) of the seed manifest, when it lists any."""
     try:
-        with open(os.path.join(spec_dir, SEED_MANIFEST), encoding="utf-8") as handle:
+        with open(os.path.join(spec_dir, SEED_MANIFEST_FILE), encoding="utf-8") as handle:
             manifest = json.load(handle)
     except (OSError, ValueError):
         return []

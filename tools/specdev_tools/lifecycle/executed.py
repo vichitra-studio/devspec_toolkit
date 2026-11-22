@@ -44,13 +44,12 @@ DONE = "done"
 
 AT_DEPLOY = "at-deploy"
 LATER_STAGE = "later-stage"
-PROVEN_BY_EVIDENCE = "proven"
 NEEDS_EVIDENCE = "needs-evidence"
 RECORDED = "recorded"
 NO_RECORD = "no-record"
 STALE = "stale"
 NOT_DONE = "not-done"
-SATISFIED = frozenset({AT_DEPLOY, LATER_STAGE, PROVEN_BY_EVIDENCE, RECORDED})
+SATISFIED = frozenset({AT_DEPLOY, LATER_STAGE, PROVEN, RECORDED})
 """The states of an action that hold the item up: every other state is something the item still owes."""
 
 
@@ -185,8 +184,12 @@ def naming_bindings(graph: Graph, item: Node, action: Mapping[str, Any]) -> list
 
 
 def realises_hash(lock: Lock, item_id: str) -> str:
-    """``sha256:<hex>`` of the sorted ``(target, content hash)`` pairs of the lock entries whose source is the plan item *item_id* and whose field is ``realises``."""
-    pairs = sorted([entry.target, entry.content_hash] for entry in lock.entries if entry.source == item_id and entry.field == REALISES)
+    """``sha256:<hex>`` of the sorted ``(target, content hash, chain stamp)`` triples of the lock entries whose source is the plan item *item_id* and whose field is ``realises``.
+
+    The chain stamp is part of it so that attesting the item again after something above changed makes its records stale, even when
+    the text of the criterion it realises is the same.
+    """
+    pairs = sorted([entry.target, entry.content_hash, entry.chain_stamp] for entry in lock.entries if entry.source == item_id and entry.field == REALISES)
     return HASH_PREFIX + hashlib.sha256(json.dumps(pairs, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
@@ -251,7 +254,7 @@ def _verifier_state(named: NamedBinding, graph: Graph, ctx: ProofContext) -> Act
         return ActionReading(None, LATER_STAGE, f"binding {named.binding} is at stage {named.stage}: proof owed at that stage, held by the release gate")
     status = verifier_proof(graph, ctx, named.verifier, CLOSE_CAP, treat_ci_as_dev=True).status
     if status == PROVEN:
-        return ActionReading(None, PROVEN_BY_EVIDENCE, f"binding {named.binding} has valid passing evidence")
+        return ActionReading(None, PROVEN, f"binding {named.binding} has valid passing evidence")
     return ActionReading(None, NEEDS_EVIDENCE, f"binding {named.binding} has no valid passing evidence ({status}): run `specdev verify run {named.binding}`")
 
 

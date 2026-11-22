@@ -298,6 +298,8 @@ class TestW555Step00OutOfScopeThin(unittest.TestCase):
                 repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=tmpdir
             )
             w555 = _w555_errors(errors)
+            self.assertIn("supply 1 out-of-scope or non-goal bullet(s)", w555[0])
+            self.assertNotIn("out_of_scope", w555[0])
             self.assertTrue(
                 len(w555) == 1,
                 f"Expected exactly 1 W555 for 1 substantive item. Got: {w555}\n"

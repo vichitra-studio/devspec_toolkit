@@ -104,12 +104,12 @@ def lock_path_of(host: Path) -> Path:
     return host / "spec" / "extras" / "trace.lock.json"
 
 
-def change_lock_hash(host: Path) -> None:
-    """Replace the content hash of the lock entries of the plan item, as a re-attest of a changed criterion would."""
+def change_lock_hash(host: Path, key: str = "content_hash") -> None:
+    """Replace the content hash (or, with *key* ``chain_stamp``, the chain stamp) of the lock entries of the plan item, as a re-attest of a changed criterion (or of an upstream change) would."""
     path = lock_path_of(host)
     document = json.loads(path.read_text(encoding="utf-8"))
     for entry in document["entries"]:
         if entry["source"] == ITEM:
-            entry["content_hash"] = "sha256:" + "0" * 64
+            entry[key] = "sha256:" + "0" * 64
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 

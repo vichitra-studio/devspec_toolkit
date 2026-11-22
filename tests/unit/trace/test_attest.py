@@ -15,7 +15,7 @@ from specdev_tools.trace.suspects import check_lock_orphans, missing_entries
 
 from ..graph._synth import ROOT, git, run_cli
 from ._lock_support import EXAMPLE_HOST
-from .test_suspects import CLOSED_HOLDERS, CRITERION, Example
+from ._suspects_support import CLOSED_HOLDERS, CRITERION, Example
 
 API = "api-password-reset-confirm"
 FIX_EXPIRED = "fix-password-reset-expired-token"

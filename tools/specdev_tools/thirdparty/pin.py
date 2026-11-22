@@ -8,7 +8,6 @@ other flagging code exists.
 from __future__ import annotations
 
 import json
-import re
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error, refusal
 from specdev_tools.graph.model import Graph

@@ -233,6 +233,8 @@ def test_legacy_item_widened_across_steps_lands_in_the_earliest_flagged_legacy(l
 @pytest.mark.parametrize("fixture", ["legacy_spec", "unified_spec"])
 def test_context_skill_jq_pipeline_yields_pointers(request: pytest.FixtureRequest, fixture: str):
     """specdev-context SKILL.md pipes ``.records[]?.impact[]?`` of the JSON into resolve-pointers."""
+    if shutil.which("jq") is None:
+        pytest.skip("jq is not installed")
     spec_dir: Path = request.getfixturevalue(fixture)
     r = _run_cli(spec_dir, "--json")
     jq = subprocess.run(["jq", IMPACT_PIPELINE], input=r.stdout, capture_output=True, text=True, check=True)

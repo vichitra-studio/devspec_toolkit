@@ -176,6 +176,7 @@ def test_the_registered_checks_fixture_removes_what_a_test_registered(registered
 
 
 def test_the_check_left_by_the_previous_test_is_gone() -> None:
+    # Meaningful only after the test above, which leaves a check behind for the fixture to remove (the two stay together in this order).
     assert "left-by-a-test" not in [spec.name for spec in check_registry.CHECK_REGISTRY]
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from ...core.errors import make_error, SpecError
 from ...core.scope_helpers import as_dict, dict_items

@@ -16,8 +16,7 @@ from unittest.mock import patch
 from specdev_tools import cli
 from specdev_tools.migration.proposers import MigratedTree, context_of, load_tree
 
-from .test_convert_remove import edit as _edit_and_commit
-from ._support import MINI_HOST, REAL_ROOT, git
+from ._support import edit as _edit_and_commit, git, MINI_HOST, REAL_ROOT
 
 OVERLAY = MINI_HOST.parent / "legacy_bindings" / "ci"
 CAPTURE = "extras/migration/capture.json"

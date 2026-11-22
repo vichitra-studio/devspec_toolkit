@@ -60,9 +60,9 @@ migration 1.1.1 -> 1.2.0 (dry run, nothing written)
   p1 p1_capture: 2 edit(s), 0 worklist item(s)
   p2 p2_id_collisions: 8 edit(s), 4 worklist item(s)
   ...
-  p6 p6_baseline: 73 edit(s), 0 worklist item(s)
+  p6 p6_baseline: 78 edit(s), 0 worklist item(s)
   p7 p7_host_files: 5 edit(s), 5 worklist item(s)
-total: 614 edit(s), 91 worklist item(s), 28 file(s) changed
+total: 619 edit(s), 88 worklist item(s), 28 file(s) changed
 ```
 
 `--json` prints the same as a document (`status`, `edits_by_script`, `worklist_items`, `residue`, `errors`). Each script the run lists has a one-sentence description in the changelog of 1.2.0, the file `changelog/v1.2.0.md` of the toolkit (the entries "Migration script `<id>`").
@@ -90,7 +90,7 @@ Check the result before you go on:
 specdev spec-check spec --repo-root $TK --spec-root ./spec --git-root .
 ```
 
-On the invented host the errors fall from 559 to 278 (the merge check, which reads more, prints 285). [Sizing](#sizing) has the numbers of two real hosts. The codes that mark a shape the scripts must have fixed (`E768`, `E704`, `E761`, `E622`) are gone. What is left is the judgement pass.
+On the invented host the errors fall from 559 to 281 (the merge check, which reads more, prints 288). [Sizing](#sizing) has the numbers of two real hosts. The codes that mark a shape the scripts must have fixed (`E768`, `E704`, `E761`, `E622`) are gone. What is left is the judgement pass.
 
 ## Step 3: the one commit
 
@@ -130,7 +130,7 @@ specdev align triage spec --repo-root $TK --git-root .
 ```
 
 ```
-Worklist: 91 open item(s), 33 blocking; 0 resolved
+Worklist: 88 open item(s), 30 blocking; 0 resolved
 
 operator (25 open):
   BLOCKING  wl-00-decisions-seed-seed-decision-clarifications
@@ -138,7 +138,7 @@ operator (25 open):
       evidence: the seed manifest lists seed-decision-clarifications (docs/seed/seed_decision_clarifications.md), which holds decisions; ...
       proposal: fold what it decides into the seeds that own each subject, then remove its entry ...
   ...
-agent (66 open):
+agent (63 open):
   ...
 ```
 
@@ -146,13 +146,13 @@ agent (66 open):
 
 Each item has an id, a step, a kind, the node or file it is about, the evidence the script saw and, when it has one, a proposal. **operator** items need a decision of a person. **agent** items are ones an agent can work out from the spec and propose, which a person confirms. `BLOCKING` is a display hint: it sorts the list, and nothing refuses on it. `--step NN`, `--audience operator|agent` and `--json` narrow or reformat the list. The list is ordered by audience, blocking first, then step and kind.
 
-Decide the `status-conflict` items first (`--step 14` lists them), before any other work of the pass. Each names the sources that disagree about a milestone and says which one closed it. If the milestone is done, resolve the item. If it is not, the migration closed it by mistake, and the way to reopen it is in the 1.1.1 spec, before the migration; see "A milestone closed by mistake" below.
+Decide the `status-conflict` items first (`--step 14` lists them), before any other work of the pass. Each names the sources that disagree about a milestone and says which ones closed it, or that none did (then only a step 09 entry says it is done: correct that entry in the 1.1.1 spec the same way). If the milestone is done, resolve the item. If it is not, the migration closed it by mistake, and the way to reopen it is in the 1.1.1 spec, before the migration; see "A milestone closed by mistake" below.
 
 The kinds you will meet most, by what you do:
 
 | Kind | What it asks for |
 |---|---|
-| `trace-link`, `fixture-target`, `legacy-ref`, `schedules`, `connection-external` | a link field the old data could not fix: say what the node derives from, verifies or schedules |
+| `trace-link`, `fixture-target`, `legacy-ref`, `schedules`, `connection-external` | a link field the old data could not fix: say what the node derives from, verifies or schedules. A milestone's `schedules` item appears only when a typed deliverable could not be written (a capability, an unknown id, a free-text entry) or when `schedules` stayed empty; the deliverables that resolved are already in `schedules` |
 | `scope-reason`, `rule-reason` | the reason a `later` or `out` item or a rule needs; no reason is invented |
 | `legacy-exit-condition` | the old exit condition is now a task criterion; name what it `refines` |
 | `legacy-open-item`, `anchor-open-item`, `ambiguity-about`, `duplicate-promoted-item` | an open item without an `about`, or kept in two places: write the answer into the spec and delete the item (`specdev json delete --id <item-id>`). An `about` repairs the item's shape (E520) and nothing more: `spec-check --merge`, which `align validate` runs, reports E631 for every open item outside a frozen plan until the item is deleted. A question that is still open is deleted here and raised again after the migration |
@@ -190,7 +190,7 @@ Work in the order of the waterfall: 00, 01, 02, 02a, 04, 05, 06, 07, 08, 09, 10,
    | 07 | `template_nfrs.md` | 16a / 16b / 16c | `template_impl_planner.md` / `template_impl_coder.md` / `template_impl_reviewer.md` |
    | 08 | `template_fixtures.md` | | |
 
-3. **Ask for proposals once, before the first step.** `specdev align propose spec --kind refines|prose-ids|bindings` adds worklist items that carry a candidate each (add `--dry-run` to print them and add nothing); run each kind once for the whole spec, and a rerun adds nothing. `refines` is for the task criteria of step 14, `prose-ids` for text that names an id, `bindings` for legacy fixtures (see [the legacy binding pass](#the-legacy-binding-pass)). A rerun adds no item twice. Proposals are suggestions with a score; nothing is applied.
+3. **Ask for proposals once for the whole spec, before the first step (not again for each step).** `specdev align propose spec --kind refines|prose-ids|bindings` adds worklist items that carry a candidate each (add `--dry-run` to print them and add nothing); run each kind once for the whole spec, and a rerun adds nothing. `refines` is for the task criteria of step 14, `prose-ids` for text that names an id, `bindings` for legacy fixtures (see [the legacy binding pass](#the-legacy-binding-pass)). Proposals are suggestions with a score; nothing is applied.
 4. **Read a node, then edit it by id.** `specdev node show <id>` prints the node, where it lives and its links in and out. `specdev node candidates --for <id> --field <field>` lists the nodes a field accepts (use it when a link is refused with E767 "the field accepts: ..."). Then:
    - `specdev json patch --id <id> .<field> '<json>'`: set a field. Setting a link field writes its lock entry.
    - `specdev json insert --id <id> .<array field> '<json>'`: add an item inside a node (a criterion, a task).
@@ -215,7 +215,7 @@ Points the pass runs into:
 - A node with `scope: out` or `later` needs its `scope_reason` first; a fixture with `mode: manual` needs its `manual_reason` first. A node with `scope: out` does not count as distilling a seed for E748: an in-scope node must list the seed.
 - A seed that the manifest routes to a step and no node of that step lists in `derives_from` is `E748`; a seed with no route is `E747`. Route it in `spec/common/seed_manifest.json` (a file edit, not a node) or distil it.
 - After a job's steps changed, `specdev canonical-autofix spec --write` rewrites the canonical references of the job (`E210`).
-- **An error that has no worklist item.** After the mechanical stage many of the remaining errors are `E520 ... '<field>' is a required property` for a link a node must now have: `derives_from` on the charter's assumptions, risks and scope items, on the delivery baseline's environments, gates and secrets, on API errors and on requirements; `threatens` and `mitigated_by` on edge cases. No item is written for them (the migration cannot know what the node derives from) and the message names the place only as a file and a path with an index, for example `00_charter.json:risks/0: 'derives_from' is a required property`. Read the node at the path, list what the field accepts, and write the link (run on the invented host):
+- **An error that has no worklist item.** After the mechanical stage many of the remaining errors are `E520 ... '<field>' is a required property` for a link a node must now have: `derives_from` on the charter's assumptions, risks and scope items, on capabilities, on the delivery baseline's environments, gates and secrets, on API errors and on requirements; `threatens` and `mitigated_by` on edge cases. No item is written for them (the migration cannot know what the node derives from) and the message names the place only as a file and a path of keys and indexes: `00_charter.json:risks/0: 'derives_from' is a required property`, `02a_delivery_baseline.json:environments/ci: ...` for an environment (its key), `05_interface_contracts.json:apis/0/errors/0: ...` for a nested node. The jq path of the first is `.risks[0]`, of the second `.environments.ci`, of the third `.apis[0].errors[0]`. Read the node at the path, list what the field accepts, and write the link (run on the invented host):
 
   ```bash
   specdev json read spec/00_charter.json '.risks[0]' --repo-root $TK
@@ -223,7 +223,7 @@ Points the pass runs into:
   specdev json patch --id risk-volunteer-availability-at-the-cafe-lantern .derives_from '["seed-volunteer-roster"]' --repo-root $TK --git-root .
   ```
 
-  The first prints the node (`{"risk_id": "risk-volunteer-availability-at-the-cafe-lantern", "text": "...", "scope": "in"}`; the id is the field that ends in `_id`). The second prints `6 candidates for risk.derives_from (showing 6)` and one line per node the field accepts (id, kind, step, file, text). The third prints `patched risk-volunteer-availability-at-the-cafe-lantern (00_charter.json .risks[0])` and `lock entry written: risk-volunteer-availability-at-the-cafe-lantern.derives_from -> seed-volunteer-roster`; a target the field does not accept is refused with `E767` and nothing is written. The same three commands answer `threatens` and `mitigated_by` (the value is a list of ids).
+  The first prints the node (`{"risk_id": "risk-volunteer-availability-at-the-cafe-lantern", "text": "...", "scope": "in"}`; the id is the field that ends in `id`, such as `risk_id` (an edge case has `id`), or the key of an environment). The second prints `6 candidates for risk.derives_from (showing 6)` and one line per node the field accepts (id, kind, step, file, text). The third prints `patched risk-volunteer-availability-at-the-cafe-lantern (00_charter.json .risks[0])` and `lock entry written: risk-volunteer-availability-at-the-cafe-lantern.derives_from -> seed-volunteer-roster`; a target the field does not accept is refused with `E767` and nothing is written. The same three commands answer `threatens` and `mitigated_by` (the value is a list of ids).
 - Text that names an id (`E752`): reword it without the id, or write the relation as a link and take the id out. The nodes of a frozen plan are not read.
 
 ### Step 14: `refines` on task criteria
@@ -254,7 +254,7 @@ You have two answers. Narrow the invariant to the requirement or API it is reall
 A milestone is closed by the migration when any one of three 1.1.1 sources says it is done: its `status` in `14_roadmap.json`, the `status` of its row in `16_impl_context.json`, or the `verdict` (`verified`) in the `review` block of its plan file. The migration keeps what they said, so a second run closes it again, and its plan is then a closed plan, not an open one. Reopening it in the migrated spec (setting the anchor row to `in_progress` and deleting its `close`) leaves a plan with 1.1.1 fields that the open-plan scripts never reshaped. To reopen it, undo the migration, correct the 1.1.1 spec, and run it again:
 
 1. Undo the migration. Before the migration commit: `git checkout -- spec && git clean -fd spec`. After it: `git revert --no-edit <the migration commit>`.
-2. Correct each source that says done. The item's evidence names them, for example `14 says done; anchor says done; 09 milestone-catalog-basics says done; 16c verdict says verified (closed by 14.status, 16c.verdict)`. Three of the readings can close a milestone: `14` (the roadmap `status`), `anchor` (the row of `16_impl_context.json`) and `16c verdict` (the plan's review); the parenthesis `closed by` lists the ones that did. The `09` reading (the milestone of `09_impl_plan.json`) never closes a milestone, but it is compared with the others: if it still says done once the others are corrected, the run raises a new `status-conflict` item for the milestone, so correct it as well. `specdev json patch` works on the 1.1.1 files with the toolkit's `--repo-root`:
+2. Correct each source that says done. The item's evidence names them, for example `the sources of ms-late-fees disagree: 14 says done; anchor says pending; 09 ms-late-fees says pending (closed by 14.status)`. Three of the readings can close a milestone: `14` (the roadmap `status`), `anchor` (the row of `16_impl_context.json`) and `16c verdict` (the plan's review); the parenthesis `closed by` lists the ones that did. The `09` reading (the milestone of `09_impl_plan.json`) never closes a milestone, but it is compared with the others: if it still says done once the others are corrected, the run raises a new `status-conflict` item for the milestone, so correct it as well. `specdev json patch` works on the 1.1.1 files with the toolkit's `--repo-root`:
 
    ```bash
    specdev json patch spec/14_roadmap.json '.milestones[<N>].status' '"in_progress"' --repo-root $TK
@@ -268,7 +268,7 @@ A milestone is closed by the migration when any one of three 1.1.1 sources says 
 
 ### An open plan
 
-A plan whose milestone is still open is not frozen (this is also the plan of a milestone you had the migration reopen, see "A milestone closed by mistake"). If the plan was deferred as a whole, the worklist holds one `plan-item-disposition` item about its milestone that quotes the old reason: `specdev milestone defer <milestone-id> --reason "..."` keeps the deferral. The migration removed its old progress fields (`execution.execution_results`, `implementation.status`, an action's `evidence`, `review.fixture_status` and the like); their values are not copied into the capture. Read them in git: `specdev align triage spec --legacy 16a` prints the plan files as they were (`--legacy 16` prints only the anchor file `16_impl_context.json`). **Record each action that was carried out again** with `specdev plan record <item>/<action>` (see `specdev plan record --help`); the close gate asks for the records by name. A plan item keeps its `spec_ref` (with its pins) until you write `realises` on the item and delete the old field with the file form, `specdev json delete <plan file> '.plan.spec_alignment.checklist[<N>].spec_ref'` (`<N>` is the item's place in the `checklist`): the `spec-ref-realises` items say which items. Items marked deferred or dropped in the old plan are `plan-item-disposition` items for you, not open items in the plan. A frozen plan (a milestone whose anchor row says `done`) is changed by the migration in three things and by nothing else, and you never edit it: it gains the `milestone` key; the names the toolkit now computes are removed from it (`milestone_ref`, `nfr_refs` and `fixture_ref` of its plan items, and a stored `content_hash` or `chain_stamp`); and its open items (`execution.emergent_ambiguities` and the like) are removed from it and listed as `legacy-open-item` worklist items (a closed plan keeps no open item; the old item is in the capture and in git).
+A plan whose milestone is still open is not frozen (this is also the plan of a milestone you had the migration reopen, see "A milestone closed by mistake"). A legacy-shaped open item of such a plan (one that still has the 1.1.1 fields) shows as a warning, W630, at the merge check and as E520 at the step gate, until it is converted or deleted. If the plan was deferred as a whole, the worklist holds one `plan-item-disposition` item about its milestone that quotes the old reason: `specdev milestone defer <milestone-id> --reason "..."` keeps the deferral. The migration removed its old progress fields (`execution.execution_results`, `implementation.status`, an action's `evidence`, `review.fixture_status` and the like); their values are not copied into the capture. Read them in git: `specdev align triage spec --legacy 16a` prints the plan files as they were (`--legacy 16` prints only the anchor file `16_impl_context.json`). **Record each action that was carried out again** with `specdev plan record <item>/<action>` (see `specdev plan record --help`); the close gate asks for the records by name. A plan item keeps its `spec_ref` (with its pins) until you write `realises` on the item and delete the old field with the file form, `specdev json delete <plan file> '.plan.spec_alignment.checklist[<N>].spec_ref'` (`<N>` is the item's place in the `checklist`): the `spec-ref-realises` items say which items. Items marked deferred or dropped in the old plan are `plan-item-disposition` items for you, not open items in the plan. A frozen plan (a milestone whose anchor row says `done`) is changed by the migration in three things and by nothing else, and you never edit it: it gains the `milestone` key; the names the toolkit now computes are removed from it (`milestone_ref`, `nfr_refs` and `fixture_ref` of its plan items, and a stored `content_hash` or `chain_stamp`); and its open items (`execution.emergent_ambiguities` and the like) are removed from it and listed as `legacy-open-item` worklist items (a closed plan keeps no open item; the old item is in the capture and in git).
 
 ## Step 7: finish
 
@@ -287,7 +287,7 @@ stamp: migration_status cleared, last_migration refreshed (spec/specdev_version)
 Migration finished. Commit the result.
 ```
 
-- Worklist items that are still open are information, not a failure: `validate` keeps the folder and prints how many are unresolved and how many were marked blocking. `--keep-worklist` keeps it even when nothing is open.
+- Worklist items that are still open are information, not a failure: `validate` keeps the folder and prints how many are unresolved and how many were marked blocking. `--keep-worklist` keeps it even when nothing is open; on a host whose migration files are already gone it prints `nothing to do: the migration was finished before and no migration file is left`.
 - With a spec stamped below the toolkit's version, `validate` is refused: the migration has not been run.
 - With errors it prints them and `spec-check --merge reports N error(s); the migration is not finished and nothing was changed`, exit 1.
 - Without `--base-ref` it needs a default branch (`origin/main`, `origin/master`, `main` or `master`) that holds the 1.1.1 spec; otherwise `E900`.
@@ -367,4 +367,4 @@ python -m tests.e2e.host_migration.harness --host-copy <copy> --toolkit <1.2.0 t
 
 The copy must be a `git clone` (a copy that lacks untracked files adds `E530` findings before and after), committed, with `spec/` clean, and the toolkit root must say 1.2.0 in `tools/pyproject.toml` (the harness refuses the live checkout). `--kind` is a label for the report. The run prints the checklist of the mechanical stage (a dry run that changes nothing, a real run, a second run with no edit, nothing outside `spec/`, no id lost, fewer errors) and the table of counts the sizing below is made from (`--stage end` checks the finished state: a clean merge check, no live `E882`, and `align validate` exit 0). Two further tests of the folder, one per real host, are skipped unless an environment variable names a copy (see `tests/e2e/host_migration/conftest.py`).
 
-The same pass as a scripted example is `tests/integration/_mini_host_pass.py` (`run_scripted_pass`), driven by `tests/fixtures/migration/mini_host_pass/pass.json`. It takes the invented host from 285 errors after the mechanical stage to zero in 182 commands: 91 items resolved, about 100 links written, 17 `attest --step` runs, 12 sentences reworded, 13 nodes added and 8 removed; then `spec-check --merge` printed no error and `align validate` exited 0. Read `pass.json` as the model of what each step's answers look like.
+The same pass as a scripted example is `tests/integration/_mini_host_pass.py` (`run_scripted_pass`), driven by `tests/fixtures/migration/mini_host_pass/pass.json`. It takes the invented host from 288 errors after the mechanical stage to zero in 180 commands: 88 items resolved, about 100 links written, 17 `attest --step` runs, 12 sentences reworded, 13 nodes added and 8 removed; then `spec-check --merge` printed no error and `align validate` exited 0. Read `pass.json` as the model of what each step's answers look like.

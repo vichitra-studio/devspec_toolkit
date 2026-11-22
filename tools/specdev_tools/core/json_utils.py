@@ -222,8 +222,7 @@ def find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
     """Locate the schema/ directory.
 
     Public API: this is part of json_utils' supported surface and may be imported
-    by other toolkit modules (e.g. validation linters). The legacy
-    ``_find_schema_dir`` name is retained below as a backward-compatible alias.
+    by other toolkit modules (e.g. validation linters).
 
     Search order:
     1. repo_root/schema (explicit --repo-root from CLI)
@@ -247,11 +246,6 @@ def find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
         if os.path.isdir(normed):
             return normed
     return None
-
-
-# Backward-compatible alias for the formerly-private name. Retained so existing
-# internal callers and imports continue to resolve; prefer ``find_schema_dir``.
-_find_schema_dir = find_schema_dir
 
 
 def resolve_schema_path(
@@ -389,7 +383,7 @@ def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
     If ``repo_root`` is falsy (None/empty) **or** ``repo_root/tools/schema_registry.json``
     does not exist (e.g. the default ``--repo-root .`` pointing at a host wrapper dir
     in a submodule deployment), fall back to the package-relative toolkit root derived
-    from ``json_utils.__file__``.  This is the same anchor that ``_find_schema_dir``
+    from ``json_utils.__file__``.  This is the same anchor that ``find_schema_dir``
     candidate #2 uses, guaranteeing bare agent invocations (no ``--repo-root``) always
     resolve the schema registry correctly.
 

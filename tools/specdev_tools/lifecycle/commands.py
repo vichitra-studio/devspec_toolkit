@@ -14,7 +14,7 @@ from typing import Any
 
 from ..core.errors import SpecError
 from ..core.json_output import format_errors_json
-from ..graph.commands import add_root_flags, print_json, resolve_git_root, run_on_graph, usage_error
+from ..graph.commands import add_root_flags, print_json, roots, run_on_graph, usage_error
 from ..graph.model import Graph
 from ..graph.ownership import CLOSE_OWNER
 from ..graph.stages import DEPLOY_ENVIRONMENTS
@@ -171,7 +171,7 @@ def _emit(args: argparse.Namespace, document: dict[str, Any], text: str) -> None
 
 
 def _plan_record(args: argparse.Namespace, address: Address | None, graph: Graph) -> None:
-    spec_root, repo_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
+    spec_root, repo_root, git_root = roots(args)
     if address is None:
         pruned = prune_records(spec_root, repo_root, milestone_id_of(graph, spec_root, args.prune))
         _emit(args, _prune_json(pruned), _prune_text(pruned))
@@ -254,7 +254,7 @@ CLOSE_DESCRIPTION = (
     "Close an in_progress milestone. The close gate checks, and reports every finding at once: E810 a task criterion no plan item "
     "realises, E811 a criterion not proven (at the dev stage; a ci binding counts as dev; staging and production bindings do "
     "not hold the close up), E812 a plan item not executed, E813 the review of the plan is not verified, E632 an open item in the "
-    "plan, E763 a suspect link on the milestone's chain, E746 a scaffold row that is not a tracked file, E814 no sign-off record. "
+    "plan, E763 a suspect link on the milestone's chain, E761 a link of a plan item that has no lock entry, E746 a scaffold row that is not a tracked file, E814 no sign-off record. "
     "With errors nothing is written and the command exits 1, the errors listed by owner. With none, ONE write sets status done and "
     "the close record (signed_off_by the git author email of the latest sign-off, signoff its id, tree, plan_hash, closed_at, "
     "migrations); the plan is frozen from then on (a record write is refused with E820, spec-check frozen-plans reports a "
@@ -310,10 +310,6 @@ def gate_providers(spec_root: str, repo_root: str, git_root: str) -> ProviderFac
     return build
 
 
-def _roots(args: argparse.Namespace) -> tuple[str, str, str]:
-    return os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
-
-
 def _refused(args: argparse.Namespace, command: str, error: SpecError, details: tuple[SpecError, ...] = ()) -> int:
     """Print a refusal (text on stderr: the finding, then the findings behind it; JSON on stdout) and return exit code 1."""
     if args.json_output:
@@ -338,7 +334,7 @@ def _guarded(command: str, args: argparse.Namespace, body: Callable[[], int]) ->
 def run_milestone_start(args: argparse.Namespace) -> int:
     """Run ``specdev milestone start`` on the parsed *args*; returns the exit code (0 started, 1 refused)."""
     def body() -> int:
-        result = start_milestone(*_roots(args), args.milestone)
+        result = start_milestone(*roots(args), args.milestone)
         what = "already in progress, nothing written" if result.noop else f"{'resumed' if result.resumed else 'started'} ({result.previous} -> in_progress)" + ("; the deferral reason is cleared" if result.resumed else "")
         _emit(args, {"command": "milestone start", "milestone": result.milestone, "previous": result.previous, "noop": result.noop, "resumed": result.resumed, "notes": list(result.notes)}, "\n".join([f"milestone {result.milestone}: {what}", *result.notes]))
         return 0
@@ -349,7 +345,7 @@ def run_milestone_start(args: argparse.Namespace) -> int:
 def run_milestone_defer(args: argparse.Namespace) -> int:
     """Run ``specdev milestone defer`` on the parsed *args*; returns the exit code (0 deferred, 1 refused)."""
     def body() -> int:
-        spec_root, repo_root, _ = _roots(args)
+        spec_root, repo_root, _ = roots(args)
         result = defer_milestone(spec_root, repo_root, args.milestone, args.reason)
         _emit(args, {"command": "milestone defer", "milestone": result.milestone, "previous": result.previous, "reason": result.reason}, f"milestone {result.milestone}: deferred ({result.previous} -> deferred): {result.reason}")
         return 0
@@ -398,7 +394,7 @@ def _closed_text(result: CloseResult) -> str:
 def run_milestone_close(args: argparse.Namespace) -> int:
     """Run ``specdev milestone close`` on the parsed *args*; returns the exit code (0 closed, or the gate passes with --check; 1 refused)."""
     def body() -> int:
-        spec_root, repo_root, git_root = _roots(args)
+        spec_root, repo_root, git_root = roots(args)
         result = close_milestone(spec_root, repo_root, git_root, args.milestone, gate_providers(spec_root, repo_root, git_root), check_only=args.check)
         if not result.report.passed:
             if args.json_output:
@@ -416,7 +412,7 @@ def run_milestone_close(args: argparse.Namespace) -> int:
 def run_milestone_signoff(args: argparse.Namespace) -> int:
     """Run ``specdev milestone sign-off`` on the parsed *args*; returns the exit code (0 recorded, 1 refused)."""
     def body() -> int:
-        spec_root, repo_root, git_root = _roots(args)
+        spec_root, repo_root, git_root = roots(args)
         result = sign_off(spec_root, repo_root, git_root, args.milestone, gate_providers(spec_root, repo_root, git_root))
         document = {**view_dict(result.view), "command": "milestone sign-off", "record": result.record, "file": result.file}
         _emit(args, document, f"{view_text(result.view)}\n\nrecorded {result.record['signoff_id']} ({result.file}): tree {result.record['tree']}, signed by {result.record['git_author']['name']} <{result.record['git_author']['email']}>")
@@ -428,7 +424,7 @@ def run_milestone_signoff(args: argparse.Namespace) -> int:
 def run_status(args: argparse.Namespace) -> int:
     """Run ``specdev status`` on the parsed *args*; returns the exit code (0 whatever it lists; 1 when it cannot read what it needs)."""
     def run(graph: Graph) -> int:
-        spec_root, repo_root, git_root = _roots(args)
+        spec_root, repo_root, git_root = roots(args)
         context = status_context(spec_root, repo_root, git_root, lock_if_present(spec_root), graph, gate_providers(spec_root, repo_root, git_root))
         if args.milestone:
             view = milestone_view(context, milestone_id_of(graph, spec_root, args.milestone))

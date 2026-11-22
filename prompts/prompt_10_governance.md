@@ -57,7 +57,7 @@ For each upstream artifact ingested, extract the following:
 ## Coverage Closure
 Before emitting, verify:
 - Every organizational constraint in `spec/00_charter.json` (`constraints`, `compliance`) is encoded as a rule whose `derives_from` names it, or as a commit convention.
-- Every `cli_command` is a name listed in `tools/cli_commands.json` that answers `specdev <command> --help`.
+- Every `cli_command` is a name listed in `tools/cli_commands.json` that answers `specdev <command> --help`; a name that is not in the list is E530 at the step 10 gate.
 - Every id in `derives_from` names a charter constraint, risk or scope item, an environment or gate of Step 02a, or an approver-only stakeholder.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - The review cadence and branching strategy align with the milestone schedule in `spec/09_impl_plan.json`.
@@ -81,7 +81,7 @@ Before emitting, verify:
 - **Canonical Refs**: `commit_message_rules.id_pattern_ref` SHOULD be populated with a canon entry of kind `id_pattern` when the commit pattern aligns with a canonical ID pattern (e.g., `cn:core:id_pattern:conventional-commit`); the kind is schema-pinned to `id_pattern` — no other kind is accepted, but the field itself is optional. `policy_ref` SHOULD be populated with a canon entry of kind `policy` when a governing policy applies (e.g., `cn:core:policy:spec-first`); the kind is schema-pinned to `policy` — no other kind is accepted, but the field itself is optional. `command_ref` SHOULD be populated with a canon entry of kind `command` (e.g., `cn:core:command:governance-check`) when the rule maps to a CLI command — no other kind is accepted. All referenced IDs must also appear in `canonical_refs_used`, and canonical-integrity (E120) will reject any kind mismatch against the canon registry.
 
 ## Cross-Step Synthesis Notes
-- rules: `cli_command` is a command name from `tools/cli_commands.json`; `enforcer` has the one value `review`. A rule with neither is enforced by a Step 12 job whose `realises` names it. `schema/10_governance.schema.json` is the contract.
+- rules: `cli_command` is a command name from `tools/cli_commands.json` (E530 for any other); `enforcer` has the one value `review`. A rule with neither is enforced by a Step 12 job whose `realises` names it. `schema/10_governance.schema.json` is the contract.
 - commit_message_rules.error_message: explicitly list the valid `type` enums so users know what to type without reading regex (e.g., "Format: type(scope): msg [id]. Allowed types: feat, fix, chore.")
 
 ## Emergent Ambiguities

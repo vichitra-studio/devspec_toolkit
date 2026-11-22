@@ -17,7 +17,7 @@ import os
 import sys
 from typing import Any
 
-from specdev_tools.graph.commands import print_json, resolve_git_root, run_on_graph
+from specdev_tools.graph.commands import print_json, roots, run_on_graph
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.stages import CI_STAGE
 from specdev_tools.proof.validity import ProofContext, evidence_for, evidence_valid
@@ -79,7 +79,7 @@ def _json(proven: list[str], todo: list[str], results: list[Evidence], gate: Rel
 
 
 def _prep(args: argparse.Namespace, graph: Graph, canon_dir_of: CanonDirOf) -> int:
-    spec_root, repo_root, git_root = os.path.abspath(args.spec_root), os.path.abspath(args.repo_root), resolve_git_root(args)
+    spec_root, repo_root, git_root = roots(args)
     evidence_dir = records_folder(spec_root)
     ctx = ProofContext(git_root, spec_root, evidence_dir)
     ids = selected_ids(graph, every=True, milestone=None, stage=CI_STAGE, only_stage=False)

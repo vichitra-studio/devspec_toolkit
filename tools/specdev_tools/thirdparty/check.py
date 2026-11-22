@@ -44,11 +44,12 @@ def _source_error(node_id: str, pin: str, source: PinSource, git_root: str) -> S
 
 
 def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Path) -> list[SpecError]:
-    """The findings for every third-party node that has declared pin sources, in graph order.
+    """The findings for every third-party node, in graph order.
 
-    A pin that is not exact is E336 (its sources are not read); a source that cannot give a version is E338; a source
-    whose version is not the pin is E337.  A third party with no declared source is not checked; a ``pin_sources`` key that
-    names no third-party node is E338 (a mistyped key would otherwise switch the check off).
+    A pin that is not exact is E336, whether or not the third party declares sources (its sources are not read); a source
+    that cannot give a version is E338; a source whose version is not the pin is E337.  A third party with no declared
+    source has only its pin checked for exactness; a ``pin_sources`` key that names no third-party node is E338 (a mistyped
+    key would otherwise switch the check off).
     """
     sources_of = pin_sources_by_id(declarations, graph.canonical_id)
     third_parties = {node.id for node in graph.by_kind.get(THIRD_PARTY, ())}
@@ -59,7 +60,7 @@ def check_pins(graph: Graph, declarations: HostDeclarations, git_root: str | Pat
     ]
     for node in graph.by_kind.get(THIRD_PARTY, ()):
         sources, pin = sources_of.get(node.id, ()), pin_of(graph, node.id)
-        if sources and not pin_is_exact(pin):
+        if not pin_is_exact(pin):
             findings.append(not_exact_error(node.id, pin))
             continue
         findings.extend(error for source in sources if (error := _source_error(node.id, pin, source, str(git_root))) is not None)

@@ -21,10 +21,8 @@ from specdev_tools.core.entry_key_registry import (
 )
 from specdev_tools.core.json_utils import _collect_ids_from_file
 from specdev_tools.core.registry import SchemaRegistry, clear_shared_caches
-from specdev_tools.registry.annotation_scan import (
-    make_ref_resolver,
-    scan_annotations,
-)
+from specdev_tools.registry.annotation_scan import scan_annotations
+from specdev_tools.registry.annotations import SchemaRefs
 from specdev_tools.registry import generate as generate_mod
 from specdev_tools.registry import step_order_gen
 from specdev_tools.registry.generate import _serialize, generate_registry
@@ -63,7 +61,7 @@ def _by_path(arrays: list[dict]) -> dict[str, dict]:
 
 def test_make_ref_resolver_anchor_pointer_and_whole_schema():
     reg = SchemaRegistry(str(_ROOT))
-    resolve = make_ref_resolver(reg)
+    resolve = SchemaRefs(reg).resolve
     id_array, uri, ptr = resolve("vc:core:collections#kebabIdArray")
     assert uri == "vc:core:collections" and id_array.get("$anchor") == "kebabIdArray"
     kebab, uri, _ = resolve("vc:core:atoms#kebabId")

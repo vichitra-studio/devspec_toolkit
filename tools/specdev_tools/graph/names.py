@@ -22,6 +22,7 @@ MITIGATED_BY = "mitigated_by"
 RELIES_ON = "relies_on"
 CONNECTS_TO = "connects_to"
 ABOUT = "about"
+ALIASES = "aliases"  # the field of a node that lists the ids it had before a rename (not a link)
 
 # kinds
 API = "api"

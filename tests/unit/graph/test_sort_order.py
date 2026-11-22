@@ -24,8 +24,7 @@ from specdev_tools.graph.diff import diff_to_dict, group_changes, render_text
 from specdev_tools.graph.recipes import RecipeError, parse_recipes
 
 from ._synth import EXAMPLE_SPEC, HASH_SEEDS, ROOT, copy_build_spec, copy_example, make_toolkit, run_python_seeded, run_specdev_seeded, write_json
-from .test_diff import _TASK_FILE, _criterion, _diff, _docs, _fr, _snapshot
-from .test_recipes import _core_16b, _raw, _set
+from ._builders import _TASK_FILE, _core_16b, _criterion, _diff, _docs, _fr, _raw, _set, _snapshot
 
 _CRITERION = "ac-password-reset-3"
 _FLAGS = ["--repo-root", str(ROOT), "--spec-root", str(EXAMPLE_SPEC)]
@@ -45,7 +44,7 @@ def test_unknown_kinds_and_verbs_are_named_in_name_order_whatever_the_hash_seed(
 
 _CYCLE_CODE = """
 import json
-from unit.graph.test_resolve import _decl, _graph, _node
+from unit.graph._builders import _decl, _graph, _node
 from specdev_tools.graph.resolve import resolve_graph
 zeta, mid, alpha = (_decl(name, ["B"], ["B"]) for name in ("zeta", "mid", "alpha"))
 graph = _graph([_node("a", "B", "s2", [(zeta, "b")]), _node("b", "B", "s2", [(mid, "c")]), _node("c", "B", "s2", [(alpha, "a")])])
@@ -62,7 +61,7 @@ def test_a_cycle_through_three_link_fields_names_the_fields_in_name_order(seed: 
 
 _DIFF_CODE = """
 import json
-from unit.graph.test_diff import _TASK_FILE, _criterion, _diff, _docs, _fr
+from unit.graph._builders import _TASK_FILE, _criterion, _diff, _docs, _fr
 
 names = ["fr-m", "fr-c", "fr-x", "fr-a", "fr-q", "fr-e", "fr-t"]
 old, new = _docs(*[_fr(n, "Old.") for n in names]), _docs(*[_fr(n, "New.") for n in names])
@@ -202,7 +201,7 @@ def test_a_contract_view_lists_fields_links_and_criteria_in_name_order() -> None
 
 _TABLE_CODE = """
 import json
-from unit.graph.test_recipes import _core_16b, _raw, _set
+from unit.graph._builders import _core_16b, _raw, _set
 from specdev_tools.graph.recipes import RecipeError, parse_recipes
 
 def message(change):

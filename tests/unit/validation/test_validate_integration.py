@@ -216,9 +216,7 @@ class ValidateIntegrationTests(unittest.TestCase):
 
     def test_deep_validators_dispatch_covers_all_step_modules(self):
         expected = {
-            "01",
             "02",
-            "02a",
             "03",
             "04",
             "05",

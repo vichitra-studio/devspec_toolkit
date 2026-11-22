@@ -16,7 +16,7 @@ from specdev_tools.validation.validate import validate_dir
 
 from unit.graph._synth import ROOT, git, run_cli
 from unit.trace._lock_support import EXAMPLE_HOST
-from unit.trace.test_suspects import CRITERION, Example
+from unit.trace._suspects_support import CRITERION, Example
 
 EDIT = " Also reject a token issued for another account."
 BASE_BRANCH = "main"

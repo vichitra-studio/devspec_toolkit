@@ -61,6 +61,7 @@ def _same_before_and_after(host: Path, probe: Callable[[Path], T]) -> tuple[T, T
 def test_spec_check_passes_with_the_file_present(host: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The summary of ``spec-check`` on the example with the file added is the pinned golden: no new check, no new finding."""
     _add_declarations(host)
+    shutil.copytree(FIXTURE_FILE.parents[2] / "repo", host, dirs_exist_ok=True)  # the files its pin_sources read (the pins agree with them)
     spec = str(host / "spec")
     run_plain_spec_check(str(ROOT), spec, git_root=str(host), spec_root=spec, project_canon_dir=f"{spec}/canon")
     assert capsys.readouterr().err == GOLDEN.read_text(encoding="utf-8")

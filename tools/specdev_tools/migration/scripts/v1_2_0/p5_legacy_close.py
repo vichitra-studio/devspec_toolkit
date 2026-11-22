@@ -92,7 +92,11 @@ def _conflicts(ctx) -> list[WorklistItem]:
                 "(`git checkout -- spec && git clean -fd spec` before the migration commit; `git revert --no-edit <the migration commit>` after it), correct in the 1.1.1 spec each source "
                 "that says done (the evidence names them), commit, and run `specdev align apply spec --auto` again: the milestone is then open and its plan is migrated as an open plan "
                 "(see the host guide, 'A milestone closed by mistake')"
-                if milestone in closed else f"decide whether {milestone} is done and close it with `specdev milestone close`"
+                if milestone in closed else (
+                    f"{milestone} stays open: only {', '.join(source for source, reading in readings if _says_done(reading))} says it is done, and no source that closes a milestone does. "
+                    "If it is not done, correct that entry in the 1.1.1 spec (see the host guide, 'A milestone closed by mistake'); "
+                    "if it is done, close it with `specdev milestone close`"
+                )
             ),
         ))
     return items

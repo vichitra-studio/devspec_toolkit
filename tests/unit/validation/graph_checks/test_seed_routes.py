@@ -13,7 +13,8 @@ from integration._step_gate_support import run_split, step_gate_host
 from specdev_tools.core.errors import SpecError
 from specdev_tools.graph.resolve import resolve_graph
 from specdev_tools.validation.graph_checks.codes import SEED_LINK_NOT_ROUTED, SEED_NOT_ROUTED, SEED_ROUTE_UNUSED
-from specdev_tools.validation.graph_checks.context import SEED_MANIFEST_PATH, GraphCheckContext
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
+from specdev_tools.validation.graph_checks.context import GraphCheckContext
 from specdev_tools.validation.graph_checks.seed_routes import _routes, check_seed_routes
 from specdev_tools.validation.seed_lint import lint_seeds
 from unit.graph._synth import HASH_SEEDS, ROOT
@@ -32,7 +33,7 @@ def _host(tmp_path: Path, manifest: str | None = None, **edits: Edit) -> Path:
     host = tmp_path / "host"
     shutil.copytree(EXAMPLE_HOST, host)
     if manifest is not None:
-        shutil.copy(FIXTURES / f"{manifest}.json", host / "spec" / SEED_MANIFEST_PATH)
+        shutil.copy(FIXTURES / f"{manifest}.json", host / "spec" / SEED_MANIFEST_FILE)
     edit_documents(host / "spec", **edits)
     return host
 
@@ -64,7 +65,7 @@ def test_the_worked_example_has_no_seed_route_finding(tmp_path: Path) -> None:
 
 def test_unrouted_seed_gives_e747_owner_step_00(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "unrouted_seed"))
-    assert (found.code, found.node_id, found.owner, found.file) == (SEED_NOT_ROUTED, EXTRA, "step:00", SEED_MANIFEST_PATH)
+    assert (found.code, found.node_id, found.owner, found.file) == (SEED_NOT_ROUTED, EXTRA, "step:00", SEED_MANIFEST_FILE)
     assert found.jq_path == ".seeds[1]" and found.route is None and found.target is None
 
 
@@ -74,7 +75,7 @@ def test_global_seed_order_only_seed_is_still_e747(tmp_path: Path) -> None:
 
 def test_unused_route_gives_e748_owned_by_its_step(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "unused_route"))
-    assert (found.code, found.node_id, found.owner, found.file) == (SEED_ROUTE_UNUSED, SEED, "step:02a", SEED_MANIFEST_PATH)
+    assert (found.code, found.node_id, found.owner, found.file) == (SEED_ROUTE_UNUSED, SEED, "step:02a", SEED_MANIFEST_FILE)
     assert found.jq_path == '.step_requirements["02a"]'
     assert "step 02a" in found.message and SEED in found.message and "derives_from" in found.message
 
@@ -136,7 +137,7 @@ def test_e749_carries_route(tmp_path: Path) -> None:
 def test_e748_identity_differs_per_seed_and_step(tmp_path: Path) -> None:
     """Two unused routes differ in the step gate's key: ``node_id`` (seed) and ``jq_path`` (step) tell them apart."""
     host = _host(tmp_path, "unused_route")
-    manifest = host / "spec" / SEED_MANIFEST_PATH
+    manifest = host / "spec" / SEED_MANIFEST_FILE
     document = json.loads(manifest.read_text(encoding="utf-8"))
     document["step_requirements"]["02a"] = [SEED]
     document["step_requirements"]["05"] = [SEED]
@@ -158,7 +159,7 @@ def test_a_step_requirements_value_that_is_not_a_list_is_skipped(tmp_path: Path)
 def test_route_of_makes_the_e748_of_its_step_wait_on_an_open_item_about_the_seed(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """End to end through ``spec-check --step 05``: the E748 of step 05 waits on the open item about the seed (step 06 would not), and blocks without the item."""
     def route_to_05(host: Path) -> None:
-        path = host / "spec" / SEED_MANIFEST_PATH
+        path = host / "spec" / SEED_MANIFEST_FILE
         document = json.loads(path.read_text(encoding="utf-8"))
         document["step_requirements"]["05"] = [SEED]
         path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
@@ -231,7 +232,7 @@ def test_seed_routes_report_in_the_same_order_whatever_the_hash_seed(seed: int, 
     def route_the_seed_to_four_steps(document: dict[str, Any]) -> None:
         document["step_requirements"].update({"02a": [SEED], "16": [SEED, EXTRA], "05": [SEED]})
 
-    host = _host(tmp_path, "unrouted_seed", **{SEED_MANIFEST_PATH: route_the_seed_to_four_steps})
+    host = _host(tmp_path, "unrouted_seed", **{SEED_MANIFEST_FILE: route_the_seed_to_four_steps})
     listed = seeded(seed, __name__, "_listed", str(host))
     assert listed == _listed(str(host))
     assert [row[0] for row in listed] == [SEED_ROUTE_UNUSED] * 4
@@ -249,7 +250,7 @@ def test_a_seed_no_entry_routes_anywhere_is_one_e747_and_no_e749(tmp_path: Path,
         else:
             document["step_requirements"] = {}
 
-    findings = _found(_host(tmp_path, **{SEED_MANIFEST_PATH: unroute}))
+    findings = _found(_host(tmp_path, **{SEED_MANIFEST_FILE: unroute}))
     assert [error.code for error in findings] == [SEED_NOT_ROUTED] and findings[0].node_id == SEED
 
 
@@ -259,7 +260,7 @@ def test_a_route_of_a_step_the_spec_does_not_have_is_not_e748(tmp_path: Path) ->
     def add_unknown_step(document: dict[str, Any]) -> None:
         document["step_requirements"]["99"] = [SEED]
 
-    assert _found(_host(tmp_path, **{SEED_MANIFEST_PATH: add_unknown_step})) == []
+    assert _found(_host(tmp_path, **{SEED_MANIFEST_FILE: add_unknown_step})) == []
 
 
 # --- the way out each message names (every one is followed to a clean spec-check in the report of the round) ------------------
@@ -280,14 +281,14 @@ def _messages(host: Path, code: str) -> dict[str | None, str]:
 
 def test_e748_of_a_seeds_only_route_says_to_remove_the_seed_with_it(tmp_path: Path) -> None:
     """Removing the only route of a seed starts E747: the advice names what clears both."""
-    message = _messages(_host(tmp_path, **{SEED_MANIFEST_PATH: _extra_seed({"02": [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
+    message = _messages(_host(tmp_path, **{SEED_MANIFEST_FILE: _extra_seed({"02": [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
     assert "distil the seed in that step (a node of step 02 lists seed-extra in derives_from)" in message
     assert message.endswith("remove the seed from the manifest (its seeds[] entry, this route and its document)")
 
 
 def test_e748_of_a_seeds_only_route_names_the_links_to_the_seed_in_other_steps(tmp_path: Path) -> None:
     """Removing the seed alone leaves the links of a node of another step (E700): the advice says how many nodes link it and the command that lists them."""
-    edits = {SEED_MANIFEST_PATH: _extra_seed({"02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
+    edits = {SEED_MANIFEST_FILE: _extra_seed({"02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
     message = _messages(_host(tmp_path, **edits), SEED_ROUTE_UNUSED)[EXTRA]
     assert message.endswith(f"remove the seed from the manifest (its seeds[] entry, this route and its document) and the links to it {_links(1)}, then run specdev attest --prune")
     assert "needs one first" not in message and "its only route" not in message
@@ -295,7 +296,7 @@ def test_e748_of_a_seeds_only_route_names_the_links_to_the_seed_in_other_steps(t
 
 def test_e748_of_a_seed_with_two_routes_one_of_them_unused_says_to_remove_the_route_only(tmp_path: Path) -> None:
     """Two routes are not an only route, however the count is written: the unused one is removed alone and the seed stays."""
-    edits = {SEED_MANIFEST_PATH: _extra_seed({"02": [EXTRA], "02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
+    edits = {SEED_MANIFEST_FILE: _extra_seed({"02": [EXTRA], "02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
     message = _messages(_host(tmp_path, **edits), SEED_ROUTE_UNUSED)[EXTRA]
     assert message.endswith("distil the seed in that step (a node of step 02a lists seed-extra in derives_from), or remove the route")
 
@@ -310,7 +311,7 @@ def test_e748_of_a_route_that_is_not_the_seeds_only_one_says_to_remove_the_route
 @pytest.mark.parametrize("step", ["05", "16"])
 def test_e748_of_a_step_that_cannot_link_a_seed_says_to_move_the_route_not_to_distil_there(tmp_path: Path, step: str) -> None:
     """A node of step 05, or of the trinity steps, cannot list a seed: "distil it in that step" cannot be followed."""
-    message = _messages(_host(tmp_path, **{SEED_MANIFEST_PATH: _extra_seed({step: [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
+    message = _messages(_host(tmp_path, **{SEED_MANIFEST_FILE: _extra_seed({step: [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
     assert "distil the seed in that step" not in message
     assert "move the route to a step whose nodes can link a seed (00, 02, 02a) and list seed-extra in derives_from of a node there, or remove the seed from the manifest" in message
 
@@ -374,8 +375,8 @@ def test_e747_names_the_global_seed_order_entry_when_the_seed_has_one(tmp_path: 
     def order(document: dict[str, Any]) -> None:
         document["global_seed_order"].append(EXTRA)
 
-    assert "(its seeds[] entry, its global_seed_order entry and its document)" in _e747(tmp_path / "listed", **{SEED_MANIFEST_PATH: order})
-    sole = _messages(_host(tmp_path / "sole", **{SEED_MANIFEST_PATH: lambda doc: doc.update(step_requirements={})}), SEED_NOT_ROUTED)[SEED]
+    assert "(its seeds[] entry, its global_seed_order entry and its document)" in _e747(tmp_path / "listed", **{SEED_MANIFEST_FILE: order})
+    sole = _messages(_host(tmp_path / "sole", **{SEED_MANIFEST_FILE: lambda doc: doc.update(step_requirements={})}), SEED_NOT_ROUTED)[SEED]
     assert "(its seeds[] entry, its global_seed_order entry and its document)" in sole and "needs another seed" not in sole
 
 
@@ -385,7 +386,7 @@ def test_e749_says_to_prune_after_removing_the_link(tmp_path: Path) -> None:
 
 
 def test_a_seed_listed_twice_under_one_step_is_one_unused_route_and_its_only_one(tmp_path: Path) -> None:
-    host = _host(tmp_path, **{SEED_MANIFEST_PATH: _extra_seed({"02a": [EXTRA, EXTRA]})})
+    host = _host(tmp_path, **{SEED_MANIFEST_FILE: _extra_seed({"02a": [EXTRA, EXTRA]})})
     assert _rows(_found(host)) == [(SEED_ROUTE_UNUSED, EXTRA, "step:02a")]
     assert "remove the seed from the manifest" in _messages(host, SEED_ROUTE_UNUSED)[EXTRA]
 
@@ -395,7 +396,7 @@ def test_a_route_to_an_id_that_is_no_seed_is_not_reported_here(tmp_path: Path) -
     def route_unknown(document: dict[str, Any]) -> None:
         document["step_requirements"]["02a"] = ["seed-nope"]
 
-    assert _found(_host(tmp_path, **{SEED_MANIFEST_PATH: route_unknown})) == []
+    assert _found(_host(tmp_path, **{SEED_MANIFEST_FILE: route_unknown})) == []
 
 
 def test_the_routes_of_the_manifest_leave_out_what_is_not_a_list_of_ids(tmp_path: Path) -> None:

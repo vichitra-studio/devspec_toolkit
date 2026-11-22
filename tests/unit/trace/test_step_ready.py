@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from specdev_tools.trace.replay import ReplayPlan
+from specdev_tools.trace.replay import ReplayPlan, compute_replay
 from specdev_tools.graph.queries import plural
 from specdev_tools.trace.step_ready import Blocker, Readiness, check_ready, first_clause, link_steps, not_ready_error, present_steps, required_spec_inputs
 
 from ..graph._synth import ROOT
-from .test_suspects import Example
+from ._suspects_support import Example
 from ._lock_support import EXAMPLE_HOST
 
 
@@ -98,3 +98,29 @@ def test_the_clause_is_about_the_first_step_only() -> None:
     """Step 05 has a suspect link and step 08 has gaps: the first step decides the clause, step 08's gaps are not mentioned yet."""
     readiness = Readiness("14", ("05", "08"), (_blocker("05", "suspect"), _blocker("08", "gap")))
     assert first_clause(readiness) == "replay step 05 first"
+
+
+def test_the_step_to_replay_first_is_the_earliest_pending_step_above_even_when_it_is_not_linked(example: Example) -> None:
+    """A seed edit makes step 00's links suspect; step 01's links are suspect too and cannot be attested before 00's, though step 04 links to 01 only."""
+    example.edit_seed()
+    graph = example.graph()
+    plan = compute_replay(graph, example.lock(), example.seed_texts(graph))
+    pending = [item.step for item in plan.steps if item.nodes]
+    assert pending[:2] == ["00", "01"]
+    present = present_steps(graph, str(example.spec))
+    readiness = check_ready(graph, plan, "04", required_spec_inputs(str(ROOT), "04"), present)
+    assert not readiness.ready
+    assert {blocker.step for blocker in readiness.blockers} == {"01"}
+    assert readiness.replay_first == "00"
+    assert first_clause(readiness) == "replay step 00 first"
+    assert "step 01 (" in not_ready_error(readiness).message and not_ready_error(readiness).message.endswith("replay step 00 first")
+    assert check_ready(graph, plan, "01", [], present).replay_first == "00"
+
+
+def test_a_pending_step_above_that_is_not_linked_does_not_block_a_step_whose_own_links_are_clean(example: Example) -> None:
+    example.edit_criterion()
+    graph = example.graph()
+    plan = compute_replay(graph, example.lock(), example.seed_texts(graph))
+    present = present_steps(graph, str(example.spec))
+    readiness = check_ready(graph, plan, "04", [], present)
+    assert readiness.ready and readiness.replay_first is None and readiness.earlier == ()

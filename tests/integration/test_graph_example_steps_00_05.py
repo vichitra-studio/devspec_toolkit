@@ -36,9 +36,7 @@ _FILES = (
     "05_interface_contracts.json",
 )
 _DEEP_STEPS = {
-    "01_capabilities.json": "01",
     "02_system_sketch.json": "02",
-    "02a_delivery_baseline.json": "02a",
     "04_fr_list.json": "04",
     "05_interface_contracts.json": "05",
 }

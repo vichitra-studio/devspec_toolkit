@@ -41,8 +41,7 @@ from specdev_tools.validation.merge_gate import MERGE_BINDINGS, closed_by_branch
 from specdev_tools.validation.spec_check import run_spec_check_json
 
 from ._bindings_support import FIXTURES, RECORDS, align, edit_capture, edit_json, fixture_of, fresh, records, run_line, tree_of
-from .test_convert_remove import migrate
-from ._support import REAL_ROOT, git, tree_digest
+from ._support import git, migrate, REAL_ROOT, tree_digest
 
 FEE = "fix-late-fee-two-days"
 DESK = "fix-checkout-conflict"

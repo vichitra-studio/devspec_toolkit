@@ -14,7 +14,7 @@ import yaml
 from specdev_tools import cli
 from specdev_tools.core.errors import ERROR_CODES
 
-from ..core.test_error_code_registry import REGISTERED_WITHOUT_EMITTER
+from ..core._error_code_support import REGISTERED_WITHOUT_EMITTER
 
 _ROOT = Path(__file__).resolve().parents[3]
 _ERROR_CODES_MD = _ROOT / "docs" / "developers" / "error-codes.md"

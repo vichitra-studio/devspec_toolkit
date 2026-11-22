@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .test_convert_remove import items, migrate, read
+from ._support import items, migrate, read
 
 
 def _pairs(report) -> dict[str, str]:

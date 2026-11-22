@@ -24,10 +24,9 @@ from specdev_tools.graph.kinds import SEED_STEP
 from specdev_tools.graph.model import Graph
 from specdev_tools.graph.queries import plural
 from specdev_tools.trace import replay
+from specdev_tools.trace.attest import REASON_MISSING, REASON_SUSPECT
 from specdev_tools.trace.suspects import lock_links
 
-REASON_MISSING = "missing"
-REASON_SUSPECT = "suspect"
 REASON_GAP = "gap"
 
 
@@ -56,6 +55,8 @@ class Readiness:
     step: str
     upstream: tuple[str, ...]
     blockers: tuple[Blocker, ...]
+    earlier: tuple[Blocker, ...] = ()
+    """What is pending in the earliest step above that the blockers' steps do not link to, when it lies above the first blocker's step: not a blocker of *step*, only where the replay has to begin."""
 
     @property
     def ready(self) -> bool:
@@ -64,15 +65,22 @@ class Readiness:
 
     @property
     def replay_first(self) -> str | None:
-        """The upstream step to deal with first (the earliest in the waterfall that has a blocker), or ``None`` when ready."""
+        """The upstream step to deal with first, or ``None`` when ready.
+
+        The earliest step in the waterfall that has a blocker; when a step above all of them, one *step* does not link to, still
+        has something pending, that step (a link cannot be attested while the node it points to is suspect).
+        """
+        if self.earlier:
+            return self.earlier[0].step
         return self.blockers[0].step if self.blockers else None
 
 
 def first_clause(readiness: Readiness) -> str:
     """What to do first, worded by the blockers of the first step: ``write step NN first`` for a missing file; ``replay step NN first`` for suspect links; ``fix the coverage gaps of step NN first`` when there are only coverage gaps (no replay or attest clears a gap); ``replay step NN first and fix its coverage gaps`` for both."""
     step = readiness.replay_first
-    reasons = {blocker.reason for blocker in readiness.blockers if blocker.step == step}
-    if readiness.blockers and readiness.blockers[0].reason == REASON_MISSING:
+    first = [*readiness.earlier, *readiness.blockers]
+    reasons = {blocker.reason for blocker in first if blocker.step == step}
+    if first and first[0].reason == REASON_MISSING:
         return f"write step {step} first"
     if reasons == {REASON_GAP}:
         return f"fix the coverage gaps of step {step} first"
@@ -136,7 +144,24 @@ def check_ready(
     for item in replay.pending_replay(plan, scope):
         blockers.extend(_replay_blockers(item))
     blockers.sort(key=lambda b: (graph.shape.step_key(b.step), b.node or "", b.field or "", b.target or "", b.code or ""))
-    return Readiness(step, upstream, tuple(blockers))
+    return Readiness(step, upstream, tuple(blockers), _earlier_pending(graph, plan, step, blockers))
+
+
+def _earlier_pending(graph: Graph, plan: replay.ReplayPlan, step: str, blockers: list[Blocker]) -> tuple[Blocker, ...]:
+    """The suspect links of the earliest step above the first of *blockers* that has any; empty when there is none, or no blocker.
+
+    A link cannot be attested while the node it points to is suspect, so the replay begins there.  A coverage gap of a step
+    that *step* does not link to is not in the way and is not named.
+    """
+    if not blockers:
+        return ()
+    limit = graph.shape.step_key(blockers[0].step)
+    above = {name for name in graph.shape.step_ranks if name != SEED_STEP and graph.shape.step_key(name) < limit}
+    for item in sorted(replay.pending_replay(plan, above), key=lambda item: graph.shape.step_key(item.step)):
+        suspect = tuple(blocker for blocker in _replay_blockers(item) if blocker.reason == REASON_SUSPECT)
+        if suspect:  # only a suspect link above orders the replay; a coverage gap of an unlinked step does not
+            return suspect
+    return ()
 
 
 # --- output ---------------------------------------------------------------------------------------------------------

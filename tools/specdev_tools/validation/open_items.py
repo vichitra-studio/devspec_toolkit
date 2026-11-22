@@ -1,9 +1,8 @@
-"""The open-item check and the deletion of resolved items.
+"""The open-item check.
 
 An open item (an ``ambiguity-item``) is a question the spec cannot answer yet.  ``check_open_items`` reports the live
-ones at one of three gates and ``delete_resolved_items`` removes the 1.1.1 items already marked ``resolved``.  Where the
-items are and what "open" means is the single answer of ``core.ambiguity_items``; this module only decides what each
-gate does with them.
+ones at one of three gates.  Where the items are and what "open" means is the single answer of ``core.ambiguity_items``;
+this module only decides what each gate does with them.
 
 ======  ================================================  ====================================
 Gate    Finding                                           Owner
@@ -21,7 +20,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Literal
 
@@ -33,15 +32,12 @@ from specdev_tools.core.ambiguity_items import (
     SilentTarget,
     about_targets,
     is_open,
-    iter_ambiguity_items,
     read_ambiguity_items,
 )
-from specdev_tools.core.errors import FindingError, SpecError, make_error
-from specdev_tools.core.json_utils import delete_text, json_write_atomic
+from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.graph.ownership import CLOSE_OWNER, STEP_PREFIX, step_for_file
 from specdev_tools.graph.queries import plural
 from specdev_tools.trace.lockfile import MERGE_CHECK_OWNER
-from specdev_tools.trace.writing import writing_graph
 
 Gate = Literal["step", "merge", "close"]
 FrozenProvider = Callable[[Path], bool]
@@ -91,30 +87,6 @@ def check_open_items(
     else:
         findings = _step_findings(items, root, frozen)
     return findings + unreadable
-
-
-def delete_resolved_items(
-    spec_dir: str | os.PathLike[str], repo_root: str | os.PathLike[str], *, apply: bool = False
-) -> dict[str, int]:
-    """Count (and with *apply* delete) the legacy items whose ``status`` is ``resolved``; the count is per file.
-
-    Looks in ``plan.ambiguities`` and ``execution.emergent_ambiguities`` of every milestone plan and in the anchor's
-    ``plan.ambiguities`` (the arrays of ``core.ambiguity_items``).  Items that are not resolved are never touched.  The
-    keys of the result are file paths relative to *spec_dir*, only for files that hold at least one resolved item.
-    A dry run reads only; a write holds the write lock and each file is replaced atomically (a failure on a later file
-    leaves the earlier ones written).  It does not decide whether a plan is frozen: M10 runs it before the close hash.
-
-    Raises:
-        FindingError: E520 when a spec file cannot be read or written (``cannot write <file>: <reason>``), E769 when
-            another write holds the lock.
-    """
-    root = os.fspath(spec_dir)
-    with writing_graph(None, root, os.fspath(repo_root), "delete resolved open items", write=apply):
-        positions = _resolved_positions(root)
-        if apply:
-            for path, by_location in positions.items():
-                _rewrite_without(path, root, by_location)
-    return {_relative(root, path): sum(map(len, by_location.values())) for path, by_location in positions.items()}
 
 
 def _relative(root: str, path: str) -> str:
@@ -210,37 +182,3 @@ def _close_findings(items: list[AmbiguityItem], root: str, plan_path: str) -> li
         for item in items
         if item.step in PLAN_ITEM_STEPS and Path(item.artifact_path).resolve() == plan
     ]
-
-
-def _read_all(root: str) -> Iterator[AmbiguityItem]:
-    try:
-        yield from iter_ambiguity_items(root)
-    except AmbiguityReadError as error:
-        raise FindingError(_unreadable(root, error)) from error
-
-
-def _resolved_positions(root: str) -> dict[str, dict[str, list[int]]]:
-    """Per file and array location, the list indices of the resolved items (the arrays are read in file order)."""
-    seen: Counter[tuple[str, str]] = Counter()
-    found: dict[str, dict[str, list[int]]] = {}
-    for item in _read_all(root):
-        key = (item.artifact_path, item.location)
-        index, seen[key] = seen[key], seen[key] + 1
-        if not is_open(item):
-            found.setdefault(item.artifact_path, {}).setdefault(item.location, []).append(index)
-    return found
-
-
-def _rewrite_without(path: str, root: str, by_location: dict[str, list[int]]) -> None:
-    """Write *path* without the items at the given indices of each array; E520 when it cannot be written."""
-    with open(path, encoding="utf-8") as handle:
-        text = handle.read()
-    for location, indices in by_location.items():
-        text = delete_text(text, f"{location}[{','.join(map(str, indices))}]")
-    try:
-        json_write_atomic(path, text)
-    except OSError as error:
-        artifact = _relative(root, path)
-        raise FindingError(make_error(
-            "E520", f"cannot write {artifact}: {error.strerror or error}", file=artifact
-        )) from error

@@ -15,7 +15,7 @@ from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT, run_cli
 from unit.trace._lock_support import EXAMPLE_HOST
-from unit.trace.test_suspects import SEED_FILE, Example
+from unit.trace._suspects_support import SEED_FILE, Example
 
 SEED = "seed-accounts"
 SCOPE, CAP, FR = "scope-password-reset", "cap-account-recovery", "fr-password-reset"

@@ -3,7 +3,6 @@ import unittest
 from specdev_tools.validation.validators import (
     step_04,
     step_05,
-    step_02a,
     step_06,
     step_07,
     step_08,
@@ -185,14 +184,12 @@ class StepValidatorsTests(unittest.TestCase):
 
 def test_step_02a_duplicate_gate_id():
     gates = [{"gate_id": "gate-lint"}, {"gate_id": "gate-lint"}]
-    assert step_02a.validate_step_02a({"ci_gates": gates}, ".") == []
     errs = unique_id_errors({"02a_delivery_baseline.json": {"ci_gates": gates}})
     assert [(e.code, e.owner, e.node_id) for e in errs] == [("E704", "step:02a", "gate-lint")]
 
 
 def test_step_02a_duplicate_secret_id():
     secrets = [{"secret_id": "sec-db"}, {"secret_id": "sec-db"}]
-    assert step_02a.validate_step_02a({"secrets": secrets}, ".") == []
     errs = unique_id_errors({"02a_delivery_baseline.json": {"secrets": secrets}})
     assert [(e.code, e.owner, e.node_id) for e in errs] == [("E704", "step:02a", "sec-db")]
 

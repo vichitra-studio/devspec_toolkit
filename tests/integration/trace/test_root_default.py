@@ -16,7 +16,7 @@ from specdev_tools.validation.spec_check import run_spec_check_json
 
 from unit.graph._synth import ROOT, git, run_cli
 from unit.trace._lock_support import EXAMPLE_HOST
-from unit.trace.test_suspects import Example
+from unit.trace._suspects_support import Example
 
 FR = "fr-password-reset-request"
 STEPS = ("00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16a")

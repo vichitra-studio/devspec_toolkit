@@ -12,7 +12,6 @@ from .linter_utils import (
     collect_ids_and_refs,
     graph_covered_files,
     graph_known_ids,
-    is_reference_context,
     iter_json,
 )
 

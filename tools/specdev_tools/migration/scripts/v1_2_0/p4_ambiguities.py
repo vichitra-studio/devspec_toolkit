@@ -5,9 +5,7 @@ Three arrays held legacy items (``severity``, ``status``, ``impact``): the ancho
 ``description``, ``about``; an item exists or is deleted).  This script, in the order of the legacy-item rules:
 
 1. deletes every ``resolved`` item (history is git; the count is printed).  The rule is M6a's (``core.ambiguity_items.is_open``,
-   the reader ``validation.open_items.delete_resolved_items`` uses); the deletion itself goes through the format-preserving
-   writer, because ``delete_resolved_items`` rewrites a file through ``jq`` at indent 4 and would reformat a plan written at
-   another indent (checked: an indent-2 plan comes out whole-file changed);
+   ``iter_ambiguity_items`` reads them); the deletion goes through the format-preserving writer, so a plan written at another indent keeps it;
 2. removes a non-resolved item of a legacy-closed plan and lists it as an informational worklist item (``blocking: false``,
    ``about`` the plan's milestone), so a frozen plan keeps no open item;
 3. converts a non-resolved item of the anchor or an open plan to the unified shape when its ``impact`` names exactly one

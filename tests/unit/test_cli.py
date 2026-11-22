@@ -298,29 +298,6 @@ class CliTests(unittest.TestCase):
                                     },
                                 },
                             },
-                            "tech_stack": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "tech_stack_ref": {"type": "object"},
-                                    },
-                                },
-                            },
-                            "dependencies": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "type": {"type": "string"},
-                                        "id": {"type": "string"},
-                                        "dependency_ref": {"type": "object"},
-                                    },
-                                },
-                            },
                             "terms": {
                                 "type": "array",
                                 "items": {
@@ -431,22 +408,6 @@ class CliTests(unittest.TestCase):
                                 "status": "active",
                                 "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
                             },
-                            {
-                                "id": "cn:core:tech_stack:python",
-                                "kind": "tech_stack",
-                                "preferred_label": "python",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
-                            {
-                                "id": "cn:core:dependency:auth-service",
-                                "kind": "dependency",
-                                "preferred_label": "auth-service",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
                         ],
                         "aliases": [],
                     }
@@ -471,14 +432,6 @@ class CliTests(unittest.TestCase):
                         "extensions": [
                             {"area_of_concern": "security"},
                             {"area_of_concern": "unknown-area"},
-                        ],
-                        "tech_stack": [
-                            {"name": "python"},
-                            {"name": "unknown-tech"},
-                        ],
-                        "dependencies": [
-                            {"type": "external", "id": "auth-service"},
-                            {"type": "external", "id": "unknown-dependency"},
                         ],
                         "terms": [
                             {"term": "JWT"},
@@ -544,21 +497,11 @@ class CliTests(unittest.TestCase):
                 payload["extensions"][0].get("governance_label_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:tech_stack:python", "kind": "tech_stack"},
-                payload["tech_stack"][0].get("tech_stack_ref"),
-            )
-            self.assertEqual(
-                {"id": "cn:core:dependency:auth-service", "kind": "dependency"},
-                payload["dependencies"][0].get("dependency_ref"),
-            )
-            self.assertEqual(
                 {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
                 payload["threats"][0].get("risk_category_ref"),
             )
             self.assertNotIn("action_ref", payload["items"][0])
             self.assertNotIn("governance_label_ref", payload["extensions"][1])
-            self.assertNotIn("tech_stack_ref", payload["tech_stack"][1])
-            self.assertNotIn("dependency_ref", payload["dependencies"][1])
             self.assertNotIn("risk_category_ref", payload["threats"][1])
 
     def test_canonical_autofix_infers_term_and_risk_category_with_negative_cases(self):
@@ -774,78 +717,6 @@ class CliTests(unittest.TestCase):
                 {"id": "cn:core:environment:prod", "kind": "environment"},
                 payload.get("environment_ref"),
             )
-
-    def test_canonical_autofix_does_not_infer_dependency_ref_from_top_level_id(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            canon_dir = repo_root / "canon"
-            tools_dir = repo_root / "tools"
-            schema_dir = repo_root / "schema"
-            spec_dir.mkdir()
-            canon_dir.mkdir()
-            tools_dir.mkdir()
-            schema_dir.mkdir()
-            self._write_schema_registry_with_canon(
-                repo_root,
-                {"vc:test": "schema/test.schema.json"},
-            )
-            (schema_dir / "test.schema.json").write_text(
-                json.dumps(
-                    {
-                        "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "vc:test",
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "id": {"type": "string"},
-                            "dependency_ref": {"type": "object"},
-                            "canonical_refs_used": {"type": "array"},
-                        },
-                        "required": ["id", "canonical_refs_used"],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (canon_dir / "manifest.json").write_text(
-                json.dumps(
-                    {
-                        "registry_version": "1.0.0",
-                        "entries": [
-                            {
-                                "id": "cn:core:dependency:artifact-id",
-                                "kind": "dependency",
-                                "preferred_label": "artifact-id",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
-                        ],
-                        "aliases": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            artifact = spec_dir / "artifact.json"
-            artifact.write_text(
-                json.dumps(
-                    {
-                        "$schema": "vc:test",
-                        "id": "artifact-id",
-                        "canonical_refs_used": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            code, out, err = self._run_cli(
-                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
-            )
-            self.assertEqual(0, code, msg=err)
-            self.assertIn("OK", out)
-
-            payload = json.loads(artifact.read_text(encoding="utf-8"))
-            self.assertNotIn("dependency_ref", payload)
 
     def test_canonical_autofix_infers_acronym_refs(self):
         with tempfile.TemporaryDirectory() as td:

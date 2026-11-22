@@ -89,7 +89,7 @@ _LOAD_LOCK = threading.Lock()
 # and precomputed into the excluded-keys set at load time.
 ALWAYS_EXCLUDED = frozenset(["canonical_refs_used", "canonical_proposals"])
 
-_REGISTRY_FILENAME = "entry_key_registry.json"
+REGISTRY_FILENAME = "entry_key_registry.json"
 
 
 def _load(repo_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
@@ -116,7 +116,7 @@ def _load(repo_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
     if cache_key not in _REGISTRY_CACHE:
         with _LOAD_LOCK:
             if cache_key not in _REGISTRY_CACHE:
-                path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+                path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
                 if not os.path.isfile(path):
                     raise FileNotFoundError(
                         f"Entry-key registry not found at {path!r}. "

@@ -126,6 +126,26 @@ def test_record_goes_stale_after_a_lock_hash_change(tmp_path: Path) -> None:
     assert len(records_in(host)) == 1
 
 
+def test_record_goes_stale_when_the_item_is_attested_again_with_the_same_criterion_text(tmp_path: Path) -> None:
+    """Something above the criterion changed, the criterion's own text did not, the item was read and attested again: the work is carried out again."""
+    host = plan_host(tmp_path)
+    spec, repo, git = roots(host)
+    record_action(spec, repo, git, A01, "done")
+    change_lock_hash(host, "chain_stamp")
+    lock = read_lock(spec)
+    (finding,) = check_plan_records(graph_of(host), lock, spec)
+    assert (finding.code, finding.node_id) == ("W825", "rec-0001")
+    reading = item_reading(graph_of(host), context(host), ITEM, lock)
+    assert not reading.executed and reading.actions[0].state == executed.STALE
+
+
+def test_a_record_stays_valid_while_the_lock_entry_is_not_attested_again(tmp_path: Path) -> None:
+    host = plan_host(tmp_path)
+    spec, repo, git = roots(host)
+    record_action(spec, repo, git, A01, "done")
+    assert check_plan_records(graph_of(host), read_lock(spec), spec) == []
+
+
 def test_prune_removes_an_orphan_and_keeps_the_others(tmp_path: Path) -> None:
     host = plan_host(tmp_path, action("a02"))
     spec, repo, git = roots(host)

@@ -7,7 +7,7 @@
 2. every plan item that realises a criterion in play is executed (E812);
 3. the review block of the plan says ``verified`` (E813);
 4. the plan holds no open item (E632);
-5. no suspect link is on the milestone's chain (E763);
+5. no suspect link (E763) and no link without a lock entry (E761) is on the milestone's chain;
 6. the scaffold rows of the APIs the criteria refine are tracked files (E746);
 7. a sign-off record exists for the milestone (E814).
 
@@ -246,11 +246,12 @@ def _owned(findings: list[SpecError]) -> list[SpecError]:
 
 
 def _suspect_findings(graph: Graph, ctx: ProofContext, lock: Lock | None, milestone_id: str) -> tuple[list[SpecError], list[str]]:
-    """The E763 findings on the milestone's chain (owned by the close gate) and a note when the check could not run (no trace lock)."""
+    """The E761 (a link never attested) and E763 findings on the milestone's chain (owned by the close gate) and a note when the check could not run (no trace lock)."""
     if lock is None:
         return [], ["no trace lock: the suspect-link check was skipped"]
-    on_the_chain = chain.suspect_links_on_chain(graph, lock, read_seed_texts(graph, ctx.git_root), chain.milestone_chain(graph, milestone_id))
-    return _owned(on_the_chain), []
+    milestone = chain.milestone_chain(graph, milestone_id)
+    suspect = chain.suspect_links_on_chain(graph, lock, read_seed_texts(graph, ctx.git_root), milestone)
+    return _owned([*chain.missing_entry_links_on_chain(graph, lock, milestone), *suspect]), []
 
 
 def _apis_of(graph: Graph, scope: Scope) -> list[str]:
@@ -306,7 +307,7 @@ def check_close_gate(
     *graph* is the graph of the spec folder of *ctx*, *lock* its trace lock (``executed.lock_if_present``; ``None`` skips the
     suspect check and the staleness of records), *open_items* and *scaffold* the two checks of ``validation`` (see the module
     docstring).  A milestone whose close record is a legacy close gives a clean report without any check.  The findings come
-    in the order of the checks: E810 and E811 by criterion, E812 by plan item, E813, E632, E763, E746, E814; one criterion or
+    in the order of the checks: E810 and E811 by criterion, E812 by plan item, E813, E632, E761 and E763, E746, E814; one criterion or
     plan item whose stage cannot be told is one E334 and the others are still answered.
 
     Raises:

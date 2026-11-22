@@ -40,6 +40,7 @@ Bash surface is restricted to these subcommand families only:
 | `specdev node show <id>` | One spec node, read-only |
 | `specdev plan record <ITEM>/<action-id> --outcome done\|failed\|blocked [--note TEXT]` | Record an action you carried out |
 | `specdev verify run <binding-id>` | Prove an action that names a verifier |
+| `specdev verify bind <verifier-id> --command CMD --guard REGEX` | Bind a test you wrote in this item to its verifier, when the verifier has no binding for that command yet (the plan could not know it); the 16c review reads the binding |
 | `specdev spec-check spec --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Gate check — run after every edit batch |
 | `specdev json structure <file>` / `keys <file> '<path>'` / `schema <file> '<path>'` | Shape probes before composing a filter |
 | `specdev json read <file> '<filter>'` | Targeted plan reads |

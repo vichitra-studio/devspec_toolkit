@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ...core.cli_commands import known_cli_commands
 from ...core.errors import make_error, SpecError
 
 _ALLOWED_OWNERS: frozenset[str] = frozenset(
@@ -13,9 +14,9 @@ _ALLOWED_OWNERS: frozenset[str] = frozenset(
 def validate_step_10(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
     """Validate Step 10 (Governance) logic.
 
-    Checks the owner value, the ``commit_message_rules`` pattern (it must compile) and the
-    ``commit_message_rules.allowed_types`` entries. A wrong-typed value is left to the schema
-    and never raises here.
+    Checks the owner value, the ``commit_message_rules`` pattern (it must compile), the
+    ``commit_message_rules.allowed_types`` entries and the ``cli_command`` of each rule (it must be on the command list
+    that ``registry-generate`` writes). A wrong-typed value is left to the schema and never raises here.
     """
     errors: list[SpecError] = []
 
@@ -26,7 +27,34 @@ def validate_step_10(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
     commit_rules = instance.get("commit_message_rules")
     if isinstance(commit_rules, dict):
         errors.extend(_commit_rule_errors(commit_rules))
+    errors.extend(_rule_command_errors(instance.get("rules"), toolkit_root))
     return errors
+
+
+def _rule_command_errors(rules: object, toolkit_root: str) -> list[SpecError]:
+    """E530 for each rule whose ``cli_command`` is not a command of the toolkit's command list.
+
+    Nothing is reported when the list cannot be read: there is then nothing to compare with.
+    """
+    if not isinstance(rules, list):
+        return []
+    named = [(rule, rule["cli_command"]) for rule in rules if isinstance(rule, dict) and isinstance(rule.get("cli_command"), str)]
+    if not named:
+        return []
+    try:
+        commands = known_cli_commands(toolkit_root)
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+    return [
+        make_error(
+            "E530",
+            f"the cli_command '{command}' of rule '{rule.get('rule_id')}' is not a specdev command; "
+            f"give a command as you type it after specdev, for example spec-check or third-party check",
+            node_id=rule["rule_id"] if isinstance(rule.get("rule_id"), str) else None,
+        )
+        for rule, command in named
+        if command not in commands
+    ]
 
 
 def _commit_rule_errors(commit_rules: dict[str, Any]) -> list[SpecError]:

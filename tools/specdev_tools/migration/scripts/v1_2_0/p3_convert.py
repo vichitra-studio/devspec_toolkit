@@ -5,10 +5,15 @@ One row of ``migration/maps/v1_2_0.yaml`` per field (script ``p3_convert``); the
 * ``refs``: a field holding ids of one kind (``goal_id``, ``success_metric_refs``, a connection's ``from``) becomes the link
   field the registry declares for (holder kind, target kind);
 * ``typed``: a list of ``{type, id, note}`` entries (``trace``, ``targets``, ``target_ids``, ``mitigations``) becomes links
-  when the entry's type, the kind the id really has and ONE declared link field of the holder agree; every other entry is a
+  when the entry's type, the kind the id really has and ONE declared link field of the holder agree (a borrowed type such as
+  ``charter-goal`` fixes no kind: the kind of the one node that has the id counts); every other entry is a
   worklist item (never a silent drop) and the old note goes;
 * ``rename``, ``value``, ``out-of-scope``, ``rule-scope``, ``environment-config``, ``defaults``: the one-to-one cases;
-* ``schedules`` (step 09 ``deliverables``) and ``spec-ref`` (open plans): judgement, one worklist item per case.
+* ``schedules`` (step 09 ``deliverables``): each typed entry whose type, real kind and the field's ``x-link`` kinds agree and whose id
+  resolves is written to the milestone's ``schedules`` (order kept, no duplicate); the entry's ``note`` is not carried (the capture
+  has it).  A capability, an id no node has, a free-text string or a type that disagrees with the id is not written: the milestone
+  gets one worklist item naming each entry left and why (blocking only when ``schedules`` stays empty);
+* ``spec-ref`` (open plans): judgement, one worklist item per case.
 
 The link field of a (holder kind, target kind) pair comes from the kind registry, leaving out the verbs that accept any
 kind (``replaces``, ``removes``, ``about``): "exactly one declared field" or the case is a worklist item.  Where a node
@@ -26,8 +31,9 @@ from typing import Any
 
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.contract import path_steps
-from specdev_tools.graph.model import LIFECYCLES, Node
-from specdev_tools.graph.names import ABOUT, CONNECTS_TO
+from specdev_tools.graph.model import LIFECYCLES, Node, article
+from specdev_tools.graph.names import ABOUT, CAPABILITY, CONNECTS_TO, DESIGN_MILESTONE, SCHEDULES
+from specdev_tools.graph.resolve import link_target_allowed
 from specdev_tools.migration.maps import LEGACY_STEP_IDS, legacy_ref_fields, shape_rows
 from specdev_tools.migration.registry import PHASE_SHAPES, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.spec_reads import closed_plan_files, row_step, schedule_proposals, step_file
@@ -225,12 +231,16 @@ class _Pass:
         spec = row["convert"]
         kind = spec.get("item_kind", KIND_TRACE_LINK)
         ident = entry.get("id") if isinstance(entry, dict) else None
-        stated = types.get(str(entry.get("type"))) if isinstance(entry, dict) else None
         real = self.kind_of.get(ident) if isinstance(ident, str) else None
+        entry_type = str(entry.get("type")) if isinstance(entry, dict) else None
+        borrowed = entry_type in legacy_ref_fields()["borrowed_types"]
+        stated = real if borrowed else types.get(entry_type)
         field_name = spec.get("to") or (self.link_field(node.kind, real) if real else None)
         text = f"{spec['field']} entry {entry!r}"
         if not isinstance(ident, str) or real is None:
             self.worklist(node, kind, f"{spec['field']}-{ident}", f"{text}: no node has this id", "drop it or point it at the node it meant")
+        elif borrowed and ident in self.graph.dups:
+            self.worklist(node, kind, f"{spec['field']}-{ident}", f"{text}: several nodes have this id", "decide which it is")
         elif stated is None or stated != real:
             self.worklist(node, kind, f"{spec['field']}-{ident}", f"{text}: the entry's type fixes {stated or 'no kind'}, the id is a {real}", "decide which it is")
         elif field_name is None or not self.accepts(node.kind, field_name, real):
@@ -343,20 +353,54 @@ class _Pass:
                 self.plan.edits += 1
 
     def _schedules(self, row: dict[str, Any]) -> None:
+        """Step 09 ``deliverables`` (typed ``{type, id, note}`` entries) become ``schedules``; what cannot is one worklist item per milestone."""
         name = step_file(self.ctx, row_step(row))
-        if name is None:
+        decl = self.graph.decls.get(DESIGN_MILESTONE)
+        link = next((link for link in (decl.links if decl else ()) if link.field == SCHEDULES), None)
+        if name is None or link is None:
             return
         proposals = schedule_proposals(self.ctx, self.graph, self.kind_of)
+        types = legacy_ref_fields()["typed_types"]
         for node, item in self.entries:
-            if node.file != name or node.kind != "design-milestone":
+            if node.file != name or node.kind != DESIGN_MILESTONE:
                 continue
-            if item.get("schedules"):
-                self.drop(item, "deliverables")
-                continue
-            candidates = proposals.get(node.id, [])
-            self.worklist(node, KIND_SCHEDULES, "schedules", f"{node.id} schedules nothing yet: `schedules` is required and the old `deliverables` are free text (in capture.json, milestone_links)",
-                          f"schedule: {', '.join(candidates)}" if candidates else "no candidate: the paired 14 milestone names none", blocking=True)
+            written, left = self._deliverables(link, node, item.get("deliverables"), types)
+            self.add_links(item, SCHEDULES, written)
             self.drop(item, "deliverables")
+            if item.get(SCHEDULES) and not left:
+                continue
+            empty = not item.get(SCHEDULES)
+            candidates = [c for c in proposals.get(node.id, []) if c not in written]
+            what = "schedules nothing yet: `schedules` is required" if empty else f"schedules {len(written)} of its deliverables; the rest was not written"
+            evidence = f"{node.id} {what}" + (f". Not written: {'; '.join(left)}" if left else "") + " (the old list, with each note, is in capture.json, milestone_links)"
+            proposal = (
+                f"schedule: {', '.join(candidates)}" if candidates
+                else "no candidate: the paired 14 milestone names none" if empty
+                else "add what the milestone should schedule with `specdev json insert --id <milestone-id> .schedules '\"<id>\"'`, or resolve the item"
+            )
+            self.worklist(node, KIND_SCHEDULES, "schedules", evidence, proposal, blocking=empty)
+
+    def _deliverables(self, link: Any, node: Node, entries: Any, types: dict[str, Any]) -> tuple[list[str], list[str]]:
+        """``(ids to schedule, what is left)`` for the old ``deliverables`` of *node*: an entry is written when its type, the kind its id really has and the field agree."""
+        written: list[str] = []
+        left: list[str] = []
+        for entry in entries if isinstance(entries, list) else []:
+            ident = entry.get("id") if isinstance(entry, dict) else None
+            target = self.graph.by_id.get(ident) if isinstance(ident, str) else None
+            stated = types.get(str(entry.get("type"))) if isinstance(entry, dict) else None
+            if not isinstance(entry, dict):
+                why = "a free-text entry, not a typed one"
+            elif target is None or ident in self.graph.dups:
+                why = "no node has this id" if target is None else "several nodes have this id"
+            elif stated != target.kind:
+                why = f"the entry's type fixes {stated or 'no kind'}, the id is {article(target.kind)} {target.kind}"
+            elif not link_target_allowed(link, node.step, target, self.graph.shape):
+                why = f"`schedules` takes no {target.kind} here" + (" (the capability of a milestone is computed from the FRs it schedules)" if target.kind == CAPABILITY else "")
+            else:
+                written.append(ident)
+                continue
+            left.append(f"{entry!r}: {why}")
+        return written, left
 
     def _spec_ref(self, row: dict[str, Any]) -> None:
         for rel in sorted(rel for rel in {n.file for n, _ in self.entries if n.kind == "plan-item"} if rel not in self.closed):

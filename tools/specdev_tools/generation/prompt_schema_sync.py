@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from referencing import Registry
 
 from ..core.errors import SpecError, make_error
-from ..core.registry import SchemaRegistry, get_shared_registry
+from ..core.registry import get_shared_registry
 
 FENCED_JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 EMBEDDED_SCHEMA_RE = re.compile(r"#+\s*Embedded Schema\s*```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)

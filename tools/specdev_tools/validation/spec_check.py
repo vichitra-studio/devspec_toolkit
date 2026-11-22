@@ -16,11 +16,10 @@ import sys
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 from ..core.config import reset_config
-from ..core.errors import SpecError
+from ..core.errors import FindingError, SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.check import run_graph_check
@@ -45,7 +44,7 @@ from .check_registry import (
     register_check,
     run_registered_checks,
 )
-from .merge_gate import run_merge_checks
+from .merge_gate import pins_check, run_merge_checks
 from .open_items import check_open_items
 from .validators.step_14_milestones import check_milestone_numbers
 
@@ -356,6 +355,17 @@ def _check_plan_records(ctx: CheckContext) -> dict[str, Any]:
     return check_result(check_plan_records(ctx.check_graph, lock, ctx.effective_spec_root))
 
 
+def _check_third_party_pins(ctx: CheckContext) -> dict[str, Any]:
+    """The ``third-party-pins`` check (E336 to E338): the merge gate's pin check, owned by step 02 and run at every step gate.
+
+    A declarations file that cannot be read is the check's one E520, as in the merge gate.
+    """
+    try:
+        return pins_check(ctx)
+    except FindingError as exc:
+        return check_result([exc.error])
+
+
 register_check("schema-validation", _check_schema_validation)
 register_check("toolkit-version", _check_toolkit_version_result)
 register_check("spec-quality-lint", _check_spec_quality_lint)
@@ -372,6 +382,7 @@ register_check("registry-check", _check_registry)
 register_check("hardcoded-seed-check", _check_hardcoded_seed)
 register_check("glossary-drift-check", _check_glossary_drift, default_owner=STEP_PREFIX + "03")
 register_check("trace-lock", _check_trace_lock)
+register_check("third-party-pins", _check_third_party_pins, default_owner=STEP_PREFIX + "02")
 bind_proof_seams()
 graph_checks.publish_graph_checks()
 graph_checks.register_graph_check("milestone-numbers", check_milestone_numbers)
