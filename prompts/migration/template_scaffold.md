@@ -11,13 +11,17 @@
 
 ### Items of step 15
 
-No script or proposer writes an item of its own for step 15; the items below and the step's check are the pass.
+No script or proposer writes an item of its own for step 15; the items below and the step's check are the pass. One error of the step has no item and no remedy of its own:
+
+| Error | What it says | Answer with |
+|---|---|---|
+| `E746` | A scaffold row of an API that is built (a task criterion of a closed milestone refines it) names a `path` that is not a file git tracks: `E746 scaffold row <row-id> names <path>, which is not a tracked file (merge mode); add and commit the file, or correct the row's path`. A migrated row keeps the `path` 1.1.1 gave it, often a route such as `/tools` | Put the path of the file that implements the API into the row and commit that file: `specdev json patch --id <row-id> .path '"src/routes/tools.ts"'` (`git ls-files` lists the tracked files). Do it for every row the check names |
 
 ### Items any step can carry
 
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
-| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry |
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry. When the entry points to a node of a later step, the link belongs to that node's own field (`derives_from` of an FR, for example): check it there with `specdev node show <target-id>`, then resolve the item |
 | `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
 | `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
 | `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |

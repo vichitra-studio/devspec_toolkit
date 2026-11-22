@@ -307,3 +307,5 @@ def _finish(spec: str, version: str, stamp: dict, report: ValidateReport, keep_w
             report.deleted.append(rel)
         if os.path.isdir(folder) and not os.listdir(folder):
             os.rmdir(folder)
+    if not (report.stamp_finished or report.deleted or report.kept):
+        report.notes.append("nothing to do: the migration was finished before and no migration file is left")

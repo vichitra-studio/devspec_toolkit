@@ -17,7 +17,7 @@ from specdev_tools.migration.context import CAPTURE_REL
 from specdev_tools.graph.build import build_graph
 from specdev_tools.migration.registry import PHASE_CONTENT, Problem, ScriptResult, ScriptSpec
 from specdev_tools.migration.spec_reads import LEGACY, PLAN_HOLDER_STEP, about_allowed, add_open_item, array_at, closed_plan_files, ensure_array, has_open_item, plan_milestones
-from specdev_tools.migration.worklist import OPEN_ITEM_RULE, WorklistItem, add_items, make_item, missing_items
+from specdev_tools.migration.worklist import WorklistItem, add_items, make_item, missing_items
 
 SCRIPT = ScriptSpec(id="p4_plan_security_items", phase=PHASE_CONTENT, requires=("p3_remove", "p4_ambiguities"), touches=("16", "extras"))
 
@@ -67,7 +67,7 @@ def _frozen_items(entries: list[_Entry], frozen: set[str]) -> list[WorklistItem]
         make_item(
             PLAN_HOLDER_STEP, KIND_FROZEN, e.milestone, audience="operator", blocking=False, key=e.label,
             evidence=f"{e.description} (from {e.rel}, a closed plan: the plan is not changed)",
-            proposal=f"raise it again in the right artifact after the migration, or drop it; {OPEN_ITEM_RULE}",
+            proposal="raise it again in the right artifact after the migration (for a fixture: `specdev json insert --step 08 .fixtures '{...}'`), or drop it",
         )
         for e in entries
         if e.rel in frozen

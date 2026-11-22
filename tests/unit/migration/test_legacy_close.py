@@ -120,6 +120,7 @@ def test_disagreeing_sources_add_a_status_conflict_item(migrated, tmp_path):
     host, _toolkit, _report = migrated
     [conflict] = items(host, "status-conflict")
     assert conflict["about"] == LATE_FEES and conflict["step"] == "14" and conflict["audience"] == "operator" and conflict["blocking"] is True
+    assert "`git revert --no-edit <the migration commit>`" in conflict["proposal"]
     for said in ("14 says done", "anchor says pending", "09 ms-late-fees says pending", "closed by 14.status"):
         assert said in conflict["evidence"], said
     assert closed_ids(host) >= {LATE_FEES}, "a conflict closes the milestone all the same; the item asks the operator to confirm"

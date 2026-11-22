@@ -186,6 +186,8 @@ def test_untyped_prose_citation_is_not_rewritten_and_gives_one_worklist_item(mig
     assert len(found) == 1
     assert "criterion at 04_fr_list.json" in found[0]["evidence"] and "task-criterion at 14_roadmap.json" in found[0]["evidence"]
     assert "tc-catalog-search-1" in found[0]["evidence"]
+    # the plan is closed and frozen: the person is told to leave the text, not to edit a frozen plan
+    assert "closed and frozen: leave the text as it is and resolve the item" in found[0]["proposal"]
 
 
 def test_ambiguity_item_duplicates_are_left_for_p4(migrated):
@@ -195,6 +197,9 @@ def test_ambiguity_item_duplicates_are_left_for_p4(migrated):
     promoted = _items(migrated, "duplicate-promoted-item")
     assert [i["about"] for i in promoted] == ["amb-fee-rounding"]
     assert promoted[0]["audience"] == "operator" and promoted[0]["blocking"] is True
+    # the run renames the plan's copy, so both are deleted by id; the item no longer says `--id` refuses the id
+    assert "`amb-fee-rounding-2`" in promoted[0]["proposal"] and "specdev json delete --id amb-fee-rounding`" in promoted[0]["proposal"]
+    assert "refuses it" not in promoted[0]["proposal"]
 
 
 def test_renamed_collision_writes_no_alias(migrated):

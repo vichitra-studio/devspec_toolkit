@@ -14,14 +14,14 @@
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
 | `ambiguity-about` | operator | An open item of a plan does not name exactly one node of an earlier step | Answer it in the spec, then delete the item: `specdev json delete --id <item-id>`. An `about` (`specdev json patch --id <item-id> .about '["<node-id>"]'`, then `specdev json delete <file> '<item path>.<field>'` for each old field) repairs the item's shape (E520) and nothing more: the merge check (`align validate`) reports E631 for every open item outside a frozen plan until it is deleted. A question that is still open is deleted here and raised again after the migration |
-| `plan-security-item` | operator | A closed plan asked for a fixture or a spec change that was never made (the plan is not changed) | Raise it again in the right artifact (a fixture: `specdev json insert --step 08 .fixtures '{...}'`), or drop it |
+| `plan-security-item` | operator | A closed plan asked for a fixture or a spec change that was never made (the plan is not changed) | Raise it again in the right artifact after the migration (for a fixture: `specdev json insert --step 08 .fixtures '{...}'`), or drop it |
 | `spec-ref-realises` | agent | A plan item's `spec_ref` names a task; the item must `realises` task criteria | `specdev json insert --id <plan-item-id> .realises '"<criterion-id>"'` (the proposal names the criteria), then remove the old field of that item: `specdev json delete <plan file> '.plan.spec_alignment.checklist[<N>].spec_ref'` (`<N>` is the item's place in the plan's `checklist`; the plan item is still an error, E520, until the field is gone; `--id` removes a whole node, not a field, so the file form with a path is the one that deletes a field) |
 
 ### Items any step can carry
 
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
-| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry |
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry. When the entry points to a node of a later step, the link belongs to that node's own field (`derives_from` of an FR, for example): check it there with `specdev node show <target-id>`, then resolve the item |
 | `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
 | `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
 | `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |

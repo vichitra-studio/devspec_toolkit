@@ -1467,7 +1467,10 @@ def build_json_parser() -> argparse.ArgumentParser:
     p_readm.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read-multi")
 
     # Patch
-    p_patch = subparsers.add_parser("patch", help="Update value")
+    p_patch = subparsers.add_parser(
+        "patch", help="Update value",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json patch --id <node-id> <field-path> <value> (`specdev json patch --id <node-id> --help`).",
+    )
     p_patch.add_argument("file", help="JSON file path")
     p_patch.add_argument("path", help="jq path to target (e.g. .version)")
     p_patch.add_argument("value", help="New value (JSON string or raw string)")
@@ -1484,7 +1487,10 @@ def build_json_parser() -> argparse.ArgumentParser:
     )
 
     # Insert
-    p_insert = subparsers.add_parser("insert", help="Insert/Append value")
+    p_insert = subparsers.add_parser(
+        "insert", help="Insert/Append value",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json insert --id <node-id> <field-path> <value>, or --step <NN> <node-object> for a new node (`specdev json insert --id <node-id> --help`).",
+    )
     p_insert.add_argument("file", help="JSON file path")
     p_insert.add_argument("path", help="jq path to target array/object")
     p_insert.add_argument("value", help="Value to insert")
@@ -1512,7 +1518,10 @@ def build_json_parser() -> argparse.ArgumentParser:
     )
 
     # Delete
-    p_del = subparsers.add_parser("delete", help="Delete value")
+    p_del = subparsers.add_parser(
+        "delete", help="Delete value",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json delete --id <node-id> (`specdev json delete --id <node-id> --help`).",
+    )
     p_del.add_argument("file", help="JSON file path")
     p_del.add_argument("path", help="jq path to target")
     p_del.add_argument("--dry-run", action="store_true", help="Preview result without writing")

@@ -172,7 +172,7 @@ It prints `<id>: resolved (extras/migration/worklist.json)` and changes only the
 
 ## Step 6: the pass, step by step
 
-Work in the order of the waterfall: 00, 01, 02, 02a, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 16a. Step 03 (the glossary) needs no pass. An edit makes the links that point at the edited node suspect, so finish a step before the next, and inside a step edit a node that other nodes link to before those nodes (it saves a second `attest`). For one step NN:
+Work in the order of the waterfall: 00, 01, 02, 02a, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 16a, 16b, 16c. Step 03 (the glossary) needs no pass. An edit makes the links that point at the edited node suspect, so finish a step before the next, and inside a step edit a node that other nodes link to before those nodes (it saves a second `attest`). For one step NN:
 
 1. **List what is asked.** `specdev align triage spec --step NN`.
 2. **Open the template of the step by hand.** `specdev align prompts` is not made for this migration: on a 1.1.1 host its only output is a prompt for the removed step 13a file, made from the charter template (`Template: template_charter.md`), so you open the file yourself: `prompts/migration/template_<name>.md`. Each template says what the step's nodes look like in 1.2.0, the table of item kinds with the command that answers each, and how to close an item.
@@ -190,7 +190,7 @@ Work in the order of the waterfall: 00, 01, 02, 02a, 04, 05, 06, 07, 08, 09, 10,
    | 07 | `template_nfrs.md` | 16a / 16b / 16c | `template_impl_planner.md` / `template_impl_coder.md` / `template_impl_reviewer.md` |
    | 08 | `template_fixtures.md` | | |
 
-3. **Ask for proposals where there are some.** `specdev align propose spec --kind refines|prose-ids|bindings` adds worklist items that carry a candidate each (add `--dry-run` to print them and add nothing). `refines` is for the task criteria of step 14, `prose-ids` for text that names an id, `bindings` for legacy fixtures (see [the legacy binding pass](#the-legacy-binding-pass)). A rerun adds no item twice. Proposals are suggestions with a score; nothing is applied.
+3. **Ask for proposals once, before the first step.** `specdev align propose spec --kind refines|prose-ids|bindings` adds worklist items that carry a candidate each (add `--dry-run` to print them and add nothing); run each kind once for the whole spec, and a rerun adds nothing. `refines` is for the task criteria of step 14, `prose-ids` for text that names an id, `bindings` for legacy fixtures (see [the legacy binding pass](#the-legacy-binding-pass)). A rerun adds no item twice. Proposals are suggestions with a score; nothing is applied.
 4. **Read a node, then edit it by id.** `specdev node show <id>` prints the node, where it lives and its links in and out. `specdev node candidates --for <id> --field <field>` lists the nodes a field accepts (use it when a link is refused with E767 "the field accepts: ..."). Then:
    - `specdev json patch --id <id> .<field> '<json>'`: set a field. Setting a link field writes its lock entry.
    - `specdev json insert --id <id> .<array field> '<json>'`: add an item inside a node (a criterion, a task).
@@ -205,7 +205,7 @@ Work in the order of the waterfall: 00, 01, 02, 02a, 04, 05, 06, 07, 08, 09, 10,
    E882 trace lock entry (fr-catalog-search, field derives_from, target 'cap-browse-catalog') still carries the migration baseline marker; check the link, then clear it: `specdev attest fr-catalog-search` shows what would be written, `specdev attest fr-catalog-search --yes` writes it
    ```
 
-   Check the link, then `specdev attest <node-id> --yes` for each node; without `--yes` the command prints what it would write. `specdev attest --step NN --yes` accepts the links the steps' edits made *suspect*, and prints `attest: nothing to attest` when only baseline entries are left, so baseline entries are cleared node by node. The links of a closed milestone keep their marker for good (`E765` when you try to attest them) and are not an error.
+   Check the link, then `specdev attest <node-id> --yes` for each node; without `--yes` the command prints what it would write. `specdev attest --step NN --yes` accepts every link of the step that is *suspect* because its target changed, and that includes a baseline link whose target was edited in the pass. The baseline links that are not suspect are not touched by it: it prints `attest: nothing to attest` when only those are left, and they are cleared node by node. The links of a closed milestone keep their marker for good (`E765` when you try to attest them) and are not an error.
 7. **Gate the step.** `specdev spec-check spec --step NN ...` ends with `RESULT: CLEAR` or `RESULT: BLOCKED`. While the stamp differs from the merge base's, the gate is in migration mode: an error of an earlier step that still has baseline markers is printed as upstream debt, and an error of any other earlier step is new. Clear each step before the next.
 
 Order of attention that worked on the invented host: the charter's links to seeds and needs; capabilities; components and environments; requirements; API errors (each `derives_from` the criterion it follows from); fixtures (`verifies` the criteria; a new fixture where a criterion, API, invariant or NFR was left with none); milestone `schedules`; rule texts and their `derives_from`; edge cases and threats; jobs (`realises`); the task criteria of step 14; the scaffold row paths (a tracked file each); the plan of the open milestone.
@@ -215,6 +215,15 @@ Points the pass runs into:
 - A node with `scope: out` or `later` needs its `scope_reason` first; a fixture with `mode: manual` needs its `manual_reason` first. A node with `scope: out` does not count as distilling a seed for E748: an in-scope node must list the seed.
 - A seed that the manifest routes to a step and no node of that step lists in `derives_from` is `E748`; a seed with no route is `E747`. Route it in `spec/common/seed_manifest.json` (a file edit, not a node) or distil it.
 - After a job's steps changed, `specdev canonical-autofix spec --write` rewrites the canonical references of the job (`E210`).
+- **An error that has no worklist item.** After the mechanical stage many of the remaining errors are `E520 ... '<field>' is a required property` for a link a node must now have: `derives_from` on the charter's assumptions, risks and scope items, on the delivery baseline's environments, gates and secrets, on API errors and on requirements; `threatens` and `mitigated_by` on edge cases. No item is written for them (the migration cannot know what the node derives from) and the message names the place only as a file and a path with an index, for example `00_charter.json:risks/0: 'derives_from' is a required property`. Read the node at the path, list what the field accepts, and write the link (run on the invented host):
+
+  ```bash
+  specdev json read spec/00_charter.json '.risks[0]' --repo-root $TK
+  specdev node candidates --for risk-volunteer-availability-at-the-cafe-lantern --field derives_from --repo-root $TK --git-root .
+  specdev json patch --id risk-volunteer-availability-at-the-cafe-lantern .derives_from '["seed-volunteer-roster"]' --repo-root $TK --git-root .
+  ```
+
+  The first prints the node (`{"risk_id": "risk-volunteer-availability-at-the-cafe-lantern", "text": "...", "scope": "in"}`; the id is the field that ends in `_id`). The second prints `6 candidates for risk.derives_from (showing 6)` and one line per node the field accepts (id, kind, step, file, text). The third prints `patched risk-volunteer-availability-at-the-cafe-lantern (00_charter.json .risks[0])` and `lock entry written: risk-volunteer-availability-at-the-cafe-lantern.derives_from -> seed-volunteer-roster`; a target the field does not accept is refused with `E767` and nothing is written. The same three commands answer `threatens` and `mitigated_by` (the value is a list of ids).
 - Text that names an id (`E752`): reword it without the id, or write the relation as a link and take the id out. The nodes of a frozen plan are not read.
 
 ### Step 14: `refines` on task criteria
@@ -245,16 +254,17 @@ You have two answers. Narrow the invariant to the requirement or API it is reall
 A milestone is closed by the migration when any one of three 1.1.1 sources says it is done: its `status` in `14_roadmap.json`, the `status` of its row in `16_impl_context.json`, or the `verdict` (`verified`) in the `review` block of its plan file. The migration keeps what they said, so a second run closes it again, and its plan is then a closed plan, not an open one. Reopening it in the migrated spec (setting the anchor row to `in_progress` and deleting its `close`) leaves a plan with 1.1.1 fields that the open-plan scripts never reshaped. To reopen it, undo the migration, correct the 1.1.1 spec, and run it again:
 
 1. Undo the migration. Before the migration commit: `git checkout -- spec && git clean -fd spec`. After it: `git revert --no-edit <the migration commit>`.
-2. Correct each source that says done. The item's evidence names them (`14 says done`, `anchor says done`, `16c verdict verified`). `specdev json patch` works on the 1.1.1 files with the toolkit's `--repo-root`:
+2. Correct each source that says done. The item's evidence names them, for example `14 says done; anchor says done; 09 milestone-catalog-basics says done; 16c verdict says verified (closed by 14.status, 16c.verdict)`. Three of the readings can close a milestone: `14` (the roadmap `status`), `anchor` (the row of `16_impl_context.json`) and `16c verdict` (the plan's review); the parenthesis `closed by` lists the ones that did. The `09` reading (the milestone of `09_impl_plan.json`) never closes a milestone, but it is compared with the others: if it still says done once the others are corrected, the run raises a new `status-conflict` item for the milestone, so correct it as well. `specdev json patch` works on the 1.1.1 files with the toolkit's `--repo-root`:
 
    ```bash
    specdev json patch spec/14_roadmap.json '.milestones[<N>].status' '"in_progress"' --repo-root $TK
    specdev json patch spec/16_impl_context.json '.plan.milestone_index[<N>].status' '"in_progress"' --repo-root $TK
    specdev json patch spec/impl_context/ms_<batch>_plan.json '.review.verdict' '"needs_work"' --repo-root $TK
+   specdev json patch spec/09_impl_plan.json '.milestones[<N>].status' '"in_progress"' --repo-root $TK
    ```
 
    (`<N>` is the place of the milestone or row in its list; `specdev json read <file> '<path>'` shows it. Patch only the sources the item names.)
-3. Commit, then run `specdev align apply spec --auto --repo-root $TK --git-root .` again. Followed on a copy of the example host for its `ms-late-fees` (whose only source saying done was the roadmap `status`): after the undo by either form and the one patch, the run printed no `legacy close` line for it, the worklist held no `status-conflict` item, and its anchor row read `pending`. For a milestone that all three sources called done, the same three patches left the row `in_progress`, the run closed no milestone but the ones still done, and `spec-check` reported on its plan only what it reports on any open plan (E520 for the `spec_ref` and missing `realises` of each item, E304 `ROADMAP_TASK_UNCOVERED`), which the open-plan paragraph below tells you to repair.
+3. Commit, then run `specdev align apply spec --auto --repo-root $TK --git-root .` again. Followed on a copy of the example host for its `ms-late-fees` (whose only source saying done was the roadmap `status`): after the undo by either form and the one patch, the run printed no `legacy close` line for it, the worklist held no `status-conflict` item, and its anchor row read `pending`. Followed for `ms-catalog-basics`, which the roadmap, the anchor row, the plan's verdict and the step 09 entry all called done: after the four patches above the run closed no milestone but the ones still done and the worklist held no `status-conflict` item for it; with the step 09 patch left out the item `14 says in_progress; anchor says in_progress; 09 milestone-catalog-basics says done; 16c verdict says needs_work (no closing source, so it stays open)` was there. `spec-check` reports on the plan of a reopened milestone only what it reports on any open plan (E520 for the `spec_ref` and missing `realises` of each item, E304 `ROADMAP_TASK_UNCOVERED`), which the open-plan paragraph below tells you to repair.
 
 ### An open plan
 
@@ -339,7 +349,7 @@ The mechanical stage removes about 60 to 70 percent of the errors. What is left,
 |---|---|---|---|
 | `E882` baseline links | 1,948 | 386 | a person, one `attest <node> --yes` per node |
 | `E752` an id in live text (closed step-14 nodes not counted) | 1,337 | 112 | reword, or write the link |
-| `E520` a field only a person can give (`derives_from`, `refines` on task criteria, `scope_reason`, `pin`) | 884 | 323 | a person, from the worklist |
+| `E520` a field only a person can give (`derives_from`, `refines` on task criteria, `scope_reason`, `pin`) | 884 | 323 | a person; most have no worklist item, see "An error that has no worklist item" in step 6 |
 | `E740` a node nothing links to | 854 | 197 | link it, or give it a scope reason |
 | `E743` / `E742` no verifier / an unused verifier | 304 / 109 | 79 / 23 | a fixture or job that `verifies`, a `verified_by` |
 | `E566`, `E748`, `E701`, `E304`, `E741` | 56, 48, 21, 12, 10 | 21, 7, 2, 0, 6 | a person |

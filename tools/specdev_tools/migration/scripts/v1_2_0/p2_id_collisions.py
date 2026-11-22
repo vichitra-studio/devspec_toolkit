@@ -28,7 +28,7 @@ from specdev_tools.graph.model import Graph, Node
 from specdev_tools.migration.context import CAPTURE_REL, file_key
 from specdev_tools.migration.maps import LEGACY_STEP_IDS, legacy_ref_fields
 from specdev_tools.migration.registry import PHASE_IDS, Problem, ScriptResult, ScriptSpec
-from specdev_tools.migration.spec_reads import AMBIGUITY, RENAMES_KEY
+from specdev_tools.migration.spec_reads import AMBIGUITY, RENAMES_KEY, closed_plan_files
 from specdev_tools.migration.worklist import OPEN_ITEM_RULE, WorklistItem, add_items, make_item, missing_items
 from specdev_tools.validation.linter_utils import graph_known_ids
 
@@ -154,7 +154,7 @@ class _Plan:
             if rule and rule.get("triage_when_files") and ANCHOR_FILE in {n.file for n in nodes} and len({n.file for n in nodes}) > 1:
                 item = make_item("16", KIND_PROMOTED, old, audience="operator", blocking=True,
                                  evidence=f"the open item {old} is in the anchor and in a plan ({', '.join(sorted({n.file for n in nodes}))}): one item promoted from a plan to the anchor",
-                                 proposal=f"keep the live copy and delete the other with `specdev json delete <file> '<jq path of the copy>'` (the id is defined twice, so `--id` refuses it); the copy you keep is an open item too: {OPEN_ITEM_RULE}")
+                                 proposal=f"the run renames the plan's copy to `{old}-2` (the next number not in use if that is taken; the run prints `duplicate id renamed: {old} -> <new id>`), so each copy has its own id: answer the question in the spec, then delete both by id (`specdev json delete --id {old}` and `specdev json delete --id {old}-2`); {OPEN_ITEM_RULE}")
                 self.items[item.id] = item
             return
         if rule and rule.get("rename"):
@@ -173,6 +173,7 @@ class _Plan:
         nodes_by_file: dict[str, list[tuple[Path, Node]]] = {}
         for node in graph.nodes:
             nodes_by_file.setdefault(node.file, []).append((tuple(path_steps(node.jq_path) or ()), node))
+        frozen = closed_plan_files(ctx)
         patterns = {old: re.compile(rf"(?<![A-Za-z0-9_-]){re.escape(old)}(?![A-Za-z0-9_-])") for old in by_old}
         for rel in sorted(graph.documents):
             if not _scanned(rel):
@@ -192,16 +193,19 @@ class _Plan:
                     elif text == old and kind:
                         continue  # the field fixes the kind that keeps the id
                     else:
-                        self._citation(rel, path, field, text, holder, old, graph)
+                        self._citation(rel, path, field, text, holder, old, graph, rel in frozen)
 
-    def _citation(self, rel: str, path: Path, field: str | None, text: str, holder: Node | None, old: str, graph: Graph) -> None:
+    def _citation(self, rel: str, path: Path, field: str | None, text: str, holder: Node | None, old: str, graph: Graph, in_frozen_plan: bool) -> None:
         defs = graph.dups[old]
         described = "; ".join(f"{n.kind} at {n.file} {n.jq_path}" + (f" (now {r.new})" if (r := next((r for r in self.renames if r.node is n), None)) else "") for n in defs)
         about = holder.id if holder else rel
         item = make_item(
             file_key(rel), KIND_CITATION, about, audience="agent", blocking=False, key=f"{old}-{field or 'text'}",
             evidence=f"{rel} {'.'.join(str(p) for p in path)} names `{old}`; {len(defs)} nodes defined it: {described}",
-            proposal=f"decide which one the text means; if the renamed one, replace `{old}` with its new id",
+            proposal=(
+                "the plan holding this text is closed and frozen: leave the text as it is and resolve the item"
+                if in_frozen_plan else f"decide which one the text means; if the renamed one, replace `{old}` with its new id"
+            ),
         )
         self.items[item.id] = item
 

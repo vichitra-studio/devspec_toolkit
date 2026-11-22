@@ -17,11 +17,13 @@
 | `legacy-binding` | agent | A command the 1.1.1 plans or CI ran for legacy fixtures; the proposal carries the `verify bind` line and its class (certain, needs-judgement). Written by the proposer (`--kind bindings`) | Run the line after judging it, or let `specdev align bind-legacy spec --yes --repo-root ./devspec_toolkit --git-root .` write the certain groups; then `specdev verify run <binding-id> --stage <stage>` |
 | `legacy-fixture` | agent | A legacy fixture has no command group (it verifies no node, or the plans name no command) | Link the fixture to the criteria it checks, then `specdev verify bind <fixture-id> --command '<command>' --guard '<regex>'`; or, when only a person can check it, `specdev json patch --id <fixture-id> .manual_reason '"<why>"'`, then `specdev json patch --id <fixture-id> .mode '"manual"'` and `specdev verify attest <fixture-id>` |
 
+An NFR that no fixture or job verifies is `E743`, and the step check counts it against step 08, although its item (`nfr-verifier`) is listed under step 12 and is answered there with a job. Step 08 therefore stays `BLOCKED` on it until a job of step 12 `verifies` the NFR, or you add a fixture that does here (`specdev json insert --step 08 .fixtures '{...}'` with the NFR in `verifies`). Close step 08 after step 12, or add the fixture.
+
 ### Items any step can carry
 
 | Kind | Who | What it asks | Answer with |
 |---|---|---|---|
-| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry |
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry. When the entry points to a node of a later step, the link belongs to that node's own field (`derives_from` of an FR, for example): check it there with `specdev node show <target-id>`, then resolve the item |
 | `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
 | `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
 | `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |

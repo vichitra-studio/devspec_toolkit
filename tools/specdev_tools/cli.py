@@ -1601,7 +1601,8 @@ def main():
                 print(note)
             if outcome.stamp_finished:
                 print("stamp: migration_status cleared, last_migration refreshed (spec/specdev_version).")
-            print("Migration finished. Commit the result.")
+            if outcome.stamp_finished or outcome.deleted:
+                print("Migration finished. Commit the result.")
 
     elif args.cmd == "update":
         from .update import run_update, UpdateResult

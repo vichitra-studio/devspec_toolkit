@@ -243,6 +243,10 @@ class _Pass:
             criteria = [n.id for n in self.graph.nodes if n.kind == "criterion" and n.parent == ident]
             if criteria:
                 return f"`verifies` takes criteria, not an FR: use the criteria of {ident}: {', '.join(criteria)}"
+        back = self.link_field(real, node.kind)
+        if back:
+            return (f"the link belongs to the other node, a later step: `{back}` of {ident} takes a {node.kind}; check it there (`specdev node show {ident}`), "
+                    f"then resolve this item")
         return "link it by hand with the field that fits, or drop it"
 
     def _rename(self, row: dict[str, Any]) -> None:

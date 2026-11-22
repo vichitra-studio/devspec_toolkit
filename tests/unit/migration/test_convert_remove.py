@@ -344,3 +344,10 @@ def test_every_removed_value_a_later_script_reads_is_in_the_capture(migrated):
         if row["disposition"] == "capture-then-remove":
             section = capture[row["captured_in"].split(".")[0]]
             assert section, f"{row['id']}: the capture section {row['captured_in']} is empty on the mini host"
+
+
+def test_a_trace_entry_that_names_a_node_of_a_later_step_says_the_link_belongs_to_that_node(migrated):
+    host, _, _ = migrated
+    found = [i for i in items(host, "trace-link") if i["about"] == "cap-reserve-tool" and "fr-reserve-tool" in i["evidence"]]
+    assert len(found) == 1
+    assert "`derives_from` of fr-reserve-tool takes a capability" in found[0]["proposal"] and "specdev node show fr-reserve-tool" in found[0]["proposal"]

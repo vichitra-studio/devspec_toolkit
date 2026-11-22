@@ -90,7 +90,7 @@ class MigrationReport:
             lines.append(f"total: {self.total_edits} edit(s), {self.worklist_items} worklist item(s), {len(self.changed_files)} file(s) changed")
         lines.extend(f"residue: {line}" for line in self.residue)
         if self.not_run and self.changed_files:
-            lines.append("not run by the runner (do these by hand or with `align prompts`):")
+            lines.append("not run by the runner (do these by hand):")
             lines.extend(f"  - {entry}" for entry in self.not_run)
         if self.dry_run:
             lines.append(self.diff if self.diff else "no change")

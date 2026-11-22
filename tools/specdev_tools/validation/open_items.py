@@ -53,9 +53,9 @@ _ANSWER_NEEDED = "needed from the operator"
 def default_frozen(plan_path: Path) -> bool:
     """The provider that says no plan is frozen: the default of ``check_open_items`` for a caller that passes none.
 
-    ``spec-check`` passes ``functools.partial(frozen.is_frozen_path, spec_root)`` instead, so an open item in the plan of a
-    closed milestone is a legacy item there; no merge-gate caller exists at this commit (a merge or release gate must pass
-    that provider, not this one).  Nothing in ``tools/`` uses the default now; tests do.
+    The step gate (``spec-check``) and the merge gate pass the real provider (``ctx.is_frozen_plan``), so an open item in
+    the plan of a closed milestone is a legacy item there.  The close gate uses this default: it reads the one plan of the
+    milestone being closed, which is not frozen yet.
     """
     return False
 

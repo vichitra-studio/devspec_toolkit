@@ -283,6 +283,8 @@ def test_plan_security_items_open_and_frozen(tmp_path):
     assert sorted(tuple(a["about"]) for a in open_items) == [("ms-reservations",), ("task-reserve-sms",)]
     frozen = items(host, "plan-security-item")
     assert len(frozen) == 2 and all(not i["blocking"] and "ms-catalog-basics" == i["about"] for i in frozen)
+    # the item is about a fixture or a spec change, never an open item: no open-item rule and no `--id <item-id>` command
+    assert all("E631" not in i["proposal"] and "<item-id>" not in i["proposal"] and "--step 08 .fixtures" in i["proposal"] for i in frozen)
     assert not any("asked for" in a["description"] for a in read(host, CLOSED_PLAN)["plan"].get("ambiguities", []))
 
 

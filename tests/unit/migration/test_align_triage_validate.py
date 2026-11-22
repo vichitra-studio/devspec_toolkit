@@ -321,6 +321,7 @@ def test_validate_clears_migration_status(host):
         digest_before = digest(host)
         code, out, _ = specdev("validate", str(host / SPEC), "--repo-root", str(REAL_ROOT))
     assert code == 0 and "was not rewritten" in out and digest(host) == digest_before
+    assert "nothing to do: the migration was finished before" in out and "Migration finished" not in out
 
 
 def test_validate_refuses_a_spec_that_was_not_migrated(tmp_path):

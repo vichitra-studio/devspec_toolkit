@@ -15,9 +15,10 @@ file as ``json patch --id`` does, refuses (E767) an edit that adds a schema viol
 atomically.  The row's ``status``, ``deferral_reason`` and ``close`` are not part of any lock entry (the contract of an
 anchor row is ``summary`` and ``checklist_id_prefix``), so the trace lock stays true without a write.
 
-Stable for M10 (names and signatures are documented here and in the plan; M8 owns the record shape, M10 owns when they
-run): ``write_legacy_close(spec_root, milestone_id, source)`` and
-``append_close_migration(spec_root, milestone_id, hash_after, note)``.
+For migrations (this module owns the record shape, a migration script owns when it runs):
+``write_legacy_close(spec_root, milestone_id, source)``, which the 1.2.0 migration calls, and
+``append_close_migration(spec_root, milestone_id, hash_after, note)``, for a later migration that changes a plan
+that is already closed (the 1.2.0 migration reshapes a plan before it writes the close, so it does not call it).
 """
 from __future__ import annotations
 

@@ -81,4 +81,6 @@ def test_a_kind_file_that_cannot_be_renamed_because_the_target_exists_says_so(tm
     report = runner.run_migration(host / "spec", toolkit_root=toolkit, git_root=host)
     assert report.status != ok
     [error] = [e for e in report.errors if "p3_host_canon" in e.message]
-    assert "canon/kinds/invariant.json exists, so it was not moved" in error.message and "merge its entries" in error.message
+    assert "canon/kinds/invariant.json exists, so it was not moved" in error.message and "merge the entries of canon/kinds/inv.json" in error.message
+    assert "`git clean -fd spec`" in error.message  # the leftover files of an undone run
+    assert "writing `invariant` as the `kind` of each entry and in place of `inv` in its id" in error.message

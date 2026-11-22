@@ -147,8 +147,16 @@ def apply(ctx) -> ScriptResult:
 
 def _target_note(rel: str, document: dict[str, Any], renamed: dict[str, str], documents: dict[str, Any]) -> str:
     """Why a renamed kind's file was not moved, when the file of the new name already exists: what a person does about it."""
-    target = f"{KINDS_DIR}/{renamed[document['kind']]}.json" if document.get("kind") in renamed else None
-    return f" ({target} exists, so it was not moved: merge its entries into {target}, delete {rel}, commit, and run again)" if target in documents else ""
+    old = document.get("kind")
+    new = renamed.get(old) if isinstance(old, str) else None
+    target = f"{KINDS_DIR}/{new}.json" if new else None
+    if target not in documents:
+        return ""
+    return (
+        f" ({target} exists, so it was not moved. If you undid a run of this migration, remove the files it left first (`git clean -fd spec`) and run again. "
+        f"Otherwise merge the entries of {rel} into {target}, writing `{new}` as the `kind` of each entry and in place of `{old}` in its id (`cn:<namespace>:{old}:<name>` becomes "
+        f"`cn:<namespace>:{new}:<name>`), delete {rel}, commit, and run again)"
+    )
 
 
 def verify(before, after) -> list[Problem]:

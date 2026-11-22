@@ -216,7 +216,8 @@ def test_a_host_at_the_toolkit_version_is_a_noop_that_does_not_stamp(tmp_path):
 def test_the_list_of_changes_no_script_makes_is_printed_only_when_the_run_changed_something():
     notes = ["change_schema: a step file changed shape"]
     ran = MigrationReport(STATUS_OK, False, "1.1.1", "1.2.0", scripts=[ScriptReport("p1_a", 1, 1, 1)], not_run=notes, changed_files=["spec/a.json"])
-    assert "not run by the runner" in ran.render() and "  - change_schema: a step file changed shape" in ran.render()
+    assert "not run by the runner (do these by hand):" in ran.render() and "  - change_schema: a step file changed shape" in ran.render()
+    assert "align prompts" not in ran.render()
     nothing = MigrationReport(STATUS_NOOP, False, "1.2.0", "1.2.0", scripts=[ScriptReport("p1_a", 1, 0, 0)], not_run=notes)
     assert "not run by the runner" not in nothing.render() and "change_schema" not in nothing.render()
     dry = MigrationReport(STATUS_OK, True, "1.1.1", "1.2.0", scripts=[ScriptReport("p1_a", 1, 1, 1)], not_run=notes, changed_files=["spec/a.json"])
