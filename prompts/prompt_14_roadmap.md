@@ -56,7 +56,7 @@ Task `acceptance_criteria` in Step 14 REFINE the obligations of the steps above 
 - **Removed condition** = contradiction: FR says "authentication required", task says "authentication optional" — FORBIDDEN.
 - **More specific artifact** = refinement: FR says "page renders", task says "read operation for resource returns success with expected component" — OK.
 
-**Step Authority**: Step 14 is the authoritative source for execution-level `migration_plan` entries and task-level `depends_on`. Step 09 provides the design-level implementation plan. When Step 09 and Step 14 disagree on sequencing or scope, Step 14 takes precedence for execution decisions.
+**Step Authority**: Step 14 is the authoritative source for execution-level `migration_plan` entries and task-level `depends_on`. Step 09 provides the design-level implementation plan and stores no order between its milestones. This roadmap must reach everything a Step 09 milestone schedules (`E567` otherwise); a change of scope is made at Step 09 first, never here.
 
 ## Heuristics For Completeness
 - **Unified View**: The roadmap must include items from BOTH the Core specs and any found Extensions.
@@ -76,7 +76,7 @@ Task `acceptance_criteria` in Step 14 REFINE the obligations of the steps above 
 - **NO Backward Planning**: Dates must proceed logically from earliest to latest, and the milestones are listed in ascending `target_date` order (`E520` otherwise); the order states no dependency.
 - **NEVER create a `depends_on` cycle**: Task A depending on B which depends on A is forbidden and is reported as `E703`.
 - **NEVER refine or verify with an id that is not in the spec**: `refines`, `verified_by` and `depends_on` name existing nodes, of the kinds the schema accepts for the field (`E700` when no node has the id, `E701` for a node of another kind).
-- **NEVER weaken an upstream AC**: Task acceptance criteria must be equal to or STRICTER than the originating FR acceptance criteria. A task AC that relaxes a threshold, removes a condition, or contradicts a constraint is a regression, not a refinement.
+- **NEVER weaken an upstream AC, and never add a bar it does not state**: A task AC that relaxes a threshold, removes a condition, or contradicts a constraint of the originating FR acceptance criterion is a regression, not a refinement. A task AC that sets a stricter threshold or a new condition that no upstream node states is an invention: raise an open item about the FR criterion, so that Step 04 decides.
 - **NO Ambiguous Task Scope**: Task `description` must name the specific deliverable artifact (endpoint, template, table, config, module) being created or modified. "Configure dependencies" is too vague — "Configure OAuth2 client credentials in session middleware settings" is specific.
 - If `risk_status` is 'high' or 'critical', the `risks` array MUST contain >=1 entry naming the specific blocker.
 - A task that is deliberately not built now carries a `disposition` (`value` `deferred` or `wont_do`, with a `reason`: for `deferred`, the blocker and the condition to resume). Do not delete the task to dodge a coverage finding. The milestone, tasks and task criteria of a closed milestone are not edited by id (`json patch|insert|delete --id` is E767): `specdev node status <id> not_applicable` parks one whose built target was deleted, and a change of the work is a new task or milestone.

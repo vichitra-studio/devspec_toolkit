@@ -16,13 +16,13 @@ After generating the JSON artifact, implement the scaffold manually or using you
 
 #### Primary Sources (directly consumed)
 - `spec/15_scaffold.json` (if updating): current scaffold state for incremental generation
-- **02_system_sketch.json**: Component IDs, service boundaries, and `third_parties` (each with a `name` and an exact `pin` — the primary source of technology decisions: language runtime, framework, infrastructure, tools) used to derive the project_skeleton module structure, language/framework selection, and scaffold directory conventions
-- **02a_delivery_baseline.json**: Deployment environment and infrastructure constraints used to select appropriate framework configurations and container orchestration templates for the scaffold
 - **05_interface_contracts.json**: All API definitions (`api_id`, `path`, `method`) used to generate the `interface_map`: each row names the APIs its file implements in `realises`
-- **09_impl_plan.json**: Design milestones (what each one `schedules`, and its `target_date`) used to decide which modules the first scaffold must contain. Technology choices and pins are not read here: they are the `third_parties` of Step 02
-- **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 
 #### Reference Sources (context only)
+- **02_system_sketch.json**: Component IDs, service boundaries, and `third_parties` (each with a `name` and an exact `pin` — the primary source of technology decisions: language runtime, framework, infrastructure, tools) used to derive the project_skeleton module structure, language/framework selection, and scaffold directory conventions
+- **02a_delivery_baseline.json**: Deployment environment and infrastructure constraints used to select appropriate framework configurations and container orchestration templates for the scaffold
+- **09_impl_plan.json**: Design milestones (what each one `schedules`, and its `target_date`) used to decide which modules the first scaffold must contain. Technology choices and pins are not read here: they are the `third_parties` of Step 02
+- **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 - **spec/04_fr_list.json**: for stub method signatures and to verify that every endpoint-dependent FR has a corresponding scaffold route
 - **00_charter.json**: Project identity and scope boundaries used to name the scaffold service and constrain module generation to in-scope domains only
 - **01_capabilities.json**: Capability definitions used to verify that scaffold modules cover all declared system capabilities and no capability lacks a corresponding code entry point

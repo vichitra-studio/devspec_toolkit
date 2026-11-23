@@ -14,7 +14,6 @@ Translate governance rules and fixture expectations into enforceable CI automati
 
 ### Primary Sources (directly consumed)
 - **10_governance.json**: commit patterns and `rules` (each with its `cli_command` or `enforcer`) — these ARE the CI gate definitions
-- **04_fr_list.json**: the `must-have` FRs, which the jobs of this artifact must gate
 
 ### Reference Sources (context only)
 - **02a_delivery_baseline.json**: CI gate definitions and deployment environments — referenced for coverage closure (every gate, environment and secret must be named in the `realises` of a job) and environment_ref sourcing
