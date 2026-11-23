@@ -137,7 +137,8 @@ Severity defaults:
 These are defaults. Reviewer may upgrade severity when impact is higher than default.
 
 `near-duplicate` is review judgement, not a check: two nodes of one kind with the same upstream link and
-overlapping downstream links that state one obligation. Report it as kind `drift`, severity P2, with a
+overlapping downstream links that state one obligation, or two nodes of different kinds that state the same
+obligation (an API error and an invariant that both say an unknown id returns 404). Report it as kind `drift`, severity P2, with a
 `message` that STARTS with the fixed word `near-duplicate:` followed by the two node ids and the advice
 to merge or delete one (the signature is a hash of the message, so the fixed word keeps it stable
 across reviewers).

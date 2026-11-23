@@ -87,7 +87,7 @@ Before emitting, verify:
 - [ ] Every endpoint defines ≥1 error response for each applicable HTTP error class (4xx, 5xx)
 - [ ] Resource naming is consistent across all APIs (no mixed singular/plural, no verbs in resource paths)
 - [ ] Every externally-observable FR behavior has at least one API endpoint
-- [ ] No ID referenced by this step (fr_id, nfr_id, inv_id) conflicts with the same ID in a sibling step
+- [ ] No ID referenced by this step (the ids of upstream nodes: FRs, acceptance criteria, components) conflicts with the same ID in a sibling step
 - [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist

@@ -93,7 +93,7 @@ If any of these apply to capabilities with `scope` `in`, they MUST generate FRs 
 ## Coverage Closure
 Before emitting, verify:
 - Every upstream requirement referenced in "Extraction Intent" is named in the `derives_from` of at least one FR, OR explicitly documented as a gap with rationale.
-- No upstream capability, FR, or milestone ID is silently dropped.
+- No upstream capability ID is silently dropped.
 - All `derives_from` ids resolve to ids present in `spec/01_capabilities.json`.
 - If any upstream id cannot be named in a `derives_from`: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
@@ -101,7 +101,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every FR statement is falsifiable — there exists a test that could prove it wrong
 - [ ] No two FRs describe overlapping behaviors (each FR has a unique behavior boundary)
-- [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
+- [ ] No ID referenced by this step (the capability ids in `derives_from`) conflicts with the same ID in a sibling step
 - [ ] Each FR's `acceptance_criteria` is written at the behavioral level — concrete enough that Step 14 tasks can derive execution-level criteria without contradiction
 - [ ] Functional requirements meet the schema minimum count
 - [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.

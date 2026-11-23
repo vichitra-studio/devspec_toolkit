@@ -55,7 +55,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every deployment stage identified in the ingested seeds is represented
 - [ ] All environment-specific constraints and SLA targets are explicitly defined
-- [ ] No environment name referenced in other spec files is missing from this baseline
+- [ ] No environment name referenced in an upstream spec file is missing from this baseline
 - [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
