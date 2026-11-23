@@ -154,6 +154,17 @@ def test_the_earlier_step_is_named_when_a_coverage_gap_sorts_before_the_suspect_
     assert readiness.replay_first == "05" and first_clause(readiness) == "replay step 05 first"
 
 
+def test_the_earlier_step_is_named_when_a_coverage_gap_sorts_after_the_suspect_link(example: Example, gap_providers: object) -> None:
+    """The suspect link of step 06 is the first blocker and a coverage gap of a later step the last one: step 05 is still named."""
+    register_gap_provider(lambda graph, lock: [CoverageGap("E743", "zz-sorts-last", "08")])
+    example.edit_criterion()
+    graph = example.graph()
+    plan = compute_replay(graph, example.lock(), example.seed_texts(graph))
+    readiness = check_ready(graph, plan, "14", [], present_steps(graph, str(example.spec)))
+    assert readiness.blockers[0].reason == "suspect" and (readiness.blockers[-1].step, readiness.blockers[-1].reason) == ("08", "gap")
+    assert readiness.replay_first == "05"
+
+
 def test_a_pending_step_above_that_is_not_linked_does_not_block_a_step_whose_own_links_are_clean(example: Example) -> None:
     example.edit_criterion()
     graph = example.graph()

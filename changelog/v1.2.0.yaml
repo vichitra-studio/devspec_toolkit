@@ -753,8 +753,8 @@ changes:
       ready for K = 02, 04 and 05, not ready, 1 blocker (step 07: coverage gap E740:
       metric-reset-completion-rate) for K = 08 and 09, and not ready, 11 blockers
       (steps 07, 08 and 12) for K = 14.
-      When the first blocker is a suspect link, the last line names the
-      earliest step above it that holds a suspect link, even a step that NN has
+      When any blocker is a suspect link, the last line names the earliest
+      step above the blockers that holds a suspect link, even a step that NN has
       no link into, because a link cannot be attested while the node it points
       to is suspect; a coverage gap of an unlinked step is not named. The
       blockers listed are still those of the steps NN links to.

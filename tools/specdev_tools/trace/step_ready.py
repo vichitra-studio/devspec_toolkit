@@ -56,7 +56,7 @@ class Readiness:
     upstream: tuple[str, ...]
     blockers: tuple[Blocker, ...]
     earlier: tuple[Blocker, ...] = ()
-    """The suspect links of the earliest step above that the blockers' steps do not link to, when it lies above the first blocker's step and the first blocker is itself a suspect link: not a blocker of *step*, only where the replay has to begin."""
+    """The suspect links of the earliest step above that the blockers' steps do not link to, when it lies above the first blocker's step and any blocker is a suspect link: not a blocker of *step*, only where the replay has to begin."""
 
     @property
     def ready(self) -> bool:
@@ -67,7 +67,7 @@ class Readiness:
     def replay_first(self) -> str | None:
         """The upstream step to deal with first, or ``None`` when ready.
 
-        The earliest step in the waterfall that has a blocker; when the first blocker is a suspect link and a step above it, one
+        The earliest step in the waterfall that has a blocker; when any blocker is a suspect link and a step above them, one
         *step* does not link to, has a suspect link too, that step (a link cannot be attested while the node it points to is
         suspect; a coverage gap of such a step is not in the way and is not named).
         """
