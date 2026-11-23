@@ -1900,3 +1900,38 @@ rows:
   change: remove
   disposition: none
   note: schema definition only; the data rows carry the migration
+- id: SC-06-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-16
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-20
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-30
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'

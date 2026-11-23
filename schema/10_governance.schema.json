@@ -57,7 +57,7 @@
                 "minLength": 1
               },
               "derives_from": {
-                "description": "Ids of the upstream nodes that give this rule its reason: a charter constraint, risk or scope item, an environment or gate of step 02a, or an approver-only stakeholder. At least one. Example: [\"risk-reset-link-takeover\"]. Anti-pattern: leaving a rule without a reason, or naming a functional requirement here.",
+                "description": "Ids of the upstream nodes that give this rule its reason: a charter constraint, risk or scope item, an environment or gate of step 02a, or an approver-only stakeholder. At least one. Example: [\"risk-reset-link-takeover\"]. Anti-pattern: leaving a rule without a reason, or naming a functional requirement here. A seed routed to this step may be listed in addition, for content taken straight from the seed and not through an upstream node; a seed alone does not satisfy the field.",
                 "type": "array",
                 "minItems": 1,
                 "uniqueItems": true,
@@ -71,10 +71,14 @@
                     "scope-item",
                     "gate",
                     "environment",
-                    "stakeholder"
+                    "stakeholder",
+                    "seed"
                   ],
                   "required": true,
-                  "built": true
+                  "built": true,
+                  "additional_kinds": [
+                    "seed"
+                  ]
                 }
               },
               "assumes": {

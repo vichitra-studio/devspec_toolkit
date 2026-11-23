@@ -48,7 +48,7 @@ Before starting, ensure your current specs are clean and valid.
 **User Action:**
 > **PROMPT:**
 > I am adding feature [Name].
-> 1. Check the seeds declared in `spec/common/seed_manifest.json` for steps 00, 02 and 02a (seeds are routed to no other step). Do they need updates?
+> 1. Check the seeds declared in `spec/common/seed_manifest.json` for each step the manifest routes them to (`step_requirements`). Do they need updates?
 > 2. Iterate through Specs 00, 01, 02, 03, and 04.
 > Ask me if updates are needed for each.
 > Use each step's canonical prompt (`prompts/prompt_NN_name.md`) and emit updated JSON directly to `spec/NN_name.json`.

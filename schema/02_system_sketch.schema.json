@@ -88,7 +88,7 @@
                 ]
               },
               "derives_from": {
-                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from. Every Step 01 capability whose scope is 'in' must be named in the derives_from of at least one component (step 02 validator, E590; the check runs when the Step 01 file is present).",
+                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from. Every Step 01 capability whose scope is 'in' must be named in the derives_from of at least one component (step 02 validator, E590; the check runs when the Step 01 file is present). A seed routed to this step may be listed in addition, for content taken straight from the seed and not through an upstream node; a seed alone does not satisfy the field.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -97,10 +97,14 @@
                 "x-link": {
                   "kinds": [
                     "capability",
-                    "constraint"
+                    "constraint",
+                    "seed"
                   ],
                   "required": true,
-                  "built": true
+                  "built": true,
+                  "additional_kinds": [
+                    "seed"
+                  ]
                 },
                 "minItems": 1
               },
@@ -181,7 +185,7 @@
                 "$ref": "vc:core:atoms#kebabId"
               },
               "derives_from": {
-                "description": "Ids of the components that are the source of this connection (normally one: the component the data or call originates from; at least one is required). Each must be a component declared in this document; the link is checked by the graph, not by JSON Schema.",
+                "description": "Ids of the components that are the source of this connection (normally one: the component the data or call originates from; at least one is required). Each must be a component declared in this document; the link is checked by the graph, not by JSON Schema. A seed routed to this step may be listed in addition, for content taken straight from the seed and not through an upstream node; a seed alone does not satisfy the field.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -189,12 +193,16 @@
                 "uniqueItems": true,
                 "x-link": {
                   "kinds": [
-                    "component"
+                    "component",
+                    "seed"
                   ],
                   "required": true,
                   "built": true,
                   "same_step_kinds": [
                     "component"
+                  ],
+                  "additional_kinds": [
+                    "seed"
                   ]
                 },
                 "minItems": 1

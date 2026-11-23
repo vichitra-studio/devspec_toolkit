@@ -90,8 +90,8 @@ def test_used_route_gives_no_e748(tmp_path: Path) -> None:
 
 def test_route_to_step_whose_kinds_cannot_link_a_seed_is_e748(tmp_path: Path) -> None:
     (found,) = _found(_host(tmp_path, "non_linkable_route"))
-    assert (found.code, found.node_id, found.owner, found.jq_path) == (SEED_ROUTE_UNUSED, SEED, "step:04", '.step_requirements["04"]')
-    assert found.message.startswith(f"the seed manifest routes {SEED} to step 04 but no node kind of step 04 can link a seed (only the kinds of steps 00, 02, 02a can); move the route to a step whose nodes can link a seed (00, 02, 02a)")
+    assert (found.code, found.node_id, found.owner, found.jq_path) == (SEED_ROUTE_UNUSED, SEED, "step:13", '.step_requirements["13"]')
+    assert found.message.startswith(f"the seed manifest routes {SEED} to step 13 but no node kind of step 13 can link a seed; move the route to the step that distils the seed and list {SEED} in derives_from of a node there")
 
 
 def test_trinity_key_gives_e748_naming_the_trinity_case(tmp_path: Path) -> None:
@@ -117,12 +117,46 @@ def test_record_link_about_is_ignored(tmp_path: Path) -> None:
     assert holders == {"tp-argon2", "tp-mailrelay"}
 
 
-def test_derives_from_seed_on_a_04_node_is_the_resolver_error_not_e749(tmp_path: Path) -> None:
-    """A requirement (step 04) cannot link a seed through ``derives_from``: the resolver reports the wrong kind (E701) and the route check stays silent."""
-    context = _context(_host(tmp_path, "unrouted_link", **{"04_fr_list.json": _derive_from_seed(_first_fr)}))
-    assert {error.node_id for error in check_seed_routes(context, "merge") if error.code == SEED_LINK_NOT_ROUTED} == {"tp-argon2", "tp-mailrelay"}
-    wrong_kind = [error for error in resolve_graph(context.graph) if error.node_id == "fr-password-reset"]
-    assert [error.code for error in wrong_kind] == ["E701"]
+def test_derives_from_seed_on_a_04_node_is_e749_until_the_seed_is_routed_to_04(tmp_path: Path) -> None:
+    """A requirement (step 04) may list a seed beside its capability: the resolver accepts the link, and the route check asks for the route (E749) until the manifest has it."""
+    edits = {"04_fr_list.json": _derive_from_seed(_first_fr)}
+    context = _context(_host(tmp_path / "unrouted", **edits))
+    assert [(error.code, error.node_id, error.owner) for error in check_seed_routes(context, "merge")] == [(SEED_LINK_NOT_ROUTED, "fr-password-reset", "step:04")]
+    assert [error for error in resolve_graph(context.graph) if error.node_id == "fr-password-reset"] == []
+    routed = _host(tmp_path / "routed", **edits, **{SEED_MANIFEST_FILE: lambda doc: doc["step_requirements"].update({"04": [SEED]})})
+    assert _found(routed) == []
+
+
+def test_route_to_a_later_step_is_e748_until_a_node_of_that_step_lists_the_seed(tmp_path: Path) -> None:
+    """Every step from 00 to 15 but 03 and 13 has a kind that can list a seed: an unused route there says to distil the seed in that step."""
+    host = _host(tmp_path, **{SEED_MANIFEST_FILE: lambda doc: doc["step_requirements"].update({"06": [SEED]})})
+    (found,) = _found(host)
+    assert (found.code, found.owner, found.route) == (SEED_ROUTE_UNUSED, "step:06", (SEED, "06"))
+    assert found.message.endswith(f"but no node of step 06 lists {SEED} in derives_from; distil the seed in that step (a node of step 06 lists {SEED} in derives_from), or remove the route")
+
+
+def test_the_steps_whose_kinds_can_link_a_seed_are_all_but_03_13_and_the_trinity_steps(tmp_path: Path) -> None:
+    assert sorted(_linkable_steps(_context(_host(tmp_path)).graph)) == ["00", "01", "02", "02a", "04", "05", "06", "07", "08", "09", "10", "11", "12", "14", "15"]
+
+
+def test_a_seed_alone_does_not_satisfy_a_required_link_that_accepts_it_in_addition(tmp_path: Path) -> None:
+    """An FR that lists only a seed has no capability: E701 of the resolver, on the field, with what it needs; a seed beside the capability raises nothing."""
+    only_seed = _context(_host(tmp_path, **{"04_fr_list.json": lambda doc: _first_fr(doc).update({"derives_from": [SEED]})}))
+    (found,) = [error for error in resolve_graph(only_seed.graph) if error.node_id == "fr-password-reset"]
+    assert (found.code, found.owner, found.target) == ("E701", "step:04", f"derives_from->{SEED}")
+    assert found.message == f"fr-password-reset, field derives_from holds only targets of kind seed ({SEED}); the field accepts seed in addition and needs at least one of: capability"
+
+
+def test_a_seed_beside_a_target_that_does_not_resolve_is_left_to_the_finding_of_that_link(tmp_path: Path) -> None:
+    """The capability is misspelt: E700 for that link, and no E701 that would send the author looking for a second fault."""
+    context = _context(_host(tmp_path, **{"04_fr_list.json": lambda doc: _first_fr(doc).update({"derives_from": [SEED, "cap-no-such"]})}))
+    assert [error.code for error in resolve_graph(context.graph) if error.node_id == "fr-password-reset"] == ["E700"]
+
+
+def test_a_seed_alone_satisfies_a_field_that_does_not_declare_it_additional(tmp_path: Path) -> None:
+    """A third party of step 02 derives from a seed or a constraint: the seed alone is enough, as before."""
+    context = _context(_host(tmp_path))
+    assert [error for error in resolve_graph(context.graph) if error.code == "E701"] == []
 
 
 def test_e748_carries_route(tmp_path: Path) -> None:
@@ -309,12 +343,12 @@ def test_e748_of_a_route_that_is_not_the_seeds_only_one_says_to_remove_the_route
     assert "links to it" not in message
 
 
-@pytest.mark.parametrize("step", ["05", "16"])
+@pytest.mark.parametrize("step", ["13", "16"])
 def test_e748_of_a_step_that_cannot_link_a_seed_says_to_move_the_route_not_to_distil_there(tmp_path: Path, step: str) -> None:
-    """A node of step 05, or of the trinity steps, cannot list a seed: "distil it in that step" cannot be followed."""
+    """A node of step 13, or of the trinity steps, cannot list a seed: "distil it in that step" cannot be followed."""
     message = _messages(_host(tmp_path, **{SEED_MANIFEST_FILE: _extra_seed({step: [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
     assert "distil the seed in that step" not in message
-    assert "move the route to a step whose nodes can link a seed (00, 02, 02a) and list seed-extra in derives_from of a node there, or remove the seed from the manifest" in message
+    assert "move the route to the step that distils the seed and list seed-extra in derives_from of a node there, or remove the seed from the manifest" in message
 
 
 def test_e747_of_a_seed_no_node_links_says_to_route_it_and_have_a_node_list_it(tmp_path: Path) -> None:

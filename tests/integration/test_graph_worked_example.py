@@ -131,6 +131,22 @@ def test_candidates_for_a_kind_offer_the_capability_and_nothing_from_step_05_on(
     assert all(order.index(item["step"]) < order.index("05") for item in offered)
 
 
+def test_candidates_offer_a_seed_only_when_the_manifest_routes_it_to_the_holders_step(tmp_path: Path) -> None:
+    """The example routes the seed to steps 00 and 02: a third party is offered it, an FR is not until the manifest routes it to step 04 (a link to a seed not routed there is E749)."""
+    spec = copy_example(tmp_path / "spec")
+
+    def offered(kind: str) -> set[str]:
+        result = run_specdev("node", "candidates", "--kind", kind, "--field", "derives_from", *_flags(spec), "--json")
+        assert result.returncode == 0, result.stderr
+        return {item["id"] for item in json.loads(result.stdout)["candidates"] if item["kind"] == "seed"}
+
+    assert offered("third-party") == {"seed-accounts"} and offered("fr") == set()
+    manifest = load_doc(spec, "common/seed_manifest.json")
+    manifest["step_requirements"]["04"] = ["seed-accounts"]
+    write_json(spec, "common/seed_manifest.json", manifest)
+    assert offered("fr") == {"seed-accounts"}
+
+
 def test_candidates_for_a_node_leave_out_the_target_it_already_links(tmp_path: Path) -> None:
     """PD-10: the FR already derives from the only capability, so there is nothing left to offer."""
     spec = copy_example(tmp_path / "spec")

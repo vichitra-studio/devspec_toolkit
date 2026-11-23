@@ -76,6 +76,21 @@
             "uniqueItems": true,
             "description": "Former ids of this scaffold row; `specdev node rename` adds the old id here. Optional."
           },
+          "derives_from": {
+            "description": "Ids of the seeds this scaffold row takes content from directly. Optional: list a seed routed to this step, and only for content taken straight from the seed and not through an upstream node.",
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "uniqueItems": true,
+            "x-link": {
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "built": false
+            }
+          },
           "replaces": {
             "type": "array",
             "items": {

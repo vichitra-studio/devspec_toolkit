@@ -30,6 +30,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 | `required` | Required boolean. |
 | `built` | Optional boolean, default false. |
 | `same_step_kinds` | Optional array, a subset of `kinds` that may be held in the same step. |
+| `additional_kinds` | Optional array, a subset of `kinds` that the field accepts in addition to the others. When the link is required, a value that holds only targets of these kinds does not satisfy it (E701). Used for a seed listed beside a node's upstream link. |
 
 ## Link verbs (`linkVerb`)
 
@@ -82,7 +83,7 @@ All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annota
 | ANNOT-02 | A kind is not kebab-case, or one kind is declared at more than one site. |
 | ANNOT-03 | The node's items schema is missing, the id property is missing or not a string, or a `map_keyed` node lacks `additionalProperties`. |
 | ANNOT-05 | An `x-link` field name is not a link verb, is not an array whose items `$ref` is `vc:core:atoms#kebabId`, `vc:core:atoms#screamingSnakeId` or `vc:core:graph#nodeId`, or does not sit on a node item; or a `"*"` or `about` field whose items do not `$ref` `vc:core:graph#nodeId`. |
-| ANNOT-07 | An `x-link` kind (or a `same_step_kinds` entry) is not a declared kind or not in `kinds`. |
+| ANNOT-07 | An `x-link` kind (or a `same_step_kinds` or `additional_kinds` entry) is not a declared kind or not in `kinds`. |
 | ANNOT-08 | A node item lacks `lifecycle` as `$ref vc:core:graph#lifecycle`; an obligation item lacks `scope`, `scope_reason` or the `scopeReasonRule` in its `allOf`. `top_of_graph` kinds and role `record` kinds are exempt from `lifecycle`, `scope` and `scope_reason`. |
 | ANNOT-20 | The derived step graph has a cycle (raised by the step-order derivation). |
 | ANNOT-21 | An `x-link` kind lives in the holder's own step and is not in `same_step_kinds` (step-order derivation). Record-role holders are checked too; only their edges are exempt from the order. |

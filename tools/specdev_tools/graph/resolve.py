@@ -63,9 +63,14 @@ def _ordered(steps: Iterable[str], shape: SpecShape) -> list[str]:
     return sorted(steps, key=shape.step_key)
 
 
+def _target_steps(link: Link, shape: SpecShape) -> set[str]:
+    """The steps that declare a kind the link is for: a kind accepted only in addition (a seed beside the upstream node) is not where a missing target is looked for."""
+    return {step for kind in link.decl.kinds if kind not in link.decl.additional_kinds for step in shape.kind_steps.get(kind, ())}
+
+
 def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
-    """The steps that declare a kind the link accepts, when none of them has a file in the spec; else nothing."""
-    steps = {step for kind in link.decl.kinds for step in shape.kind_steps.get(kind, ())}
+    """The steps that declare a kind the link is for, when none of them has a file in the spec; else nothing."""
+    steps = _target_steps(link, shape)
     if not steps or any(shape.files_by_step.get(step) for step in steps):
         return []
     return _ordered(steps, shape)
@@ -74,8 +79,7 @@ def _absent_steps(link: Link, shape: SpecShape) -> list[str]:
 def _unreadable_file(link: Link, graph: Graph) -> tuple[str, str] | None:
     """The first ``(step, file)`` that the builder skipped, among the files of the steps that declare a kind the link accepts."""
     skipped = {error.file for error in graph.load_errors}
-    steps = {step for kind in link.decl.kinds for step in graph.shape.kind_steps.get(kind, ())}
-    for step in _ordered(steps, graph.shape):
+    for step in _ordered(_target_steps(link, graph.shape), graph.shape):
         for path in graph.shape.files_by_step.get(step, ()):
             if path in skipped:
                 return step, path
@@ -110,6 +114,32 @@ def _wrong_kind_error(holder: Node, link: Link, target: Node) -> SpecError:
         f"{holder.id}, field {link.field}, target '{target.id}' is {article(target.kind)} {target.kind}; the field accepts: {accepted}",
         link=link,
     )
+
+
+def _only_additional_errors(graph: Graph, holder: Node) -> list[SpecError]:
+    """E701 for each required field of *holder* whose targets all resolve to kinds the field accepts only in addition (a seed beside the upstream node, never in its place).
+
+    A field with a target that does not resolve, or one of a kind the field refuses, is left to the finding of that link.
+    """
+    errors: list[SpecError] = []
+    fields: dict[str, list[Link]] = {}
+    for link in holder.links:
+        if link.decl.required and link.decl.additional_kinds:
+            fields.setdefault(link.field, []).append(link)
+    for name, links in fields.items():
+        decl = links[0].decl
+        targets = [graph.find(link.target) for link in links]
+        if any(target is None or target.kind not in decl.additional_kinds for target in targets):
+            continue
+        needed = ", ".join(kind for kind in decl.kinds if kind not in decl.additional_kinds)
+        only = ", ".join(decl.additional_kinds)
+        errors.append(_error(
+            "E701", holder,
+            f"{holder.id}, field {name} holds only targets of kind {only} ({', '.join(link.target for link in links)}); "
+            f"the field accepts {only} in addition and needs at least one of: {needed}",
+            link=links[0],
+        ))
+    return errors
 
 
 def direction_allowed(decl: LinkDecl, holder_step: str | None, target: Node, shape: SpecShape) -> bool:
@@ -267,5 +297,6 @@ def resolve_graph(
         for link in holder.links:
             if link.field not in HISTORY_FIELDS:
                 errors.extend(_link_errors(graph, holder, link, edges, hooks, frozen=link.field in FROZEN_FIELDS and holder.id in historical))
+        errors.extend(_only_additional_errors(graph, holder))
     errors.extend(_cycle_errors(edges))
     return errors

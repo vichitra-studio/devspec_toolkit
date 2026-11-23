@@ -121,6 +121,12 @@
           "uniqueItems": true,
           "items": {"$ref": "vc:core:graph#kindName"},
           "description": "Subset of kinds that may be held in the same step as the source."
+        },
+        "additional_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "vc:core:graph#kindName"},
+          "description": "Subset of kinds that the field accepts in addition to the others: when the link is required, a value that holds only targets of these kinds does not satisfy it (E701)."
         }
       },
       "required": ["kinds", "required"],

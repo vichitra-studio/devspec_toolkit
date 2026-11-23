@@ -186,7 +186,7 @@
                 "$ref": "vc:core:graph#scopeReason"
               },
               "derives_from": {
-                "description": "Ids of the capabilities this functional requirement is derived from. At least one is required; every functional requirement must be justified by what it derives from.",
+                "description": "Ids of the capabilities this functional requirement is derived from. At least one is required; every functional requirement must be justified by what it derives from. A seed routed to this step may be listed in addition, for content taken straight from the seed and not through an upstream node; a seed alone does not satisfy the field.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -194,10 +194,14 @@
                 "uniqueItems": true,
                 "x-link": {
                   "kinds": [
-                    "capability"
+                    "capability",
+                    "seed"
                   ],
                   "required": true,
-                  "built": true
+                  "built": true,
+                  "additional_kinds": [
+                    "seed"
+                  ]
                 },
                 "minItems": 1
               },

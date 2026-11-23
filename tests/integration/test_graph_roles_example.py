@@ -277,11 +277,11 @@ def test_derives_from_seed_from_an_unrouted_02a_node_gives_e749(tmp_path: Path) 
     assert _triples(checks, "seed-routes") == [("E749", "dev", "step:02a")]
 
 
-def test_derives_from_seed_from_a_04_node_gives_e701_not_e749(tmp_path: Path) -> None:
-    """Delta seed_link_from_04: a requirement of step 04 cannot link a seed: E701 from the graph check, and no E749."""
+def test_derives_from_seed_from_a_04_node_gives_e749_not_e701(tmp_path: Path) -> None:
+    """Delta seed_link_from_04: a requirement of step 04 lists a seed beside its capability, and the manifest does not route the seed to step 04: E749, and nothing from the graph check."""
     checks = _checks(_host(tmp_path / "h", "seed_link_from_04"))
-    assert _triples(checks, "graph") == [("E701", "fr-password-reset", "step:04")]
-    assert _triples(checks, "seed-routes") == []
+    assert _triples(checks, "graph") == []
+    assert _triples(checks, "seed-routes") == [("E749", "fr-password-reset", "step:04")]
 
 
 # --- scaffold paths -------------------------------------------------------------------------------------------------------

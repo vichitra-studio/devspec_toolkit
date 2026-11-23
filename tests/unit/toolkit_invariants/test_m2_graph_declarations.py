@@ -101,6 +101,28 @@ def test_every_link_kind_is_declared_or_seed(decls, fname: str) -> None:
         assert set(kinds) <= known, (link.field_name, kinds)
 
 
+def test_a_seed_is_additional_wherever_a_required_derives_from_had_other_kinds_before_seeds_were_routed_to_every_step() -> None:
+    """The holders whose required ``derives_from`` accepts a seed only beside an upstream node (``additional_kinds``).
+
+    The kinds of step 00, the third party and the environment are not among them: there a seed alone is the source.
+    """
+    registry = json.loads((_ROOT / "tools" / "entry_key_registry.json").read_text(encoding="utf-8"))
+    found: dict[str, list[str]] = {}
+
+    def walk(entry: dict[str, Any]) -> None:
+        for link in entry.get("links", []):
+            if "additional_kinds" in link:
+                assert link["field"] == "derives_from" and link["required"] is True and set(link["additional_kinds"]) < set(link["kinds"])
+                found[entry["kind"]] = link["additional_kinds"]
+        for nested in entry.get("nested", []):
+            walk(nested)
+
+    for file_entry in registry["registry"].values():
+        for entry in file_entry.get("arrays", []):
+            walk(entry)
+    assert found == {kind: ["seed"] for kind in ("capability", "component", "connection", "gate", "secret", "fr", "api", "api-error", "rule")}
+
+
 @pytest.mark.parametrize("fname", _FILES)
 def test_no_forward_links_in_steps_00_05(decls, fname: str) -> None:
     kind_step = {n.kind: _step_of(n.schema_file) for n in decls.nodes if n.kind != "seed" and _is_step_schema(n.schema_file)}
@@ -305,13 +327,13 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ('00_charter.schema.json', '/allOf/1/properties/constraints/items/properties/derives_from', ['need', 'seed']),
     ('00_charter.schema.json', '/allOf/1/properties/constraints/items/properties/assumes', ['assumption']),
     ('00_charter.schema.json', '/allOf/1/properties/constraints/items/properties/replaces', '*'),
-    ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/derives_from', ['metric', 'scope-item', 'segment']),
+    ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/derives_from', ['metric', 'scope-item', 'seed', 'segment']),
     ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/assumes', ['assumption']),
     ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/replaces', '*'),
-    ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/derives_from', ['capability', 'constraint']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/derives_from', ['capability', 'constraint', 'seed']),
     ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/assumes', ['assumption']),
     ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/replaces', '*'),
-    ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/derives_from', ['component']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/derives_from', ['component', 'seed']),
     ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/connects_to', ['component', 'third-party']),
     ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/assumes', ['assumption']),
     ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/replaces', '*'),
@@ -322,23 +344,23 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/environments/additionalProperties/properties/derives_from', ['constraint', 'scope-item', 'seed']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/environments/additionalProperties/properties/assumes', ['assumption']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/environments/additionalProperties/properties/replaces', '*'),
-    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/derives_from', ['component', 'constraint']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/derives_from', ['component', 'constraint', 'seed']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/assumes', ['assumption']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/replaces', '*'),
-    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/derives_from', ['component', 'connection', 'constraint']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/derives_from', ['component', 'connection', 'constraint', 'seed']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/assumes', ['assumption']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/replaces', '*'),
     ('03_glossary.schema.json', '/allOf/1/properties/terms/items/properties/replaces', '*'),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/acceptance_criteria/items/properties/assumes', ['assumption']),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/acceptance_criteria/items/properties/replaces', '*'),
-    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/derives_from', ['capability']),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/derives_from', ['capability', 'seed']),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/depends_on', ['fr']),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/assumes', ['assumption']),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/replaces', '*'),
-    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/derives_from', ['criterion']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/derives_from', ['criterion', 'seed']),
     ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/assumes', ['assumption']),
     ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/replaces', '*'),
-    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/derives_from', ['fr']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/derives_from', ['fr', 'seed']),
     ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/provided_by', ['component']),
     ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/relies_on', ['third-party']),
     ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/depends_on', ['api']),

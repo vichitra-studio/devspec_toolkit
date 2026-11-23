@@ -82,20 +82,23 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/constrains", ["api", "component", "connection", "fr"]),
     ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/assumes", ["assumption"]),
     ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/replaces", "*"),
+    ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/derives_from", ["seed"]),
     ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/constrains", ["api", "component", "connection", "fr"]),
     ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/relies_on", ["third-party"]),
-    ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/derives_from", ["metric"]),
+    ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/derives_from", ["metric", "seed"]),
     ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/assumes", ["assumption"]),
     ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/replaces", "*"),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/verifies", ["api", "criterion", "invariant", "nfr"]),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/removes", "*"),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/replaces", "*"),
+    ("08_fixtures.schema.json", "/properties/fixtures/items/properties/derives_from", ["seed"]),
     ("09_impl_plan.schema.json", "/properties/milestones/items/properties/schedules", ["api", "component", "criterion", "environment", "fr", "invariant", "nfr", "risk"]),
     ("09_impl_plan.schema.json", "/properties/milestones/items/properties/replaces", "*"),
-    ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/derives_from", ["constraint", "environment", "gate", "risk", "scope-item", "stakeholder"]),
+    ("09_impl_plan.schema.json", "/properties/milestones/items/properties/derives_from", ["seed"]),
+    ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/derives_from", ["constraint", "environment", "gate", "risk", "scope-item", "seed", "stakeholder"]),
     ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/assumes", ["assumption"]),
     ("10_governance.schema.json", "/allOf/1/properties/rules/items/properties/replaces", "*"),
-    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/derives_from", ["risk"]),
+    ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/derives_from", ["risk", "seed"]),
     ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/threatens", ["api", "component", "connection", "third-party"]),
     ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/mitigated_by", _MITIGATION_KINDS),
     ("11_redteam.schema.json", "/allOf/1/properties/threats/items/properties/assumes", ["assumption"]),
@@ -104,11 +107,14 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/mitigated_by", _MITIGATION_KINDS),
     ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/assumes", ["assumption"]),
     ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/replaces", "*"),
+    ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/derives_from", ["seed"]),
     ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/realises", ["environment", "gate", "rule", "secret"]),
     ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/verifies", ["nfr"]),
     ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/depends_on", ["job"]),
     ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/replaces", "*"),
+    ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/derives_from", ["seed"]),
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/replaces", "*"),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/derives_from", ["seed"]),
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/depends_on", ["task"]),
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/replaces", "*"),
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/refines", _REFINABLE_KINDS),
@@ -117,6 +123,7 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/replaces", "*"),
     ("15_scaffold.schema.json", "/properties/interface_map/items/properties/realises", ["api"]),
     ("15_scaffold.schema.json", "/properties/interface_map/items/properties/replaces", "*"),
+    ("15_scaffold.schema.json", "/properties/interface_map/items/properties/derives_from", ["seed"]),
     ("16_anchor.schema.json", "/properties/plan/properties/milestone_index/items/properties/about", ["roadmap-milestone"]),
     ("16_impl_context.schema.json", "/properties/plan/properties/spec_alignment/properties/checklist/items/properties/realises", ["task-criterion"]),
     ("16_impl_context.schema.json", "/properties/plan/properties/spec_alignment/properties/checklist/items/properties/replaces", "*"),
@@ -288,6 +295,7 @@ def test_step_06_invariant_declares_constrains_and_assumes_links(decls) -> None:
         {
             "constrains": (["api", "component", "connection", "fr"], False),
             "assumes": (["assumption"], False),
+            "derives_from": (["seed"], False),
             "replaces": ("*", False),
         },
     )
@@ -300,7 +308,7 @@ def test_step_07_nfr_declares_constrains_relies_on_and_derives_from(decls) -> No
         {
             "constrains": (["api", "component", "connection", "fr"], False),
             "relies_on": (["third-party"], False),
-            "derives_from": (["metric"], False),
+            "derives_from": (["metric", "seed"], False),
             "assumes": (["assumption"], False),
             "replaces": ("*", False),
         },
@@ -315,18 +323,20 @@ def test_step_08_fixture_declares_verifies_and_removes_links(decls) -> None:
         {
             "verifies": (["api", "criterion", "invariant", "nfr"], False),
             "removes": ("*", False),
+            "derives_from": (["seed"], False),
             "replaces": ("*", False),
         },
     )
 
 
-def test_step_09_x_links_are_schedules_and_replaces_only(decls) -> None:
-    """The design milestone declares ``schedules`` (required) and the shared ``replaces``: no order link, no same-step kinds."""
+def test_step_09_x_links_are_schedules_a_seed_link_and_replaces_only(decls) -> None:
+    """The design milestone declares ``schedules`` (required), an optional ``derives_from`` for a seed and the shared ``replaces``: no order link, no same-step kinds."""
     fname = "09_impl_plan.schema.json"
     _assert_links(
         decls, fname,
         {
             "schedules": (["api", "component", "criterion", "environment", "fr", "invariant", "nfr", "risk"], True),
+            "derives_from": (["seed"], False),
             "replaces": ("*", False),
         },
     )
@@ -338,7 +348,7 @@ def test_step_10_rule_declares_derives_from_assumes_and_replaces_links(decls) ->
     _assert_links(
         decls, fname,
         {
-            "derives_from": (["constraint", "environment", "gate", "risk", "scope-item", "stakeholder"], True),
+            "derives_from": (["constraint", "environment", "gate", "risk", "scope-item", "seed", "stakeholder"], True),
             "assumes": (["assumption"], False),
             "replaces": ("*", False),
         },
@@ -354,13 +364,14 @@ def test_step_11_threat_and_edge_case_declare_threatens_and_mitigated_by(decls) 
             by_holder.setdefault(holder, {})[link.field_name] = (kinds if kinds == "*" else sorted(kinds), link.value["required"])
     assert by_holder == {
         "threat": {
-            "derives_from": (["risk"], False),
+            "derives_from": (["risk", "seed"], False),
             "threatens": (["api", "component", "connection", "third-party"], True),
             "mitigated_by": (sorted(_MITIGATION_KINDS), False),
             "assumes": (["assumption"], False),
             "replaces": ("*", False),
         },
         "edge-case": {
+            "derives_from": (["seed"], False),
             "threatens": (["api", "component", "fr"], True),
             "mitigated_by": (sorted(_MITIGATION_KINDS), True),
             "assumes": (["assumption"], False),
@@ -379,6 +390,7 @@ def test_step_12_job_verifies_link_is_nfr_only_and_not_built(decls) -> None:
             "realises": (["environment", "gate", "rule", "secret"], False),
             "verifies": (["nfr"], False),
             "depends_on": (["job"], False),
+            "derives_from": (["seed"], False),
             "replaces": ("*", False),
         },
     )
@@ -387,7 +399,7 @@ def test_step_12_job_verifies_link_is_nfr_only_and_not_built(decls) -> None:
     assert _link(decls, fname, "depends_on").value["same_step_kinds"] == ["job"]
 
 
-def test_step_14_milestone_stores_no_link_task_depends_on_and_criterion_refines(decls) -> None:
+def test_step_14_milestone_stores_a_seed_link_only_task_depends_on_and_criterion_refines(decls) -> None:
     fname = "14_roadmap.schema.json"
     by_holder: dict[str, dict[str, tuple[Any, bool]]] = {}
     for link in _links(decls, fname):
@@ -395,7 +407,7 @@ def test_step_14_milestone_stores_no_link_task_depends_on_and_criterion_refines(
         for holder in link.holders:
             by_holder.setdefault(holder, {})[link.field_name] = (kinds if kinds == "*" else sorted(kinds), link.value["required"])
     assert by_holder == {
-        "roadmap-milestone": {"replaces": ("*", False)},
+        "roadmap-milestone": {"derives_from": (["seed"], False), "replaces": ("*", False)},
         "task": {"depends_on": (["task"], False), "replaces": ("*", False)},
         "task-criterion": {
             "refines": (_REFINABLE_KINDS, False),
@@ -419,8 +431,9 @@ def test_step_14_task_criterion_requires_refines_or_removes_and_task_disposition
 
 def test_step_15_scaffold_row_realises_apis_and_builds_nothing(decls, reader) -> None:
     fname = "15_scaffold.schema.json"
-    _assert_links(decls, fname, {"realises": (["api"], True), "replaces": ("*", False)})
+    _assert_links(decls, fname, {"realises": (["api"], True), "derives_from": (["seed"], False), "replaces": ("*", False)})
     assert _link(decls, fname, "realises").value.get("built", False) is False
+    assert _link(decls, fname, "derives_from").value.get("built", False) is False
     nodes = {n.kind: n for n in _nodes(decls, fname)}
     assert nodes["scaffold-row"].value["contract"] == ["path"]
     assert "method" not in _props(reader, nodes["scaffold-row"])

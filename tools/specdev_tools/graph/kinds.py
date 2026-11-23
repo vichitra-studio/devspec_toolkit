@@ -40,6 +40,8 @@ class LinkDecl:
     required: bool
     built: bool
     same_step_kinds: tuple[str, ...]
+    additional_kinds: tuple[str, ...] = ()
+    """Kinds of ``kinds`` the field accepts in addition: targets of these kinds alone do not satisfy a required link."""
 
     def accepts(self, kind: str) -> bool:
         """True when a node of *kind* may be the target of this link."""
@@ -100,6 +102,7 @@ def _link_decl(raw: dict[str, Any], all_kinds: tuple[str, ...]) -> LinkDecl:
         required=raw.get("required") is True,
         built=raw.get("built") is True,
         same_step_kinds=tuple(str_items(raw.get("same_step_kinds"))),
+        additional_kinds=tuple(str_items(raw.get("additional_kinds"))),
     )
 
 

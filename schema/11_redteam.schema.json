@@ -27,7 +27,7 @@
                 "description": "Unique kebab-case identifier for this threat. Recommended format: threat-{category}-{description}. Example: 'threat-auth-token-forgery', 'threat-data-sql-injection', 'threat-dos-api-flooding'. Should be stable across spec versions."
               },
               "derives_from": {
-                "description": "Ids of the charter risks this threat comes from. Optional; naming the risk is what lets the risk be built. Example: [\"risk-reset-link-takeover\"].",
+                "description": "Ids of the charter risks this threat comes from. Optional; naming the risk is what lets the risk be built. Example: [\"risk-reset-link-takeover\"]. A seed routed to this step may also be listed, for content taken straight from the seed and not through an upstream node.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -35,7 +35,8 @@
                 "uniqueItems": true,
                 "x-link": {
                   "kinds": [
-                    "risk"
+                    "risk",
+                    "seed"
                   ],
                   "required": false,
                   "built": true
@@ -307,6 +308,21 @@
                   "$ref": "vc:core:atoms#kebabId"
                 },
                 "uniqueItems": true
+              },
+              "derives_from": {
+                "description": "Ids of the seeds this edge case takes content from directly. Optional: list a seed routed to this step, and only for content taken straight from the seed and not through an upstream node.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": false,
+                  "built": true
+                }
               },
               "replaces": {
                 "description": "Ids of nodes that this edge case replaces. Optional.",

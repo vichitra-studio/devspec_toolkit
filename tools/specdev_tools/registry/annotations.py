@@ -467,6 +467,9 @@ def _lint_links(
             for k in same:
                 if k not in kinds:
                     issues.append(f"ANNOT-07 {loc}: same_step_kinds entry {k!r} is not in kinds")
+            for k in lk.value.get("additional_kinds") or []:
+                if k not in kinds:
+                    issues.append(f"ANNOT-07 {loc}: additional_kinds entry {k!r} is not in kinds")
     return issues
 
 

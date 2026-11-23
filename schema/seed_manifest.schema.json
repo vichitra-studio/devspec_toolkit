@@ -95,7 +95,7 @@
       "type": "object",
       "patternProperties": {
         "^(\\d{2}[a-c]?)$": {
-          "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '00': ['seed-overview', 'seed-tech-stack'] (the charter step reads both seeds). A step with a letter uses its full key: '02a': ['seed-tech-stack']. Only steps 00, 02 and 02a can be routed a seed, because only their nodes can link one with derives_from; a route to any other step is E748 at spec-check. Anti-pattern: key format '0' instead of '00' — step keys must be zero-padded two-digit strings, with the letter for a multi-part step.",
+          "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '00': ['seed-overview', 'seed-tech-stack'] (the charter step reads both seeds). A step with a letter uses its full key: '02a': ['seed-tech-stack']. Route a seed to every step that distils a part of it: a node of that step must list the seed in derives_from, and a route no node of its step uses is E748 at spec-check. No node of step 03, 13 or the trinity steps can list a seed, so a route there is always E748. Anti-pattern: key format '0' instead of '00' — step keys must be zero-padded two-digit strings, with the letter for a multi-part step.",
           "$ref": "vc:core:collections#kebabIdArray"
         }
       },

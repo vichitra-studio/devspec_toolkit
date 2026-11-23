@@ -130,14 +130,17 @@
                 }
               },
               "derives_from": {
-                "description": "Ids of the charter metrics this NFR quantifies. Optional and illustrative: name the metric when the NFR exists to meet one.",
+                "description": "Ids of the charter metrics this NFR quantifies. Optional and illustrative: name the metric when the NFR exists to meet one. A seed routed to this step may also be listed, for content taken straight from the seed and not through an upstream node.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
                 },
                 "uniqueItems": true,
                 "x-link": {
-                  "kinds": ["metric"],
+                  "kinds": [
+                    "metric",
+                    "seed"
+                  ],
                   "required": false,
                   "built": true
                 }

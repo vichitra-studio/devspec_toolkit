@@ -117,8 +117,8 @@ def _unrouted_seeds(ctx: GraphCheckContext, routes: Routes) -> list[SpecError]:
 def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str | None, parts: str) -> str:
     """E748: why the route is unused and the ways out that clear it.
 
-    When no node of the step can link a seed (a trinity key, or a step none of whose kinds links one), distilling it
-    there cannot be done: the route moves to a step that can.  *parts* is what removing the seed takes; *remove_links* is ``None`` unless this is the seed's only
+    When no node of the step can link a seed (a trinity key, or a step none of whose kinds declares a ``derives_from`` that
+    accepts a seed: steps 03 and 13), distilling it there cannot be done: the route moves to a step that can.  *parts* is what removing the seed takes; *remove_links* is ``None`` unless this is the seed's only
     route: removing it alone would start E747, so the seed goes with it, and with the links to it (*remove_links*, empty
     when no node links the seed).
     """
@@ -127,7 +127,7 @@ def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str 
     if step in TRINITY_KEYS:
         reason = f"the trinity key {step} cannot be used: no node of the trinity steps links a seed"
     elif step not in linkable:
-        reason = f"no node kind of step {step} can link a seed (only the kinds of steps {', '.join(sorted(linkable))} can)"
+        reason = f"no node kind of step {step} can link a seed"
     else:
         reason = f"no node of {where} lists {seed} in derives_from"
     if remove_links is None:
@@ -139,7 +139,7 @@ def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str 
     if can_distil:
         advice = f"distil the seed in that step (a node of {where} lists {seed} in derives_from), or {remove}"
     else:
-        advice = f"move the route to a step whose nodes can link a seed ({', '.join(sorted(linkable))}) and list {seed} in derives_from of a node there, or {remove}"
+        advice = f"move the route to the step that distils the seed and list {seed} in derives_from of a node there, or {remove}"
     return f"the seed manifest routes {seed} to {where} but {reason}; {advice}"
 
 

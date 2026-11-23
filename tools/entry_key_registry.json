@@ -415,12 +415,16 @@
           "kind": "capability",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
                 "scope-item",
                 "segment",
-                "metric"
+                "metric",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -485,11 +489,15 @@
           "kind": "component",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
                 "capability",
-                "constraint"
+                "constraint",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -530,10 +538,14 @@
           "kind": "connection",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
-                "component"
+                "component",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": [
@@ -708,11 +720,15 @@
           "kind": "gate",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
                 "component",
-                "constraint"
+                "constraint",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -750,12 +766,16 @@
           "kind": "secret",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
                 "connection",
                 "component",
-                "constraint"
+                "constraint",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -880,10 +900,14 @@
           "kind": "fr",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
-                "capability"
+                "capability",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -1006,10 +1030,14 @@
           "kind": "api",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
-                "fr"
+                "fr",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -1076,10 +1104,14 @@
               "kind": "api-error",
               "links": [
                 {
+                  "additional_kinds": [
+                    "seed"
+                  ],
                   "built": true,
                   "field": "derives_from",
                   "kinds": [
-                    "criterion"
+                    "criterion",
+                    "seed"
                   ],
                   "required": true,
                   "same_step_kinds": []
@@ -1175,6 +1207,15 @@
               "same_step_kinds": []
             },
             {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
               "built": false,
               "field": "replaces",
               "kinds": "*",
@@ -1259,7 +1300,8 @@
               "built": true,
               "field": "derives_from",
               "kinds": [
-                "metric"
+                "metric",
+                "seed"
               ],
               "required": false,
               "same_step_kinds": []
@@ -1344,6 +1386,15 @@
               "same_step_kinds": []
             },
             {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
               "built": false,
               "field": "replaces",
               "kinds": "*",
@@ -1409,6 +1460,15 @@
               "same_step_kinds": []
             },
             {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
               "built": false,
               "field": "replaces",
               "kinds": "*",
@@ -1459,6 +1519,9 @@
           "kind": "rule",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
@@ -1467,7 +1530,8 @@
                 "scope-item",
                 "gate",
                 "environment",
-                "stakeholder"
+                "stakeholder",
+                "seed"
               ],
               "required": true,
               "same_step_kinds": []
@@ -1538,7 +1602,8 @@
               "built": true,
               "field": "derives_from",
               "kinds": [
-                "risk"
+                "risk",
+                "seed"
               ],
               "required": false,
               "same_step_kinds": []
@@ -1647,6 +1712,15 @@
               "same_step_kinds": []
             },
             {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
               "built": false,
               "field": "replaces",
               "kinds": "*",
@@ -1727,6 +1801,15 @@
               "same_step_kinds": [
                 "job"
               ]
+            },
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
             },
             {
               "built": false,
@@ -1811,6 +1894,15 @@
           "id_field": "milestone_id",
           "kind": "roadmap-milestone",
           "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
             {
               "built": false,
               "field": "replaces",
@@ -1961,6 +2053,15 @@
                 "api"
               ],
               "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
               "same_step_kinds": []
             },
             {

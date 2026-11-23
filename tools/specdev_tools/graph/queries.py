@@ -14,6 +14,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.core.errors import FindingError, SpecError, make_error
 from specdev_tools.core.json_utils import nearest_ids
 from specdev_tools.graph.contract import item_of
@@ -361,6 +362,15 @@ def _candidate(node: Node) -> Candidate:
     return Candidate(node.id, node.kind, node.step, node.file, node.lifecycle, node.scope, node.label)
 
 
+def _seeds_routed_to(graph: Graph, steps: Iterable[str]) -> set[str]:
+    """The seed ids the seed manifest routes to one of *steps* (``step_requirements``); a value that is not a list is left out."""
+    manifest = graph.documents.get(SEED_MANIFEST_FILE)
+    routes = manifest.get("step_requirements") if isinstance(manifest, Mapping) else None
+    if not isinstance(routes, Mapping):
+        return set()
+    return {seed for step in steps for seed in (routes.get(step) if isinstance(routes.get(step), list) else ()) if isinstance(seed, str)}
+
+
 def candidates(
     graph: Graph,
     link_field: str,
@@ -373,7 +383,8 @@ def candidates(
     """The nodes that the link field *link_field* may point at, for a holder of *kind* or for the node *for_id*.
 
     A candidate is of a kind the field accepts, in a step earlier than the holder's (or the holder's own step when the
-    field declares the candidate's kind as same-step) and is not ``not_applicable``; a deprecated one is included.  With
+    field declares the candidate's kind as same-step) and is not ``not_applicable``; a deprecated one is included.  A seed
+    is a candidate only when the seed manifest routes it to a step of the holder (a link to any other seed is E749).  With
     *for_id* the holder itself, the nodes the holder already links to in this field and the nodes that would close a
     same-step cycle are left out.  *query* keeps the nodes whose id or label contains the text (case-insensitive);
     *limit* cuts the list after sorting by step order, then id; ``total`` counts the matches before the cut.
@@ -390,12 +401,14 @@ def candidates(
     excluded = holder.linked
     if holder.node is not None:
         excluded = excluded | {holder.node.id} | _same_step_ancestors(graph, holder.node)
+    routed = _seeds_routed_to(graph, holder.steps)
     matches = sorted(
         (
             node
             for node in graph.gated_nodes()
             if node.id not in excluded
             and any(link_target_allowed(decl, step, node, graph.shape) for step in holder.steps or (None,))
+            and (node.kind != SEED_KIND or node.id in routed)
             and _matches(node, query)
         ),
         key=graph.shape.order_key,

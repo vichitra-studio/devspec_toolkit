@@ -315,6 +315,13 @@
   {"id": "SC-16_impl_context-36", "step": "16_impl_context", "path": "execution.final_status", "change": "remove", "replaced_by": null, "owner": "M8", "design": ["DOC L572"], "tickets": []},
   {"id": "SC-16_impl_context-37", "step": "16_impl_context", "path": "plan.spec_alignment.checklist[].implementation.actions[].evidence", "change": "remove", "replaced_by": "execution.records and the evidence records", "owner": "M8", "design": ["DOC L571"], "tickets": []},
   {"id": "SC-core-collections-12", "step": "core/collections", "path": "$defs.traceRef", "change": "remove", "replaced_by": null, "owner": "M3", "design": [], "tickets": []},
-  {"id": "SC-core-collections-13", "step": "core/collections", "path": "$defs.traceId", "change": "remove", "replaced_by": null, "owner": "M3", "design": [], "tickets": []}
+  {"id": "SC-core-collections-13", "step": "core/collections", "path": "$defs.traceId", "change": "remove", "replaced_by": null, "owner": "M3", "design": [], "tickets": []},
+  {"id": "SC-06-13", "step": "06", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-08-13", "step": "08", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-09-16", "step": "09", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-11-20", "step": "11", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-12-13", "step": "12", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-14-30", "step": "14", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-15-13", "step": "15", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []}
  ]
 }

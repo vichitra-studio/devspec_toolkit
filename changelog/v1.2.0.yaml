@@ -968,8 +968,8 @@ changes:
       global_seed_order entry when it has one, and its document, and the
       links to it with their count and the command that lists them, then
       specdev attest --prune);
-      E748 says to distil the seed in that step, to move the route to step 00,
-      02 or 02a when no node of the step can link a seed, to remove the route,
+      E748 says to distil the seed in that step, to move the route when no
+      node of the step can link a seed (step 03, 13 or a trinity step), to remove the route,
       or, when it is the seed's only route, to remove the seed with it and the
       links to it that nodes still hold; E749
       ends or remove the link and run specdev attest --prune (a derives_from
@@ -1654,10 +1654,8 @@ changes:
       prompt_16b_impl_coder.md says what 16b does with a test it wrote that no
       binding covers: it binds the test with specdev verify bind, which the
       agent may run. The seed manifest schema,
-      docs/prompts/shared_expectations.md and docs/agents/agents.md say that a
-      seed is routed only to steps 00, 02 and 02a, the steps whose nodes can
-      link a seed; a route to any other step, the trinity steps included, is
-      E748.
+      docs/prompts/shared_expectations.md and docs/agents/agents.md say which
+      steps a seed can be routed to (see the entry on seed links).
     migration:
       action: none
 
@@ -2241,5 +2239,32 @@ changes:
       points to specdev align validate. A spec with no stamp is re-stamped as
       before. Shown by specdev update spec --repo-root ./devspec_toolkit
       --no-install --dry-run.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      A seed can be routed to any step from 00 to 15 except 03 and 13, and a
+      node of that step lists it in derives_from. Before, only the kinds of
+      step 00, a third party of step 02 and an environment of step 02a could
+      list a seed, so a route to any other step was an E748 that could not be
+      cleared. Now every kind with a derives_from accepts a seed (capability,
+      component, connection, CI gate, secret, FR, API, API error, NFR, rule,
+      threat), and an invariant, fixture, design milestone, edge case, CI job,
+      roadmap milestone and scaffold row get an optional derives_from that
+      accepts a seed only. Where derives_from is required, the seed is listed
+      beside the upstream node and never in its place: a field that holds only
+      seeds is E701; the kinds of step 00, the third party and the environment
+      still derive from a seed alone. The link annotation has a new optional
+      key, additional_kinds (a subset of kinds; lint ANNOT-07;
+      docs/developers/schema-annotations.md). The route checks E747, E748 and
+      E749 are unchanged; the E748 message of a step that cannot list a seed
+      no longer lists the steps that can. specdev node candidates offers a
+      seed only when the manifest routes it to the holder's step.
+      seed_templates/seed_manifest.json routes seed-overview to step 01 again. A term of step 03 and an
+      extension of step 13 hold no links, so a route to those steps is still
+      E748. Shown by specdev json insert --id fr-password-reset .derives_from
+      '"seed-accounts"' on the worked example, then spec-check (E749 until the
+      manifest routes the seed to step 04).
     migration:
       action: none

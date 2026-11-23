@@ -303,4 +303,5 @@ class _HostWalk:
             "required": bool(lk.get("required")),
             "built": bool(lk.get("built", False)),
             "same_step_kinds": list(lk.get("same_step_kinds") or []),
+            **({"additional_kinds": list(lk["additional_kinds"])} if lk.get("additional_kinds") else {}),
         })
