@@ -1,7 +1,11 @@
 """Unified spec-check: runs all applicable validation and lint checks in one pass.
 
-Wraps validate-all as the core, then adds checks that validate-all doesn't run
-(seed-lint, fixtures-lint, canon-schema-alignment).
+The first check, ``schema-validation``, validates every spec artifact with ``validate_file`` (the validator of
+validate-all), leaving the quality lint and the canonical integrity to checks of their own.  The other registered
+checks follow in the order of the registration block: toolkit-version, spec-quality-lint, canonical-lint,
+canonical-integrity, hallucination-lint, seed-lint, fixtures-lint, dependency-order-lint, graph, computed-fields,
+records, registry-check, hardcoded-seed-check, glossary-drift-check, trace-lock, third-party-pins, the graph checks
+(``graph_checks``), open-items, frozen-plans and plan-records.
 Reports per-check breakdown with PASS/WARN/FAIL/SKIP status.
 
 This module holds the check bodies, their registrations and the plain run with its summary.  The registry they are
@@ -416,7 +420,8 @@ def run_checks(
 ) -> OrderedDict[str, dict[str, Any]]:
     """Run all applicable checks and return per-check results.
 
-    With *merge* the three merge checks of ``validation.merge_gate`` follow the registered ones; *base_ref* is the
+    With *merge* the two merge checks of ``validation.merge_gate`` (``merge-open-items``, ``merge-bindings``) follow the
+    registered ones (the pin check is the registered ``third-party-pins`` check, run in every mode); *base_ref* is the
     ``--base-ref`` they measure "closed by this branch" from (``merge_gate.resolve_merge_base``).
 
     Each value is either:

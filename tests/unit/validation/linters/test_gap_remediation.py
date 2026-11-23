@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 
 from specdev_tools.core.step_paths import get_step_from_path
+from specdev_tools.validation import validate as validate_module
 from specdev_tools.validation.validate import DEEP_VALIDATORS
 
 
@@ -72,15 +73,27 @@ class TestDeepValidatorsSubSteps:
         assert callable(DEEP_VALIDATORS[step])
 
     @pytest.mark.parametrize("step", ["16a", "16b", "16c"])
-    def test_shares_validator_with_step_16(self, step):
-        """Sub-steps should delegate to the same validator logic as step 16."""
-        # Both lambdas wrap step_16.validate_step_16; we can verify by
-        # checking that calling with trivially empty data does not raise.
-        validator = DEEP_VALIDATORS[step]
-        # A minimal call — validators return a list of error strings.
-        # An empty dict will likely produce errors, but should not raise.
-        result = validator({}, ".", {})
-        assert isinstance(result, list)
+    def test_returns_a_list_for_empty_data(self, step):
+        """A validator called with an empty document returns a list and does not raise."""
+        assert isinstance(DEEP_VALIDATORS[step]({}, ".", {}), list)
+
+    @pytest.mark.parametrize(
+        ("step", "expected"),
+        [
+            ("16", "step_16_anchor.validate_step_16_anchor"),
+            ("16a", "step_16a.validate_step_16a"),
+            ("16b", "step_16a.validate_step_16a"),
+            ("16c", "step_16c.validate_step_16c"),
+        ],
+    )
+    def test_each_step_16_key_runs_its_validator(self, monkeypatch, step, expected):
+        """``16`` runs the anchor validator, ``16a`` and ``16b`` the 16a validator, ``16c`` the 16c validator."""
+        called: list[str] = []
+        for name in ("step_16_anchor.validate_step_16_anchor", "step_16a.validate_step_16a", "step_16c.validate_step_16c"):
+            module, function = name.split(".")
+            monkeypatch.setattr(getattr(validate_module, module), function, lambda *args, name=name: called.append(name) or [])
+        assert DEEP_VALIDATORS[step]({}, ".", {}) == []
+        assert called == [expected]
 
 
 # ---------------------------------------------------------------------------

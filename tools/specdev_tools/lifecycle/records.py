@@ -64,7 +64,8 @@ def _next_number(numbers: Iterable[int]) -> int:
 def mint_id(prefix: str, existing_ids: Iterable[str]) -> str:
     """The next global id ``<prefix>-<NNNN>``: one past the highest number among *existing_ids* of that prefix, four digits.
 
-    A deleted id is never reused.  *prefix* has no trailing hyphen: ``rec``, ``dep``, ``evd``, ``so-<milestone id>``.
+    The number counts from the ids that exist now: when the highest id is deleted, its number is minted again.  *prefix* has
+    no trailing hyphen: ``rec``, ``dep``, ``evd``, ``so-<milestone id>``.
     """
     taken = re.compile(rf"^{re.escape(prefix)}-(\d+)$")
     numbers = (int(m.group(1)) for m in map(taken.match, existing_ids) if m)
@@ -74,7 +75,7 @@ def mint_id(prefix: str, existing_ids: Iterable[str]) -> str:
 def mint_action_id(existing_action_ids_in_item: Iterable[str]) -> str:
     """The next action id ``a<NN>`` of one plan item: one past the highest existing number, two digits (three after ``a99``).
 
-    A deleted id is never reused; an id that does not match ``^a[0-9]{2,}$`` is ignored.
+    When the highest id is deleted, its number is minted again; an id that does not match ``^a[0-9]{2,}$`` is ignored.
     """
     numbers = (int(m.group(1)) for m in map(_ACTION_ID.match, existing_action_ids_in_item) if m)
     return f"a{_next_number(numbers):02d}"

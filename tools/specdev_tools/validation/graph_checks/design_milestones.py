@@ -13,7 +13,7 @@ from .use_table import Use, use_pairs
 
 
 class _Index(NamedTuple):
-    """What the in-play task criteria refine: for each refined id, the roadmap milestones (in order of the listing, no repeats) that hold a criterion refining it."""
+    """What the in-play task criteria refine: for each refined id, the roadmap milestone of every criterion refining it, in the order the graph lists the criteria (a milestone is listed once per such criterion)."""
 
     refined_by: dict[str, list[Node]]
     order: dict[str, int]
@@ -57,8 +57,9 @@ def matching_milestones(ctx: GraphCheckContext) -> list[tuple[Node, Node]]:
     or a node it contains (ruling R17; ``trace.history.contained`` is the one containment walk), so a milestone that
     schedules an FR is computed by the criteria that refine one of the FR's criteria.  The design milestone is in play
     (a design milestone out of play is in no pair); the roadmap milestone is the one above the criterion and need not be
-    in play.  Ordered as ``ctx.in_play_nodes()`` is (design milestone, then roadmap milestone, in the order of the
-    first criterion); a design milestone with no pair is not computed by any step-14 milestone.
+    in play.  Each pair is listed once, ordered as ``ctx.in_play_nodes()`` is (design milestone, then roadmap milestone;
+    a roadmap milestone that is not in play follows those in play, by id); a design milestone with no pair is not
+    computed by any step-14 milestone.
     """
     return _matching(ctx, _index(ctx))
 

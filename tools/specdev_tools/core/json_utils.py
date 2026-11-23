@@ -1181,7 +1181,9 @@ def _resolve_single_pointer(
     repo_root (keyword-only, required) is the toolkit root directory containing
     ``tools/entry_key_registry.json``.
     git_root (keyword-only) anchors relative ``file`` paths; defaults to cwd.
-    Always returns a dict; never raises.
+    A pointer that does not resolve returns a dict with ``exists: False``.
+    Raises ``FileNotFoundError`` when the registry is missing under *repo_root*
+    and ``UnicodeDecodeError`` when the target file is not UTF-8.
     """
     base_dir = os.path.abspath(git_root) if git_root else os.getcwd()
 
@@ -1361,8 +1363,10 @@ def resolve_pointers(
     Returns:
         Report dict: {"results": [...], "summary": {"hits": N, "misses": M}}
 
-    Always returns a valid dict once repo_root is supplied; never raises beyond
-    the argument-binding TypeError described above.
+    A pointer that does not resolve is a miss in the report. Beyond the
+    argument-binding TypeError described above, raises ``FileNotFoundError``
+    when the registry is missing under *repo_root* and ``UnicodeDecodeError``
+    when a target file is not UTF-8.
     """
     results = []
     hits = 0
@@ -1393,7 +1397,10 @@ def resolve_pointers_from_stdin(
     All parameters are keyword-only. ``repo_root`` is REQUIRED and is the
     toolkit root directory containing ``tools/entry_key_registry.json``.
     Reads JSON pointer list from stdin. Writes report JSON to ``out_path``
-    (file) or stdout. Always exits 0 — the report is the artifact (§ specdev json resolve-pointers).
+    (file) or stdout. Exits 0 when a report is written, whatever its misses — the
+    report is the artifact (§ specdev json resolve-pointers). A registry missing
+    under ``repo_root`` (``FileNotFoundError``) or a target file that is not UTF-8
+    (``UnicodeDecodeError``) propagates and the command exits non-zero.
     """
     raw = sys.stdin.read()
 
@@ -1483,7 +1490,7 @@ def build_json_parser() -> argparse.ArgumentParser:
     # Insert
     p_insert = subparsers.add_parser(
         "insert", help="Insert/Append value",
-        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json insert --id <node-id> <field-path> <value>, or --step <NN> <node-object> for a new node (`specdev json insert --id <node-id> --help`).",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json insert --id <node-id> <field-path> <value>, or --step <NN> <collection-path> <node-object> for a new node (`specdev json insert --id <node-id> --help`).",
     )
     p_insert.add_argument("file", help="JSON file path")
     p_insert.add_argument("path", help="jq path to target array/object")
@@ -1541,10 +1548,11 @@ def build_json_parser() -> argparse.ArgumentParser:
 
     # Resolve-pointers: validate and resolve a JSON array of pointer objects.
     # Input: pointer list from stdin (no --in flag; flag minimalism).
-    # Output: report to --out <path> or stdout.  Always exits 0.
+    # Output: report to --out <path> or stdout.  Exits 0 when a report is written;
+    # a missing registry or a target file that is not UTF-8 exits non-zero.
     p_rp = subparsers.add_parser(
         "resolve-pointers",
-        help="Validate a JSON pointer list and return a resolution report (always exits 0)",
+        help="Validate a JSON pointer list and return a resolution report (exits 0 with a report; non-zero when the registry is missing or a target file is not UTF-8)",
     )
     p_rp.add_argument(
         "--out",
@@ -1617,7 +1625,7 @@ def main():
         elif args.command == "schema":
             result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
         elif args.command == "resolve-pointers":
-            # Always exits 0; report is the artifact.
+            # Exits 0 when a report is written; the report is the artifact.
             if getattr(args, "spec_root", None):
                 print(
                     "--spec-root is no longer used by resolve-pointers (registry is toolkit-side). "

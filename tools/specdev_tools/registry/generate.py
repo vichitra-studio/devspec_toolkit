@@ -620,7 +620,6 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         (registry_doc, extraction_paths_doc) — two dicts ready to serialize.
 
     Raises:
-        FileNotFoundError: if core/collections.schema.json is missing.
         json.JSONDecodeError: if any schema file is malformed.
         AnnotationError: if the x-node / x-link annotation lint finds issues.
         StepOrderError: if ``steps`` of tools/step_order.json cannot be read or leaves out a step

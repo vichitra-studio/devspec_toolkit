@@ -91,13 +91,13 @@ def resolve_extras_path(spec_dir: str, filename: str) -> str:
     return str(Path(spec_dir).resolve() / "extras" / filename)
 
 
-# Refs tried, in order, when a command needs the repository's default branch and none is given.
-# Used by the step gate's base ref (core/git_base.py) and the graph's default base ref (graph/gitview.py).
 STAMP_FILE = "specdev_version"
 """The name of the file that stamps a spec folder with the toolkit version it was built with."""
 STATUS_IN_PROGRESS = "in_progress"
 """The ``migration_status`` the stamp holds between the runner's install and the close of the triage."""
 
+# The default-branch candidates of the step gate's base ref (core/git_base.py) and of the graph's default base ref (graph/gitview.py).
+# Refs tried, in order, when a command needs the repository's default branch and none is given.
 DEFAULT_BRANCH_CANDIDATES: tuple[str, ...] = ("origin/main", "origin/master", "main", "master")
 
 

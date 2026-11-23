@@ -2,8 +2,9 @@
 
 A check is a function ``CheckContext -> result`` registered with ``register_check`` under a name and a default owner.
 ``run_registered_checks`` runs each one once, in registration order, and stamps the owner of every finding that has
-none.  Other milestones register their checks by importing this module only; ``validation.spec_check`` holds the checks
-of M1 to M6a and the plain run, ``validation.step_gate_run`` the step gate.  Nothing here imports either of them.
+none.  Every check is registered in the registration block of ``validation.spec_check`` (a graph rule through
+``graph_checks.register_graph_check`` and ``publish_graph_checks``, called there); ``validation.spec_check`` also holds
+the plain run, ``validation.step_gate_run`` the step gate.  Nothing here imports either of them.
 """
 
 from __future__ import annotations

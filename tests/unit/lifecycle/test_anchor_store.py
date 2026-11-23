@@ -142,7 +142,7 @@ def test_append_close_migration(tmp_path: Path) -> None:
     row = anchor_store.read_row(spec, MILESTONE)
     assert row is not None and row.close is not None
     assert row.close["migrations"] == [{"hash_after": HASH_B, "note": "first"}, {"hash_after": HASH_A, "note": "second"}]
-    assert row.close["plan_hash"] == HASH_A and row.status == "done"
+    assert {key: value for key, value in row.close.items() if key != "migrations"} == closed_record() and row.status == "done"
 
 
 def test_append_close_migration_refuses_a_milestone_that_is_not_closed(tmp_path: Path) -> None:

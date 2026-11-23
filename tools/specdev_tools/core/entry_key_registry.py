@@ -1,9 +1,8 @@
 """entry_key_registry.py — deterministic entry-key registry for spec files.
 
 Maps each spec file's top-level entry arrays to the canonical id field and
-kind string for that array.  Used by json_utils to replace the interim
-``_ID_CANDIDATE_FIELDS`` / ``_KIND_LOOKUP`` broad scan with a deterministic
-per-file lookup.
+kind string for that array.  json_utils uses it as a deterministic per-file
+lookup: it is the only source of the arrays to scan and of their id fields.
 
 Registry data location (toolkit-side)
 --------------------------------------
@@ -27,13 +26,14 @@ list_entries(spec_file, repo_root)
     Return the registered (array_path, id_field, kind) tuples for a file,
     including nested array entries with their full dot-notation path.
     Returns an empty list if the file has no entry arrays in the registry
-    (e.g. 16).  Returns None for **unknown** files (callers fall back
-    to legacy broad scan).
+    (e.g. 16).  Returns None for **unknown** files (json_utils indexes
+    no id of such a file).
 
 find_entry(spec_file, id_value, repo_root)
-    Not used by the current json_utils hot path (which iterates all entries
-    via list_entries + index-builds), but exposed for the bundle assembler
-    Not used by the current hot path but exposed for callers that need direct entry lookup.
+    Return the registered (array_path, id_field, kind) tuple of the array
+    that should hold *id_value*.  json_utils does not call it (it iterates
+    all entries via list_entries and builds an index); it is exposed for
+    callers that need a direct entry lookup.
 
 is_corpus_excluded(array_key, repo_root)
     True for array keys that must never contribute to nearest-id corpus
@@ -52,7 +52,8 @@ Design constraints
 - Fallback to ``None`` (not empty list) for unknown filenames so callers can
   distinguish "known file with no arrays" from "unknown file".
 - Steps registered with ``arrays: []`` (e.g. 16) return an empty list
-  rather than None — callers skip the legacy broad scan for those files.
+  rather than None — json_utils indexes no id for either, and only ``None``
+  marks the file as unknown.
 """
 
 from __future__ import annotations
@@ -153,8 +154,8 @@ def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]
     Returns:
         - ``list`` (possibly empty) if the file is **known** to the registry.
           Empty list means the step's file has no entry arrays (e.g. 16).
-        - ``None`` if the file is **unknown** — caller should fall back to the
-          legacy broad ``_ID_CANDIDATE_FIELDS`` scan.
+        - ``None`` if the file is **unknown** — json_utils indexes no id of
+          such a file (there is no broad scan).
 
     Args:
         spec_file: basename or relative path of the spec file.
@@ -268,17 +269,22 @@ def find_entry(
     tuple for the array that *should* contain entries of this id.  The caller
     must still index the file's data to locate the specific entry.
 
-    Limitation: when multiple arrays in the same file all use bare ``id`` as
-    their id field (e.g. ``edge_cases`` and ``trace`` in 11_redteam.json),
-    there is no prefix heuristic to disambiguate them.  In that case this
-    function returns ``None``.  Callers that need to locate a bare-id entry
-    should iterate all arrays via ``list_entries`` and scan each one.
+    A file with one registered array returns that array for any *id_value*.
+    With several arrays, the first one whose id-field stem (``fr_id`` →
+    ``fr``) is a prefix of *id_value* is returned.
+
+    Limitation: an array whose id field is bare ``id`` (e.g. ``edge_cases``
+    and ``trace`` in 11_redteam.json) has no stem and is never matched among
+    several arrays.  When no stem matches, this function returns ``None``.
+    Callers that need to locate a bare-id entry should iterate all arrays
+    via ``list_entries`` and scan each one.
 
     Args:
         spec_file: basename or relative path.
         id_value: the id string to look up (e.g. "fr-newsletter-subscribe").
-            Used only for suffix-based heuristics; the registry matches by
-            array registration, not by scanning actual id values.
+            Used only for the prefix match against each id-field stem; the
+            registry matches by array registration, not by scanning actual
+            id values.
         repo_root: filesystem path to the toolkit root directory.
             The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
 

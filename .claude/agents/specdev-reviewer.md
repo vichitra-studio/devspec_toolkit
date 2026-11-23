@@ -52,7 +52,7 @@ Flag discipline:
 - Exception: `specdev json resolve-pointers` accepts `--git-root` to anchor relative paths.
 - `spec-check`, `stale`: pass all three flags
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
-- `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
+- `upstream-backlog`: takes the positional `spec_dir`, `--repo-root` and `--spec-root`; it does not accept `--git-root`.
 - `specdev validate`: pass `--repo-root` only.
 - `canon-accept` uses `--git-root`, NOT `--spec-root`. (This agent does not call canon-accept.)
 

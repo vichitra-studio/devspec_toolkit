@@ -66,7 +66,7 @@ Flag discipline:
 - `specdev json` subcommands (`read`, `structure`, `keys`, `schema`): pass `--repo-root` only.
 - `spec-check`, `trace`, `node show`, `verify run`: pass all three flags —
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
-- `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
+- `upstream-backlog`: takes the positional `spec_dir`, `--repo-root` and `--spec-root`; it does not accept `--git-root`.
 - `specdev validate`: pass `--repo-root` only.
 
 ---

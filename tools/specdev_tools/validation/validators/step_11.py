@@ -19,10 +19,10 @@ def validate_step_11(
 ) -> list[SpecError]:
     """Validate Step 11 (Red Team / Threat Modeling) logic.
 
-    Checks threat_id uniqueness, API-to-threat coverage (W583: an API no threat ``threatens``) and
+    Checks API-to-threat coverage (W583: an API no threat ``threatens``) and
     invariant coverage (W615: a security invariant no threat is ``mitigated_by``). An API or invariant
     whose every linked FR is parked is exempt from both. The existence of the ids a threat names is
-    not checked here. A wrong-typed value is left to the schema and never raises.
+    not checked here, nor is the uniqueness of ``threat_id`` (duplicate ids are the graph's E704). A wrong-typed value is left to the schema and never raises.
     """
     errors: list[SpecError] = []
 

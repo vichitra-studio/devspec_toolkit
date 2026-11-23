@@ -15,7 +15,7 @@ does not cover:
 For the full schema-validation assertion, see:
   tests/unit/registry/test_generate.py::TestSchemaValidation::test_registry_doc_validates_against_schema
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_registry_generation.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/

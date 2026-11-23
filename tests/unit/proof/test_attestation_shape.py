@@ -4,8 +4,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from specdev_tools.core.schema_validate import schema_violations
 from specdev_tools.proof.validity import STALE_HASH, attestation_valid
 from specdev_tools.verify.records import ATTESTATION_TYPE, attestations_about
@@ -41,6 +39,8 @@ def test_an_attestation_without_a_git_author_breaks_the_schema(tmp_path: Path) -
 def test_attestations_about_resolves_an_old_id(tmp_path: Path) -> None:
     host = host_with(tmp_path)
     attest(host, FIXTURE)
-    assert [a.evidence_id for a in attestations_about(graph_of(host), FIXTURE)] == ["evd-attest-one"]
-    assert attestations_about(graph_of(host), "fix-no-such") == []
-    pytest.importorskip("specdev_tools")
+    graph = graph_of(host)
+    graph.alias_index["fix-old-name"] = FIXTURE
+    assert [a.evidence_id for a in attestations_about(graph, "fix-old-name")] == ["evd-attest-one"]
+    assert [a.evidence_id for a in attestations_about(graph, FIXTURE)] == ["evd-attest-one"]
+    assert attestations_about(graph, "fix-no-such") == []

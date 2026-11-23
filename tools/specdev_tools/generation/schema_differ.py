@@ -1,11 +1,10 @@
 """Schema differ for DevSpec Toolkit migration system.
 
 Compares user spec files against toolkit schemas to identify migration gaps.
-At ~1300 LOC this is the largest module in the toolkit; a future refactor
-could split it into core diff logic, report formatters, and apply/backup
-helpers (see AUDIT-020).
+The module is about 1100 lines; a future refactor could split it into core
+diff logic, report formatters, and apply/backup helpers.
 
-See: docs/developers/workflows/migration_system_spec.md
+See: docs/developers/design/migration_system_spec.md
 """
 from __future__ import annotations
 

@@ -37,7 +37,8 @@ RELEASE_DESCRIPTION = (
     "ignore), a host that declares no release_tag_pattern (E911), a tag name that does not match the pattern, is not a name git accepts "
     "or exists already (E912), and a release gate with errors (listed, exit 1). It does not push the tag and commits nothing: "
     "pushing the tag starts the deploy, which is the person's or the host's step. It picks no version number. "
-    "Subcommands: check (the production-deploy gate of a tag), rollback (record that a release is not verified in production). "
+    "Subcommands: check (the production-deploy gate of a tag), prep (run the unproven dev and CI bindings and list what the release "
+    "gate still finds), rollback (record that a release is not verified in production). "
     "Exit 0 tagged, 1 refused, 2 usage."
 )
 CHECK_DESCRIPTION = (
@@ -73,11 +74,11 @@ def _path_flags_parent() -> argparse.ArgumentParser:
 
 
 def add_release_parsers(sub: Any, canon_dir_of: CanonDirOf) -> None:
-    """Register ``release`` (and ``release check``, ``release rollback``) on the top-level sub-parsers action *sub*.
+    """Register ``release`` (and ``release check``, ``release rollback``, ``release prep``) on the top-level sub-parsers action *sub*.
 
     *canon_dir_of* finds the project canon folder (``cli._discover_project_canon_dir``).
     """
-    release = sub.add_parser("release", help="Cut a release tag, check a tag for production, record a rollback", description=RELEASE_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
+    release = sub.add_parser("release", help="Cut a release tag, check a tag for production, record a rollback, prepare a release", description=RELEASE_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     release.add_argument("--tag", dest="cut_tag", metavar="TAG", help="The release tag to create on HEAD (must match the host's release_tag_pattern and not exist)")
     release.add_argument("--message", dest="cut_message", metavar="TEXT", help="The annotation of the tag (default: 'release <tag>')")
     add_root_flags(release)
@@ -133,7 +134,7 @@ def run_release(args: argparse.Namespace, canon_dir_of: CanonDirOf) -> int:
         return 0 if result.tagged else EXIT_REFUSED
 
     if not args.cut_tag:
-        return usage_error("release", "--tag is required to cut a release (a subcommand: check, rollback)")
+        return usage_error("release", "--tag is required to cut a release (a subcommand: check, prep, rollback)")
     return run_on_graph("release", args, cut)
 
 

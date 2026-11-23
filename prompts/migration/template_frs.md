@@ -71,7 +71,7 @@ The migrated artifact MUST include:
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
 - `functional_requirements[].rationale`: String explaining the business or technical justification.
-- `functional_requirements[].priority`: MoSCoW enum — `must-have | should-have | could-have | wont-have`.
+- `functional_requirements[].priority`: MoSCoW enum — `must-have | should-have | could-have`. A requirement left out of the release is parked with `scope` (`later` or `out`), not with a priority value.
 - `functional_requirements[].preconditions`: Array of strings — state conditions before execution.
 - `functional_requirements[].postconditions`: Array of strings — state conditions after execution.
 - `functional_requirements[].action_ref`: Canonical reference (kind: `action`) for the primary verb.
@@ -80,7 +80,7 @@ The migrated artifact MUST include:
 ## Context
 
 Functional requirements are the primary traceability anchor. FR IDs appear in
-interface contracts (Step 05), fixtures (Step 08) and roadmap
+interface contracts (Step 05), invariants (Step 06), NFRs (Step 07), implementation plan milestones (Step 09) and roadmap
 tasks (Step 14). Never edit an `fr_id` in place: `specdev node rename <old-id> <new-id>` rewrites the links to it. The field is `functional_requirements` (not `requirements`) — rename
 accordingly. Each FR requires a `capability_ref` canonical object and a `derives_from`
 array of capability ids; FRs without these will fail canonical-integrity checks. The

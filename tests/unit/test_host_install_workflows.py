@@ -218,7 +218,7 @@ class TestRetiredCommands:
         assert (spec_validation, line_of("path: spec/trace_matrix.json"), "trace_matrix.json") in by_command
         assert len(found) == 4
         pointers = {f.command: f.text for f in found}
-        assert "superseded by `specdev spec-check`" in pointers["validate-all"]
+        assert pointers["validate-all"] == "'validate-all' is superseded in 1.2.0 by `specdev spec-check` (run it with --merge on a pull request)"
         assert cli.REMOVED_COMMANDS["matrix"] in pointers["matrix"]
 
     def test_a_job_matrix_strategy_is_not_the_matrix_command(self, host):

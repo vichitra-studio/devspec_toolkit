@@ -2,7 +2,7 @@
 
 The record is ``extras/signoff/so-<milestone>-<NNNN>.json`` (schema ``vc:extras:signoff-record``): the milestone, the code tree
 now, the git author, the time and what was listed to the person (the counts and ids of ``status --milestone``).  Several
-sign-offs per milestone are allowed and ids are never reused.  Nothing checks who runs the command, whether the tree is the
+sign-offs per milestone are allowed and each gets the number after the highest existing one.  Nothing checks who runs the command, whether the tree is the
 current one or whether the verdict is ``verified``: the record carries the tree and the author, ``milestone close`` prints the
 sign-off tree next to the tree it closes at, and the ask rule of the host is the operator's approval.
 """

@@ -2,7 +2,7 @@
 
 A listing built from a set or a dict depends on ``PYTHONHASHSEED`` or on insertion order when its sort is dropped, so each
 case here gives the input in reverse order and, where the input is a set, runs under several hash seeds in a subprocess.
-``WIP/1.2.0/impl/reviews/M4/R5_fixes_1.md`` lists every ``sorted(`` / ``.sort(`` of the graph code and the case that kills it.
+Each section comment names the module and the functions whose ``sorted(`` / ``.sort(`` its tests pin.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ _CRITERION = "ac-password-reset-3"
 _FLAGS = ["--repo-root", str(ROOT), "--spec-root", str(EXAMPLE_SPEC)]
 
 
-# --- trace.py:118  the unknown names of --kinds / --verbs, named in name order ---------------------------------------
+# --- graph/trace.py _unknown_names  the unknown names of --kinds / --verbs, named in name order ---------------------
 
 @pytest.mark.parametrize("seed", HASH_SEEDS)
 @pytest.mark.parametrize(("flag", "subject"), [("--kinds", "kind"), ("--verbs", "link field")])
@@ -40,7 +40,7 @@ def test_unknown_kinds_and_verbs_are_named_in_name_order_whatever_the_hash_seed(
     assert re.findall(rf"no {subject} '(\w+)'", result.stderr) == ["aaa", "kkk", "mmm", "qqq", "zzz"]
 
 
-# --- resolve.py:221  the link fields of a cycle ---------------------------------------------------------------------
+# --- graph/resolve.py _cycle_errors  the link fields of a cycle -----------------------------------------------------
 
 _CYCLE_CODE = """
 import json
@@ -57,7 +57,7 @@ def test_a_cycle_through_three_link_fields_names_the_fields_in_name_order(seed: 
     assert json.loads(run_python_seeded(seed, _CYCLE_CODE)) == ["Link cycle within step s2: a, b, c (field alpha, mid, zeta)"]
 
 
-# --- diff.py:137, 141, 166 ------------------------------------------------------------------------------------------
+# --- graph/diff.py diff_snapshots, group_changes  the changed nodes, the new removals and the groups ----------------
 
 _DIFF_CODE = """
 import json
@@ -102,7 +102,7 @@ def test_groups_come_in_role_then_kind_order_not_in_id_order() -> None:
     assert text.index("z-fr") < text.index("ms-a") < text.index("a-task")
 
 
-# --- queries.py:140, 177, 238, 119 ----------------------------------------------------------------------------------
+# --- graph/queries.py _incoming, _view, _link_decl, nearest_suffix  the incoming counts, the aliases, the link fields and the nearest names ---
 
 def test_incoming_counts_are_listed_by_verb_then_kind_not_in_the_order_the_links_were_built() -> None:
     graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
@@ -143,7 +143,7 @@ def test_kinds_at_the_same_distance_are_offered_in_name_order_whatever_the_hash_
     assert result.stderr.strip() == "E706 no kind 'aa'; nearest: api, gate, task"
 
 
-# --- kinds.py:154, build.py:139, 140, 105 ---------------------------------------------------------------------------
+# --- graph/kinds.py _parse; graph/build.py _shape, _plan  the kind names, the steps of a kind and the files of a step ---
 
 _SHAPE_CODE = """
 import json
@@ -183,7 +183,7 @@ def test_two_files_of_one_step_are_read_and_listed_in_path_order_not_in_registry
     assert graph.shape.files_by_step["04"] == ("04_alpha.json", "04_fr_list.json")
 
 
-# --- contract.py:82, 90, 115 ----------------------------------------------------------------------------------------
+# --- graph/contract.py _own_fields, _own_links, contract_view  the fields, the links and the criteria of a contract view ---
 
 def test_a_contract_view_lists_fields_links_and_criteria_in_name_order() -> None:
     criteria = [_criterion("ac-z", "Z."), _criterion("ac-b", "B."), _criterion("ac-m", "M.")]
@@ -197,7 +197,7 @@ def test_a_contract_view_lists_fields_links_and_criteria_in_name_order() -> None
     assert list(view["criteria"]) == ["ac-b", "ac-m", "ac-z"]
 
 
-# --- recipes.py:211, 213, 303 ---------------------------------------------------------------------------------------
+# --- graph/recipes.py _parse_roles, parse_recipes  the roles and the reports a wrong table names --------------------
 
 _TABLE_CODE = """
 import json
@@ -236,7 +236,7 @@ def test_the_roles_a_table_may_name_are_listed_in_name_order() -> None:
     assert "must list roles among 16a, 16b, 16c (not 17z)" in raised.value.error.message
 
 
-# --- context/scope_resolver.py:54 -----------------------------------------------------------------------------------
+# --- context/scope_resolver.py resolve_scope  the ids of a kind in resolved_ids -------------------------------------
 
 def test_context_scope_lists_the_ids_of_a_kind_by_id_though_the_kind_spans_two_steps(tmp_path: Path) -> None:
     """``trace`` orders by step then id; the ids of one kind in ``resolved_ids`` are in id order, as in 1.1.1."""

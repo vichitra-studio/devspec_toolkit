@@ -239,7 +239,7 @@ class TestSchemaGovernanceLabelRefKind:
 
 
 class TestSchemaRequiredItemProperties:
-    """Schema requires 7 properties on each extension item."""
+    """Each extension item has 7 required properties: the six removed here and ``governance_label_ref`` (``TestSchemaGovernanceLabelRef``)."""
 
     @pytest.mark.parametrize("field", [
         "extension_id", "title", "area_of_concern", "justification",

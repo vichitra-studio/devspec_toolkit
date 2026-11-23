@@ -52,7 +52,6 @@ SETUP_EXAMPLE = "npm ci"
 LOCK_FILES = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "uv.lock", "Pipfile.lock", "requirements.txt", "Cargo.lock", "go.sum", "composer.lock", "Gemfile.lock")
 JSON_LOCK_FILE = "package-lock.json"
 
-_VALIDATE_ALL = "validate-all"
 _INSTALL = re.compile(r"\b(?:npm ci|npm install|yarn install|pnpm install|uv sync|uv pip install|pip install|poetry install|bundle install|composer install|go mod download)\b")
 _RUN_PREFIX = re.compile(r"^(?:-\s+)?(?:run:\s*)?")
 _CANDIDATE_LIMIT = 5
@@ -136,7 +135,7 @@ def _retired_items(ctx: MigrationContext, host: Path) -> list[WorklistItem]:
     for finding in retired_command_findings(host):
         text = _read_lines(host, finding.file)
         shown = text[finding.line - 1].strip() if finding.line and 0 < finding.line <= len(text) else ""
-        replacement = finding.text.replace("was removed in 1.2.0; superseded by", "is superseded in 1.2.0 by") if finding.command == _VALIDATE_ALL else finding.text
+        replacement = finding.text
         is_hook = finding.file == PRE_COMMIT_FILE
         tail = " A hook that calls a retired command refuses every commit of the pass until its line is edited." if is_hook else ""
         items.append(

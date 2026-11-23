@@ -362,15 +362,18 @@ changes:
 
   - type: remove_validator
     description: >
-      Error codes removed from the registry, PROMOTABLE_PAIRS (25 pairs become 23:
-      W581 to E581 and W582 to E582 go) and the catalog
+      Error codes removed from the registry, PROMOTABLE_PAIRS (25 pairs become 10:
+      W581 to E581 and W582 to E582 go here, and the pairs of W550, W560, W562 to
+      W569, W575, W576 and W592 go with the checks that other entries remove) and
+      the catalog
       docs/developers/error-codes.md: E142, E581, E582, W574, W581, W582, W602,
       W605, W607, W612 and W616. The fields they read are gone, and no emitter is
       left. The E530 sub-code LINKED_TEST_FILE_NOT_FOUND is removed with its guide
       (specdev guide E530-LINKED_TEST_FILE_NOT_FOUND now prints the base E530
       guide) and its JSON remediation advice. hallucination-lint no longer checks
       linked_test_expectation paths and no longer reports INVENTED_ENUM_OR_ID for
-      pr_rules. E305, E307 and E596 stay.
+      pr_rules. E596 stays; E305 and E307 are retired with the plan fields they
+      read (see the entry that retires E301 to E307).
     migration:
       action: none
 
@@ -403,12 +406,12 @@ changes:
       anchor no longer emits W607 or W612; a plan file with no milestone key is
       skipped with W608, a plan whose milestone no anchor row is about is
       skipped with W611, and W610 pairs a plan with its row through milestone.
-      E302 no longer checks execution.critical_evidence.passed_test_commands.
+      The step 16 validator no longer reports E301, E302, E305, E306 or E307 (see
+      the entry that retires them).
       E304 now means: the plan's milestone is not a roadmap milestone, or a task
       of it (not set aside by disposition) has no plan item whose realises names
       one of its criteria; a task with no acceptance criterion is reported as
-      well, since no plan item can realise it. A plan with no plan.status is
-      read as active by the E301 plan-level check.
+      well, since no plan item can realise it.
     migration:
       action: none
 
@@ -418,9 +421,10 @@ changes:
       field (a field the schema marks x-link, such as verifies, refines or
       realises) exists; the graph check of spec-check does (E700 to E703). The
       checks that
-      read 1.1.1 plan fields run only on plan items that carry them: E301 (item
-      shapes), E305, W599, W600 and W601 key on implementation.status, and E307 on
-      an object spec_ref. On a 1.2.0 plan item they report nothing.
+      read 1.1.1 plan fields are retired with those fields: E301 (item shapes),
+      E305, W599, W600 and W601 keyed on implementation.status, and E307 on an
+      object spec_ref. No plan item, in the 1.1.1 or the 1.2.0 shape, is reported
+      with them.
     migration:
       action: none
 

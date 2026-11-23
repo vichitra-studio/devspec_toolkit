@@ -246,7 +246,7 @@ def test_all_objects_are_closed(schema_path: Path) -> None:
 # FIX-057 — nesting depth regression guard (threshold = 21)
 # ===========================================================================
 
-_NESTING_THRESHOLD = 21  # observed max in Step 16 (16_impl_context) — increased by 2 after allOf composition with step_base
+_NESTING_THRESHOLD = 21  # 2 above the deepest schema: Step 16 (16_impl_context) measures 19
 
 
 @pytest.mark.parametrize("schema_path", _SCHEMA_FILES, ids=_SCHEMA_IDS)
@@ -265,11 +265,11 @@ def test_nesting_depth_within_threshold(schema_path: Path) -> None:
 # FIX-058 — description coverage regression guard (aggregate floor)
 # ===========================================================================
 
-# Aggregate coverage after Batch 0b enrichment is ~94.7%.  The floor is set
+# Aggregate coverage measures 94.4%.  The floor is set
 # to 80% — well below current state — so any significant bulk removal of
 # descriptions is caught while leaving room for minor schema refactors.
 # Raise the floor if aggregate coverage climbs further and stabilises.
-_DESCRIPTION_COVERAGE_FLOOR = 0.80  # 80% — safe buffer below current 94.7%
+_DESCRIPTION_COVERAGE_FLOOR = 0.80  # 80% — safe buffer below the measured 94.4%
 
 
 def test_aggregate_description_coverage() -> None:

@@ -55,9 +55,9 @@ The 21 templates in `prompts/migration/` carry only `{{STEP_ID}}`, `{{SOURCE_VER
 - **Cons:** No iteration, limited syntax (`$var` only)
 - **Verdict:** Insufficient — same limitations as f-strings
 
-## Dual-Renderer Landscape
+## Renderer Landscape
 
-Two renderers coexist in the toolkit — they serve different subsystems and are not interchangeable:
+The toolkit has one template renderer:
 
 ### `render_template()` — Generation subsystem
 - **Location**: `specdev_tools/generation/prompt_generator.py`
@@ -65,12 +65,7 @@ Two renderers coexist in the toolkit — they serve different subsystems and are
 - **Mechanism**: Accepts a `PromptContext` dataclass and performs full `{{VAR}}` substitution and `{{#each LIST}}...{{/each}}` iteration against a loaded template string.
 - **Status**: Fully implemented; this ADR's decision applies to this renderer.
 
-### `_render_prompt()` — Migration subsystem
-- **Location**: `specdev_tools/migration/runner.py`
-- **Role**: Produces prompt files for `AI_ASSISTED` migration steps at plan-execution time (invoked by `execute_single_step()`).
-- **Mechanism**: Loads the template file, applies `{{VAR}}` interpolation via the internal `_interpolate_template()` helper, appends a `## Context` block containing the step's context JSON, and returns the concatenated string.
-- **Interpolation context**: At minimum contains `project_name` (from `spec/00_charter.json` `title` field), `spec_version` (from `spec/specdev_version`), and `step_id` (the step being migrated). Unknown placeholders are left as-is for backward compatibility with static templates.
-- **Status**: Basic `{{VAR}}` interpolation is implemented (AUDIT-049 resolved). The `{{#each}}` iteration blocks supported by the generation-subsystem `render_template()` are intentionally not replicated here — if list rendering is needed in migration templates, authors should call `render_template()` directly.
+The migration subsystem (`specdev_tools/migration/runner.py`) runs migration scripts and renders no template.
 
 ## Consequences
 

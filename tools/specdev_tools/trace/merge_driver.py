@@ -31,7 +31,7 @@ ATTRIBUTES_GIT_PATH = "info/attributes"
 
 
 class LockMergeError(FindingError):
-    """The merge or the installation cannot go on; ``error`` is the finding (E520, or E760 from a malformed version)."""
+    """The merge or the installation cannot go on; ``error`` is the finding (E520).  A malformed version raises ``LockError`` (E760) from ``parse_lock``."""
 
 
 @dataclass(frozen=True)

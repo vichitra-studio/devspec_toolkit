@@ -8,7 +8,7 @@ selects them and ``-m "not host_migration"`` leaves them out.
 
 The other variables, all optional:
 
-* ``SPECDEV_HOST_TOOLKIT``: a toolkit root that says 1.2.0 (default: a copy of this checkout made for the session);
+* ``SPECDEV_HOST_TOOLKIT``: a toolkit root that says 1.2.0 (default: this checkout itself; no copy is made);
 * ``SPECDEV_HOST_STAGE``: ``mechanical`` (default) or ``end`` (the copy is the migrated host after the judgement pass);
 * ``SPECDEV_HOST_EXPECT_W`` / ``SPECDEV_HOST_EXPECT_P``: a JSON file of counts the run must reproduce (kept OUTSIDE the repository);
 * ``SPECDEV_HOST_BASE_REF``: the merge base of the end stage.

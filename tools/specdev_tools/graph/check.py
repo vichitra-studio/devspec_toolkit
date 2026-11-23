@@ -26,8 +26,9 @@ def _node_finding(code: str, node: Node, message: str, *, link: Link | None = No
 def check_alias_space(graph: Graph) -> list[SpecError]:
     """E771 for every alias that equals the id of a node or an alias another node lists.
 
-    Aliases share the id space of the nodes, whatever a node's lifecycle.  Each offending alias is reported once, owned
-    by the step of the node that lists it (for an alias two nodes list, the later node in build order).
+    Aliases share the id space of the nodes, whatever a node's lifecycle.  An alias that equals a node id is reported
+    for each node that lists it; an alias that several nodes list is reported for each node after the first in build
+    order.  Each finding is owned by the step of the node that lists the alias.
     """
     listed: dict[str, Node] = {}
     errors: list[SpecError] = []

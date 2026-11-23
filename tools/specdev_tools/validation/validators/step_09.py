@@ -8,7 +8,7 @@ from ...core.errors import make_error, SpecError
 
 
 def validate_step_09(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
-    """Validate Step 09 (design milestones): unique ``milestone_id`` and ISO ``target_date`` values in date order.
+    """Validate Step 09 (design milestones): ISO ``target_date`` values in date order (a repeated ``milestone_id`` is the graph's E704).
 
     ``toolkit_root`` and ``spec_root`` are the dispatcher's common signature; no check reads another step.
     """

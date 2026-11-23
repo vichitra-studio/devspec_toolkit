@@ -1,7 +1,8 @@
 """Which pipeline step a spec file belongs to, from its path and (for ``impl_context/``) its content.
 
 Lives in ``core`` because both ``validation`` (deep-validator dispatch) and ``graph`` (error ownership) need it and
-``graph`` must not import ``validation``.  ``validation.validate`` keeps the old underscore names as aliases.
+``graph`` must not import ``validation``.  ``validation.validate`` imports ``get_step_from_path`` and
+``refine_impl_context_substep`` from here.
 """
 from __future__ import annotations
 
@@ -65,7 +66,7 @@ def get_step_from_path(path: str) -> str:
         if IMPL_CONTEXT_DIR_RE.match(dirname):
             # Default to "16a" for impl_context/ artifacts.  Content-based
             # refinement (see refine_impl_context_substep) promotes to
-            # "16b"/"16c" once the artifact is loaded.
+            # "16c" once the artifact is loaded.
             return "16a"
 
     return "unknown"
@@ -97,11 +98,10 @@ def refine_impl_context_substep(step: str, data: Any) -> str:
     signal then surfaces the real problem — wrong location for this artifact_role.
 
     Note on invalid verdicts: promotion triggers on *any* non-empty string in
-    ``review.verdict`` — including values outside the ``VALID_VERDICTS`` enum
-    (e.g. ``"TOTALLY_INVALID"``).  This is intentional: the enum check lives
-    inside ``validate_step_16c``, so routing must reach it *first* for the
-    E520 signal to fire.  Demoting unknown verdicts back to 16a would silence
-    that diagnostic.
+    ``review.verdict`` — including values outside the verdict enum
+    (e.g. ``"TOTALLY_INVALID"``).  The schema owns the verdict enum and reports
+    such a value as a schema finding; ``validate_step_16c`` passes the file
+    through to ``validate_step_16a``, so the route changes no check.
     """
     if step != "16a" or not isinstance(data, dict):
         return step

@@ -7,6 +7,10 @@
   "required": ["version", "entries"],
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "description": "The schema URI of the lock file.",
+      "const": "vc:extras:trace-lock"
+    },
     "version": {
       "description": "Format version of the lock file. Only version 1 exists.",
       "const": 1

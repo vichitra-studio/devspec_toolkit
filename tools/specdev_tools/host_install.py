@@ -2,8 +2,8 @@
 
 A *piece* is one thing the toolkit puts into a host repository (a hook file, a git setting, a workflow, a wrapper...).
 This module is the core every piece stands on: the registry of pieces, the context a piece reads, the result a piece
-returns, the dry-run rule, the marker helpers and the warning codes.  Real pieces are added by later work items, each
-by one function and one line in :data:`PIECES`.
+returns, the dry-run rule, the marker helpers and the warning codes.  The seven pieces are in :data:`PIECES`, each one
+function and one line.
 
 The rules every piece follows (the report of a run says which one applied):
 
@@ -12,7 +12,8 @@ The rules every piece follows (the report of a run says which one applied):
 * with ``ctx.dry_run`` it writes nothing and runs no command, and returns :data:`WOULD_INSTALL` for what it would do;
 * a second run changes nothing and returns :data:`CURRENT`.
 
-The module sits beside ``update.py`` outside the layer chain: only ``update.py`` and ``cli.py`` import it.
+The module sits beside ``update.py`` outside the layer chain: ``update.py`` imports it, and so do two migration modules
+(``migration/proposers/bindings.py`` and ``migration/scripts/v1_2_0/p7_host_files.py``) that read a host's own files.
 """
 from __future__ import annotations
 
@@ -866,7 +867,7 @@ def render_merge_check_workflow(
 
 
 _VALIDATE_ALL = "validate-all"
-_VALIDATE_ALL_REPLACEMENT = "superseded by `specdev spec-check` (run it with --merge on a pull request)"
+_VALIDATE_ALL_SUPERSEDED = "'validate-all' is superseded in 1.2.0 by `specdev spec-check` (run it with --merge on a pull request)"
 _TRACE_MATRIX_FILE = "trace_matrix.json"
 _TRACE_MATRIX_REPLACEMENT = "no longer produced; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage"
 _INVOCATION = r"(?:\bspecdev|specdev_tools\.cli|run_specdev\.sh)"
@@ -908,18 +909,20 @@ def host_workflow_files(host_root: Path) -> list[tuple[str, str]]:
 
 
 def retired_command_findings(host_root: Path, *, removed_commands: dict[str, str] | None = None) -> list[Finding]:
-    """W932 findings for the host's own files that still call a command 1.2.0 retired (ruling N9).
+    """W932 findings for the host's own files that still call a command 1.2.0 removed or superseded (ruling N9).
 
     Read: every ``.github/workflows/*.yml`` and ``*.yaml`` whose first line is not the toolkit's header, and
     ``.pre-commit-config.yaml`` outside the marked block.  A finding is made for the four commands of
-    ``core.constants.REMOVED_COMMANDS`` and for ``validate-all`` when they stand as the command after ``specdev``,
-    ``specdev_tools.cli`` or ``run_specdev.sh`` (so a ``matrix:`` job strategy is not one), and for any mention of
+    ``core.constants.REMOVED_COMMANDS`` (removed) and for ``validate-all`` (a live command, superseded by
+    ``spec-check``) when they stand as the command after ``specdev``, ``specdev_tools.cli`` or ``run_specdev.sh`` (so a
+    ``matrix:`` job strategy is not one), and for any mention of
     ``trace_matrix.json``; a comment line is not read.  ``dag-lint`` is not a retired command.  Nothing is rewritten.
     *removed_commands* replaces the table ``core.constants.REMOVED_COMMANDS``.
     """
     table = REMOVED_COMMANDS if removed_commands is None else removed_commands
-    replacements = {**table, _VALIDATE_ALL: _VALIDATE_ALL_REPLACEMENT}
-    patterns = {name: re.compile(rf"{_INVOCATION}\s+{re.escape(name)}(?![\w-])") for name in replacements}
+    texts = {name: f"'{name}' was removed in 1.2.0; {replacement}" for name, replacement in table.items()}
+    texts[_VALIDATE_ALL] = _VALIDATE_ALL_SUPERSEDED
+    patterns = {name: re.compile(rf"{_INVOCATION}\s+{re.escape(name)}(?![\w-])") for name in texts}
     files = host_workflow_files(host_root)
     pre_commit = host_root / PRE_COMMIT_FILE
     try:
@@ -933,7 +936,7 @@ def retired_command_findings(host_root: Path, *, removed_commands: dict[str, str
         for number, line in _scan_lines(text, skip_block=rel == PRE_COMMIT_FILE):
             for name, pattern in patterns.items():
                 if pattern.search(line):
-                    findings.append(Finding(W_RETIRED_COMMAND, rel, number, name, f"'{name}' was removed in 1.2.0; {replacements[name]}"))
+                    findings.append(Finding(W_RETIRED_COMMAND, rel, number, name, texts[name]))
             if _TRACE_MATRIX_FILE in line:
                 findings.append(Finding(W_RETIRED_COMMAND, rel, number, _TRACE_MATRIX_FILE, f"'{_TRACE_MATRIX_FILE}' is {_TRACE_MATRIX_REPLACEMENT}"))
     return findings

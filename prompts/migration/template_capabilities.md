@@ -83,8 +83,8 @@ The migrated artifact MUST include:
 ## Context
 
 Capabilities bridge charter artifacts to functional requirements. Preserve all
-`capability_id` values since they are referenced by FRs in Step 04, NFRs in
-Step 07, and the system sketch in Step 02. The schema no longer uses `id` —
+`capability_id` values since they are referenced by FRs in Step 04, the
+system sketch in Step 02 and roadmap task criteria in Step 14. The schema no longer uses `id` —
 rename any `id` field to `capability_id`. Each capability must have a `derives_from`
 array of ids pointing back to charter scope items, user segments or success metrics. The `verb`
 field drives downstream `action_ref` values; do not use generic verbs like

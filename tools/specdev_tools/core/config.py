@@ -1,7 +1,9 @@
 """Centralised environment variable configuration.
 
-Reads all ``SPECDEV_*`` env vars once and exposes them as typed properties
-via the :class:`SpecdevConfig` singleton.
+Reads three ``SPECDEV_*`` env vars once (``SPECDEV_WARNINGS_AS_ERRORS``,
+``SPECDEV_PROMOTE_CODES``, ``SPECDEV_REPLAY_BASE_REF``) and exposes them as typed
+properties via the :class:`SpecdevConfig` singleton.  ``SPECDEV_INVARIANTS_STRICT``
+is not held here: ``cli.py`` reads it from the environment for ``invariants-check``.
 
 Created by FIX-003 (Batch 0).
 """
@@ -25,7 +27,7 @@ def _parse_set(key: str) -> set[str]:
 
 
 class SpecdevConfig:
-    """Typed, read-only view of all ``SPECDEV_*`` environment variables.
+    """Typed, read-only view of three ``SPECDEV_*`` environment variables.
 
     Attributes
     ----------

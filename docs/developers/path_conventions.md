@@ -57,7 +57,7 @@ Prompts reference spec inputs using paths relative to `$SPEC_DIR`:
 
 ### CLI Context
 
-CLI commands accept `--repo-root` to resolve `$TOOLKIT_ROOT` and `--spec-dir` or positional `spec` to resolve `$SPEC_DIR`:
+CLI commands accept `--repo-root` to resolve `$TOOLKIT_ROOT`, and `--spec-root` or a positional `spec_dir` to resolve `$SPEC_DIR` (see the three-root table above); `--spec-dir` exists only on `specdev context review`:
 
 ```bash
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit

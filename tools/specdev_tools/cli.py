@@ -318,7 +318,7 @@ def build_parser() -> _SpecdevParser:
     sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
     from .validation.step_gate_report import DETAIL_CHOICES
 
-    sc.add_argument("--merge", action="store_true", help="The merge gate: also fail on open items (E631), on a third-party pin that differs from its source and on a failing dev or CI binding of a milestone this branch closes (run now, nothing recorded); not with --step, --paths or --detail")
+    sc.add_argument("--merge", action="store_true", help="The merge gate: also fail on open items (E631) and on a failing dev or CI binding of a milestone this branch closes (run now, nothing recorded); not with --step, --paths or --detail")
     sc.add_argument("--base-ref", default=None, help="With --step or --paths (or --merge): the base ref; the baseline is its merge-base with HEAD (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master); with --merge a commit id this clone lacks (the null id of a first push) means the first parent of HEAD")
     sc.add_argument("--detail", choices=DETAIL_CHOICES, default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
 

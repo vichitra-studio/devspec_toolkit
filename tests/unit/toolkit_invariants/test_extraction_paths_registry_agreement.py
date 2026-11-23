@@ -20,7 +20,7 @@ Exclusions:
     not in ``registry``). However, those steps must NOT appear in extraction_paths
     either (they have no entry arrays to extract).
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_extraction_paths_registry_agreement.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/

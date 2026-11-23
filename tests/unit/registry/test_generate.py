@@ -24,6 +24,7 @@ from typing import Any
 
 import pytest
 
+from specdev_tools.registry import generate as generate_module
 from specdev_tools.registry.annotations import collect_annotations, lint_annotations
 from specdev_tools.registry.generate import _serialize, generate_registry, run
 from specdev_tools.registry.schema_checklist import CHECKLIST_FILE, ChecklistError, generate_checklist
@@ -234,11 +235,13 @@ class TestStepCoverageCompleteness:
 
 
 class TestNoArraysSteps:
-    """Every step in steps_without_entry_arrays has a non-empty rationale; step 16 registers its arrays."""
+    """A step with no schema file is listed in steps_without_entry_arrays with a rationale; step 16 registers its arrays."""
 
-    def test_every_step_without_entry_arrays_has_a_rationale(self) -> None:
+    def test_a_step_without_a_schema_file_is_listed_with_a_rationale(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        real = generate_module._schema_file_for_step
+        monkeypatch.setattr(generate_module, "_schema_file_for_step", lambda step, schema_dir: None if step == "12" else real(step, schema_dir))
         reg_doc, _ = _run_generator()
-        assert all(item["rationale"] for item in reg_doc["steps_without_entry_arrays"])
+        assert reg_doc["steps_without_entry_arrays"] == [{"step": "12", "rationale": "no schema file"}]
 
     def test_16_registers_its_ambiguity_arrays(self) -> None:
         reg_doc, _ = _run_generator()
@@ -268,16 +271,6 @@ class TestDeferredRegistration:
         for step in ("16b", "16c"):
             assert step in deferred, f"Step '{step}' not found in steps_with_deferred_registration."
             assert deferred[step]["rationale"], f"Step '{step}' has empty rationale."
-
-    def test_deferred_steps_not_in_without_entry_arrays(self) -> None:
-        """Disjoint sets: 16a/16b/16c must not appear in steps_without_entry_arrays."""
-        reg_doc, _ = _run_generator()
-        without_steps_set = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
-        for step in ("16a", "16b", "16c"):
-            assert step not in without_steps_set, (
-                f"Deferred step '{step}' found in steps_without_entry_arrays — "
-                "deferred and without-entry-arrays must be disjoint."
-            )
 
     def test_deferred_steps_not_in_registry(self) -> None:
         """Deferred steps must not appear as 'step' values inside the registry."""
@@ -349,10 +342,9 @@ class TestRegistryCutover:
             assert {role for _, role, _ in triples} == {row["role"]}, kind
             assert {coarse for _, _, coarse in triples} == {row.get("coarse", False)}, kind
 
-    def test_steps_without_entry_arrays_loses_10_15_16(self) -> None:
+    def test_no_step_is_without_entry_arrays(self) -> None:
         reg_doc, _ = _run_generator()
-        without = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
-        assert without == set()
+        assert reg_doc["steps_without_entry_arrays"] == []
 
     def test_steps_with_deferred_registration_loses_16a(self) -> None:
         reg_doc, _ = _run_generator()

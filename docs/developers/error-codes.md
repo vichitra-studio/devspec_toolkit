@@ -163,7 +163,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and an API id of step 05 is not named in the `threatens` of any threat in the artifact (`threatens` accepts api, component, connection and third-party ids). Each API should be threatened by at least one threat. The check only runs when Step 05 is present.
 
-**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted.
+**Exemption**: The seed ids of the seed manifest are taken out of an API's `derives_from` first (an API may list a seed beside its FRs). An API is skipped if what is left is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`) — such an API will never be built, so demanding threat coverage for it is moot. An API that derives from a parked FR and a seed is therefore exempt. An API whose `derives_from` is empty, holds only seed ids, or holds an id that is neither a seed nor a parked FR (e.g. a capability id) is not exempted.
 
 **Resolution**: Add a threat in Step 11 whose `threatens` includes the uncovered API id, or confirm the API is intentionally outside threat scope.
 
@@ -768,7 +768,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### W585 ANCHOR_DRIFT_SKIP
 
-**Trigger**: Fired by `step_16_anchor.py` when `spec_path` is not provided to `validate_step_16_anchor`, so all filesystem-dependent drift checks (W588, W589, W608 for plan files, W611, the `[scope]` shape of E308, the `[mapping]` shape of E309, W610) are skipped — only the in-memory `milestone_index` checks still run.
+**Trigger**: Fired by `step_16_anchor.py` when `spec_path` is not provided to `validate_step_16_anchor`, so all filesystem-dependent drift checks (W588, W589, W608 for plan files, W611, E308 [scope], E308 [ownership], E309 [mapping], W610) are skipped — only the in-memory `milestone_index` checks still run.
 
 **Resolution**: Pass `spec_path` when invoking the anchor validator so the filesystem-dependent checks can run.
 
@@ -1464,9 +1464,9 @@ Five commands print the codes below. `specdev spec-check --merge` runs the merge
 
 ### E911 RELEASE_TAG_PATTERN_UNDECLARED
 
-**Trigger**: A command that needs the pattern of release tags finds none in `spec/common/host_declarations.json`: `specdev release --tag`, `release rollback`, the release gate (`specdev status` prints it under `release-gate`) and the production-verification section of `specdev status` (which prints it as a line starting `not read:`). `E911 the host declares no release_tag_pattern; add one to spec/common/host_declarations.json (a regular expression, for example ^v[0-9]+[.][0-9]+[.][0-9]+$)`. Nothing is written.
+**Trigger**: A command that needs the pattern of release tags finds none in `spec/common/host_declarations.json`: `specdev release --tag`, `release rollback`, the release gate (`specdev status` prints it under `release-gate`) and the production-verification section of `specdev status` (which prints it as a line starting `not read:`). `E911 the host declares no release_tag_pattern; add one to spec/common/host_declarations.json (a regular expression, for example ^v[0-9]+[.][0-9]+[.][0-9]+$)`. The same commands raise E911 when the declared pattern is not a regular expression: `E911 the release_tag_pattern '<pattern>' is not a regular expression (<the error of the regular expression>); correct it in spec/common/host_declarations.json`. Nothing is written.
 
-**Resolution**: Declare the pattern (see [host_declarations.md](host_declarations.md)). Followed: with `{"$schema": "vc:host-declarations", "release_tag_pattern": "^v[0-9]+[.][0-9]+[.][0-9]+$"}` in `spec/common/host_declarations.json` and committed, `specdev release --tag v1.0.0` on the worked example went on to the release gate and printed 82 errors where it had refused with E911 before; the first was E608 (the example has no version stamp), none was E911.
+**Resolution**: Declare the pattern, or correct the one declared (see [host_declarations.md](host_declarations.md)). Followed: with `{"$schema": "vc:host-declarations", "release_tag_pattern": "^v[0-9]+[.][0-9]+[.][0-9]+$"}` in `spec/common/host_declarations.json` and committed, `specdev release --tag v1.0.0` on the worked example went on to the release gate and printed 82 errors where it had refused with E911 before; the first was E608 (the example has no version stamp), none was E911.
 
 **Promotable**: No (error only).
 
@@ -1576,7 +1576,7 @@ Five commands print the codes below. `specdev spec-check --merge` runs the merge
 
 ### W932 HOST_RETIRED_COMMAND
 
-**Trigger**: `specdev update` finds, in a host's own workflow (`.github/workflows/*.yml` and `*.yaml` without the toolkit's header) or in its `.pre-commit-config.yaml` outside the marked block, a command that 1.2.0 removed: the four removed commands (`forward-replay-check`, `completeness-check`, `traceability-check`, `matrix`), `validate-all` (as the command after `specdev`, `specdev_tools.cli` or `run_specdev.sh`; a GitHub `matrix:` strategy is not a hit) and any mention of `trace_matrix.json`. One warning per line: `W932 HOST_RETIRED_COMMAND: .github/workflows/spec_validation.yml:21: 'validate-all' was removed in 1.2.0; superseded by `specdev spec-check` (run it with --merge on a pull request)`; `...:24: 'matrix' was removed in 1.2.0; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage`; `...:24: 'trace_matrix.json' is no longer produced; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage`. Comment lines are skipped. The installer reports and never rewrites the file, and the report does not change a piece's status.
+**Trigger**: `specdev update` finds, in a host's own workflow (`.github/workflows/*.yml` and `*.yaml` without the toolkit's header) or in its `.pre-commit-config.yaml` outside the marked block, a command that 1.2.0 removed or superseded: the four removed commands (`forward-replay-check`, `completeness-check`, `traceability-check`, `matrix`), `validate-all`, which stays a command and is superseded by `spec-check` (as the command after `specdev`, `specdev_tools.cli` or `run_specdev.sh`; a GitHub `matrix:` strategy is not a hit) and any mention of `trace_matrix.json`. One warning per line: `W932 HOST_RETIRED_COMMAND: .github/workflows/spec_validation.yml:21: 'validate-all' is superseded in 1.2.0 by `specdev spec-check` (run it with --merge on a pull request)`; `...:24: 'matrix' was removed in 1.2.0; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage`; `...:24: 'trace_matrix.json' is no longer produced; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage`. Comment lines are skipped. The installer reports and never rewrites the file, and the report does not change a piece's status.
 
 **Resolution**: Edit the host's workflow by hand: replace the command by the one the message names. Not followed for this entry (the scan only reports; no run edited the file): the warning stays until the line is changed.
 

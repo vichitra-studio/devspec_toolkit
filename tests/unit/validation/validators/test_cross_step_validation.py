@@ -1,13 +1,10 @@
-"""Comprehensive tests for R9 cross-step ID validators.
+"""What the single-file validators of steps 06, 08, 09, 12 and 13 report about the ids of other steps: nothing.
 
-Tests the remaining validators that perform cross-step reference validation:
-- step_12: job depends_on (same-step; no cross-step checks)
-- step_13: Governance label refs in extensions
+None of them checks a link target; an unknown target (E700) and a link cycle (E703) are graph findings of ``spec-check``.
 
-Each test class covers three scenarios:
-(a) Valid upstream refs pass with no W590/E590
-(b) Missing upstream file emits W590
-(c) Broken ref (ID not in upstream) emits E590
+- step_12: an unknown or cyclic ``depends_on`` gives nothing from ``validate_step_12`` and E700 / E703 from ``spec-check``
+- step_13: a ``governance_label_ref`` absent from step 10, or a missing step 10 file, gives no E590 and no W590
+- steps 06, 08, 09, 12 and 13: with no spec directory the validator gives no W590
 """
 
 import json
@@ -73,16 +70,16 @@ class TestStep12CrossStep(unittest.TestCase):
     def _spec_check_findings(jobs):
         return spec_check_graph_findings({"12_ci_gates.json": {"jobs": jobs}})
 
-    def test_unknown_depends_on_job_yields_e590(self):
-        """The old E590 is now E700 from ``spec-check``; the single-file validator reports nothing."""
+    def test_unknown_depends_on_job_yields_e700_from_spec_check(self):
+        """An unknown ``depends_on`` target is E700 from ``spec-check``; the single-file validator reports nothing."""
         jobs = [self._job("job-a", ["job-ghost"])]
         self.assertEqual(_render(self._validate(jobs)), [])
         findings = self._spec_check_findings(jobs)
         self.assertEqual([(f["code"], f["owner"], f["node_id"]) for f in findings], [("E700", "step:12", "job-a")])
         self.assertIn("job-ghost", findings[0]["message"])
 
-    def test_depends_on_cycle_yields_e141(self):
-        """The old E141 is now E703 from ``spec-check``; the single-file validator reports nothing."""
+    def test_depends_on_cycle_yields_e703_from_spec_check(self):
+        """A ``depends_on`` cycle is E703 from ``spec-check``; the single-file validator reports nothing."""
         jobs = [self._job("job-a", ["job-b"]), self._job("job-b", ["job-a"])]
         self.assertEqual(_render(self._validate(jobs)), [])
         findings = self._spec_check_findings(jobs)
@@ -110,7 +107,7 @@ class TestStep12CrossStep(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestStep13CrossStep(unittest.TestCase):
-    """step_13 no longer cross-checks governance_label_ref against step 10 (E-030).
+    """step_13 does not cross-check governance_label_ref against step 10 (E-030).
 
     The label is a canon reference, checked by canonical-integrity (E110).
     """
@@ -153,7 +150,7 @@ class TestStep13CrossStep(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestCrossStepNoSpecDir(unittest.TestCase):
-    """When the spec directory does not exist at all, validators should emit W590."""
+    """With no spec directory, the validators of steps 06, 08, 09, 12 and 13 emit no W590: none reads an upstream file."""
 
     def test_step_06_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:

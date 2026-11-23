@@ -90,12 +90,10 @@ class TestStep11Fixtures:
         assert any("threatens" in msg for msg in _schema_errors(data))
 
     def test_invalid_category_has_bad_category(self):
-        """invalid_category.json uses a non-enum category value."""
-        data = json.loads(
-            (FIXTURES_DIR / "invalid_category.json").read_text()
-        )
-        threat = data["threats"][0]
-        assert threat["category"] == "invalid-category"
+        """invalid_category.json uses a non-enum category value, and the schema says so."""
+        data = json.loads((FIXTURES_DIR / "invalid_category.json").read_text())
+        assert data["threats"][0]["category"] == "invalid-category"
+        assert any("'invalid-category' is not one of" in msg for msg in _schema_errors(data))
 
     def test_doc_example_validates(self):
         assert _doc_example_errors(lambda threat, edge_case: None) == []

@@ -9,7 +9,7 @@ step_base.schema.json (they are not step-level artifacts).
 
 Step schemas (NN_*.schema.json) are the primary targets.
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_schema_wellformed.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/
@@ -123,7 +123,7 @@ class TestSchemaWellformed:
 
     @pytest.mark.parametrize("schema_path", _step_schemas(), ids=lambda p: p.name)
     def test_step_schema_references_step_base(self, schema_path: Path) -> None:
-        """Step schemas must reference vc:core:step-base (directly or via allOf)."""
+        """The text of a step schema file must hold ``vc:core:step-base`` (a substring search of the file, not a walk of ``allOf``)."""
         data = json.loads(schema_path.read_text(encoding="utf-8"))
         schema_text = schema_path.read_text(encoding="utf-8")
         assert "vc:core:step-base" in schema_text, (

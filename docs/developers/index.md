@@ -10,7 +10,7 @@ Use this index to locate the developer-facing material while working through the
 
 ## Workflow Guides
 - [`workflows/discovery.md`](workflows/discovery.md) — steps 00–12 overview.
-- [`workflows/spec_to_impl.md`](workflows/spec_to_impl.md) — steps 13–17 overview.
+- [`workflows/spec_to_impl.md`](workflows/spec_to_impl.md) — steps 13–16c overview.
 - [`workflows/workflow_migrate_1_2_0.md`](workflows/workflow_migrate_1_2_0.md) — migrating a 1.1.1 host to 1.2.0: the mechanical stage, the judgement pass, `align validate`, sizing.
 - [`workflows/workflow_migration.md`](workflows/workflow_migration.md) — guide for migrating projects after toolkit updates.
 - [`workflows/workflow_align.md`](workflows/workflow_align.md) — guide for using the specdev align CLI.

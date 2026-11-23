@@ -1,6 +1,8 @@
 """WI-M8-16: the text of the M8 catalogues (error codes, command reference, changelog).
 
-Each test pins a fact, such as "this code has an entry with its registered name" or "the two changelog files agree", and never the wording of a sentence.
+Each test pins a fact, such as "this code has an entry with its registered name" or "the two changelog files agree".
+Four pin a phrase: ``M8_CHANGELOG_MARKERS`` (the words that find a changelog entry), ``OLD_WORDINGS`` (sentences the catalogues must not hold),
+the ``Shown by`` ending of an M8 changelog entry, and the milestone state block of the reference.
 """
 from __future__ import annotations
 

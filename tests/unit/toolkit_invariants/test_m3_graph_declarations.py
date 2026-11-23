@@ -1,6 +1,6 @@
 """M3 graph declarations: every ``x-node`` / ``x-link`` the step 06-16 schemas carry.
 
-The model is ``test_m2_graph_declarations.py`` for steps 00-05; the helpers and fixtures are imported from it.
+The model is ``test_m2_graph_declarations.py`` for steps 00-05; the helpers come from ``_declarations_support.py`` and the fixtures from ``conftest.py``.
 Tests are parametrised over the M3 schema files that carry ``x-node`` today. A step item adds its schema to the
 tables below (``_EXPECTED_KINDS``, ``_EXPECTED_LINK_KINDS``) and one ``test_step_NN_...`` test with its link
 fields; the generic tests then cover it with no further edit.

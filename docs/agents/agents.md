@@ -21,7 +21,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 1. **Read Inputs**
    - Load the relevant human guide: `spec/NN_name.guide.md`.
    - Load the deterministic prompt: [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
-   - In prompts, use the sections: `Operating Flow`, `Self‑Audit Gate`, and `Coverage Closure`. Some prompts also include a `Context To Ingest` section; when present, follow it.
+   - In prompts, use the sections: `Operating Flow`, `Self‑Audit Gate`, and `Coverage Closure`. Every prompt also has a `Negative Constraints` section; follow it.
 2. **Prepare Context**
    - Read `spec/common/seed_manifest.json` first and ingest required seeds in order.
    - For every step, ingest the seeds listed in `step_requirements[NN]` (resolved to paths via `seeds[]`, in `global_seed_order` order — read order only, not inclusion) before any other context. A seed is routed to each step that distils a part of it: a node of that step lists the seed in `derives_from` (beside the upstream node where the field is required and also names upstream nodes: see the seed rules of `docs/prompts/shared_expectations.md`), and `spec-check` reports a route that no node of its step uses, and any route to step 13 or a trinity step, as E748. A step with empty or absent `step_requirements[NN]` ingests no seeds; there is no fallback to `global_seed_order`.

@@ -41,7 +41,7 @@ spec/specdev_version is left as it is. Run, in this order:
 The seven lines are this guide in short (the command of line 1 is the same run with `--no-install`, which skips the host-file scan and so prints no warning; use the command above). The scan prints one `W932 HOST_RETIRED_COMMAND` warning for each line of your hooks and workflows that calls a command 1.2.0 removed (`matrix`, `forward-replay-check`, `completeness-check`, `traceability-check`) or replaced (`validate-all` is superseded by `spec-check`):
 
 ```
-W932 HOST_RETIRED_COMMAND: .github/workflows/spec_validation.yml:11: 'validate-all' was removed in 1.2.0; superseded by `specdev spec-check` (run it with --merge on a pull request)
+W932 HOST_RETIRED_COMMAND: .github/workflows/spec_validation.yml:11: 'validate-all' is superseded in 1.2.0 by `specdev spec-check` (run it with --merge on a pull request)
 W932 HOST_RETIRED_COMMAND: .github/workflows/spec_validation.yml:12: 'matrix' was removed in 1.2.0; use `specdev coverage --by fr` for the FR view and `specdev trace --up|--down <id>` for lineage
 ```
 

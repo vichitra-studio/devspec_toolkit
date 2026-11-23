@@ -48,7 +48,7 @@
         },
         "coarse": {
           "type": "boolean",
-          "description": "True when the node is a coarse obligation; the built computation that reads it arrives with a later milestone."
+          "description": "True when the node is a coarse obligation. The annotation is copied into the entry-key registry; the built computation decides coarseness by kind (scope-item, risk, capability) and does not read it."
         },
         "step": {
           "type": "string",

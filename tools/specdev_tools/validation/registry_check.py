@@ -389,8 +389,10 @@ def _check_unregistered_arrays(
     - TraceRef arrays (``.trace``) — cross-step foreign-key refs intentionally
       absent from the registry per generator Rule B.
     - Arrays whose first item has no id-like field (e.g. pure config arrays).
-    - Files that are not registered AND not in ``steps_without_entry_arrays``
-      (those are future/unknown steps — skip entirely rather than flood output).
+
+    Every top-level ``.json`` file of the spec root is scanned, registered or
+    not: a file the registry does not know gets W614 for each of its
+    id-bearing arrays.
     """
     errs: list[SpecError] = []
 

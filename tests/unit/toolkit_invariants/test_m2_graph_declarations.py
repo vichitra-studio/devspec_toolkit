@@ -2,7 +2,6 @@
 
 Tests are parametrised over the M2 schema files that carry ``x-node`` today, so a schema
 added to the graph is covered by adding its kinds to ``_EXPECTED_KINDS``, not by copying tests.
-Letters (a)-(i) are those of section 7 of the M2 plan.
 """
 from __future__ import annotations
 
@@ -101,7 +100,7 @@ def test_every_link_kind_is_declared_or_seed(decls, fname: str) -> None:
         assert set(kinds) <= known, (link.field_name, kinds)
 
 
-def test_a_seed_is_additional_wherever_derives_from_also_names_an_upstream_kind_outside_step_00_02_and_02a() -> None:
+def test_a_seed_is_additional_in_nine_required_derives_from_fields_and_in_the_optional_ones_of_the_nfr_and_the_threat() -> None:
     """The holders whose ``derives_from`` accepts a seed in addition to an upstream kind (``additional_kinds``): nine required fields, where a seed alone is E701, and the optional fields of the NFR and the threat, where it only keeps a missing target looked for in the upstream step.
 
     The kinds of step 00, the third party and the environment are not among them: there a seed alone is the source.

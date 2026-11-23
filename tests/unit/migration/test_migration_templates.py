@@ -356,9 +356,16 @@ def test_a_kind_named_for_one_step_is_written_at_that_step(written):
     assert wrong == set()
 
 
+def any_step_rows(template_name: str) -> list[str]:
+    """The rows of the table under ``### Items any step can carry``, one per kind, as written."""
+    table = _text(template_name).split("### Items any step can carry\n", 1)[1].split("\n#", 1)[0]
+    return [line for line in table.splitlines() if KIND_ROW.match(line)]
+
+
 def test_the_any_step_table_is_the_same_in_every_template():
-    rows = {name: sorted(named_kinds(name) & set.intersection(*(named_kinds(n) for n in EXPECTED_TEMPLATES))) for name in EXPECTED_TEMPLATES}
-    assert len({tuple(r) for r in rows.values()}) == 1 and len(next(iter(rows.values()))) >= 8
+    expected = any_step_rows(EXPECTED_TEMPLATES[0])
+    assert len(expected) >= 8
+    assert [name for name in EXPECTED_TEMPLATES if any_step_rows(name) != expected] == []
 
 
 # --- shape ----------------------------------------------------------------------------------------------------------------

@@ -354,10 +354,17 @@ def test_insert_into_a_present_field_that_is_not_an_array_names_what_it_is(host:
 
 def test_classic_jq_path_forms_unchanged(host: Path, tmp_path: Path) -> None:
     scratch = tmp_path / "scratch.json"
-    scratch.write_text(json.dumps({"$schema": "vc:none", "items": [{"id": "a"}], "n": 1}), encoding="utf-8")
-    for argv in (("patch", str(scratch), ".n", "2", "--spec-root", "ignored", "--git-root", "ignored"), ("insert", str(scratch), ".items", '{"id": "b"}'), ("delete", str(scratch), ".items[0]")):
+    scratch.write_text((host / "spec" / FR_FILE).read_text(encoding="utf-8"), encoding="utf-8")
+    added = {**_item(host, FR_FILE, "functional_requirements", "fr_id", FR_REQUEST), "fr_id": "fr-added-by-path"}
+    for argv in (
+        ("patch", str(scratch), ".functional_requirements[0].statement", '"The system shall be edited by path."', "--spec-root", "ignored", "--git-root", "ignored"),
+        ("insert", str(scratch), ".functional_requirements", json.dumps(added)),
+        ("delete", str(scratch), ".functional_requirements[1]"),
+    ):
         status, out = run_cli("json", *argv)
-        assert status in (0, 1), out
+        assert status == 0, out
+    written = json.loads(scratch.read_text(encoding="utf-8"))["functional_requirements"]
+    assert [item["fr_id"] for item in written] == [FR, "fr-added-by-path"] and written[0]["statement"] == "The system shall be edited by path."
     classic = run_cli("json", "read", str(host / "spec" / FR_FILE), ".functional_requirements[0].fr_id", *_flags(host))
     assert classic[0] == 0 and classic[1].strip() == FR
     before_lock = Path(lock_path(str(host / "spec"))).read_bytes()
@@ -388,7 +395,7 @@ def test_edit_refused_only_for_the_violation_it_adds_not_for_an_unrelated_existi
 
 
 def test_write_cost_at_w_scale(host: Path) -> None:
-    """PD-8: a write builds the graph three times (base, under the lock, candidate); the cost is recorded, not gated."""
+    """PD-8: a write builds the graph three times (base, under the lock, candidate); the cost is printed and gated at 120 s."""
     document = _doc(host, FR_FILE)
     template = document["functional_requirements"][1]
     for number in range(300):

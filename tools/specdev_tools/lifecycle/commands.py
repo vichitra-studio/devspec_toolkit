@@ -245,8 +245,8 @@ DEFER_DESCRIPTION = (
 )
 SIGNOFF_DESCRIPTION = (
     "Record the sign-off of an in_progress milestone: extras/signoff/so-<milestone>-<NNNN>.json holds the code tree now, the git "
-    "author, the time and what was listed (manual fixtures and how many are attested, deferred and won't-do tasks, plan items "
-    "not executed, proof owed at staging or prod). The same view as `specdev status --milestone <id>` is printed. A second "
+    "author, the time and what was listed (manual fixtures and how many are attested, deferred and won't-do tasks, open items, "
+    "proof owed at staging or prod). The same view as `specdev status --milestone <id>` is printed. A second "
     "sign-off gets the next number. Nothing checks who runs it, whether the review said verified, or whether the tree is the "
     "current one at close. Refused: E801 (the milestone is not in_progress), E803, E800 (no anchor row). Exit 0 recorded, 1 refused."
 )
@@ -254,7 +254,7 @@ CLOSE_DESCRIPTION = (
     "Close an in_progress milestone. The close gate checks, and reports every finding at once: E810 a task criterion no plan item "
     "realises, E811 a criterion not proven (at the dev stage; a ci binding counts as dev; staging and production bindings do "
     "not hold the close up), E812 a plan item not executed, E813 the review of the plan is not verified, E632 an open item in the "
-    "plan, E763 a suspect link on the milestone's chain, E761 a link of a plan item that has no lock entry, E746 a scaffold row that is not a tracked file, E814 no sign-off record. "
+    "plan, E763 a suspect link on the milestone's chain, E761 a link on the milestone's chain that has no lock entry, E746 a scaffold row that is not a tracked file, E814 no sign-off record. "
     "With errors nothing is written and the command exits 1, the errors listed by owner. With none, ONE write sets status done and "
     "the close record (signed_off_by the git author email of the latest sign-off, signoff its id, tree, plan_hash, closed_at, "
     "migrations); the plan is frozen from then on (a record write is refused with E820, spec-check frozen-plans reports a "

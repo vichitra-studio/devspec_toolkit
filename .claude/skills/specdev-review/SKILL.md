@@ -245,7 +245,7 @@ When running specdev commands from this skill:
   (`json patch|insert|delete --id`, `json insert --step`) take all three flags.
 - `spec-check`, `stale`, `governance-check`:
   pass all three flags `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
-- `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
+- `upstream-backlog`: takes the positional `spec_dir`, `--repo-root` and `--spec-root`; it does not accept `--git-root`.
 - `canon-accept`: pass `--git-root`, NOT `--spec-root`.
 
 Never read `spec/*.json` directly. All spec reads go through `specdev json read` with a filter.

@@ -13,7 +13,7 @@ A step is "accounted for" if it appears in any of:
 
 Reads directly from ``devspec_toolkit/tools/entry_key_registry.json``.
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_step_registry_coverage.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/

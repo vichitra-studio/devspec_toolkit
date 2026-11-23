@@ -14,7 +14,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 | `id` / `map_keyed: true` | Exactly one. `id` names the id property of each item; `map_keyed` means the map key is the id. |
 | `role` / `top_of_graph: true` | Exactly one. `role` is a `nodeRole`; `top_of_graph` is only for kind `seed`. |
 | `contract` | Property names that make up the node's contract. Required unless `top_of_graph`. |
-| `coarse` | Optional boolean. Declares a coarse obligation; the built computation that reads it comes later. |
+| `coarse` | Optional boolean. Declares a coarse obligation. `registry-generate` copies it into the registry entry; the built computation decides coarseness by kind (`scope-item`, `risk`, `capability`) and does not read it. |
 | `step` | Optional step id. Default: the numeric prefix of the schema file name. |
 | `files` | Optional relative globs. Default: the step's spec file. Step 16 plan files must set `files: ["impl_context/ms_*_plan.json"]` explicitly. |
 

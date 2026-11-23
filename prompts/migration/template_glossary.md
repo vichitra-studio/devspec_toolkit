@@ -70,6 +70,7 @@ The migrated artifact MUST include:
 - `terms[].units`: String (pattern: `^[A-Za-z0-9/]+$`) — unit of measurement if the term is quantifiable.
 - `terms[].acronym_ref`: Canonical reference (kind: `acronym`) — only when `acronym` field is also set.
 - `terms[].unit_ref`: Canonical reference (kind: `unit`) — only when `units` field is also set.
+- `terms[].derives_from`: Array of seed ids (kinds: `seed`) — the seeds the term takes its definition from directly; list a seed routed to this step, as the `seed-route-cleanup` row does.
 
 ## Context
 

@@ -9,13 +9,16 @@ demand.  The fix adds a structural rule: if the enclosing object's JSON Schema
 declares ``additionalProperties:false`` AND defines no ``*_ref``/``*_refs``
 property, E541 is suppressed for all free-text fields of that object.
 
-Four surfaces were affected on the host:
+The four surfaces on a host:
   1. plan.ambiguities[].description  (16_impl_context.schema.json, ap:false, no ref slot)
   2. plan.docs_impact.rationale       (16_impl_context.schema.json, ap:false, no ref slot)
   3. milestones[].name                (09_impl_plan.schema.json,    ap:false, no ref slot)
   4. execution.records[].note         (16_impl_context.schema.json, free text of a record)
 
-Surfaces 1–3 are covered by the structural rule (this test file).
+Surface 3 is covered by the structural rule alone.  Surfaces 1 and 2 are covered
+twice: by the structural rule and by the ``ambiguities`` / ``docs_impact`` key-name
+skips in ``_E541_SKIP_KEYS``; their tests take those two keys out of the skip set,
+so only the structural rule can suppress E541 there.
 Surface 4 is covered by the ``execution`` key-name skip in ``_E541_SKIP_KEYS``
 (the free text of an execution record is run output, not spec vocabulary).
 
@@ -48,6 +51,7 @@ from typing import Any
 
 import pytest
 
+from specdev_tools.validation import hallucination_lint
 from specdev_tools.validation.hallucination_lint import (
     _check_free_text_terms,
     _is_structurally_unbindable,
@@ -262,7 +266,18 @@ class TestMilestonesNameStructuralRule:
 # ---------------------------------------------------------------------------
 
 class TestPlanSubtreesStructuralRule:
-    """Surfaces 1 and 2 (plan.ambiguities[].description, plan.docs_impact.rationale)."""
+    """Surfaces 1 and 2 (plan.ambiguities[].description, plan.docs_impact.rationale).
+
+    Both keys are also in ``_E541_SKIP_KEYS``; the fixture takes them out of the set,
+    so the structural rule is the only thing that can suppress E541 in these tests.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _without_the_key_name_skip(self, monkeypatch):
+        monkeypatch.setattr(
+            hallucination_lint, "_E541_SKIP_KEYS",
+            hallucination_lint._E541_SKIP_KEYS - {"ambiguities", "docs_impact"},
+        )
 
     def test_ambiguities_description_suppressed(self):
         """(a) plan.ambiguities[].description must NOT fire E541 (structural rule)."""

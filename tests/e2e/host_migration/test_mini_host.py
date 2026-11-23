@@ -180,7 +180,7 @@ def test_every_code_the_stage_must_clear_names_a_script_that_exists_and_the_firs
     for code, script in MUST_CLEAR.items():
         assert (SCRIPTS / f"{script}.py").is_file(), (code, script)
     for code in ("E768", "E704", "E761"):
-        assert code in (SCRIPTS / f"{MUST_CLEAR[code]}.py").read_text(encoding="utf-8") or code in (SCRIPTS / "p4_ambiguities.py").read_text(encoding="utf-8"), code
+        assert code in (SCRIPTS / f"{MUST_CLEAR[code]}.py").read_text(encoding="utf-8"), code
 
 
 @pytest.mark.parametrize(

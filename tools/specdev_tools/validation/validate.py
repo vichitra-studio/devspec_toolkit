@@ -473,7 +473,8 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     #   refine_impl_context_substep(step, data) (core/step_paths.py) then promotes a plan with a non-empty
     #   review.verdict to "16c"; chain-up inside the validators (16c→16a→base) preserves the earlier checks.
     # "16b" is a pipeline step of tools/step_order.json that has no validator of its own (a coder's output is an
-    #   execution record, not a file), so `validate --step 16b` runs the 16a checks.
+    #   execution record, not a file).  Its entry maps the step to the 16a checks; nothing routes a file to "16b"
+    #   (core/step_paths.py), so `validate_file` does not reach it.
     "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
     "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
     "16b": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),

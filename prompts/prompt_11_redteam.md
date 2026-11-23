@@ -77,7 +77,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Negative Constraints
 - **DO NOT** list generic threats (e.g., "OWASP Top 10") without specific application context.
-- **DO NOT** omit `threatens` for any threat or edge case; each must name an API, component, connection or third party (an edge case may also name an FR).
+- **DO NOT** omit `threatens` for any threat or edge case; a threat must name an API, component, connection or third party, and an edge case an API, component or FR.
 - **DO NOT** use vague mitigations (e.g., "Fix it"); name specific invariants, NFRs or fixtures in `mitigated_by`.
 - **DO NOT** ignore edge cases; operational failure modes are just as critical as security threats.
 
@@ -86,7 +86,7 @@ Before emitting, verify:
 - Every `api_id` in `spec/05_interface_contracts.json` is named in the `threatens` of ≥1 threat (reported as `W583`). The only exemption: an `api_id` is skipped ONLY when its `derives_from` is not empty and names nothing but parked FRs (`scope` `later` or `out`); an `api_id` that derives from no FR is still required to have coverage. For low-risk internal-only endpoints that don't qualify for this exemption, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
 - Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
 - Every step-06 invariant that carries a `risk_category_ref` must be named in the `mitigated_by` of at least one threat (reported as `W615`), unless it qualifies for the same exemption (its `constrains` is not empty and names nothing but parked FRs).
-- Every id in `threatens` resolves to an existing API, component, connection or third party (Steps 05 and 02), and every id in `mitigated_by` and `derives_from` resolves to an existing node of an accepted kind.
+- Every id in a threat's `threatens` resolves to an existing API, component, connection or third party (Steps 05 and 02), every id in an edge case's `threatens` to an existing API, component or FR (Steps 05, 02 and 04), and every id in `mitigated_by` and `derives_from` resolves to an existing node of an accepted kind.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
 - [ ] Every upstream ID from ingested context has been consumed
@@ -101,7 +101,7 @@ Before emitting, verify:
 - [ ] All `edge_cases` entries have a structured `id` field
 
 ## Step-Specific Output Constraints
-1.  `threatens`: MUST be populated for every threat and every edge case: bare ids of APIs, components, connections or third parties (an edge case may also name an FR).
+1.  `threatens`: MUST be populated for every threat and every edge case: for a threat, bare ids of APIs, components, connections or third parties; for an edge case, bare ids of APIs, components or FRs.
 2.  `mitigated_by`: bare ids of existing nodes of the kinds in the Task constraint above; there are no notes and no `{type, id}` objects. Required for every edge case; for a threat, this step requires it too.
 3.  `derives_from`: the charter risk the threat comes from, when there is one.
 4.  `category`: MUST be one of the allowed enum values (defined in `vc:core:atoms#threatCategory`).
@@ -127,7 +127,8 @@ Before emitting, verify:
     - `severity`: validated against `vc:core:atoms#severityLevel` (schema-enforced — do not restate values here).
 - **edge_cases**:
     - `id`: `ec-<slug>` (e.g., `ec-timeout-upstream`).
-    - `threatens`, `mitigated_by`: as for a threat; both are required for an edge case.
+    - `threatens`: Array of bare ids. Valid kinds are API, component and FR (consult schema `vc:11-redteam`); a connection or a third party is not accepted here.
+    - `mitigated_by`: as for a threat. `threatens` and `mitigated_by` are both required for an edge case.
     - `description`: The specific operational scenario (e.g. "Upstream API returns 429 after 100 requests").
     - `trigger`: The condition or threshold causing this (e.g., "Latency > 5000ms", "Concurrent Users > 1000").
 

@@ -22,7 +22,7 @@ Step-Level Variables (auto-populated based on status):
 - ARCHIVE_PATH, FILENAME (for archive operations)
 - CHANGE_REASON (from changelog description)
 
-See: docs/developers/workflows/migration_system_spec.md
+See: docs/developers/design/migration_system_spec.md
 """
 from __future__ import annotations
 

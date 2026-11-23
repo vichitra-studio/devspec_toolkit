@@ -65,7 +65,7 @@ def test_own_properties_survive_allof_merge():
     assert "branch_field" in result["properties"], "allOf branch property must be merged"
 
 
-def test_own_property_wins_collision_with_allof_branch():
+def test_allof_branch_wins_collision_with_own_property():
     """When own and allOf define the same key, the branch (later) wins.
 
     merge_allof / _get_all_properties both use .update() (branch-wins semantics).

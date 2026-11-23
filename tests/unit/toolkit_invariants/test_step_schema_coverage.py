@@ -7,7 +7,7 @@ via the STEPS_WITHOUT_SCHEMAS allowlist below. Currently that set is empty —
 all active steps (00 through 16, 16a/16b/16c) have schemas. If a new step
 is added without a schema, add it to the allowlist with a rationale comment.
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_step_schema_coverage.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/

@@ -46,7 +46,7 @@ Flag discipline:
 - `specdev json` subcommands (`structure`, `keys`, `schema`): pass `--repo-root` only.
 - Exception: `specdev json resolve-pointers` accepts `--git-root` (anchors relative paths) and warns-then-ignores `--spec-root`.
 - `spec-check` and all validation/governance commands: pass all three flags — `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
-- `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
+- `upstream-backlog`: takes the positional `spec_dir`, `--repo-root` and `--spec-root`; it does not accept `--git-root`.
 
 ---
 

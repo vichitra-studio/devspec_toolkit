@@ -54,7 +54,7 @@ class SuspectLink:
 
     ``cause`` is ``content_changed`` when the target's own content hash differs from the stored one, else
     ``upstream_changed`` (something above the target moved its chain stamp).  ``roots`` are up to three of the nearest
-    upstream nodes (the target first, then containment parent, folded criteria and link targets, level by level) with
+    upstream nodes (the target first, then containment parent, containment children and link targets, level by level) with
     an accepted link into them whose stored content hash no longer matches: where the change came from.
     """
 
@@ -155,7 +155,11 @@ def orphan_entries(graph: Graph, lock: Lock) -> list[LockEntry]:
 
 
 def _upstream(graph: Graph, node: Node) -> Iterator[str]:
-    """The ids a node's chain stamp is built from: its containment parent, folded criteria and link targets."""
+    """The ids the walk for roots follows from a node: its containment parent, its containment children and its link targets.
+
+    Every child is followed, folded or not, so the walk is wider than what feeds a chain stamp (the parent, the folded
+    criteria and the link targets); a link of a history field is not followed.
+    """
     if node.parent is not None and node.parent in graph.by_id:
         yield node.parent
     yield from node.children

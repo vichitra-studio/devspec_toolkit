@@ -3,8 +3,8 @@
 The anchor validator reads a ``milestone_index`` row by ``about`` (else ``anchor_id``, else the old ``milestone_id``), so a
 migrated row and an unmigrated one both find their plan.  W608 fires at two sites: a plan file with no file-level
 ``milestone`` key (the shape ``p2_plan_milestone_key`` fixes) and an anchor file that still declares the plan schema.  Both are
-pinned here as they are; the second is the open decision of the report (``needs-decision``): no migration script rewrites a
-pre-split anchor, so the warning is the only signal such a host gets.
+pinned here as they are.  The second is kept as a warning: no migration script rewrites a pre-split anchor, so W608 is the only
+signal such a host gets, and its entry in ``docs/developers/error-codes.md`` (W608, case 1) gives the steps to migrate by hand.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def test_the_migrated_anchor_row_and_plan_give_no_w608(tmp_path: Path) -> None:
 
 
 def test_the_pre_split_anchor_branch_still_gives_w608(tmp_path: Path) -> None:
-    """An anchor file that declares ``vc:16-impl-context`` still gets W608 (kept: see the report's needs-decision)."""
+    """An anchor file that declares ``vc:16-impl-context`` still gets W608 (no migration script rewrites it; ``docs/developers/error-codes.md``, W608 case 1)."""
     spec = example_spec(tmp_path)
     anchor: dict[str, Any] = load(spec, ANCHOR)
     anchor["$schema"] = "vc:16-impl-context"

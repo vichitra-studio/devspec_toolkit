@@ -378,8 +378,8 @@ def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) ->
 
     Raises:
         GitViewError: E708 when the ref or the spec folder at the ref cannot be read; E709 when the spec at the ref is
-            stamped with a toolkit version below 1.2.0 (whatever its tree looks like), or, when it has no stamp, when
-            its tree has no graph node (seeds do not count).
+            stamped with a toolkit version below 1.2.0 (whatever its tree looks like), or when its tree has no graph
+            node (seeds do not count), whatever the stamp of the spec is.
         KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
     """
     from specdev_tools.graph.build import build_graph  # not at the top: the git merge driver imports this module and builds no graph
