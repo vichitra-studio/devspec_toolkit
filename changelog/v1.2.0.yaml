@@ -969,7 +969,7 @@ changes:
       links to it with their count and the command that lists them, then
       specdev attest --prune);
       E748 says to distil the seed in that step, to move the route when no
-      node of the step can link a seed (step 03, 13 or a trinity step), to remove the route,
+      node of the step can link a seed (step 13 or a trinity step), to remove the route,
       or, when it is the seed's only route, to remove the seed with it and the
       links to it that nodes still hold; E749
       ends or remove the link and run specdev attest --prune (a required
@@ -2244,11 +2244,11 @@ changes:
 
   - type: change_schema
     description: >
-      A seed can be routed to any step from 00 to 15 except 03 and 13, and a
+      A seed can be routed to any step from 00 to 15 except 13, and a
       node of that step lists it in derives_from. Every kind with a
       derives_from accepts a seed (capability,
       component, connection, CI gate, secret, FR, API, API error, NFR, rule,
-      threat), and an invariant, fixture, design milestone, edge case, CI job,
+      threat), and a term, invariant, fixture, design milestone, edge case, CI job,
       roadmap milestone and scaffold row get an optional derives_from that
       accepts a seed only. Where derives_from is required, the seed is listed
       beside the upstream node and never in its place: a field that holds only
@@ -2256,15 +2256,14 @@ changes:
       still derive from a seed alone. The link annotation has a new optional
       key, additional_kinds (a subset of kinds; lint ANNOT-07;
       docs/developers/schema-annotations.md). The route checks are E747, E748 and
-      E749; the E748 message of a step that cannot list a seed (03, 13, a
+      E749; the E748 message of a step that cannot list a seed (13, a
       trinity key) says to move the route to the step that distils the seed. specdev node candidates offers a
       seed only when the manifest routes it to the holder's step.
       seed_templates/seed_manifest.json keeps its 1.1.1 routes (00, 01, 02,
       02a): a new host's first capability lists seed-overview beside its
       charter node, or the route is removed (E748). The Breaking items, which
-      list what each kind gains, do not repeat this field. A term of step 03 and an
-      extension of step 13 hold no links, so a route to those steps is still
-      E748. Shown by specdev json insert --id fr-password-reset .derives_from
+      list what each kind gains, do not repeat this field. An extension of step
+      13 holds no links, so a route to step 13 is E748. Shown by specdev json insert --id fr-password-reset .derives_from
       '"seed-accounts"' on the worked example, then spec-check (E749 until the
       manifest routes the seed to step 04).
     migration:

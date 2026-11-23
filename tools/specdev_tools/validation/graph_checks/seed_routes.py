@@ -118,7 +118,7 @@ def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str 
     """E748: why the route is unused and the ways out that clear it.
 
     When no node of the step can link a seed (a trinity key, or a step none of whose kinds declares a ``derives_from`` that
-    accepts a seed: steps 03 and 13), distilling it there cannot be done: the route moves to a step that can.  *parts* is what removing the seed takes; *remove_links* is ``None`` unless this is the seed's only
+    accepts a seed: step 13), distilling it there cannot be done: the route moves to a step that can.  *parts* is what removing the seed takes; *remove_links* is ``None`` unless this is the seed's only
     route: removing it alone would start E747, so the seed goes with it, and with the links to it (*remove_links*, empty
     when no node links the seed).
     """

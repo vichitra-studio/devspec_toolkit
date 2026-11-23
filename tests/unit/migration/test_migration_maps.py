@@ -18,7 +18,7 @@ def test_map_loads_through_importlib_resources():
     folder = resources.files("specdev_tools.migration.maps")
     names = {entry.name for entry in folder.iterdir()}
     assert {"v1_2_0.yaml", "legacy_ref_fields.yaml"} <= names
-    assert len(shape_map()["rows"]) == 323
+    assert len(shape_map()["rows"]) == 324
     assert shape_map()["retired_files"] and shape_map()["host_canon"]["renamed_kinds"] == {"inv": "invariant"}
     assert legacy_ref_fields()["fields"]
 

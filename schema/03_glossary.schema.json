@@ -102,6 +102,21 @@
                 },
                 "uniqueItems": true
               },
+              "derives_from": {
+                "description": "Ids of the seeds this term takes its definition from directly. Optional: list a seed routed to this step, and only for content taken straight from the seed and not through an upstream node.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": false,
+                  "built": true
+                }
+              },
               "replaces": {
                 "description": "Ids of nodes that this term replaces. Optional.",
                 "type": "array",

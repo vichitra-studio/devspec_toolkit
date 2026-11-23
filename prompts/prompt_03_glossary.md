@@ -26,7 +26,7 @@ For each upstream artifact ingested, extract the following:
 - **Emit**: Write artifact JSON once all terms are reconciled and canonical proposals are prepared.
 
 ## Heuristics For Completeness
-- Term-use rule: a term stores no link. It counts as used when its `term` label appears in the text of a node of steps 04 to 15 (case is ignored, `-`, `_` and `/` read as a space, whole words only, an `s` or `es` may follow the last word). Choose the label as the words downstream text will actually use. `spec-check` reports a term whose label no node mentions (E741); the way out is to use the label in the text of a node of steps 04 to 15, or to delete the term with `specdev json delete --id <term_id>`.
+- Term-use rule: no node links to a term. It counts as used when its `term` label appears in the text of a node of steps 04 to 15 (case is ignored, `-`, `_` and `/` read as a space, whole words only, an `s` or `es` may follow the last word). Choose the label as the words downstream text will actually use. `spec-check` reports a term whose label no node mentions (E741); the way out is to use the label in the text of a node of steps 04 to 15, or to delete the term with `specdev json delete --id <term_id>`.
 - Populate `units` for every term whose `term_id` corresponds to a metric in `spec/00_charter.json` `success_metrics` to enable downstream alignment; populate `domain` for every term where a grouping domain can be clearly identified from the upstream artifacts.
 - Coverage rule: every metric name in `spec/00_charter.json` `success_metrics[*].name` should have a corresponding `term_id` entry with `units` populated.
 - Completeness formula: % of key nouns from charter/capability statements and upstream metrics covered in the glossary.

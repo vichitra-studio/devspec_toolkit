@@ -202,10 +202,11 @@ def test_replaces_optional_with_node_id_items_and_aliases_without_x_link(
         assert aliases["items"]["$ref"] == "vc:core:atoms#kebabId", node.kind
 
 
-def test_term_kind_is_context_and_only_declares_replaces_link(decls) -> None:
+def test_term_kind_is_context_and_declares_only_a_seed_link_and_replaces(decls) -> None:
+    """No node links to a term (it is used by its label), and a term links to nothing but a seed it takes its definition from."""
     fname = "03_glossary.schema.json"
     assert [n.value["role"] for n in _nodes(decls, fname)] == ["context"]
-    assert [lk.field_name for lk in _links(decls, fname)] == ["replaces"]
+    assert {lk.field_name: (lk.value["kinds"], lk.value["required"]) for lk in _links(decls, fname)} == {"derives_from": (["seed"], False), "replaces": ("*", False)}
 
 
 def _same_step_edges(decls) -> set[tuple[str, str]]:
@@ -353,6 +354,7 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/derives_from', ['component', 'connection', 'constraint', 'seed']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/assumes', ['assumption']),
     ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/replaces', '*'),
+    ('03_glossary.schema.json', '/allOf/1/properties/terms/items/properties/derives_from', ['seed']),
     ('03_glossary.schema.json', '/allOf/1/properties/terms/items/properties/replaces', '*'),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/acceptance_criteria/items/properties/assumes', ['assumption']),
     ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/acceptance_criteria/items/properties/replaces', '*'),

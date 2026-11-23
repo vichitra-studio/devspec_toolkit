@@ -128,15 +128,24 @@ def test_derives_from_seed_on_a_04_node_is_e749_until_the_seed_is_routed_to_04(t
 
 
 def test_route_to_a_later_step_is_e748_until_a_node_of_that_step_lists_the_seed(tmp_path: Path) -> None:
-    """Every step from 00 to 15 but 03 and 13 has a kind that can list a seed: an unused route there says to distil the seed in that step."""
+    """Every step from 00 to 15 but 13 has a kind that can list a seed: an unused route there says to distil the seed in that step."""
     host = _host(tmp_path, **{SEED_MANIFEST_FILE: lambda doc: doc["step_requirements"].update({"06": [SEED]})})
     (found,) = _found(host)
     assert (found.code, found.owner, found.route) == (SEED_ROUTE_UNUSED, "step:06", (SEED, "06"))
     assert found.message.endswith(f"but no in-scope node of step 06 lists {SEED} in derives_from; distil the seed in that step (an in-scope node of step 06 lists {SEED} in derives_from), or remove the route")
 
 
-def test_the_steps_whose_kinds_can_link_a_seed_are_all_but_03_13_and_the_trinity_steps(tmp_path: Path) -> None:
-    assert sorted(_linkable_steps(_context(_host(tmp_path)).graph)) == ["00", "01", "02", "02a", "04", "05", "06", "07", "08", "09", "10", "11", "12", "14", "15"]
+def test_a_glossary_term_uses_a_route_to_step_03_by_listing_the_seed(tmp_path: Path) -> None:
+    """A term links to nothing but a seed it takes its definition from: the route to step 03 is unused until a term lists the seed, and the resolver accepts the link."""
+    route = {SEED_MANIFEST_FILE: lambda doc: doc["step_requirements"].update({"03": [SEED]})}
+    assert _rows(_found(_host(tmp_path / "unused", **route))) == [(SEED_ROUTE_UNUSED, SEED, "step:03")]
+    listed = _host(tmp_path / "used", **route, **{"03_glossary.json": lambda doc: doc["terms"][0].update({"derives_from": [SEED]})})
+    assert _found(listed) == []
+    assert [error for error in resolve_graph(_context(listed).graph) if error.file == "03_glossary.json"] == []
+
+
+def test_the_steps_whose_kinds_can_link_a_seed_are_all_but_13_and_the_trinity_steps(tmp_path: Path) -> None:
+    assert sorted(_linkable_steps(_context(_host(tmp_path)).graph)) == ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "14", "15"]
 
 
 def test_a_seed_alone_does_not_satisfy_a_required_link_that_accepts_it_in_addition(tmp_path: Path) -> None:

@@ -322,6 +322,7 @@
   {"id": "SC-11-20", "step": "11", "path": "edge_cases[].derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-12-13", "step": "12", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-14-30", "step": "14", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
-  {"id": "SC-15-13", "step": "15", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []}
+  {"id": "SC-15-13", "step": "15", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-03-07", "step": "03", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []}
  ]
 }

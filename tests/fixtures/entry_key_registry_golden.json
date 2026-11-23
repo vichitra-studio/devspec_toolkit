@@ -845,6 +845,15 @@
           "kind": "term",
           "links": [
             {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
               "built": false,
               "field": "replaces",
               "kinds": "*",
