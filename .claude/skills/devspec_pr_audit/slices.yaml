@@ -171,7 +171,16 @@ slices:
     - "tools/specdev_tools/analysis/**/*.py"
     - "tools/specdev_tools/generation/**/*.py"
     - "tools/specdev_tools/core/**/*.py"          # shared core utilities (loaders, parsers, constants)
-    - "tools/specdev_tools/*.py"                  # top-level lint/validate modules (validate.py, fixtures_lint.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
+    - "tools/specdev_tools/graph/**/*.py"         # 1.2.0: the spec graph (nodes, links, resolver, queries)
+    - "tools/specdev_tools/trace/**/*.py"         # 1.2.0: trace lock, stale, attest, context recipes
+    - "tools/specdev_tools/lifecycle/**/*.py"     # 1.2.0: milestone start/close, plan and review records, status
+    - "tools/specdev_tools/release/**/*.py"       # 1.2.0: release prep and release gate
+    - "tools/specdev_tools/verify/**/*.py"        # 1.2.0: verification runs and records
+    - "tools/specdev_tools/proof/**/*.py"         # 1.2.0: proof of a criterion
+    - "tools/specdev_tools/thirdparty/**/*.py"    # 1.2.0: third-party checks
+    - "tools/error_ownership.json"                # hand-maintained: the owner of each finding code
+    - "tools/graph_recipes.json"                  # hand-maintained: context recipes read by trace
+    - "tools/specdev_tools/*.py"                # top-level lint/validate modules (validate.py, fixtures_lint.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
   expansion_rules:
     - target: "schema/{step}_*.json"
       capture: "tools/specdev_tools/validation/step_*.py"
@@ -275,6 +284,8 @@ slices:
     Governs how breaking changes are introduced and applied.
   globs:
     - "tools/specdev_tools/migration/**/*.py"
+    - "tools/specdev_tools/migration/maps/**/*.yaml"   # the disposition map of each schema change
+    - "tools/schema_changes.json"                      # hand-maintained input of the schema-change checklist
     - "prompts/migration/**/*.md"        # verified: prompts/migration/ exists
     - "migration_prompts/**/*.md"        # back-compat: legacy location for migration templates
     - "changelog/**/*.md"
