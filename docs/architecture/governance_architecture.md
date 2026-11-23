@@ -44,7 +44,7 @@ Replay is the set of suspect links in the trace lock (`spec/extras/trace.lock.js
 
 Defined in `spec/common/seed_manifest.json`.
 
-**Routing is manifest-driven:** `spec/common/seed_manifest.json` is the single authoritative source for which seeds apply to which steps and where they live. The `step_requirements` map in the manifest defines per-step seed requirements; the `seeds[]` array defines each seed's `path` and metadata. Any step — across the full 00–16c waterfall — may declare seed requirements via `step_requirements[NN]`. Steps not listed (or with an empty array) require no seeds; `global_seed_order` governs only the read order of step-required seeds. The `seed-lint` command validates that all referenced seed IDs are declared in the manifest and that each step's usage is consistent with its manifest entry.
+**Routing is manifest-driven:** `spec/common/seed_manifest.json` is the single authoritative source for which seeds apply to which steps and where they live. The `step_requirements` map in the manifest defines per-step seed requirements; the `seeds[]` array defines each seed's `path` and metadata. Only steps 00, 02 and 02a may be given seeds in `step_requirements`: they are the steps whose node kinds can link a seed, and a route to any other step is refused (E748). Steps not listed (or with an empty array) require no seeds; `global_seed_order` governs only the read order of step-required seeds. The `seed-lint` command validates that all referenced seed IDs are declared in the manifest and that each step's usage is consistent with its manifest entry.
 
 ---
 

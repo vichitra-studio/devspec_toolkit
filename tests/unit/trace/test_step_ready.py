@@ -118,7 +118,7 @@ def test_the_step_to_replay_first_is_the_earliest_pending_step_above_even_when_i
     assert check_ready(graph, plan, "01", [], present).replay_first == "00"
 
 
-def test_an_earlier_step_is_named_only_when_the_first_blocker_is_a_suspect_link(example: Example, gap_providers: object) -> None:
+def test_no_earlier_step_is_named_when_no_blocker_is_a_suspect_link(example: Example, gap_providers: object) -> None:
     """The name of a metric is edited: step 07 holds one suspect link and step 08 coverage gaps, none of them linked to step 07's suspect node.  Replaying step 07 does not unblock step 11, so the clause is the gaps of step 08."""
     register_gap_provider(lambda graph, lock: [CoverageGap("E743", f"ac-{index}", "08") for index in range(5)])
     example.edit_item("metric-recovery-time", lambda item: item.update(name=item["name"] + " (measured at the 95th percentile)"))
@@ -141,6 +141,17 @@ def test_a_coverage_gap_of_an_unlinked_step_above_does_not_order_the_replay(exam
     readiness = check_ready(graph, plan, "14", [], present_steps(graph, str(example.spec)))
     assert readiness.blockers[0].reason == "suspect" and readiness.replay_first == "05"
     assert {blocker.step for blocker in readiness.earlier} == {"05"}
+
+
+def test_the_earlier_step_is_named_when_a_coverage_gap_sorts_before_the_suspect_link(example: Example, gap_providers: object) -> None:
+    """Step 06 holds a suspect link and a coverage gap whose node id sorts first: the replay still begins at step 05, where the suspect links start."""
+    register_gap_provider(lambda graph, lock: [CoverageGap("E743", "aa-sorts-first", "06")])
+    example.edit_criterion()
+    graph = example.graph()
+    plan = compute_replay(graph, example.lock(), example.seed_texts(graph))
+    readiness = check_ready(graph, plan, "14", [], present_steps(graph, str(example.spec)))
+    assert (readiness.blockers[0].step, readiness.blockers[0].reason) == ("06", "gap")
+    assert readiness.replay_first == "05" and first_clause(readiness) == "replay step 05 first"
 
 
 def test_a_pending_step_above_that_is_not_linked_does_not_block_a_step_whose_own_links_are_clean(example: Example) -> None:

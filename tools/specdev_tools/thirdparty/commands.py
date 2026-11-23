@@ -112,7 +112,7 @@ def _check_sources(args: argparse.Namespace, graph: Graph) -> int:
     if args.json_output:
         print_json({"command": "third-party check", "mode": "sources", "checked": checked, "errors": []})
     else:
-        print("every pin matches its declared sources" if checked else "every pin is exact; no pin sources are declared, so no version was compared")
+        print("every pin matches its declared sources" if checked else "every pin that is given is exact; no pin sources are declared, so no version was compared")
     return 0
 
 

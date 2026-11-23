@@ -371,7 +371,8 @@ and `json insert --step`, take all three flags, as do `step create`, `step ready
 
 Never read `spec/*.json` directly. Never edit the lock file by hand: `specdev attest` writes it, and
 only after you have read the old and new text it shows. `specdev node status <id> <lifecycle>` marks a
-node `deprecated` or `not_applicable`; `specdev node rename <old> <new>` renames one and keeps the old id
+node `deprecated` (or `active` again); `not_applicable` is only for a step-14 node of a closed milestone
+and is refused elsewhere (E705). `specdev node rename <old> <new>` renames a node and keeps the old id
 as an alias. Deleting a node is `specdev json delete --id`.
 
 ---

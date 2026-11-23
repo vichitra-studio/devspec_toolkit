@@ -149,13 +149,14 @@ def check_ready(
 
 
 def _earlier_pending(graph: Graph, plan: replay.ReplayPlan, step: str, blockers: list[Blocker]) -> tuple[Blocker, ...]:
-    """The suspect links of the earliest step above the first of *blockers* that has any; empty when there is none, or no blocker.
+    """The suspect links of the earliest step above the first of *blockers* that has any; empty when there is none, or when no blocker is a suspect link.
 
-    A link cannot be attested while the node it points to is suspect, so the replay begins there.  That holds for a suspect
-    link only: when the first blocker is a coverage gap or a missing file, a replay of an earlier step does not unblock it, so
-    no earlier step is named, and a coverage gap of a step that *step* does not link to is not named either.
+    A link cannot be attested while the node it points to is suspect, so the replay begins there.  That holds when a replay is
+    what *step* waits for: when every blocker is a coverage gap or a missing file, a replay of an earlier step unblocks nothing,
+    so no earlier step is named.  A coverage gap of a step that *step* does not link to is not named either.  Which blocker
+    sorts first does not matter: a gap and a suspect link of one step are ordered by node id.
     """
-    if not blockers or blockers[0].reason != REASON_SUSPECT:
+    if not any(blocker.reason == REASON_SUSPECT for blocker in blockers):
         return ()
     limit = graph.shape.step_key(blockers[0].step)
     above = {name for name in graph.shape.step_ranks if name != SEED_STEP and graph.shape.step_key(name) < limit}

@@ -1353,7 +1353,7 @@ changes:
   - type: add_config
     description: >
       specdev spec-check runs a new check, removal-rules (owner step 14, listed
-      after milestone-numbers; 27 checks on the worked example): E341
+      after milestone-numbers): E341
       REMOVAL_FIXTURE_MISMATCH (the removes of a removal criterion and of its
       removal fixture differ, or a removal fixture removes an id that no criterion
       listing it removes) and E342 REMOVES_TARGET_PRESENT (a criterion or a

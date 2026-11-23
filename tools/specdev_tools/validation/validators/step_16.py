@@ -5,6 +5,7 @@ import fnmatch
 import os
 from pathlib import Path
 
+from ...core.constants import SEED_MANIFEST_FILE
 from ...core.errors import FindingError, make_error, SpecError
 from ...core.loaders import read_json_object
 from ...core.scope_helpers import as_dict, dict_items, str_in, str_items
@@ -73,7 +74,7 @@ def _find_seed_manifest(spec_path: Optional[str], spec_root: Optional[str] = Non
           ``<host>/spec/common/seed_manifest.json``. ✓
     """
     if spec_root is not None:
-        cand = os.path.join(os.path.abspath(spec_root), "common", "seed_manifest.json")
+        cand = os.path.join(os.path.abspath(spec_root), SEED_MANIFEST_FILE)
         return cand if os.path.exists(cand) else None
 
     if spec_path:
@@ -82,7 +83,7 @@ def _find_seed_manifest(spec_path: Optional[str], spec_root: Optional[str] = Non
             spec_dir = os.path.dirname(dirname)
         else:
             spec_dir = dirname
-        cand = os.path.join(spec_dir, "common", "seed_manifest.json")
+        cand = os.path.join(spec_dir, SEED_MANIFEST_FILE)
         return cand if os.path.exists(cand) else None
 
     return None
