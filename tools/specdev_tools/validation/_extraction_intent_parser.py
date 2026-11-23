@@ -47,6 +47,9 @@ IMPL_CONTEXT_ENTRY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The section header, at level two or three: "## Extraction Intent" or "### Extraction Intent"
+INTENT_HEADER_RE = re.compile(r"^(#{2,3}) Extraction Intent")
+
 # Extracts the step number from an artifact filename like "04_fr_list.json" -> "04"
 ARTIFACT_STEP_RE = re.compile(r"^(\d{2}[a-z]?)_")
 
@@ -72,10 +75,10 @@ class ParsedIntent:
 
 
 def parse_extraction_intent(prompt_path: Path) -> ParsedIntent | None:
-    """Parse the ``### Extraction Intent`` section from a prompt file.
+    """Parse the ``Extraction Intent`` section from a prompt file.
 
-    Uses dag_lint's section boundary logic: stops at ``## `` or a subsequent
-    ``### `` header (more correct than stopping at any ``#``).
+    The header is ``## Extraction Intent`` or ``### Extraction Intent``. The section ends at the next header of
+    its own level or above: a level-two section keeps its ``###`` subsections.
 
     Returns ``None`` if the file cannot be read or the section is not found.
     """
@@ -84,25 +87,28 @@ def parse_extraction_intent(prompt_path: Path) -> ParsedIntent | None:
     except OSError:
         return None
 
-    # Find the ### Extraction Intent header
+    # Find the Extraction Intent header, at level two or three
     lines = text.splitlines()
     intent_start = None
+    header_level = 0
     for i, line in enumerate(lines):
-        if line.strip().startswith("### Extraction Intent"):
+        header = INTENT_HEADER_RE.match(line.strip())
+        if header:
             intent_start = i + 1
+            header_level = len(header.group(1))
             break
 
     if intent_start is None:
         return None
 
-    # Collect lines until the next ## or ### header or end of file
+    # Collect lines until the next header of the section's own level or above, or end of file
     intent_lines: list[str] = []
     for i in range(intent_start, len(lines)):
         line = lines[i]
         stripped = line.strip()
-        # Stop at the next section header (## or ###)
+        # A level-two section keeps its ### subsections; a level-three section stops at the next ###
         if stripped.startswith("## ") or (
-            stripped.startswith("### ") and i > intent_start
+            header_level == 3 and stripped.startswith("### ") and i > intent_start
         ):
             break
         intent_lines.append(line)

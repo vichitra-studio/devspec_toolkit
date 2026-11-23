@@ -26,7 +26,7 @@ def check_extraction_intent(
 ) -> list[SpecError]:
     """Validate extraction intent sections against step_order.json.
 
-    For each prompt file that contains a ``### Extraction Intent`` section:
+    For each prompt file that contains an ``Extraction Intent`` section (level two or three):
     1. Parse declared upstream artifact references from the section.
     2. Cross-reference against the step's declared consumption set — preferring
        ``step_metadata[step_id].required_spec_inputs`` (the authoritative
@@ -41,7 +41,7 @@ def check_extraction_intent(
         W597 — intent text is vague (<10 words or contains "relevant"/"as needed")
         E598 — intent references an artifact not in step_order.json steps list
 
-    Prompts without a ``### Extraction Intent`` section are skipped gracefully.
+    Prompts without an ``Extraction Intent`` section are skipped gracefully.
     """
     errors: list[SpecError] = []
     prompts_path = prompts_dir or os.path.join(repo_root, "prompts")
@@ -105,7 +105,7 @@ def check_extraction_intent(
             errors.append(make_error(
                 "E591",
                 f"EXTRACTION_INTENT_EMPTY prompt_{step_id} "
-                f"has ### Extraction Intent section but no entries were parsed",
+                f"has an Extraction Intent section but no entries were parsed",
             ))
             continue
 

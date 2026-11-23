@@ -15,7 +15,6 @@ Establish the authoritative charter that captures the business problem, intended
 For each upstream artifact ingested, extract the following:
 - **Seeds**: per spec/common/seed_manifest.json step_requirements["00"]
 - **Existing org context** (if present): Business objectives, compliance posture, target users/markets from any product briefs in repo
-- **spec/03_glossary.json, spec/07_nfrs.json** (if present): Align metrics/units and terminology with early drafts
 
 ## Operating Flow: Extract → Scope → Validate → Emit
 - **Extract**: Build a private Context Ledger from all seeds listed for this step in the manifest. Capture: problem statement (who/what/impact), scope boundaries (in, later, out), constraints, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics. Do not output it. For any seed covering tech stack or infrastructure: extract every hardware, legacy, platform or technology limit as an item of `constraints`, dependency risks as `risks`, and conditions taken for granted as `assumptions`. Do not leave seed tech constraint data unreflected — every tech constraint must become a `constraints` item.

@@ -56,7 +56,7 @@ class Readiness:
     upstream: tuple[str, ...]
     blockers: tuple[Blocker, ...]
     earlier: tuple[Blocker, ...] = ()
-    """The suspect links of the earliest step above that the blockers' steps do not link to, when it lies above the first blocker's step and any blocker is a suspect link: not a blocker of *step*, only where the replay has to begin."""
+    """The suspect links of the earliest step above that *step* does not link to, when it lies above the first blocker's step and any blocker is a suspect link: not a blocker of *step*, only where the replay has to begin."""
 
     @property
     def ready(self) -> bool:

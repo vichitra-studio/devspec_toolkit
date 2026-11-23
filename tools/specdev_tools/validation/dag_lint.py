@@ -173,7 +173,7 @@ def _check_extraction_intents(
 ) -> None:
     """Check for undeclared upstream refs in extraction intent sections (W596).
 
-    For each prompt file that has a ``### Extraction Intent`` section:
+    For each prompt file that has an ``Extraction Intent`` section (level two or three):
       - Parse intent entries to identify which upstream artifacts are declared
       - Warn if a referenced artifact is not in the computed allowed upstream steps
 

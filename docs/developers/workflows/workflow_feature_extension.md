@@ -197,6 +197,18 @@ Supply the executed artifact path. The reviewer validates execution against the 
 
 ---
 
+## Changing or Removing a Feature
+
+The phases above add. A change to something the spec already holds uses the same waterfall, with these commands:
+
+*   **Change a node**: edit it at its own step (`specdev json patch --id <id> ...`). `specdev stale` then lists every link that points at it as suspect; replay each step it names and accept each link with `specdev attest`.
+*   **Descope an FR or a capability**: set its `scope` to `later` or `out` with a `scope_reason`.
+*   **Rename a node**: `specdev node rename <old-id> <new-id>` (the old id stays as an alias).
+*   **Remove a node that no work refined**: the loop "Removing a node" in [`error-codes.md`](../error-codes.md#graph-role-checks-74x).
+*   **Remove or replace a node that a closed milestone built**: a milestone of its own, with a removal criterion and a removal fixture; the loop "Removing a node through a milestone" in the same section. The release gate reports work that was changed or deleted and that no closed milestone answers (E343, E344).
+
+---
+
 ## Completion
 
 1.  **Replay the links**: Run `specdev stale` and read each suspect link: edit the node that holds it, or accept it with `specdev attest`. `specdev matrix` (which rebuilt the trace matrix) was removed in 1.2.0.

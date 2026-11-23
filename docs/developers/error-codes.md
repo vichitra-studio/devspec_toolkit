@@ -243,7 +243,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 ### E591 / W591 EXTRACTION_INTENT_EMPTY
 
-**Trigger**: A prompt has a `### Extraction Intent` section header but no parseable artifact entries beneath it.
+**Trigger**: A prompt has an `Extraction Intent` section header (`##` or `###`) but no parseable artifact entries beneath it.
 
 **Resolution**: Add extraction intent entries listing each upstream artifact and what to extract from it.
 

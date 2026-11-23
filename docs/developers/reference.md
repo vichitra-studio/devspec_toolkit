@@ -468,11 +468,11 @@ Validates the completeness and consistency of the dependency DAG defined in `too
 - No circular dependencies in the computed upstream graph (E585 DAG_CIRCULAR_DEPENDENCY).
 - Prompt extraction intent entries reference only computed upstream steps (W596 UNDECLARED_UPSTREAM_REF).
 
-**When to run:** After running `registry-generate` (which writes `tools/step_order.json`) or after changing any prompt's `### Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
+**When to run:** After running `registry-generate` (which writes `tools/step_order.json`) or after changing any prompt's `Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
 
 #### `extraction-intent-check`
 
-Validates that each prompt's `### Extraction Intent` section is consistent with `tools/step_order.json`: an entry may name only a step that the `steps` list holds (E598 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise). It also reports an empty section (E591: the `### Extraction Intent` header is present and neither a step entry nor a manifest-anchored seed bullet, `- **Seeds**: per spec/common/seed_manifest.json step_requirements[...]`, parses) and vague intent text (W597). A prompt without that header is skipped with no message. An entry that names a step which does not precede the current one is reported by `dag-lint` (W596), not by this command.
+Validates that each prompt's `Extraction Intent` section (a `##` or `###` heading; a `##` section keeps its `###` subsections) is consistent with `tools/step_order.json`: an entry may name only a step that the `steps` list holds (E598 otherwise), and every step in the current step's `step_metadata.required_spec_inputs` needs an entry (E597 otherwise). It also reports an empty section (E591: the `### Extraction Intent` header is present and neither a step entry nor a manifest-anchored seed bullet, `- **Seeds**: per spec/common/seed_manifest.json step_requirements[...]`, parses) and vague intent text (W597). A prompt without that header is skipped with no message. An entry that names a step which does not precede the current one is reported by `dag-lint` (W596), not by this command.
 
 **What it checks:**
 - Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).
@@ -480,7 +480,7 @@ Validates that each prompt's `### Extraction Intent` section is consistent with 
 - Intent text is specific (W597 EXTRACTION_INTENT_VAGUE — fewer than 10 words or contains weasel words).
 - Extraction intent sections are non-empty when present (E591 EXTRACTION_INTENT_EMPTY).
 
-**When to run:** After adding or modifying `### Extraction Intent` sections in prompts.
+**When to run:** After adding or modifying `Extraction Intent` sections in prompts.
 
 #### `env-check`
 

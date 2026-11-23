@@ -34,7 +34,7 @@ All paths resolve from `$GIT_ROOT`. If running from `$TOOLKIT_ROOT`, paths break
 | `Read` on any file under `$SPEC_DIR/` |
 | `Read` on any file under `$TOOLKIT_ROOT/canon/kinds/` |
 | `Read` on tool-output dump files (`*.txt`, `.specdev/`, `/tmp/`) |
-| `cat` / `Bash` reads of spec or canon files |
+| `cat` / `Bash` reads of spec or canon files, `git show <ref>:spec/...` among them (what changed between two git refs: `specdev diff <refA> <refB>`) |
 | `Edit` on any existing file under `$SPEC_DIR/` (use `specdev json patch/insert/delete`) |
 | `Write` on any file under `$SPEC_DIR/` (a brand-new step file is made with `specdev step create <NN> --from <draft>`; the draft is written outside `spec/`, at `.specdev/drafts/step_<NN>.json`) |
 | Unfiltered `specdev json read <file>` — always pass a jq filter |

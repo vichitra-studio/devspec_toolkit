@@ -1141,9 +1141,12 @@ changes:
       (specdev stale); a seed that no node links has no signal in the graph
       (E747 to E749 are other conditions: a seed no route names, a route no node
       uses, a link to a seed the route does not reach). W595 stays registered
-      for the messages of specdev seed-index. Closes DEVSPEC-185 and
-      DEVSPEC-237. A host must delete the CI lines that call either command
-      (both now exit 2).
+      for the messages of specdev seed-index. Closes DEVSPEC-185. Of
+      DEVSPEC-237 it closes the checks that never ran: the closure checks are
+      gone, and specdev extraction-intent-check now reads a "## Extraction
+      Intent" section too (it skipped eight prompts before); an empty seed file
+      is still not reported. A host must delete the CI lines that call either
+      command (both now exit 2).
     migration:
       action: none
 

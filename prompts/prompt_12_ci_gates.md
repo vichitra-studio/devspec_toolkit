@@ -13,18 +13,18 @@ Translate governance rules and fixture expectations into enforceable CI automati
 ## Extraction Intent
 
 ### Primary Sources (directly consumed)
-- `spec/10_governance.json`: commit patterns and `rules` (each with its `cli_command` or `enforcer`) — these ARE the CI gate definitions
-- `spec/04_fr_list.json`: the `must-have` FRs, which must be gated
+- **10_governance.json**: commit patterns and `rules` (each with its `cli_command` or `enforcer`) — these ARE the CI gate definitions
+- **04_fr_list.json**: the `must-have` FRs, which the jobs of this artifact must gate
 
 ### Reference Sources (context only)
-- `spec/02a_delivery_baseline.json`: CI gate definitions and deployment environments — referenced for coverage closure (every gate, environment and secret must be named in the `realises` of a job) and environment_ref sourcing
-- `spec/06_invariants.json`: Invariant entries — determines whether an invariants-check job step is required
-- `spec/07_nfrs.json`: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
-- `spec/08_fixtures.json`: Fixture entries — Self-Audit Gate prerequisite confirming at least one fixture entry exists
-- `spec/05_interface_contracts.json`: API contracts for schema validation gates — referenced to verify completeness of gate coverage
-- `spec/09_impl_plan.json`: Milestones for completeness gate design — referenced to verify completeness of gate coverage
-- `spec/11_redteam.json`: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
-- All other spec steps: referenced only to verify completeness of gate coverage
+- **02a_delivery_baseline.json**: CI gate definitions and deployment environments — referenced for coverage closure (every gate, environment and secret must be named in the `realises` of a job) and environment_ref sourcing
+- **06_invariants.json**: Invariant entries — determines whether an invariants-check job step is required
+- **07_nfrs.json**: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
+- **08_fixtures.json**: Fixture entries — Self-Audit Gate prerequisite confirming at least one fixture entry exists
+- **05_interface_contracts.json**: API contracts for schema validation gates — referenced to verify completeness of gate coverage
+- **09_impl_plan.json**: Milestones for completeness gate design — referenced to verify completeness of gate coverage
+- **11_redteam.json**: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
+- All other upstream steps (00 to 11): referenced only to verify completeness of gate coverage
 
 ## Operating Flow: Survey → Gate → Threshold → Emit
 - **Survey**: Survey all mandatory spec steps and their validators — identify every step that requires a CI quality checkpoint, including `spec-check`, fixture lint, invariants, governance, and red team mitigations.

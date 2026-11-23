@@ -14,6 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from specdev_tools.validation._extraction_intent_parser import parse_extraction_intent
 from specdev_tools.validation.extraction_intent_check import check_extraction_intent
 from specdev_tools.core.errors import render_errors
 
@@ -603,6 +604,49 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self.assertIn("E597", codes, "Missing upstream dep should trigger E597")
             self.assertIn("W597", codes, "Short intent should trigger W597")
             self.assertIn("E598", codes, "Invalid step ref should trigger E598")
+
+    def test_level_two_section_is_read_through_its_subsections(self):
+        """A ``## Extraction Intent`` section is checked, and its ``###`` subsections belong to it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "01", "02"],
+                prompts={
+                    "prompt_02_system_sketch.md": (
+                        "# Step 02 System Sketch\n\n"
+                        "## Extraction Intent\n\n"
+                        "### Must-Extract\n"
+                        "- **00_charter.json**: Extract the project name, "
+                        "vision statement, and success criteria for system boundaries\n"
+                        "\n"
+                        "### Should-Extract\n"
+                        "- **99_fake.json**: An entry of a subsection is read, so "
+                        "this reference to a step that does not exist is reported\n"
+                        "\n"
+                        "## Operating Flow\n"
+                        "- **98_other.json**: This is not parsed because the next "
+                        "level-two heading ended the section before this line\n"
+                    ),
+                },
+            )
+            rendered = render_errors(check_extraction_intent(tmp))
+            # Step 01 has no entry: the section was read, not skipped
+            self.assertEqual(len([e for e in rendered if e.startswith("E597")]), 1)
+            e598 = [e for e in rendered if e.startswith("E598")]
+            self.assertEqual(len(e598), 1)
+            self.assertIn("99", e598[0])
+
+    def test_every_toolkit_prompt_with_the_section_is_parsed(self):
+        """No prompt of the toolkit that has the section is skipped by the parser."""
+        prompts_dir = Path(__file__).resolve().parents[4] / "prompts"
+        with_section = [
+            path
+            for path in sorted(prompts_dir.glob("prompt_*.md"))
+            if "# Extraction Intent" in path.read_text(encoding="utf-8")
+        ]
+        self.assertGreaterEqual(len(with_section), 20)
+        skipped = [path.name for path in with_section if parse_extraction_intent(path) is None]
+        self.assertEqual(skipped, [])
 
     def test_no_e597_on_the_toolkit_prompts(self):
         """On the generated step order every prompt of the toolkit has an entry for each required input."""

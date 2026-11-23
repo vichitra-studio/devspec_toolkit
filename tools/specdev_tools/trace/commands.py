@@ -87,8 +87,9 @@ STEP_DESCRIPTION = (
     "                           file (edit it with `specdev json patch|insert|delete --id`) or is 16 to 16c. Writes\n"
     "                           nothing with --dry-run.\n"
     "  ready NN                 Exit 0 when step NN may start; exit 1 (E773) when a step above it is missing or has\n"
-    "                           pending replay (a suspect link or a coverage gap), listing each blocker and the step to\n"
-    "                           write or replay first. An unknown step is E706, exit 1."
+    "                           pending replay (a suspect link or a coverage gap), listing each blocker and what to do\n"
+    "                           first: write a step, replay a step, or fix its coverage gaps. An unknown step is\n"
+    "                           E706, exit 1."
 )
 
 

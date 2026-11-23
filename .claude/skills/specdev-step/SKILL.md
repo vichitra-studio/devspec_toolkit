@@ -98,7 +98,9 @@ link, or a coverage gap E740, E742 or E743 that the input step owns). Exit 0 pri
 `step <NN>: ready`; go on. Exit 1 (E773) means an input has no spec file yet or has pending
 replay, and the output names it (for example `step 04: no spec file yet` and `write step 04
 first`, or, on a copy of the worked example with the files from step 08 on removed, `step 08: not
-ready, 1 blocker`, `step 07: coverage gap E740: metric-reset-completion-rate`). Print that output
+ready, 1 blocker`, `step 07: coverage gap E740: metric-reset-completion-rate`). The last line says
+what to do first; when a link is suspect it can name a step above the inputs (for example `replay
+step 01 first`), because the replay begins at the earliest suspect step. Print that output
 and stop; do not dispatch.
 
 Dispatch `specdev-impl` with `mode: "author"`:
