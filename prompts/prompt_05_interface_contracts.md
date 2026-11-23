@@ -77,7 +77,7 @@ Before finalizing, ensure these are addressed:
 ## Coverage Closure
 Before emitting, verify:
 - Every FR in `spec/04_fr_list.json` that specifies an observable external behavior is named in the `derives_from` of ≥1 API in this artifact, OR explained as internal-only.
-- All `derives_from` entries on APIs are `fr_id` values and all `derives_from` entries on errors are `criterion_id` values from `spec/04_fr_list.json`.
+- All `derives_from` entries on APIs are `fr_id` values and all `derives_from` entries on errors are `criterion_id` values from `spec/04_fr_list.json`, or a seed routed to step 05 listed beside them.
 - Every `component_id` from `spec/02_system_sketch.json` that exposes an interface is named in `provided_by` of at least one API contract defined here.
 - All resource and action names align with `term_id` values from `spec/03_glossary.json`.
 - If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.

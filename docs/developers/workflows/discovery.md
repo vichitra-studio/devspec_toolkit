@@ -41,7 +41,7 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 Use the [core validation commands](../reference.md#core-validation-commands) after each artifact update to keep discovery outputs consistent before moving to implementation.
 
 ## Step 02 Troubleshooting
-- Components, connections and third parties require `derives_from` (links to capabilities or constraints, components, seeds or constraints respectively); a missing one fails schema validation.
+- Components, connections and third parties require `derives_from` (links to capabilities or constraints, components, seeds or constraints respectively; a component and a connection may list a seed routed to step 02 beside them); a missing one fails schema validation.
 - Components must include 3–6 responsibilities and an owner.
 - Multiple components require at least one connection; each connection must include `connection_id`, `protocol`, `trust_boundary`, `derives_from` (the source component) and `connects_to` (a component or third party).
 - `partner`/`public` connections require `auth` and `rate_limit`; `event` protocol requires `reliability`.

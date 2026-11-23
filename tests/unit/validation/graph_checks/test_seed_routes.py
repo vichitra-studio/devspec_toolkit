@@ -132,7 +132,7 @@ def test_route_to_a_later_step_is_e748_until_a_node_of_that_step_lists_the_seed(
     host = _host(tmp_path, **{SEED_MANIFEST_FILE: lambda doc: doc["step_requirements"].update({"06": [SEED]})})
     (found,) = _found(host)
     assert (found.code, found.owner, found.route) == (SEED_ROUTE_UNUSED, "step:06", (SEED, "06"))
-    assert found.message.endswith(f"but no node of step 06 lists {SEED} in derives_from; distil the seed in that step (a node of step 06 lists {SEED} in derives_from), or remove the route")
+    assert found.message.endswith(f"but no in-scope node of step 06 lists {SEED} in derives_from; distil the seed in that step (an in-scope node of step 06 lists {SEED} in derives_from), or remove the route")
 
 
 def test_the_steps_whose_kinds_can_link_a_seed_are_all_but_03_13_and_the_trinity_steps(tmp_path: Path) -> None:
@@ -317,7 +317,7 @@ def _messages(host: Path, code: str) -> dict[str | None, str]:
 def test_e748_of_a_seeds_only_route_says_to_remove_the_seed_with_it(tmp_path: Path) -> None:
     """Removing the only route of a seed starts E747: the advice names what clears both."""
     message = _messages(_host(tmp_path, **{SEED_MANIFEST_FILE: _extra_seed({"02": [EXTRA]})}), SEED_ROUTE_UNUSED)[EXTRA]
-    assert "distil the seed in that step (a node of step 02 lists seed-extra in derives_from)" in message
+    assert "distil the seed in that step (an in-scope node of step 02 lists seed-extra in derives_from)" in message
     assert message.endswith("remove the seed from the manifest (its seeds[] entry, this route and its document)")
 
 
@@ -333,13 +333,13 @@ def test_e748_of_a_seed_with_two_routes_one_of_them_unused_says_to_remove_the_ro
     """Two routes are not an only route, however the count is written: the unused one is removed alone and the seed stays."""
     edits = {SEED_MANIFEST_FILE: _extra_seed({"02": [EXTRA], "02a": [EXTRA]}), "02_system_sketch.json": _tp_derives_from(EXTRA)}
     message = _messages(_host(tmp_path, **edits), SEED_ROUTE_UNUSED)[EXTRA]
-    assert message.endswith("distil the seed in that step (a node of step 02a lists seed-extra in derives_from), or remove the route")
+    assert message.endswith("distil the seed in that step (an in-scope node of step 02a lists seed-extra in derives_from), or remove the route")
 
 
 def test_e748_of_a_route_that_is_not_the_seeds_only_one_says_to_remove_the_route_whoever_links_the_seed(tmp_path: Path) -> None:
     """The route is the thing removed: the links of the nodes of other steps (here all of steps 00 and 02) stay and are not named."""
     message = _messages(_host(tmp_path, "unused_route"), SEED_ROUTE_UNUSED)[SEED]
-    assert message.endswith("distil the seed in that step (a node of step 02a lists seed-accounts in derives_from), or remove the route")
+    assert message.endswith("distil the seed in that step (an in-scope node of step 02a lists seed-accounts in derives_from), or remove the route")
     assert "links to it" not in message
 
 
@@ -417,7 +417,7 @@ def test_e747_names_the_global_seed_order_entry_when_the_seed_has_one(tmp_path: 
 
 def test_e749_says_to_prune_after_removing_the_link(tmp_path: Path) -> None:
     messages = _messages(_host(tmp_path, "unrouted_link"), SEED_LINK_NOT_ROUTED)
-    assert messages["tp-argon2"].endswith('add seed-accounts to step_requirements["02"], or remove the link and run specdev attest --prune (a derives_from that would be left empty needs another entry)')
+    assert messages["tp-argon2"].endswith('add seed-accounts to step_requirements["02"], or remove the link and run specdev attest --prune (a required derives_from that would be left empty needs another entry)')
 
 
 def test_a_seed_listed_twice_under_one_step_is_one_unused_route_and_its_only_one(tmp_path: Path) -> None:

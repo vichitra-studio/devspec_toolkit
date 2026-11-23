@@ -185,7 +185,7 @@
                 "$ref": "vc:core:atoms#kebabId"
               },
               "derives_from": {
-                "description": "Ids of the components that are the source of this connection (normally one: the component the data or call originates from; at least one is required). Each must be a component declared in this document; the link is checked by the graph, not by JSON Schema. A seed routed to this step may be listed in addition, for content taken straight from the seed and not through an upstream node; a seed alone does not satisfy the field.",
+                "description": "Ids of the components that are the source of this connection (normally one: the component the data or call originates from; at least one is required). Each must be a component declared in this document, apart from a seed; the link is checked by the graph, not by JSON Schema. A seed routed to this step may be listed in addition, for content taken straight from the seed and not through an upstream node; a seed alone does not satisfy the field.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

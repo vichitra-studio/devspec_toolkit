@@ -126,7 +126,7 @@
           "type": "array",
           "uniqueItems": true,
           "items": {"$ref": "vc:core:graph#kindName"},
-          "description": "Subset of kinds that the field accepts in addition to the others: when the link is required, a value that holds only targets of these kinds does not satisfy it (E701)."
+          "description": "Subset of kinds that the field accepts in addition to the others: when the link is required, a value that holds only targets of these kinds does not satisfy it (E701), and a target that cannot be found is looked for in the steps of the other kinds."
         }
       },
       "required": ["kinds", "required"],

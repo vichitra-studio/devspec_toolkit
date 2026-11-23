@@ -34,7 +34,7 @@ Before starting, ensure your current specs are clean and valid.
     *   *Reference*: `prompts/prompt_00_project_charter.md`.
 2.  **Step 01: Capabilities & Stack**:
     *   **Check**: Does this introduce a new Tech Stack element (e.g., Redis)?
-    *   **Action**: Update the tech-stack seed declared in `spec/common/seed_manifest.json` first (the manifest routes it to steps 02 and 02a), then update `spec/01_capabilities.json`.
+    *   **Action**: Update the tech-stack seed declared in `spec/common/seed_manifest.json` first (the template manifest routes it to steps 00, 02 and 02a), then update `spec/01_capabilities.json`.
     *   *Reference*: `prompts/prompt_01_capabilities.md`.
 3.  **Step 02: System Sketch**: Does this add a new Component? Update the diagram.
     *   *Reference*: `prompts/prompt_02_system_sketch.md`.

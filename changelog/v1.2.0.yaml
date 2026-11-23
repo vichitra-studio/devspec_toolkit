@@ -972,8 +972,8 @@ changes:
       node of the step can link a seed (step 03, 13 or a trinity step), to remove the route,
       or, when it is the seed's only route, to remove the seed with it and the
       links to it that nodes still hold; E749
-      ends or remove the link and run specdev attest --prune (a derives_from
-      that would be left empty needs another entry). A message that says to
+      ends or remove the link and run specdev attest --prune (a required
+      derives_from that would be left empty needs another entry). A message that says to
       remove a node says how many nodes still link it and the command that
       lists them (specdev trace <id> --down --depth 1); the catalogue says
       once, as a loop, what removing a node takes. A fix
@@ -2245,10 +2245,8 @@ changes:
   - type: change_schema
     description: >
       A seed can be routed to any step from 00 to 15 except 03 and 13, and a
-      node of that step lists it in derives_from. Before, only the kinds of
-      step 00, a third party of step 02 and an environment of step 02a could
-      list a seed, so a route to any other step was an E748 that could not be
-      cleared. Now every kind with a derives_from accepts a seed (capability,
+      node of that step lists it in derives_from. Every kind with a
+      derives_from accepts a seed (capability,
       component, connection, CI gate, secret, FR, API, API error, NFR, rule,
       threat), and an invariant, fixture, design milestone, edge case, CI job,
       roadmap milestone and scaffold row get an optional derives_from that
@@ -2257,11 +2255,14 @@ changes:
       seeds is E701; the kinds of step 00, the third party and the environment
       still derive from a seed alone. The link annotation has a new optional
       key, additional_kinds (a subset of kinds; lint ANNOT-07;
-      docs/developers/schema-annotations.md). The route checks E747, E748 and
-      E749 are unchanged; the E748 message of a step that cannot list a seed
-      no longer lists the steps that can. specdev node candidates offers a
+      docs/developers/schema-annotations.md). The route checks are E747, E748 and
+      E749; the E748 message of a step that cannot list a seed (03, 13, a
+      trinity key) says to move the route to the step that distils the seed. specdev node candidates offers a
       seed only when the manifest routes it to the holder's step.
-      seed_templates/seed_manifest.json routes seed-overview to step 01 again. A term of step 03 and an
+      seed_templates/seed_manifest.json keeps its 1.1.1 routes (00, 01, 02,
+      02a): a new host's first capability lists seed-overview beside its
+      charter node, or the route is removed (E748). The Breaking items, which
+      list what each kind gains, do not repeat this field. A term of step 03 and an
       extension of step 13 hold no links, so a route to those steps is still
       E748. Shown by specdev json insert --id fr-password-reset .derives_from
       '"seed-accounts"' on the worked example, then spec-check (E749 until the

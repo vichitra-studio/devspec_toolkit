@@ -39,7 +39,10 @@
                     "seed"
                   ],
                   "required": false,
-                  "built": true
+                  "built": true,
+                  "additional_kinds": [
+                    "seed"
+                  ]
                 }
               },
               "threatens": {

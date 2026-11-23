@@ -52,7 +52,7 @@ Before finalizing, verify these system-level capabilities are considered:
 Before emitting, verify:
 - Every `scope_items` entry with `scope` `in` and every success metric in `spec/00_charter.json` is addressed by ≥1 `capability_id`, OR explicitly recorded as a capability with `scope` `out` and a `scope_reason`.
 - No charter scope item is silently dropped — each must map to at least one named capability.
-- All `derives_from` entries are ids present in `spec/00_charter.json` (`scope_items[*].scope_id`, `user_segments[*].segment_id`, `success_metrics[*].metric_id`).
+- All `derives_from` entries are ids present in `spec/00_charter.json` (`scope_items[*].scope_id`, `user_segments[*].segment_id`, `success_metrics[*].metric_id`), or a seed routed to step 01 listed beside them.
 - If any charter goal cannot be mapped to a capability: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)

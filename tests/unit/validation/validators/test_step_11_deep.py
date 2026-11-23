@@ -168,6 +168,23 @@ class TestApiCoverageSkipsApisOfParkedFrs:
         assert not any("api-only-parked" in e for e in fired), fired
 
 
+    def test_a_seed_beside_the_parked_fr_does_not_end_the_exemption(self, toolkit_root):
+        """An API may list a seed routed to step 05 beside its FR: the seed is not an FR, so the API of a parked FR stays exempt; an id that is neither still ends it."""
+        os.makedirs(os.path.join(toolkit_root, "spec", "common"), exist_ok=True)
+        _write_spec(toolkit_root, "common/seed_manifest.json", {"seeds": [{"seed_id": "seed-accounts"}]})
+        self._setup(
+            toolkit_root,
+            [{"fr_id": "fr-parked", "scope": "out"}],
+            [{"api_id": "api-parked-with-seed", "derives_from": ["fr-parked", "seed-accounts"]},
+             {"api_id": "api-only-a-seed", "derives_from": ["seed-accounts"]},
+             {"api_id": "api-parked-with-other", "derives_from": ["fr-parked", "seed-not-listed"]}],
+        )
+        fired = _codes(toolkit_root, {"threats": []}, "W583")
+        assert not any("api-parked-with-seed" in e for e in fired), fired
+        assert any("api-only-a-seed" in e for e in fired), fired
+        assert any("api-parked-with-other" in e for e in fired), fired
+
+
 class TestInvariantCoverageW615:
     """W615 fires for security-relevant invariants (with a risk_category_ref) that no threat is ``mitigated_by``."""
 

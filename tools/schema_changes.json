@@ -319,7 +319,7 @@
   {"id": "SC-06-13", "step": "06", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-08-13", "step": "08", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-09-16", "step": "09", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
-  {"id": "SC-11-20", "step": "11", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-11-20", "step": "11", "path": "edge_cases[].derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-12-13", "step": "12", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-14-30", "step": "14", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-15-13", "step": "15", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []}

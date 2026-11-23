@@ -121,7 +121,7 @@ Before emitting, verify:
     - `description`: A detailed narrative of the attack scenario. Don't be vague; explain *how* the attack works in the context of the system (e.g. "Attacker injects SQL into the 'user_id' parameter to bypass auth").
     - `vector`: The specific technical method (e.g., "JWT Substitution", "SQL Injection", "Race Condition").
     - `threatens`: Array of bare ids. Valid kinds are API, component, connection and third party (consult schema `vc:11-redteam`). **CRITICAL**: These must match actual upstream IDs from Step 02 (components, connections, third parties) or Step 05 (APIs).
-    - `derives_from`: Array of bare ids of the charter risks the threat comes from. Optional; naming the risk is what lets the risk be built.
+    - `derives_from`: Array of bare ids of the charter risks the threat comes from, and of a seed routed to step 11. Optional; naming the risk is what lets the risk be built.
     - `category`: strictly validated against the schema enum `vc:core:atoms#threatCategory` — see Taxonomy of Threats above.
     - `mitigated_by`: Array of bare ids of the nodes that mitigate the threat. The kinds are in the schema `vc:11-redteam` (`mitigated_by` items), and a capability is not one of them. Pick the node that does the work: an invariant that holds the rule, an NFR that bounds the resource, an API error that answers the abuse, a fixture that proves it. There is no `note`: say how it mitigates in the threat's `description`.
     - `severity`: validated against `vc:core:atoms#severityLevel` (schema-enforced — do not restate values here).

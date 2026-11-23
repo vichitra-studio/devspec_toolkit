@@ -203,7 +203,7 @@ After emitting, promote project-specific terms to the canon registry:
 > - Full scan of controllers, routers, and resolvers in the API layer
 >
 > The AI identifies every public endpoint/method, extracts input/output types, and emits `spec/05_interface_contracts.json`.
-> Every id in an API's `derives_from` must be an FR from Step 2.4.
+> Every id in an API's `derives_from` must be an FR from Step 2.4, or a seed the manifest routes to step 05 listed beside an FR.
 
 **Validation ritual:**
 ```bash

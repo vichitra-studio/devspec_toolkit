@@ -62,7 +62,7 @@ Before emitting, verify:
 - Every quantitative metric in `spec/00_charter.json` `success_metrics` is encoded as ≥1 `nfr_id` with a numeric `target` and canonical `unit`.
 - Every performance-critical FR in `spec/04_fr_list.json` (latency, throughput, availability requirements) has a corresponding `nfr_id`.
 - All `unit` values resolve to canonical units from `spec/03_glossary.json` or the canon registry — no invented units.
-- Every id in `derives_from` names a charter metric; every id in `constrains` names an FR, an API, a component or a connection.
+- Every id in `derives_from` names a charter metric or a seed routed to step 07; every id in `constrains` names an FR, an API, a component or a connection.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any success metric cannot be expressed as a measurable NFR: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID from ingested context has been consumed

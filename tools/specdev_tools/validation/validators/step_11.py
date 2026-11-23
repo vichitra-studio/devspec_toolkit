@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
+
+from ...core.constants import SEED_MANIFEST_FILE
 
 from ...core.scope_helpers import as_list, dict_items, is_parked, str_items
 from ...core.errors import make_error, SpecError
@@ -32,7 +36,11 @@ def validate_step_11(
     parked_fr_ids = _load_parked_fr_ids(toolkit_root, artifact_path)
 
     if api_ids is not None:
-        api_fr_links = _load_fr_links_by_id(toolkit_root, artifact_path, "05", "apis", "api_id", _fr_ids_from_derives_from)
+        seed_ids = _load_seed_ids(toolkit_root, artifact_path)
+        api_fr_links = {
+            api_id: linked - seed_ids
+            for api_id, linked in _load_fr_links_by_id(toolkit_root, artifact_path, "05", "apis", "api_id", _fr_ids_from_derives_from).items()
+        }
         errors.extend(_api_coverage_errors(_linked_ids(threats, "threatens"), api_ids, api_fr_links, parked_fr_ids))
 
     if invariant_ids is not None:
@@ -146,9 +154,25 @@ def _fr_ids_from_constrains(entity: dict[str, Any]) -> set[str]:
 def _fr_ids_from_derives_from(entity: dict[str, Any]) -> set[str]:
     """Every non-empty string in an entity's ``derives_from``, not filtered to FR ids.
 
-    An API's ``derives_from`` lists FRs only; an id that is not a parked FR keeps the entity out of the
-    "only parked FRs" subset test of ``_only_links_parked_frs``."""
+    An API's ``derives_from`` lists FRs, and may list a seed beside them: the caller takes the seeds of the manifest out
+    (``_load_seed_ids``).  Any other id that is not a parked FR keeps the entity out of the "only parked FRs" subset test
+    of ``_only_links_parked_frs``."""
     return _non_empty_strings(entity.get("derives_from"))
+
+
+def _load_seed_ids(toolkit_root: str, artifact_path: str | None) -> set[str]:
+    """The seed ids of the seed manifest beside the artifact, then of ``<toolkit_root>/spec``; empty when neither can be read."""
+    folders = ([Path(artifact_path).parent] if artifact_path else []) + [Path(toolkit_root) / "spec"]
+    for folder in folders:
+        if not (folder / SEED_MANIFEST_FILE).is_file():
+            continue
+        try:
+            manifest = json.loads((folder / SEED_MANIFEST_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(manifest, dict):
+            return {str(seed["seed_id"]) for seed in dict_items(manifest.get("seeds")) if seed.get("seed_id")}
+    return set()
 
 
 def _non_empty_strings(value: Any) -> set[str]:

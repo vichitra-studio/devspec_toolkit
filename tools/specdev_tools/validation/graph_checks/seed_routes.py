@@ -129,7 +129,7 @@ def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str 
     elif step not in linkable:
         reason = f"no node kind of step {step} can link a seed"
     else:
-        reason = f"no node of {where} lists {seed} in derives_from"
+        reason = f"no in-scope node of {where} lists {seed} in derives_from"
     if remove_links is None:
         remove = "remove the route"
     else:
@@ -137,7 +137,7 @@ def _unused_message(seed: str, step: str, linkable: set[str], remove_links: str 
             f"remove the seed from the manifest ({parts}){remove_links}" + (", then run specdev attest --prune" if remove_links else "")
         )
     if can_distil:
-        advice = f"distil the seed in that step (a node of {where} lists {seed} in derives_from), or {remove}"
+        advice = f"distil the seed in that step (an in-scope node of {where} lists {seed} in derives_from), or {remove}"
     else:
         advice = f"move the route to the step that distils the seed and list {seed} in derives_from of a node there, or {remove}"
     return f"the seed manifest routes {seed} to {where} but {reason}; {advice}"
@@ -169,7 +169,7 @@ def _links_to_unrouted_seeds(ctx: GraphCheckContext, routes: Routes) -> list[Spe
         for target, seed in _seed_links(ctx.graph, holder):
             if seed.id in routed or seed.id not in routed_anywhere:
                 continue
-            message = f"{holder.id} derives from seed {seed.id}, which the seed manifest does not route to step {holder.step}; add {seed.id} to step_requirements[\"{holder.step}\"], or remove the link and run specdev attest --prune (a derives_from that would be left empty needs another entry)"
+            message = f"{holder.id} derives from seed {seed.id}, which the seed manifest does not route to step {holder.step}; add {seed.id} to step_requirements[\"{holder.step}\"], or remove the link and run specdev attest --prune (a required derives_from that would be left empty needs another entry)"
             findings.append(ctx.finding(SEED_LINK_NOT_ROUTED, holder, message, target=link_target(DERIVES_FROM, target), route=(seed.id, holder.step)))
     return findings
 

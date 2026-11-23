@@ -305,6 +305,21 @@ def test_a_target_in_a_file_that_could_not_be_read_says_so() -> None:
         assert "no node has that id" not in error.message and "no file of step" not in error.message
 
 
+def test_a_seed_the_field_accepts_in_addition_is_not_where_a_missing_target_is_looked_for() -> None:
+    """An API, an NFR and a threat accept a seed beside their upstream kind: a misspelt upstream id is not blamed on a seed manifest that could not be read, and a missing upstream step is still named."""
+    docs = {
+        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-x"]}]},
+        "04_fr_list.json": {"functional_requirements": []},
+        "07_nfrs.json": {"nfrs": [{"nfr_id": "nfr-a", "derives_from": ["metric-x"]}]},
+        "common/seed_manifest.json": [1],
+    }
+    graph = docs_graph(docs)
+    assert [item.file for item in graph.load_errors] == ["common/seed_manifest.json"]
+    by_holder = {error.node_id: error.message for error in resolve_graph(graph) if error.code == "E700"}
+    assert by_holder["api-a"].endswith("no node has that id")
+    assert by_holder["nfr-a"].endswith("no file of step 00 exists in the spec, so the target cannot be found")
+
+
 def test_a_file_that_could_not_be_read_does_not_change_the_other_two_e700_messages() -> None:
     """Only a file of a step that holds a kind the field accepts counts: the glossary is no home of an FR."""
     docs = {

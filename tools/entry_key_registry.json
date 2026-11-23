@@ -1297,6 +1297,9 @@
               "same_step_kinds": []
             },
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [
@@ -1599,6 +1602,9 @@
           "kind": "threat",
           "links": [
             {
+              "additional_kinds": [
+                "seed"
+              ],
               "built": true,
               "field": "derives_from",
               "kinds": [

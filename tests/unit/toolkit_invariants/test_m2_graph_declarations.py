@@ -101,26 +101,29 @@ def test_every_link_kind_is_declared_or_seed(decls, fname: str) -> None:
         assert set(kinds) <= known, (link.field_name, kinds)
 
 
-def test_a_seed_is_additional_wherever_a_required_derives_from_had_other_kinds_before_seeds_were_routed_to_every_step() -> None:
-    """The holders whose required ``derives_from`` accepts a seed only beside an upstream node (``additional_kinds``).
+def test_a_seed_is_additional_wherever_derives_from_also_names_an_upstream_kind_outside_step_00_02_and_02a() -> None:
+    """The holders whose ``derives_from`` accepts a seed in addition to an upstream kind (``additional_kinds``): nine required fields, where a seed alone is E701, and the optional fields of the NFR and the threat, where it only keeps a missing target looked for in the upstream step.
 
     The kinds of step 00, the third party and the environment are not among them: there a seed alone is the source.
     """
     registry = json.loads((_ROOT / "tools" / "entry_key_registry.json").read_text(encoding="utf-8"))
     found: dict[str, list[str]] = {}
+    required: dict[str, bool] = {}
 
     def walk(entry: dict[str, Any]) -> None:
         for link in entry.get("links", []):
             if "additional_kinds" in link:
-                assert link["field"] == "derives_from" and link["required"] is True and set(link["additional_kinds"]) < set(link["kinds"])
+                assert link["field"] == "derives_from" and set(link["additional_kinds"]) < set(link["kinds"])
                 found[entry["kind"]] = link["additional_kinds"]
+                required[entry["kind"]] = link["required"]
         for nested in entry.get("nested", []):
             walk(nested)
 
     for file_entry in registry["registry"].values():
         for entry in file_entry.get("arrays", []):
             walk(entry)
-    assert found == {kind: ["seed"] for kind in ("capability", "component", "connection", "gate", "secret", "fr", "api", "api-error", "rule")}
+    assert found == {kind: ["seed"] for kind in ("capability", "component", "connection", "gate", "secret", "fr", "api", "api-error", "rule", "nfr", "threat")}
+    assert sorted(kind for kind, needed in required.items() if not needed) == ["nfr", "threat"]
 
 
 @pytest.mark.parametrize("fname", _FILES)

@@ -30,7 +30,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 | `required` | Required boolean. |
 | `built` | Optional boolean, default false. |
 | `same_step_kinds` | Optional array, a subset of `kinds` that may be held in the same step. |
-| `additional_kinds` | Optional array, a subset of `kinds` that the field accepts in addition to the others. When the link is required, a value that holds only targets of these kinds does not satisfy it (E701). Used for a seed listed beside a node's upstream link. |
+| `additional_kinds` | Optional array, a subset of `kinds` that the field accepts in addition to the others. When the link is required, a value that holds only targets of these kinds does not satisfy it (E701). A target that cannot be found is looked for in the steps of the other kinds (the two special forms of E700). Used for a seed listed beside a node's upstream link. |
 
 ## Link verbs (`linkVerb`)
 

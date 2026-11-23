@@ -1916,7 +1916,7 @@ rows:
   disposition: none
   note: 'addition: nothing to migrate'
 - id: SC-11-20
-  path: '**.derives_from'
+  path: edge_cases[].derives_from
   change: add
   disposition: none
   note: 'addition: nothing to migrate'

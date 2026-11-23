@@ -54,7 +54,7 @@ DO NOT:
 - Use non-enum protocols (must be one of: http, grpc, event, rpc, db, file)
 - Use generic responsibilities (must be specific and measurable)
 - Reuse component IDs from other steps or artifacts
-- Create dangling connections (`derives_from` and `connects_to` must name components or third parties declared in this file)
+- Create dangling connections (`derives_from` names a component of this file, with a seed routed to step 02 beside it at most; `connects_to` names a component or third party of this file)
 - Omit auth or rate_limit requirements for partner or public trust boundaries
 - Model a third-party service as a component; record it under `third_parties`
 - Use `trust_boundary: internal` on connections whose `connects_to` names a third party

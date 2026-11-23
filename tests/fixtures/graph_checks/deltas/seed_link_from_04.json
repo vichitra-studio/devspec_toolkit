@@ -1,5 +1,5 @@
 {
-  "description": "A requirement of step 04 derives from the seed (the wrong kind of link for a 04 node).",
+  "description": "A requirement of step 04 lists the seed beside its capability, and the manifest does not route the seed to step 04 (E749).",
   "ops": [
     {
       "op": "append",

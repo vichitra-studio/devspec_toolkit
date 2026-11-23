@@ -86,7 +86,7 @@ If any of these apply to capabilities with `scope` `in`, they MUST generate FRs 
 - **DO NOT** use implementation details (function names, DB tables) in statements.
 - **DO NOT** bundle multiple behaviors into one FR.
 - **DO NOT** leave acceptance criteria vague ('it works').
-- **DO NOT** name ids in `derives_from` that do not exist in `spec/01_capabilities.json`.
+- **DO NOT** name ids in `derives_from` that are neither a capability of `spec/01_capabilities.json` nor a seed routed to step 04.
 - **DO NOT** use subjective language ("fast", "secure", "user-friendly").
 - **DO NOT** write FRs that are implementation steps rather than observable behaviors.
 
@@ -94,7 +94,7 @@ If any of these apply to capabilities with `scope` `in`, they MUST generate FRs 
 Before emitting, verify:
 - Every upstream requirement referenced in "Extraction Intent" is named in the `derives_from` of at least one FR, OR explicitly documented as a gap with rationale.
 - No upstream capability ID is silently dropped.
-- All `derives_from` ids resolve to ids present in `spec/01_capabilities.json`.
+- All `derives_from` ids resolve to ids present in `spec/01_capabilities.json`, or to a seed routed to step 04 (beside a capability, never alone: E701).
 - If any upstream id cannot be named in a `derives_from`: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
@@ -118,7 +118,7 @@ Before emitting, verify:
 - IDs are stable and descriptive (avoid renaming once referenced downstream).
 
 ## Cross-Step Synthesis Notes
-- **Link Fields**: `derives_from` is a list of capability ids (bare ids, no notes). Use `depends_on` (a list of FR ids of this file) only when one FR cannot hold without another. Park an FR or a criterion that is deferred or excluded with `scope` `later` or `out` and a `scope_reason`; do not delete it. A relation is never written as an id inside `statement` or `text`.
+- **Link Fields**: `derives_from` is a list of capability ids, with a seed routed to step 04 beside them where the FR takes content straight from that seed (bare ids, no notes). Use `depends_on` (a list of FR ids of this file) only when one FR cannot hold without another. Park an FR or a criterion that is deferred or excluded with `scope` `later` or `out` and a `scope_reason`; do not delete it. A relation is never written as an id inside `statement` or `text`.
 
 ## Best Practices
 - **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.

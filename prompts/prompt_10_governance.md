@@ -58,7 +58,7 @@ For each upstream artifact ingested, extract the following:
 Before emitting, verify:
 - Every organizational constraint in `spec/00_charter.json` (`constraints`, `compliance`) is encoded as a rule whose `derives_from` names it, or as a commit convention.
 - Every `cli_command` is a name listed in `tools/cli_commands.json` that answers `specdev <command> --help`; a name that is not in the list is E530 at the step 10 gate.
-- Every id in `derives_from` names a charter constraint, risk or scope item, an environment or gate of Step 02a, or an approver-only stakeholder.
+- Every id in `derives_from` names a charter constraint, risk or scope item, an environment or gate of Step 02a, or an approver-only stakeholder, or a seed routed to step 10 listed beside one of them.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - The review cadence and branching strategy align with the milestone schedule in `spec/09_impl_plan.json`.
 - No charter-level change-control requirement is silently dropped.
