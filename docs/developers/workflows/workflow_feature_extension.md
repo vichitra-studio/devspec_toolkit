@@ -172,7 +172,7 @@ Now we run the machine.
 > Context: Read the updated Specs 04, 05, 06, 08, 11.
 > Output: a draft of the plan outside `spec/` (`.specdev/drafts/plan_<batch>.json`), then `specdev step create 16a <batch> --from .specdev/drafts/plan_<batch>.json`.
 
-The command creates the plan file `spec/impl_context/ms_<batch>_plan.json`. The draft holds `plan` (checklist, target files, test commands) and no `execution` or `review`. A person approves the plan, then `specdev milestone start <milestone-id>` starts the milestone.
+The command creates the plan file `spec/impl_context/ms_<batch>_plan.json`. The draft holds `milestone` (the roadmap milestone id the plan is for) and `plan` (checklist, target files, test commands), and no `execution` or `review`. A person approves the plan, then `specdev milestone start <milestone-id>` starts the milestone.
 
 ### Step 16b: Coder
 *Reference*: `prompts/prompt_16b_impl_coder.md`.

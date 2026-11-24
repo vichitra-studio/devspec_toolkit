@@ -115,7 +115,7 @@ count alone decides between branches 1 and 2.
    `/specdev-trinity`):
    - Assign exactly one reviewer covering the plan artifact.
    - `scope_kind` = `plan_artifact`.
-   - Step-counting and byte-threshold rules (branches 1–2) do not apply.
+   - The step-count and change-share rules (branches 1–2) do not apply.
    - Of branch 3 only the `with_backlog` case applies: the reviewer is added when the flag is true.
 
 The 80% / 30% / 3-step thresholds are starting estimates. They may be exposed as env vars
