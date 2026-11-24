@@ -24,6 +24,14 @@ file points to a section of it, that section is the rule.
 
 ---
 
+## Worktree dispatch
+
+The session may run in a git worktree, and a relative path may resolve against another checkout. Use the absolute paths of the dispatch verbatim for every Read, Write and Bash call.
+Before you write the findings file run `git rev-parse --show-toplevel` and compare it with the `--git-root` of the dispatch (or with the directory that holds `.specdev/`); when they
+differ, write no findings file and reply `worktree mismatch: <toplevel> is not <git-root>`.
+
+---
+
 ## Tools
 
 Bash surface is restricted to these subcommand families only:
@@ -291,7 +299,7 @@ The file MUST conform to `vc:infra:findings` (schema URI) and carry `"$schema": 
   "findings": [
     {
       "kind": "bug",
-      "location": "src/routes/password-resets/confirm.ts#L14",
+      "location": "src/routes/password-resets/confirm.ts#confirmPasswordReset",
       "signature": "expired-token-check-after-update",
       "message": "src/routes/password-resets/confirm.ts:14 checks the token age after the password update, so an expired token still changes the password.",
       "severity": "P0",
@@ -310,7 +318,7 @@ Field discipline (the full rules are `prompt_16c` section 1):
 - `findings`: array of finding-records. Empty array = CONVERGED for this reviewer.
 - Each finding: `kind` (enum from taxonomy above), `location` (file#/json/pointer form or
   bare file path), `signature` (stable short string), `message` (specific, at most 600
-  characters, citing `file:line`), `severity` (P0/P1/P2), `evidence` (optional, encouraged),
+  characters, naming the file and the function or class), `severity` (P0/P1/P2), `evidence` (optional, encouraged),
   `suggested_fix` (required for P0 and P1).
 - Name the plan items a finding concerns: the file's `scope` when it is a plan-item id, and each
   `upstream_refs` entry written as a plan-item id. Each must be an item of the plan, or

@@ -323,6 +323,7 @@
   {"id": "SC-12-13", "step": "12", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-14-30", "step": "14", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-15-13", "step": "15", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
-  {"id": "SC-03-07", "step": "03", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []}
+  {"id": "SC-03-07", "step": "03", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
+  {"id": "SC-16_impl_context-38", "step": "16_impl_context", "path": "plan.context.existing_structures[].line_range", "change": "remove", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-252"]}
  ]
 }

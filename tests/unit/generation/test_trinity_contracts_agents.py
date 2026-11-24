@@ -226,3 +226,9 @@ def test_the_reviewer_text_writes_a_findings_file_that_validates_and_review_reco
     assert code != 0 and "E520" in out, out
     code, out = run_on_example(host, "review", "record", MILESTONE, "--verdict", "needs_work", "--findings-file", bare)
     assert code != 0 and "E823" in out, out
+
+
+def test_impl_agent_states_the_ambiguity_gate() -> None:
+    """H-235-3: the agent that runs an item carries the Ambiguity Gatekeeper rule of prompt 16b."""
+    text = _text("impl")
+    assert "Ambiguity gate" in text and "Ambiguity Gatekeeper" in text

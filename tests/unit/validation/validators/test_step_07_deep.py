@@ -37,6 +37,11 @@ class TestValidMinimal:
         assert errors == []
 
 
+    def test_validator_does_not_check_the_nfr_id_pattern(self, toolkit_root):
+        instance = {"nfrs": [{"nfr_id": "nfr-latency", "stage": "prod"}]}
+        assert validate_step_07(instance, toolkit_root) == []
+
+
 class TestDuplicateId:
     def test_duplicate_nfr_id(self, toolkit_root):
         instance = {

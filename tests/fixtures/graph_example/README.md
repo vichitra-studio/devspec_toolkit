@@ -23,7 +23,7 @@ The errors, by code (run `specdev spec-check spec --repo-root <toolkit> --spec-r
 | E744 | 1 | `cross-cutting` | `task-implement-password-reset-confirm` falls under `nfr-latency-reset-email` but no criterion of the task refines it. |
 | E566 | 1 | `milestone-numbers` | `fr-password-reset-request` is in scope and no task criterion reaches it. |
 
-The warnings are W594 (six files, 01, 03, 06, 08, 12 and 13, restate their upstream in few words, so the token overlap stays under its threshold) and W555 (the seed has no out-of-scope bullets).
+The warning is W555 (the seed has no out-of-scope bullets).
 
 The set is pinned by `tests/integration/test_graph_roles_example.py` (each E740 with its owner step and the part the
 example leaves out), `tests/integration/test_graph_example_steps_06_16.py` (`_PINNED_FINDINGS`, the warnings),

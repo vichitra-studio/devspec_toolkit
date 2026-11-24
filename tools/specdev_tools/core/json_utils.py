@@ -14,14 +14,18 @@ future extractor.py). The CLI entry point (main) handles printing to stdout.
 """
 
 import argparse
+import contextlib
 import glob as glob_mod
 import json
 import os
+import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 from collections import Counter
+from collections.abc import Iterator
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
@@ -47,7 +51,15 @@ from specdev_tools.core.schema_validate import (
 _STREAMING_FILTER_RE = re.compile(r'\[\s*\]')
 
 # --- Configuration ---
-JQ_INDENT = 4  # Enforce 4-space indent to match repo style
+JQ_INDENT = 4  # Indent of a new file; an existing file keeps its own (see detect_indent)
+
+# jq starts with no environment: a filter such as ``$ENV.TOKEN`` or ``env.TOKEN`` reads null.
+_JQ_ENV: dict[str, str] = {}
+
+
+def _jq_command(args: List[str]) -> List[str]:
+    """The jq command line for *args*, with jq resolved in this process (jq itself gets no PATH)."""
+    return [shutil.which('jq') or 'jq', *args]
 
 
 # --- Exceptions ---
@@ -89,8 +101,8 @@ def validate_jq_filter(jq_filter: str) -> Optional[str]:
         # Wrap in try/catch so runtime-only errors (null iteration, missing keys)
         # don't block valid filters — we only want to catch syntax errors here.
         result = subprocess.run(
-            ['jq', '-n', f'try ({jq_filter}) catch null'],
-            capture_output=True, text=True, timeout=5,
+            _jq_command(['-n', f'try ({jq_filter}) catch null']),
+            capture_output=True, text=True, timeout=5, env=_JQ_ENV,
         )
         if result.returncode != 0 and result.stderr:
             stderr = result.stderr.strip()
@@ -119,15 +131,15 @@ def _require_valid_filter(jq_filter: str) -> None:
 
 def run_jq(args: List[str], input_data: Optional[str] = None, file_path: Optional[str] = None, timeout: int = 30) -> str:
     """Run jq command and return output. Raises JsonUtilsError on failure."""
-    cmd = ['jq'] + args
+    cmd = _jq_command(args)
     if file_path:
         cmd.append(file_path)
 
     try:
         if input_data is not None:
-            result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout)
+            result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout, env=_JQ_ENV)
         else:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout, env=_JQ_ENV)
         return result.stdout.strip()
     except FileNotFoundError:
         raise JsonUtilsError("jq is not installed or not on PATH. Install with: brew install jq")
@@ -164,11 +176,11 @@ def build_id_index(schema_dir: str) -> Dict[str, str]:
     # Primary: schema/**/*.schema.json
     for path in glob_mod.glob(os.path.join(schema_dir, '**/*.schema.json'), recursive=True):
         try:
-            with open(path, 'r') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if '$id' in data:
+                if isinstance(data, dict) and '$id' in data:
                     index[data['$id']] = path
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             continue
 
     # Also scan sibling canon/ directory for canon schemas
@@ -176,11 +188,11 @@ def build_id_index(schema_dir: str) -> Dict[str, str]:
     if os.path.isdir(canon_dir):
         for path in glob_mod.glob(os.path.join(canon_dir, '**/*.schema.json'), recursive=True):
             try:
-                with open(path, 'r') as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    if '$id' in data:
+                    if isinstance(data, dict) and '$id' in data:
                         index[data['$id']] = path
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 continue
 
     return index
@@ -202,7 +214,7 @@ def resolve_ref(ref: str, id_index: Dict[str, str], cache: Dict[str, dict]) -> O
 
     if file_path not in cache:
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 cache[file_path] = json.load(f)
         except (json.JSONDecodeError, OSError):
             return None
@@ -282,8 +294,11 @@ def resolve_schema_path(
 
 # --- Core Operations ---
 
-def json_read(file_path: str, jq_filter: str) -> Optional[str]:
-    """Read data using a jq filter. Returns the result string, or None if empty."""
+def json_read(file_path: str, jq_filter: str, as_json: bool = False) -> Optional[str]:
+    """Read data using a jq filter. Returns the result string, or None if empty.
+
+    With *as_json* the value is printed as JSON (a string keeps its quotes) instead of raw text.
+    """
     if jq_filter == ".":
         raise JsonUtilsError(
             "Full JSON reads are not allowed. Specify a targeted path (e.g. .title, .items[0])."
@@ -292,7 +307,8 @@ def json_read(file_path: str, jq_filter: str) -> Optional[str]:
     _check_file(file_path)
     _require_valid_filter(jq_filter)
 
-    result = run_jq(['-r', jq_filter], file_path=file_path, timeout=10)
+    flags = [] if as_json else ['-r']
+    result = run_jq([*flags, jq_filter], file_path=file_path, timeout=10)
     if result == 'null':
         return "null"
     return result
@@ -344,15 +360,43 @@ def json_keys(file_path: str, path_selector: str) -> Optional[str]:
     return None
 
 
+def detect_indent(text: str, default: str = " " * JQ_INDENT) -> str:
+    """The indentation unit of the JSON *text*: the leading whitespace of its first indented non-blank line
+    (``"\t"`` for a tab), else *default*."""
+    for line in text.splitlines():
+        stripped = line.lstrip(" \t")
+        if stripped and len(stripped) < len(line):
+            return line[: len(line) - len(stripped)]
+    return default
+
+
+def _jq_indent_args(indent: str) -> List[str]:
+    """The jq flags that print *indent*: ``--tab``, ``--indent n`` for 1 to 7 spaces, else the default indent."""
+    if indent == "\t":
+        return ["--tab"]
+    if indent.strip(" ") == "" and 1 <= len(indent) <= 7:
+        return ["--indent", str(len(indent))]
+    return ["--indent", str(JQ_INDENT)]
+
+
 def json_write_atomic(file_path: str, data_str: str) -> None:
-    """Write string data to file atomically, enforcing format."""
+    """Write *data_str* to *file_path* atomically in the file's own indentation (new file: ``JQ_INDENT`` spaces).
+
+    Raises JsonUtilsError on empty content or a jq failure; a failed write leaves no temp file.
+    """
     if not data_str or not data_str.strip():
         raise JsonUtilsError(
             f"Refusing to write empty content to {file_path}. "
             "This usually indicates an upstream jq error — check the filter and input."
         )
 
-    formatted = run_jq(['--indent', str(JQ_INDENT), '.'], input_data=data_str, timeout=10)
+    try:
+        with open(file_path, encoding='utf-8') as fh:
+            original_text = fh.read()
+    except OSError:
+        original_text = ''
+    indent_args = _jq_indent_args(detect_indent(original_text))
+    formatted = run_jq([*indent_args, '.'], input_data=data_str, timeout=10)
 
     if not formatted or not formatted.strip():
         raise JsonUtilsError(
@@ -366,11 +410,18 @@ def json_write_atomic(file_path: str, data_str: str) -> None:
     except OSError:
         original_mode = None
 
-    with tempfile.NamedTemporaryFile('w', dir=dirname, delete=False) as tf:
-        tf.write(formatted + '\n')
-        temp_name = tf.name
-
-    os.replace(temp_name, file_path)
+    tf = tempfile.NamedTemporaryFile('w', dir=dirname, delete=False, encoding='utf-8')
+    temp_name = tf.name
+    try:
+        with tf:
+            tf.write(formatted + '\n')
+        os.replace(temp_name, file_path)
+    except BaseException:
+        try:
+            os.unlink(temp_name)
+        except OSError:
+            pass
+        raise
     if original_mode is not None:
         os.chmod(file_path, original_mode)
 
@@ -584,13 +635,34 @@ def patch_text(content: str, path_selector: str, value: str, is_json: bool = Tru
     return _run_value_filter(f'({path_selector}) = $v', content, value, is_json)
 
 
+_ARRAY_ITEM_OBJECT_COUNT = (
+    '[path({sel}) as $p | select(($p|length)>0 and ($p|last|type)=="number") | getpath($p) | select(type=="object")] | length'
+)
+
+
+def _refuse_array_item_target(content: str, path_selector: str) -> None:
+    """Raise ``JsonUtilsError`` when *path_selector* names an object held as an item of an array in *content*."""
+    try:
+        count = int(run_jq([_ARRAY_ITEM_OBJECT_COUNT.format(sel=path_selector)], input_data=content, timeout=10))
+    except (JsonUtilsError, ValueError):
+        return  # not a path expression: the insert filter reports it
+    if count > 0:
+        raise JsonUtilsError(
+            f"'{path_selector}' names an item of an array (an object): an insert there would merge into that item, "
+            "not add one. Insert into the array itself (the path without the index) to append, "
+            "or use json patch for a field of the item."
+        )
+
+
 def insert_text(content: str, path_selector: str, value: str, is_json: bool = True, *, create: bool = False) -> str:
     """The JSON text *content* with *value* appended to the array (or merged into the object) at *path_selector*.
 
-    With *create*, a missing (null) target becomes ``[value]``.  Raises ``JsonUtilsError`` for a jq filter that does not
-    parse, or when the target is neither an array nor an object (nor null with *create*).
+    With *create*, a missing (null) target becomes ``[value]``.  A path that names an object held as an array item
+    (``.rules[1]``) is refused: the value would merge into that item.  Raises ``JsonUtilsError`` for a jq filter that
+    does not parse, for such a path, or when the target is neither an array nor an object (nor null with *create*).
     """
     _require_valid_filter(path_selector)
+    _refuse_array_item_target(content, path_selector)
     return _run_value_filter(_insert_filter(path_selector, create=create), content, value, is_json)
 
 
@@ -616,6 +688,70 @@ def _insert_filter(path_selector: str, *, create: bool) -> str:
     )
 
 
+_COUNT_PATHS = '[path({sel})] | length'
+_COUNT_EXISTING_PATHS = (
+    '. as $d | [path({sel}) | select(length==0 or (. as $p | try ($d | getpath($p[:-1]) | '
+    'if type=="array" then ($p[-1]|type)=="number" and $p[-1] < length and $p[-1] >= -length '
+    'elif type=="object" then has($p[-1]) else false end) catch false))] | length'
+)
+
+
+def _count_targets(content: str, path_selector: str, *, existing_only: bool) -> Optional[int]:
+    """How many paths *path_selector* yields in *content* (with *existing_only*: paths that exist and can be deleted).
+
+    Returns None when jq cannot count it (the selector is not a path expression); the edit then reports its own error.
+    """
+    template = _COUNT_EXISTING_PATHS if existing_only else _COUNT_PATHS
+    try:
+        return int(run_jq([template.format(sel=path_selector)], input_data=content, timeout=10))
+    except (JsonUtilsError, ValueError):
+        return None
+
+
+def _warn_if_many(path_selector: str, count: Optional[int]) -> None:
+    """Print the multi-match warning to stderr when *count* is above one."""
+    if count is not None and count > 1:
+        print(f"warning: '{path_selector}' matches {count} values; all {count} are changed.", file=sys.stderr)
+
+
+_SUMMARY_MAX_MATCHES = 5
+_SUMMARY_MAX_CHARS = 120
+
+
+def _compact(value: Any) -> str:
+    """*value* as compact JSON, cut at ``_SUMMARY_MAX_CHARS`` characters."""
+    text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    return text if len(text) <= _SUMMARY_MAX_CHARS else text[:_SUMMARY_MAX_CHARS] + '...'
+
+
+def _value_of(value: str, is_json: bool) -> Any:
+    """The Python value that the command line *value* stands for (JSON when *is_json*, else the raw string)."""
+    return json.loads(value) if is_json else value
+
+
+def _dry_run_text(
+    verb: str, path_selector: str, location: str, content: str, new_content: str,
+    *, new: Optional[tuple[Any]], show_old: bool, show_file: bool,
+) -> str:
+    """What a dry run returns: the whole resulting file (*show_file*), else a short report of the matches.
+
+    *new* is a one-item tuple holding the value written at each match (None for a delete); *show_old* lists the
+    values now at the matches, at most ``_SUMMARY_MAX_MATCHES`` of them.
+    """
+    if show_file:
+        return f"[dry-run] Would {verb} {path_selector} in {location}:\n{new_content}"
+    matches = json.loads(run_jq(['-c', f'[({path_selector})]'], input_data=content, timeout=10))
+    lines = [f"[dry-run] Would {verb} {path_selector} in {location}: {len(matches)} value(s)"]
+    for old in matches[:_SUMMARY_MAX_MATCHES]:
+        if show_old:
+            lines.append(f"  old: {_compact(old)}")
+        if new is not None:
+            lines.append(f"  new: {_compact(new[0])}")
+    if len(matches) > _SUMMARY_MAX_MATCHES:
+        lines.append(f"  ... and {len(matches) - _SUMMARY_MAX_MATCHES} more")
+    return "\n".join(lines)
+
+
 def json_patch(
     file_path: str,
     path_selector: str,
@@ -624,11 +760,12 @@ def json_patch(
     dry_run: bool = False,
     repo_root: Optional[str] = None,
     validate: bool = True,
+    show_file: bool = False,
 ) -> str:
     """Update a value at the path.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
+    (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
 
     When ``validate`` is True (the default), the edit is validated against the
     document's own ``$schema`` before writing.  Uses a differential (before/after)
@@ -637,19 +774,106 @@ def json_patch(
     """
     _check_file(file_path)
 
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
+    _require_valid_filter(path_selector)
+    count = _count_targets(content, path_selector, existing_only=False)
+    if count == 0:
+        raise JsonUtilsError(
+            f"The selector '{path_selector}' matches nothing in {file_path}: nothing was changed. "
+            "Check the filter (a select() that names no item?)."
+        )
     new_content = patch_text(content, path_selector, value, is_json)
+    _warn_if_many(path_selector, count)
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
         _ws1_differential_check(file_path, content, new_content, eff_root)
 
     if dry_run:
-        return f"[dry-run] Would update {path_selector} in {file_path}:\n{new_content}"
+        return _dry_run_text(
+            "update", path_selector, file_path, content, new_content,
+            new=(_value_of(value, is_json),), show_old=True, show_file=show_file,
+        )
     json_write_atomic(file_path, new_content)
     return f"Updated {path_selector} in {file_path}"
+
+
+_BATCH_VERBS = {"patch": "update", "insert": "insert into", "delete": "delete"}
+
+
+def _apply_batch_item(index: int, item: Any, content: str) -> tuple[str, str, str]:
+    """Apply one item of a batch file to the JSON text *content*.
+
+    Returns ``(verb, path, new_content)``.  Raises ``JsonUtilsError("batch item <i> (<op> <path>): <reason>")`` for a
+    malformed item or a failing jq filter.
+    """
+    op = item.get("op") if isinstance(item, dict) else None
+    path = item.get("path") if isinstance(item, dict) else None
+    label = f"batch item {index} ({op} {path})"
+    if op not in _BATCH_VERBS:
+        raise JsonUtilsError(f"{label}: 'op' must be one of {', '.join(_BATCH_VERBS)}")
+    if not isinstance(path, str) or not path:
+        raise JsonUtilsError(f"{label}: 'path' must be a jq path")
+    if op != "delete" and "value" not in item:
+        raise JsonUtilsError(f"{label}: 'value' is missing")
+    try:
+        if op == "delete":
+            return _BATCH_VERBS[op], path, delete_text(content, path)
+        value = json.dumps(item["value"], ensure_ascii=False)
+        edit = patch_text if op == "patch" else insert_text
+        return _BATCH_VERBS[op], path, edit(content, path, value, True)
+    except JsonUtilsError as error:
+        raise JsonUtilsError(f"{label}: {error}") from error
+
+
+def json_patch_batch(
+    file_path: str,
+    ops_path: str,
+    dry_run: bool = False,
+    repo_root: Optional[str] = None,
+    show_file: bool = False,
+) -> str:
+    """Apply the operations of the JSON array in *ops_path* to *file_path* in order: one validation, one atomic write.
+
+    Each item is ``{"op": "patch"|"insert"|"delete", "path": "<jq path>", "value": <any JSON>}`` (no ``value`` for
+    ``delete``).  Returns ``Applied <n> operations to <file>``; with *dry_run* a report that lists the first
+    ``_SUMMARY_MAX_MATCHES`` operations (the whole resulting file with *show_file*) and writes nothing.
+    Raises ``JsonUtilsError`` before anything is written when the ops file is not an array, an item is malformed or
+    fails (the message names the item), or the edit adds a schema violation.
+    """
+    _check_file(file_path)
+    try:
+        with open(ops_path, 'r', encoding='utf-8') as f:
+            ops = json.load(f)
+    except (OSError, json.JSONDecodeError) as error:
+        raise JsonUtilsError(f"cannot read the batch file {ops_path}: {error}") from error
+    if not isinstance(ops, list) or not ops:
+        raise JsonUtilsError(f"The batch file {ops_path} must hold a non-empty JSON array of {{op, path, value}} items.")
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        original = f.read()
+    running = original
+    reports: list[str] = []
+    for index, item in enumerate(ops):
+        before = running
+        verb, path, running = _apply_batch_item(index, item, before)
+        if dry_run and not show_file and index < _SUMMARY_MAX_MATCHES:
+            new = None if verb == "delete" else (item["value"],)
+            reports.append(_dry_run_text(
+                verb, path, file_path, before, running, new=new, show_old=verb != "insert into", show_file=False,
+            ))
+
+    _ws1_differential_check(file_path, original, running, resolve_effective_toolkit_root(repo_root))
+    if not dry_run:
+        json_write_atomic(file_path, running)
+        return f"Applied {len(ops)} operations to {file_path}"
+    heading = f"[dry-run] Would apply {len(ops)} operations to {file_path}"
+    if show_file:
+        return f"{heading}:\n{running}"
+    more = [f"  ... and {len(ops) - _SUMMARY_MAX_MATCHES} more operations"] if len(ops) > _SUMMARY_MAX_MATCHES else []
+    return "\n".join([heading, *reports, *more])
 
 
 def json_insert(
@@ -661,11 +885,12 @@ def json_insert(
     repo_root: Optional[str] = None,
     validate: bool = True,
     create_schema: Optional[str] = None,
+    show_file: bool = False,
 ) -> str:
-    """Append to array or merge object.
+    """Append to array or merge object.  A path that names an object held as an array item is refused (see ``insert_text``).
 
     Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
+    (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
 
     When ``validate`` is True (the default), the edit is validated against the
     document's own ``$schema`` before writing.  Uses a differential (before/after)
@@ -692,12 +917,13 @@ def json_insert(
         active_filter = _insert_filter(path_selector, create=True)
     else:
         _check_file(file_path)
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         active_filter = _insert_filter(path_selector, create=False)
 
     _require_valid_filter(path_selector)
 
+    _refuse_array_item_target(content, path_selector)
     new_content = _run_value_filter(active_filter, content, value, is_json)
 
     if validate:
@@ -705,9 +931,10 @@ def json_insert(
         _ws1_differential_check(file_path, content, new_content, eff_root)
 
     if dry_run:
-        if using_seed:
-            return f"[dry-run] Would create and insert into {path_selector} in {file_path}:\n{new_content}"
-        return f"[dry-run] Would insert into {path_selector} in {file_path}:\n{new_content}"
+        return _dry_run_text(
+            "create and insert into" if using_seed else "insert into", path_selector, file_path, content, new_content,
+            new=(_value_of(value, is_json),), show_old=False, show_file=show_file,
+        )
 
     # On seed path, ensure the parent directory exists before writing.
     if using_seed:
@@ -725,11 +952,12 @@ def json_delete(
     dry_run: bool = False,
     repo_root: Optional[str] = None,
     validate: bool = False,
+    show_file: bool = False,
 ) -> str:
     """Delete item at path.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
+    (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
 
     ``validate`` defaults to False: the classic ``json delete`` and ``node status <id> active`` validate nothing.  When
     True, the edit is checked against the document's own ``$schema`` as ``json patch`` is: only a violation the
@@ -738,14 +966,24 @@ def json_delete(
     """
     _check_file(file_path)
 
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
+    _require_valid_filter(path_selector)
+    count = _count_targets(content, path_selector, existing_only=True)
+    if count == 0:
+        raise JsonUtilsError(
+            f"Nothing to delete at '{path_selector}' in {file_path}: the selector matches nothing, "
+            "or the index is out of range. Nothing was changed."
+        )
     new_content = delete_text(content, path_selector)
+    _warn_if_many(path_selector, count)
     if validate:
         _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root))
     if dry_run:
-        return f"[dry-run] Would delete {path_selector} in {file_path}:\n{new_content}"
+        return _dry_run_text(
+            "delete", path_selector, file_path, content, new_content, new=None, show_old=True, show_file=show_file,
+        )
     json_write_atomic(file_path, new_content)
     return f"Deleted {path_selector} in {file_path}"
 
@@ -832,6 +1070,12 @@ def _effective_schema(node: dict, resolve_fn) -> dict:
     return _schema_nav_effective_schema(node, resolve_fn, include_conditionals=True)
 
 
+_CONSTRAINT_KEYWORDS = (
+    "minItems", "maxItems", "uniqueItems", "minLength", "maxLength", "pattern", "format",
+    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "additionalProperties", "const",
+)
+
+
 def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optional[str] = None) -> Optional[str]:
     """Discover allowable fields from the schema, resolving $ref URNs and allOf inline.
 
@@ -851,7 +1095,7 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
             "Make sure it has a $schema field and the schema directory is accessible."
         )
 
-    with open(schema_path, 'r') as f:
+    with open(schema_path, 'r', encoding='utf-8') as f:
         schema = json.load(f)
 
     def _resolve_node(node: dict) -> Optional[dict]:
@@ -910,7 +1154,7 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
             }
         }, indent=2)
 
-    info = {
+    info: Dict[str, Any] = {
         "type": current.get("type"),
         "description": current.get("description"),
         "allowed_properties": list(current.get("properties", {}).keys()) if current.get("type") == "object" or current.get("properties") else None,
@@ -918,7 +1162,17 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
         "required": current.get("required"),
         "enum": current.get("enum")
     }
+    info.update(_constraints_of(current))
+    if current.get("type") == "array" and isinstance(current.get("items"), dict):
+        items_constraints = _constraints_of(_effective_schema(current["items"], _resolve_node))
+        if items_constraints:
+            info["items_constraints"] = items_constraints
     return json.dumps(info, indent=2)
+
+
+def _constraints_of(node: Dict[str, Any]) -> Dict[str, Any]:
+    """The keywords of ``_CONSTRAINT_KEYWORDS`` that the schema *node* carries, under their own names."""
+    return {keyword: node[keyword] for keyword in _CONSTRAINT_KEYWORDS if keyword in node}
 
 
 def _summarise_prop(prop: dict) -> dict:
@@ -951,6 +1205,12 @@ _FORBIDDEN_ABS_PREFIXES = (
 )
 
 
+def _under_any(paths: set[str], prefix: str) -> bool:
+    """True when any of *paths* is *prefix* or below it, comparing the prefix as written and with symlinks resolved."""
+    prefixes = {os.path.normpath(prefix), os.path.realpath(prefix)}
+    return any(p == q or p.startswith(q + os.sep) for p in paths for q in prefixes)
+
+
 def _is_forbidden_path(file_path: str) -> Optional[str]:
     """Return a reason string if file_path is a forbidden pointer target, else None.
 
@@ -964,16 +1224,13 @@ def _is_forbidden_path(file_path: str) -> Optional[str]:
     """
     # C1: Reject absolute paths under known temp directories before other checks.
     if os.path.isabs(file_path):
-        norm = os.path.normpath(file_path)
+        forms = {os.path.normpath(file_path), os.path.realpath(file_path)}
         for prefix in _FORBIDDEN_ABS_PREFIXES:
-            prefix_norm = os.path.normpath(prefix)
-            if norm == prefix_norm or norm.startswith(prefix_norm + os.sep):
+            if _under_any(forms, prefix):
                 return f"path is under forbidden temp prefix '{prefix}'"
         tmpdir = os.environ.get("TMPDIR")
-        if tmpdir:
-            tmpdir_norm = os.path.normpath(tmpdir)
-            if norm == tmpdir_norm or norm.startswith(tmpdir_norm + os.sep):
-                return f"path is under forbidden temp prefix (TMPDIR='{tmpdir}')"
+        if tmpdir and _under_any(forms, tmpdir):
+            return f"path is under forbidden temp prefix (TMPDIR='{tmpdir}')"
 
     # Normalise away leading ./ for prefix matching
     normalised = file_path.lstrip("./").replace("\\", "/")
@@ -1450,6 +1707,56 @@ def _add_repo_root(parser: argparse.ArgumentParser, command: str) -> None:
     parser.add_argument("--repo-root", default=".", help=f"Accepted for CLI consistency; unused by {command}")
 
 
+def _add_ref(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--ref REF`` option of the read subcommands."""
+    parser.add_argument(
+        "--ref", metavar="REF", default=None,
+        help="Read the file as of this git ref (tag, branch or commit) instead of the working tree",
+    )
+
+
+def _materialise_at_ref(file_path: str, ref: str) -> str:
+    """Write *file_path* as of the git *ref* to a new temporary folder and return the copy's path.
+
+    Raises ``JsonUtilsError`` (``cannot read <path> at <ref>: <git reason>``) when git is missing, the folder is not in
+    a repository, the ref is unknown or the path is absent at the ref.  The caller removes the folder.
+    """
+    from specdev_tools.graph.gitview import GitViewError, git_reason, run_git
+
+    abs_path = os.path.abspath(file_path)
+    folder = os.path.dirname(abs_path)
+    while not os.path.isdir(folder):
+        folder = os.path.dirname(folder)
+    try:
+        top = run_git(folder, ["rev-parse", "--show-toplevel"])
+        if top.returncode != 0:
+            raise JsonUtilsError(f"cannot read {file_path} at {ref}: {git_reason(top)}")
+        root = top.stdout.decode("utf-8").strip()
+        rel = os.path.relpath(abs_path, root).replace(os.sep, "/")
+        shown = run_git(root, ["show", f"{ref}:{rel}"])
+    except GitViewError as error:
+        raise JsonUtilsError(f"cannot read {file_path} at {ref}: {error}") from error
+    if shown.returncode != 0:
+        raise JsonUtilsError(f"cannot read {rel} at {ref}: {git_reason(shown)}")
+    copy_dir = tempfile.mkdtemp()
+    copy_path = os.path.join(copy_dir, os.path.basename(abs_path))
+    pathlib.Path(copy_path).write_bytes(shown.stdout)
+    return copy_path
+
+
+@contextlib.contextmanager
+def _read_source(file_path: str, ref: Optional[str]) -> Iterator[str]:
+    """The path to read: *file_path* itself, or a temporary copy of it as of the git *ref* (removed on exit)."""
+    if ref is None:
+        yield file_path
+        return
+    copy_path = _materialise_at_ref(file_path, ref)
+    try:
+        yield copy_path
+    finally:
+        shutil.rmtree(os.path.dirname(copy_path), ignore_errors=True)
+
+
 def build_json_parser() -> argparse.ArgumentParser:
     """Build the ``specdev json`` argparse parser (no parsing, no side effects)."""
     parser = argparse.ArgumentParser(description="Smart JSON Tool for AI Agents")
@@ -1460,12 +1767,18 @@ def build_json_parser() -> argparse.ArgumentParser:
     p_read.add_argument("file", help="JSON file path")
     p_read.add_argument("filter", help="jq filter (e.g. .items[0].name, .version, '.items[] | select(.id==\"x\")')")
     p_read.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read")
+    p_read.add_argument(
+        "--json", dest="as_json", action="store_true",
+        help="Print the value as JSON (strings quoted) instead of raw text",
+    )
+    _add_ref(p_read)
 
     # Read-multi
     p_readm = subparsers.add_parser("read-multi", help="Read multiple paths in one pass (keyed output)")
     p_readm.add_argument("file", help="JSON file path")
     p_readm.add_argument("filters", nargs="+", help="jq filters (e.g. .version .name)")
     p_readm.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read-multi")
+    _add_ref(p_readm)
 
     # Patch
     p_patch = subparsers.add_parser(
@@ -1473,10 +1786,15 @@ def build_json_parser() -> argparse.ArgumentParser:
         epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json patch --id <node-id> <field-path> <value> (`specdev json patch --id <node-id> --help`).",
     )
     p_patch.add_argument("file", help="JSON file path")
-    p_patch.add_argument("path", help="jq path to target (e.g. .version)")
-    p_patch.add_argument("value", help="New value (JSON string or raw string)")
+    p_patch.add_argument("path", nargs="?", help="jq path to target (e.g. .version)")
+    p_patch.add_argument("value", nargs="?", help="New value (JSON string or raw string)")
+    p_patch.add_argument(
+        "--batch", metavar="OPS_FILE", default=None,
+        help='JSON array of {"op": "patch"|"insert"|"delete", "path": ..., "value": ...} applied in one validation and one write',
+    )
     p_patch.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
-    p_patch.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    p_patch.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
+    p_patch.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
     p_patch.add_argument(
         "--repo-root",
         default=".",
@@ -1496,7 +1814,8 @@ def build_json_parser() -> argparse.ArgumentParser:
     p_insert.add_argument("path", help="jq path to target array/object")
     p_insert.add_argument("value", help="Value to insert")
     p_insert.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
-    p_insert.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    p_insert.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
+    p_insert.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
     p_insert.add_argument(
         "--create-schema",
         metavar="URI",
@@ -1525,7 +1844,8 @@ def build_json_parser() -> argparse.ArgumentParser:
     )
     p_del.add_argument("file", help="JSON file path")
     p_del.add_argument("path", help="jq path to target")
-    p_del.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    p_del.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
+    p_del.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
     _add_repo_root(p_del, "delete")
 
     # Keys
@@ -1533,12 +1853,14 @@ def build_json_parser() -> argparse.ArgumentParser:
     p_keys.add_argument("file", help="JSON file path")
     p_keys.add_argument("path", help="jq path (optional)", default=".", nargs="?")
     _add_repo_root(p_keys, "keys")
+    _add_ref(p_keys)
 
     # Structure
     p_struct = subparsers.add_parser("structure", help="Show visual hierarchical structure")
     p_struct.add_argument("file", help="JSON file path")
     p_struct.add_argument("path", help="jq path (optional)", default=".", nargs="?")
     _add_repo_root(p_struct, "structure")
+    _add_ref(p_struct)
 
     # Schema
     p_schema = subparsers.add_parser("schema", help="Query schema capabilities")
@@ -1598,15 +1920,27 @@ def main():
     try:
         result = None
         if args.command == "read":
-            result = json_read(args.file, args.filter)
+            with _read_source(args.file, args.ref) as path:
+                result = json_read(path, args.filter, as_json=args.as_json)
         elif args.command == "read-multi":
-            result = json_read_multi(args.file, args.filters)
+            with _read_source(args.file, args.ref) as path:
+                result = json_read_multi(path, args.filters)
+        elif args.command == "patch" and args.batch:
+            if args.path is not None or args.value is not None:
+                raise JsonUtilsError("--batch takes the operations from its file: give no path or value with it.")
+            result = json_patch_batch(
+                args.file, args.batch, dry_run=args.dry_run, repo_root=os.path.abspath(args.repo_root),
+                show_file=args.show_file,
+            )
         elif args.command == "patch":
+            if args.path is None or args.value is None:
+                parser.error("the following arguments are required: path, value (or give --batch OPS_FILE)")
             result = json_patch(
                 args.file, args.path, args.value, not args.raw,
                 dry_run=getattr(args, "dry_run", False),
                 repo_root=os.path.abspath(args.repo_root),
                 validate=True,
+                show_file=args.show_file,
             )
         elif args.command == "insert":
             result = json_insert(
@@ -1615,13 +1949,18 @@ def main():
                 repo_root=os.path.abspath(args.repo_root),
                 validate=True,
                 create_schema=getattr(args, "create_schema", None),
+                show_file=args.show_file,
             )
         elif args.command == "delete":
-            result = json_delete(args.file, args.path, dry_run=getattr(args, "dry_run", False))
+            result = json_delete(
+                args.file, args.path, dry_run=getattr(args, "dry_run", False), show_file=args.show_file,
+            )
         elif args.command == "keys":
-            result = json_keys(args.file, args.path)
+            with _read_source(args.file, args.ref) as path:
+                result = json_keys(path, args.path)
         elif args.command == "structure":
-            result = json_structure(args.file, args.path)
+            with _read_source(args.file, args.ref) as path:
+                result = json_structure(path, args.path)
         elif args.command == "schema":
             result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
         elif args.command == "resolve-pointers":

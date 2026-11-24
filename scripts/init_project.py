@@ -10,6 +10,22 @@ def run_cmd(cmd, cwd=None, check=True):
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, cwd=cwd, check=check)
 
+def install_commit_msg_hook(pre_commit_bin, cwd):
+    """Install the commit-msg hook that `--strict` asks for; returns True when it was installed.
+
+    pre-commit refuses (exit 1) when the host sets core.hooksPath: that is a warning here, as the installer treats it (W931), not a crash after the host files are in place.
+    """
+    try:
+        run_cmd([pre_commit_bin, "install", "--hook-type", "commit-msg"], cwd=cwd)
+    except subprocess.CalledProcessError:
+        print(
+            "Warning: `pre-commit install --hook-type commit-msg` failed (for example because the host sets core.hooksPath); "
+            "the commit-msg hook is not installed. Install it yourself, or unset core.hooksPath and run `pre-commit install --hook-type commit-msg`.",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
 def build_install_delegate(venv_dir, rel_toolkit_root, force_claude=False):
     """The command that installs the host files through the venv CLI: run with the host root as cwd.
 
@@ -433,7 +449,7 @@ def main():
         print(f"Warning: pre-commit binary not found in {venv_name}. Skipping the strict-mode hooks.")
     elif args.strict:
         print("Strict mode enabled: Installing commit-msg hook...")
-        run_cmd([pre_commit_bin, "install", "--hook-type", "commit-msg"], cwd=target_dir)
+        install_commit_msg_hook(pre_commit_bin, target_dir)
 
         # Append governance commit-msg hook if not already present
         config_path = os.path.join(target_dir, ".pre-commit-config.yaml")

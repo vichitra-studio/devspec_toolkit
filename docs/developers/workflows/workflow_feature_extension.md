@@ -28,6 +28,10 @@ Before starting, ensure your current specs are clean and valid.
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
+0.  **Seeds**:
+    *   **Check**: Does the feature need a seed of its own (a new subject, not an edit of the overview or tech-stack seed)?
+    *   **Action**: Run `/specdev-seed`: it drafts the seed from `seed_templates/seed_extension.md`, registers it in `spec/common/seed_manifest.json`, routes it to the steps that distil it (`step_requirements`) and lints it. A change to an existing seed is an edit of its file; `specdev stale` then lists the nodes that link to it.
+    *   *Reference*: `docs/prompts/shared_expectations.md` section 7.
 1.  **Step 00: Seed Docs & Charter**:
     *   **Check**: Does this feature change the project overview (Success Metrics/Users)?
     *   **Action**: Update the overview seed declared in `spec/common/seed_manifest.json` first, then update `spec/00_charter.json`.

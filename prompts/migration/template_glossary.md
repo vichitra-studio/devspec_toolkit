@@ -40,7 +40,7 @@ No script or proposer writes an item of its own for step 03; the items below and
 
 **Step-base fields (required in every artifact):**
 
-- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `glossary-v1`). Convention: `{step-noun}-v{N}`.
+- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `glossary-v1`).
 - `owner`: String enum — must be one of `api | ui | system | ops | data | product | business | engineering`.
 - `created_at`: String — ISO 8601 UTC timestamp (e.g., `2025-10-16T22:06:04.202593Z`).
 - `canonical_refs_used`: Array of canonical reference objects — required even when empty (`[]`).
@@ -65,7 +65,7 @@ The migrated artifact MUST include:
 ## Optional Fields
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `terms[].acronym`: Uppercase string (pattern: `^[A-Z0-9]{2,}$`) — include only if the acronym appears 3+ times or is standard industry usage.
+- `terms[].acronym`: Uppercase string with inner / or - allowed (pattern: `^[A-Z0-9][A-Z0-9/-]*[A-Z0-9]$`) — include only if the acronym appears 3+ times or is standard industry usage.
 - `terms[].domain`: Lowercase alphabetic-only kebab-case string (pattern: `^[a-z]+(?:-[a-z]+)*$`) — no digits allowed.
 - `terms[].units`: String (pattern: `^[A-Za-z0-9/]+$`) — unit of measurement if the term is quantifiable.
 - `terms[].acronym_ref`: Canonical reference (kind: `acronym`) — only when `acronym` field is also set.

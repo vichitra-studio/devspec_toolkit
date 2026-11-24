@@ -626,3 +626,42 @@ class TestRemovalHygiene:
             f"stderr={result.stderr!r}"
         )
         assert "unrecognized" in result.stderr.lower() or "error" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# --dry-run prints a short summary; --show-file prints the whole file (DEVSPEC-240)
+# ---------------------------------------------------------------------------
+
+
+class TestDryRunSummary:
+    def _items_file(self, tmp_path: pathlib.Path, count: int = 8) -> pathlib.Path:
+        f = tmp_path / "items.json"
+        f.write_text(json.dumps({"owner": "api", "items": list(range(count))}, indent=2), encoding="utf-8")
+        return f
+
+    def test_dry_run_prints_a_short_summary_by_default(self, tmp_path: pathlib.Path) -> None:
+        f = tmp_path / "10_governance.json"
+        shutil.copyfile(pathlib.Path(_TOOLKIT_ROOT) / "tests/fixtures/graph_example/spec/10_governance.json", f)
+        before = f.read_bytes()
+        result = json_patch(str(f), ".owner", '"ops"', dry_run=True, validate=False)
+        assert len(result.splitlines()) < 20 and len(before.splitlines()) > len(result.splitlines())
+        assert f.read_bytes() == before
+
+    def test_dry_run_show_file_keeps_the_whole_file(self, tmp_path: pathlib.Path) -> None:
+        f = _make_spec_file(tmp_path)
+        result = json_patch(str(f), ".owner", '"ops"', dry_run=True, validate=False, show_file=True)
+        assert result.startswith(f"[dry-run] Would update .owner in {f}:\n")
+        assert json.loads(result.split(":\n", 1)[1])["owner"] == "ops"
+
+    def test_dry_run_summary_lists_old_and_new(self, tmp_path: pathlib.Path) -> None:
+        f = _make_spec_file(tmp_path)
+        assert json_patch(str(f), ".owner", '"ops"', dry_run=True, validate=False).splitlines() == [
+            f"[dry-run] Would update .owner in {f}: 1 value(s)", '  old: "api"', '  new: "ops"',
+        ]
+        assert json_insert(str(f), ".items", "99", dry_run=True, validate=False).splitlines()[1:] == ["  new: 99"]
+        assert json_delete(str(f), ".owner", dry_run=True).splitlines()[1:] == ['  old: "api"']
+
+    def test_dry_run_summary_cuts_after_five_matches(self, tmp_path: pathlib.Path) -> None:
+        f = self._items_file(tmp_path)
+        lines = json_patch(str(f), ".items[]", "0", dry_run=True, validate=False).splitlines()
+        assert lines[0].endswith("8 value(s)") and lines[-1] == "  ... and 3 more" and len(lines) == 12

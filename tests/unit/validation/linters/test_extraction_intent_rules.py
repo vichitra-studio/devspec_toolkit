@@ -199,10 +199,10 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self.assertIn("'99'", e598[0])
 
     # ------------------------------------------------------------------
-    # 5. Prompt without extraction intent section -- graceful skip
+    # 5. Prompt without extraction intent section -- E591
     # ------------------------------------------------------------------
-    def test_no_extraction_intent_section_skipped(self):
-        """A prompt without ### Extraction Intent is silently skipped."""
+    def test_prompt_without_extraction_intent_section_is_e591(self):
+        """A prompt with no ``Extraction Intent`` section holds no entries: E591."""
         with tempfile.TemporaryDirectory() as tmp:
             self._make_repo(
                 tmp,
@@ -214,8 +214,46 @@ class TestExtractionIntentCheck(unittest.TestCase):
                     ),
                 },
             )
-            errors = check_extraction_intent(tmp)
-            self.assertEqual(errors, [])
+            e591 = [e for e in render_errors(check_extraction_intent(tmp)) if e.startswith("E591")]
+            self.assertEqual(len(e591), 1)
+            self.assertIn("prompt_01", e591[0])
+            self.assertIn("no Extraction Intent section", e591[0])
+
+    def test_every_toolkit_prompt_has_the_section(self):
+        """No prompt of the toolkit lacks the section: the check reports no E591 on the repository."""
+        repo_root = str(Path(__file__).resolve().parents[4])
+        e591 = [e for e in render_errors(check_extraction_intent(repo_root)) if e.startswith("E591")]
+        self.assertEqual(e591, [])
+
+    def _forward_read_errors(self, prompt_name: str, prompt_step: str, read_file: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "01", "02"],
+                prompts={
+                    prompt_name: (
+                        f"# Step {prompt_step}\n\n"
+                        "### Extraction Intent\n\n"
+                        f"- **{read_file}**: Extract the names and the descriptions "
+                        "of the items that this step must cover in full\n"
+                    ),
+                },
+            )
+            return [e for e in render_errors(check_extraction_intent(tmp)) if e.startswith("E598")]
+
+    def test_entry_for_a_later_step_is_e598(self):
+        e598 = self._forward_read_errors("prompt_01_capabilities.md", "01", "02_system_sketch.json")
+        self.assertEqual(len(e598), 1)
+        self.assertIn("'02'", e598[0])
+        self.assertIn("comes after this step", e598[0])
+
+    def test_entry_for_the_own_step_is_allowed(self):
+        self.assertEqual(self._forward_read_errors("prompt_01_capabilities.md", "01", "01_capabilities.json"), [])
+
+    def test_real_prompts_have_no_forward_read(self):
+        repo_root = str(Path(__file__).resolve().parents[4])
+        e598 = [e for e in render_errors(check_extraction_intent(repo_root)) if e.startswith("E598")]
+        self.assertEqual(e598, [])
 
     # ------------------------------------------------------------------
     # 6. Empty extraction intent section -- E591

@@ -45,7 +45,7 @@ An error with no item: an `E520 ... '<field>' is a required property` for a link
 
 **Step-base fields (required in every artifact):**
 
-- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `interface-contracts-v1`). Convention: `{step-noun}-v{N}`.
+- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `interface-contracts-v1`).
 - `owner`: String enum — must be one of `api | ui | system | ops | data | product | business | engineering`.
 - `created_at`: String — ISO 8601 UTC timestamp (e.g., `2025-10-16T22:06:04.202593Z`).
 - `canonical_refs_used`: Array of canonical reference objects — required even when empty (`[]`).
@@ -85,7 +85,7 @@ The migrated artifact MUST include:
 - `apis[].event_ref`: Canonical reference (kind: `event`) for events emitted or consumed.
 - `apis[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
 - `apis[].policy_ref`: Canonical reference (kind: `policy`) for access control policy.
-- `apis[].enum_provenance`: Object required whenever a parameter declares `enum`; needs `source_url`, `source_date`, and `resolved_at`.
+- `apis[].enum_provenance`: Object required when the API names a third party in `relies_on` and a parameter declares `enum`; needs `source_url`, `source_date`, and `resolved_at`.
 
 ## Context
 

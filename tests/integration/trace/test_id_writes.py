@@ -6,6 +6,7 @@ command in this process through ``run_cli``.  The jq-path forms of the same subc
 """
 from __future__ import annotations
 
+import difflib
 import json
 import shutil
 import time
@@ -523,3 +524,13 @@ def test_step_create_16a_without_impl_context_folder(host: Path, tmp_path: Path)
     code, out = run_cli("step", "create", "16a", "account_recovery", "--from", str(draft), *_flags(host))
     assert code == 0, out
     assert _doc(host, PLAN_FILE) == json.loads(draft.read_text(encoding="utf-8"))
+
+
+def test_a_write_by_id_keeps_the_indent_of_the_file(host: Path) -> None:
+    path = host / "spec" / "10_governance.json"
+    before = path.read_text(encoding="utf-8").splitlines()
+    status, out = _run(host, "patch", "--id", "rule-spec-check-on-every-pr", ".text", '"Every pull request passes the merge check."')
+    assert status == 0, out
+    after = path.read_text(encoding="utf-8").splitlines()
+    changed = [line for line in difflib.ndiff(before, after) if line[:2] in ("- ", "+ ")]
+    assert len(changed) <= 2, changed

@@ -48,9 +48,9 @@
                 "minLength": 2
               },
               "acronym": {
-                "description": "Optional uppercase acronym or abbreviation for this term (e.g., 'JWT' for JSON Web Token, 'API' for Application Programming Interface). Must be 2+ uppercase letters/digits. Include only if the acronym (1) appears ≥3 times in project documentation or code, OR (2) is standard industry usage that any practitioner would know. Examples of valid inclusions: 'JWT' (industry standard, appears in all auth flows), 'PII' (regulatory term used throughout compliance sections), 'API' (foundational term). Examples of when to omit: 'MP' for 'Monthly Payment' that appears only once; 'CCO' for an internal role title never referenced in code. Anti-pattern: including every capitalised phrase in the spec — acronyms should genuinely save space and reduce ambiguity.",
+                "description": "Optional uppercase acronym or abbreviation for this term (e.g., 'JWT' for JSON Web Token, 'API' for Application Programming Interface). Must be 2+ characters: uppercase letters and digits, with `/` or `-` allowed inside (for example 'JWT', 'CI/CD', 'JSON-LD'), never at the start or the end. Include only if the acronym (1) appears ≥3 times in project documentation or code, OR (2) is standard industry usage that any practitioner would know. Examples of valid inclusions: 'JWT' (industry standard, appears in all auth flows), 'PII' (regulatory term used throughout compliance sections), 'API' (foundational term). Examples of when to omit: 'MP' for 'Monthly Payment' that appears only once; 'CCO' for an internal role title never referenced in code. Anti-pattern: including every capitalised phrase in the spec — acronyms should genuinely save space and reduce ambiguity.",
                 "type": "string",
-                "pattern": "^[A-Z0-9]{2,}$"
+                "pattern": "^[A-Z0-9][A-Z0-9/-]*[A-Z0-9]$"
               },
               "definition": {
                 "description": "Clear, precise definition of the term as used in THIS project. Must be at least 20 characters (enforced by minLength). Should: (1) define the term without using the term itself, (2) distinguish it from similar terms in the domain, (3) be specific to the project context rather than a generic dictionary definition. Example: 'A short-lived cryptographic credential issued by the authentication service upon successful login, valid for 15 minutes. Distinct from the refresh_token which is long-lived.' Avoid: circular definitions, vague descriptions, generic Wikipedia-style prose.",
@@ -70,7 +70,7 @@
                 "pattern": "^[A-Za-z0-9/]+$"
               },
               "term_ref": {
-                "description": "Canonical reference to the canon entry for this term. Kind must be 'term'. Example: {\"id\": \"cn:project:term:billing-reconciliation\", \"kind\": \"term\", \"label\": \"billing reconciliation\"}. The id must match an entry in canon/manifest.json, or a canonical_proposals entry must be added. This is the primary mechanism for promoting a glossary term to the shared vocabulary. Validated by canonical-integrity lint.",
+                "description": "Canonical reference to the canon entry for this term. Kind must be 'term'. Example: {\"id\": \"cn:project:term:billing-reconciliation\", \"kind\": \"term\", \"label\": \"billing reconciliation\"}. The id must match an entry in canon/manifest.json, or a canonical_proposals entry must be added. This is the primary mechanism for promoting a glossary term to the shared vocabulary. Validated by canonical-integrity lint. A glossary term is vocabulary, so the kind is always 'term'. A role, a unit, an environment or an entity is not a glossary term: it is a canon entry of its own kind, proposed in `canonical_proposals` with that kind and bound by the `*_ref` field of the node that uses it.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "term" } } }

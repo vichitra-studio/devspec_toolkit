@@ -46,7 +46,6 @@ _REQUIRED_TOP_LEVEL_KEYS = frozenset({
     "registry",
     "_sentinels",
     "steps_without_entry_arrays",
-    "steps_with_deferred_registration",
 })
 
 

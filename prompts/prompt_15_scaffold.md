@@ -47,8 +47,8 @@ After generating the JSON artifact, implement the scaffold manually or using you
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- `spec/09_impl_plan.json` is present and contains at least one milestone entry.
-- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/09_impl_plan.json` is present and contains at least one milestone entry. (read as context; `specdev step ready 15` does not check this file, it checks step 05)
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry. (read as context; `specdev step ready 15` does not check this file, it checks step 05)
 - `spec/05_interface_contracts.json` is present and contains at least one api entry.
 
 ## Clarification Questions
@@ -57,7 +57,7 @@ After generating the JSON artifact, implement the scaffold manually or using you
 ## Negative Constraints
 - **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
 - **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
-- **DO NOT** mark `build_status` as `green` without evidence that validators have been executed; the schema enforces structural coupling between `build_status` and `validators`.
+- **DO NOT** mark `build_status` as `green` without evidence that validators have been executed; the schema enforces structural coupling between `build_status` and `validators`. No tool runs the strings in `validators`: the schema and `validators/step_15.py` check only that the list is non-empty when `build_status` is `green`.
 - **DO NOT** include logic or implementation code; this is a scaffold only.
 
 ## Coverage Closure
@@ -71,17 +71,17 @@ Before emitting, verify:
 - Every `row_id` is a new id: it is not the id of an API or of any other node (E704), so use `scaffold-` followed by the API slug.
 - Every row's `path` is a file that git tracks. Once an API a row realises is built (a task criterion of a closed milestone refines it), `spec-check` reports an untracked file as `E746 scaffold row <row_id> names <path>, which is not a tracked file (merge mode); add and commit the file, or correct the row's path`.
 - If any API contract cannot be scaffolded (e.g., async job, event): add a gap question (Clarify mode) rather than silently omitting the route.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every component from Step 02 system sketch has a corresponding directory or module in the scaffold
 - [ ] Directory structure matches the component hierarchy and trust boundaries from Step 02
-- [ ] Every scaffold stub has at least one corresponding test file placeholder
-- [ ] Every `interface_map` route has a corresponding stub handler in the `project_skeleton` directory structure (not just a directory entry)
+- [ ] Every scaffold stub has at least one corresponding test file placeholder (review rule: `project_skeleton` cannot express it and no tool checks it)
+- [ ] Every `interface_map` route has a corresponding stub handler in the `project_skeleton` directory structure (not just a directory entry) (review rule: `project_skeleton` cannot express it and no tool checks it)
 - [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
-- `project_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
+- `project_skeleton` specifies language (required by the schema), framework and core modules sufficient to build/run a minimal service (authoring and review rule: `framework` and `modules` are optional in the schema and no tool checks them).
 - `interface_map` covers all in-scope APIs (Step 5): each row has a `row_id`, a file `path` (relative to the project root, forward slashes) and `realises`, the APIs it implements (at least one, only APIs).
 - `validators` must be populated when `build_status` is `green` (minimum item count per schema). Include commands that verify schema correctness, type safety, and lint compliance for the project languages.
 - `build_status` reflects build health; allowed values are defined in the schema.

@@ -84,7 +84,6 @@ _EXPECTED_KINDS: dict[str, str] = {
 _PINNED_WARNINGS = Counter(
     {
         "W555": 1,  # the seed has no out-of-scope section (only a prose line), so the lint counts 0 of the 3 it expects
-        "W594": 2,  # 01 and 03 restate the design's wording with little token overlap upstream
     }
 )
 
@@ -93,8 +92,6 @@ _PINNED_WARNINGS = Counter(
 _PINNED_WARNING_SUBJECTS = Counter(
     {
         ("W555", "STEP00_SEED_OUT_OF_SCOPE_THIN"): 1,
-        ("W594", "01_capabilities.json"): 1,
-        ("W594", "03_glossary.json"): 1,
     }
 )
 

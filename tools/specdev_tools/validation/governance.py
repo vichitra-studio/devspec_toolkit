@@ -30,6 +30,7 @@ def check_commit_message(spec_dir: str, message: str) -> list[SpecError]:
     require_ids = rules.get("require_spec_ids")
     pattern = rules.get("pattern")
     custom_msg = rules.get("error_message")
+    # The schema requires `pattern` whenever `require_spec_ids` is true.
     if require_ids and pattern:
         if not re.match(pattern, message or ""):
             if custom_msg:

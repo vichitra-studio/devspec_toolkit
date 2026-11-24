@@ -10,9 +10,9 @@ from ._error_code_support import CODE_LITERAL_RE, ERRORS_MODULE, REGISTERED_WITH
 # edits this list in the same commit as its code change.
 EXPECTED_PROMOTABLE_PAIRS = {
     "W571": "E571", "W572": "E572",
-    "W573": "E573", "W580": "E580",
+    "W580": "E580",
     "W150": "E150", "W591": "E591", "W593": "E593",
-    "W594": "E594", "W595": "E595", "W615": "E615",
+    "W595": "E595", "W615": "E615",
 }
 
 # Numeric suffixes where E{N} and W{N} intentionally carry DIFFERENT semantic
@@ -44,12 +44,12 @@ class TestR9ErrorCodes(unittest.TestCase):
     # All new R9 codes (26 new + 4 previously unregistered) + DEVSPEC-89 additions
     R9_NEW_CODES = {
         "E150", "E551", "E552", "E553", "E554",
-        "E571", "E572", "E573", "E580", "E585",
-        "E590", "E591", "E593", "E594", "E595",
+        "E571", "E572", "E580", "E585",
+        "E590", "E591", "E593", "E595",
         "E596", "E597", "E598", "E599",
         "E615",
         "W552",
-        "W590", "W591", "W593", "W594", "W595",
+        "W590", "W591", "W593", "W595",
         "W596", "W597",
         "W615",
     }
@@ -63,7 +63,7 @@ class TestR9ErrorCodes(unittest.TestCase):
         """PROMOTABLE_PAIRS equals the explicit W->E list above (10 pairs)."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
         self.assertEqual(PROMOTABLE_PAIRS, EXPECTED_PROMOTABLE_PAIRS)
-        self.assertEqual(len(PROMOTABLE_PAIRS), 10)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 8)
 
     def test_removed_codes_not_registered(self):
         """The codes whose input fields were removed are gone from ERROR_CODES and PROMOTABLE_PAIRS."""

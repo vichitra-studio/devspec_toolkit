@@ -44,7 +44,7 @@ Before emitting, verify:
 - No seed requirement is silently dropped — this is the root artifact; nothing upstream can be deferred.
 - All metric names and units in `success_metrics` align with terminology used in the seed documents.
 - If any seed statement is ambiguous or contradictory: add a gap question (Clarify mode) rather than making an assumption.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `scope_items` holds specific items (not vague categories); every `later` or `out` item has a `scope_reason`

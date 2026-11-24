@@ -28,7 +28,7 @@
     },
     "global_seed_order": {
       "$ref": "vc:core:collections#kebabIdArray",
-      "description": "Defines the canonical READ ORDER for seeds. It does NOT by itself cause a seed to be ingested at any step — per-step inclusion is governed by step_requirements[NN]. When a step's required seeds are resolved they are emitted in this order; required seeds absent from this list are appended afterward. Should include at minimum the IDs for the host's declared seed files."
+      "description": "Defines the canonical READ ORDER for seeds. It does NOT by itself cause a seed to be ingested at any step — per-step inclusion is governed by step_requirements[NN]. When a step's required seeds are resolved they are emitted in this order; required seeds absent from this list are appended afterward. A seed may be left out of this list: it is then read after the listed ones, in the order the step lists it."
     },
     "seeds": {
       "type": "array",

@@ -53,7 +53,7 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 | Inventory can't go negative | `product.stock_count >= 0` at all times; stock decrements are atomic with order confirmation |
 
 ## Heuristics For Completeness
-- Choose the appropriate `language` value (see schema/06_invariants.schema.json for the authoritative enum): prefer machine-evaluable languages for data predicates and field-level logic when the constraint is automatable; MUST set `severity=error` for invariants derived from FR acceptance criteria with error conditions or from security boundaries in `spec/02_system_sketch.json`.
+- Choose the appropriate `language` value (see schema/06_invariants.schema.json for the authoritative enum): prefer machine-evaluable languages for data predicates and field-level logic when the constraint is automatable; MUST set `severity=error` for invariants derived from FR acceptance criteria with error conditions or from security boundaries in `spec/02_system_sketch.json`. `severity` is required by the schema (E520 when missing); which rules are `error` is an authoring and review rule that no tool checks.
 - Scope discipline: enumerate only affected components/APIs; avoid global rules unless necessary.
 - Ambiguity scrub: translate narrative policies into boolean/evaluable forms.
 
@@ -64,7 +64,7 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 - `spec/02_system_sketch.json` is present and contains at least one component entry.
 
 ## Negative Constraints
-- ❌ Prefer machine-evaluable `language` values over prose-only options; see schema/06_invariants.schema.json for the authoritative language enum.
+- ❌ Prefer machine-evaluable `language` values over prose-only options; see schema/06_invariants.schema.json for the authoritative language enum. A rule with `language` `text` is valid and no tool flags it (authoring and review rule).
 - ❌ DO NOT invent component IDs; use only those from Step 2.
 - ❌ DO NOT leave `constrains` out of a rule that is not system-wide; every rule says over what it holds.
 
@@ -76,7 +76,7 @@ Before emitting, verify:
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - No business rule, security boundary, or data integrity constraint is silently omitted.
 - If any constraint cannot be expressed in the supported `language` formats: add a gap question (Clarify mode) rather than skipping it.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every entity with state transitions in the FR set has ≥1 state-transition invariant
@@ -88,12 +88,13 @@ Before emitting, verify:
 
 ## Step-Specific Completeness Checklist
 - Every rule has a precise description, executable `language`, and concrete `expression` when automation is possible.
+- `policy_ref` is required on every rule: a canonical reference with `kind: "policy"` to the governance or compliance policy the rule serves (see the Output Contract example); `canonical-integrity` reports one that does not resolve (E110).
 - `scope` is the delivery scope of a rule (`in`, `later` or `out`); `constrains` limits the rule to specific FRs, APIs, components or connections to avoid false positives.
-- `severity` must be set deliberately (see schema/06_invariants.schema.json for authoritative enum values); prefer the harder severity for hard guarantees, the softer value for observability-only rules.
+- `severity` is required and must be set deliberately (see schema/06_invariants.schema.json for authoritative enum values); prefer the harder severity for hard guarantees, the softer value for observability-only rules.
 - `enforcement_point` must match one of the canonical values defined in schema/06_invariants.schema.json (see the `enforcement_point` enum in that file for the full authoritative list).
 - `constrains` names the FRs, APIs, components or connections a rule holds over (never a capability or an NFR); `assumes` names the charter assumptions it rests on.
 - A rule that is deferred or excluded carries `scope` `later` or `out` with `scope_reason`.
-- `risk_category_ref`: populate when this invariant maps to a known risk domain for red-team alignment (Step 11 cross-reference); use a canonicalRef object pointing to the appropriate risk category in canon/kinds/risk_category.json.
+- `risk_category_ref`: populate when this invariant maps to a known risk domain for red-team alignment (Step 11 cross-reference); use a canonicalRef object pointing to the appropriate risk category in canon/kinds/risk_category.json. Only a rule that carries it is checked for red-team coverage (W615 at step 11); a rule without it is not checked.
 - Avoid purely textual rules unless automation is truly not feasible.
 
 ## Best Practices
@@ -101,7 +102,7 @@ Before emitting, verify:
 - **Scoping**: Describe each invariant in business language first, then name in `constrains` the FRs, APIs, components or connections it applies to.
 - **Severity**: Tag `severity` deliberately (see schema/06_invariants.schema.json for authoritative enum values) to guide escalation paths — harder values for hard guarantees, softer values for observability alerts.
 - **Links**: Name what each invariant constrains in `constrains` (bare ids, no notes) so auditors know where the rule holds.
-- **Sample maintenance**: Any PR that adds, modifies, or removes a runtime-evaluable (`cel`/`jsonlogic`) invariant MUST update `spec/samples/invariants_sample.json` in the same PR — see the "Invariant Evaluation Sample" section of `prompt_08_fixtures.md`. The Step 12 CI gate runs `invariants-check` against that sample.
+- **Sample maintenance**: Any PR that adds, modifies, or removes a runtime-evaluable (`cel`/`jsonlogic`) invariant MUST update `spec/samples/invariants_sample.json` in the same PR — see the "Invariant Evaluation Sample" section of `prompt_08_fixtures.md`. The Step 12 CI gate runs `invariants-check` against that sample. Nothing checks that the sample changed in the same PR; a stale sample shows only when `invariants-check` fails on it (authoring and review rule).
 
 ## Common Pitfalls
 - **Empty Logic**: Leaving the `expression` empty or non-executable, which prevents automation in CI and runtime.
@@ -134,6 +135,7 @@ Before emitting, verify:
       "description": "The system ensures every request to an authenticated endpoint carries a valid session token.",
       "language": "cel",
       "expression": "request.authenticated == true && request.token != null",
+      "severity": "error",
       "enforcement_point": "api-gateway",
       "constrains": ["fr-auth-login", "api-auth-login", "auth-service"],
       "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy" }

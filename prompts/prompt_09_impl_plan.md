@@ -25,7 +25,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Operating Flow: Scope → Sequence → Resource → Link → Reconcile → Emit
 - **Scope**: Derive the set of milestones from in-scope capabilities and FRs. Every in-scope capability must be reached by ≥1 milestone through the FRs it schedules.
-- **Sequence**: Give every milestone a `target_date` and list the milestones in ascending date order (a plan out of order is reported as `E520`). The dates are the only statement of order: a milestone names no predecessor, and `schedules` never names another milestone. Identify the critical path from the dates.
+- **Sequence**: Give every milestone a `target_date` (not required by the schema; a date that is present is checked) and list the milestones in ascending date order (a plan out of order is reported as `E520`). The dates are the only statement of order: a milestone names no predecessor, and `schedules` never names another milestone. Identify the critical path from the dates.
 - **Resource**: Validate each milestone's feasibility against charter constraints and the `third_parties` of `spec/02_system_sketch.json`. Technology choices and pins belong to Step 02; this step does not restate them. A choice that planning shows to be wrong is a gap question for Step 02.
 - **Link**: Name in `schedules` every node a milestone delivers: FRs or acceptance criteria, APIs, invariants, NFRs, components, environments and charter risks, at least one. The capability a milestone serves follows from the FRs it schedules.
 - **Reconcile**: Verify cross-step consistency before emitting:
@@ -37,7 +37,7 @@ For each upstream artifact ingested, extract the following:
 **Extraction Mandate**: Every in-scope capability from `01_capabilities.json` must be reached by ≥1 milestone: a milestone's `schedules` names an FR of the capability. List any capability not reached and explain why (e.g., deferred with `scope` `later` in Step 01, handled by infrastructure).
 
 ## Heuristics For Completeness
-- MUST populate `target_date` on every milestone (the schema accepts a milestone without one; this step does not) and list the milestones in ascending date order. MUST include `migration_plan` when the plan replaces a running system or data schema, or breaks a public API contract.
+- SHOULD populate `target_date` on every milestone and list the milestones in ascending date order (the schema and `spec-check` accept a milestone without a date; a date that is present must be ISO `YYYY-MM-DD` and the dates must not decrease, E520 otherwise). Include `migration_plan` when the plan replaces a running system or data schema, or breaks a public API contract (an authoring and review rule: no tool decides whether the plan does).
 - Ambiguity scrub: milestones should schedule the FRs/APIs they deliver and name the CI gates that pass them.
 
 ## Self-Audit Gate
@@ -59,7 +59,7 @@ Before emitting, verify:
 - Every milestone has a `target_date`, and the dates ascend down the list.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any capability has unclear implementation path: add a gap question (Clarify mode) rather than deferring silently.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every in-scope capability is reached by ≥1 milestone through the FRs it schedules
@@ -70,7 +70,7 @@ Before emitting, verify:
 
 ## Step-Specific Completeness Checklist
 - Milestones include clear names, `target_date`, `schedules`, risks, and spikes for unknowns.
-- `migration_plan` describes data or API migration if replacing existing systems.
+- `migration_plan` describes data or API migration if replacing existing systems, in 2 to 4 sentences (the bound of `schema/09_impl_plan.schema.json`: what is replaced, the sequence, the rollback and the acceptance test).
 
 ## Best Practices
 - **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`. Name the FRs/APIs a milestone delivers in `schedules` (bare ids, no notes).

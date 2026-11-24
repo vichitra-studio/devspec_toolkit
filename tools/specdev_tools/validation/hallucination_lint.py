@@ -10,7 +10,6 @@ from ..canonical.lint import lint_canon_dirs
 from ..canonical.registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.json_utils import find_schema_dir, build_id_index, resolve_ref as _resolve_urn_ref
-from ..core.registry import derive_allowed_upstream
 from ..core.schema_nav import child_schema as _nav_child_schema
 from ..core.schema_nav import effective_schema as _nav_effective_schema
 from .linter_utils import (
@@ -21,8 +20,6 @@ from .linter_utils import (
     is_resolved_canonical_ref,
     iter_json,
     load_canonical_stages,
-    tokenize_free_text,
-    DERIVATION_STOPWORDS,
 )
 
 if TYPE_CHECKING:
@@ -119,9 +116,6 @@ def lint_hallucinations(
         errors.extend(_check_existing_structures_paths(rel, data, path_root))
         if nfr_ids is not None:
             errors.extend(_check_nfr_refs(rel, data, nfr_ids))
-        # Derivation reads step_order.json from the toolkit (repo_root/tools/),
-        # not the host repo, so it uses `root` (toolkit root), not `path_root`.
-        errors.extend(_check_content_derivation(rel, data, spec_dir, root))
         collect_ids_and_refs(data, rel, known_ids, refs, skip_ids_for_files=covered)
     for rel, p, ref_id in refs:
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
@@ -194,25 +188,11 @@ def _scan_node(
                                 value=item,
                             ))
             if key == "command" and isinstance(value, str):
-                # Skip prefix check when a sibling command_ref asserts a canon ref.
-                # We DO NOT re-validate that the ref resolves — verb validation is
-                # intentionally deferred. canonical-integrity (E210/E110) owns *ref*
-                # resolution and will fail loudly if the asserted id is unresolvable.
-                if not is_resolved_canonical_ref(node.get("command_ref")):
-                    prefix = value.strip().split(" ", 1)[0]
-                    if prefix and prefix not in known_command_prefixes and not canon.resolve_alias("command", prefix):
-                        errs.append(make_error(
-                            "E530",
-                            f"INVENTED_ENUM_OR_ID {rel}:{p}={prefix} "
-                            f"Command prefix '{prefix}' is not in the allowlist. "
-                            f"Resolve by either (a) attaching a sibling command_ref to a registered canon entry "
-                            f"under <spec-root>/canon/kinds/command.json, "
-                            f"or (b) appending the prefix to <spec-root>/canon/command_prefixes.json.",
-                            subcode="INVENTED_ENUM_OR_ID",
-                            file=rel,
-                            jq_path=f".{p}",
-                            value=prefix,
-                        ))
+                errs.extend(_command_prefix_errors(rel, f".{p}", value, node.get("command_ref"), canon, known_command_prefixes))
+            if key == "test_commands" and isinstance(value, list):
+                for idx, item in enumerate(value):
+                    if isinstance(item, str):
+                        errs.extend(_command_prefix_errors(rel, f".{p}[{idx}]", item, None, canon, known_command_prefixes))
             errs.extend(_scan_node(rel, value, canon, known_command_prefixes, p, stages=active_stages))
     elif isinstance(node, list):
         for idx, item in enumerate(node):
@@ -220,6 +200,36 @@ def _scan_node(
     return errs
 
 
+def _command_prefix_errors(
+    rel: str,
+    jq_path: str,
+    command: str,
+    command_ref: Any,
+    canon: CanonicalRegistry,
+    known_command_prefixes: set[str],
+) -> list[SpecError]:
+    """E530 for a *command* whose first word is in no prefix allowlist, unless *command_ref* asserts a canon ref.
+
+    The ref is not re-validated here: verb validation is deferred, canonical-integrity (E210/E110) owns *ref*
+    resolution and fails loudly if the asserted id is unresolvable.  *jq_path* locates the command in the file.
+    """
+    if is_resolved_canonical_ref(command_ref):
+        return []
+    prefix = command.strip().split(" ", 1)[0]
+    if not prefix or prefix in known_command_prefixes or canon.resolve_alias("command", prefix):
+        return []
+    return [make_error(
+        "E530",
+        f"INVENTED_ENUM_OR_ID {rel}:{jq_path.lstrip('.')}={prefix} "
+        f"Command prefix '{prefix}' is not in the allowlist. "
+        f"Resolve by either (a) attaching a sibling command_ref to a registered canon entry "
+        f"under <spec-root>/canon/kinds/command.json, "
+        f"or (b) appending the prefix to <spec-root>/canon/command_prefixes.json.",
+        subcode="INVENTED_ENUM_OR_ID",
+        file=rel,
+        jq_path=jq_path,
+        value=prefix,
+    )]
 
 
 def _is_valid_unit(value: str, canon: CanonicalRegistry) -> bool:
@@ -623,108 +633,6 @@ def _check_nfr_refs(rel: str, data: Any, nfr_ids: set[str]) -> list[SpecError]:
                     jq_path=jq_path,
                     value=ref,
                 ))
-    return errs
-
-
-# R9/T20: Content derivation check
-# Minimum token overlap between a downstream artifact and its upstream
-# dependencies before W594 CONTENT_DERIVATION_LOW_OVERLAP fires.  Chosen
-# empirically: well-derived artifacts share at least 5 domain-specific tokens.
-_DERIVATION_OVERLAP_THRESHOLD = 5
-
-_DERIVATION_FREE_TEXT_FIELDS = {
-    "description", "statement", "rationale", "justification", "notes",
-    "narrative", "definition", "postconditions", "preconditions",
-}
-
-
-def _extract_free_text_tokens(obj: Any) -> set[str]:
-    """Extract tokens from all free-text fields in a spec artifact."""
-    tokens: set[str] = set()
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k in _DERIVATION_FREE_TEXT_FIELDS and isinstance(v, str):
-                tokens |= tokenize_free_text(v, stopwords=DERIVATION_STOPWORDS)
-            elif isinstance(v, (dict, list)):
-                tokens |= _extract_free_text_tokens(v)
-    elif isinstance(obj, list):
-        for item in obj:
-            tokens |= _extract_free_text_tokens(item)
-    return tokens
-
-
-def _check_content_derivation(
-    rel: str,
-    data: Any,
-    spec_dir: str,
-    repo_root: str,
-    threshold: int = _DERIVATION_OVERLAP_THRESHOLD,
-) -> list[SpecError]:
-    """R9/T20: Check that downstream content derives from upstream artifacts."""
-    errs: list[SpecError] = []
-    # Load step_order.json to find upstream dependencies
-    step_order_path = os.path.join(repo_root, "tools", "step_order.json")
-    if not os.path.isfile(step_order_path):
-        return errs
-
-    # Determine current step from filename
-    basename = os.path.basename(rel)
-    step_match = re.match(r"^(\d{2}[a-z]?)_", basename)
-    if not step_match:
-        return errs
-    step_id = step_match.group(1)
-
-    try:
-        with open(step_order_path, "r", encoding="utf-8") as f:
-            order_data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return errs
-
-    upstream_deps = derive_allowed_upstream(step_id, order_data.get("steps", []))
-    if not upstream_deps:
-        return errs
-
-    # Extract tokens from downstream (current artifact)
-    downstream_tokens = _extract_free_text_tokens(data)
-    if not downstream_tokens:
-        return errs
-
-    # Load and tokenize upstream artifacts
-    upstream_tokens: set[str] = set()
-    missing_upstreams: list[str] = []
-    for dep_step in upstream_deps:
-        found = False
-        if os.path.isdir(spec_dir):
-            for fn in os.listdir(spec_dir):
-                if fn.startswith(f"{dep_step}_") and fn.endswith(".json"):
-                    dep_path = os.path.join(spec_dir, fn)
-                    try:
-                        with open(dep_path, "r", encoding="utf-8") as f:
-                            dep_data = json.load(f)
-                        upstream_tokens |= _extract_free_text_tokens(dep_data)
-                        found = True
-                    except (OSError, json.JSONDecodeError):
-                        pass
-                    break
-        if not found:
-            missing_upstreams.append(dep_step)
-
-    for dep in missing_upstreams:
-        errs.append(make_error("W590", f"CROSS_STEP_UPSTREAM_MISSING upstream step {dep} artifact not found; skipping derivation check"))
-
-    if not upstream_tokens:
-        return errs
-
-    # Count overlap
-    overlap = downstream_tokens & upstream_tokens
-    if len(overlap) < threshold:
-        errs.append(make_error(
-            "W594",
-            f"CONTENT_DERIVATION_LOW_OVERLAP {rel} "
-            f"overlap={len(overlap)} threshold={threshold} "
-            f"(downstream has {len(downstream_tokens)} tokens, upstream has {len(upstream_tokens)} tokens)",
-        ))
-
     return errs
 
 

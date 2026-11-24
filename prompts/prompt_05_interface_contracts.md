@@ -33,7 +33,7 @@ For each upstream artifact ingested, extract the following:
 - **URL structure**: Nest resources to show ownership (`/users/{id}/sessions`). Keep nesting ≤2 levels deep.
 - **Method semantics**: See the schema's `method` field (→ `vc:core:atoms#httpMethod`) for the authoritative decision rules per HTTP verb.
 - **Pagination**: All collection endpoints MUST support `limit`/`offset` or cursor-based pagination. Default and max page sizes must be defined.
-- **Error responses**: Every endpoint MUST define at least one 4xx and one 5xx error response. Include `code` and `message` in all error bodies.
+- **Error responses**: Every endpoint MUST define at least one 4xx and one 5xx error response. Include `code` and `message` in all error bodies. No tool checks the status classes (an authoring and review rule); `code` and `message` are required by the schema.
 - **Versioning**: Use URL path versioning (`/v1/`) unless the charter specifies otherwise. Version bump required on breaking changes.
 
 ### Implicit API Discovery
@@ -81,18 +81,19 @@ Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that exposes an interface is named in `provided_by` of at least one API contract defined here.
 - All resource and action names align with `term_id` values from `spec/03_glossary.json`.
 - If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] Every endpoint defines ≥1 error response for each applicable HTTP error class (4xx, 5xx)
+- [ ] Every endpoint defines ≥1 error response for each applicable HTTP error class (4xx, 5xx) (review rule; not checked by a tool)
 - [ ] Resource naming is consistent across all APIs (no mixed singular/plural, no verbs in resource paths)
 - [ ] Every externally-observable FR behavior has at least one API endpoint
 - [ ] No ID referenced by this step (the ids of upstream nodes: FRs, acceptance criteria, components) conflicts with the same ID in a sibling step
 - [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
-- Each API entry has version, protocol, route/path (or equivalent), method (where applicable), and owner.
+- Each API entry has version, protocol and owner; an `http` API also has `path` and `method` (the schema requires both, E520 otherwise).
 - Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
+- An API that names a third party in `relies_on` and has a parameter that declares an `enum` needs an `enum_provenance`: where the value set comes from (source, date, resolver). E311 reports a missing one.
 - `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
 - `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` field (see schema/05_interface_contracts.schema.json → `vc:core:atoms#apiSecurity`).
 - `derives_from` names the FRs that justify the API; each entry of `errors` has an `error_id`, a `scope` and a `derives_from` naming the acceptance criteria it comes from.
@@ -140,6 +141,8 @@ Before emitting, verify:
       "name": "Example Resource API",
       "version": "v1",
       "protocol": "http",
+      "path": "/example-resources/{id}",
+      "method": "GET",
       "owner": "api",
       "interface_ref": {"id": "cn:project:interface:example-resource", "kind": "interface"},
       "scope": "in",

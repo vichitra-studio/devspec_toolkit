@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from specdev_tools.core.json_utils import json_schema_discovery
+from specdev_tools.core.json_utils import _CONSTRAINT_KEYWORDS, json_schema_discovery
 from specdev_tools.core.schema_nav import effective_schema
 
 # ---------------------------------------------------------------------------
@@ -766,3 +766,49 @@ def test_child_schema_reads_property_index_pattern_and_additional(step: str | in
 def test_child_schema_treats_a_pattern_that_is_not_a_regular_expression_as_matching_nothing() -> None:
     assert child_schema({"patternProperties": {"(": {"type": "boolean"}}}, "(") is None
     assert child_schema({}, "anything", additional=True) is None
+
+
+# ---------------------------------------------------------------------------
+# 11. json schema prints the constraint keywords of the node (DEVSPEC-211)
+# ---------------------------------------------------------------------------
+
+_EXAMPLE_SPEC = _REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+
+
+def _example_info(file_name: str, path_selector: str) -> dict:
+    raw = json_schema_discovery(str(_EXAMPLE_SPEC / file_name), path_selector, repo_root=str(_REPO_ROOT))
+    assert raw is not None
+    return json.loads(raw)
+
+
+def test_probe_prints_min_and_max_items():
+    info = _example_info("02_system_sketch.json", ".components[].responsibilities")
+    assert (info["minItems"], info["maxItems"]) == (3, 6)
+
+
+def test_probe_prints_min_length():
+    assert _example_info("00_charter.json", ".problem_statement")["minLength"] == 20
+
+
+def test_probe_prints_every_constraint_keyword_of_the_node(tmp_path):
+    values: dict[str, Any] = {
+        "minItems": 1, "maxItems": 2, "uniqueItems": True, "minLength": 1, "maxLength": 9, "pattern": "^a",
+        "format": "date", "minimum": 0, "maximum": 5, "exclusiveMinimum": -1, "exclusiveMaximum": 6,
+        "additionalProperties": False, "const": "x",
+    }
+    assert set(values) == set(_CONSTRAINT_KEYWORDS)
+    schema_dir = tmp_path / "schema"
+    schema_dir.mkdir()
+    (schema_dir / "t.schema.json").write_text(json.dumps({
+        "$id": "vc:test:constraints",
+        "type": "object",
+        "properties": {
+            "field": {"type": "array", "items": {"type": "string", "minLength": 2}, **values},
+        },
+    }), encoding="utf-8")
+    document = tmp_path / "doc.json"
+    document.write_text(json.dumps({"$schema": "vc:test:constraints", "field": []}), encoding="utf-8")
+    raw = json_schema_discovery(str(document), ".field", repo_root=str(tmp_path))
+    info = json.loads(raw)
+    assert {keyword: info[keyword] for keyword in _CONSTRAINT_KEYWORDS} == values
+    assert info["items_constraints"] == {"minLength": 2}

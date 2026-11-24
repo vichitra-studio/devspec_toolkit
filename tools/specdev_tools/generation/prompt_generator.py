@@ -35,6 +35,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..context._utils import merged_required_and_properties
 from .schema_differ import (
     DiffType,
     FieldDiff,
@@ -288,7 +289,9 @@ def gather_step_context(
                 
                 # Extract required fields
                 schema_data = json.loads(context.target_schema)
-                context.required_fields = _extract_required_fields(schema_data)
+                context.required_fields = _extract_required_fields(
+                    merged_required_and_properties(schema_data, toolkit_root)
+                )
             except Exception:
                 pass
         context.target_file = str(step_diff.target_file.name) if step_diff.target_file else f"{step_diff.step_id}.json"
@@ -435,7 +438,9 @@ def gather_paradigm_context(
                     context.schema_ref = f"../devspec_toolkit/schema/{schema_name}"
                 
                 schema_data = json.loads(context.target_schema)
-                context.required_fields = _extract_required_fields(schema_data)
+                context.required_fields = _extract_required_fields(
+                    merged_required_and_properties(schema_data, toolkit_root)
+                )
             except Exception:
                 pass
     

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 
 from ..core.errors import SpecError, make_error
 from .linter_utils import (
-    build_file_graph_or_none,
     build_lint_graph,
     collect_ids_and_refs,
     graph_covered_files,
@@ -19,9 +18,11 @@ if TYPE_CHECKING:
     from ..graph.model import Graph
 
 
-PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|XXX|placeholder)\b", re.IGNORECASE)
+# Markers only. The English word "placeholder" is not a marker, and a marker written after a hyphen (the sentinel
+# '-tbd', 'api-x-schema-tbd') is the sentinel the schemas and prompts tell authors to write. AUTO-DERIVE is the
+# marker prompt 02 tells the author to resolve.
+PLACEHOLDER_RE = re.compile(r"(?<![\w-])(TBD|TODO|FIXME|XXX|AUTO-DERIVE)\b", re.IGNORECASE)
 STEP_ARTIFACT_RE = re.compile(r"^\d{2}[a-z]?_[a-z0-9_]+\.json$")
-ASSUMPTION_ID_RE = re.compile(r"\b((?:fr|api|cap|nfr|inv|fix|comp|job|step|role|env|unit|stage|owner|trace|gov)-[a-z0-9]+(?:-[a-z0-9]+)*)\b")
 # Spec baseline: few|some|many|several|various — extended with safe additions: fast|reliable|easy|hard|quick
 # R9: additional vague terms: appropriate|adequate|sufficient|reasonable|significant|typical|generally|usually
 VAGUE_QUANTIFIER_RE = re.compile(
@@ -32,7 +33,7 @@ VAGUE_QUANTIFIER_RE = re.compile(
 # Free-text fields to scan for vague language (beyond assumptions)
 _VAGUE_SCAN_FIELDS = {
     "description", "statement", "rationale", "justification", "notes",
-    "narrative", "postconditions", "preconditions", "risks", "spikes",
+    "postconditions", "preconditions", "risks", "spikes",
     "migration_plan", "definition",
 }
 # Metadata fields that should NOT be scanned
@@ -75,7 +76,7 @@ def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[Spec
         errors.extend(_check_free_text_vague(rel, data))
         collect_ids_and_refs(data, rel, known_ids, refs, skip_ids_for_files=covered)
 
-    # Second pass: assumption checks with full cross-artifact known_ids
+    # Second pass: assumption checks
     for path in iter_json(spec_dir):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -85,7 +86,7 @@ def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[Spec
         if not _is_step_artifact(path, data):
             continue
         rel = os.path.relpath(path, spec_dir)
-        errors.extend(_check_assumptions(rel, data, known_ids))
+        errors.extend(_check_assumptions(rel, data))
 
     for rel, p, ref_id in refs:
         if ref_id.startswith("external:") or ref_id.startswith("cn:"):
@@ -96,12 +97,11 @@ def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[Spec
     return errors
 
 
-def lint_spec_quality_file(path: str, spec_dir: str | None = None, *, graph: Graph | None = None) -> list[SpecError]:
+def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[SpecError]:
     """Run per-artifact quality checks used by single-file validation.
 
     This enforces deterministic top-level and placeholder/array checks without
-    requiring full-directory reference closure.  The ids an assumption may name come from *graph* (the one-file
-    graph slice when ``None``), or from a scan of the file when the graph holds no node of it.
+    requiring full-directory reference closure.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -121,24 +121,12 @@ def lint_spec_quality_file(path: str, spec_dir: str | None = None, *, graph: Gra
     errs.extend(placeholder_errs)
     errs.extend(_check_critical_arrays(rel, data))
     errs.extend(_check_free_text_vague(rel, data))
-    errs.extend(_check_assumptions(rel, data, _single_file_known_ids(path, rel, data, graph)))
+    errs.extend(_check_assumptions(rel, data))
     return errs
 
 
-def _single_file_known_ids(path: str, rel: str, data: Any, graph: Graph | None) -> set[str]:
-    """Ids an assumption of the single file *path* may name: graph nodes, else the ids the file's fields define."""
-    if graph is None:
-        graph = build_file_graph_or_none(path, data)
-        covered = frozenset({rel.replace(os.sep, "/")}) if graph is not None and graph.nodes else frozenset()
-    else:
-        covered = graph_covered_files(graph)
-    known_ids = graph_known_ids(graph)
-    collect_ids_and_refs(data, rel, known_ids, [], skip_ids_for_files=covered)
-    return known_ids
-
-
-def _check_assumptions(rel: str, data: Any, known_ids: set[str], path: str = "") -> list[SpecError]:
-    """RFC 3.6: Warn if assumption text references unbound spec IDs."""
+def _check_assumptions(rel: str, data: Any, path: str = "") -> list[SpecError]:
+    """Check each ``assumptions`` value: too many (W572), a marker (E512), a vague word (W571)."""
     errs: list[SpecError] = []
     if isinstance(data, dict):
         for k, v in data.items():
@@ -146,39 +134,51 @@ def _check_assumptions(rel: str, data: Any, known_ids: set[str], path: str = "")
             if k == "assumptions":
                 if isinstance(v, list) and len(v) > _ASSUMPTION_THRESHOLD:
                     errs.append(make_error("W572", f"ASSUMPTION_COUNT_HIGH {rel}:{p} count={len(v)}"))
-                errs.extend(_scan_assumption_value(rel, v, known_ids, p))
+                errs.extend(_scan_assumption_value(rel, v, p))
             else:
-                errs.extend(_check_assumptions(rel, v, known_ids, p))
+                errs.extend(_check_assumptions(rel, v, p))
     elif isinstance(data, list):
         for i, v in enumerate(data):
-            errs.extend(_check_assumptions(rel, v, known_ids, f"{path}[{i}]"))
+            errs.extend(_check_assumptions(rel, v, f"{path}[{i}]"))
     return errs
 
 
-def _scan_assumption_value(rel: str, value: Any, known_ids: set[str], path: str) -> list[SpecError]:
+def _scan_assumption_value(rel: str, value: Any, path: str) -> list[SpecError]:
     """Scan one ``assumptions`` value: a string, a list of them, or an assumption node whose ``text`` is scanned."""
     errs: list[SpecError] = []
     if isinstance(value, dict):
         if "text" in value:
-            errs.extend(_scan_assumption_value(rel, value["text"], known_ids, f"{path}.text"))
+            errs.extend(_scan_assumption_value(rel, value["text"], f"{path}.text"))
     elif isinstance(value, str):
         if PLACEHOLDER_RE.search(value):
             errs.append(make_error("E512", f"ASSUMPTION_HAS_PLACEHOLDER {rel}:{path} value={value}"))
         for token in _scan_for_vague_language(value):
             errs.append(make_error("W571", f"ASSUMPTION_VAGUE_QUANTIFIER {rel}:{path} ref={token}"))
-        for m in ASSUMPTION_ID_RE.finditer(value):
-            token = m.group(1)
-            if token not in known_ids:
-                errs.append(make_error("W573", f"ASSUMPTION_UNBOUND_ID {rel}:{path} ref={token}"))
     elif isinstance(value, list):
         for i, item in enumerate(value):
-            errs.extend(_scan_assumption_value(rel, item, known_ids, f"{path}[{i}]"))
+            errs.extend(_scan_assumption_value(rel, item, f"{path}[{i}]"))
     return errs
 
 
 def _scan_for_vague_language(text: str) -> list[str]:
     """Extract vague terms from a text string. Returns list of matched tokens."""
     return [m.group(1) for m in VAGUE_QUANTIFIER_RE.finditer(text)]
+
+
+def _vague_findings(rel: str, path: str, text: str) -> list[SpecError]:
+    """One W593 for each vague word of *text*, located at *path* of the file *rel*."""
+    return [make_error("W593", f"VAGUE_LANGUAGE_FREE_TEXT {rel}:{path} ref={token}") for token in _scan_for_vague_language(text)]
+
+
+def _check_scan_field_list(rel: str, items: list[Any], path: str) -> list[SpecError]:
+    """W593 for each string of the list *items* of a scan field; an item that is not a string is walked."""
+    errs: list[SpecError] = []
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            errs.extend(_vague_findings(rel, f"{path}[{i}]", item))
+        else:
+            errs.extend(_check_free_text_vague(rel, item, f"{path}[{i}]"))
+    return errs
 
 
 def _check_free_text_vague(rel: str, data: Any, path: str = "") -> list[SpecError]:
@@ -190,8 +190,9 @@ def _check_free_text_vague(rel: str, data: Any, path: str = "") -> list[SpecErro
                 continue
             p = f"{path}.{k}" if path else k
             if k in _VAGUE_SCAN_FIELDS and isinstance(v, str):
-                for token in _scan_for_vague_language(v):
-                    errs.append(make_error("W593", f"VAGUE_LANGUAGE_FREE_TEXT {rel}:{p} ref={token}"))
+                errs.extend(_vague_findings(rel, p, v))
+            elif k in _VAGUE_SCAN_FIELDS and isinstance(v, list):
+                errs.extend(_check_scan_field_list(rel, v, p))
             elif k != "assumptions":
                 errs.extend(_check_free_text_vague(rel, v, p))
     elif isinstance(data, list):

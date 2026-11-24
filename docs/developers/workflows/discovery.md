@@ -21,7 +21,7 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 | 07 — NFRs | Set performance/reliability targets | `spec/07_nfrs.json` |
 | 08 — Fixtures | Provide traceable test data | `spec/08_fixtures.json` |
 | 09 — Implementation Plan | Sequence delivery milestones | `spec/09_impl_plan.json` |
-| 10 — Governance | Define change control policies | `spec/10_governance.json` |
+| 10 — Governance | Set the commit-message convention and the rules that enforce the charter's constraints | `spec/10_governance.json` |
 | 11 — Red Team | Enumerate threats and mitigations | `spec/11_redteam.json` |
 | 12 — CI Gates | Wire automated enforcement | `spec/12_ci_gates.json` |
 

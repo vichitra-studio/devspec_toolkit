@@ -173,3 +173,24 @@ def test_the_guides_of_the_migration_codes_are_valid_yaml_with_the_fields_the_lo
     for code in ("E700", "E701", "E702", "E703", "E704", "E880", "E881", "E882", "E884"):
         data = yaml.safe_load((folder / f"{code}.yaml").read_text(encoding="utf-8"))
         assert data["code"] == code and data["title"] and data["trigger"] and data["resolution"]
+
+
+def test_step_10_is_not_described_as_change_control() -> None:
+    discovery = (ROOT / "docs" / "developers" / "workflows" / "discovery.md").read_text(encoding="utf-8")
+    prompt = (ROOT / "prompts" / "prompt_10_governance.md").read_text(encoding="utf-8")
+    assert "change control policies" not in discovery.lower()
+    assert "change control" not in prompt.lower()
+    assert "| 10 — Governance | Set the commit-message convention" in discovery
+    assert prompt.startswith("# Step 10 · Governance\n")
+
+
+@pytest.mark.parametrize(
+    ("relative", "sentence"),
+    [
+        ("docs/prompts/shared_expectations.md", "A decision that another step or a seed owns"),
+        ("docs/agents/agents.md", "An answer that another step or a seed owns is not applied in this step"),
+    ],
+)
+def test_shared_expectations_and_agents_name_the_open_item_route(relative: str, sentence: str) -> None:
+    text = (ROOT / relative).read_text(encoding="utf-8")
+    assert sentence in text and ".ambiguities" in text and "open item" in text

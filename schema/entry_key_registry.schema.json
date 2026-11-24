@@ -10,8 +10,7 @@
     "_note",
     "registry",
     "_sentinels",
-    "steps_without_entry_arrays",
-    "steps_with_deferred_registration"
+    "steps_without_entry_arrays"
   ],
   "additionalProperties": false,
   "properties": {
@@ -54,7 +53,7 @@
     },
     "steps_without_entry_arrays": {
       "type": "array",
-      "description": "Steps that have no top-level entry-bearing arrays (neither schema-derived nor deferred).",
+      "description": "Steps that register no node kind of their own: no schema file, or their records are blocks inside another step's file.",
       "items": {
         "$ref": "#/$defs/stepRationale"
       }
@@ -64,13 +63,6 @@
       "description": "Kinds whose ids do not come from a step schema collection (today only 'seed', declared in the host's common/seed_manifest.json). Not listed in extraction_paths.json: these are not step files.",
       "items": {
         "$ref": "#/$defs/externalKind"
-      }
-    },
-    "steps_with_deferred_registration": {
-      "type": "array",
-      "description": "Steps whose entries live in non-canonical per-milestone files rather than spec/NN_*.json.",
-      "items": {
-        "$ref": "#/$defs/stepRationale"
       }
     }
   },

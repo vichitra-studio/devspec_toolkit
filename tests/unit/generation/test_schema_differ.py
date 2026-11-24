@@ -254,6 +254,19 @@ class TestDiffStepFields:
         diffs = diff_step_fields(user, schema)
         assert any(d.diff_type == DiffType.MISSING_REQUIRED and d.path == "name" for d in diffs)
 
+    def test_required_field_inside_allof_is_reported(self, tmp_path):
+        user = tmp_path / "spec.json"
+        schema = tmp_path / "spec.schema.json"
+        user.write_text(json.dumps({"id": "test"}))
+        schema.write_text(json.dumps({
+            "allOf": [{
+                "required": ["id", "name"],
+                "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+            }],
+        }))
+        diffs = diff_step_fields(user, schema)
+        assert [d.path for d in diffs if d.diff_type == DiffType.MISSING_REQUIRED] == ["name"]
+
     def test_schema_ref_outdated(self, tmp_path):
         user = tmp_path / "spec.json"
         schema = tmp_path / "spec.schema.json"
@@ -313,10 +326,10 @@ _LEGACY_CHARTER = {
 
 
 class TestDiffStepFieldsM2Schemas:
-    """The differ reads only the top level of a schema (``required``, ``properties``,
-    ``additionalProperties``). The M2 step 00-05 schemas keep their rules inside
-    ``allOf`` and ``unevaluatedProperties``, so item-level and graph-shape changes
-    are invisible to ``align``."""
+    """The differ reads the top level of a schema (``required`` and ``properties`` merged
+    across ``allOf``, and ``additionalProperties``). The M2 step 00-05 schemas keep their
+    item-level rules inside ``allOf`` and ``unevaluatedProperties``, so item-level and
+    graph-shape changes are invisible to ``align``."""
 
     def test_diff_step_fields_m2_02a_top_level_only(self, tmp_path):
         user = tmp_path / "02a_delivery_baseline.json"
@@ -325,6 +338,7 @@ class TestDiffStepFieldsM2Schemas:
             "id": "delivery-baseline",
             "owner": "ops",
             "created_at": "2026-01-01T00:00:00Z",
+            "canonical_refs_used": [],
             "environments": {
                 "dev": {"url": "http://localhost"},
                 "ci": {"runner": "gha"},
@@ -343,12 +357,12 @@ class TestDiffStepFieldsM2Schemas:
         diffs = diff_step_fields(user, _SCHEMA_DIR / "00_charter.schema.json")
         assert not [d for d in diffs if d.diff_type == DiffType.EXTRA_FIELD]
 
-    def test_diff_step_fields_m2_00_scope_items_not_reported_by_top_level_differ(self, tmp_path):
-        """Pins a known limit of the differ (the migration of steps 00-05 does not rely on it)."""
+    def test_diff_step_fields_m2_00_reports_scope_items_required_by_an_allof_branch(self, tmp_path):
         user = tmp_path / "00_charter.json"
         user.write_text(json.dumps(_LEGACY_CHARTER))
         diffs = diff_step_fields(user, _SCHEMA_DIR / "00_charter.schema.json")
-        assert not [d for d in diffs if d.diff_type == DiffType.MISSING_REQUIRED]
+        missing = {d.path for d in diffs if d.diff_type == DiffType.MISSING_REQUIRED}
+        assert {"scope_items", "owner"} <= missing
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +460,7 @@ def _write_good_step16_layout(spec_dir: Path) -> None:
         "id": "anchor-v1",
         "owner": "api",
         "created_at": "2026-02-08T00:00:00Z",
+        "canonical_refs_used": [],
         "artifact_role": "anchor",
         "plan": {},
     }), encoding="utf-8")

@@ -262,6 +262,19 @@ def _check_step00_out_of_scope_thin(
         ))
 
 
+def _is_blank_file(path: str) -> bool:
+    """True when the file at *path* holds nothing but whitespace.
+
+    A file that cannot be opened is not reported here (the existence check
+    of ``lint_seeds`` is the only one that applies to it).
+    """
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read().strip() == ""
+    except OSError:
+        return False
+
+
 def lint_seeds(
     repo_root: str,
     spec_dir: str,
@@ -315,6 +328,11 @@ def lint_seeds(
                 "E520",
                 f"Seed '{seed_id}' path '{seed_path}' does not exist or is not readable"
                 f" (resolved: {resolved})",
+            ))
+        elif _is_blank_file(resolved):
+            errors.append(make_error(
+                "E520",
+                f"Seed '{seed_id}' path '{seed_path}' is empty (a seed that a step reads must hold text)",
             ))
         try:
             common = os.path.commonpath(

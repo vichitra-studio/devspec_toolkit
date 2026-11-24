@@ -15,9 +15,8 @@ Exclusions:
   - ``_meta`` and other ``_``-prefixed keys in extraction_paths (tooling metadata).
   - Sentinel basenames in the registry (``canonical_refs_used``, ``canonical_proposals``).
   - Registry entries with ``_special: true``.
-  - Steps in ``steps_without_entry_arrays`` and ``steps_with_deferred_registration``
-    are excluded from the registry side (they are registered as opted-out/deferred,
-    not in ``registry``). However, those steps must NOT appear in extraction_paths
+  - Steps in ``steps_without_entry_arrays`` are excluded from the registry side
+    (they are registered as opted-out, not in ``registry``). However, those steps must NOT appear in extraction_paths
     either (they have no entry arrays to extract).
 
 Toolkit root from this file: Path(__file__).parents[3]

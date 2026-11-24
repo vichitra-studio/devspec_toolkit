@@ -418,7 +418,8 @@ def build_parser() -> _SpecdevParser:
     al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "triage", "bind-legacy", "prompts", "rollback", "validate"],
                     help="Alignment action: apply (the mechanical migration), propose, triage (the worklist), bind-legacy (bind "
                          "the legacy fixtures), validate (finish the migration), status/diff/plan/prompts (read the structural "
-                         "differences), rollback (a pre-1.2.0 backup)")
+                         "differences), rollback (restores a pre-1.2.0 backup folder as it was; the restored spec is not validated, "
+                         "it is in the format of the toolkit that made it)")
     al.add_argument("spec_dir", help="Path to user spec/ directory")
     al.add_argument("--repo-root", default=".", help="Toolkit root directory")
     al.add_argument("--git-root", default=None,
@@ -537,6 +538,9 @@ def build_parser() -> _SpecdevParser:
     cca.add_argument("--repo-root", default=".")
     cca.add_argument("--git-root", default=None, help="Host repo git root (writes to <git-root>/spec/canon/ as project canon)")
     cca.add_argument("--owner", default=None, help="Owner to assign to accepted entries (default: no owner)")
+    cca.add_argument("--update", action="store_true",
+                     help="Rewrite the definition, preferred label and aliases of an existing entry whose proposal changed "
+                          "(default: report it and change nothing)")
     cca.add_argument("--dry-run", action="store_true", help="Report what would be added without writing")
     cca.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
@@ -630,6 +634,7 @@ def build_parser() -> _SpecdevParser:
             "  patch              Replace a value at a jq path\n"
             "  insert             Append to an array at a jq path\n"
             "  delete             Remove a value at a jq path\n"
+            "  keys               List the keys at a jq path\n"
             "  schema             Resolve the schema URI for a file\n"
             "  structure          Print the structural outline of a file\n"
             "  resolve-pointers   Verify a list of file:jq pointers\n\n"
@@ -677,6 +682,34 @@ def _refuse_removed_command(argv: list[str]) -> None:
     if argv and argv[0] in REMOVED_COMMANDS:
         print(f"specdev: {argv[0]} was removed in 1.2.0; {REMOVED_COMMANDS[argv[0]]}", file=sys.stderr)
         sys.exit(2)
+
+
+def _print_canon_accept_report(result: dict, dry_run: bool) -> None:
+    """Print the text report of ``canon-accept``: one line per entry, then the OK or WARN summary line."""
+    added, skipped, changed = result["added"], result["skipped"], result["changed"]
+    updated, would_update, malformed = result["updated"], result["would_update"], result["malformed"]
+    for cid in added:
+        print(f"  + {'would add' if dry_run else 'added'}: {cid}")
+    for cid in skipped:
+        print(f"  ~ unchanged: {cid}")
+    for item in changed:
+        print(f"  ! changed (not updated, use --update): {item['id']} ({', '.join(item['fields'])})")
+    for cid in updated:
+        print(f"  ~ updated: {cid}")
+    for cid in would_update:
+        print(f"  ~ would update: {cid}")
+    if malformed:
+        print(f"  ! {malformed} malformed proposal(s) skipped (missing required fields)")
+    if not (added or skipped or changed or updated or would_update or malformed):
+        print("OK (no proposals found)")
+        return
+    n_updated = len(would_update) if dry_run else len(updated)
+    prefix = "dry-run: " if dry_run else ""
+    counts = f"{len(added)} {'would be ' if dry_run else ''}added, {n_updated} {'would be ' if dry_run else ''}updated, {len(skipped)} unchanged"
+    if changed:
+        print(f"WARN ({prefix}{counts}, {len(changed)} changed and not updated, {malformed} malformed)")
+    else:
+        print(f"OK ({prefix}{counts}, {malformed} malformed)")
 
 
 def main():
@@ -964,7 +997,8 @@ def main():
             sys.exit(1 if any(e.code.startswith("E") for e in spec_errors) else 0)
         else:
             if not changes:
-                print("OK (no changes)")
+                print("No changes. canonical-autofix does not sync a canon definition with the glossary: "
+                      "E607 is out of its scope (specdev guide E607).")
                 return
             from .core.errors import SpecError as _SE
             def _is_error_item(item):
@@ -1559,6 +1593,7 @@ def main():
                     restore_backup(spec_dir, selected)
                     log_operation(spec_dir, f"Restored from {selected.backup_dir.name}", "success")
                     print(f"\u2705 Restored from {selected.backup_dir.name}")
+                    print("  Not validated: the backup is in the format of the toolkit that made it; check it with that toolkit version.")
         elif args.action == "validate":
             from .graph.gitview import host_root_of
             from .migration.triage import validate_migration
@@ -1847,7 +1882,7 @@ def main():
         else:
             canon_dir = None
             project_canon = False
-        result = run_canon_accept(
+        accept_result = run_canon_accept(
             spec_file=spec_file,
             namespace=args.namespace,
             repo_root=repo_root,
@@ -1855,12 +1890,14 @@ def main():
             owner=getattr(args, "owner", None),
             canon_dir=canon_dir,
             project_canon=project_canon,
+            git_root=git_root,
+            update=args.update,
         )
         if getattr(args, "json_output", False):
-            error_str = result.get("error")
-            added = result.get("added", [])
-            skipped = result.get("skipped", [])
-            malformed = result.get("malformed", 0)
+            error_str = accept_result.get("error")
+            added = accept_result.get("added", [])
+            skipped = accept_result.get("skipped", [])
+            malformed = accept_result.get("malformed", 0)
             errs_list = [f"E521 CANON_ACCEPT_FAILED {error_str}"] if error_str else []
             from .core.errors import ensure_spec_errors
             from .core.json_output import format_errors_json
@@ -1869,34 +1906,20 @@ def main():
                 "command": "canon-accept",
                 "added": added,
                 "skipped": skipped,
+                "changed": accept_result.get("changed", []),
+                "updated": accept_result.get("updated", []),
+                "would_update": accept_result.get("would_update", []),
                 "malformed": malformed,
                 "dry_run": args.dry_run,
             }
             print(format_errors_json(spec_errors, context=ctx))
             sys.exit(1 if error_str else 0)
         else:
-            error_str = result.get("error")
+            error_str = accept_result.get("error")
             if error_str:
                 print(f"E521 CANON_ACCEPT_FAILED {error_str}", file=sys.stderr)
                 sys.exit(1)
-            added = result.get("added", [])
-            skipped = result.get("skipped", [])
-            malformed = result.get("malformed", 0)
-            if added:
-                label = "would add" if args.dry_run else "added"
-                for cid in added:
-                    print(f"  + {label}: {cid}")
-            if skipped:
-                for cid in skipped:
-                    print(f"  ~ skipped (duplicate): {cid}")
-            if malformed:
-                print(f"  ! {malformed} malformed proposal(s) skipped (missing required fields)")
-            if not added and not skipped and not malformed:
-                print("OK (no proposals found)")
-            elif args.dry_run:
-                print(f"OK (dry-run: {len(added)} would be added, {len(skipped)} skipped, {malformed} malformed)")
-            else:
-                print(f"OK ({len(added)} added, {len(skipped)} skipped, {malformed} malformed)")
+            _print_canon_accept_report(accept_result, args.dry_run)
 
     elif args.cmd == "milestone-state":
         from .context.milestone_state import compute_milestone_state, load_spec_view

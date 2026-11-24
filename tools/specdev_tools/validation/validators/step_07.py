@@ -9,7 +9,6 @@ from ...core.errors import make_error, SpecError
 from ...validation.linter_utils import load_canonical_stages
 
 KNOWN_STAGES = {"dev", "ci", "staging", "prod"}
-NFR_ID_PATTERN = re.compile(r"^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def validate_step_07(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
@@ -22,14 +21,10 @@ def validate_step_07(instance: dict[str, Any], toolkit_root: str, spec_root: str
     # Load canonical stage values if available
     canon_stages = load_canonical_stages(os.path.join(toolkit_root, "canon"))
 
-    for i, nfr in enumerate(nfrs):
+    for nfr in nfrs:
         if not isinstance(nfr, dict):
             continue
         nfr_id = nfr.get("nfr_id")
-
-        # NFR ID format check
-        if isinstance(nfr_id, str) and not NFR_ID_PATTERN.match(nfr_id):
-            errors.append(make_error("E530", f"NFR at index {i} has nfr_id '{nfr_id}' that does not follow 'nfr-<kebab>' convention"))
 
         # Target digit validation (schema requires pattern ^.*\d+.*$)
         target = nfr.get("target")

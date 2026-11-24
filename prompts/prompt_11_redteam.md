@@ -61,7 +61,7 @@ For each upstream artifact ingested, extract the following:
 | ✅ **Strong** | "Profile Update SQLi" | "Unsanitized 'bio' field" | `threatens: ["api-user-profile"]` |
 
 ## Heuristics For Completeness
-- **Coverage**: Every API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector). A missing threat is reported as `W583` (message: `API_UNCOVERED_BY_THREAT <api id> has no corresponding threat in Step 11`). Exception: an API is exempt ONLY when its `derives_from` is not empty and names nothing but parked FRs (`scope` `later` or `out`) — an API that derives from no FR is NOT exempt and still requires threat coverage.
+- **Coverage**: Every API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector). A missing threat is reported as `W583` (message: `API_UNCOVERED_BY_THREAT <api id> has no corresponding threat in Step 11`). W583 is a warning: it has no error form and does not fail `spec-check`; a review loop treats it as a finding. It covers APIs only. Exception: an API is exempt ONLY when its `derives_from` is not empty and names nothing but parked FRs (`scope` `later` or `out`) — an API that derives from no FR is NOT exempt and still requires threat coverage.
 - **Specificity**: Avoid "Generic DDOS". Use "Search API Reflection Attack".
 - **Linkage**: If the mitigation is "Enforce Role Check", name the invariant that states the role check in `mitigated_by`.
 
@@ -84,12 +84,12 @@ For each upstream artifact ingested, extract the following:
 ## Coverage Closure
 Before emitting, verify:
 - Every `api_id` in `spec/05_interface_contracts.json` is named in the `threatens` of ≥1 threat (reported as `W583`). The only exemption: an `api_id` is skipped ONLY when its `derives_from` is not empty and names nothing but parked FRs (`scope` `later` or `out`); an `api_id` that derives from no FR is still required to have coverage. For low-risk internal-only endpoints that don't qualify for this exemption, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
-- Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
-- Every step-06 invariant that carries a `risk_category_ref` must be named in the `mitigated_by` of at least one threat (reported as `W615`), unless it qualifies for the same exemption (its `constrains` is not empty and names nothing but parked FRs).
+- Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario (review rule: no tool checks components; W583 covers APIs only).
+- Every step-06 invariant that carries a `risk_category_ref` must be named in the `mitigated_by` of at least one threat (reported as `W615`), unless it qualifies for the same exemption (its `constrains` is not empty and names nothing but parked FRs). W615 is a warning and checks only a rule that carries a `risk_category_ref` (step 06 makes that field optional); a rule without one is not checked.
 - Every id in a threat's `threatens` resolves to an existing API, component, connection or third party (Steps 05 and 02), every id in an edge case's `threatens` to an existing API, component or FR (Steps 05, 02 and 04), and every id in `mitigated_by` and `derives_from` resolves to an existing node of an accepted kind.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
@@ -110,7 +110,7 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - [ ] **Surface Coverage**: Every API and critical component has at least one mapped threat.
 - [ ] **Category Diversity**: Threats are not just `authz`; `transport`, `business_logic`, and `data_privacy` are represented.
-- [ ] **Edge Case Rigor**: At least 3 distinct non-malicious failure modes (e.g., timeouts, race conditions) are identified.
+- [ ] **Edge Case Rigor**: At least 3 distinct non-malicious failure modes (e.g., timeouts, race conditions) are identified (review rule: the schema requires neither `edge_cases` nor a count).
 - [ ] **Link Integrity**: Every threat has a valid `threatens` array naming existing Step 05 or Step 02 nodes.
 - [ ] **Mitigation Actionability**: `mitigated_by` names specific invariants, NFRs, FRs, criteria or fixtures that exist; a control that does not exist yet is a gap question, never a made-up id.
 

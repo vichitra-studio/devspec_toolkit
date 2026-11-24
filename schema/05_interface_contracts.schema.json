@@ -42,7 +42,7 @@
             "id": "api_id"
           },
           "items": {
-            "description": "A single API contract with path, method, parameters, security, and links. Every API derives from at least one functional requirement. End-to-end worked example — a complete login endpoint entry: {\"api_id\": \"api-auth-login\", \"name\": \"User Login\", \"version\": \"v1\", \"protocol\": \"http\", \"method\": \"POST\", \"path\": \"/auth/login\", \"owner\": \"api\", \"security\": \"oauth2\", \"scope\": \"in\", \"derives_from\": [\"fr-user-login\"], \"parameters\": [{\"name\": \"X-Request-ID\", \"in\": \"header\", \"required\": false}], \"input_schema_ref\": \"schemas/auth/login_request.json\", \"output_schema_ref\": \"schemas/auth/login_response.json\", \"errors\": [{\"error_id\": \"err-login-invalid-credentials\", \"scope\": \"in\", \"derives_from\": [\"ac-user-login-2\"], \"code\": \"invalid-credentials\", \"message\": \"Email or password did not match — caller must not retry without user correction\", \"severity\": \"error\"}, {\"error_id\": \"err-login-internal\", \"scope\": \"in\", \"derives_from\": [\"ac-user-login-2\"], \"code\": \"internal-error\", \"message\": \"Unexpected server failure\", \"severity\": \"error\"}], \"interface_ref\": {\"id\": \"cn:project:interface:auth-login\", \"kind\": \"interface\", \"label\": \"auth-login\"}}. Decision rule: every required field (api_id, name, version, protocol, owner, interface_ref, scope, derives_from) must be present; omit optional fields (path, method) only for non-HTTP protocols.",
+            "description": "A single API contract with path, method, parameters, security, and links. Every API derives from at least one functional requirement. End-to-end worked example — a complete login endpoint entry: {\"api_id\": \"api-auth-login\", \"name\": \"User Login\", \"version\": \"v1\", \"protocol\": \"http\", \"method\": \"POST\", \"path\": \"/auth/login\", \"owner\": \"api\", \"security\": \"oauth2\", \"scope\": \"in\", \"derives_from\": [\"fr-user-login\"], \"parameters\": [{\"name\": \"X-Request-ID\", \"in\": \"header\", \"required\": false}], \"input_schema_ref\": \"schemas/auth/login_request.json\", \"output_schema_ref\": \"schemas/auth/login_response.json\", \"errors\": [{\"error_id\": \"err-login-invalid-credentials\", \"scope\": \"in\", \"derives_from\": [\"ac-user-login-2\"], \"code\": \"invalid-credentials\", \"message\": \"Email or password did not match — caller must not retry without user correction\", \"severity\": \"error\"}, {\"error_id\": \"err-login-internal\", \"scope\": \"in\", \"derives_from\": [\"ac-user-login-2\"], \"code\": \"internal-error\", \"message\": \"Unexpected server failure\", \"severity\": \"error\"}], \"interface_ref\": {\"id\": \"cn:project:interface:auth-login\", \"kind\": \"interface\", \"label\": \"auth-login\"}}. Decision rule: every required field (api_id, name, version, protocol, owner, interface_ref, scope, derives_from) must be present; path and method are required when protocol is http; omit them only for non-HTTP protocols.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -64,11 +64,11 @@
                 "$ref": "vc:core:atoms#apiProtocol"
               },
               "path": {
-                "description": "URL path for this endpoint. Optional — omit for non-HTTP protocols (e.g., gRPC, MQTT). Should follow REST conventions: use nouns for resources, kebab-case for multi-word segments, path parameters in {braces}. Worked examples: '/auth/login' (action endpoint with no path params — use POST method); '/users/{user_id}/profile' (resource with a single path param — GET or PUT); '/orders/{order_id}/items/{item_id}' (nested resource with two path params). No trailing slash. No query parameters (those go in parameters array). Anti-pattern: '/getUser' (verb in path — use GET /users/{id} instead); '/api/v1/auth/login' (include the version prefix in the path only if the API versioning contract explicitly specifies path-based versioning — prefer version field for version tracking).",
+                "description": "URL path for this endpoint. Required when protocol is http; omit for non-HTTP protocols (e.g., gRPC, MQTT). Should follow REST conventions: use nouns for resources, kebab-case for multi-word segments, path parameters in {braces}. Worked examples: '/auth/login' (action endpoint with no path params — use POST method); '/users/{user_id}/profile' (resource with a single path param — GET or PUT); '/orders/{order_id}/items/{item_id}' (nested resource with two path params). No trailing slash. No query parameters (those go in parameters array). Anti-pattern: '/getUser' (verb in path — use GET /users/{id} instead); '/api/v1/auth/login' (include the version prefix in the path only if the API versioning contract explicitly specifies path-based versioning — prefer version field for version tracking).",
                 "type": "string"
               },
               "method": {
-                "description": "When provided, must be one of: GET, POST, PUT, PATCH, DELETE (enforced by enum). Optional — omit for non-HTTP protocols such as gRPC, WebSocket, or event buses. Decision rules: GET — read with no side effects, safe and idempotent, never for actions; POST — create a new resource or trigger a non-idempotent action (login, payment); PUT — full replacement of an existing resource, idempotent (caller provides complete object); PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource, idempotent. Anti-pattern: POST for idempotent updates (use PUT or PATCH); GET for operations with side effects (use POST or PUT).",
+                "description": "When provided, must be one of: GET, POST, PUT, PATCH, DELETE (enforced by enum). Required when protocol is http (enforced by if/then); omit for non-HTTP protocols such as gRPC, WebSocket, or event buses. Decision rules: GET — read with no side effects, safe and idempotent, never for actions; POST — create a new resource or trigger a non-idempotent action (login, payment); PUT — full replacement of an existing resource, idempotent (caller provides complete object); PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource, idempotent. Anti-pattern: POST for idempotent updates (use PUT or PATCH); GET for operations with side effects (use POST or PUT).",
                 "$ref": "vc:core:atoms#httpMethod"
               },
               "input_schema_ref": {
@@ -80,7 +80,7 @@
                 "type": "string"
               },
               "errors": {
-                "description": "All meaningful failure modes this API endpoint may return. Decision rule: always include at minimum one 4xx (client error) and one 5xx (server error). Example minimum set for an authenticated endpoint: unauthorized (missing/invalid token), forbidden (insufficient permissions), not-found (resource absent), rate-limit-exceeded (too many requests), internal-error (unexpected server failure). Each error is its own node (error_id, scope, derives_from) carrying the vc:core:errors#errorState fields code, message, and severity.",
+                "description": "All meaningful failure modes this API endpoint may return. Decision rule: include at minimum one 4xx (client error) and one 5xx (server error); an authoring and review rule, no tool checks it because an error carries no status class. Example minimum set for an authenticated endpoint: unauthorized (missing/invalid token), forbidden (insufficient permissions), not-found (resource absent), rate-limit-exceeded (too many requests), internal-error (unexpected server failure). Each error is its own node (error_id, scope, derives_from) carrying the vc:core:errors#errorState fields code, message, and severity.",
                 "type": "array",
                 "x-node": {
                   "kind": "api-error",
@@ -290,7 +290,7 @@
               "enum_provenance": {
                 "type": "object",
                 "additionalProperties": false,
-                "description": "Required when any parameter of this API declares an enum (parameters[].enum). Decision rule: record where the value set comes from — most often an external standard (ISO 4217 currency codes, IANA language tags, country codes, card brand lists), but also an internal list, which is asked for provenance too because structure cannot tell the two apart. Omit when no parameter declares an enum. Listing errors does not require it. Example for ISO 4217: {\"source_url\": \"https://www.iso.org/iso-4217-currency-codes.html\", \"source_date\": \"2024-01-15\", \"resolved_version\": \"2024 edition\", \"resolved_at\": \"2024-01-15T10:00:00Z\", \"resolver\": \"finance-team\"}",
+                "description": "Required when the API names a third party in `relies_on` and any parameter of it declares an enum (parameters[].enum). Decision rule: record where the value set comes from — most often an external standard (ISO 4217 currency codes, IANA language tags, country codes, card brand lists). Omit for a first-party value set and when no parameter declares an enum. Listing errors does not require it. Example for ISO 4217: {\"source_url\": \"https://www.iso.org/iso-4217-currency-codes.html\", \"source_date\": \"2024-01-15\", \"resolved_version\": \"2024 edition\", \"resolved_at\": \"2024-01-15T10:00:00Z\", \"resolver\": \"finance-team\"}",
                 "properties": {
                   "source_url": {
                     "description": "URL of the external source where the enum values originate. Use the canonical standards body URL. Examples: 'https://www.iso.org/iso-4217-currency-codes.html' (currency codes), 'https://www.iana.org/assignments/language-subtag-registry' (language tags), 'https://stripe.com/docs/api/cards/object#card_object-brand' (card brands from Stripe API docs).",
@@ -449,6 +449,24 @@
             "allOf": [
               {
                 "$ref": "vc:core:graph#scopeReasonRule"
+              },
+              {
+                "if": {
+                  "properties": {
+                    "protocol": {
+                      "const": "http"
+                    }
+                  },
+                  "required": [
+                    "protocol"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "path",
+                    "method"
+                  ]
+                }
               }
             ]
           }

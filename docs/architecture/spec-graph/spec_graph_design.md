@@ -997,7 +997,7 @@ hashes hash their own evidence string (V3).
 | Spec first | At merge the pin must equal the repo-declared sources (lockfile, image tag, CI pin, as the host declares them); a mismatch is an error owned by step 02. At deploy the deploy job checks that the installed version equals the pin of what it deploys and records it. No ongoing environment checks | Ruled |
 | Pin change | `specdev third-party pin <id> <version>` edits the pin and flags the whole downstream closure. The code change is made in the same branch, through a change milestone whose task criteria refine the obligations that rely on the third party | Ruled (same branch, refined obligations: Definition) |
 | Other | No code anchors into vendor source. Retirement as for any node. Migrating today's tech-stack lists is judgement work in step 02's pass | Ruled |
-| E311 | Today's enum-provenance check forces `enum_provenance` on every API with errors; it should apply only to externally sourced enums. E311 no longer fires for an API's errors; it still asks every parameter enum for provenance, internal or external, because structure cannot tell the two apart (**As built**) | Problem filed (DEVSPEC-289) |
+| E311 | Today's enum-provenance check forces `enum_provenance` on every API with errors; it should apply only to externally sourced enums. E311 no longer fires for an API's errors; it fires for an API that has a parameter enum and names a third party in `relies_on`, so a first-party value set needs no provenance (**As built**) | Problem filed (DEVSPEC-289) |
 
 ```mermaid
 flowchart LR
@@ -2743,7 +2743,7 @@ overruled: the cost is the code change it names.
 | 8.3 ("at deploy") | Recorded with `plan record --at-deploy` | A plain `plan record` on such an action is accepted and never counts | Ruling L21 |
 | 8.4 (records) | Each record carries its git author | Not a deferral: its reason is on the anchor row | An author would be a new stored field; git has it |
 | 9 (pins) | Exact; checked against sources at merge | Exactness and the comparison are errors of step 02 in every `spec-check` | Rulings D-R3, D-R7 |
-| 9 (E311) | Only externally sourced enums | No longer for errors; still every parameter enum | Structure cannot tell internal from external |
+| 9 (E311) | Only externally sourced enums | Only an API with a parameter enum that relies on a third party | `relies_on` names the third party |
 | 10 (step 10 enforcers) | `cli_command` checked against the command list | At step 10; the value is a command path without flags | Design review round 1 |
 | 10 (step 13) | "Fixed now: … fails E590 … and E210 …" | Says it is the 1.1.1 clash that is fixed | The sentence read as a rule to enforce |
 | 10 (step 13a) | Its numbers become `spec-check` coverage | Printed by `specdev coverage`; the gaps are E740 to E745 | No threshold warns |

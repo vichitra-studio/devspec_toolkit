@@ -31,7 +31,7 @@ def _glossary(terms=None, proposals=None, refs_used=None) -> dict:
 
 
 def _term(term_id: str, definition: str, canon_id: str | None = None) -> dict:
-    t: dict = {"term_id": term_id, "term": term_id, "definition": definition}
+    t: dict = {"term_id": term_id, "term": term_id.removeprefix("term-"), "definition": definition}
     if canon_id:
         t["term_ref"] = {"id": canon_id, "kind": "term", "label": term_id, "version": "1.0.0"}
     return t
@@ -56,7 +56,7 @@ def _canon_entry(eid: str, definition: str, accepted_from: str = "03_glossary.js
     return {
         "id": eid,
         "kind": eid.split(":")[2],
-        "preferred_label": eid,
+        "preferred_label": eid.rsplit(":", 1)[1],
         "definition": definition,
         "version": "1.0.0",
         "status": "active",
@@ -413,3 +413,140 @@ def test_term_missing_term_id_does_not_suppress_e607(tmp_path):
     e607 = [e for e in result if e.code == "E607"]
     assert len(e607) == 1, f"Expected exactly 1 E607, got {e607}"
     assert "term-drifted" in e607[0].message
+
+
+# ---------------------------------------------------------------------------
+# H-152-2: normalised comparison, first difference, label, proposals of any step
+# ---------------------------------------------------------------------------
+
+_FOO = "cn:project:term:foo"
+
+
+def _term_canon(tmp_path: Path, term: dict, entry: dict, proposals=None) -> tuple[Path, Path]:
+    spec = tmp_path / "spec"
+    canon = spec / "canon"
+    _write(spec / "03_glossary.json", _glossary(terms=[term], proposals=proposals))
+    _write(canon / "manifest.json", _manifest([entry]))
+    return spec, canon
+
+
+def _e607(spec: Path, canon: Path) -> list:
+    return [e for e in lint_glossary_drift(str(spec), project_canon_dir=str(canon)) if e.code == "E607"]
+
+
+def _step_artifact_with_proposal(spec: Path, file_name: str, proposal: dict) -> None:
+    _write(spec / file_name, {"id": file_name, "canonical_proposals": [proposal]})
+
+
+def test_whitespace_and_unicode_form_do_not_count_as_drift(tmp_path):
+    decomposed = "Café owner  grants\naccess."
+    composed = "Café owner grants access."
+    spec, canon = _term_canon(
+        tmp_path,
+        _term("term-foo", decomposed, _FOO),
+        _canon_entry(_FOO, composed),
+        proposals=[_proposal("foo", composed)],
+    )
+    assert lint_glossary_drift(str(spec), project_canon_dir=str(canon)) == []
+
+
+def test_the_drift_message_names_the_first_difference(tmp_path):
+    spec, canon = _term_canon(
+        tmp_path,
+        _term("term-foo", "A shared start, then spec text.", _FOO),
+        _canon_entry(_FOO, "A shared start, then canon text."),
+    )
+    (e607,) = _e607(spec, canon)
+    assert "first_difference_at=21" in e607.message
+    assert "spec='spec text.'" in e607.message
+    assert "canon='canon text.'" in e607.message
+
+
+def test_a_proposal_drift_message_names_the_first_difference(tmp_path):
+    spec = tmp_path / "spec"
+    _write(spec / "03_glossary.json", _glossary(
+        terms=[_term("term-foo", "Same start, term end.")],
+        proposals=[_proposal("foo", "Same start, proposal end.")],
+    ))
+    (e606,) = lint_glossary_drift(str(spec))
+    assert e606.code == "E606"
+    assert "first_difference_at=12 spec='term end.' proposal='proposal end.'" in e606.message
+
+
+def test_a_changed_term_label_is_e607_unless_the_old_label_is_an_alias(tmp_path):
+    renamed = _canon_entry(_FOO, "Same.")
+    renamed["preferred_label"] = "new label"
+    term = _term("term-foo", "Same.", _FOO)
+    spec, canon = _term_canon(tmp_path, term, renamed)
+    (e607,) = _e607(spec, canon)
+    assert "field=preferred_label" in e607.message
+
+    renamed["aliases"] = ["FOO"]
+    _write(canon / "manifest.json", _manifest([renamed]))
+    assert _e607(spec, canon) == []
+
+
+def test_a_capability_proposal_that_differs_from_its_canon_entry_is_e607(tmp_path):
+    spec = tmp_path / "spec"
+    canon = spec / "canon"
+    cap_id = "cn:project:capability:login"
+    _write(spec / "03_glossary.json", _glossary())
+    _step_artifact_with_proposal(spec, "01_capabilities.json", {
+        **_proposal("login", "Members sign in.", kind="capability"),
+    })
+    entry = _canon_entry(cap_id, "Members sign in with a password.", accepted_from="01_capabilities.json")
+    _write(canon / "kinds" / "capability.json", {"kind": "capability", "entries": [entry]})
+
+    (e607,) = lint_glossary_drift(str(spec), project_canon_dir=str(canon))
+    assert e607.code == "E607"
+    assert e607.message.startswith(
+        f"CANON_PROPOSAL_DRIFT kind=capability canon={cap_id} file=01_capabilities.json field=definition"
+    )
+    assert e607.path == f"01_capabilities.json:{cap_id}"
+
+
+def test_a_metric_proposal_that_matches_its_canon_entry_is_clean(tmp_path):
+    spec = tmp_path / "spec"
+    canon = spec / "canon"
+    metric_id = "cn:project:metric:p95"
+    _write(spec / "03_glossary.json", _glossary())
+    _step_artifact_with_proposal(spec, "07_nfr.json", _proposal("p95", "95th percentile latency.", kind="metric"))
+    entry = _canon_entry(metric_id, "95th percentile  latency.", accepted_from="07_nfr.json")
+    _write(canon / "manifest.json", _manifest([entry]))
+
+    assert lint_glossary_drift(str(spec), project_canon_dir=str(canon)) == []
+
+
+def test_the_glossary_file_is_not_scanned_twice(tmp_path):
+    spec, canon = _term_canon(
+        tmp_path,
+        _term("term-foo", "Term text.", _FOO),
+        _canon_entry(_FOO, "Canon text."),
+        proposals=[_proposal("foo", "Term text.")],
+    )
+    codes = [e.code for e in lint_glossary_drift(str(spec), project_canon_dir=str(canon))]
+    assert codes == ["E607"]
+
+
+# ---------------------------------------------------------------------------
+# H-256-1: the lint reads the project tier through the registry loader
+# ---------------------------------------------------------------------------
+
+def test_manifest_only_project_canon_is_checked(tmp_path):
+    spec, canon = _term_canon(
+        tmp_path,
+        _term("term-foo", "Edited definition.", _FOO),
+        _canon_entry(_FOO, "Accepted definition."),
+    )
+    assert not (canon / "kinds").exists()
+    (e607,) = _e607(spec, canon)
+    assert "term-foo" in e607.message
+
+
+def test_orphans_come_from_the_same_loaded_entries(tmp_path):
+    spec = tmp_path / "spec"
+    canon = spec / "canon"
+    _write(spec / "03_glossary.json", _glossary())
+    _write(canon / "kinds" / "term.json", _kinds_term_file([_canon_entry(_FOO, "Orphan.")]))
+    (w606,) = lint_glossary_drift(str(spec), project_canon_dir=str(canon))
+    assert w606.code == "W606"

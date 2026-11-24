@@ -179,6 +179,14 @@ def test_declared_edges_09_14_and_14_16_present():
     assert "14" in consumers["09"] and "16" in consumers["14"]
 
 
+def test_16c_reads_16a_by_a_declared_edge(tmp_path):
+    assert ["16a", "16c"] in _load(_COMMITTED)["declared_edges"]
+    _generate(tmp_path / "regen" / "step_order.json")
+    generated = _load(tmp_path / "regen" / "step_order.json")
+    assert "16a" in generated["step_metadata"]["16c"]["required_spec_inputs"]
+    assert "16c" in generated["downstream_consumers"]["16a"]
+
+
 def test_build_step_order_document_keeps_hand_steps_and_declared_edges():
     hand = _load(_COMMITTED)
     derived = {

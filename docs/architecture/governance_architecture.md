@@ -95,7 +95,7 @@ The required sequence after any spec edit:
 4. fixtures-lint     -- check that each fixture has input and expected (see the note below)
 ```
 
-`fixtures-lint` recognises a step 08 file by a `$schema` that ends in `/08_fixtures.schema.json`. A file that carries the registry id `vc:08-fixtures`, which is what the step 08 prompt writes, is not read and the command prints `OK` (DEVSPEC-237).
+`fixtures-lint` recognises a step 08 file by the registry id `vc:08-fixtures` (what the step 08 prompt writes) or by a `$schema` that ends in `/08_fixtures.schema.json` (the only form 1.1.1 read). A fixture of such a file with no `input` or `expected` is `E520`: a file with `{"$schema": "vc:08-fixtures", "fixtures": [{"fixture_id": "fx-a", "mode": "unit"}]}` printed `E520 fx-a: missing input/expected`.
 
 **When to run each check:**
 

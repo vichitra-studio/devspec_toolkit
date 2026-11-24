@@ -114,3 +114,7 @@ class Step06IntegrationTests(unittest.TestCase):
     def test_invalid_owner_fixture_fails_naming_owner(self):
         rendered = self._schema_errors("invalid_owner.json", lambda spec: None)
         self.assertTrue(any("owner" in msg for msg in rendered), rendered)
+
+    def test_rule_without_severity_fails(self):
+        rendered = self._schema_errors("valid_full.json", lambda spec: spec["rules"][0].pop("severity"))
+        self.assertTrue(any("severity" in msg for msg in rendered), rendered)

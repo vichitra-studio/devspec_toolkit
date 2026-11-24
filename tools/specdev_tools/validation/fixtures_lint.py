@@ -5,14 +5,15 @@ from typing import Any
 from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
 
+_FIXTURES_SCHEMA_ID = "vc:08-fixtures"
 _FIXTURES_SCHEMA_SUFFIX = "/08_fixtures.schema.json"
 
 
 def _load_fixtures(spec_dir: str) -> list[Any]:
     """Return every fixture entry of every step 08 artifact under *spec_dir*; unreadable files are skipped.
 
-    As in 1.1.1, a step 08 artifact is recognised by a ``$schema`` ending in ``/08_fixtures.schema.json``;
-    a file that carries the registry id ``vc:08-fixtures`` is not read (DEVSPEC-237).
+    A step 08 artifact is recognised by the registry id ``vc:08-fixtures`` or by a ``$schema`` ending in
+    ``/08_fixtures.schema.json`` (the only form 1.1.1 read).
     """
     fixtures: list[Any] = []
     for p in iter_spec_artifacts(spec_dir):
@@ -25,7 +26,8 @@ def _load_fixtures(spec_dir: str) -> list[Any]:
             continue
         schema = data.get("$schema", "")
         entries = data.get("fixtures", [])
-        if isinstance(schema, str) and schema.endswith(_FIXTURES_SCHEMA_SUFFIX) and isinstance(entries, list):
+        is_step_08 = isinstance(schema, str) and (schema == _FIXTURES_SCHEMA_ID or schema.endswith(_FIXTURES_SCHEMA_SUFFIX))
+        if is_step_08 and isinstance(entries, list):
             fixtures.extend(entries)
     return fixtures
 

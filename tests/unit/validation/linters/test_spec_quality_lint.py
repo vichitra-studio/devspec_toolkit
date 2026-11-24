@@ -1,9 +1,18 @@
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
-from specdev_tools.validation.spec_quality_lint import PLACEHOLDER_RE, lint_spec_quality
+import pytest
+
+from specdev_tools.validation.spec_quality_lint import (
+    _VAGUE_SCAN_FIELDS,
+    PLACEHOLDER_RE,
+    _check_assumptions,
+    _check_free_text_vague,
+    lint_spec_quality,
+)
 from specdev_tools.core.errors import render_errors
 
 
@@ -96,24 +105,16 @@ class SpecQualityLintTests(unittest.TestCase):
             self.assertFalse(any("artifact.json missing top-level 'generation_quality'" in e for e in render_errors(errs)))
 
     def test_detects_assumption_vague_quantifier(self):
-        from specdev_tools.validation.spec_quality_lint import _check_assumptions
-        errs = _check_assumptions("test.json", {"assumptions": ["Some things are fast"]}, set())
+        errs = _check_assumptions("test.json", {"assumptions": ["Some things are fast"]})
         self.assertTrue(any("W571 ASSUMPTION_VAGUE_QUANTIFIER" in e and "ref=Some" in e for e in render_errors(errs)))
         self.assertTrue(any("W571 ASSUMPTION_VAGUE_QUANTIFIER" in e and "ref=fast" in e for e in render_errors(errs)))
 
     def test_detects_assumption_placeholder(self):
-        from specdev_tools.validation.spec_quality_lint import _check_assumptions
-        errs = _check_assumptions("test.json", {"assumptions": ["This is TBD"]}, set())
+        errs = _check_assumptions("test.json", {"assumptions": ["This is TBD"]})
         self.assertTrue(any("E512 ASSUMPTION_HAS_PLACEHOLDER" in e for e in render_errors(errs)))
 
-    def test_detects_assumption_unbound_id(self):
-        from specdev_tools.validation.spec_quality_lint import _check_assumptions
-        errs = _check_assumptions("test.json", {"assumptions": ["fr-auth-login works"]}, set(["fr-other"]))
-        self.assertTrue(any("W573 ASSUMPTION_UNBOUND_ID" in e and "ref=fr-auth-login" in e for e in render_errors(errs)))
-
     def test_detects_assumption_count_high(self):
-        from specdev_tools.validation.spec_quality_lint import _check_assumptions
-        errs = _check_assumptions("test.json", {"assumptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]}, set())
+        errs = _check_assumptions("test.json", {"assumptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]})
         self.assertTrue(any("W572 ASSUMPTION_COUNT_HIGH" in e for e in render_errors(errs)))
 
     def test_no_tech_stack_coherence_check(self):
@@ -137,6 +138,77 @@ class SpecQualityLintTests(unittest.TestCase):
         for value in ("<owner>", "Map<string>s", "a<b>c"):
             self.assertIsNone(PLACEHOLDER_RE.search(value), value)
         self.assertIsNotNone(PLACEHOLDER_RE.search("owner: TBD"))
+
+
+STEP_ARTIFACT_BASE = {
+    "id": "charter",
+    "owner": "system",
+    "created_at": "2026-01-01T00:00:00Z",
+    "canonical_refs_used": [],
+}
+
+
+def _quality_lines(tmp_path: Path, **fields: object) -> list[str]:
+    """Rendered findings of ``lint_spec_quality`` over one step 00 artifact holding *fields*."""
+    spec = tmp_path / "spec"
+    spec.mkdir(exist_ok=True)
+    (spec / "00_charter.json").write_text(json.dumps({**STEP_ARTIFACT_BASE, **fields}), encoding="utf-8")
+    return render_errors(lint_spec_quality(str(spec)))
+
+
+@pytest.mark.parametrize("value", ["placeholder metadata", "Placeholder image"])
+def test_the_english_word_placeholder_is_not_a_marker(value: str) -> None:
+    assert PLACEHOLDER_RE.search(value) is None
+
+
+@pytest.mark.parametrize("value", ["-tbd", "api-x-schema-tbd", "schemas/x/y_tbd"])
+def test_the_tbd_sentinel_is_not_a_marker(value: str) -> None:
+    assert PLACEHOLDER_RE.search(value) is None
+
+
+@pytest.mark.parametrize("value", ["TBD", "owner: TBD", "[TODO]", "fixme", "XXX"])
+def test_marker_forms_still_match(value: str) -> None:
+    assert PLACEHOLDER_RE.search(value) is not None
+
+
+def test_the_english_word_placeholder_gives_no_e510(tmp_path: Path) -> None:
+    assert not any("E510" in line for line in _quality_lines(tmp_path, notes="placeholder metadata"))
+
+
+def test_a_marker_gives_e510(tmp_path: Path) -> None:
+    assert any("E510" in line for line in _quality_lines(tmp_path, notes="TODO"))
+
+
+@pytest.mark.parametrize("value", ["[AUTO-DERIVE] postgres", "AUTO-DERIVE postgres"])
+def test_auto_derive_marker_raises_e510(tmp_path: Path, value: str) -> None:
+    assert PLACEHOLDER_RE.search(value) is not None
+    assert any("E510" in line for line in _quality_lines(tmp_path, notes=value))
+
+
+def test_auto_derive_marker_in_assumption_raises_e512() -> None:
+    errs = _check_assumptions("test.json", {"assumptions": ["[AUTO-DERIVE] the store is postgres"]})
+    assert any("E512 ASSUMPTION_HAS_PLACEHOLDER" in line for line in render_errors(errs))
+
+
+def test_auto_derive_word_after_hyphen_is_not_a_marker() -> None:
+    assert PLACEHOLDER_RE.search("x-auto-derive") is None
+
+
+def test_w593_scans_a_string_inside_risks_spikes_preconditions_and_postconditions() -> None:
+    data = {"frs": [{"statement": "reliable thing", "risks": ["various failures"], "preconditions": ["several users"]}]}
+    lines = [line for line in render_errors(_check_free_text_vague("f.json", data)) if "W593" in line]
+    assert [re.search(r"f\.json:(\S+)", line).group(1).rsplit(".", 1)[-1] for line in lines] == [
+        "statement", "risks[0]", "preconditions[0]",
+    ]
+
+
+def test_w593_still_scans_a_list_of_objects_under_a_scan_field() -> None:
+    data = {"risks": [{"description": "various failures"}]}
+    assert any("risks[0].description" in line for line in render_errors(_check_free_text_vague("f.json", data)))
+
+
+def test_narrative_is_not_a_scan_field() -> None:
+    assert "narrative" not in _VAGUE_SCAN_FIELDS
 
 
 if __name__ == "__main__":

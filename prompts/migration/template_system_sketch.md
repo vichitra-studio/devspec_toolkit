@@ -46,7 +46,7 @@
 
 **Step-base fields (required in every artifact):**
 
-- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `system-sketch-v1`). Convention: `{step-noun}-v{N}`.
+- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `system-sketch-v1`).
 - `owner`: String enum — must be one of `api | ui | system | ops | data | product | business | engineering`.
 - `created_at`: String — ISO 8601 UTC timestamp (e.g., `2025-10-16T22:06:04.202593Z`).
 - `canonical_refs_used`: Array of canonical reference objects — required even when empty (`[]`).

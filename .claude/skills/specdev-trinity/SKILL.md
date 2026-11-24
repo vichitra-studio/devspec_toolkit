@@ -163,7 +163,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
    Each reviewer writes to:
    `.specdev/findings/findings_ms-<batch_id>-plan_<round>_r<reviewer_id>.json`
 
-   (Ensure directory exists once: `mkdir -p .specdev/findings`.)
+   Once: `mkdir -p .specdev/findings`. Before the reviewers of a round are dispatched, remove what an earlier run left for this plan and round, so that the merge in 2b sees only the files of this run: `rm -f .specdev/findings/findings_ms-<batch_id>-plan_<round>_r*.json .specdev/findings/findings_ms-<batch_id>-plan_<round>.json`
 
    **2b. Merge with the jq one-liner** (the merged file keeps `"$schema": "vc:infra:findings"`; without it
    `specdev validate` gives E520 and `review record` refuses the file):
@@ -180,7 +180,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    After Agent returns (blocker handling — canonical contract: `specdev-impl.md` § "Blocker emission protocol"):
    1. Parse return JSON.
-   2. If `status != "blocker"`: check `gate_status` and `errors_remaining`; carry forward.
+   2. If `status != "blocker"`: check `gate_status` and `errors_remaining`; carry forward. A finding in neither `findings_closed` nor `findings_open` counts as open. Check one write per closed finding as `/specdev-review` does (its step 2 of "After Agent returns"), then print `Round <N>: <C> findings closed by <E> edits, <O> open.`
    3. If `status == "blocker"`:
       a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
          If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).

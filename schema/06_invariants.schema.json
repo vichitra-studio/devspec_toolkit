@@ -61,7 +61,7 @@
                 "type": "string"
               },
               "severity": {
-                "description": "Violation severity level. Decision rule — use 'error' for invariants protecting data integrity, security, or financial accuracy: violations must be rejected with a 4xx/5xx response and the operation must not proceed; use 'warn' for soft business rules where the operation is permitted but the violation is logged for review (e.g., an order with an unusually high discount percentage). Examples — error: inv-payment-positive-amount (a negative or zero payment amount must be rejected outright); warn: inv-order-discount-threshold (discount >50% is logged for fraud review but the order is not blocked). Anti-pattern: using 'warn' for security invariants — security violations must never be silently allowed; always use 'error' for auth, injection-prevention, and access-control constraints.",
+                "description": "Required. Violation severity level. Decision rule — use 'error' for invariants protecting data integrity, security, or financial accuracy: violations must be rejected with a 4xx/5xx response and the operation must not proceed; use 'warn' for soft business rules where the operation is permitted but the violation is logged for review (e.g., an order with an unusually high discount percentage). Examples — error: inv-payment-positive-amount (a negative or zero payment amount must be rejected outright); warn: inv-order-discount-threshold (discount >50% is logged for fraud review but the order is not blocked). Anti-pattern: using 'warn' for security invariants — security violations must never be silently allowed; always use 'error' for auth, injection-prevention, and access-control constraints.",
                 "type": "string",
                 "enum": [
                   "warn",
@@ -169,7 +169,8 @@
               "description",
               "language",
               "expression",
-              "policy_ref"
+              "policy_ref",
+              "severity"
             ],
             "allOf": [
               {

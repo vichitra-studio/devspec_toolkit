@@ -72,6 +72,14 @@ class TestLookupGuide:
         assert entry is not None
         assert entry.get("subcode") == "INVENTED_ENUM_OR_ID"
 
+    def test_guide_e607_exists_and_names_both_canon_files(self) -> None:
+        entry = lookup_guide("E607")
+        assert entry is not None
+        text = format_guide_text(entry)
+        assert "E210" in text
+        assert "manifest.json" in text
+        assert "kinds/<kind>.json" in text
+
     def test_unknown_code_returns_none(self) -> None:
         entry = lookup_guide("EXXXUNKNOWN")
         assert entry is None

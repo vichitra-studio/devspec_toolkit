@@ -25,7 +25,7 @@ _ROOT = Path(__file__).parents[3]
 _SCHEMA_DIR = _ROOT / "schema"
 _FIXTURES = _ROOT / "tests" / "fixtures"
 _NEW_SHAPE_SPEC = _FIXTURES / "graph_example" / "spec"
-_UNANNOTATED_STEPS = frozenset({"13_extension_manifest.schema.json"})
+_UNANNOTATED_STEPS: frozenset[str] = frozenset()
 _OBLIGATION_ROLES = frozenset({"obligation-system", "obligation-delivery"})
 _STAR_VERBS = frozenset({"replaces", "removes", "about"})
 _LINK_VERBS = frozenset(
@@ -126,15 +126,19 @@ def test_task_criterion_refines_kinds_equal_obligation_kinds(registry: dict[str,
     assert len(refines["kinds"]) == len(obligation_kinds)
 
 
-def test_exactly_13_has_no_x_node() -> None:
+def test_every_step_schema_has_an_x_node() -> None:
     real = sorted(p for p in _SCHEMA_DIR.glob("[0-9][0-9]*_*.schema.json"))
     assert {p.name for p in real if '"x-node"' not in p.read_text()} == _UNANNOTATED_STEPS
 
 
-def test_extension_entry_unchanged_after_ambiguities_edit(registry: dict[str, Any]) -> None:
+def test_extension_entry_is_declared_by_x_node(registry: dict[str, Any]) -> None:
+    """The ``extension`` kind keeps the path, id field and kind it had when the id-field heuristic found it; step 13 now declares it (a record, no links)."""
     pre_m1 = json.loads((_FIXTURES / "entry_key_registry_pre_m1.json").read_text())["registry"]
     extension = lambda reg: [a for a in reg["13_extension_manifest.json"]["arrays"] if a["array_path"] == ".extensions"]  # noqa: E731
-    assert extension(registry) == extension(pre_m1) != []
+    (new,) = extension(registry)
+    (old,) = extension(pre_m1)
+    assert {k: new[k] for k in old} == old
+    assert (new["source"], new["role"], "links" in new) == ("x-node", "record", False)
 
 
 def test_anchor_row_registered_under_step_16(registry: dict[str, Any]) -> None:

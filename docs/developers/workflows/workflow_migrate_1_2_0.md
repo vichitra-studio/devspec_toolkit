@@ -225,6 +225,11 @@ Points the pass runs into:
 
   The first prints the node (`{"risk_id": "risk-volunteer-availability-at-the-cafe-lantern", "text": "...", "scope": "in"}`; the id is the field that ends in `id`, such as `risk_id` (an edge case has `id`), or the key of an environment). The second prints `6 candidates for risk.derives_from (showing 6)` and one line per node the field accepts (id, kind, step, file, text). The third prints `patched risk-volunteer-availability-at-the-cafe-lantern (00_charter.json .risks[0])` and `lock entry written: risk-volunteer-availability-at-the-cafe-lantern.derives_from -> seed-volunteer-roster`; a target the field does not accept is refused with `E767` and nothing is written. The same three commands answer `threatens` and `mitigated_by` (the value is a list of ids).
 - Text that names an id (`E752`): reword it without the id, or write the relation as a link and take the id out. The nodes of a frozen plan are not read.
+- An extension of step 13 with fewer than 3 `required_schema_sections` is `E520` (`align validate`): add sections, or remove the extension with `specdev json delete --id <extension-id>`.
+- A rule of step 06 without `severity` is `E520 ... 'severity' is a required property` (`align validate`): set it with `specdev json patch --id <inv-id> .severity '"error"'` (`error` or `warn`; which rules are `error` is a review rule, see prompt 06).
+- A step 10 `commit_message_rules` with `require_spec_ids: true` and no `pattern` is `E520 ... 'pattern' is a required property` (`align validate`): add the pattern with `specdev json patch spec/10_governance.json .commit_message_rules.pattern '"<regex>"'`, or set `require_spec_ids` to `false`.
+- A step 05 API with `protocol: http` and no `path` or no `method` is `E520 ... 'path' is a required property` (`align validate`): set it with `specdev json patch --id <api-id> .path '"/..."'` (and `.method '"GET"'`, one of GET, POST, PUT, PATCH, DELETE); an API of another protocol needs neither.
+- A step 14 milestone with `risk_status` `high` or `critical` and no entry in `risks` is `E520` (`align validate`): add a risk with `specdev json insert --id <milestone-id> .risks '"<risk>"'`, or lower `risk_status`.
 
 ### Step 14: `refines` on task criteria
 

@@ -43,7 +43,7 @@ For each upstream artifact ingested, extract the following:
 | Automated monitoring | Alert fires within 60s when error rate exceeds 1% over 5-min window; measured in Datadog |
 
 ## Heuristics For Completeness
-- MUST include `stage` and `owner` for every NFR (both are unconditionally required by the schema — see schema/07_nfrs.schema.json required[]); MUST include `measurement_method` that specifies a concrete query, tool, or dashboard URL.
+- MUST include `stage` and `owner` for every NFR (both are unconditionally required by the schema — see schema/07_nfrs.schema.json required[]); MUST include `measurement_method` (required by the schema); it SHOULD specify a concrete query, tool, or dashboard URL (an authoring and review rule: no tool checks more than that the string is present).
 - Auto-link: set `constrains` so that latency/throughput name public APIs; availability/durability name services and data stores; cost names components.
 - Ambiguity scrub: quantify targets and specify time window/percentiles.
 
@@ -65,7 +65,7 @@ Before emitting, verify:
 - Every id in `derives_from` names a charter metric or a seed routed to step 07; every id in `constrains` names an FR, an API, a component or a connection.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any success metric cannot be expressed as a measurable NFR: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every NFR target has a numeric value with explicit unit (no subjective language)

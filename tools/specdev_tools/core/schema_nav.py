@@ -71,9 +71,9 @@ def effective_schema(
         causing infinite recursion or silent data corruption.
     :param include_conditionals: When ``True``, properties from ``oneOf``,
         ``anyOf``, ``then``, and ``else`` branches are unioned into ``props``
-        (but never into ``required``).  Defaults to ``False`` so that existing
-        ``merge_allof`` / ``_get_all_properties`` callers experience zero
-        behavior change.
+        (but never into ``required``).  Defaults to ``False``.  ``merge_allof``
+        and ``_get_all_properties`` call it twice and add the conditional-only
+        properties under the allOf-only ones.
     :param _seen: **Internal — do not pass.**  A frozenset of ``$ref`` strings
         already resolved on the current recursion path.  Used as a cycle guard:
         if a ``$ref`` string is encountered that is already in ``_seen``, the

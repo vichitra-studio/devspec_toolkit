@@ -27,6 +27,7 @@
 
 **Trigger**: A validator could not resolve a required input and fails closed rather than crashing. These message families share this code:
 - `UNRESOLVED_INPUT` — a required directory, file, or spec input was missing or unreadable (e.g. `missing_spec_dir`, `missing_canon_dir`, `invalid_json`), or a CLI input precondition was not met.
+- A seed listed in the manifest is empty (`specdev seed-lint`): `E520 Seed 'seed-a' path 'docs/seed/a.md' is empty (a seed that a step reads must hold text)`. The file exists but holds nothing or only whitespace; write the seed text into it.
 - `schema_not_found` — the schema registry could not load the schema for a `$schema` URI. As of 1.1.0, `specdev validate` / `spec-check` fail closed on **all** registry I/O errors (previously only `FileNotFoundError` was caught; `PermissionError` and other `OSError`s now route here instead of escaping uncaught). The step-11 validator likewise emits a structured `E520` for a `threats[]` entry that is not an object.
 - `docs_impact` content validation — the step-16 validator (`step_16.py`) emits `E520` when a milestone plan has code-change actions (non-doc `file_create`/`file_edit` targets) but `plan.docs_impact` is missing, its `status` is not `"required"`, `docs_touched` is empty, or a `docs_touched` entry does not match a `doc_paths` pattern from `seed_manifest.json`.
 - The file boundary of a milestone plan — the step-16 validator (`step_16.py`) emits `E520` when the `target` of a `file_create` or `file_edit` action matches no pattern of `plan.summary.target_file_patterns` and is not listed in `plan.summary.milestone_supporting_files`: `Action 'a02' of plan item 'PWRESET_CONFIRM_01' targets 'src/auth/session.ts', which plan.summary.target_file_patterns does not cover: add a pattern for it, or change the action.` Add a pattern that covers the path, or change the action. The plan of a milestone closed by a migration is not compared. A file listed in `execution.files_touched` is compared with the patterns in the same way (`File '<path>' is touched by implementation but not covered by target_file_patterns.`); the 1.2.0 loop does not write that list.
@@ -47,6 +48,8 @@
 **Resolution**: Run `specdev guide E530-INVENTED_ENUM_OR_ID` for the full playbook.  Quick summary: extend `spec/canon/command_prefixes.json` with the allowed verb, or register the verb as a canonical command entry and attach a sibling `command_ref`.
 
 A second case is owned by step 10: a rule whose `cli_command` is not a command of `tools/cli_commands.json`. Run on a copy of the worked example with `"cli_command": "nonexistent-cmd"` in `spec/10_governance.json`: `spec-check spec --step 10` printed `E530  [10 own]  10_governance.json  .../spec/10_governance.json: the cli_command 'nonexistent-cmd' of rule 'rule-spec-check-on-every-pr' is not a specdev command; give a command as you type it after specdev, for example spec-check or third-party check` and `RESULT: BLOCKED`; the plain run printed the same line. Give the command as you type it after `specdev`: `specdev json patch --id rule-spec-check-on-every-pr .cli_command '"spec-check"'` printed `patched rule-spec-check-on-every-pr (10_governance.json .rules[1])` and the step gate printed `RESULT: CLEAR`.
+
+**The command-prefix check** also reads the string entries of `plan.review_requirements.test_commands`, not only the `command` of an object.
 
 **See also**: E110.
 
@@ -174,7 +177,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Trigger**: Fired by the canonical-integrity check when an artifact's `canonical_refs_used[]` array drifts from the canonical references actually present in the document body. Three subcodes: `canonical_refs_used_missing` (a canonical ID is referenced in the body but absent from `canonical_refs_used[]`), `canonical_refs_used_extra` (an ID is listed in `canonical_refs_used[]` but not used in the body), and `unresolved_canonical_semantic` (a semantic field carries a value with no resolved canonical ref).
 
-**Resolution**: For the `canonical_refs_used_*` subcodes, run `./tools/run_specdev.sh canonical-autofix <spec folder> --write` to sync `canonical_refs_used[]` with the body. For `unresolved_canonical_semantic`, supply the missing canonical reference (declare it in `canonical_proposals` and run `canon-accept`, or correct the semantic value).
+**Resolution**: For the `canonical_refs_used_*` subcodes, run `./tools/run_specdev.sh canonical-autofix <spec folder> --write` to sync `canonical_refs_used[]` with the body. For `unresolved_canonical_semantic`, supply the missing canonical reference (declare it in `canonical_proposals` and run `canon-accept`, or correct the semantic value). A proposal's `source_field` suppresses the finding in either form, `terms[*].term` or `terms[3].term`.
 
 **Promotable**: No — error-only; there is no `W210` counterpart.
 
@@ -236,7 +239,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Trigger (W590)**: The upstream artifact file is missing entirely; cross-step validation is skipped for that upstream.
 
-**Resolution (E590)**: Fix the broken ID reference to match an ID that exists in the upstream artifact.
+**Resolution (E590)**: Fix the broken ID reference to match an ID that exists in the upstream artifact. For an NFR `metric` that names a glossary term whose label was edited by hand, rebind the metric to the new label, or undo the edit and rename with `specdev node rename --label <term-id> "<new label>"`, which rewrites the uses.
 
 **Resolution (W590)**: Generate the missing upstream artifact first, then re-validate.
 
@@ -244,9 +247,9 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 ### E591 / W591 EXTRACTION_INTENT_EMPTY
 
-**Trigger**: A prompt has an `Extraction Intent` section header (`##` or `###`) but no parseable artifact entries beneath it.
+**Trigger**: A prompt has an `Extraction Intent` section header (`##` or `###`) but no parseable artifact entries beneath it, or a prompt has no such section at all (or the file cannot be read).
 
-**Resolution**: Add extraction intent entries listing each upstream artifact and what to extract from it.
+**Resolution**: Add an `Extraction Intent` section with entries listing each upstream artifact and what to extract from it.
 
 **Promotable**: No. The check emits E591 only. W591 is catalogued and paired with E591 in the promotion table, but nothing emits it, so there is no warning to promote.
 
@@ -257,14 +260,6 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 **Resolution**: Replace vague language with specific, measurable terms.
 
 **Promotable**: W593 → E593. Note: W571 is emitted for vague language in `assumptions` fields specifically.
-
-### E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP
-
-**Trigger**: A downstream artifact's free-text content shares fewer than the configured threshold (default: 5) of distinct tokens with its declared upstream artifacts.
-
-**Resolution**: Ensure downstream content is derived from upstream artifacts. Review extraction intent and incorporate upstream terminology.
-
-**Promotable**: W594 → E594. W594 is advisory by default — content derivation is heuristic with inherent false-positive risk.
 
 ### E595 / W595 CONTENT_STALENESS
 
@@ -309,9 +304,9 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 ### E598 EXTRACTION_INTENT_INVALID_REF
 
-**Trigger**: An extraction intent entry references a step that does not exist in step_order.json's `steps` list.
+**Trigger**: An extraction intent entry references a step that does not exist in step_order.json's `steps` list, or a step that comes after the prompt's own step in the `steps` order.
 
-**Resolution**: Fix the artifact reference to point to a valid step number.
+**Resolution**: Fix the artifact reference to point to a valid, earlier step number.
 
 **Promotable**: No (error only).
 
@@ -348,14 +343,6 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 **Resolution**: Review assumptions and remove or consolidate redundant entries.
 
 **Promotable**: W572 → E572.
-
-### E573 / W573 ASSUMPTION_UNBOUND_ID
-
-**Trigger**: An assumption references an ID that cannot be resolved to any known artifact.
-
-**Resolution**: Bind the assumption to a valid spec artifact ID or remove the reference.
-
-**Promotable**: W573 → E573.
 
 ### W570 GRACEFUL_SKIP
 
@@ -537,10 +524,9 @@ Printed, for a plan of a milestone that has no anchor row: `W611 <anchor file>: 
 
 ### E311 MISSING_ENUM_PROVENANCE
 
-**Trigger**: Fired by `step_05.py` when an API entry in `05_interface_contracts.json` declares at least one `parameters[].enum` but has no `enum_provenance` field recording where the value set originated, for reproducibility tracking. Listing `errors` or `error_codes` does not fire it.
+**Trigger**: Fired by `step_05.py` when an API entry in `05_interface_contracts.json` declares at least one `parameters[].enum`, names at least one third party in `relies_on`, and has no `enum_provenance` field recording where the value set originated, for reproducibility tracking. Listing `errors` or `error_codes` does not fire it.
 
-**Resolution**: Add an `enum_provenance` field to the API entry documenting the source of the enum values (e.g. an external standard such as ISO 4217 or IANA language tags, a canonical registry entry, or an upstream spec artifact). An internal enum is asked for provenance too, because structure cannot tell internal from external value sets.
-
+**Resolution**: Add an `enum_provenance` field to the API entry documenting the source of the enum values (e.g. an external standard such as ISO 4217 or IANA language tags, a canonical registry entry, or an upstream spec artifact).
 **Promotable**: No (error only).
 
 ### E320 STEP13_EXTENSION_ERROR
@@ -605,7 +591,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E337 THIRD_PARTY_PIN_MISMATCH
 
-**Trigger**: `spec-check` (every run), `specdev third-party check` or the release gate read a version source the host declares for a third party (`pin_sources` in `spec/common/host_declarations.json`: a `json-pointer` into a file or a `regex` with one capture group) and the version it gives is not the node's `pin`. The message names the node, the pin, the file and where in it, and the version found. A third party with several sources gets one finding per source that differs; a third party with no declared source is compared with nothing (its pin is still tested for exactness, E336). The finding is step 02's own: with `package-lock.json` at `0.42.0` and the pin `0.41.1`, `spec-check spec --step 02` listed `E337  [02 own]  tp-argon2  ...` and printed `RESULT: BLOCKED`, and the plain run printed `[FAIL] third-party-pins  1 errors  0 warnings`. Example, with `package-lock.json` at `0.42.0` and the pin `0.41.1`: `E337 the pin '0.41.1' of 'tp-argon2' differs from package-lock.json at /packages/node_modules~1argon2/version, which gives '0.42.0'; make them equal with third-party pin or in that file`, exit 1. `specdev spec-check --merge` lists it under the one check `third-party-pins` (the merge gate has no pin check of its own): `spec-check spec --merge --base-ref HEAD` printed `spec-check: 31 checks run, 26 errors, 7 warnings`, `[FAIL] third-party-pins  1 errors  0 warnings` and the E337 line above once, and `specdev status` lists it once; with `pin_sources` removed from the declarations the check printed `[PASS]`.
+**Trigger**: `spec-check` (every run), `specdev third-party check` or the release gate read a version source the host declares for a third party (`pin_sources` in `spec/common/host_declarations.json`: a `json-pointer` into a file or a `regex` with one capture group) and the version it gives is not the node's `pin`. The message names the node, the pin, the file and where in it, and the version found. A third party with several sources gets one finding per source that differs; a third party with no declared source is compared with nothing (its pin is still tested for exactness, E336). The finding is step 02's own: with `package-lock.json` at `0.42.0` and the pin `0.41.1`, `spec-check spec --step 02` listed `E337  [02 own]  tp-argon2  ...` and printed `RESULT: BLOCKED`, and the plain run printed `[FAIL] third-party-pins  1 errors  0 warnings`. Example, with `package-lock.json` at `0.42.0` and the pin `0.41.1`: `E337 the pin '0.41.1' of 'tp-argon2' differs from package-lock.json at /packages/node_modules~1argon2/version, which gives '0.42.0'; make them equal with third-party pin or in that file`, exit 1. `specdev spec-check --merge` lists it under the one check `third-party-pins` (the merge gate has no pin check of its own): `spec-check spec --merge --base-ref HEAD` printed `spec-check: 31 checks run, 26 errors, 1 warnings`, `[FAIL] third-party-pins  1 errors  0 warnings` and the E337 line above once, and `specdev status` lists it once; with `pin_sources` removed from the declarations the check printed `[PASS]`.
 
 **Resolution**: Owner `step:02` in the ownership table (the command's own output prints none). Change the pin to the version the repository has: `specdev third-party pin tp-argon2 0.42.0` printed `patched tp-argon2 ...` (it makes the links into the node suspect; the code change is made in this branch through a change milestone) and `third-party check` printed `every pin matches its declared sources`, exit 0. Or change the file back to the pin.
 
@@ -639,7 +625,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 **Trigger**: The check `removal-rules`. A task criterion or a fixture that is not closed lists in `removes` an id that a node (or an old id of a node) has now: the thing it says is gone is still in the spec. The same rule as E772 for `replaces`. A closed criterion is never checked, so an id removed long ago can be used again. Example, a criterion `tc-retire-ec` and a fixture `fix-ec-gone` that remove `ec-token-at-expiry-second`: `E342 task-criterion tc-retire-ec removes ec-token-at-expiry-second, which is still in the spec: delete ec-token-at-expiry-second, or take it out of removes` and the same for `fixture fix-ec-gone` (link `removes->ec-token-at-expiry-second`).
 
-**Resolution**: Owner `step:14`. Delete the node, or take the id out of `removes` of the criterion and the fixture (the two lists stay equal, E341). Run, deleting: `specdev json delete spec/11_redteam.json '.edge_cases[0]'` left E762 for three lock entries of the deleted node and E763 on `tc-retire-ec` (the fixture it lists changed); `specdev attest --prune` (`removed 3 orphan entries`) and `specdev attest tc-retire-ec --yes` cleared them, and `spec-check` ended with one error fewer than the unchanged example (the E740 of the deleted edge case) and one more warning (W594 on `11_redteam.json`, content overlap). A node that other nodes link is removed by the loop of Removing a node above. Run, taking the id out: with `removes` listing a second id that is gone, the id was taken out of the fixture and the criterion, `specdev attest tc-retire-ec --yes` cleared the E763 that the edit left, and `spec-check` showed the 25 errors of the example.
+**Resolution**: Owner `step:14`. Delete the node, or take the id out of `removes` of the criterion and the fixture (the two lists stay equal, E341). Run, deleting: `specdev json delete spec/11_redteam.json '.edge_cases[0]'` left E762 for three lock entries of the deleted node and E763 on `tc-retire-ec` (the fixture it lists changed); `specdev attest --prune` (`removed 3 orphan entries`) and `specdev attest tc-retire-ec --yes` cleared them, and `spec-check` ended with one error fewer than the unchanged example (the E740 of the deleted edge case). A node that other nodes link is removed by the loop of Removing a node above. Run, taking the id out: with `removes` listing a second id that is gone, the id was taken out of the fixture and the criterion, `specdev attest tc-retire-ec --yes` cleared the E763 that the edit left, and `spec-check` showed the 25 errors of the example.
 
 **Promotable**: No (error only).
 
@@ -713,7 +699,7 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E510 PLACEHOLDER_VALUE_FOUND
 
-**Trigger**: Fired by `spec_quality_lint.py`'s independent placeholder scan when any string value in a spec artifact matches the placeholder pattern (e.g. bracket-wrapped tokens like `[TBD]`, `[FIXME]`).
+**Trigger**: Fired by `spec_quality_lint.py`'s independent placeholder scan when any string value in a spec artifact matches a marker (the markers TBD, TODO, FIXME, XXX and AUTO-DERIVE as whole words, any case, e.g. `[TBD]`, `[FIXME]`, `[AUTO-DERIVE]`; the English word "placeholder" and the sentinel "-tbd" written after a hyphen are not markers).
 
 **Resolution**: Replace the placeholder text with real, project-specific content.
 
@@ -721,11 +707,11 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E512 ASSUMPTION_HAS_PLACEHOLDER
 
-**Trigger**: Fired by `spec_quality_lint.py` when a value inside an `assumptions[]` entry matches the placeholder pattern.
+**Trigger**: Fired by `spec_quality_lint.py` when a value inside an `assumptions[]` entry matches a marker (the markers TBD, TODO, FIXME, XXX and AUTO-DERIVE as whole words, any case; the English word "placeholder" and the sentinel "-tbd" written after a hyphen are not markers).
 
 **Resolution**: Replace the placeholder text in the assumption with a concrete, project-specific statement.
 
-**See also**: E571/W571 ASSUMPTION_VAGUE_QUANTIFIER, W573 ASSUMPTION_UNBOUND_ID (the other assumption-content checks).
+**See also**: E571/W571 ASSUMPTION_VAGUE_QUANTIFIER, W572 ASSUMPTION_COUNT_HIGH (the other assumption-content checks). An id written in the text of an assumption is E752.
 
 ### E521 VALIDATOR_RUNTIME
 
@@ -739,15 +725,15 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E606 GLOSSARY_PROPOSAL_DRIFT
 
-**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` `terms[]` entry's `definition` differs from the `definition` on its matching `canonical_proposals` entry (matched by `term-{temp_id}`, `kind == "term"` proposals only — acronym proposals are excluded since acronyms have no `terms[]` counterpart).
+**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` `terms[]` entry's `definition` differs from the `definition` on its matching `canonical_proposals` entry (matched by `term-{temp_id}`, `kind == "term"` proposals only — acronym proposals are excluded since acronyms have no `terms[]` counterpart). Both texts are compared after collapsing whitespace and composing Unicode, and the message names the first differing position (`first_difference_at=<n>`).
 
 **Resolution**: Reconcile the term's `definition` in `terms[]` with the corresponding `canonical_proposals` entry so both describe the same definition.
 
 ### E607 GLOSSARY_CANON_DRIFT
 
-**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` term's `definition` differs from the `definition` of the already-accepted `cn:project:` canon entry it's bound to via `term_ref`.
+**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` term's `definition` differs from the `definition` of the already-accepted `cn:project:` canon entry it's bound to via `term_ref`, or when the term's label (`term`) is neither that entry's `preferred_label` nor one of its `aliases` (compared ignoring case; message has `field=preferred_label`), or, for a `canonical_proposals` item of any other step (for example a capability or a metric), when its `definition` or `proposed_label` differs from the canon entry `cn:project:<kind>:<temp_id>` it was made into (message starts `CANON_PROPOSAL_DRIFT`). Texts are compared after collapsing whitespace and composing Unicode, and the message names the first differing position (`first_difference_at=<n>`).
 
-**Resolution**: Update the glossary term's `definition` to match the canon entry (the source of truth once accepted), or re-run `canon-accept` if the glossary's definition is the intended update.
+**Resolution**: Decide which text is right. Either update the glossary term's `definition` to match the canon entry, or edit the canon entry's `definition` in both `spec/canon/kinds/<kind>.json` and `spec/canon/manifest.json` (`canon-accept` does not update an entry that exists, and `canonical-autofix` does not touch definitions). `specdev guide E607` prints the steps.
 
 ### W606 GLOSSARY_CANON_ORPHAN
 
@@ -1003,7 +989,7 @@ E740, E742 and E743 are **coverage gaps**: a node, or a missing node, that the s
 
 The messages below are copied from runs on copies of the worked example (`tests/fixtures/graph_example`), with the code as it is now. The worked example is a partial spec: `spec-check` reports 17 E740, 5 E743 and 1 E744 on it, and none of the other codes of this section, and `specdev step ready 14` reports 5 blockers (the five E743 of step 08). These counts are written here and nowhere else in the documentation: the other places, and the quotes below, write `N` or say that the partial example reports role findings, because the counts move when the example changes.
 
-**The attest step.** Most fixes below add, change or remove a link, and the trace lock (see [Trace Lock (76x)](#trace-lock-76x)) has to follow before `spec-check` is clean. Until it does, `spec-check` shows E761 for a link that is new (the lock has no entry for it), E763 for a link whose target, or something above its target, was edited (editing a node makes suspect the links that point at it and those below it), and E762 for a link that was removed (the lock still has its entry). It is needed after a link was written by path or by hand (`json patch|insert|delete FILE`, or a file put into `spec/`: E761 for each new link, E762 for a removed one; run: a task criterion inserted by path gave two E761 until `specdev attest tc-request-new --yes`) and after an edit to a node that other nodes link to (E763 at each of them, whatever the form of the edit; run: `json patch --id fr-password-reset .priority` made 22 links suspect). The id forms (`json patch|insert|delete --id`, `json insert --step`) and `step create --from` write the lock entry of each link they add or remove themselves, and `attest` then says `attest: nothing to attest` (run: the same criterion inserted with `json insert --id` cleared E566 and left no E761). Where a Resolution below says "the attest step", it means this paragraph. So a fix that needs the step: run `specdev attest <node> --yes` for each node an E761 or E763 names, run `spec-check` again, and repeat while one of them shows (a node that links to another suspect node is refused with E764: attest the node it links to first, or run `specdev attest --step NN --yes`, which goes upward first; `--step` writes the links that are suspect, and said `attest: nothing to attest` for links that were only new, which need `specdev attest <node> --yes`); after a link was removed, run `specdev attest --prune`. A Resolution below says it **clears** a finding when, after the attest step, the finding was gone and `spec-check` showed no finding of another code or node than the run started with (the token counts of a `W594` move whenever upstream text is edited: the same finding, another number). Each fix that the Resolutions describe was run on a copy of the worked example, and each ended with that step; without it the runs showed E761, E762 or E763 in place of the finding.
+**The attest step.** Most fixes below add, change or remove a link, and the trace lock (see [Trace Lock (76x)](#trace-lock-76x)) has to follow before `spec-check` is clean. Until it does, `spec-check` shows E761 for a link that is new (the lock has no entry for it), E763 for a link whose target, or something above its target, was edited (editing a node makes suspect the links that point at it and those below it), and E762 for a link that was removed (the lock still has its entry). It is needed after a link was written by path or by hand (`json patch|insert|delete FILE`, or a file put into `spec/`: E761 for each new link, E762 for a removed one; run: a task criterion inserted by path gave two E761 until `specdev attest tc-request-new --yes`) and after an edit to a node that other nodes link to (E763 at each of them, whatever the form of the edit; run: `json patch --id fr-password-reset .priority` made 22 links suspect). The id forms (`json patch|insert|delete --id`, `json insert --step`) and `step create --from` write the lock entry of each link they add or remove themselves, and `attest` then says `attest: nothing to attest` (run: the same criterion inserted with `json insert --id` cleared E566 and left no E761). Where a Resolution below says "the attest step", it means this paragraph. So a fix that needs the step: run `specdev attest <node> --yes` for each node an E761 or E763 names, run `spec-check` again, and repeat while one of them shows (a node that links to another suspect node is refused with E764: attest the node it links to first, or run `specdev attest --step NN --yes`, which goes upward first; `--step` writes the links that are suspect, and said `attest: nothing to attest` for links that were only new, which need `specdev attest <node> --yes`); after a link was removed, run `specdev attest --prune`. A Resolution below says it **clears** a finding when, after the attest step, the finding was gone and `spec-check` showed no finding of another code or node than the run started with. Each fix that the Resolutions describe was run on a copy of the worked example, and each ended with that step; without it the runs showed E761, E762 or E763 in place of the finding.
 
 **Removing a node.** The fixes below that remove a seed, a fixture or a job are one loop, whatever the node. The message says how many nodes link it and the command that lists them; this list says the rest, and the Resolutions of E742, E747, E748 and E749 refer to it.
 
@@ -1017,7 +1003,7 @@ The messages below are copied from runs on copies of the worked example (`tests/
 
 1. Add the removal fixture to step 08: a fixture (here `fix-ec-gone`) with `removes` naming the node and no `verifies` (`specdev json insert --step 08 .fixtures '<fixture>'`). A removal fixture is bound at stage `dev` (E330 for another).
 2. Add a milestone in step 14 whose task has a removal criterion: a task criterion (here `tc-retire-ec`) with `removes` naming the same ids and `verified_by` listing the fixture, with its row in `plan.milestone_index` of step 16 (`json insert --step 14 .milestones '<milestone>'`, `json insert --step 16 .plan.milestone_index '<row>'`). While the node is still in the spec, `spec-check` gives E342 for the criterion and for the fixture. E341 appears when the two `removes` lists differ, or when the fixture removes an id that no criterion listing it removes: make the lists the same.
-3. Delete the node: `specdev json delete --id ec-token-at-expiry-second`. E342 goes and the delete leaves E763 on the criterion; `specdev attest tc-retire-ec --yes` and `specdev attest --prune` clear it, and `spec-check` ended with one error fewer than the unchanged example (the E740 of the deleted node) and one more warning (W594).
+3. Delete the node: `specdev json delete --id ec-token-at-expiry-second`. E342 goes and the delete leaves E763 on the criterion; `specdev attest tc-retire-ec --yes` and `specdev attest --prune` clear it, and `spec-check` ended with one error fewer than the unchanged example (the E740 of the deleted node).
 4. Close the milestone: `status: done` with `close.signed_off_by` in its row (`json patch --id <anchor id> .close '{"signed_off_by": "..."}'`, then `.status '"done"'`). A criterion of a closed milestone is history: its `verified_by` and `refines` are not resolved against the nodes that exist now (no E700 for a deleted fixture or node), and its `removes` is not checked (E342). The removal fixture may then be deleted: run, `json delete --id fix-ec-gone` before the close left E700 on the criterion's `verified_by`, and `spec-check` had none after the close.
 5. E343 and E344 come from the release gate (`specdev release --tag`, `release prep`, `status`), never from `spec-check`: a closed milestone's criterion refines a node that was changed since (E343) or deleted (E344), and no closed milestone answers it. A removal criterion like the one above answers a deleted node, also when it names the node that contained it; a change milestone, whose criterion refines the node at its new content, answers a changed one.
 
@@ -1788,6 +1774,14 @@ Removed in 1.2.0 with W607: the step 16 anchor no longer emits it (see W607 abov
 Removed in 1.2.0: the fields it read are gone and no emitter is left.
 
 ## Exception Classes
+
+### E573 / W573 ASSUMPTION_UNBOUND_ID (removed)
+
+Removed in 1.2.0: an id written in the text of an assumption is E752 (node id in prose).
+
+### E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP (removed)
+
+Removed in 1.2.0: derivation is stated by `derives_from` links and checked by the graph; the token-overlap heuristic read nine hand-listed text keys.
 
 ### SubmoduleDetectionError
 

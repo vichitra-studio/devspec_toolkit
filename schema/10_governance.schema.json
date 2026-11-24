@@ -160,7 +160,7 @@
           "properties": {
             "require_spec_ids": {
               "type": "boolean",
-              "description": "When true and `pattern` is set, governance-check fails a message that does not match `pattern`. When false, or when `pattern` is absent, it accepts any message. It does not check that an id named in the message exists. Spec ids that may appear in a message, written in brackets (e.g., [fr-user-login]), begin with one of these prefixes: fr-* (functional requirements), api-* (API contracts), cap-* (capabilities), nfr-* (non-functional requirements), inv-* (invariants), fix-* (fixtures), ms-* (milestones), ext-* (extensions). Anti-pattern: a prefix not in this list (e.g., req-*, feat-*) — use the canonical prefixes so a reader can find the node."
+              "description": "When true, `pattern` is required (E520 when absent) and governance-check fails a message that does not match it. When false, it accepts any message. It does not check that an id named in the message exists. Spec ids that may appear in a message, written in brackets (e.g., [fr-user-login]), begin with one of these prefixes: fr-* (functional requirements), api-* (API contracts), cap-* (capabilities), nfr-* (non-functional requirements), inv-* (invariants), fix-* (fixtures), ms-* (milestones), ext-* (extensions). Anti-pattern: a prefix not in this list (e.g., req-*, feat-*) — use the canonical prefixes so a reader can find the node."
             },
             "pattern": {
               "type": "string",
@@ -188,7 +188,22 @@
           },
           "required": [
             "require_spec_ids"
-          ]
+          ],
+          "if": {
+            "properties": {
+              "require_spec_ids": {
+                "const": true
+              }
+            },
+            "required": [
+              "require_spec_ids"
+            ]
+          },
+          "then": {
+            "required": [
+              "pattern"
+            ]
+          }
         },
         "policy_ref": {
           "description": "Canonical reference to the governance policy. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Omit if no canonical policy entry applies.",

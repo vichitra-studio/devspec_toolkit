@@ -109,8 +109,8 @@ def test_governance_load_ignores_the_file(host: Path) -> None:
     assert after is not None and after.get("$schema") != "vc:host-declarations"
 
 
-def test_fixtures_lint_ignores_the_file(host: Path) -> None:
-    """The example's fixtures file carries the registry id, which the reader skips, so a 1.1.1-style fixtures file (a ``$schema`` ending ``/08_fixtures.schema.json``) is added to give the reader something to find."""
+def test_fixtures_lint_reads_the_registry_id_and_the_legacy_file_and_ignores_the_declarations(host: Path) -> None:
+    """A 1.1.1-style fixtures file (a ``$schema`` ending ``/08_fixtures.schema.json``) is added next to the example's ``vc:08-fixtures`` file; the reader finds it, and adding the declarations file changes nothing."""
     fixture = {"fixture_id": "fx-one", "input": {}, "expected": {"status": 200}}
     legacy = {"$schema": "https://example.invalid/schema/08_fixtures.schema.json", "fixtures": [fixture]}
     (host / "spec" / "08_legacy.json").write_text(json.dumps(legacy), encoding="utf-8")
@@ -120,7 +120,7 @@ def test_fixtures_lint_ignores_the_file(host: Path) -> None:
 
     before, after = _same_before_and_after(host, probe)
     assert after == before
-    assert after[0] == [fixture]
+    assert fixture in after[0]
 
 
 def test_touched_steps_maps_the_file_to_no_step(host: Path) -> None:

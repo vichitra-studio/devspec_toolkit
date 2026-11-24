@@ -40,13 +40,14 @@ For each upstream artifact ingested, extract the following:
   - *AI/ML*: Are there models, training pipelines, or RAG flows? -> Needs an ML/Model Spec.
   - *Infrastructure*: specific K8s configs, Terraform modules, specialized hardware? -> Needs an Infra Spec.
   - *Integration*: Complex 3rd party APIs (Stripe, Twilio, Salesforce)? -> Needs an Integration Spec.
-- **Filter**: Exclude generic items already covered by the core specs (standard REST APIs are in Step 05, standard NFRs in Step 07). Only create extensions when a domain requires >=3 dedicated schema sections not expressible in existing step schemas (05, 06, 07).
+- **Filter**: Exclude generic items already covered by the core specs (standard REST APIs are in Step 05, standard NFRs in Step 07). Only create extensions when a domain requires >=3 dedicated schema sections not expressible in existing step schemas (05, 06, 07). The schema enforces the count: `required_schema_sections` of an extension holds at least 3 names.
 - **Plan**: For each identified need, define the extension_id and structure. File names are derived from extension_id (hyphens → underscores + `.json`).
 
 ## Heuristics For Completeness
 - **Explicit > Implicit**: If a system has a Vector Database, do not leave it as an "implementation detail". Assign it `extension_id: ext-01-vectordb` — the output filename `ext_01_vectordb.json` is derived automatically (hyphens → underscores + `.json`).
 - **Don't Over-Splice**: Only create extensions for truly complex domains. A simple CRUD app might not need a dedicated Database Spec if the Interface Contracts (Step 05) are sufficient.
-- **Justification**: Extensions carry no link fields, so each `justification` MUST name the functional requirement, NFR or component that justifies the extension, by its name or metric rather than its id.
+- **Justification**: Extensions carry no link fields, so each `justification` MUST name the functional requirement, NFR or component that justifies the extension, by its name or metric rather than its id. This is an authoring and review rule: the schema and E320 check only that the text is present.
+- **Schema design guidelines**: each extension's `schema_design_guidelines` is at least 40 characters and contains one of the words verif-, test, check, validat- or assert- (schema `pattern` `([Vv]erif|[Tt]est|[Cc]heck|[Vv]alidat|[Aa]ssert)`; that keyword match is the only check of its content); `extension_decision.rationale` is at least 40 characters.
 - **Roadmap**: Explaining *why* an extension is needed helps the Roadmap (Step 14) prioritize it correctly.
 
 ## Self-Audit Gate
@@ -57,6 +58,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Negative Constraints
 - If no complex domains are found, set `extension_decision.status` to `'none-required'` with a rationale citing evaluated components and NFR categories, and return `extensions: []`. Do NOT invent trivial extensions.
+- Guidance, not checked: the rationale of an extension decision says what was evaluated and ruled out (for 'none-required' the components of Step 02 and the NFR categories of Step 07, by name) or, for 'extensions-required', the domain gaps that need extensions. Review judges it.
 - **DO NOT** create extensions for items expressible via standard Steps 04–10 (library bloat).
 - **DO NOT** redefine standard API routes or create extensions that overlap existing pipeline steps.
 - **DO NOT** ignore the forward-only flow: extensions are for domain-specific verticals only.
@@ -70,7 +72,7 @@ Before emitting, verify:
 - No identified architectural gap is silently dropped: record the decision in `extension_decision.rationale` or ask a gap question.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any domain complexity is unclear: add a gap question (Clarify mode) rather than generating a speculative extension.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every extension request is traceable to a specific upstream spec artifact
@@ -83,7 +85,7 @@ Before emitting, verify:
 - [ ] All extension points reference valid schema-defined extension mechanisms
 - [ ] Generated prompt follows the same phase structure as toolkit prompts (Operating Flow with named phases)
 - [ ] Extension includes validation command and test gate specification
-- [ ] Extension is created only when the domain requires ≥3 dedicated schema sections that are not expressible in existing step schemas (05, 06, 07) — no extension for concerns already covered by core steps
+- [ ] Extension is created only when the domain requires ≥3 dedicated schema sections that are not expressible in existing step schemas (05, 06, 07) — no extension for concerns already covered by core steps (`required_schema_sections` has ≥3 entries: schema `minItems`)
 
 ## Governance Label Resolution
 `governance_label_ref` is checked once: the referenced canonical ID must exist in `canon/manifest.json` (verified by `canonical-integrity`, error E110). It is not checked against step 10. List the label in this step's own `canonical_refs_used`; do NOT add it to `spec/10_governance.json` `canonical_refs_used` (the 10 schema has no field that can hold it, so it would raise E210 `canonical_refs_used_extra`).
@@ -91,7 +93,7 @@ Before emitting, verify:
 Authoritative values: resolve governance_label IDs from `canon/manifest.json` (kind: `governance_label`). Do not enumerate inline — the registry is the source of truth and validated by canonical-integrity lint (E110).
 
 ## Cross-Step Synthesis Notes
-- extensions[*].justification: MUST name a specific component from `spec/02_system_sketch.json` or NFR from `spec/07_nfrs.json` (by its name or metric, not its id) that necessitates the extension.
+- extensions[*].justification: MUST name a specific component from `spec/02_system_sketch.json` or NFR from `spec/07_nfrs.json` (by its name or metric, not its id) that necessitates the extension. This is an authoring and review rule: the schema and E320 check only that the text is present.
 - extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) with `kind: "governance_label"`. The `id` must resolve in `canon/manifest.json` (see Governance Label Resolution above); it is not listed in step 10. If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
 - extension_decision: **REQUIRED**. The cardinality constraints between `status` and `extensions` are machine-enforced by schema `vc:13-extension-manifest` allOf conditionals — consult the schema as the authoritative source.
 - **Optional per-extension fields** (omit when not applicable): `tag_ref` (kind: `"tag"` — for cross-cutting concern tags like `critical-path`), `policy_ref` (kind: `"policy"` — when the extension is governed by a specific policy), `id_pattern_ref` (kind: `"id_pattern"` — only when extension IDs follow a non-standard pattern).

@@ -58,6 +58,27 @@ class PromptSchemaSyncTests(unittest.TestCase):
             ),
         )
 
+    def test_load_contract_resolves_allof_required(self):
+        from specdev_tools.context._utils import merge_allof
+        from specdev_tools.core.registry import SchemaRegistry
+        from specdev_tools.generation.prompt_schema_sync import _load_contract
+
+        repo_root = Path(__file__).resolve().parents[3]
+        schema_path = repo_root / "schema" / "04_fr_list.schema.json"
+        required, _props, _schema = _load_contract(str(schema_path), repo_root)
+        expected = merge_allof(json.loads(schema_path.read_text(encoding="utf-8")), SchemaRegistry(str(repo_root)))
+        self.assertEqual(set(expected["required"]), set(required))
+        self.assertTrue(required)
+
+    def test_every_step_schema_has_a_required_set_in_the_contract(self):
+        from specdev_tools.generation.prompt_schema_sync import _load_contract
+
+        repo_root = Path(__file__).resolve().parents[3]
+        schema_paths = sorted((repo_root / "schema").glob("[0-9][0-9]*.schema.json"))
+        self.assertTrue(schema_paths)
+        empty = [p.name for p in schema_paths if not _load_contract(str(p), repo_root)[0]]
+        self.assertEqual([], empty, msg=f"schemas with no required set: {empty}")
+
     def test_detects_missing_required(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

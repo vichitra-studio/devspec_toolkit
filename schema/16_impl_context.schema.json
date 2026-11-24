@@ -503,7 +503,7 @@
           "properties": {
             "existing_structures": {
               "type": "array",
-              "description": "Code artifacts relevant to this implementation. Each entry identifies a specific function or class, not just a file. Object form example: {signature: 'def validate_jwt(token: str) -> Claims:', source_file: 'src/auth/jwt.py', line_range: 'L45-L62'}. String form for non-code artifacts. Anti-pattern: listing file names without identifying the specific function or class.",
+              "description": "Code artifacts relevant to this implementation. Each entry identifies a specific function or class, not just a file. Object form example: {signature: 'def validate_jwt(token: str) -> Claims:', source_file: 'src/auth/jwt.py'}. String form for non-code artifacts. Anti-pattern: listing file names without identifying the specific function or class.",
               "items": {
                 "oneOf": [
                   {
@@ -520,13 +520,8 @@
                       },
                       "source_file": {
                         "type": "string",
-                        "pattern": "^[^/].*\\.(py|ts|js|go|rs)$",
-                        "description": "Relative path to the source file containing this structure."
-                      },
-                      "line_range": {
-                        "type": "string",
-                        "pattern": "^L\\d+-L\\d+$",
-                        "description": "Line range where the structure is defined (e.g., 'L10-L25')."
+                        "pattern": "^[^/].*$",
+                        "description": "Repo-relative path of the file that holds this structure (any file type)."
                       }
                     },
                     "required": [
@@ -1248,7 +1243,7 @@
               "description": {
                 "type": "string",
                 "maxLength": 600,
-                "description": "A finding description must include: (1) what was observed (file:line reference where applicable), (2) why it matters (the impact), (3) which spec requirement it violates (checklist item ID or FR/NFR reference). Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
+                "description": "The text of one finding, at most 600 characters; `specdev review record` writes it from the `message` of the findings file. Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
               },
               "related_checklist_ids": {
                 "type": "array",

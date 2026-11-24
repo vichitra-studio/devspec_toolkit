@@ -40,7 +40,7 @@ Synthesize the foundational strategy (Step 09: Implementation Plan), the detaile
 
 ### Task Criteria Refine Upstream Obligations
 Task `acceptance_criteria` in Step 14 REFINE the obligations of the steps above them (FR acceptance criteria, APIs, invariants, NFRs, threats and the rest): they break a high-level obligation into an implementation-verifiable check. The relation is the `refines` link of a criterion. Rules:
-- **Every in-scope obligation is refined.** A criterion states what the obligation does not: a threshold, a case, an observable. A criterion that only repeats the obligation adds nothing.
+- **Every in-scope obligation is refined.** A criterion states how the obligation is observed or verified. The threshold or case it checks is one that an upstream node states (refine that node); a threshold or case that no upstream node states is not written here (see "Refinement Decision Rules"). A criterion that only repeats the obligation adds nothing.
 - **One criterion per rule.** When several nodes state the same rule (an FR criterion and the API that carries it), the criterion `refines` the most downstream system or delivery node, not each of them.
 - **Cross-cutting obligations are refined in every task they bind.** An invariant or NFR that constrains something a task builds gets a refining criterion in that task (`E744` otherwise).
 - **A refinement carries its verifier.** `verified_by` lists a fixture, job or rule that proves what the criterion refines (`E745` otherwise). A criterion that refines a threat or an edge case is verified through that node's `mitigated_by`: a fixture listed there, or a fixture that verifies an obligation listed there (a fixture's `verifies` can never name a threat).
@@ -50,9 +50,9 @@ Task `acceptance_criteria` in Step 14 REFINE the obligations of the steps above 
 - Every task criterion should be verifiable by a specific CI check, unit test, or manual procedure.
 
 ### Refinement Decision Rules
-- **Stricter threshold** = refinement: FR says "within 500ms", task says "within 200ms" — OK.
+- **Stricter threshold** = invention, not a refinement: FR says "within 500ms", task says "within 200ms" — do not write 200ms; raise an open item about the FR criterion so that Step 04 decides, unless an upstream node (an NFR, an invariant) already states 200ms: then refine that node.
 - **Weaker threshold** = contradiction: FR says "within 500ms", task says "within 1000ms" — FORBIDDEN.
-- **Added edge case** = refinement: FR says "user can login", task adds "invalid credential returns error response" — OK.
+- **Added edge case** = refinement only when an upstream node states it: FR says "user can login", the API error `err-login-invalid-credential` states "invalid credential returns an error response", the task criterion refines that API error; when no node states it, raise an open item about the FR criterion.
 - **Removed condition** = contradiction: FR says "authentication required", task says "authentication optional" — FORBIDDEN.
 - **More specific artifact** = refinement: FR says "page renders", task says "read operation for resource returns success with expected component" — OK.
 
@@ -88,7 +88,7 @@ Before emitting, verify:
 - Every id in `refines`, `verified_by` and `depends_on` resolves to a node of the right kind.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any upstream obligation cannot be refined: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every Step 09 milestone's scheduled node that a task criterion can refine is refined by a criterion of this roadmap, itself or through a node it contains. `spec-check` reports one that is not as `E567` on the Step 09 milestone: `fr <id> is scheduled by <milestone> but no task criterion refines it: add a task criterion that refines it or a node it contains, or remove it from the schedules of <milestone>`. A scheduled risk, component or environment is never reported
@@ -149,6 +149,7 @@ Before emitting, verify:
 ### milestones[].spikes
 - Document only technical investigations that are necessary to resolve uncertainty.
 - Keep spikes brief and focused on a single question or hypothesis.
+- Guidance, not checked: write each spike as one string that names the question, the time budget and the expected output. Review judges it.
 
 ### migration_plan
 - Use a short string describing how legacy work is migrated, or `"none"` if not applicable.

@@ -1940,3 +1940,10 @@ rows:
   change: add
   disposition: none
   note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-38
+  path: plan.context.existing_structures[].line_range
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)

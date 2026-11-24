@@ -1866,8 +1866,21 @@
         },
         {
           "array_path": ".extensions",
+          "contract": [
+            "title",
+            "area_of_concern",
+            "justification",
+            "required_schema_sections",
+            "schema_design_guidelines",
+            "tag_ref",
+            "policy_ref",
+            "id_pattern_ref",
+            "governance_label_ref"
+          ],
           "id_field": "extension_id",
-          "kind": "extension"
+          "kind": "extension",
+          "role": "record",
+          "source": "x-node"
         }
       ],
       "step": "13"
@@ -2371,15 +2384,14 @@
       "step": "16a"
     }
   },
-  "steps_with_deferred_registration": [
+  "steps_without_entry_arrays": [
     {
-      "rationale": "per-milestone files; deferred per Out-of-scope",
+      "rationale": "no node kind of its own: its records are blocks inside the plan file, registered under step 16a",
       "step": "16b"
     },
     {
-      "rationale": "per-milestone files; deferred per Out-of-scope",
+      "rationale": "no node kind of its own: its records are blocks inside the plan file, registered under step 16a",
       "step": "16c"
     }
-  ],
-  "steps_without_entry_arrays": []
+  ]
 }

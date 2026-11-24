@@ -633,6 +633,66 @@ class TestLifecycleCommandsHelp(_CliMixin, unittest.TestCase):
                 self.assertIn("specdev json patch|insert|delete --id", text)
 
 
+class TestHelpTexts(_CliMixin, unittest.TestCase):
+    """Help text of ``align`` and ``json`` says what the commands do."""
+
+    def test_align_help_says_rollback_does_not_validate(self):
+        code, out, err = self._run_cli(["align", "--help"])
+        self.assertEqual(code, 0, err)
+        self.assertIn("not validated", " ".join(out.split()))
+
+    def test_json_help_lists_every_json_subcommand(self):
+        from specdev_tools.core.json_utils import build_json_parser
+
+        names = next(a for a in build_json_parser()._actions if a.dest == "command").choices
+        code, out, err = self._run_cli(["json", "--help"])
+        self.assertEqual(code, 0, err)
+        listed = {line.split()[0] for line in out.splitlines() if line.startswith("  ") and line.strip()}
+        self.assertLessEqual(set(names), listed)
+
+
+class TestCanonAcceptReport(_CliMixin, unittest.TestCase):
+    """``canon-accept`` tells a changed entry from an unchanged one and offers ``--update``."""
+
+    def _setup(self, tmp: Path, definition: str) -> list[str]:
+        canon = tmp / "canon"
+        canon.mkdir()
+        entry = {"id": "cn:project:entity:my-term", "kind": "entity", "preferred_label": "My Term", "definition": "Stored."}
+        manifest = {"$schema": "vc:core:canon", "registry_version": "1.0.0", "entries": [entry], "aliases": []}
+        (canon / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        proposal = {"temp_id": "my-term", "kind": "entity", "proposed_label": "My Term",
+                    "definition": definition, "source_field": "terms[0].definition"}
+        spec = tmp / "03_glossary.json"
+        spec.write_text(json.dumps({"canonical_proposals": [proposal]}), encoding="utf-8")
+        return ["canon-accept", "--from", str(spec), "--repo-root", str(tmp)]
+
+    def test_canon_accept_help_lists_update(self):
+        code, out, err = self._run_cli(["canon-accept", "--help"])
+        self.assertEqual(code, 0, err)
+        self.assertIn("--update", out)
+
+    def test_a_changed_entry_is_a_warn_with_exit_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self._run_cli(self._setup(Path(tmp), "Changed."))
+        self.assertEqual(code, 0, err)
+        self.assertIn("! changed (not updated, use --update): cn:project:entity:my-term (definition)", out)
+        self.assertIn("WARN (", out)
+
+    def test_update_prints_updated_and_ok(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self._run_cli([*self._setup(Path(tmp), "Changed."), "--update"])
+        self.assertEqual(code, 0, err)
+        self.assertIn("~ updated: cn:project:entity:my-term", out)
+        self.assertIn("OK (0 added, 1 updated, 0 unchanged, 0 malformed)", out)
+
+    def test_an_unchanged_entry_is_reported_as_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self._run_cli(self._setup(Path(tmp), "Stored."))
+        self.assertEqual(code, 0, err)
+        self.assertIn("~ unchanged: cn:project:entity:my-term", out)
+        self.assertIn("OK (0 added, 0 updated, 1 unchanged, 0 malformed)", out)
+
+
 class TestSpecCheckMerge(_CliMixin, unittest.TestCase):
     """``spec-check --merge``: the flag, ``--base-ref`` beside it, and what it does not combine with (WI-M9-01)."""
 

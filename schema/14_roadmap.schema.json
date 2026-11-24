@@ -32,7 +32,7 @@
               "target_date": {
                 "type": "string",
                 "format": "date",
-                "description": "Target completion date in ISO 8601 format (YYYY-MM-DD). Decision rule: set target_date to the sprint end date when the milestone aligns to a sprint; use the agreed delivery date from the project plan otherwise. Examples: '2025-03-31' (end of Q1 sprint), '2025-06-15' (negotiated delivery date for a partner integration). Each milestone should have a distinct date that reflects its actual planned completion. Anti-pattern: setting all milestones to the same date — identical dates signal copy-paste from a template rather than a real plan, and make it impossible to sequence or track progress."
+                "description": "Target completion date in ISO 8601 format (YYYY-MM-DD). Decision rule: set target_date to the sprint end date when the milestone aligns to a sprint; use the agreed delivery date from the project plan otherwise. Examples: '2025-03-31' (end of Q1 sprint), '2025-06-15' (negotiated delivery date for a partner integration). Milestones are listed in non-decreasing date order (E520 otherwise); equal dates are allowed and no tool flags them. Anti-pattern: setting all milestones to the same date signals copy-paste from a template rather than a real plan (a review rule)."
               },
               "risk_status": {
                 "$ref": "vc:core:atoms#severityLevel",
@@ -304,11 +304,11 @@
               },
               "risks": {
                 "$ref": "vc:core:collections#stringArray",
-                "description": "Known risks that could delay or block this milestone. Each entry should name the specific threat, its probability, and the planned mitigation. Decision rule: write one entry per distinct risk, not one entry per category. Examples: 'Third-party payment API instability — high probability during peak load; mitigate with circuit breaker and fallback to manual processing order queue.' 'Legal review for PII data policy may miss Sprint 3 deadline — medium probability; mitigate by requesting review in Sprint 2 with a two-week buffer.' Anti-pattern: 'Technical risks' or 'Integration risks' (category labels, not named risks — a reviewer cannot act on a category). Write no node id into the text."
+                "description": "Known risks that could delay or block this milestone. Each entry should name the specific threat, its probability, and the planned mitigation. Decision rule: write one entry per distinct risk, not one entry per category. Examples: 'Third-party payment API instability — high probability during peak load; mitigate with circuit breaker and fallback to manual processing order queue.' 'Legal review for PII data policy may miss Sprint 3 deadline — medium probability; mitigate by requesting review in Sprint 2 with a two-week buffer.' Anti-pattern: 'Technical risks' or 'Integration risks' (category labels, not named risks — a reviewer cannot act on a category). Write no node id into the text. Required with at least one entry when `risk_status` is `high` or `critical` (E520 otherwise)."
               },
               "spikes": {
                 "$ref": "vc:core:collections#stringArray",
-                "description": "Time-boxed technical investigations required to resolve specific uncertainties before work can proceed. Decision rule: each spike entry must name (1) the question being answered, (2) the time budget, and (3) the expected output. Examples: 'Evaluate Redis Cluster vs Elasticache for session store — 2-day spike, output: architectural decision record with latency benchmarks.' 'Prototype JWT rotation with zero-downtime rollover — 1-day spike, output: working proof of concept committed to feature branch.' Anti-pattern: 'Investigate performance' or 'Research options' (open-ended spikes with no time box or defined output cannot be completed or reviewed). Write no node id into the text."
+                "description": "Time-boxed technical investigations that resolve a specific uncertainty before work can proceed; one string per spike. Examples: 'Evaluate Redis Cluster vs Elasticache for session store — 2-day spike, output: architectural decision record with latency benchmarks.' 'Prototype JWT rotation with zero-downtime rollover — 1-day spike, output: working proof of concept committed to feature branch.' Anti-pattern: 'Investigate performance' or 'Research options' (open-ended spikes with no time box or defined output cannot be completed or reviewed). Write no node id into the text."
               },
               "lifecycle": {
                 "description": "Lifecycle state of this milestone: active (default), deprecated or not_applicable.",
@@ -357,6 +357,26 @@
               "user_story",
               "tasks"
             ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "risk_status": {
+                      "enum": ["high", "critical"]
+                    }
+                  },
+                  "required": ["risk_status"]
+                },
+                "then": {
+                  "required": ["risks"],
+                  "properties": {
+                    "risks": {
+                      "minItems": 1
+                    }
+                  }
+                }
+              }
+            ],
             "description": "A single roadmap milestone with a user story and its tasks. It stores no links: the design milestones and capabilities it serves are computed from what its task criteria refine."
           },
           "x-node": {
@@ -376,7 +396,7 @@
         "migration_plan": {
           "type": "string",
           "minLength": 1,
-          "description": "High-level strategy for migrating from existing systems or data. A good migration plan addresses four areas: (1) what is being replaced (legacy system, schema version, or API contract); (2) migration sequence (strangler fig pattern vs. big-bang replacement); (3) rollback plan (how to revert if migration fails); (4) acceptance test for successful migration (how to confirm the migration is complete). Example: 'Migrate auth from session cookies to JWT tokens using strangler fig pattern across 3 milestones — existing session auth remains active until milestone 3; rollback: re-enable session middleware; acceptance: all auth endpoints accept JWT tokens and all legacy session tests pass.' Anti-pattern: 'We will migrate the data' (does not describe sequence, rollback, or acceptance criteria)."
+          "description": "Short strategy for migrating from existing systems or data, in one or two sentences and under 40 words, or the string \"none\" when nothing is migrated. Name what is replaced and how the migration is reversed or confirmed. Example: 'Move auth from session cookies to JWT behind a strangler facade over three milestones; roll back by re-enabling cookies; done when no cookie session is created.'"
         }
       },
       "required": [

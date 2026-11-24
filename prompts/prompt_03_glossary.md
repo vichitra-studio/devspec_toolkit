@@ -27,6 +27,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Heuristics For Completeness
 - Term-use rule: no node links to a term. It counts as used when its `term` label appears in the text of a node of steps 04 to 15 (case is ignored, `-`, `_` and `/` read as a space, whole words only, an `s` or `es` may follow the last word). Choose the label as the words downstream text will actually use. `spec-check` reports a term whose label no node mentions (E741); the way out is to use the label in the text of a node of steps 04 to 15, or to delete the term with `specdev json delete --id <term_id>`.
+- Renaming a term that downstream text already uses: run `specdev node rename --label <term-id> "<new label>"` (add `--dry-run` to list the uses first). It changes the `term` label and rewrites every exact use of the old label in the text of nodes of steps 04 to 15, the `metric` of a step 07 NFR included. Editing `term` by hand leaves E590 against step 07 until the metric is rebound.
 - Populate `units` for every term whose `term_id` corresponds to a metric in `spec/00_charter.json` `success_metrics` to enable downstream alignment; populate `domain` for every term where a grouping domain can be clearly identified from the upstream artifacts.
 - Coverage rule: every metric name in `spec/00_charter.json` `success_metrics[*].name` should have a corresponding `term_id` entry with `units` populated.
 - Completeness formula: % of key nouns from charter/capability statements and upstream metrics covered in the glossary.
@@ -50,7 +51,7 @@ Before emitting, verify:
 - All `term_ref` cross-references resolve to valid canonical registry IDs (either existing entries in `canon/manifest.json` or anticipated IDs matching `canonical_proposals` entries).
 - Units referenced in `spec/00_charter.json` `success_metrics` are defined here with canonical unit values.
 - If any charter or capability term is ambiguous: add a gap question (Clarify mode) rather than inventing a definition.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every term in `terms` that does not already have a matching entry in `canon/manifest.json` has a corresponding entry in `canonical_proposals`
@@ -83,7 +84,7 @@ Before emitting, verify:
 - **Circular**: Writing circular definitions that reference the term itself or other undefined jargon.
 - **Missing Units**: Skipping units for metrics, leading to mismatches across FRs and monitoring.
 - **Duplicates**: Allowing duplicate or near-duplicate entries that confuse schema validation.
-- **Drift**: Every domain noun introduced in steps 04-16c MUST have a corresponding `term_id` in this glossary; downstream steps MUST NOT introduce terms not defined here, and MUST write a defined term by its label.
+- **Drift**: One concept, one term: do not define a second term for a concept an existing term already covers, and choose each label as the words later text will actually use (see the term-use rule above); a term no node uses by its label is reported as E741.
 - **Broadness**: Definitions that are too broad or business-jargon-heavy to guide engineers.
 
 # Clarification Questions
@@ -106,7 +107,7 @@ specdev canon-accept --from spec/03_glossary.json --namespace cn:project:
 ```
 (or equivalently: `./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit --namespace cn:project:`)
 
-This promotes all `canonical_proposals` entries to `canon/manifest.json`. Proposals whose generated ID already exists are skipped automatically.
+This promotes all `canonical_proposals` entries to `canon/manifest.json`. Proposals whose generated ID already exists are skipped automatically. The proposal stays in the file afterwards; it is not removed or marked.
 
 ### What to Populate in `canonical_proposals`
 

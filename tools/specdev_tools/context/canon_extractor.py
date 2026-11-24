@@ -3,8 +3,8 @@
 Implements ``extract_canon(step_id, repo_root, spec_root=None) -> dict``.
 
 Schema-driven kind discovery: walks the step's output schema to find _ref
-fields, maps them to canon kinds via INFERENCE_RULES, then loads the relevant
-canon/kinds/{kind}.json files.
+fields, maps them to canon kinds via INFERENCE_RULES, then loads the entries of
+those kinds from both canon tiers (project entries win).
 """
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.constants import INFERENCE_RULES
+from ..canonical.registry import load_tier_entries
 from ._utils import (
-    load_json as _u_load_json,
     find_step_schema_uri as _u_find_step_schema_uri,
     merge_allof as _u_merge_allof,
 )
@@ -27,10 +27,6 @@ from ._utils import (
 _REF_TO_KIND: dict[str, str] = {
     rule[1]: rule[2] for rule in INFERENCE_RULES
 }
-
-
-def _load_json(path: str) -> Any:
-    return _u_load_json(path)
 
 
 def _find_step_schema_uri(step_id: str, registry: SchemaRegistry) -> str | None:
@@ -105,41 +101,14 @@ def _collect_ref_fields_split(
     return required, optional
 
 
-def _load_kind_entries(kind: str, repo_root: str) -> list[dict[str, Any]]:
-    """Load entries from ``canon/kinds/{kind}.json``.
-
-    The file has the structure:
-      {"kind": "...", "entries": [...]}
-
-    Each entry has ``id``, ``preferred_label``, ``definition``, ``aliases``.
-    """
-    kind_path = os.path.join(repo_root, "canon", "kinds", f"{kind}.json")
-    if not os.path.isfile(kind_path):
-        return []
-    try:
-        data = _load_json(kind_path)
-    except (OSError, json.JSONDecodeError):
-        return []
-
-    raw_entries: list[Any]
-    if isinstance(data, list):
-        raw_entries = data
-    elif isinstance(data, dict):
-        raw_entries = data.get("entries", [])
-    else:
-        return []
-
-    result: list[dict[str, Any]] = []
-    for entry in raw_entries:
-        if not isinstance(entry, dict):
-            continue
-        result.append({
-            "id": entry.get("id", ""),
-            "preferred_label": entry.get("preferred_label", ""),
-            "definition": entry.get("definition", ""),
-            "aliases": entry.get("aliases", []),
-        })
-    return result
+def _summarise_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Reduce a canon entry to the fields a step prompt reads."""
+    return {
+        "id": entry.get("id", ""),
+        "preferred_label": entry.get("preferred_label", ""),
+        "definition": entry.get("definition", ""),
+        "aliases": entry.get("aliases", []),
+    }
 
 
 def extract_canon(step_id: str, repo_root: str, spec_root: str | None = None) -> dict[str, Any]:
@@ -153,9 +122,9 @@ def extract_canon(step_id: str, repo_root: str, spec_root: str | None = None) ->
         Path to the devspec_toolkit repo root (toolkit-tier canon).
     spec_root:
         Optional path to the host project's spec directory. When provided,
-        project-tier entries from ``{spec_root}/canon/kinds/{kind}.json`` are
-        merged after toolkit entries, so project-specific terms are visible
-        alongside core vocabulary.
+        project-tier entries of ``{spec_root}/canon/`` (``manifest.json`` and
+        ``kinds/*.json``) are merged with the toolkit entries; project entries
+        win over core entries of the same id.
 
     Returns
     -------
@@ -192,29 +161,19 @@ def extract_canon(step_id: str, repo_root: str, spec_root: str | None = None) ->
             seen_kinds.add(kind)
 
     # ------------------------------------------------------------------
-    # 3. Load entries for each kind — toolkit tier first, then project tier.
+    # 3. Load entries for each kind from both tiers (project wins).
     # ------------------------------------------------------------------
-    # Resolve project canon directory: {spec_root}/canon/ when spec_root given.
     project_canon_root: str | None = None
     if spec_root:
         candidate = os.path.join(os.path.abspath(spec_root), "canon")
         if os.path.isdir(candidate):
             project_canon_root = candidate
 
+    tier_entries = load_tier_entries(repo_root_abs, "canon", project_canon_dir=project_canon_root)
     canon_kinds: dict[str, list[dict[str, Any]]] = {}
     total_entries = 0
     for kind in kinds_needed:
-        # Toolkit-tier entries (e.g. devspec_toolkit/canon/kinds/term.json)
-        entries = _load_kind_entries(kind, repo_root_abs)
-        # Project-tier entries merged in (e.g. spec/canon/kinds/term.json)
-        if project_canon_root:
-            project_root_for_kind = os.path.dirname(project_canon_root)  # parent of canon/
-            project_entries = _load_kind_entries(kind, project_root_for_kind)
-            # Deduplicate by id — toolkit entries take precedence; project entries whose id
-            # already exists in the toolkit tier are skipped. In practice this is a no-op
-            # because toolkit IDs are cn:core:* and project IDs are cn:project:*.
-            toolkit_ids = {e["id"] for e in entries}
-            entries = entries + [e for e in project_entries if e["id"] not in toolkit_ids]
+        entries = [_summarise_entry(e) for e in tier_entries if e.get("kind") == kind]
         canon_kinds[kind] = entries
         total_entries += len(entries)
 

@@ -349,7 +349,7 @@ def _validate_unresolved_candidates(
         label = _norm_semantic(value)
         if (field_path, label) in conflicts:
             continue
-        if (field_path, kind, label) in proposals:
+        if (_wild(field_path), kind, label) in proposals:
             continue
         errors.append(
             make_error(
@@ -492,6 +492,14 @@ def _kind_for_ref_key(ref_key: str) -> str | None:
     return None
 
 
+_WILDCARD_INDEX = re.compile(r"\[(?:\d+|\*)\]")
+
+
+def _wild(path: str) -> str:
+    """*path* with every array index (``[3]`` or ``[*]``) written ``[*]``."""
+    return _WILDCARD_INDEX.sub("[*]", path)
+
+
 def _proposal_index(value: Any) -> set[tuple[str, str, str]]:
     out: set[tuple[str, str, str]] = set()
     if not isinstance(value, list):
@@ -503,7 +511,7 @@ def _proposal_index(value: Any) -> set[tuple[str, str, str]]:
         kind = item.get("kind")
         label = item.get("proposed_label")
         if isinstance(field, str) and isinstance(kind, str) and isinstance(label, str):
-            out.add((field, kind, _norm_semantic(label)))
+            out.add((_wild(field), kind, _norm_semantic(label)))
     return out
 
 

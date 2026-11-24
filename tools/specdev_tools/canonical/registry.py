@@ -72,7 +72,7 @@ class CanonicalRegistry:
                                             f"CANON_ID_COLLISION_PROJECT_WINS id={eid} (project entry overrides core)",
                                         )
                                     )
-                        manifest = _merge_manifest_data(manifest, project_manifest)
+                        manifest = merge_manifest_data(manifest, project_manifest)
 
         if manifest is None:
             return cls(entries={}, aliases={}, alias_status={}, load_errors=load_errors)
@@ -199,6 +199,21 @@ class CanonicalRegistry:
         return errs
 
 
+def load_tier_entries(
+    repo_root: str,
+    canon_dir: str = "canon",
+    project_canon_dir: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return the entries of the toolkit and project canon tiers, ordered by id.
+
+    The project entry wins over the toolkit entry of the same id (W421 is
+    recorded by ``CanonicalRegistry.load`` and not returned here).  A tier
+    that is absent contributes nothing.
+    """
+    registry = CanonicalRegistry.load(repo_root, canon_dir, project_canon_dir)
+    return [entry.payload for entry in sorted(registry.entries.values(), key=lambda e: e.id)]
+
+
 def _norm(value: str) -> str:
     # Treat whitespace, underscores, and hyphens as equivalent separators.
     tokens = [part for part in re.split(r"[\s_-]+", (value or "").lower().strip()) if part]
@@ -226,7 +241,7 @@ def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | 
     elif modular is None:
         combined = manifest
     else:
-        combined = _merge_manifest_data(manifest, modular)
+        combined = merge_manifest_data(manifest, modular)
 
     examples = _load_examples_manifests(root / canon_dir, load_errors)
     if examples is None:
@@ -234,7 +249,7 @@ def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | 
     if combined is None:
         return examples, load_errors
     # Manifest/modular entries take precedence over examples entries.
-    return _merge_manifest_data(examples, combined), load_errors
+    return merge_manifest_data(examples, combined), load_errors
 
 
 def _load_examples_manifests(canon_root: Path, load_errors: list[SpecError]) -> dict[str, Any] | None:
@@ -336,7 +351,7 @@ def _load_modular_manifest(canon_root: Path, load_errors: list[SpecError]) -> di
     }
 
 
-def _merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> dict[str, Any]:
+def merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> dict[str, Any]:
     entries_by_id: dict[str, dict[str, Any]] = {}
     for raw in _iter_dicts(manifest.get("entries", [])):
         entry_id = raw.get("id")

@@ -14,7 +14,7 @@ from typing import Any, Iterator
 
 from ..core.json_utils import resolve_effective_toolkit_root
 from ..core.loaders import iter_spec_artifacts
-from ..graph.build import build_file_graph, build_graph
+from ..graph.build import build_graph
 from ..graph.kinds import KindRegistryError
 from ..graph.model import Graph
 
@@ -23,14 +23,6 @@ from ..graph.model import Graph
 # Stopword sets shared by the linters
 # ---------------------------------------------------------------------------
 
-DERIVATION_STOPWORDS: frozenset[str] = frozenset({
-    "that", "this", "with", "from", "have", "will", "been", "were", "they",
-    "their", "than", "each", "which", "when", "what", "there", "about",
-    "would", "make", "like", "into", "only", "also", "most", "some",
-    "could", "should", "does", "must", "shall", "true", "false", "null",
-    "http", "https", "schema", "json", "spec", "step",
-})
-
 CONTENT_STOPWORDS: frozenset[str] = frozenset({
     "that", "this", "with", "from", "have", "will", "been", "were", "they",
     "their", "than", "each", "which", "when", "what", "there", "about",
@@ -38,33 +30,6 @@ CONTENT_STOPWORDS: frozenset[str] = frozenset({
     "could", "should", "does", "must", "shall", "true", "false", "null",
     "http", "https", "schema", "json", "spec", "step",
 })
-
-
-# ---------------------------------------------------------------------------
-# tokenize_free_text — replaces 3 copies of free-text tokenizer
-# ---------------------------------------------------------------------------
-
-def tokenize_free_text(text: str, *, stopwords: frozenset[str] | None = None) -> set[str]:
-    """Extract significant tokens: 4+ char lowercase words, no stopwords.
-
-    Parameters
-    ----------
-    text : str
-        Raw text to tokenize.
-    stopwords : frozenset[str] | None
-        Custom stopword set.  Defaults to ``DERIVATION_STOPWORDS``.
-
-    Returns
-    -------
-    set[str]
-        Set of significant tokens.
-    """
-    if stopwords is None:
-        stopwords = DERIVATION_STOPWORDS
-    return {
-        w for w in re.findall(r"[a-z][a-z0-9_-]{3,}", text.lower())
-        if w not in stopwords
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -92,14 +57,6 @@ def build_lint_graph(spec_dir: str, repo_root: str | None = None) -> Graph | Non
     """
     try:
         return build_graph(spec_dir, repo_root or resolve_effective_toolkit_root(None))
-    except KindRegistryError:
-        return None
-
-
-def build_file_graph_or_none(path: str, document: dict[str, Any]) -> Graph | None:
-    """The one-file graph slice of the spec file *path* (parsed content *document*), or ``None`` without a registry."""
-    try:
-        return build_file_graph(path, resolve_effective_toolkit_root(None), document)
     except KindRegistryError:
         return None
 

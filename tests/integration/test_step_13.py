@@ -80,5 +80,12 @@ def test_e030_label_not_in_canon_fires_e110(tmp_path):
     assert not [e for e in errors if e.code == "E590" and "bogus" in str(e)]
 
 
+def test_extension_with_two_sections_fails():
+    from specdev_tools.validation.validate import validate_file
+
+    errors = validate_file(str(_REPO), str(_REPO / "tests/fixtures/step_13/invalid_two_sections.json"))
+    assert any(e.code == "E520" and "required_schema_sections" in e.render() for e in errors), [e.render() for e in errors]
+
+
 if __name__ == "__main__":
     main()

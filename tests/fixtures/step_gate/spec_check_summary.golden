@@ -1,11 +1,11 @@
-spec-check: 30 checks run, 25 errors, 7 warnings
+spec-check: 30 checks run, 25 errors, 1 warnings
 
   [PASS] schema-validation              0 errors  0 warnings
   [FAIL] toolkit-version                1 errors  0 warnings
   [PASS] spec-quality-lint              0 errors  0 warnings
   [PASS] canonical-lint                 0 errors  0 warnings
   [PASS] canonical-integrity            0 errors  0 warnings
-  [WARN] hallucination-lint             0 errors  6 warnings
+  [PASS] hallucination-lint             0 errors  0 warnings
   [WARN] seed-lint                      0 errors  1 warnings
   [PASS] fixtures-lint                  0 errors  0 warnings
   [PASS] dependency-order-lint          0 errors  0 warnings

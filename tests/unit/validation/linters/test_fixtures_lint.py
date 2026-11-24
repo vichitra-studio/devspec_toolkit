@@ -7,15 +7,17 @@ from typing import Any
 from specdev_tools.validation.fixtures_lint import lint_fixtures
 from specdev_tools.core.errors import render_errors
 
-# The lint recognises a step 08 artifact by the suffix of its ``$schema``.
+# The lint recognises a step 08 artifact by the registry id or by the suffix of its ``$schema``.
 _FIXTURES_SCHEMA = "https://example.invalid/schema/08_fixtures.schema.json"
+_REGISTRY_ID = "vc:08-fixtures"
+_WORKED_EXAMPLE_SPEC = Path(__file__).resolve().parents[3] / "fixtures" / "graph_example" / "spec"
 
 
-def _lint(fixtures: list[Any]) -> list[str]:
+def _lint(fixtures: list[Any], schema: str = _FIXTURES_SCHEMA) -> list[str]:
     """Render the findings of ``lint_fixtures`` over a spec dir that holds one step 08 artifact."""
     with tempfile.TemporaryDirectory() as td:
         (Path(td) / "08_fixtures.json").write_text(
-            json.dumps({"$schema": _FIXTURES_SCHEMA, "fixtures": fixtures}), encoding="utf-8"
+            json.dumps({"$schema": schema, "fixtures": fixtures}), encoding="utf-8"
         )
         return render_errors(lint_fixtures(td))
 
@@ -52,6 +54,21 @@ class FixturesLintTests(unittest.TestCase):
 
     def test_wrong_typed_entries_do_not_raise(self):
         self.assertEqual(_lint([7, "fix-a", None, ["x"]]), [])
+
+    def test_file_with_registry_id_is_read(self):
+        rendered = _lint([{"fixture_id": "fx-bad-status", "mode": "contract", "input": {}, "expected": {"status": 42}}], _REGISTRY_ID)
+        self.assertTrue(any("fx-bad-status" in e and "expected.status" in e for e in rendered), rendered)
+
+    def test_file_with_legacy_suffix_is_still_read(self):
+        rendered = _lint([{"fixture_id": "fx-bad-status", "mode": "contract", "input": {}, "expected": {"status": 42}}], _FIXTURES_SCHEMA)
+        self.assertTrue(any("fx-bad-status" in e and "expected.status" in e for e in rendered), rendered)
+
+    def test_worked_example_fixtures_pass(self):
+        self.assertEqual(render_errors(lint_fixtures(str(_WORKED_EXAMPLE_SPEC))), [])
+
+    def test_fixture_without_expected_in_registry_id_file_is_e520(self):
+        rendered = _lint([{"fixture_id": "fx-no-expected", "mode": "unit", "input": {}}], _REGISTRY_ID)
+        self.assertTrue(any("E520" in e and "fx-no-expected" in e and "missing input/expected" in e for e in rendered), rendered)
 
 
 if __name__ == "__main__":

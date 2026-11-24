@@ -18,7 +18,7 @@ Each D-type carries a `cross_boundary_candidate` annotation indicating whether i
 ### D1 — Definition ↔ duplicate definition
 **Generic pattern.** The same rule, value, or definition is asserted in two or more files; one is authoritative and the others restate it.
 **Detection lens.** Find values present in artifact A and artifact B (same enum / same number / same constraint / same identifier list). If both exist independently, who owns it? Is the non-owner restating, or referencing?
-**Example shape.** A required-fields list in a schema and a "fields you must include" line in a prompt; a numeric threshold in code and in docs.
+**Example shape.** A required-fields list in a schema and a "fields you must include" line in a prompt; a numeric threshold in code and in docs; a schema field description that invites what the prompt of the same step forbids in its Negative Constraints (a description that says to cite a regulation beside a prompt that forbids citations in a field).
 **Cross-boundary candidate.** True — typically manifests across slice boundaries.
 
 ### D2 — Producer ↔ consumer shape

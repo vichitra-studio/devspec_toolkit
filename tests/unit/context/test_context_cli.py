@@ -185,6 +185,32 @@ class TestContextCanon:
         )
 
 
+def test_context_canon_includes_manifest_only_project_entry(tmp_path):
+    """A project canon that holds manifest.json alone (no kinds/) is read by `context canon`."""
+    canon = tmp_path / "spec" / "canon"
+    canon.mkdir(parents=True)
+    entry = {
+        "id": "cn:project:capability:account-recovery",
+        "kind": "capability",
+        "preferred_label": "Account recovery",
+        "definition": "Members regain access to an account.",
+        "version": "1.0.0",
+        "status": "active",
+    }
+    (canon / "manifest.json").write_text(
+        json.dumps({"registry_version": "1.0.0", "entries": [entry], "aliases": []}), encoding="utf-8",
+    )
+    proc = _run(
+        "context", "canon",
+        "--step", "04",
+        "--repo-root", str(REPO_ROOT),
+        "--spec-root", str(tmp_path / "spec"),
+    )
+    data = _parse_json(proc)
+    ids = [e["id"] for e in data["canon_kinds"]["capability"]]
+    assert "cn:project:capability:account-recovery" in ids
+
+
 # ---------------------------------------------------------------------------
 # context freshness
 # ---------------------------------------------------------------------------

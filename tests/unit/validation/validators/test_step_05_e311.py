@@ -1,4 +1,4 @@
-"""E311 (missing enum provenance) fires only for a declared parameter enum."""
+"""E311 (missing enum provenance) fires only for a declared parameter enum of an API that relies on a third party."""
 import pytest
 
 from specdev_tools.validation.validators.step_05 import validate_step_05
@@ -20,25 +20,31 @@ def test_errors_only_api_without_provenance_no_e311():
     assert _e311(api) == []
 
 
-def test_parameter_enum_without_provenance_fires_e311():
-    assert len(_e311(_api(parameters=[_ENUM_PARAM]))) == 1
+def test_parameter_enum_without_relies_on_no_e311():
+    assert _e311(_api(parameters=[_ENUM_PARAM])) == []
 
 
-def test_parameter_enum_with_provenance_clean():
-    assert _e311(_api(parameters=[_ENUM_PARAM], enum_provenance=_PROVENANCE)) == []
+def test_parameter_enum_with_relies_on_without_provenance_fires_e311():
+    assert len(_e311(_api(parameters=[_ENUM_PARAM], relies_on=["tp-bank"]))) == 1
+
+
+def test_parameter_enum_with_relies_on_and_provenance_clean():
+    assert _e311(_api(parameters=[_ENUM_PARAM], relies_on=["tp-bank"], enum_provenance=_PROVENANCE)) == []
 
 
 @pytest.mark.parametrize(
     ("api", "fires"),
     [
-        (_api(parameters=[_ENUM_PARAM]), True),
+        (_api(parameters=[_ENUM_PARAM]), False),
         (_api(parameters=[_ENUM_PARAM], relies_on=["tp-bank"]), True),
-        (_api(parameters=[_ENUM_PARAM], enum_provenance=_PROVENANCE), False),
+        (_api(parameters=[_ENUM_PARAM], relies_on=[]), False),
+        (_api(parameters=[_ENUM_PARAM], relies_on=["tp-bank"], enum_provenance=_PROVENANCE), False),
+        (_api(parameters=[{"name": "id", "in": "path", "required": True}], relies_on=["tp-bank"]), False),
         (_api(parameters=[{"name": "id", "in": "path", "required": True}]), False),
         (_api(errors=[{"code": "x"}]), False),
         (_api(), False),
     ],
-    ids=["enum", "enum-relies-on", "enum-provenance", "plain-param", "errors-only", "bare"],
+    ids=["enum", "enum-relies-on", "enum-empty-relies-on", "enum-provenance", "plain-param-relies-on", "plain-param", "errors-only", "bare"],
 )
 def test_e311_reading_table(api, fires):
     assert bool(_e311(api)) is fires

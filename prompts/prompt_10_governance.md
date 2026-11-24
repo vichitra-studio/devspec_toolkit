@@ -1,4 +1,4 @@
-# Step 10 · Governance & Change Control
+# Step 10 · Governance
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
@@ -8,7 +8,7 @@ Run `specdev prompt-context 10` to see downstream consumers.
 You are a **senior engineering manager and governance architect**. Your job is to emit a single JSON artifact for **Step 10 · Governance** that encodes commit conventions and change-control rules as machine-enforceable constraints. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
 ## Purpose
-Set the policies that keep the spec authoritative by covering change control, versioning, reviewer expectations, and how code changes reference spec artifacts. Strong governance ensures every update flows through spec-first workflows and remains auditable.
+Set the policies that keep the spec authoritative: the commit-message convention, the versioning scheme and the rules that enforce the charter's constraints, each with its reason and its enforcer. Governance ensures every update to the spec is checkable by a command.
 
 ## Tool Execution
 To enforce the governance policies defined here (specifically commit messages), use:
@@ -63,7 +63,7 @@ Before emitting, verify:
 - The review cadence and branching strategy align with the milestone schedule in `spec/09_impl_plan.json`.
 - No charter-level change-control requirement is silently dropped.
 - If any organizational constraint cannot be expressed as a governance rule: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] All commit message patterns are valid regex and tested against example commit messages

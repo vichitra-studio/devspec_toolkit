@@ -210,7 +210,7 @@ class TestDuplicateHandling:
             "id": "cn:project:entity:my-term",
             "kind": "entity",
             "preferred_label": "My Term",
-            "definition": "Already here.",
+            "definition": "A well-defined term.",
             "version": "1.0.0",
             "status": "active",
             "owners": ["spec-platform"],
@@ -238,7 +238,7 @@ class TestDuplicateHandling:
             "id": "cn:project:entity:term-a",
             "kind": "entity",
             "preferred_label": "Term A",
-            "definition": "Already here.",
+            "definition": "Old.",
             "version": "1.0.0",
             "status": "active",
             "owners": ["spec-platform"],
@@ -278,7 +278,7 @@ class TestDuplicateHandling:
         spec_file = tmp_path / "03_glossary.json"
         _write_json(spec_file, _make_spec([
             _proposal(temp_id="my-term", kind="entity", proposed_label="My Term", definition="First."),
-            _proposal(temp_id="my-term", kind="entity", proposed_label="My Term", definition="Duplicate."),
+            _proposal(temp_id="my-term", kind="entity", proposed_label="My Term", definition="First."),
         ]))
 
         result = run_canon_accept(
@@ -493,34 +493,33 @@ class TestAcceptedFromRelativePath:
         # Must contain the filename
         assert "03_glossary.json" in accepted_from
 
-    def test_accepted_from_falls_back_to_absolute_when_outside_repo_root(
-        self, tmp_path: Path
-    ) -> None:
-        """When spec file is outside repo_root, accepted_from falls back to absolute path."""
-        # Create two sibling dirs so spec_file is genuinely outside repo_root
-        repo = tmp_path / "the_repo"
-        repo.mkdir()
-        (repo / "canon").mkdir()
+    def _accept_from_outside_repo(self, tmp_path: Path, git_root: Path | None) -> str:
+        """Run canon-accept on a spec that lives in a host folder beside the toolkit; return the stored accepted_from."""
+        repo = tmp_path / "host" / "devspec_toolkit"
+        (repo / "canon").mkdir(parents=True)
         manifest_path = repo / "canon" / "manifest.json"
         _write_json(manifest_path, _make_manifest())
-
-        external_dir = tmp_path / "external"
-        external_dir.mkdir()
-        spec_file = external_dir / "external_spec.json"
+        spec_file = tmp_path / "host" / "spec" / "03_glossary.json"
+        spec_file.parent.mkdir()
         _write_json(spec_file, _make_spec([_proposal()]))
 
         run_canon_accept(
             spec_file=str(spec_file),
             namespace="cn:project:",
             repo_root=str(repo),
+            git_root=str(git_root) if git_root else None,
         )
 
         updated = json.loads(manifest_path.read_text(encoding="utf-8"))
-        entry = next(e for e in updated["entries"] if e["id"] == "cn:project:entity:my-term")
-        accepted_from = entry["lifecycle"]["accepted_from"]
+        return updated["entries"][0]["lifecycle"]["accepted_from"]
 
-        # The absolute path of the spec file must appear in accepted_from
-        assert str(spec_file) in accepted_from
+    def test_accepted_from_is_relative_to_git_root_when_spec_is_outside_repo_root(self, tmp_path: Path) -> None:
+        assert self._accept_from_outside_repo(tmp_path, tmp_path / "host") == "spec/03_glossary.json"
+
+    def test_accepted_from_is_never_absolute(self, tmp_path: Path) -> None:
+        accepted_from = self._accept_from_outside_repo(tmp_path, None)
+        assert accepted_from == "../spec/03_glossary.json"
+        assert not Path(accepted_from).is_absolute()
 
 
 # ---------------------------------------------------------------------------
@@ -1295,8 +1294,8 @@ class TestWriteFailureAdded:
         existing_entry = {
             "id": "cn:project:entity:existing",
             "kind": "entity",
-            "preferred_label": "Existing",
-            "definition": "Already here.",
+            "preferred_label": "E",
+            "definition": "D.",
             "version": "1.0.0",
             "status": "active",
             "owners": [],
@@ -1578,3 +1577,144 @@ class TestIdempotentRerunManifestIdentity:
         assert manifest_after_first == manifest_after_second, (
             "Manifest must be byte-identical after an idempotent re-run that adds nothing"
         )
+
+
+# ---------------------------------------------------------------------------
+# DEVSPEC-141 / DEVSPEC-152 — indentation of the canon files; changed entries and --update
+# ---------------------------------------------------------------------------
+
+def _stored_entry(**overrides: object) -> dict:
+    entry: dict = {
+        "id": "cn:project:entity:my-term",
+        "kind": "entity",
+        "preferred_label": "My Term",
+        "definition": "A well-defined term.",
+        "version": "1.0.0",
+        "status": "active",
+        "owners": [],
+        "aliases": [],
+        "lifecycle": {"introduced_at": "2026-03-01T00:00:00Z"},
+    }
+    entry.update(overrides)
+    return entry
+
+
+def _write_canon(repo: Path, entries: list[dict], indent: int = 2) -> tuple[Path, Path]:
+    """Write ``canon/manifest.json`` and ``canon/kinds/entity.json`` holding *entries*, in *indent* spaces."""
+    kinds = repo / "canon" / "kinds"
+    kinds.mkdir(parents=True)
+    manifest = repo / "canon" / "manifest.json"
+    kind_file = kinds / "entity.json"
+    manifest.write_text(json.dumps(_make_manifest(entries), indent=indent) + "\n", encoding="utf-8")
+    kind_data = {"$schema": "vc:canon:kind", "registry_version": "1.0.0", "kind": "entity", "entries": entries}
+    kind_file.write_text(json.dumps(kind_data, indent=indent) + "\n", encoding="utf-8")
+    return manifest, kind_file
+
+
+def _accept(repo: Path, tmp_path: Path, proposals: list[dict], **kwargs: object) -> dict:
+    spec_file = tmp_path / "03_glossary.json"
+    _write_json(spec_file, _make_spec(proposals))
+    return run_canon_accept(spec_file=str(spec_file), namespace="cn:project:", repo_root=str(repo), **kwargs)
+
+
+class TestCanonFileIndentation:
+    def test_a_four_space_manifest_and_kind_file_keep_four_spaces(self, tmp_repo: Path, tmp_path: Path) -> None:
+        import difflib
+
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()], indent=4)
+        before = {path: path.read_text(encoding="utf-8").splitlines() for path in (manifest, kind_file)}
+
+        result = _accept(tmp_repo, tmp_path, [_proposal(temp_id="other-term", proposed_label="Other")])
+
+        assert result["added"] == ["cn:project:entity:other-term"]
+        for path, old_lines in before.items():
+            text = path.read_text(encoding="utf-8")
+            removed = [d for d in difflib.ndiff(old_lines, text.splitlines()) if d.startswith("- ")]
+            assert len(removed) <= 2, removed
+            assert json.loads(text)["entries"][-1]["id"] == "cn:project:entity:other-term"
+
+    def test_a_two_space_canon_is_unchanged_in_style(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()], indent=2)
+
+        _accept(tmp_repo, tmp_path, [_proposal(temp_id="other-term", proposed_label="Other")])
+
+        for path in (manifest, kind_file):
+            text = path.read_text(encoding="utf-8")
+            assert text == json.dumps(json.loads(text), indent=2, ensure_ascii=False) + "\n"
+
+    def test_a_new_kind_file_takes_the_indent_of_the_manifest(self, tmp_repo: Path, tmp_path: Path) -> None:
+        (tmp_repo / "canon" / "manifest.json").write_text(json.dumps(_make_manifest(), indent=4) + "\n", encoding="utf-8")
+
+        _accept(tmp_repo, tmp_path, [_proposal()])
+
+        text = (tmp_repo / "canon" / "kinds" / "entity.json").read_text(encoding="utf-8")
+        assert text == json.dumps(json.loads(text), indent=4, ensure_ascii=False) + "\n"
+
+
+class TestChangedEntriesAndUpdate:
+    def test_a_changed_definition_is_reported_not_skipped_and_nothing_is_written(
+        self, tmp_repo: Path, tmp_path: Path
+    ) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
+        before = (manifest.read_bytes(), kind_file.read_bytes())
+
+        result = _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")])
+
+        assert result["error"] is None
+        assert result["changed"] == [{"id": "cn:project:entity:my-term", "fields": ["definition"]}]
+        assert result["skipped"] == []
+        assert (manifest.read_bytes(), kind_file.read_bytes()) == before
+
+    def test_update_rewrites_manifest_and_kind_file_together(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
+
+        result = _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")], update=True)
+
+        assert result["updated"] == ["cn:project:entity:my-term"]
+        manifest_entry = json.loads(manifest.read_text(encoding="utf-8"))["entries"][0]
+        kind_entry = json.loads(kind_file.read_text(encoding="utf-8"))["entries"][0]
+        assert manifest_entry["definition"] == "A new definition."
+        assert manifest_entry == kind_entry
+        assert manifest_entry["lifecycle"] == {"introduced_at": "2026-03-01T00:00:00Z"}
+
+    def test_update_adds_the_old_label_to_aliases_once(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
+
+        for label in ("Renamed", "My Term", "Renamed"):
+            _accept(tmp_repo, tmp_path, [_proposal(proposed_label=label)], update=True)
+
+        for path in (manifest, kind_file):
+            entry = json.loads(path.read_text(encoding="utf-8"))["entries"][0]
+            assert entry["preferred_label"] == "Renamed"
+            assert entry["aliases"] == ["My Term", "Renamed"]
+
+    def test_update_adds_an_entry_missing_from_its_kind_file(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
+        kind_data = json.loads(kind_file.read_text(encoding="utf-8"))
+        kind_data["entries"] = []
+        kind_file.write_text(json.dumps(kind_data, indent=2) + "\n", encoding="utf-8")
+
+        _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")], update=True)
+
+        entries = json.loads(kind_file.read_text(encoding="utf-8"))["entries"]
+        assert [e["definition"] for e in entries] == ["A new definition."]
+
+    def test_update_dry_run_writes_nothing(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
+        before = (manifest.read_bytes(), kind_file.read_bytes())
+
+        result = _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")], update=True, dry_run=True)
+
+        assert result["would_update"] == ["cn:project:entity:my-term"]
+        assert result["updated"] == []
+        assert (manifest.read_bytes(), kind_file.read_bytes()) == before
+
+    def test_unchanged_proposals_are_still_skipped(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
+        before = (manifest.read_bytes(), kind_file.read_bytes())
+
+        result = _accept(tmp_repo, tmp_path, [_proposal()], update=True)
+
+        assert result["skipped"] == ["cn:project:entity:my-term"]
+        assert result["changed"] == result["updated"] == result["would_update"] == []
+        assert (manifest.read_bytes(), kind_file.read_bytes()) == before

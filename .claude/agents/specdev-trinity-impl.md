@@ -28,6 +28,14 @@ writes a findings file; `specdev review record` writes the block).
 
 ---
 
+## Worktree dispatch
+
+The session may run in a git worktree, and a relative path may resolve against another checkout. Use the absolute `--repo-root`, `--spec-root` and `--git-root` of the dispatch
+verbatim, and an absolute path for every Read, Write, Edit and Bash call. Before your first write run `git rev-parse --show-toplevel` and compare it with the `--git-root` of the
+dispatch; when they differ, write nothing and return `worktree mismatch: <toplevel> is not <git-root>` as the only entry of `errors_remaining`.
+
+---
+
 ## Tools
 
 Bash surface is restricted to these subcommand families only:
@@ -83,6 +91,8 @@ invocation prompt. This agent reads it and branches.
 ## Mode: execute
 
 **Purpose:** Apply a group's `implementation.actions[]` to host source code.
+
+**Ambiguity gate.** Before the first action of an item, read the item as the Ambiguity Gatekeeper of `prompts/prompt_16b_impl_coder.md`: when it holds vagueness, a missing variable name or "implementation details tbd", make no code change for that item, write an open item (section "Open items" below) and stop on the item. No tool detects vagueness; this is your judgement.
 
 **Procedure:**
 

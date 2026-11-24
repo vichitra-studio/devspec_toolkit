@@ -6,23 +6,15 @@ from typing import Any
 from ...core.cli_commands import known_cli_commands
 from ...core.errors import make_error, SpecError
 
-_ALLOWED_OWNERS: frozenset[str] = frozenset(
-    {"api", "ui", "system", "ops", "data", "product", "business", "engineering"}
-)
-
 
 def validate_step_10(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
     """Validate Step 10 (Governance) logic.
 
-    Checks the owner value, the ``commit_message_rules`` pattern (it must compile) and the ``cli_command`` of each
+    Checks the ``commit_message_rules`` pattern (it must compile) and the ``cli_command`` of each
     rule (it must be on the command list that ``registry-generate`` writes). A wrong-typed value is left to the schema
     and never raises here.
     """
     errors: list[SpecError] = []
-
-    owner = instance.get("owner")
-    if isinstance(owner, str) and owner and owner not in _ALLOWED_OWNERS:
-        errors.append(make_error("E530", f"Invalid owner '{owner}'. Must be one of {sorted(_ALLOWED_OWNERS)}"))
 
     commit_rules = instance.get("commit_message_rules")
     if isinstance(commit_rules, dict):

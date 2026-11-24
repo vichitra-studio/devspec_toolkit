@@ -632,7 +632,7 @@ class CommandRefBypassAndProjectAllowlistTests(unittest.TestCase):
 
     # --- helpers ---------------------------------------------------------
 
-    def _write_step16(self, spec_dir: Path, command_entry: dict) -> None:
+    def _write_step16(self, spec_dir: Path, command_entry: dict | str) -> None:
         # Nest under the real schema shape (plan.review_requirements.test_commands)
         # so the fixture mirrors a valid 16a artifact. hallucination-lint walks the
         # tree generically, so structural depth does not affect verb-prefix checks —
@@ -728,6 +728,45 @@ class CommandRefBypassAndProjectAllowlistTests(unittest.TestCase):
                         self._e530_for_prefix(errs, "jq"), [],
                         f"{label}: ref must NOT bypass E530; got errors: {[e.message for e in errs]}",
                     )
+
+    # --- string-form test_commands ---------------------------------------
+
+    def test_string_test_command_with_unknown_verb_raises_e530(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(root / "spec", "inventcmd run all")
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            found = self._e530_for_prefix(errs, "inventcmd")
+            self.assertEqual(len(found), 1, [e.message for e in errs])
+            self.assertIn("test_commands[0]", found[0].message)
+
+    def test_string_test_command_with_known_verb_passes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(root / "spec", "pytest tests/ -q")
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual([e for e in errs if e.code == "E530"], [])
+
+    def test_object_test_command_with_command_ref_still_bypasses_the_check(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(
+                root / "spec",
+                {"command": "inventcmd run", "command_ref": {"id": "cn:project:command:inventcmd"}},
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(self._e530_for_prefix(errs, "inventcmd"), [])
+
+    def test_object_test_command_is_reported_once(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(root / "spec", {"command": "inventcmd run"})
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(len(self._e530_for_prefix(errs, "inventcmd")), 1)
 
     # --- project-tier allowlist -----------------------------------------
 

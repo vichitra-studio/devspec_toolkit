@@ -55,6 +55,8 @@ class FindingError(Exception):
 #   the trace matrix and the coverage thresholds: E592, W592, E604, W604;
 #   the proof and review checks of the step-16 validator, whose inputs the plan schema no longer has (a milestone closes
 #   on the close gate, E810 to E814): E301, E302, E305, E306, E307, W599, W600, W601.
+#   the assumption id scan and the derivation token-overlap check, which the graph replaced (an id in prose is E752,
+#   derivation is `derives_from`): E573, W573, E594, W594.
 # E303 stays: `governance-check` raises it for a commit message that does not match the governance rule.
 # `tests/unit/core/test_error_code_registry.py` (REMOVED_CODES) fails if one of them is registered or written as a code literal again.
 ERROR_CODES = {
@@ -125,7 +127,6 @@ ERROR_CODES = {
     "E567": "INCOMPLETE_MILESTONE_DECOMPOSITION",
     "E571": "ASSUMPTION_VAGUE_QUANTIFIER",
     "E572": "ASSUMPTION_COUNT_HIGH",
-    "E573": "ASSUMPTION_UNBOUND_ID",
     "E580": "SUBSTEP_DRIFT",
     "E585": "DAG_CIRCULAR_DEPENDENCY",
     "W552": "POTENTIAL_UNREGISTERED_PAIRING",
@@ -138,7 +139,6 @@ ERROR_CODES = {
     "W570": "GRACEFUL_SKIP",
     "W571": "ASSUMPTION_VAGUE_QUANTIFIER",
     "W572": "ASSUMPTION_COUNT_HIGH",
-    "W573": "ASSUMPTION_UNBOUND_ID",
     "W580": "SUBSTEP_DRIFT",
     "W583": "API_UNCOVERED_BY_THREAT",
     "W584": "REMEDIATION_TASK_LINK_UNKNOWN",
@@ -151,7 +151,6 @@ ERROR_CODES = {
     "E590": "CROSS_STEP_ID_NOT_FOUND",
     "E591": "EXTRACTION_INTENT_EMPTY",
     "E593": "VAGUE_LANGUAGE_FREE_TEXT",
-    "E594": "CONTENT_DERIVATION_LOW_OVERLAP",
     "E595": "CONTENT_STALENESS",
     "E596": "DAG_DEAD_END_PRODUCER",
     "E597": "EXTRACTION_INTENT_UPSTREAM_GAP",
@@ -160,7 +159,6 @@ ERROR_CODES = {
     "W590": "CROSS_STEP_UPSTREAM_MISSING",
     "W591": "EXTRACTION_INTENT_EMPTY",
     "W593": "VAGUE_LANGUAGE_FREE_TEXT",
-    "W594": "CONTENT_DERIVATION_LOW_OVERLAP",
     "W595": "CONTENT_STALENESS",
     "W596": "UNDECLARED_UPSTREAM_REF",
     "W597": "EXTRACTION_INTENT_VAGUE",
@@ -355,7 +353,6 @@ ERROR_CODES = {
 PROMOTABLE_PAIRS = {
     "W571": "E571",
     "W572": "E572",
-    "W573": "E573",
     "W580": "E580",
     "W150": "E150",
     # W590 (CROSS_STEP_UPSTREAM_MISSING) is intentionally NOT in PROMOTABLE_PAIRS.
@@ -369,7 +366,6 @@ PROMOTABLE_PAIRS = {
     # would need a new dedicated E-code rather than reusing E590.
     "W591": "E591",
     "W593": "E593",
-    "W594": "E594",
     "W595": "E595",
     # W597 (EXTRACTION_INTENT_VAGUE) is intentionally NOT in PROMOTABLE_PAIRS.
     # E597 (EXTRACTION_INTENT_UPSTREAM_GAP) is a structurally different

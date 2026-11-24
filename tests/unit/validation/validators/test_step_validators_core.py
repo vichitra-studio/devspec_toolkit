@@ -136,9 +136,10 @@ class StepValidatorsTests(unittest.TestCase):
             self.assertEqual(step_06.validate_step_06({"rules": rules}, "."), [])
 
     # T11a: step_07 tests
-    def test_step_07_bad_nfr_id_format(self):
+    def test_step_07_validator_reports_nothing_for_a_bad_nfr_id(self):
+        """The nfr_id pattern is the schema's (E520); the validator no longer checks it."""
         errs = step_07.validate_step_07({"nfrs": [{"nfr_id": "BAD"}]}, ".")
-        self.assertTrue(any("convention" in e for e in _render(errs)))
+        self.assertEqual(_render(errs), [])
 
     def test_step_07_target_no_digit(self):
         errs = step_07.validate_step_07({"nfrs": [{"nfr_id": "nfr-perf", "target": "high"}]}, ".")

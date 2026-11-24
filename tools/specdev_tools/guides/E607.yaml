@@ -1,0 +1,26 @@
+code: E607
+title: "A glossary term's definition differs from its accepted canon entry"
+trigger: |
+  `specdev spec-check` (the glossary-drift check) found a term of
+  `spec/03_glossary.json` whose `definition` differs from the `definition` of
+  the `cn:project:` canon entry that its `term_ref` names.
+resolution: |
+  1. Decide which text is right: the glossary term or the canon entry.
+  2. If the canon text is right, patch the term. Read the canon text first:
+       specdev json read spec/canon/kinds/term.json '.entries[] | select(.id=="<canon-id>") | .definition' --repo-root ./devspec_toolkit
+     then:
+       specdev json patch --id <term-id> .definition '"<canon text>"' --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+  3. If the glossary text is right: no toolkit command updates an existing
+     canon entry (`canon-accept` skips an id that exists, and
+     `canonical-autofix` does not touch definitions). Edit the entry's
+     `definition` in BOTH `spec/canon/kinds/<kind>.json` and
+     `spec/canon/manifest.json` with `specdev json patch` (the same text in
+     both, otherwise E210), and keep the proposal in `canonical_proposals` in
+     step with it (E606).
+  4. Check:
+       specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+     reports no E607 and no E210.
+see_also:
+  - E606
+  - E210
+  - W606

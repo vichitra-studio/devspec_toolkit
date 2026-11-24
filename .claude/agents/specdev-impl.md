@@ -44,6 +44,7 @@ Bash surface is restricted to these subcommand families only:
 | `specdev spec-check spec --step <NN> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | both | Step gate — runs after every edit batch |
 | `specdev validate <path> --repo-root <toolkit>` | both | Single-file validation during iterative fix |
 | `specdev canon-accept --from <file> --repo-root <toolkit> --git-root <root> --namespace cn:project: --owner product` | fix | Promote new project terms to canon |
+| `specdev canon-accept --from <file> --repo-root <toolkit> --git-root <root> --namespace cn:project: --owner product --update` | fix | Refresh the canon entries of glossary terms whose text was edited |
 | `specdev governance-check <spec> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | both | Governance gate after any commit-ready batch |
 
 No `specdev findings emit/merge/dedup`. No `specdev validate-all`.
@@ -222,6 +223,14 @@ line of the invocation prompt. This agent reads it and branches.
    would leave a schema violation, for example an empty list that needs an item.)
    When a finding's fix applies the `decision` of an open item of the artifact's
    `ambiguities` list, delete that item afterwards with `specdev json delete --id <item-id>`.
+4b. Read each fix back before you count its finding as fixed: for the node you edited run
+    `specdev node show <node-id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` (or
+    `specdev json read <file> '<jq path>' --repo-root ./devspec_toolkit` for a field) and compare the value with the one you wrote. A finding whose
+    `message` or `suggested_fix` names several parts (a list, several fields, "and") is written down as parts 1..N first, and is fixed only when
+    every part reads back. A finding with a part that did not read back, or whose write was refused, is not fixed: it goes to `findings_open` with the reason.
+4c. After the batch, read the other fields of each node you edited (`specdev node show <node-id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`). A description, statement or scope that now disagrees
+    with the node's own other fields, or with what its fixture tests (for example a description widened beyond the scope the node names), is a new
+    contradiction: fix it in the same batch, or put it in `errors_remaining` as a `drift` entry naming the node.
 5. If E-codes remain after the edit batch, fix the lowest-numbered failing entry first,
    re-validate, and continue. One fix per cycle.
 6. Repeat until the gate is clean or the agent exhausts the findings list.
@@ -312,6 +321,10 @@ canonical contract; skill files cite this section by name.
 - Fix mode (step 3b): `seed-grounding`-kind finding where the seed itself is ambiguous or alignment requires an architecture choice.
 
 **Does NOT trigger blocker:**
+- A question that an open item of the spec already asks. Before you emit a blocker or insert an open item, run
+  `specdev upstream-backlog spec --repo-root ./devspec_toolkit` and read the items whose `about` names the same node or seed.
+  When such an item has a `decision`, that is the answer: apply it and delete the item with `specdev json delete --id <item-id>`.
+  When it has none, leave it, go on with its `proposed_assumption` when it has one, and name the item id in your return instead of asking again.
 - Pre-existing E-codes from spec-check (→ `errors_remaining`).
 - Findings whose `suggested_fix` is concrete.
 - Style/verbosity preferences.
@@ -381,7 +394,7 @@ canonical contract; skill files cite this section by name.
 When the re-dispatch prompt passes back an answer to a question whose `owner` is not
 `"this-step"` (or a question that has no answer yet), do not apply it to the artifact. Insert
 an open item into the `ambiguities` list of the artifact you are working on, and go on without
-applying it:
+applying it, unless an open item already asks the same question (the first bullet of "Does NOT trigger blocker" above):
 ```bash
 specdev json insert --step <NN> .ambiguities \
   '{"description": "<the question>", "about": ["<node or seed id>"], "decision": "<the chosen option label>"}' \
@@ -409,6 +422,11 @@ Never patch `.plan` itself or any other path of the plan with the file form.
 ---
 
 ## Finding-to-edit translation rules
+
+Before every `specdev json patch`, `insert` or `delete` (author-extend, fix and author mode alike), run
+`specdev json schema <file> '<pointer>' --repo-root ./devspec_toolkit` for the pointer you are about to write and
+honour what it prints: `minItems`, `maxItems`, `minLength`, `maxLength`, `pattern`, `enum`, `const`, `required`
+and `items_constraints`. A value that breaks one of them is refused by the write; do not retry with a guess.
 
 | Finding kind | Typical edit shape |
 |---|---|
@@ -454,6 +472,12 @@ specdev canon-accept \
 The `cn:project:` namespace scopes entries to the host repo's `spec/canon/`. The toolkit's
 `cn:core:` entries are read-only from the host repo's perspective.
 
+When a fix edits the `definition` or the `term` text of a glossary term whose canon entry exists (its `term_ref` names it), edit the term and
+its `canonical_proposals` entry together (E606 compares them), then run the command above with `--update` after the edit batch. The canon
+entry is stale until you do: `spec-check` reports `E607 GLOSSARY_CANON_DRIFT`. The command prints `~ updated: <canon id>` for each entry it
+rewrites in both `spec/canon/manifest.json` and `spec/canon/kinds/<kind>.json`; without `--update` it prints `! changed (not updated, use --update)`
+and writes nothing. Never edit `spec/canon/` by hand or with a script.
+
 ---
 
 ## Gate semantics
@@ -486,10 +510,22 @@ Return a structured JSON summary:
 {
   "mode": "fix",
   "edits_applied": 7,
+  "findings_closed": [
+    {"signature": "abc123ef", "location": "fr-password-reset#description", "node": "fr-password-reset", "field": ".description",
+     "value": "The system shall let a registered member set a new password ...", "edits": 2, "parts": 1}
+  ],
+  "findings_open": [
+    {"signature": "d41d8cd9", "location": "inv-reset-token-single-use#scope", "reason": "write refused: E767"}
+  ],
   "gate_status": "clean",
   "errors_remaining": []
 }
 ```
+
+`findings_closed` has one record per finding of the findings file that you fixed and read back: `signature` and `location` are the finding's; `node` and `field` name the
+place you read back (for a finding about no node, `file` and `pointer`, a jq path, instead); `value` is what you read there after the write; `edits` is the number of
+write commands that touched the finding; `parts` the number of parts you read back. `findings_open` has one record per finding you did not fix, with the reason.
+Every finding of the file is in exactly one of the two lists.
 
 For `author-extend` mode, include a `pending_replay` field naming the steps that
 `specdev stale` lists (an empty list when it lists none):
@@ -514,7 +550,7 @@ Or on partial success:
   "errors_remaining": [
     {
       "finding_kind": "gap",
-      "location": "spec/04_fr_list.json#/functional_requirements/3",
+      "location": "fr-nonexistent-feature",
       "message": "Gap requires full author-mode content; cannot be resolved via targeted patch.",
       "e_codes": ["E530-INVENTED_ENUM_OR_ID"]
     }

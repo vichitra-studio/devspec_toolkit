@@ -110,6 +110,27 @@ class TestInitIntoHost:
         assert "specdev_tools" not in imported
 
 
+class TestCommitMsgHookInstall:
+    """`--strict` installs the commit-msg hook; a refusal by pre-commit is a warning, not a crash."""
+
+    @staticmethod
+    def _fake_pre_commit(tmp_path, exit_code):
+        script = tmp_path / "pre-commit"
+        script.write_text(f"#!/bin/sh\nexit {exit_code}\n")
+        script.chmod(0o755)
+        return str(script)
+
+    def test_a_failing_commit_msg_install_is_a_warning(self, tmp_path, capsys):
+        installed = init_project.install_commit_msg_hook(self._fake_pre_commit(tmp_path, 1), str(tmp_path))
+        assert installed is False
+        assert "core.hooksPath" in capsys.readouterr().err
+
+    def test_a_working_commit_msg_install_returns_true(self, tmp_path, capsys):
+        installed = init_project.install_commit_msg_hook(self._fake_pre_commit(tmp_path, 0), str(tmp_path))
+        assert installed is True
+        assert capsys.readouterr().err == ""
+
+
 class TestManifestDerivedSeedBootstrap:
     """Verify that seed templates land at the paths declared in seeds[].path,
     not at a hardcoded docs/seed/ location."""
@@ -209,3 +230,18 @@ class TestManifestDerivedSeedBootstrap:
             "Unmatched template should fall back to the lexicographically first "
             "seed parent dir (alpha/seeds), not a non-deterministic choice."
         )
+
+
+class TestExtensionSeedTemplate:
+    """seed_templates/seed_extension.md is a blank for the seed of one feature; init copies it with the others."""
+
+    TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    def test_extension_seed_template_is_scaffolded(self, tmp_path):
+        templates_dir = os.path.join(self.TOOLKIT_ROOT, "seed_templates")
+        manifest_path = os.path.join(templates_dir, "seed_manifest.json")
+
+        copy_seeds_from_manifest(str(tmp_path), templates_dir, manifest_path)
+
+        assert (tmp_path / "docs" / "seed" / "seed_extension.md").is_file()
+        assert (tmp_path / "docs" / "seed" / "seed_overview.md").is_file()

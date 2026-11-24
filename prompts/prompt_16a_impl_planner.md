@@ -112,6 +112,8 @@ Before emitting, verify:
 2. **NEVER** create checklist item that spans multiple files
 3. **NEVER** create implementation action that requires >2 file edits
 
+(These atomicity rules are review rules: no schema keyword or validator counts the files of an item or an action.)
+
 # Field Definitions & Rules (MANDATORY)
 
 You must populate the JSON fields according to these specific definitions and expectations, derived from the rigorous DevSpec standard.
@@ -131,13 +133,14 @@ You must populate the JSON fields according to these specific definitions and ex
 ## 2. `plan.spec_alignment.checklist` (The Contract)
 
 *   `checklist`: A list of **Atomic Requirements**.
-    *   `id`: Uppercase snake-case ID (stable). **MUST be prefixed with `milestone_index[<this milestone>].checklist_id_prefix` from the Trinity Anchor** (`spec/16_impl_context.json`). The `checklist_id_prefix` pattern and constraints are enforced by `schema/16_anchor.schema.json`. If the anchor has no row for this milestone yet, STOP (Self-Audit Gate).
+    *   `id`: Uppercase snake-case ID (stable). **MUST be prefixed with `milestone_index[<this milestone>].checklist_id_prefix` from the Trinity Anchor** (`spec/16_impl_context.json`). The `checklist_id_prefix` pattern and constraints are enforced by `schema/16_anchor.schema.json`. A checklist id that does not start with the row's prefix is reported as W610, a warning that does not fail the gate. If the anchor has no row for this milestone yet, STOP (Self-Audit Gate).
     *   `realises`: **MANDATORY**, at least one `criterion_id` of a task of this milestone (`spec/14_roadmap.json`). One item per behavior: if a criterion states several behaviors, split it into several items that realise the same criterion; an item may realise several criteria of one task only when one behavior satisfies them all.
     *   `description`: **Verbose, Atomic, and Self-Explanatory**.
         *   *Rule*: Complete the sentence "This item is satisfied when [observable, verifiable condition]."
         *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
         *   *Rule*: Write another node's id in a `realises` link, not in this text (shared_expectations section 6, rule 9).
+        *   *Scope*: "Verbose" and "NO ONE-LINERS" apply to the `description` of a checklist item and of an action only. Every other text field of the plan (a `note`, a `deferral_reason`, the `summary`, `docs_impact`) keeps the length bound its schema description states.
     *   `type`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item type enum).
     *   `layer`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item layer enum).
     *   `implementation`: **Execution Slots** (Replaces `plan.tasks`).
@@ -168,8 +171,8 @@ Field shape is in `vc:core:collections#ambiguityItem` (`schema/core/collections.
 ## 5. `plan.context` (Codebase awareness)
     *   `existing_structures` supports two valid forms:
         1) **String form** for non-code or mixed structures (e.g., shell/nginx/workflow context) including a concrete file path in the text.
-        2) **Object form** for code signatures only: `{ "signature": "...", "source_file": "...", "line_range": "Lx-Ly" }`.
-    *   For object form, `source_file` must be a repo-relative path ending in `.py`, `.ts`, `.js`, `.go`, or `.rs`.
+        2) **Object form** for code signatures only: `{ "signature": "...", "source_file": "..." }`.
+    *   For object form, `source_file` is a repo-relative path of any file type.
     *   *Rule*: Do NOT hallucinate. If you can't see the file, do not list it.
 
 ## 6. `plan.tasks` (DELETED)
@@ -209,7 +212,7 @@ Field shape is in `vc:core:collections#ambiguityItem` (`schema/core/collections.
 *   `rationale`: Why docs updates are required or not required.
 *   `docs_touched`: List of docs to update when `status: required`.
     *   *Rule*: If code changes are planned, you MUST set `status: required` and list doc paths.
-    *   *Rule*: Every doc path must appear in `plan.summary.target_file_patterns`.
+    *   *Rule*: Every doc path must appear in `plan.summary.target_file_patterns`. (review rule: `validators/step_16.py` checks `docs_touched` against the manifest's doc-path patterns, not against `target_file_patterns`)
 
 ## 12. `plan.docs` (Documentation Plan)
 

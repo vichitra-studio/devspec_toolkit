@@ -101,18 +101,11 @@ _EXPECTED_KINDS: dict[str, dict[str, str]] = {
 }
 
 # Findings of spec-check on the whole folder, as (code, subject).  The subject is a needle in the rendered message:
-# a file name, or the code's own name when no file is named.  No error appears, and no other warning.
+# a file name, or the code's own name when no file is named.  No error appears, and no other warning (W555 only).
 _PINNED_FINDINGS = Counter(
     {
         # The seed has no out-of-scope section (only a prose line): the lint counts 0 of the 3 it expects.
         ("W555", "STEP00_SEED_OUT_OF_SCOPE_THIN"): 1,
-        # The example restates its upstream in few words, so the token overlap stays under the threshold of 5.
-        ("W594", "01_capabilities.json"): 1,
-        ("W594", "03_glossary.json"): 1,
-        ("W594", "06_invariants.json"): 1,
-        ("W594", "08_fixtures.json"): 1,
-        ("W594", "12_ci_gates.json"): 1,
-        ("W594", "13_extension_manifest.json"): 1,
     }
 )
 

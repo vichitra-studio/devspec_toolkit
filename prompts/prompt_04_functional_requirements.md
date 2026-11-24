@@ -96,7 +96,7 @@ Before emitting, verify:
 - No upstream capability ID is silently dropped.
 - All `derives_from` ids resolve to ids present in `spec/01_capabilities.json`, or to a seed routed to step 04 (beside a capability, never alone: E701).
 - If any upstream id cannot be named in a `derives_from`: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every FR statement is falsifiable — there exists a test that could prove it wrong

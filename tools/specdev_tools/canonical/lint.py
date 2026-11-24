@@ -21,6 +21,7 @@ from typing import Any
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry, get_schema_validator, get_shared_registry
+from .registry import merge_manifest_data
 
 CANON_ALIASES_SCHEMA_URI = "vc:canon:aliases"
 CANON_KIND_SCHEMA_URI = "vc:canon:kind"
@@ -88,7 +89,7 @@ def lint_canon_dir(
 
     if manifest is not None and modular_manifest is not None:
         errs.extend(_detect_manifest_modular_drift(manifest, modular_manifest, manifest_file=str(manifest_path.relative_to(root))))
-        merged = _merge_manifest_data(manifest, modular_manifest)
+        merged = merge_manifest_data(manifest, modular_manifest)
     elif manifest is not None:
         merged = manifest
     elif modular_manifest is not None:
@@ -306,38 +307,6 @@ def _compose_modular_manifest(
     }
 
 
-def _merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> dict[str, Any]:
-    entries_by_id: dict[str, dict[str, Any]] = {}
-    for raw in _iter_dicts(manifest.get("entries")):
-        entry_id = raw.get("id")
-        if isinstance(entry_id, str) and entry_id:
-            entries_by_id[entry_id] = dict(raw)
-    for raw in _iter_dicts(modular.get("entries")):
-        entry_id = raw.get("id")
-        if isinstance(entry_id, str) and entry_id:
-            entries_by_id[entry_id] = dict(raw)
-
-    aliases_by_key: dict[tuple[str, str, str, str], dict[str, Any]] = {}
-    for raw in _iter_dicts(manifest.get("aliases")):
-        key = _alias_key(raw)
-        if key is not None:
-            aliases_by_key[key] = dict(raw)
-    for raw in _iter_dicts(modular.get("aliases")):
-        key = _alias_key(raw)
-        if key is not None:
-            aliases_by_key[key] = dict(raw)
-
-    merged = dict(manifest)
-    merged["registry_version"] = (
-        modular.get("registry_version")
-        if isinstance(modular.get("registry_version"), str)
-        else manifest.get("registry_version", "1.0.0")
-    )
-    merged["entries"] = [entries_by_id[k] for k in sorted(entries_by_id.keys())]
-    merged["aliases"] = [aliases_by_key[k] for k in sorted(aliases_by_key.keys())]
-    return merged
-
-
 def _detect_manifest_modular_drift(
     manifest: dict[str, Any],
     modular: dict[str, Any],
@@ -401,16 +370,6 @@ def _iter_dicts(values: Any) -> list[dict[str, Any]]:
     if not isinstance(values, list):
         return []
     return [value for value in values if isinstance(value, dict)]
-
-
-def _alias_key(alias: dict[str, Any]) -> tuple[str, str, str, str] | None:
-    kind = alias.get("kind")
-    normalized = alias.get("normalized")
-    target_id = alias.get("target_id")
-    status = alias.get("status", "active")
-    if not isinstance(kind, str) or not isinstance(normalized, str) or not isinstance(target_id, str):
-        return None
-    return (kind, _norm(normalized), target_id, str(status))
 
 
 def _alias_signature(alias: dict[str, Any]) -> str:

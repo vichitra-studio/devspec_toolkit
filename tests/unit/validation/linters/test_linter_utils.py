@@ -8,12 +8,10 @@ import os
 
 from specdev_tools.validation.linter_utils import (
     CONTENT_STOPWORDS,
-    DERIVATION_STOPWORDS,
     collect_ids_and_refs,
     extract_command_string,
     is_reference_context,
     iter_json,
-    tokenize_free_text,
 )
 
 
@@ -59,64 +57,16 @@ class TestExtractCommandString:
 class TestStopwords:
     """Verify stopword sets contain expected members and are frozensets."""
 
-    def test_derivation_is_frozenset(self):
-        assert isinstance(DERIVATION_STOPWORDS, frozenset)
-
     def test_content_is_frozenset(self):
         assert isinstance(CONTENT_STOPWORDS, frozenset)
 
     def test_common_stopwords_present(self):
         for word in ("that", "this", "with", "from", "true", "false"):
-            assert word in DERIVATION_STOPWORDS
             assert word in CONTENT_STOPWORDS
 
     def test_json_schema_terms_present(self):
         for word in ("http", "https", "schema", "json"):
-            assert word in DERIVATION_STOPWORDS
-
-
-# ---------------------------------------------------------------------------
-# tokenize_free_text
-# ---------------------------------------------------------------------------
-
-class TestTokenizeFreeText:
-    """Tests for tokenize_free_text."""
-
-    def test_extracts_long_words(self):
-        result = tokenize_free_text("The authentication module handles user login")
-        assert "authentication" in result
-        assert "module" in result
-        assert "handles" in result
-        assert "login" in result
-
-    def test_filters_short_words(self):
-        result = tokenize_free_text("The cat sat on a mat")
-        # All words are <= 3 chars or stopwords
-        assert result == set()
-
-    def test_removes_stopwords(self):
-        result = tokenize_free_text("this schema will have been were")
-        assert result == set()
-
-    def test_custom_stopwords(self):
-        custom = frozenset({"login"})
-        result = tokenize_free_text("user login page", stopwords=custom)
-        assert "login" not in result
-        assert "user" in result
-        assert "page" in result
-
-    def test_empty_string(self):
-        assert tokenize_free_text("") == set()
-
-    def test_lowercases(self):
-        result = tokenize_free_text("Authentication Module")
-        assert "authentication" in result
-        assert "module" in result
-
-    def test_ignores_numbers_only(self):
-        result = tokenize_free_text("12345 67890")
-        # Pattern requires starting with [a-z]
-        assert result == set()
+            assert word in CONTENT_STOPWORDS
 
 
 # ---------------------------------------------------------------------------

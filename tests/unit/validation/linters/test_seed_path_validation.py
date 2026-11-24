@@ -55,6 +55,31 @@ class SeedPathValidationTests(unittest.TestCase):
         path_errors = [e for e in render_errors(errors) if "does not exist" in e]
         self.assertEqual(path_errors, [], f"Unexpected errors: {path_errors}")
 
+    def _empty_errors(self, content):
+        """E520 messages that say a seed is empty, for one seed file holding *content*."""
+        manifest = {
+            "$schema": "vc:seed-manifest",
+            "seeds": [{"seed_id": "seed-overview", "path": "docs/seed/overview.md"}],
+            "global_seed_order": ["seed-overview"],
+        }
+        _tmpdir, spec_dir, repo_root = self._create_temp_project(manifest, seed_files=["docs/seed/overview.md"])
+        with open(os.path.join(repo_root, "docs/seed/overview.md"), "w") as f:
+            f.write(content)
+        return [e for e in render_errors(lint_seeds(repo_root, spec_dir)) if "is empty" in e]
+
+    def test_empty_seed_file_is_e520(self):
+        errors = self._empty_errors("")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("E520", errors[0])
+
+    def test_whitespace_only_seed_file_is_e520(self):
+        errors = self._empty_errors(" \n\t\n")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("E520", errors[0])
+
+    def test_non_empty_seed_file_passes(self):
+        self.assertEqual(self._empty_errors("one line"), [])
+
     def test_missing_seed_path_fails(self):
         """Seed path that doesn't exist on disk produces an error."""
         manifest = {

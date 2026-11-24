@@ -112,3 +112,22 @@ class Step10IntegrationTests(unittest.TestCase):
 
     def test_scope_later_without_scope_reason_fails(self):
         self._assert_fails_naming(lambda spec: spec["rules"][0].update(scope="later"), "scope_reason")
+
+    def _fixture_errors(self, fixture: str) -> list[str]:
+        """Rendered E520 errors for a step_10 fixture file."""
+        errors = specdev_validate_file(str(_REPO_ROOT), str(_FIXTURES / fixture))
+        return [e.render() for e in errors if e.code == "E520"]
+
+    def test_invalid_owner_fails_the_schema_naming_owner(self):
+        rendered = self._fixture_errors("invalid_owner.json")
+        self.assertTrue(any("owner" in msg for msg in rendered), rendered)
+
+    def test_require_spec_ids_without_pattern_fails(self):
+        rendered = self._fixture_errors("invalid_require_ids_no_pattern.json")
+        self.assertTrue(any("pattern" in msg for msg in rendered), rendered)
+
+    def test_require_spec_ids_false_without_pattern_passes(self):
+        def edit(spec: dict) -> None:
+            spec["commit_message_rules"] = {"require_spec_ids": False}
+
+        self.assertEqual(self._errors(edit), [])

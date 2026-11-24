@@ -21,6 +21,7 @@ REMOVED_CODES = (
     "W566", "W567", "E568", "W568", "E569", "W569", "E575", "W575", "E576", "W576",
     "E535", "E536",
     "E301", "E302", "E305", "E306", "E307", "W599", "W600", "W601",
+    "E573", "W573", "E594", "W594",
 )
 
 # Registered codes with no string literal outside errors.py that are not the E side
@@ -32,4 +33,7 @@ REGISTERED_WITHOUT_EMITTER = {
     # W595 is emitted, but only inside longer message strings (context/seed_indexer.py), which the literal pattern
     # above does not match; file-level forward replay and the freshness stderr lines, which wrote it, are gone.
     "W595",
+    # W590 is emitted by core/loaders.py inside a longer message string; the derivation check that wrote it as a literal
+    # (hallucination_lint) is gone.
+    "W590",
 }

@@ -14,6 +14,7 @@ from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-
 if TYPE_CHECKING:
     from referencing import Registry
 
+from ..context._utils import merged_required_and_properties
 from ..core.errors import SpecError, make_error
 from ..core.registry import get_shared_registry
 
@@ -89,7 +90,7 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
         if step == "seed":
             continue
         try:
-            schema_required, schema_props, schema = _load_contract(schema_file)
+            schema_required, schema_props, schema = _load_contract(schema_file, root)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
             errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_schema {schema_file} {exc}"))
             continue
@@ -158,14 +159,18 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
     return errors
 
 
-def _load_contract(schema_path: str) -> tuple[list[str], dict[str, Any], dict[str, Any]]:
+def _load_contract(schema_path: str, repo_root: Path) -> tuple[list[str], dict[str, Any], dict[str, Any]]:
+    """Return ``(required, properties, raw_schema)`` of the schema file.
+
+    ``required`` and ``properties`` are merged across the schema's ``allOf`` branches
+    (``merged_required_and_properties``); the third element is the schema as written,
+    which the output-contract validation uses.  Raises ``OSError`` or ``ValueError``
+    when the file cannot be read or parsed.
+    """
     with open(schema_path, "r", encoding="utf-8") as f:
         schema = json.load(f)
-    required = schema.get("required", []) or []
-    props = schema.get("properties", {})
-    if not isinstance(props, dict):
-        props = {}
-    return required, props, schema
+    merged = merged_required_and_properties(schema, repo_root)
+    return merged["required"], merged["properties"], schema
 
 
 def _prompt_candidates(prompt_dir: Path, step: str) -> list[str]:

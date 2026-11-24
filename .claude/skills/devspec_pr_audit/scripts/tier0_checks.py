@@ -398,44 +398,20 @@ def check_t09_changelog_entry_present(
     if not (non_changelog_migration or schema_files or cli_files):
         return []  # No trigger
 
-    # Check for unreleased entry in three locations
-    has_entry = False
-
-    # 1. changelog/unreleased.md
-    unreleased_md = REPO_ROOT / "changelog" / "unreleased.md"
-    if unreleased_md.exists():
-        content = unreleased_md.read_text(encoding="utf-8").strip()
-        # Non-empty beyond a bare header line?
-        non_header = [ln for ln in content.splitlines() if ln.strip() and not ln.startswith("#")]
-        if non_header:
-            has_entry = True
-
-    # 2. changelog/unreleased.yaml
+    # The entry is the YAML (the migration reads it): a `changes` item in changelog/unreleased.yaml, or a
+    # changelog/v<X.Y.Z>.yaml that the diff itself changes. A Markdown entry alone does not count.
+    has_entry = any(re.fullmatch(r"changelog/v\d+\.\d+\.\d+\.yaml", f) for f in changed_files)
     if not has_entry:
         unreleased_yaml = REPO_ROOT / "changelog" / "unreleased.yaml"
         if unreleased_yaml.exists():
-            content = unreleased_yaml.read_text(encoding="utf-8").strip()
-            non_comment = [ln for ln in content.splitlines()
-                           if ln.strip() and not ln.startswith("#")]
-            if non_comment:
-                has_entry = True
+            try:
+                import yaml
 
-    # 3. CHANGELOG.md — look for ## [Unreleased] section with content
-    if not has_entry:
-        changelog_md = REPO_ROOT / "CHANGELOG.md"
-        if changelog_md.exists():
-            text = changelog_md.read_text(encoding="utf-8")
-            in_unreleased = False
-            for line in text.splitlines():
-                if line.strip().lower().startswith("## [unreleased]"):
-                    in_unreleased = True
-                    continue
-                if in_unreleased:
-                    if line.startswith("## "):
-                        break  # Next version section
-                    if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("<!--"):
-                        has_entry = True
-                        break
+                document = yaml.safe_load(unreleased_yaml.read_text(encoding="utf-8"))
+            except Exception:
+                document = None
+            changes = document.get("changes") if isinstance(document, dict) else None
+            has_entry = isinstance(changes, list) and len(changes) > 0
 
     if has_entry:
         return []
@@ -453,9 +429,9 @@ def check_t09_changelog_entry_present(
     return [_finding(
         kind="gap",
         location="CHANGELOG.md",
-        message=(f"Slices {', '.join(trigger_slices)} have changed files but no unreleased changelog entry found. "
-                 "Add an entry to changelog/unreleased.md, changelog/unreleased.yaml, "
-                 "or CHANGELOG.md ## [Unreleased] section."),
+        message=(f"Slices {', '.join(trigger_slices)} have changed files but no changelog YAML entry found. "
+                 "Add a `changes` item to changelog/unreleased.yaml (or change changelog/v<version>.yaml in this diff); "
+                 "the Markdown is rendered from it and does not count."),
         severity="P1",
         check_id="changelog-entry-present",
         catalog_tag="D11",

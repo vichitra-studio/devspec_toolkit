@@ -74,7 +74,7 @@ Run `specdev spec-check <spec_dir> --step 08` to see what is still unproven: a c
 - Every id in `verifies` resolves to a criterion, API, invariant or NFR present in the upstream spec files.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every `must-have` FR has at least one fixture covering its happy path
@@ -90,7 +90,7 @@ Run `specdev spec-check <spec_dir> --step 08` to see what is still unproven: a c
 - Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
 
 ## Cross-Step Synthesis Notes
-- **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`. Note: `expected.body` is not actually required by the linter — `fixtures_lint.py` only enforces a valid HTTP `status` (100-599) for `mode: contract`; `body`, if present, is merely checked to be JSON-serializable. Author `body` anyway per the authoring contract above; the gate will not catch its absence.
+- **contract mode**: `expected` MUST have `status` (an HTTP status 100-599, checked by `fixtures-lint`) and SHOULD have `body`, and optionally `headers`. `fixtures-lint` does not require `body`; a `body` that is present is only checked to be JSON-serializable. Author `body` anyway per the authoring contract above; no tool reports its absence.
 - **expected**: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
 
 ## Best Practices
@@ -119,9 +119,9 @@ If Step 06 declares any invariants in a runtime-evaluable language (`cel` or `js
 
 **Shape.** A single JSON document that populates every variable path referenced by the CEL or JSONLogic expressions in `spec/06_invariants.json`. The sample should represent one consistent happy-path scenario in which every invariant evaluates to `true`.
 
-**Derivation procedure.** Walk every expression in Step 06, extract all variable references (e.g. `post.status`, `request.user.role`, `response.headers.cache_control`), take the union of those paths, and populate each one with a realistic value drawn from Step 05 contracts or Step 08 fixture data. Use concrete values — never `"TBD"` or other sentinels. Keep CEL-compatible key names (alphanumeric plus underscores); map hyphenated header names or similar to underscore form in the sample.
+**Derivation procedure.** Walk every expression in Step 06, extract all variable references (e.g. `post.status`, `request.user.role`, `response.headers.cache_control`), take the union of those paths, and populate each one with a realistic value drawn from Step 05 contracts or Step 08 fixture data. Use concrete values — never `"TBD"` or other sentinels. (an authoring rule: the spec scanners skip `spec/samples/`, so E510 never reads this file) Keep CEL-compatible key names (alphanumeric plus underscores); map hyphenated header names or similar to underscore form in the sample.
 
-**Maintenance contract.** Any PR that adds, modifies, or removes an invariant in Step 06 MUST update this sample in the same PR. This is part of downstream replay discipline. Once Step 12 wires `invariants-check` into CI, a broken sample breaks CI.
+**Maintenance contract.** Any PR that adds, modifies, or removes an invariant in Step 06 MUST update this sample in the same PR. This is part of downstream replay discipline. Nothing checks that the sample changed in the same PR; a stale sample shows only when `invariants-check` fails on it. Once Step 12 wires `invariants-check` into CI, a broken sample breaks CI.
 
 **Verification.** After authoring or updating the sample, run:
 

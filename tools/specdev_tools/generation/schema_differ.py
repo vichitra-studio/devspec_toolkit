@@ -459,8 +459,12 @@ def diff_step_fields(user_file: Path, schema_path: Path) -> List[FieldDiff]:
             ))
     
     # Check required fields
-    required = schema.get("required", [])
-    properties = schema.get("properties", {})
+    # Imported here: ``context`` loads the graph builder, which graph.gitview (and so the lock file's merge driver) must not load.
+    from ..context._utils import merged_required_and_properties
+
+    merged = merged_required_and_properties(schema, Path(schema_path).parent.parent)
+    required = merged["required"]
+    properties = merged["properties"]
     
     for field_name in required:
         if field_name not in user_data:

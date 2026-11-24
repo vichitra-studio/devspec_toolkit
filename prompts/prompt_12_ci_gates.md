@@ -32,7 +32,7 @@ Translate governance rules and fixture expectations into enforceable CI automati
 - **Emit**: Write the artifact when all gates have executable commands, measurable thresholds, and correct stage assignments.
 
 ## Heuristics For Completeness
-- MUST include a `governance-check` job step when `spec/10_governance.json` defines `commit_message_rules` with `require_spec_ids`. A rule of Step 10 that names neither `enforcer` nor `cli_command` is enforced by a job here: name it in that job's `realises`. MUST include an `invariants-check` job step when `spec/06_invariants.json` contains >=1 invariant. MUST populate `coverage_thresholds` when any NFR in `spec/07_nfrs.json` specifies a coverage metric.
+- MUST include a `governance-check` job step when `spec/10_governance.json` defines `commit_message_rules` with `require_spec_ids`. A rule of Step 10 that names neither `enforcer` nor `cli_command` is enforced by a job here: name it in that job's `realises`. MUST include an `invariants-check` job step when `spec/06_invariants.json` contains >=1 invariant. MUST populate `coverage_thresholds` when any NFR in `spec/07_nfrs.json` specifies a coverage metric. These three rules are authoring and review rules: no tool checks them.
 - Ambiguity scrub: make pipeline DAG explicit; avoid implicit sequencing.
 
 ## Self-Audit Gate
@@ -55,7 +55,7 @@ Before emitting, verify:
 - All `depends_on` links between jobs form a valid DAG — no circular dependencies.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any required gate cannot be expressed as a CI job: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every governance rule from Step 10 has a corresponding CI gate

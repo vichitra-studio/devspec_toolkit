@@ -66,7 +66,7 @@ Before emitting, verify:
 - All `owner` values on components resolve to owner enums defined in canonical registry or `spec/01_capabilities.json`.
 - All tech choices align with constraints in the ingested seeds; no stack choice contradicts a seed constraint.
 - If any capability cannot be assigned to a component: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every in-scope capability from Step 01 maps to ≥1 component or integration point

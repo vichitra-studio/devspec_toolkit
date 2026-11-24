@@ -23,7 +23,7 @@ stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdi
 ## Arguments
 
 ```
-/specdev-review <scope> [--with-backlog]
+/specdev-review <scope> [--with-backlog] [--review-only]
 ```
 
 - `<scope>`: step number (e.g. `04`), step range (e.g. `04-07`), a file path, or `all`.
@@ -31,6 +31,13 @@ stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdi
   into a `cross_step_relational` reviewer. Surfaces `assumption` and `coverage` findings tied
   to unresolved upstream items, and `regression` and `drift` findings caused by changes above a
   step that its links have not yet been re-read against (suspect links).
+- `--review-only`: review without fixing. Step 1 and Step 2a to 2c run once (round 1); Step 2d is skipped.
+  The merged file `.specdev/findings/findings_<scope>_1.json` is the whole output. Seed defects, cross-step
+  entries and operator conflicts are findings of the existing kinds (`seed-grounding`, `drift` or `coverage`
+  with `upstream_refs`, and `ambiguity`); there are no sibling documents.
+  Upstream reconciliation (confirming or refuting what earlier steps reported) is not a review output:
+  what an upstream edit makes suspect is listed by `specdev stale`, and the author accepts a link with
+  `specdev attest` after reading it.
 
 When the flag is set, `specdev-scope` always adds at least one `cross_step_relational`
 reviewer to the fan-out plan, alongside any per-step reviewers.
@@ -125,6 +132,9 @@ Each reviewer writes its own file:
 
 (Ensure the directory exists once per loop: `mkdir -p .specdev/findings`.)
 
+Before the reviewers of a round are dispatched, remove what an earlier run left for this scope and round, so that the merge in 2b sees only the files of this run:
+`rm -f .specdev/findings/findings_<scope>_<round>_r*.json .specdev/findings/findings_<scope>_<round>.json`
+
 **2b. Merge findings with the jq one-liner:**
 
 ```bash
@@ -144,6 +154,10 @@ If `findings[]` in `.specdev/findings/findings_<scope>_<round>.json` is empty:
 - Print: "CONVERGED at round <N>. No findings remain."
 - Return.
 
+If `--review-only` is set and `findings[]` is not empty:
+- Print: `REVIEW-ONLY: <N> findings (<P0_count> P0, <P1_count> P1, <P2_count> P2). Findings path: .specdev/findings/findings_<scope>_1.json`
+- Return. Do not dispatch Step 2d.
+
 **2d. Dispatch fix:**
 
 If findings remain, dispatch `specdev-impl` with:
@@ -160,6 +174,11 @@ After Agent returns (blocker handling — canonical contract: `specdev-impl.md` 
 1. Parse return JSON.
 2. If `status != "blocker"`: check `gate_status`. If `gate_status: "errors"` and
    `errors_remaining` is non-empty, carry those forward as context for the next round.
+   A finding of the merged file that is in neither `findings_closed` nor `findings_open` counts as open.
+   Check one write per closed finding yourself before you count it: run `specdev node show <node> --json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
+   (for a record with `file` and `pointer`: `specdev json read <file> '<pointer>' --repo-root ./devspec_toolkit`) and compare the field of `nodes[0].content` in the output with the record's `value`.
+   A record whose value is not there moves its finding to open: carry it forward as context for the next round, as the `errors_remaining` are.
+   Print one line: `Round <N>: <C> findings closed by <E> edits, <O> open.` (`C` the closed findings that read back, `E` = `edits_applied`, `O` the open ones.)
 3. If `status == "blocker"`:
    a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
       If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
@@ -259,6 +278,7 @@ Never read `spec/*.json` directly. All spec reads go through `specdev json read`
 - Does not handle 16b/16c code-write or code-review. Plan-phase and spec-phase only
   (16b/16c belong to `/specdev-trinity`).
 - Does not commit changes. User authorizes commits separately.
+- With `--review-only`, does not edit any spec file and does not dispatch specdev-impl.
 - Does not use `specdev findings emit/merge/dedup`. No such CLI exists.
 - Does not run reviewers sequentially in a single round. Parallel dispatch is required.
 - Does not skip AskUserQuestion on a blocker payload. Blocker questions must be presented

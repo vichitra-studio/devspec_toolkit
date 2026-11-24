@@ -412,7 +412,7 @@ class TestVagueScanFieldsCoverage(unittest.TestCase):
 
     EXPECTED_FIELDS = {
         "description", "statement", "rationale", "justification", "notes",
-        "narrative", "postconditions", "preconditions", "risks", "spikes",
+        "postconditions", "preconditions", "risks", "spikes",
         "migration_plan", "definition",
     }
 

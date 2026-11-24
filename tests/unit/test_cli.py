@@ -1341,7 +1341,8 @@ class CliTests(unittest.TestCase):
             with patch("specdev_tools.canonical.autofix.canonical_autofix", return_value={}) as p_autofix:
                 code, out, err = self._run_cli(["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root)])
                 self.assertEqual(0, code, msg=err)
-                self.assertIn("OK (no changes)", out)
+                self.assertIn("E607 is out of its scope", out)
+                self.assertNotIn("OK (no changes)", out)
                 p_autofix.assert_called_once_with(
                     os.path.abspath(str(repo_root)),
                     os.path.abspath(str(spec_dir)),

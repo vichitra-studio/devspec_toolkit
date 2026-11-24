@@ -155,6 +155,55 @@ def test_t09_cli_py_still_triggers_finding(tmp_path):
     )
 
 
+def _t09_findings(repo_root, changed_files):
+    """Run T0-09 with REPO_ROOT redirected to *repo_root* and return its findings."""
+    original_repo_root = _tier0.REPO_ROOT
+    _tier0.REPO_ROOT = repo_root
+    try:
+        return _tier0.check_t09_changelog_entry_present({}, changed_files)
+    finally:
+        _tier0.REPO_ROOT = original_repo_root
+
+
+_T09_TRIGGER = "tools/specdev_tools/cli.py"
+
+
+def _write_changelog_file(repo_root, name, text):
+    """Write changelog/<name> under *repo_root* (or CHANGELOG.md at its top for name 'CHANGELOG.md')."""
+    path = repo_root / name if name == "CHANGELOG.md" else repo_root / "changelog" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def test_t09_a_markdown_only_entry_does_not_satisfy(tmp_path):
+    """T0-09: the Markdown is rendered from the YAML, so a Markdown entry alone is no entry."""
+    _write_changelog_file(tmp_path, "unreleased.md", "A change that is described in text only.\n")
+    _write_changelog_file(tmp_path, "CHANGELOG.md", "## [Unreleased]\n\n- A change in text only.\n")
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+    assert result[0].get("catalog_tag") == "D11"
+
+
+def test_t09_the_unreleased_yaml_skeleton_does_not_satisfy(tmp_path):
+    """T0-09: the committed skeleton (`changes: []`) records nothing."""
+    _write_changelog_file(tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges: []\n')
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+
+
+def test_t09_an_unreleased_yaml_with_a_change_satisfies(tmp_path):
+    """T0-09: a `changes` item in changelog/unreleased.yaml is the entry."""
+    _write_changelog_file(
+        tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges:\n  - type: fix\n    description: x\n'
+    )
+    assert _t09_findings(tmp_path, [_T09_TRIGGER]) == []
+
+
+def test_t09_a_version_yaml_in_the_diff_satisfies(tmp_path):
+    """T0-09: a changelog/v<X.Y.Z>.yaml that the diff changes is the entry."""
+    assert _t09_findings(tmp_path, [_T09_TRIGGER, "changelog/v1.2.0.yaml"]) == []
+
+
 # ---------------------------------------------------------------------------
 # T0-10: specdev-unavailable path
 # ---------------------------------------------------------------------------

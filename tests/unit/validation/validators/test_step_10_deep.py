@@ -1,4 +1,4 @@
-"""Tests for step_10 deep validation: owner values and commit message rules."""
+"""Tests for step_10 deep validation: commit message rules and rule commands."""
 import pytest
 from specdev_tools.validation.validators.step_10 import validate_step_10
 
@@ -27,20 +27,6 @@ class TestValidMinimal:
         }
         errors = validate_step_10(instance, toolkit_root)
         assert errors == []
-
-
-class TestOwnerValidation:
-    def test_invalid_owner(self, toolkit_root):
-        instance = {"owner": "invalid-owner"}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert any("Invalid owner" in e for e in rendered)
-
-    def test_valid_owner(self, toolkit_root):
-        instance = {"owner": "api"}
-        errors = validate_step_10(instance, toolkit_root)
-        rendered = _render(errors)
-        assert not any("owner" in e.lower() for e in rendered)
 
 
 class TestCommitPattern:

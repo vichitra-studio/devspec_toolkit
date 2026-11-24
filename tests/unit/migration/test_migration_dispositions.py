@@ -52,7 +52,7 @@ def test_every_remove_row_has_a_drop_or_rename_disposition():
     """Every removed field is converted, dropped, copy-dropped, captured then removed, or sent to the worklist; only a schema definition (``$defs`` or the shared step base, whose fields have a row per step) has none."""
     rows = _rows()
     removed = [r for r in CHECKLIST.values() if r["change"] == "remove"]
-    assert len(removed) == 147
+    assert len(removed) == 148
     for entry in removed:
         row = rows[entry["id"]]
         if row["disposition"] == "none":

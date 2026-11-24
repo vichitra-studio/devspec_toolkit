@@ -21,6 +21,12 @@ round. Cheap to dispatch (Haiku); always runs even when the answer is "no fan-ou
 
 ---
 
+## Worktree dispatch
+
+The session may run in a git worktree. Use the absolute paths of the dispatch verbatim for every Read and Bash call; a relative path may resolve against another checkout.
+
+---
+
 ## Tools
 
 Bash surface is restricted to these subcommand families only:
@@ -117,6 +123,11 @@ count alone decides between branches 1 and 2.
    - `scope_kind` = `plan_artifact`.
    - The step-count and change-share rules (branches 1–2) do not apply.
    - Of branch 3 only the `with_backlog` case applies: the reviewer is added when the flag is true.
+
+5. If the scope value is a file of `spec/common/` that is not a step file (for example `spec/common/seed_manifest.json`):
+   - Assign exactly one reviewer covering that file.
+   - `scope_kind` = `manifest_artifact`; `steps` = `[]`.
+   - The step-count and change-share rules (branches 1-2) do not apply.
 
 The 80% / 30% / 3-step thresholds are starting estimates. They may be exposed as env vars
 after calibration; no env var names have been committed yet. These thresholds are

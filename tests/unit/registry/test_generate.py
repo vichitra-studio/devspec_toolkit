@@ -24,6 +24,7 @@ from typing import Any
 
 import pytest
 
+from specdev_tools.core.entry_key_registry import join_nested_path
 from specdev_tools.registry import generate as generate_module
 from specdev_tools.registry.annotations import collect_annotations, lint_annotations
 from specdev_tools.registry.generate import _serialize, generate_registry, run
@@ -177,8 +178,7 @@ class TestSentinelsPresent:
 
 class TestStepCoverageCompleteness:
     """Every step in step_order.json must appear in exactly one of:
-    registry (via its file's step), steps_without_entry_arrays, or
-    steps_with_deferred_registration.
+    registry (via its file's step) or steps_without_entry_arrays.
     """
 
     def test_all_steps_accounted_for(self) -> None:
@@ -194,20 +194,16 @@ class TestStepCoverageCompleteness:
         without_steps: set[str] = {
             item["step"] for item in reg_doc["steps_without_entry_arrays"]
         }
-        deferred_steps: set[str] = {
-            item["step"] for item in reg_doc["steps_with_deferred_registration"]
-        }
 
-        covered = registry_steps | without_steps | deferred_steps
+        covered = registry_steps | without_steps
         missing = [s for s in all_steps if s not in covered]
 
         assert not missing, (
-            f"Steps not accounted for in registry, steps_without_entry_arrays, "
-            f"or steps_with_deferred_registration: {missing}"
+            f"Steps not accounted for in registry or steps_without_entry_arrays: {missing}"
         )
 
     def test_no_step_is_double_counted(self) -> None:
-        """No step should appear in more than one bucket."""
+        """No step should appear in both buckets."""
         reg_doc, _ = _run_generator()
 
         registry_steps: set[str] = {
@@ -216,17 +212,10 @@ class TestStepCoverageCompleteness:
         without_steps: set[str] = {
             item["step"] for item in reg_doc["steps_without_entry_arrays"]
         }
-        deferred_steps: set[str] = {
-            item["step"] for item in reg_doc["steps_with_deferred_registration"]
-        }
 
         reg_and_without = registry_steps & without_steps
-        reg_and_deferred = registry_steps & deferred_steps
-        without_and_deferred = without_steps & deferred_steps
 
         assert not reg_and_without, f"Steps in both registry and without-entry-arrays: {reg_and_without}"
-        assert not reg_and_deferred, f"Steps in both registry and deferred: {reg_and_deferred}"
-        assert not without_and_deferred, f"Steps in both without-entry-arrays and deferred: {without_and_deferred}"
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +230,7 @@ class TestNoArraysSteps:
         real = generate_module._schema_file_for_step
         monkeypatch.setattr(generate_module, "_schema_file_for_step", lambda step, schema_dir: None if step == "12" else real(step, schema_dir))
         reg_doc, _ = _run_generator()
-        assert reg_doc["steps_without_entry_arrays"] == [{"step": "12", "rationale": "no schema file"}]
+        assert {"step": "12", "rationale": "no schema file"} in reg_doc["steps_without_entry_arrays"]
 
     def test_16_registers_its_ambiguity_arrays(self) -> None:
         reg_doc, _ = _run_generator()
@@ -258,29 +247,25 @@ class TestNoArraysSteps:
 
 
 # ---------------------------------------------------------------------------
-# Test 6: Deferred registration
+# Test 6: Steps inside the plan file
 # ---------------------------------------------------------------------------
 
 
-class TestDeferredRegistration:
-    """Steps 16b and 16c are in steps_with_deferred_registration only; 16a is registered by annotation."""
+class TestPlanFileSteps:
+    """Steps 16b and 16c are listed in steps_without_entry_arrays, never in the registry; 16a is registered by annotation."""
 
-    def test_deferred_steps_are_present(self) -> None:
+    def test_16b_and_16c_are_listed_without_entry_arrays_not_deferred(self) -> None:
         reg_doc, _ = _run_generator()
-        deferred = {item["step"]: item for item in reg_doc["steps_with_deferred_registration"]}
+        listed = {item["step"]: item for item in reg_doc["steps_without_entry_arrays"]}
         for step in ("16b", "16c"):
-            assert step in deferred, f"Step '{step}' not found in steps_with_deferred_registration."
-            assert deferred[step]["rationale"], f"Step '{step}' has empty rationale."
-
-    def test_deferred_steps_not_in_registry(self) -> None:
-        """Deferred steps must not appear as 'step' values inside the registry."""
-        reg_doc, _ = _run_generator()
+            assert listed[step]["rationale"] == generate_module.INSIDE_PLAN_FILE_RATIONALE, step
         registry_steps = {entry["step"] for entry in reg_doc["registry"].values()}
-        for step in ("16b", "16c"):
-            assert step not in registry_steps, (
-                f"Deferred step '{step}' found as a 'step' value in registry — "
-                "deferred steps should not have registry entries."
-            )
+        assert registry_steps.isdisjoint({"16b", "16c"})
+        assert "16a" in registry_steps
+
+    def test_registry_has_no_deferred_key(self) -> None:
+        reg_doc, _ = _run_generator()
+        assert "steps_with_deferred_registration" not in reg_doc
 
     def test_plan_item_kind_is_registered_under_the_plan_file_glob(self) -> None:
         """The plan-item kind reaches the registry through its ``x-node`` ``files`` glob, as step 16a."""
@@ -342,14 +327,11 @@ class TestRegistryCutover:
             assert {role for _, role, _ in triples} == {row["role"]}, kind
             assert {coarse for _, _, coarse in triples} == {row.get("coarse", False)}, kind
 
-    def test_no_step_is_without_entry_arrays(self) -> None:
+    def test_only_the_plan_file_steps_are_without_entry_arrays(self) -> None:
         reg_doc, _ = _run_generator()
-        assert reg_doc["steps_without_entry_arrays"] == []
-
-    def test_steps_with_deferred_registration_loses_16a(self) -> None:
-        reg_doc, _ = _run_generator()
-        assert [item["step"] for item in reg_doc["steps_with_deferred_registration"]] == ["16b", "16c"]
-        assert "16a" in {entry["step"] for entry in reg_doc["registry"].values()}
+        assert reg_doc["steps_without_entry_arrays"] == [
+            {"step": step, "rationale": generate_module.INSIDE_PLAN_FILE_RATIONALE} for step in ("16b", "16c")
+        ]
 
     def test_registry_generate_writes_schema_change_checklist_byte_identically(self, tmp_path: Path) -> None:
         paths = {name: str(tmp_path / name) for name in ("reg.json", "paths.json", "checklist.md")}
@@ -663,3 +645,58 @@ class TestSchemaFileForStepHardening:
         assert "99_alpha.schema.json" in msg, f"ValueError should list file; got: {msg!r}"
         assert "99_beta.schema.json" in msg, f"ValueError should list file; got: {msg!r}"
         assert "SCHEMA_SKIP" in msg, f"ValueError should mention SCHEMA_SKIP; got: {msg!r}"
+
+
+# ---------------------------------------------------------------------------
+# No heuristic: every kind is declared by x-node (DEVSPEC-251 ask 5)
+# ---------------------------------------------------------------------------
+
+
+class TestNoHeuristic:
+    def test_step_13_registers_its_two_declared_kinds(self) -> None:
+        reg_doc, _ = _run_generator()
+        paths = [a["array_path"] for a in reg_doc["registry"]["13_extension_manifest.json"]["arrays"]]
+        assert paths == [".ambiguities", ".extensions"]
+
+    def test_every_registry_array_is_declared_by_x_node(self) -> None:
+        reg_doc, _ = _run_generator()
+        undeclared = [
+            (basename, arr["array_path"])
+            for basename, entry in reg_doc["registry"].items()
+            for arr in _iter_all_arrays(entry)
+            if arr.get("source") != "x-node"
+        ]
+        assert undeclared == []
+
+
+# ---------------------------------------------------------------------------
+# extraction_paths.json lists nested and map-keyed paths (DEVSPEC-251 ask 7)
+# ---------------------------------------------------------------------------
+
+
+def _full_paths(arr: dict[str, Any], full_path: str) -> list[str]:
+    paths = [full_path]
+    for nested in arr.get("nested", []):
+        paths += _full_paths(nested, join_nested_path(full_path, nested["array_path"]))
+    return paths
+
+
+class TestExtractionPathsNested:
+    def test_nested_kinds_have_their_full_path(self) -> None:
+        _, paths = _run_generator()
+        assert {
+            ".milestones", ".milestones[].tasks", ".milestones[].tasks[].acceptance_criteria", ".ambiguities"
+        } <= set(paths["14"]["14_roadmap.json"])
+        assert ".functional_requirements[].acceptance_criteria" in paths["04"]["04_fr_list.json"]
+        assert ".apis[].errors" in paths["05"]["05_interface_contracts.json"]
+
+    def test_every_registry_array_has_a_path(self) -> None:
+        reg_doc, paths = _run_generator()
+        missing = []
+        for basename, entry in reg_doc["registry"].items():
+            if entry["step"] == generate_module.RECORD_HOST_STEP:
+                continue  # a record host belongs to no step: extraction_paths.json has no block for it
+            listed = set(paths[entry["step"]][basename])
+            for arr in entry["arrays"]:
+                missing += [(basename, p) for p in _full_paths(arr, arr["array_path"]) if p not in listed]
+        assert missing == []

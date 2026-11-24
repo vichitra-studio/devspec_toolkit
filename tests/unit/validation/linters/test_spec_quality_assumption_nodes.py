@@ -2,7 +2,9 @@
 import json
 
 from specdev_tools.core.errors import render_errors
+from specdev_tools.validation.graph_checks.prose_ids import check_prose_ids
 from specdev_tools.validation.spec_quality_lint import lint_spec_quality_file
+from unit.validation.graph_checks._example_support import context_of_spec, edited_example
 
 
 def _codes(tmp_path, assumptions):
@@ -23,8 +25,16 @@ def test_assumption_object_placeholder_e512(tmp_path):
     assert any("E512" in line for line in _codes(tmp_path, [_node("The vendor API is TBD")]))
 
 
-def test_assumption_object_unbound_id_w573(tmp_path):
-    assert any("W573" in line and "fr-x" in line for line in _codes(tmp_path, [_node("Existing fr-x keeps its contract")]))
+def test_assumption_naming_an_id_is_e752_not_w573(tmp_path):
+    text = "Existing fr-x keeps its contract"
+    assert not any("W573" in line for line in _codes(tmp_path, [_node(text)]))
+
+    def name_an_id(doc):
+        doc["assumptions"][0]["text"] = "The flow of cap-account-recovery is unchanged."
+
+    spec = edited_example(tmp_path / "spec", **{"00_charter.json": name_an_id})
+    (error,) = check_prose_ids(context_of_spec(spec), "merge")
+    assert (error.code, error.node_id) == ("E752", "asm-member-controls-email")
 
 
 def test_clean_assumption_object_gives_no_finding(tmp_path):

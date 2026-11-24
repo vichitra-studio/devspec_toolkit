@@ -6,6 +6,7 @@
       ".assumptions",
       ".risks",
       ".stakeholders",
+      ".stakeholders[].needs",
       ".user_segments",
       ".success_metrics",
       ".constraints"
@@ -42,13 +43,15 @@
   "04": {
     "04_fr_list.json": [
       ".ambiguities",
-      ".functional_requirements"
+      ".functional_requirements",
+      ".functional_requirements[].acceptance_criteria"
     ]
   },
   "05": {
     "05_interface_contracts.json": [
       ".ambiguities",
-      ".apis"
+      ".apis",
+      ".apis[].errors"
     ]
   },
   "06": {
@@ -103,7 +106,9 @@
   "14": {
     "14_roadmap.json": [
       ".ambiguities",
-      ".milestones"
+      ".milestones",
+      ".milestones[].tasks",
+      ".milestones[].tasks[].acceptance_criteria"
     ]
   },
   "15": {

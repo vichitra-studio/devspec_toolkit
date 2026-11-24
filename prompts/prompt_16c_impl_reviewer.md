@@ -51,6 +51,7 @@ The reviewer agent writes its findings as a file under `.specdev/findings/` (`fi
 *   `kind` is one of `gap, miss, bug, regression, assumption, ambiguity, hallucination, drift, coverage, determinism, seed-grounding`; `severity` is `P0`, `P1` or `P2`. The tool maps them: P0 to `blocking`, P1 to `major`, P2 to `minor`; `bug`/`regression`/`drift`/`determinism` to type `bug`, `gap`/`miss`/`seed-grounding` to `gap`, `assumption`/`ambiguity` to `design`, `hallucination` (behavior no criterion backs) to `scope_creep`, `coverage` to `tests`.
 *   Name the plan items a finding concerns: the file's `scope` when it is a plan-item id, and each `upstream_refs` entry written as a plan-item id. Each must be an item of the plan, or `review record` refuses the file (E823).
 *   A finding with `"status": "verified"` is fixed and confirmed and is left out of the review. A finding's `message` is at most 600 characters; the review holds at most 50 open findings.
+*   Guidance, not checked: a finding's `message` says what was observed and where, why it matters, and which plan item or requirement it concerns. Review judges it.
 *   A blocking or major finding (and any finding with a `suggested_fix`) gets a `remediation_task` made from its `suggested_fix` (else its `message`) and the file part of its `location`.
 
 The verdict is recorded with:
@@ -63,7 +64,7 @@ specdev review record <milestone-id> --verdict verified|needs_work|blocked|defer
 It replaces the whole `review` block with this one verdict (no history), adds the time, and prints the plan's size before and after. `--ratings-json` is an object of all five ratings of section 2. The three optional flags are passed by whoever runs the command: in a manual run you set them as sections 2, 4 and 5 say; the skill passes none of them, so under `/specdev-trinity` the `review` block holds the findings, the verdict and the time, and what the flags would say (a security gap, the rule that held a `verified` back) is a finding in your file. It checks the input and not your judgement: it refuses an unknown verdict, a findings file that is invalid or names an unknown plan item (E823) and a closed milestone (E820), and accepts `verified` with a blocking finding. The rules of "Reviewer judgement" below are yours to apply. You never write `execution`, `review`, a time or a hash by hand; `semantic_review` and `delivery_status` are not written by `review record`, so report scope creep and delivery gaps as findings.
 
 ## 2. Ratings (the rubric)
-*   In a manual run, provide a 0-5 integer for all five: `spec_completeness` (are all criteria realised? are items verbose and atomic?), `code_quality`, `tests_completeness`, `docs_completeness`, `metadata_usage` (are references and traceability used well? do all links resolve?).
+*   In a manual run, provide a 0-5 integer for all five: `spec_completeness` (are all criteria realised? are the descriptions of items and actions verbose and atomic? (that is the only text the "verbose" rule covers)), `code_quality`, `tests_completeness`, `docs_completeness`, `metadata_usage` (are references and traceability used well? do all links resolve?).
 *   **Scale** (reviewer judgement — rating bounds):
     *   **5**: Exemplary. Verified. (Specs are exhaustive, no "hand-waving").
     *   **4**: Good (minor nits). Verified.
@@ -78,7 +79,7 @@ It replaces the whole `review` block with this one verdict (no history), adds th
 *   If docs are missing or status is `not_required` despite code changes, add a `gap` finding of severity `P1`.
 
 ## 3. Findings (gaps, bugs, scope creep)
-*   List every issue as a finding of section 1. Cite what you saw (`file:line`), why it matters, and the item or criterion it violates.
+*   List every issue as a finding of section 1. Cite what you saw (the file and the function, class or quoted text, not a line number), why it matters, and the item or criterion it violates.
 *   A finding for a blocking or major issue carries a `suggested_fix` that says what to change in which file.
 *   Behavior that no criterion backs is a `hallucination` finding.
 
@@ -161,7 +162,7 @@ Before recording, verify:
 - Every plan item has a per-item verdict of yours: executed or proven, or named by a finding (reviewer judgement). `findings` is for issues only — a clean item does **not** need an invented finding.
 - Every task criterion of the milestone is realised by an item (the 16c pack lists criteria and items).
 - If any test command is missing or a coverage claim is unverifiable: make it a finding rather than accepting the implementation as complete.
-- [ ] Every finding includes a specific `file:line` location (no vague "the code has issues")
+- [ ] Every finding names a specific file and the function, class or text it is about (no vague "the code has issues")
 - [ ] The verdict is based on measurable criteria — the criteria's text and the test runs — not subjective quality judgment
 - [ ] Every blocking or major finding has a `suggested_fix` that is specific and actionable (not "fix the issue")
 - [ ] The rules of "Reviewer judgement" held for the verdict that is recorded

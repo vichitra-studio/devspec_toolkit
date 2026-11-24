@@ -259,72 +259,13 @@ After Agent returns:
 
 ### Step 2 — Review-fix loop
 
-After the author step completes with a clean gate, run the review-fix loop inline using
-the same protocol as `/specdev-review`:
+After the author step completes with a clean gate, run the review-fix loop by invoking the `/specdev-review` skill for scope `<NN>`
+(the Skill tool, skill `specdev-review`, args `<NN>`). The loop is written in that skill only: scope planning, reviewers in waves, the merge
+of the findings files, the fix dispatch, the blocker bridge, the cap of 5 rounds and the HALT artifact. The rule that a finding in neither
+`findings_closed` nor `findings_open` of the fix agent's return counts as open, and the read-back of each closed finding, are part of that loop.
 
-1. Dispatch `specdev-scope` with `{ "scope": "<NN>", "change_set": "git_diff" }`.
-2. For each round up to max_rounds=5:
-   a. Dispatch all planned `specdev-reviewer` instances in parallel (single message,
-      multiple Agent tool calls).
-   b. Merge with the jq one-liner (ensure directory exists once: `mkdir -p .specdev/findings`):
-      ```bash
-      jq -s '{"$schema": "vc:infra:findings", round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
-        .specdev/findings/findings_<NN>_<round>_r*.json > .specdev/findings/findings_<NN>_<round>.json
-      ```
-   c. If `findings[]` is empty: CONVERGED.
-   d. Else dispatch `specdev-impl` with `mode: "fix"` and the merged findings path.
-      After Agent returns (blocker handling — see `specdev-impl.md` § "Blocker emission protocol"):
-      1. Parse return JSON.
-      2. If `status != "blocker"`: check `gate_status` and `errors_remaining`; carry forward.
-      3. If `status == "blocker"`:
-         a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-            If malformed → HALT and surface to user.
-            Malformed includes: `questions[]` empty, any entry missing required fields,
-            edits applied AND `status: "blocker"` simultaneously (timing-constraint violation —
-            blocker window is closed after the first edit).
-         b. Persist: `mkdir -p .specdev/blockers/` then write
-            `.specdev/blockers/blocker_step-<NN>_fix_r<round>_<unix_ts>.json`.
-         c. Chunk questions ≤4. Call `AskUserQuestion` once per chunk, sequentially.
-            Collect answers keyed by `question.id`.
-            If the user dismisses or does not answer an AskUserQuestion call (empty answer set
-            returned), HALT immediately. Surface: "Blocker unresolved: user did not answer
-            clarification questions. Re-invoke /specdev-step <NN> to retry." Write a HALT
-            artifact noting `aborted_by_user` to `.specdev/blockers/blocker_step-<NN>_fix_aborted_<unix_ts>.json`.
-            Do not re-dispatch.
-         d. Build re-dispatch prompt: original fix dispatch input verbatim
-            + `## User answers (from blocker bridge)` section listing each
-              `{id, question, selected_label, selected_description, user_notes_if_any}`
-            + `## Context from prior dispatch` section (agent's `context` field)
-            + the `owner` / `about` instruction of the author dispatch above (step d): an answer
-              owned by another step or by a seed is recorded as an open item in `.ambiguities`,
-              not applied. An open item whose decision a fix applies is deleted with
-              `specdev json delete --id <item-id>`.
-         e. Increment `fix_blocker_round` counter (per-dispatch-site, scoped to this fix
-            dispatch chain, independent of author-phase counter; starts at 0 on first dispatch;
-            cap = 2 re-dispatches (counter values 0, 1, 2); does not persist across skill
-            invocations; resets to 0 at the start of each new outer review-fix round (R1/R2/.../R5)).
-         f. If `fix_blocker_round > 2`: HALT, surface to user.
-         g. Fresh Agent dispatch with augmented prompt. Continue from step 1.
-         Note: lossy re-dispatch — accepted cost; SendMessage-based resumption deferred.
-   e. Increment round and continue.
-3. If round 5 completes with findings remaining: HALT.
-
-   Write the HALT artifact:
-   ```
-   .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
-   ```
-   This is a timestamped copy of the round-5 merged findings file. It is the audit trail.
-   Do not promote it to a canonical name. The timestamped file IS the record.
-
-   Print:
-   ```
-   HALT: max_rounds=5 reached with unresolved findings.
-   Findings path: .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
-   Finding count: <N> (<P0_count> P0, <P1_count> P1, <P2_count> P2)
-   Human action required: proceed-with-gaps | replay | hand-edit then re-invoke /specdev-step <NN>
-   ```
-
-   Do not silently accept partial convergence. HALT is a first-class verdict.
+Its outcome is this skill's outcome: `CONVERGED at round <N>`, or `HALT` with the findings path
+`.specdev/findings/findings_<NN>_5_<unix_timestamp>.json`. After a HALT print what `/specdev-review` printed and go to the hand-off; do not run the loop again.
 
 The review scope for this step is `<NN>` (e.g. `04`, `02a`), as `/specdev-review` takes it; the findings files are named from it (`findings_<NN>_<round>.json`).
 

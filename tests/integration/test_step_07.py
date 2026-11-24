@@ -97,3 +97,8 @@ class Step07IntegrationTests(unittest.TestCase):
 
     def test_scope_later_without_scope_reason_fails(self):
         self._assert_nfr_fails_naming(lambda nfr: nfr.update(scope="later"), "scope_reason")
+
+    def test_nfr_id_without_a_condition_segment_fails_the_schema(self):
+        errors = specdev_validate_file(str(_REPO_ROOT), str(_FIXTURES / "invalid_nfr_id_one_segment.json"))
+        rendered = [e.render() for e in errors if e.code == "E520"]
+        self.assertTrue(any("nfr_id" in msg for msg in rendered), rendered)

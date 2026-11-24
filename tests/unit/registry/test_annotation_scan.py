@@ -118,7 +118,9 @@ def test_fixture_registry_has_nested_map_keyed_roles_and_links(mini_toolkit):
     assert reg["_format_version"] == "1.1.0"
     # extraction_paths lists annotation-derived entries in the legacy shape; no external_kinds
     assert ext["02a"]["02a_delivery_baseline.json"] == [".environments{}"]
-    assert ext["04"]["04_fr_list.json"] == [".functional_requirements", ".ambiguities"]
+    assert ext["04"]["04_fr_list.json"] == [
+        ".functional_requirements", ".functional_requirements[].acceptance_criteria", ".ambiguities"
+    ]
     assert "external_kinds" not in ext
     assert not any("seed" in str(v) for v in ext.values())
 
@@ -150,13 +152,14 @@ def test_real_registry_lists_seed_external_kind():
     assert "seed_manifest" not in json.dumps(ext)
 
 
-def test_scan_of_real_toolkit_finds_seed_and_no_step_kinds():
-    """Step 13 never gets a step kind (WI-M3-18), so only its shared ambiguity list is annotated."""
+def test_scan_of_real_toolkit_finds_seed_and_step_13_declares_only_extension_and_ambiguity_kinds():
+    """Step 13 declares no kind that a step of the graph holds links for: its ``extension`` record (unique ids, computed-field rejection) and the shared ambiguity list."""
     scan = scan_annotations(str(_ROOT))
     assert [e["kind"] for e in scan.external_kinds] == ["seed"]
     host = scan.host("schema/13_extension_manifest.schema.json")
-    assert host is not None and not host.annotation_only
-    assert {occ.entry["kind"] for occ in host.occurrences} == {"ambiguity-item"}
+    assert host is not None
+    assert {occ.entry["kind"] for occ in host.occurrences} == {"ambiguity-item", "extension"}
+    assert not any("links" in occ.entry for occ in host.occurrences if occ.entry["kind"] == "extension")
 
 
 # ----------------------------------------- unannotated files unchanged (acc. 2)
@@ -188,14 +191,14 @@ def test_unannotated_files_are_byte_identical_to_pre_m1():
     assert set(view) - set(pre["registry"]) == annotated - set(pre["registry"])
     assert reg["_sentinels"] == pre["_sentinels"]
     annotated_deferred = {"16a"}  # registered through an x-node files glob since WI-M3-18
-    assert reg["steps_with_deferred_registration"] == [
-        e for e in pre["steps_with_deferred_registration"] if e["step"] not in annotated_deferred
-    ]
+    inside_plan_file = {e["step"] for e in pre["steps_with_deferred_registration"]} - annotated_deferred
+    assert {e["step"] for e in reg["steps_without_entry_arrays"]} - {e["step"] for e in pre["steps_without_entry_arrays"]} == inside_plan_file
     ambiguity_only = set(reg["registry"]) - set(view)
     annotated_steps = {k.split("_")[0] for k in annotated | ambiguity_only} | {"13a"}  # 13a: retired by M6c
+    unchanged_steps = annotated_steps | inside_plan_file
     for key in ("steps_without_entry_arrays",):
-        assert [e for e in reg[key] if e["step"] not in annotated_steps] == [
-            e for e in pre[key] if e["step"] not in annotated_steps
+        assert [e for e in reg[key] if e["step"] not in unchanged_steps] == [
+            e for e in pre[key] if e["step"] not in unchanged_steps
         ], key
     differing = {k for k in set(reg) | set(pre) if reg.get(k) != pre.get(k)}
     # the registry map itself differs once any step is annotated; its keys are compared above
@@ -328,11 +331,11 @@ def test_object_path_unannotated_type_id_list_and_distinct_kinds(mini_toolkit, e
 
 # --------------------------------------- $ref-only vs own annotation (acc. 7, X2-03)
 
-def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(edit_json, mini_toolkit):
+def test_an_array_with_no_x_node_is_not_registered(edit_json, mini_toolkit):
     root = mini_toolkit
 
     def only_ref(doc):
-        # 05: drop its own x-node + x-link; keep an un-annotated array and reach the
+        # 05: drop its own x-node + x-link; add an un-annotated array and reach the
         # shared ambiguity definition by $ref.
         apis = doc["properties"]["interface"]["properties"]["apis"]
         apis.pop("x-node")
@@ -344,7 +347,7 @@ def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(edit_json,
         doc["properties"]["ambiguities"] = {"$ref": "vc:core:ambiguity-fixture#/$defs/ambiguityList"}
 
     def own_annotation(doc):
-        # 04 keeps its own x-node, so an un-annotated array is not registered.
+        # an un-annotated array of a file that keeps its own x-node is not registered either.
         doc["properties"]["legacy_things"] = {
             "type": "array",
             "items": {"type": "object", "properties": {"legacy_id": {"type": "string"}}},
@@ -354,7 +357,7 @@ def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(edit_json,
     edit_json(root, S04, own_annotation)
     reg, _ = _generate(root)
     ref_only = _by_path(_arrays(reg, "05_interface_contracts.json"))
-    assert ref_only[".things"] == {"array_path": ".things", "id_field": "thing_id", "kind": "thing"}
+    assert ".things" not in ref_only
     assert ref_only[".ambiguities"]["kind"] == "ambiguity-item"
     assert ".interface.apis" not in ref_only
     annotated = _by_path(_arrays(reg, "04_fr_list.json"))
@@ -466,7 +469,7 @@ def _registry_toolkit(tmp_path: Path, registry: dict[str, Any]) -> Path:
     doc = {
         "$schema": "vc:entry-key-registry", "_format_version": "1.1.0", "_note": "t",
         "registry": registry, "_sentinels": [],
-        "steps_without_entry_arrays": [], "steps_with_deferred_registration": [],
+        "steps_without_entry_arrays": [],
         "external_kinds": [{"kind": "seed", "source_file": "common/seed_manifest.json",
                             "array_path": ".seeds", "id_field": "seed_id", "top_of_graph": True}],
     }

@@ -15,15 +15,15 @@ Use this document as the authoritative baseline for all prompt-level directives.
 
 The schema at `$SCHEMA_DIR/NN_name.schema.json` is the authoritative source for all field definitions, types, required vs optional markers, enum values, patterns, and minItems rules. MUST read the schema before generating output. Do NOT guess field names, types, or valid values — all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-This step's output artifact MUST include every field listed in the schema's `required[]` array. Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them in the prompt.
+This step's output artifact MUST include every field listed in the schema's `required[]` array. Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them in the prompt prose; the Output Contract block of a prompt is a worked example that a test validates against the schema (`tests/integration/test_prompt_output_examples.py`), not a restatement.
 
 ## 3. Canonical Registry Protocol
 
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. NEVER use a deprecated canonical without checking `replaced_by` first.
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. NEVER use a deprecated canonical without checking `replaced_by` first. `spec-check` reports a use of a deprecated entry as W110, a warning that has no error form.
 
 - **Bind**: Map `*_ref` fields to canonical IDs (`cn:<namespace>:<kind>:<slug>`). Resolve aliases via `canon/aliases.json`.
 - **Required**: `canonical_refs_used` MUST list every canonical ID referenced by any `*_ref` field. For each `*_ref` in the schema: if the semantic content exists, the ref MUST be populated — not optional.
-- **Optional**: `canonical_proposals` for any new term with no registry match; `canonical_conflicts` for ambiguous or contradictory matches.
+- **Optional**: `canonical_proposals` for any new term with no registry match; `canonical_conflicts` for ambiguous or contradictory matches. An accepted proposal stays in `canonical_proposals`: `canon-accept` skips an id that is already in canon, it does not remove or mark the proposal, and E606 keeps comparing the term with it. Do not empty `canonical_proposals` after `canon-accept`, and do not report an accepted proposal as stale. To read the definition of an accepted entry, read canon: `specdev json read spec/canon/kinds/<kind>.json '.entries[] | select(.id=="<canon-id>")' --repo-root ./devspec_toolkit`.
 - **Resolution order**: exact canonical ID → active alias → canonical proposal. If multiple active canonicals match, emit `canonical_conflicts`. Never emit schema fields that invent a new semantic label without a canonical reference or proposal.
 
 ## 4. Hardening Protocol
@@ -57,9 +57,10 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
 6. Set `owner` to one of the values defined in `schema/core/atoms.schema.json` owner enum.
 7. If the schema declares link fields (fields marked `x-link`, such as `derives_from`), include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+8. Do not include any fields outside the schema.
 9. A relation between nodes is a link in a link field, never a node id in prose. A mention of another node's id (or of a retired name of it, or of a seed) in a text field is not a link: the graph never sees it, and `spec-check` reports it as E752. Turn a mention that states a relation into the link and take the id out of the text; reword any other mention.
 10. A glossary term is used by its label: a term of Step 03 that no node of steps 04 to 15 mentions by its label is reported as E741 (use the label in the text of a node, or delete the term with `specdev json delete --id <term-id>`).
+11. Output hygiene. A field holds a requirement and the ids it rests on, not its provenance or its history: no file:line citation, no date, no quotation of a seed or of a person, no measured value copied from a log, no decision story ("per operator decision ..."). A source is carried by a link field (`derives_from` and the others) and by the agent's report. The one exception is a field the schema defines as provenance (step 05 `enum_provenance`, E311). A bound that a prompt or a schema description states for a field (for example the problem statement of step 00: 1 to 3 sentences) is a limit, not advice.
 
 ## 7. Seed Order Protocol
 
@@ -74,14 +75,14 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ### 8.1 Self-Audit Gate (input sufficiency)
 
-Each gate item is a pass/fail check on whether upstream inputs are sufficient to proceed. If ALL items pass → enter Emit mode. If ANY item cannot be satisfied → enter Clarify mode: output only short bulleted gap questions, no JSON, no code fences. Stop and wait for user input.
+Each gate item is a pass/fail check on whether upstream inputs are sufficient to proceed. If ALL items pass → enter Emit mode. If ANY item cannot be satisfied → enter Clarify mode: output only short bulleted gap questions, no JSON, no code fences. Stop and wait for user input. When an agent runs the step for an orchestrator (`specdev-impl`), the gap questions are returned as a blocker payload instead (`.claude/agents/specdev-impl.md`, section "Blocker emission protocol"); the questions are the same, only the envelope differs.
 
-Output quality verification is in the Coverage Closure section — run Coverage Closure AFTER emitting the artifact.
+Output quality verification is in the Coverage Closure section — run Coverage Closure BEFORE emitting the artifact (8.2), and run `specdev spec-check` after writing it.
 
 ### 8.2 Universal Coverage Closure Checklist
 
 Each prompt's Coverage Closure section contains step-specific rules. In addition, before emitting, always verify:
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
@@ -136,10 +137,13 @@ When two upstream artifacts contradict each other:
 2. Apply precedence: seed > charter > capabilities > architecture > delivery > glossary.
 3. If same-level artifacts conflict, add a Gap Question — do not guess.
 4. Never silently resolve a conflict.
+5. A decision that another step or a seed owns (a conflict you found, or the answer to a Gap Question) is never applied inside this step. Record it as an open item of this step: `specdev json insert --step <NN> .ambiguities '<item>'`, with `description` the question, `about` the seed or nodes the decision is about and `decision` the answer when it is known. The item is deleted once the owner has applied the decision. `specdev upstream-backlog spec --repo-root <toolkit>` lists open items by the step of their `about` nodes, and the merge gate (`spec-check --merge`) fails while one is open (E631). A choice this step owns is applied here.
 
 ## 12. Context Ledger
 
 Before emitting output, build a private synthesis ledger (Context Ledger) containing all inputs ingested, decisions made, and evidence chains. Do not output it. It serves as internal audit trail for completeness closure and self-audit scoring. Each prompt's Operating Flow section specifies what the Context Ledger should contain for that step.
+
+Verification evidence is not artifact text. A reviewer records it in the `evidence[]` of the finding (`schema/infra/findings.schema.json`); an author's grounding is the link it writes; a link that a person has read and accepted is recorded by `specdev attest` in `spec/extras/trace.lock.json`.
 
 ## 13. Namespace Resolution
 

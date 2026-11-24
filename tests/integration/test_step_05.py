@@ -89,3 +89,19 @@ class Step05IntegrationTests(unittest.TestCase):
         self.assertTrue(
             any("apis/0/protocol" in msg and "'invalid-protocol' is not one of" in msg for msg in rendered), rendered
         )
+
+    def test_http_api_without_path_fails(self):
+        rendered = self._schema_errors("invalid_http_missing_path.json", lambda spec: None)
+        self.assertTrue(any("'path' is a required property" in msg for msg in rendered), rendered)
+
+    def test_http_api_without_method_fails(self):
+        rendered = self._schema_errors("invalid_http_missing_method.json", lambda spec: None)
+        self.assertTrue(any("'method' is a required property" in msg for msg in rendered), rendered)
+
+    def test_grpc_api_without_path_passes(self):
+        def make_grpc(spec: dict) -> None:
+            spec["apis"][0].update(protocol="grpc")
+            spec["apis"][0].pop("path")
+            spec["apis"][0].pop("method")
+
+        self.assertEqual(self._schema_errors("valid_rest_api.json", make_grpc), [])

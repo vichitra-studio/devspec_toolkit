@@ -145,6 +145,22 @@ class Step14IntegrationTests(unittest.TestCase):
             errors = validate_file(str(self.repo_root), str(self.fixtures_dir / name))
             self.assertTrue(errors, msg=f"{name} unexpectedly passed validation")
 
+    def test_high_risk_milestone_without_risks_rejected(self):
+        errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "invalid_high_risk_no_risks.json"))
+        self.assertTrue(any("milestones/0/risks" in e.render() for e in errors), [e.render() for e in errors])
+
+    def test_critical_risk_milestone_with_risks_accepted(self):
+        def critical(spec: dict) -> None:
+            spec["milestones"][0].update(risk_status="critical", risks=["Payment provider outage during peak load; mitigate with a queue."])
+
+        self.assertEqual([], self._errors(critical))
+
+    def test_low_risk_milestone_without_risks_accepted(self):
+        def low(spec: dict) -> None:
+            spec["milestones"][0].update(risk_status="low", risks=[])
+
+        self.assertEqual([], self._errors(low))
+
     def test_milestones_are_in_chronological_order_for_valid_fixture(self):
         data = json.loads((self.fixtures_dir / "valid_roadmap.json").read_text(encoding="utf-8"))
         dates = [m.get("target_date") for m in data.get("milestones", [])]

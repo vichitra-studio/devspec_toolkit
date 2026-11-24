@@ -19,7 +19,7 @@ from specdev_tools import trace
 from specdev_tools.graph.kinds import load_kind_registry
 from specdev_tools.validation.hallucination_lint import lint_hallucinations
 from specdev_tools.validation.linter_utils import graph_known_ids
-from specdev_tools.validation.spec_quality_lint import lint_spec_quality, lint_spec_quality_file
+from specdev_tools.validation.spec_quality_lint import lint_spec_quality
 
 from specdev_tools.validation.spec_check import run_spec_check_json
 
@@ -97,34 +97,6 @@ def test_no_xnode_schema_keeps_legacy_known_ids(tmp_path: Path, ref: str, expect
     _write(tmp_path, LEGACY_FILE, {"items": [{"item_id": "it-1"}], "link_ref": ref})
     assert bool(_lines(lint_hallucinations(str(tmp_path)), "E530")) is expected
     assert bool(_unresolved_refs(lint_spec_quality(str(tmp_path)))) is expected
-
-
-@pytest.mark.parametrize(
-    ("assumption", "expected"),
-    [("fr-login keeps its contract", False), ("fr-unknown keeps its contract", True)],
-    ids=["defined-in-file", "unknown"],
-)
-def test_assumption_unbound_id_single_file_uses_graph_slice(tmp_path: Path, assumption: str, expected: bool) -> None:
-    path = _write(
-        tmp_path,
-        NODE_FILE,
-        {"functional_requirements": [{"fr_id": "fr-login"}], "assumptions": [assumption]},
-    )
-    assert bool(_lines(lint_spec_quality_file(str(path), str(tmp_path)), "W573")) is expected
-
-
-def test_single_file_foreign_key_is_not_a_definition(tmp_path: Path) -> None:
-    """The slice replaces the scan for a file with nodes: an id only a ``*_id`` of a non-node collection holds is unbound."""
-    path = _write(
-        tmp_path,
-        NODE_FILE,
-        {
-            "functional_requirements": [{"fr_id": "fr-a"}],
-            "coverage_notes": [{"fr_id": "fr-ghost"}],
-            "assumptions": ["fr-ghost keeps its contract"],
-        },
-    )
-    assert any("fr-ghost" in line for line in _lines(lint_spec_quality_file(str(path), str(tmp_path)), "W573"))
 
 
 def _property_schemas(node: Any) -> Iterator[tuple[str, dict[str, Any]]]:

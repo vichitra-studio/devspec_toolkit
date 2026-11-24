@@ -206,8 +206,7 @@ _GET_ALL_PROPS_CASES: list[tuple[str, frozenset[str]]] = [
 def _get_all_props_for_step(step_id: str) -> dict:
     """Return the _get_all_properties result for *step_id*.
 
-    Mirrors how generate.py itself invokes _get_all_properties inside
-    _scan_schema_for_arrays: load the schema file, call the function directly.
+    Loads the schema file of the step and calls the function directly.
     """
     from specdev_tools.registry import generate  # noqa: PLC0415
 
@@ -271,3 +270,56 @@ class TestGetAllPropertiesNoopResolver:
             f"the $ref branch) — found: {sorted(unexpectedly_present)}. "
             f"Actual props: {sorted(props)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Conditional-branch properties (DEVSPEC-95)
+# ---------------------------------------------------------------------------
+
+_CONDITIONAL_SCHEMA: dict[str, Any] = {
+    "allOf": [
+        {
+            "required": ["extensions"],
+            "properties": {"extensions": {"type": "array", "items": {"type": "object"}}},
+        }
+    ],
+    "oneOf": [{"properties": {"only_in_one_of": {"type": "string"}}, "required": ["only_in_one_of"]}],
+    "then": {"properties": {"extensions": {"type": "array"}, "only_in_then": {"type": "string"}}},
+}
+
+
+def _merge_allof_of_conditional_schema() -> dict[str, Any]:
+    """``merge_allof`` properties of the conditional schema."""
+    from specdev_tools.context._utils import merge_allof  # noqa: PLC0415
+
+    return merge_allof(_CONDITIONAL_SCHEMA, _load_registry())["properties"]
+
+
+def _get_all_properties_of_conditional_schema() -> dict[str, Any]:
+    from specdev_tools.registry import generate  # noqa: PLC0415
+
+    return generate._get_all_properties(_CONDITIONAL_SCHEMA)
+
+
+_CONDITIONAL_MERGES = pytest.mark.parametrize(
+    "merged_props",
+    [_merge_allof_of_conditional_schema, _get_all_properties_of_conditional_schema],
+    ids=["merge_allof", "_get_all_properties"],
+)
+
+
+class TestConditionalBranchProperties:
+    @_CONDITIONAL_MERGES
+    def test_a_property_only_in_a_oneof_branch_is_merged(self, merged_props) -> None:
+        props = merged_props()
+        assert {"only_in_one_of", "only_in_then"} <= set(props)
+
+    @_CONDITIONAL_MERGES
+    def test_a_conditional_branch_does_not_replace_an_allof_property(self, merged_props) -> None:
+        props = merged_props()
+        assert props["extensions"]["items"] == {"type": "object"}
+
+    def test_required_is_never_taken_from_a_conditional_branch(self) -> None:
+        from specdev_tools.context._utils import merge_allof  # noqa: PLC0415
+
+        assert merge_allof(_CONDITIONAL_SCHEMA, _load_registry())["required"] == ["extensions"]

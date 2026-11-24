@@ -36,7 +36,7 @@
       "id": "cn:project:term:reset-token",
       "kind": "term",
       "preferred_label": "reset token",
-      "definition": "A single-use secret, sent by email, that authorises one password change.",
+      "definition": "A single-use secret, sent by email, that authorises one password change for one account until it expires.",
       "version": "1.0.0",
       "status": "active",
       "owners": [

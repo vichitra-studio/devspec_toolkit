@@ -9,9 +9,9 @@
       "purpose": "Collect missing, high-impact details before artifact emission.",
       "output_contract": {
         "type": "questions",
-        "format": "markdown_bullets_only",
+        "format": "markdown_bullets_or_blocker_json",
         "restrictions": [
-          "Do not emit JSON or code fences"
+          "In an interactive session do not emit JSON or code fences; an agent dispatched by a skill returns a blocker JSON (see docs/agents/agents.md section 9)"
         ]
       }
     },
@@ -50,7 +50,6 @@
       "schema": "16_impl_context"
     }
   },
-  "phase_triggers": {},
   "commands": [
     "See docs/developers/reference.md"
   ],

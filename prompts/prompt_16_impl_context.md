@@ -62,9 +62,9 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 
 ## Coverage Closure
 Before emitting, verify:
-- Every milestone in `14_roadmap.json` appears in `plan.milestone_index`, OR is explicitly listed in `scope_out` with a rationale in `plan.ambiguities`. The anchor is the cumulative ledger — `done` milestones must remain indexed so traceability stays enforceable.
+- Every milestone in `14_roadmap.json` appears in `plan.milestone_index`, OR is explicitly listed in `scope_out` with a rationale in `plan.ambiguities`. The anchor is the cumulative ledger — `done` milestones must remain indexed so traceability stays enforceable. No tool reports a roadmap milestone that has no row (review rule).
 - No roadmap task is realised by the plan items of two milestones that are not `done` (E308 — see `docs/developers/error-codes.md`). A plan owns the tasks of the criteria its items realise; `deferred` counts as not `done`. Settle this when the 16a plans are written, not on the anchor: the row stores no task list.
-- No entry in `plan.summary.scope_in` also appears in `plan.summary.scope_out` — and neither contradicts any milestone's scope.
+- No entry in `plan.summary.scope_in` also appears in `plan.summary.scope_out` — and neither contradicts any milestone's scope. E308 compares a milestone plan's scope with the anchor's; no tool compares the anchor's two lists with each other (review rule).
 - Each `checklist_id_prefix` is unique across `plan.milestone_index` — 16a plans allocate checklist IDs from this namespace.
 - All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`.
 
@@ -75,7 +75,7 @@ Before emitting, verify:
 4. **NEVER** author a per-FR checklist on the anchor — that detail lives in each 16a plan.
 5. **NEVER** set `artifact_role` to anything other than `"anchor"`.
 6. **NEVER** emit placeholder or empty-string values where content is required — consult the schema for minimum lengths.
-7. **NEVER** place `16_impl_context.json` inside `spec/impl_context/`. The anchor lives at `spec/16_impl_context.json` at the spec directory root. Files in `spec/impl_context/` are milestone plans.
+7. **NEVER** place `16_impl_context.json` inside `spec/impl_context/`. The anchor lives at `spec/16_impl_context.json` at the spec directory root. Files in `spec/impl_context/` are milestone plans. `spec-check` reports an anchor found there as W609, a warning that does not fail the gate.
 
 # Heuristics For Completeness
 1. **Every `milestone_index[].about` names a milestone of `14_roadmap.json`** — invent no IDs.

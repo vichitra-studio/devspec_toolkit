@@ -140,7 +140,7 @@ def test_the_example_on_a_clean_branch_adds_only_clean_merge_lines(host: Path) -
     report = merge(host, "--base-ref", "main")
     assert report.status("merge-open-items") == "PASS" and report.status("third-party-pins") == "PASS" and report.status("merge-bindings") == "SKIP"
     assert report.codes == plain(host).codes, "the merge mode adds no finding to the example"
-    assert "spec-check: 31 checks run, 25 errors, 7 warnings" in report.out
+    assert "spec-check: 31 checks run, 25 errors, 1 warnings" in report.out
 
 
 # --- open items -----------------------------------------------------------------------------------------------------

@@ -1008,6 +1008,23 @@ class TestStep16(unittest.TestCase):
         w570 = [e for e in errors if e.code == "W570"]
         self.assertEqual(w570, [], f"Did not expect W570 with a valid seed_manifest.json. Got: {w570}")
 
+    def _errors_with_existing_structure(self, structure: dict) -> list:
+        """Validation errors of ``valid_minimal.json`` after ``plan.context.existing_structures`` holds *structure*."""
+        plan = json.loads(Path(self.fixtures_dir, "valid_minimal.json").read_text(encoding="utf-8"))
+        plan["plan"]["context"] = {"existing_structures": [structure]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ms_existing_structure_plan.json"
+            path.write_text(json.dumps(plan), encoding="utf-8")
+            return validate_file(self.repo_root, str(path))
+
+    def test_existing_structure_with_non_code_file_is_valid(self):
+        errors = self._errors_with_existing_structure({"signature": "upstream backend { server app:8000; }", "source_file": "deploy/nginx.conf"})
+        self.assertEqual(errors, [], f"A structure in a config file should pass. Errors: {errors}")
+
+    def test_existing_structure_line_range_rejected(self):
+        errors = self._errors_with_existing_structure({"signature": "def f() -> None:", "source_file": "src/f.py", "line_range": "L1-L2"})
+        self.assertTrue(any("line_range" in e.render() for e in errors), f"Expected line_range to be rejected. Got: {errors}")
+
 
 if __name__ == '__main__':
     unittest.main()
