@@ -1,0 +1,366 @@
+<title>Spec Graph Links</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fraunces:opsz,wght@9..144,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; the interactive graph and its detail panel sit side by side on wide screens and stack on phones. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #17201d;
+  --muted: #56635e;
+  --rule: #d5dcd9;
+  --accent: #0f6b5c;
+  --accent-soft: #dcefe9;
+  --hot: #b4570a;
+  --hot-soft: #fbead6;
+  --code-bg: #eaefed;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101614; --surface: #18201d; --ink: #e4ebe8; --muted: #9aa8a2; --rule: #2c3733;
+    --accent: #5cc4ae; --accent-soft: #173a33; --hot: #f0a35a; --hot-soft: #3a2a17; --code-bg: #1f2925;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101614; --surface: #18201d; --ink: #e4ebe8; --muted: #9aa8a2; --rule: #2c3733;
+  --accent: #5cc4ae; --accent-soft: #173a33; --hot: #f0a35a; --hot-soft: #3a2a17; --code-bg: #1f2925;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 980px; margin: 0 auto; padding-block: 40px 80px; display: grid; gap: 48px; }
+header { display: grid; gap: 10px; max-width: 70ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 26px; line-height: 1.2; margin: 0 0 12px; text-wrap: balance; }
+h3 { font-size: 17px; margin: 18px 0 6px; }
+p, li { max-width: 70ch; }
+p { margin: 0 0 12px; }
+ul { margin: 0 0 12px; padding-left: 22px; }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+pre { font-family: var(--font-mono); font-size: 13px; line-height: 1.55; background: var(--code-bg); padding: 14px 16px; border-radius: 6px; overflow-x: auto; margin: 0; }
+.lede { color: var(--muted); font-size: 18px; margin: 0; }
+.mark { color: var(--accent); font-weight: 700; }
+
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.piece { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.piece .tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.piece strong { font-size: 17px; }
+.piece p { font-size: 14.5px; color: var(--muted); margin: 0; }
+.arrowrow { display: flex; justify-content: center; gap: 8px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin-top: 10px; flex-wrap: wrap; }
+
+.annot { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.annot ol { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.annot li { font-size: 15px; }
+.annot li b { font-family: var(--font-mono); font-size: 13.5px; color: var(--accent); }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 9px 12px; background: var(--bg); border-bottom: 1px solid var(--rule); }
+td { padding: 9px 12px; border-top: 1px solid var(--rule); vertical-align: top; }
+tbody tr:first-child td { border-top: 0; }
+
+.graphwrap { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.graph { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 8px; overflow-x: auto; }
+.graph svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; display: grid; gap: 10px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.panel h3 { margin: 0; font-family: var(--font-mono); font-size: 15px; overflow-wrap: anywhere; }
+.panel .kind { font-size: 13px; color: var(--muted); }
+.panel .sec { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 4px; }
+.panel ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.panel li { font-family: var(--font-mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.panel li .v { color: var(--accent); }
+.panel li.hotli { color: var(--hot); }
+.panel .none { font-family: var(--font-body); color: var(--muted); font-size: 13.5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+.step-label { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+.lane { stroke: var(--rule); stroke-width: 1; }
+.edge { stroke: var(--muted); stroke-width: 1.4; fill: none; opacity: .55; }
+.edge.same { stroke-dasharray: 5 3; }
+.edge.contain { stroke-dasharray: 2 3; opacity: .5; }
+.edge.out { stroke: var(--accent); opacity: 1; stroke-width: 2.2; }
+.edge.hot { stroke: var(--hot); opacity: 1; stroke-width: 2; }
+.node rect { fill: var(--surface); stroke: var(--rule); stroke-width: 1.4; rx: 7; }
+.node text { font-family: var(--font-mono); font-size: 11px; fill: var(--ink); pointer-events: none; }
+.node .k { font-size: 9.5px; fill: var(--muted); }
+.node { cursor: pointer; }
+.node:hover rect, .node:focus rect { stroke: var(--accent); }
+.node:focus { outline: none; }
+.node:focus-visible rect { stroke-width: 3; }
+.node.sel rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.4; }
+.node.target rect { stroke: var(--accent); stroke-width: 2; }
+.node.hot rect { fill: var(--hot-soft); stroke: var(--hot); stroke-width: 2; }
+.ah { fill: var(--muted); }
+.ah-out { fill: var(--accent); }
+.ah-hot { fill: var(--hot); }
+
+.same-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.card .step { font-family: var(--font-mono); font-size: 11px; color: var(--accent); letter-spacing: .05em; }
+.card .eg { font-family: var(--font-mono); font-size: 13px; margin: 6px 0; overflow-wrap: anywhere; }
+.card p { font-size: 14.5px; margin: 0; color: var(--muted); }
+.rules { display: grid; gap: 10px; counter-reset: r; }
+.rule { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.rule::before { counter-increment: r; content: counter(r); font-family: var(--font-mono); font-size: 13px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.rule p { margin: 2px 0 0; }
+
+@media (max-width: 760px) {
+  .three, .annot, .graphwrap, .same-grid { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .node rect, .edge { transition: stroke .15s, fill .15s, opacity .15s; }
+}
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">devspec_toolkit · spec graph · how links work</div>
+    <h1>Spec graph links, step by step</h1>
+    <p class="lede">What <code>x-node</code> and <code>x-link</code> are, how one spec links to another, and why some links stay inside a single spec. One small example, the password reset, runs through the whole page.</p>
+  </header>
+
+  <section>
+    <h2>Three pieces</h2>
+    <p>The rules about links live in one place, the data lives in another, and a tool reads both.</p>
+    <div class="three">
+      <div class="piece">
+        <span class="tag">The rulebook</span>
+        <strong>Step schemas (toolkit)</strong>
+        <p>Each step's JSON schema carries two extra annotations: <code>x-node</code> says "items here are nodes"; <code>x-link</code> says "this field links to these kinds". Hosts never edit these.</p>
+      </div>
+      <div class="piece">
+        <span class="tag">The data</span>
+        <strong>Spec files (host repo)</strong>
+        <p>Each spec node stores its own id and, in fields named after a verb, the ids of the nodes it depends on. Nothing else: no paths, no copies of text.</p>
+      </div>
+      <div class="piece">
+        <span class="tag">The tool</span>
+        <strong><code>specdev</code></strong>
+        <p>Reads the rulebook to know where nodes live and what each link may point at, then checks every link in the data and tracks changes in the trace lock.</p>
+      </div>
+    </div>
+    <div class="arrowrow"><span>rulebook</span><span>+</span><span>data</span><span>→</span><span>specdev checks and tracks</span></div>
+  </section>
+
+  <section>
+    <h2>x-node: "the items in this list are nodes"</h2>
+    <div class="annot">
+<pre>"third_parties": {
+  "type": "array",
+  "x-node": {
+    "kind": "third-party",       <span class="mark">①</span>
+    "id": "third_party_id",      <span class="mark">②</span>
+    "role": "context",           <span class="mark">③</span>
+    "contract": ["name", "pin"]  <span class="mark">④</span>
+  }
+}</pre>
+      <ol>
+        <li><b>kind</b> names what sort of node this is. The tool builds one registry of every kind, so it can find any node by id.</li>
+        <li><b>id</b> names the field holding the node's id. Ids are unique across the whole spec.</li>
+        <li><b>role</b> picks the rule the node must meet: an obligation must be built and proven, a verifier must run, context needs only to be used.</li>
+        <li><b>contract</b> lists the fields whose change matters. Change one of them and every node that depends on this one becomes suspect.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>x-link: "this field links to these kinds"</h2>
+    <div class="annot">
+<pre>"connects_to": {
+  "type": "array",
+  "items": { "$ref": "vc:core:atoms#kebabId" },
+  "x-link": {
+    "kinds": ["component", "third-party"],  <span class="mark">①</span>
+    "required": true,                         <span class="mark">②</span>
+    "built": false                            <span class="mark">③</span>
+  }
+}</pre>
+      <ol>
+        <li><b>kinds</b>: the ids in this field must be nodes of these kinds. A typo, a missing node or a wrong kind is an error.</li>
+        <li><b>required</b>: whether the field may be empty.</li>
+        <li><b>built</b>: whether building the node at this end counts toward building the node it points at.</li>
+      </ol>
+    </div>
+    <p>The relation is the field's name, so it is never written twice. In the spec file the same field is just ids:</p>
+<pre>{ "connection_id": "conn-identity-to-mailrelay",
+  "derives_from": ["identity-service"],
+  "connects_to":  ["tp-mailrelay"] }</pre>
+  </section>
+
+  <section>
+    <h2>Try it: click a node</h2>
+    <p>Steps run top to bottom, the order they are written in. Every arrow is a link <b>stored on the node at its tail</b>, pointing at a node that already exists, in an earlier step or in the same step. Click a node to see what it links to, what links to it, and what becomes suspect if it changes.</p>
+    <div class="graphwrap">
+      <div class="graph" aria-label="Example spec graph">
+        <svg id="g" viewBox="0 0 880 720" role="group" aria-label="Spec graph of the password reset example"></svg>
+      </div>
+      <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--accent)"></span>links stored on the selected node</span>
+      <span><span class="sw" style="background:var(--hot)"></span>suspect if the selected node changes</span>
+      <span>dashed arrow: a link inside one step</span>
+      <span>dotted line: contained in (an FR holds its criteria)</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Linking across specs</h2>
+    <div class="rules">
+      <div class="rule"><div><strong>The later node stores the link.</strong><p>The API at step 05 stores <code>derives_from: ["fr-password-reset"]</code>. The FR at step 04 stores nothing about the API. The tool works out "who uses this FR" by reading links backwards.</p></div></div>
+      <div class="rule"><div><strong>Links point back, never forward.</strong><p>A node may link only to a node in an earlier step or its own step. A step-04 FR can never link to a step-05 API, because that API doesn't exist yet when the FR is written.</p></div></div>
+      <div class="rule"><div><strong>Only the id is stored.</strong><p>No file path, no line number, no copy of the target's text. The tool finds the node through the kind registry.</p></div></div>
+      <div class="rule"><div><strong>The tool remembers what the author saw.</strong><p>For every link, the trace lock keeps a hash of the target as it was when the link was last checked. If the target changes, the link and everything below it become suspect until someone re-checks them.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why some links stay inside one spec</h2>
+    <p>Some relationships are decided within a single step. If there were no link, the relation would live only in prose. Then the tool could not check it, and a change on one side would never reach the other.</p>
+    <div class="same-grid">
+      <div class="card"><div class="step">Step 02 · system sketch</div><div class="eg">connection → identity-service, tp-mailrelay</div><p>An architecture arrow joins two boxes drawn in the same sketch. If MailRelay's pin changes, the connection, and the threats and NFRs on it, are re-checked.</p></div>
+      <div class="card"><div class="step">Step 04 · FRs</div><div class="eg">fr-password-reset depends_on fr-send-email</div><p>A reset needs the email feature. Without the link, a change to how emails are sent would never flag the reset flow.</p></div>
+      <div class="card"><div class="step">Step 00 · charter</div><div class="eg">risk derives_from assumption</div><p>A risk is often "what if this assumption is false". Linking them means a changed assumption flags the risk.</p></div>
+      <div class="card"><div class="step">Step 14 · roadmap</div><div class="eg">task depends_on task</div><p>One task must finish before another starts. The tool orders the work from these links and catches cycles.</p></div>
+    </div>
+    <p style="margin-top:12px">Same-step links follow the same rules as any other link: declared in the schema, ids only, checked, and tracked in the lock. A loop among them, such as A depends on B and B depends on A, is an error.</p>
+  </section>
+
+  <section>
+    <h2>What the tool checks on every link</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Check</th><th>Example of a failure</th></tr></thead>
+        <tbody>
+          <tr><td>The id exists</td><td><code>connects_to: ["tp-mailrely"]</code>, a typo</td></tr>
+          <tr><td>The kind is allowed</td><td><code>connects_to</code> pointing at an FR</td></tr>
+          <tr><td>It points back, not forward</td><td>a step-04 FR linking to a step-05 API</td></tr>
+          <tr><td>Something uses every node</td><td>a third party that nothing connects to or relies on</td></tr>
+          <tr><td>Nothing changed under it</td><td>MailRelay's pin changed, but the connection hasn't been re-checked</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var NODES = [
+    { id: "seed-accounts", kind: "seed", step: "seed", x: 440, y: 40, links: [] },
+    { id: "scope-password-reset", kind: "scope item", step: "00", x: 440, y: 112, links: [["derives_from", "seed-accounts"]] },
+    { id: "cap-account-recovery", kind: "capability", step: "01", x: 440, y: 184, links: [["derives_from", "scope-password-reset"]] },
+    { id: "identity-service", kind: "component", step: "02", x: 200, y: 262, links: [["derives_from", "cap-account-recovery"]] },
+    { id: "conn-identity-to-mailrelay", kind: "connection", step: "02", x: 440, y: 262, links: [["derives_from", "identity-service"], ["connects_to", "tp-mailrelay"]] },
+    { id: "tp-mailrelay", kind: "third party", step: "02", x: 690, y: 262, links: [["derives_from", "seed-accounts"]] },
+    { id: "fr-password-reset", kind: "FR", step: "04", x: 250, y: 344, links: [["derives_from", "cap-account-recovery"], ["depends_on", "fr-send-email"]] },
+    { id: "ac-password-reset-3", kind: "criterion (in the FR)", step: "04", x: 470, y: 344, links: [], parent: "fr-password-reset" },
+    { id: "fr-send-email", kind: "FR", step: "04", x: 700, y: 344, links: [["derives_from", "cap-account-recovery"], ["relies_on", "tp-mailrelay"]] },
+    { id: "api-password-reset-confirm", kind: "API", step: "05", x: 250, y: 424, links: [["derives_from", "fr-password-reset"], ["provided_by", "identity-service"]] },
+    { id: "inv-reset-token-single-use", kind: "invariant", step: "06", x: 560, y: 424, links: [["constrains", "api-password-reset-confirm"]] },
+    { id: "fix-expired-token", kind: "fixture", step: "08", x: 400, y: 504, links: [["verifies", "ac-password-reset-3"], ["verifies", "api-password-reset-confirm"]] },
+    { id: "tc-confirm-1", kind: "task criterion", step: "14", x: 400, y: 584, links: [["refines", "ac-password-reset-3"], ["verified_by", "fix-expired-token"]] },
+    { id: "PWRESET_CONFIRM_01", kind: "plan item", step: "16a", x: 400, y: 664, links: [["realises", "tc-confirm-1"]] }
+  ];
+  var LANES = [["seed", 40], ["00", 112], ["01", 184], ["02", 262], ["04", 344], ["05·06", 424], ["08", 504], ["14", 584], ["16a", 664]];
+  var W = 176, H = 40;
+  var byId = {}; NODES.forEach(function (n) { byId[n.id] = n; });
+  var svg = document.getElementById("g");
+  var NS = "http://www.w3.org/2000/svg";
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    (parent || svg).appendChild(e);
+    return e;
+  }
+  var defs = el("defs", {});
+  [["ah", "ah"], ["ah-out", "ah-out"], ["ah-hot", "ah-hot"]].forEach(function (m) {
+    var mk = el("marker", { id: m[0], viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", "class": m[1] }, mk);
+  });
+  LANES.forEach(function (l) {
+    el("line", { x1: 0, x2: 880, y1: l[1] + 36, y2: l[1] + 36, "class": "lane" });
+    var t = el("text", { x: 8, y: l[1] + 4, "class": "step-label" }); t.textContent = l[0];
+  });
+  function anchor(a, b) {
+    // point on a's box edge toward b
+    var dx = b.x - a.x, dy = b.y - a.y;
+    if (Math.abs(dy) < 4) return { x: a.x + (dx > 0 ? W / 2 : -W / 2), y: a.y };
+    return { x: a.x + dx * 0.15, y: a.y + (dy > 0 ? H / 2 : -H / 2) };
+  }
+  var EDGES = [];
+  NODES.forEach(function (n) {
+    n.links.forEach(function (lk) { EDGES.push({ from: n.id, to: lk[1], verb: lk[0], same: byId[lk[1]].step === n.step }); });
+    if (n.parent) EDGES.push({ from: n.id, to: n.parent, verb: "contained in", contain: true });
+  });
+  var edgeEls = EDGES.map(function (e) {
+    var a = byId[e.from], b = byId[e.to];
+    var p1 = anchor(a, b), p2 = anchor(b, a);
+    var cls = "edge" + (e.contain ? " contain" : e.same ? " same" : "");
+    var path = el("path", { d: "M" + p1.x + "," + p1.y + " L" + p2.x + "," + p2.y, "class": cls, "marker-end": e.contain ? "" : "url(#ah)" });
+    return { e: e, path: path };
+  });
+  var nodeEls = {};
+  NODES.forEach(function (n) {
+    var g = el("g", { "class": "node", tabindex: "0", role: "button", "aria-label": n.id + ", " + n.kind + ", step " + n.step });
+    el("rect", { x: n.x - W / 2, y: n.y - H / 2, width: W, height: H }, g);
+    var t = el("text", { x: n.x, y: n.y - 2, "text-anchor": "middle" }, g); t.textContent = n.id.length > 24 ? n.id.slice(0, 23) + "…" : n.id;
+    var k = el("text", { x: n.x, y: n.y + 12, "text-anchor": "middle", "class": "k" }, g); k.textContent = n.kind + " · " + n.step;
+    g.addEventListener("click", function () { select(n.id); });
+    g.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+    nodeEls[n.id] = g;
+  });
+  function downstream(id) {
+    // nodes that store a link to id (or are contained in it), transitively
+    var out = [], seen = {}; var queue = [id];
+    while (queue.length) {
+      var cur = queue.shift();
+      EDGES.forEach(function (e) {
+        var hit = (e.to === cur && !e.contain) || (e.contain && e.to === cur);
+        if (hit && !seen[e.from] && e.from !== id) { seen[e.from] = 1; out.push(e.from); queue.push(e.from); }
+      });
+    }
+    return out;
+  }
+  var panel = document.getElementById("panel");
+  function li(text, cls) { return "<li" + (cls ? ' class="' + cls + '"' : "") + ">" + text + "</li>"; }
+  function select(id) {
+    var n = byId[id];
+    var hot = downstream(id), hotSet = {}; hot.forEach(function (h) { hotSet[h] = 1; });
+    var targets = {}; n.links.forEach(function (l) { targets[l[1]] = 1; });
+    Object.keys(nodeEls).forEach(function (k) {
+      var g = nodeEls[k];
+      g.setAttribute("class", "node" + (k === id ? " sel" : hotSet[k] ? " hot" : targets[k] ? " target" : ""));
+    });
+    edgeEls.forEach(function (x) {
+      var e = x.e, base = "edge" + (e.contain ? " contain" : e.same ? " same" : "");
+      var cls = base, mk = "url(#ah)";
+      if (e.from === id) { cls += " out"; mk = "url(#ah-out)"; }
+      else if (hotSet[e.from] && (e.to === id || hotSet[e.to])) { cls += " hot"; mk = "url(#ah-hot)"; }
+      x.path.setAttribute("class", cls);
+      if (!e.contain) x.path.setAttribute("marker-end", mk);
+    });
+    var stored = n.links.length ? n.links.map(function (l) { return li('<span class="v">' + l[0] + "</span> → " + l[1]); }).join("") : (n.parent ? "" : '<li class="none">Nothing. It is the top of the graph.</li>');
+    if (n.parent) stored += li('<span class="v">contained in</span> → ' + n.parent + " (not a stored link)");
+    var users = EDGES.filter(function (e) { return e.to === id; }).map(function (e) { return li(e.from + ' <span class="v">' + e.verb + "</span>"); });
+    var sus = hot.length ? hot.map(function (h) { return li(h, "hotli"); }).join("") : '<li class="none">Nothing below it.</li>';
+    panel.innerHTML =
+      "<h3>" + n.id + "</h3>" +
+      '<div class="kind">' + n.kind + " · step " + n.step + "</div>" +
+      '<div class="sec">Stored on this node</div><ul>' + stored + "</ul>" +
+      '<div class="sec">Linked from (read backwards by the tool)</div><ul>' + (users.length ? users.join("") : '<li class="none">Nothing yet.</li>') + "</ul>" +
+      '<div class="sec">If it changes, these become suspect</div><ul>' + sus + "</ul>";
+  }
+  select("tp-mailrelay");
+})();
+</script>
