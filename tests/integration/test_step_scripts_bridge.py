@@ -12,7 +12,7 @@ class StepScriptBridgeTests(unittest.TestCase):
         scripts_dir = toolkit_root / "tests" / "integration"
         pythonpath_prefix = str(toolkit_root / "tools")
 
-        # expected_returncodes: {0} for a fixture that passes, {1} for one that fails (the three of steps 03, 04 and 06 fail by design, see below).
+        # expected_returncodes: {0} for a fixture that passes, {1} for one that fails (the two of steps 03 and 04 fail by design, see below).
         cases = [
             ("test_step_00.py", [], repo_root, {0}),
             ("test_step_01.py", [], repo_root, {0}),
@@ -25,8 +25,7 @@ class StepScriptBridgeTests(unittest.TestCase):
             # from canonical-integrity (exit 1 today). Schema validation passes. Architectural limitation of fixture-only testing.
             ("test_step_04.py", [str(toolkit_root / "tests" / "fixtures" / "step_04" / "valid_comprehensive.json")], repo_root, {1}),
             ("test_step_05.py", [str(toolkit_root / "tests" / "fixtures" / "step_05" / "valid_rest_api.json")], repo_root, {0}),
-            # Step 06 fixture constrains api IDs of 05_interface_contracts.json; not resolved in fixture-only context (exit 1 today).
-            ("test_step_06.py", [str(toolkit_root / "tests" / "fixtures" / "step_06" / "valid_full.json")], repo_root, {1}),
+            ("test_step_06.py", [str(toolkit_root / "tests" / "fixtures" / "step_06" / "valid_full.json")], repo_root, {0}),
             ("test_step_07.py", [str(toolkit_root / "tests" / "fixtures" / "step_07" / "valid_full.json")], repo_root, {0}),
             ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_generic.json")], repo_root, {0}),
             ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_http.json")], repo_root, {0}),

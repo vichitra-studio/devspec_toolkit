@@ -338,6 +338,22 @@ def test_capture_and_worklist_match_their_schemas(host, toolkit):
     assert _violations(json.loads((host / WORKLIST).read_text(encoding="utf-8"))) == []
 
 
+def test_deferred_plan_capture_validates(tmp_path, toolkit):
+    host = make_host(tmp_path, commit=False)
+    plan_file = host / "spec" / "impl_context" / "ms_reservations_plan.json"
+    data = json.loads(plan_file.read_text(encoding="utf-8"))
+    data["plan"]["status"] = "deferred"
+    data["plan"]["deferred_reason"] = "The vendor contract waits on legal review."
+    plan_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    git(host, "add", "-A")
+    git(host, "commit", "-q", "-m", "host")
+    _run(host, toolkit, [P1])
+    capture = _capture(host)
+    [row] = [p for p in capture["milestone_status"]["plans"] if p["file"].endswith("ms_reservations_plan.json")]
+    assert row["legacy_plan_deferred_reason"] == "The vendor contract waits on legal review."
+    assert _violations(capture) == []
+
+
 def test_the_two_schemas_are_well_formed_and_registered():
     registry = json.loads((REAL_ROOT / "tools" / "schema_registry.json").read_text(encoding="utf-8"))
     for uri, name in (("vc:infra:migration-capture", "migration_capture"), ("vc:infra:migration-worklist", "migration_worklist")):

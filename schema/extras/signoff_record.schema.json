@@ -71,7 +71,7 @@
             "additionalProperties": false,
             "properties": {
               "manual_fixtures": {
-                "description": "Number of manual fixtures of the milestone.",
+                "description": "Number of nodes of the milestone a person attests at sign-off: manual fixtures and rules enforced by review.",
                 "type": "integer",
                 "minimum": 0
               },

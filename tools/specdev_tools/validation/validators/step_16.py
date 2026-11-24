@@ -227,7 +227,7 @@ def _is_doc_path(path: str, doc_patterns: Optional[list[str]]) -> bool:
     """True when *path* is a built-in doc basename or matches one of the manifest's doc patterns."""
     if not path:
         return False
-    norm = path.replace("\\", "/").lstrip("./")
+    norm = _norm_path(path)
     if os.path.basename(norm) in _BUILTIN_DOC_BASENAMES:
         return True
     return any(fnmatch.fnmatch(norm, pattern) for pattern in doc_patterns or [])

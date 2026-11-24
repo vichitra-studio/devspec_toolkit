@@ -49,7 +49,7 @@ Before emitting, verify:
 - No component's infrastructure needs are silently omitted — databases and queues must be represented in `environments` config, and third-party credentials in `secrets`.
 - All environment names align with the canonical stage values defined in the schema.
 - If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
-- Compliance labels in `environments[].compliance_labels` reflect real obligations documented in upstream specs or are explicitly marked as none.
+- The entries of the top-level `compliance` array reflect real obligations documented in upstream specs; the array is empty when none applies.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
@@ -68,7 +68,7 @@ Before emitting, verify:
 - **Environments**: Document each environment (`dev`, `ci`, `staging`, `prod`) with the critical configuration knobs, dependencies, and access paths.
 - **Reproducibility**: Define minimal environment descriptors to make CI/CD reproducible (runner type, region, base images).
 - **Gates**: Enumerate `ci_gates` as actionable job names (schema, fixtures, security scans) that map directly to Step 12 output.
-- **Secrets**: Track sensitive material in `secrets` by name only (no values), with ownership and rotation expectations.
+- **Secrets**: Track sensitive material in `secrets` by name only (no values).
 - **Compliance**: Capture regulatory or contractual obligations under `compliance` to feed governance.
 
 ## Common Pitfalls

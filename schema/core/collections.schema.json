@@ -315,11 +315,7 @@
         },
         {
           "type": "number",
-          "description": "JSON number value."
-        },
-        {
-          "type": "integer",
-          "description": "JSON integer value."
+          "description": "JSON number value (an integer included)."
         },
         {
           "type": "boolean",
@@ -330,7 +326,7 @@
           "description": "JSON null value."
         }
       ],
-      "description": "Accepts any valid JSON value (object, array, string, number, integer, boolean, or null)."
+      "description": "Accepts any valid JSON value (object, array, string, number, boolean, or null); an integer is a number."
     }
   }
 }

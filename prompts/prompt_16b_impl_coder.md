@@ -135,7 +135,7 @@ Read Item → For Each Action → Carry Out → Record (or verify run) → Revie
 - Every action of the item has an id (`plan record` refuses one that has none: E821). If one has none, stop and tell the planner.
 - The Trinity Anchor (`spec/16_impl_context.json`) is present and lists this milestone in `plan.milestone_index[]` with the expected `checklist_id_prefix`.
 - `spec/05_interface_contracts.json` is present and contains at least one api entry.
-- `spec/15_scaffold.json` is present and contains at least one file entry **if** the plan declares `existing_structures` or `target_file_patterns` that reference scaffold-generated paths. (Early-cycle plans that touch hand-rolled paths only do not require scaffold output — record an open item rather than blocking.)
+- `spec/15_scaffold.json` is present and an `interface_map` row (`path`) or `project_skeleton` covers the plan's paths **if** the plan declares `existing_structures` or `target_file_patterns` that reference scaffold-generated paths. (Early-cycle plans that touch hand-rolled paths only do not require scaffold output — record an open item rather than blocking.)
 
 ## Coverage Closure
 Before finishing, verify:

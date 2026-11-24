@@ -11,7 +11,7 @@ be verified by a job as well as by a fixture, and the message names both fixes. 
 never reported: an API error (proven with its API), a threat, an edge case, a rule, a node a closed milestone's removal
 criterion ``removes``.  The owner is the one the ownership table gives (step 14 for E742, step 08 for E743).
 
-``missing_verifiers`` is the single detector the proof milestone (M7) calls.
+``missing_verifiers`` is the detector of E743; ``check_verifier_rules`` in this module is its only caller.
 """
 from __future__ import annotations
 

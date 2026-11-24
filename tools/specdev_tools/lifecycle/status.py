@@ -220,7 +220,7 @@ def status_dict(sections: list[Section]) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class CriterionLine:
-    """A criterion in play: its task and its close-mode proof status (``stage-unknown`` when its stage cannot be told)."""
+    """A criterion in play: its task and its close-mode proof status (the code ``E334``, ``STAGE_UNKNOWN``, when its stage cannot be told)."""
 
     criterion: str
     task: str

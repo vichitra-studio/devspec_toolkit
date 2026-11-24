@@ -572,6 +572,7 @@ def _apply_edit(
     if write:
         target = os.path.join(spec_root, edit.file)
         if edit.new_file:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
             replace_file_atomically(target, edit.new_text)
         else:
             json_write_atomic(target, edit.new_text)

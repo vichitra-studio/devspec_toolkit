@@ -53,9 +53,19 @@ FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 # migration_versioning slice changed OR any schema change OR cli.py changed).
 # We detect these directly from the changed file lists rather than by slice flag.
 
-# T0-09: CLI-relevant file detection
+# T0-09: CLI-relevant file detection. The entry point is cli.py; each package registers its
+# subcommands in a module named commands.py or <name>_commands.py (trace/commands.py,
+# trace/id_write_commands.py, graph/commands.py, lifecycle/commands.py, ...).
 CLI_PATHS: set[str] = {"tools/specdev_tools/cli.py"}
-CLI_PREFIX: str = "tools/specdev_tools/commands/"
+CLI_PACKAGE_PREFIX: str = "tools/specdev_tools/"
+
+
+def _is_cli_file(path: str) -> bool:
+    """Whether *path* is cli.py or a command module of a package under tools/specdev_tools/."""
+    if path in CLI_PATHS:
+        return True
+    name = path.rsplit("/", 1)[-1]
+    return path.startswith(CLI_PACKAGE_PREFIX) and (name == "commands.py" or name.endswith("_commands.py"))
 
 # ---------------------------------------------------------------------------
 # Utility helpers
@@ -196,8 +206,9 @@ def check_t05_json_parse_clean(
 ) -> list[dict[str, Any]]:
     """T0-05: Every changed *.json parses cleanly.
 
-    Skips files under tests/fixtures/ whose basename starts with 'invalid'
-    or 'malformed' — those are intentionally-broken test fixtures.
+    Skips a file that has a directory named 'fixtures' in its path and whose
+    file stem contains 'invalid' or 'malformed' — those are intentionally-broken
+    test fixtures.
     """
     findings: list[dict[str, Any]] = []
     json_files = [f for f in changed_files if f.endswith(".json")]
@@ -372,11 +383,11 @@ def check_t09_changelog_entry_present(
     routing: dict[str, list[str]],
     changed_files: list[str],
 ) -> list[dict[str, Any]]:
-    """T0-09: If migration_versioning, schemas, or cli.py changed, require unreleased entry."""
+    """T0-09: If migration_versioning, schemas, cli.py or a command module changed, require unreleased entry."""
     # Determine if there are triggering changes
     migration_files = routing.get("migration_versioning", [])
     schema_files = [f for f in changed_files if f.endswith(".schema.json")]
-    cli_files = [f for f in changed_files if f in CLI_PATHS or f.startswith(CLI_PREFIX)]
+    cli_files = [f for f in changed_files if _is_cli_file(f)]
 
     # Filter out changelog files themselves from migration trigger
     non_changelog_migration = [

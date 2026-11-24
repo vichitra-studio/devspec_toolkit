@@ -37,8 +37,8 @@ M5_CHANGELOG_MARKERS = (
     "Verification and evidence records",
     "New error codes E760 to E765",
     "File-level forward replay is retired",
-    "(DEVSPEC-317)",
-    "(DEVSPEC-318)",
+    "already had a schema violation elsewhere",
+    "only a seed file outside the spec folder had changed",
 )
 
 

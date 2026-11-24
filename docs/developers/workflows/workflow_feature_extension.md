@@ -12,7 +12,7 @@ We never skip steps. If a feature is too small for a step, we explicitly acknowl
 Each spec step uses the **two-phase Clarify/Emit protocol**:
 
 - **Clarify** (if Self-Audit Gate score < 0.9): the AI outputs only short bulleted gap questions. No JSON, no code fences. Stop and wait for answers.
-- **Emit**: the AI writes the artifact JSON directly to `spec/NN_name.json`. Do not return fenced JSON as the primary output.
+- **Emit**: the AI writes the artifact to disk through the CLI, never as fenced JSON in the response. A step that does not exist yet is written as a whole draft file outside `spec/` and created with `specdev step create NN --from <draft>`; a step that exists is edited with `specdev json patch|insert|delete --id <node-id>` (a new node: `specdev json insert --step NN <collection-path> '<node>'`). A file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
 
 ---
 
@@ -51,7 +51,7 @@ Before starting, ensure your current specs are clean and valid.
 > 1. Check the seeds declared in `spec/common/seed_manifest.json` for each step the manifest routes them to (`step_requirements`). Do they need updates?
 > 2. Iterate through Specs 00, 01, 02, 03, and 04.
 > Ask me if updates are needed for each.
-> Use each step's canonical prompt (`prompts/prompt_NN_name.md`) and emit updated JSON directly to `spec/NN_name.json`.
+> Use each step's canonical prompt (`prompts/prompt_NN_name.md`). Edit a step that exists with `specdev json patch|insert|delete --id <node-id>` (a new node: `specdev json insert --step NN`); create a step that does not exist yet from a draft outside `spec/` with `specdev step create NN --from <draft>`. Never write a file under `spec/` by hand.
 
 ---
 
@@ -74,7 +74,7 @@ Before starting, ensure your current specs are clean and valid.
 > Iterate through Steps 05, 06, 07, 08.
 > Update `spec/05_interface_contracts.json` with new endpoints.
 > Update `spec/08_fixtures.json` with new data samples.
-> Use each step's canonical prompt and emit updated JSON directly to `spec/NN_name.json`.
+> Use each step's canonical prompt. Edit a step that exists with `specdev json patch|insert|delete --id <node-id>` (a new node: `specdev json insert --step NN`); create a step that does not exist yet from a draft outside `spec/` with `specdev step create NN --from <draft>`. Never write a file under `spec/` by hand.
 
 ---
 
@@ -120,7 +120,7 @@ Only NOW do we schedule the work.
 **User Action:**
 > **PROMPT:**
 > The specs (00-13) are updated.
-> Add a new milestone to `spec/14_roadmap.json`.
+> Add a new milestone to the roadmap (`spec/14_roadmap.json`) with `specdev json insert --step 14 .milestones '<milestone>'`.
 > `milestone_id`: `ms-[feature-name]`, with a `name` and a `target_date`.
 > `user_story`: One User Story.
 > `tasks`: Atomic sub-tasks, each with `acceptance_criteria` that `refines` the new requirement's criteria.
@@ -147,7 +147,7 @@ Before running the Trinity Loop, you must create the Scaffold and the Trinity An
 ### Step 16: Trinity Anchor
 *Reference*: `prompts/prompt_16_impl_context.md`.
 
-*   **Action**: Create or update `spec/16_impl_context.json` — the root Trinity Anchor.
+*   **Action**: Create or update `spec/16_impl_context.json` — the root Trinity Anchor. No anchor file yet: write the whole artifact as a draft outside `spec/` and run `specdev step create 16 --from <draft>`. Anchor file present: add the row of the new milestone with `specdev json insert --step 16 .plan.milestone_index '<row>'`.
 *   **REQUIRED** before Step 16a can run. Step 16a uses this anchor to determine `scope_in`, `scope_out`, and the active checklist boundary.
 *   Target artifact: `spec/16_impl_context.json`
 
@@ -168,11 +168,11 @@ Now we run the machine.
 **User Action:**
 > **PROMPT:**
 > Run Step 16a.
-> Target: `step-[feature-name]` (from Roadmap).
+> Target: milestone `ms-[feature-name]` (from Roadmap).
 > Context: Read the updated Specs 04, 05, 06, 08, 11.
-> Output: `spec/impl_context/step-[feature-name].json`.
+> Output: a draft of the plan outside `spec/` (`.specdev/drafts/plan_<batch>.json`), then `specdev step create 16a <batch> --from .specdev/drafts/plan_<batch>.json`.
 
-Supply the `spec/impl_context/{step_id}.json` path. The planner populates `plan` with checklist, target files, and test commands.
+The command creates the plan file `spec/impl_context/ms_<batch>_plan.json`. The draft holds `plan` (checklist, target files, test commands) and no `execution` or `review`. A person approves the plan, then `specdev milestone start <milestone-id>` starts the milestone.
 
 ### Step 16b: Coder
 *Reference*: `prompts/prompt_16b_impl_coder.md`.
@@ -180,10 +180,10 @@ Supply the `spec/impl_context/{step_id}.json` path. The planner populates `plan`
 **User Action:**
 > **PROMPT:**
 > Run Step 16b.
-> Input: `spec/impl_context/step-[feature-name].json`.
+> Input: `spec/impl_context/ms_<batch>_plan.json`.
 > Execute the Checklist.
 
-Supply the populated plan artifact path. The coder executes each checklist item, writes code, and populates `execution`.
+Supply the plan file path. The coder executes each checklist item, writes code, and records each carried-out action with `specdev plan record <ITEM>/<action-id> --outcome done`; `execution` is written by that command only.
 
 ### Step 16c: Reviewer
 *Reference*: `prompts/prompt_16c_impl_reviewer.md`.
@@ -193,7 +193,7 @@ Supply the populated plan artifact path. The coder executes each checklist item,
 > Run Step 16c.
 > Verify the implementation against the Checklist.
 
-Supply the executed artifact path. The reviewer validates execution against the plan, populates `review`, and either approves or returns a blocking finding.
+Supply the plan file path. The reviewer validates execution against the plan and writes a findings file; `review` is written only by `specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred --findings-file <file>`, whether the reviewer approves or returns a blocking finding.
 
 ---
 

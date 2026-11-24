@@ -354,9 +354,9 @@ def _manual_reason(prose: list[str]) -> str:
 
 def _manual_proposal(fixture: str, reason: str) -> str:
     return (
-        f"class: {MANUAL}. A person carries the check out; a command cannot. Record it, then attest it: "
+        f"class: {MANUAL}. A person carries the check out; a command cannot. Record it: "
         f"specdev json patch --id {fixture} .manual_reason {shlex.quote(json.dumps(reason, ensure_ascii=False))}; "
-        f"specdev json patch --id {fixture} .mode '\"manual\"'; specdev verify attest {fixture}"
+        f"specdev json patch --id {fixture} .mode '\"manual\"'; a person then runs `specdev verify attest {fixture}`"
     )
 
 
@@ -388,11 +388,14 @@ def plan_bindings(tree: MigratedTree) -> BindingsPlan:
         found = expectations.get(node.id, [])
         commands, reading, evidence = _case_of(node, found, ci, graph, tracked)
         from_plan = any(e.trusted and e.text in commands for e in found)
+        targets = targets_of(node, graph)
+        if not (commands and targets) and is_covered(node, graph):
+            bound.append(node.id)
+            continue
         if not commands:
             reason = _manual_reason([e.text for e in found if e.trusted])
             singles.append(Single(node.id, MANUAL, f"{evidence}; manual_reason: {reason}", _manual_proposal(node.id, reason)))
             continue
-        targets = targets_of(node, graph)
         if not targets:
             singles.append(Single(node.id, JUDGEMENT, f"{evidence}; it verifies no node, so a binding would prove nothing", f"class: {JUDGEMENT}. Link the fixture to the criteria it checks, then bind it to {', '.join(commands)}"))
             continue

@@ -98,32 +98,47 @@ def test_t09_only_changelog_files_exempt_from_trigger():
     assert result == [], f"Expected [], got {result}"
 
 
-def test_t09_commands_subpackage_triggers_finding(tmp_path):
-    """T0-09: a file under tools/specdev_tools/commands/ triggers the changelog requirement.
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tools/specdev_tools/trace/commands.py",
+        "tools/specdev_tools/trace/id_write_commands.py",
+        "tools/specdev_tools/lifecycle/commands.py",
+    ],
+)
+def test_t09_a_command_module_triggers_finding(tmp_path, path):
+    """T0-09: a command module of a package (commands.py, <name>_commands.py) triggers the changelog requirement.
 
-    When a commands/ subpackage file changes without a changelog entry the
-    prefix-match branch (CLI_PREFIX) must fire, producing at least one finding.
     REPO_ROOT is temporarily redirected to tmp_path (which has no changelog
     files) so has_entry stays False and a finding is emitted.
     """
-    changed_files = ["tools/specdev_tools/commands/foo.py"]
     original_repo_root = _tier0.REPO_ROOT
     _tier0.REPO_ROOT = tmp_path
     try:
-        result = _tier0.check_t09_changelog_entry_present({}, changed_files)
+        result = _tier0.check_t09_changelog_entry_present({}, [path])
     finally:
         _tier0.REPO_ROOT = original_repo_root
-    assert len(result) >= 1, f"Expected >=1 finding for commands/ file, got {result}"
+    assert len(result) >= 1, f"Expected >=1 finding for {path}, got {result}"
     assert result[0].get("catalog_tag") == "D11", (
         f"Expected catalog_tag='D11', got {result[0].get('catalog_tag')!r}"
     )
 
 
+def test_t09_a_module_that_is_not_a_command_module_triggers_nothing(tmp_path):
+    """T0-09: a module that registers no subcommand is not a CLI change."""
+    original_repo_root = _tier0.REPO_ROOT
+    _tier0.REPO_ROOT = tmp_path
+    try:
+        result = _tier0.check_t09_changelog_entry_present({}, ["tools/specdev_tools/trace/id_writes.py"])
+    finally:
+        _tier0.REPO_ROOT = original_repo_root
+    assert result == []
+
+
 def test_t09_cli_py_still_triggers_finding(tmp_path):
     """T0-09: tools/specdev_tools/cli.py still triggers the changelog requirement (regression).
 
-    The set-membership branch (CLI_PATHS) must continue to fire after the
-    broadening change so that the original trigger path is not broken.
+    The set-membership branch (CLI_PATHS) fires for the entry point itself.
     REPO_ROOT is temporarily redirected to tmp_path (which has no changelog
     files) so has_entry stays False and a finding is emitted.
     """

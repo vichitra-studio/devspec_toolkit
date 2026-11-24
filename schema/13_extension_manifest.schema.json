@@ -22,7 +22,7 @@
         "rationale": {
           "type": "string",
           "minLength": 40,
-          "description": "Justification for the decision. For 'none-required', must cite component_ids from 02_system_sketch.json AND NFR categories from 07_nfrs.json evaluated and ruled out. For 'extensions-required', must cite the specific domain gaps that necessitate extensions."
+          "description": "Justification for the decision. For 'none-required', it cites the component_ids from 02_system_sketch.json and the NFR categories from 07_nfrs.json that were evaluated and ruled out. For 'extensions-required', it cites the specific domain gaps that necessitate extensions."
         }
       }
     },
@@ -45,7 +45,7 @@
           },
           "area_of_concern": {
             "type": "string",
-            "description": "High-level domain category this extension addresses. Use a concise noun phrase that classifies the extension's technical scope. Decision rule: when two area names could apply, choose the one that describes the domain concern (the business problem being extended), not the technology implementing it. Canonical disambiguation: 'AI' for user-facing AI features such as recommendation engines, content generation, and AI assistants; 'ML' for model training pipelines, experimentation frameworks, and model management infrastructure; 'Payments' for payment processing flows, transaction management, and financial reconciliation; 'Data' for ETL pipelines, analytics schemas, and data quality frameworks. Examples: an LLM-powered chat feature → 'AI'; a model retraining pipeline → 'ML'; a Stripe integration → 'Payments'; a dbt pipeline → 'Data'. Other accepted values: 'Security', 'Notifications', 'Infrastructure'. Anti-pattern: 'General', 'Other', 'Misc' — these defeat the purpose of domain-specific extensions and will be flagged by canonical-lint; every extension must have a specific, nameable concern."
+            "description": "High-level domain category this extension addresses. Use a concise noun phrase that classifies the extension's technical scope. Decision rule: when two area names could apply, choose the one that describes the domain concern (the business problem being extended), not the technology implementing it. Canonical disambiguation: 'AI' for user-facing AI features such as recommendation engines, content generation, and AI assistants; 'ML' for model training pipelines, experimentation frameworks, and model management infrastructure; 'Payments' for payment processing flows, transaction management, and financial reconciliation; 'Data' for ETL pipelines, analytics schemas, and data quality frameworks. Examples: an LLM-powered chat feature → 'AI'; a model retraining pipeline → 'ML'; a Stripe integration → 'Payments'; a dbt pipeline → 'Data'. Other accepted values: 'Security', 'Notifications', 'Infrastructure'. Anti-pattern: 'General', 'Other', 'Misc' — avoid these vague values: they defeat the purpose of domain-specific extensions; every extension should have a specific, nameable concern."
           },
           "justification": {
             "type": "string",

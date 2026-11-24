@@ -23,7 +23,6 @@ class TestValidMinimal:
             "owner": "engineering",
             "commit_message_rules": {
                 "pattern": r"^(feat|fix|docs)\(.+\):.+$",
-                "allowed_types": ["feat", "fix", "docs"],
             },
         }
         errors = validate_step_10(instance, toolkit_root)

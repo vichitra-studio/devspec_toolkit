@@ -148,6 +148,14 @@ def test_a_fixture_that_verifies_no_node_proves_nothing_and_is_not_grouped(host)
     assert single.category == JUDGEMENT and "verifies no node" in single.reason
 
 
+def test_bound_fixture_without_command_is_bound(host):
+    assert classes_by_fixture(plan_of(host))[RETURN] == MANUAL
+    code, _out, err = run_line(host, f"specdev verify bind {RETURN} --command 'npx jest tests/return.spec.ts' --guard 'tests/return\\.spec\\.ts'")
+    assert code == 0, err
+    plan = plan_of(host)
+    assert RETURN in plan.bound and RETURN not in classes_by_fixture(plan)
+
+
 # --- guards --------------------------------------------------------------------------------------------------------------
 
 
@@ -239,7 +247,7 @@ def manual_lines(host: Path, fixture: str) -> list[str]:
     assert code == 0, err
     items = json.loads((host / "spec" / WORKLIST_FILE).read_text(encoding="utf-8"))["items"]
     proposal = next(item["proposal"] for item in items if item["about"] == fixture and item["kind"] == "legacy-fixture")
-    return [part.strip() for part in proposal.partition("attest it: ")[2].split("; ") if part.strip().startswith("specdev json patch")]
+    return [part.strip() for part in proposal.partition("Record it: ")[2].split("; ") if part.strip().startswith("specdev json patch")]
 
 
 def schema_errors_of(host: Path, fixture: str) -> list[tuple]:

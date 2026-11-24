@@ -512,3 +512,14 @@ def test_the_collections_listed_for_a_step_are_spelt_as_the_command_takes_them(h
     assert status == 1 and out.startswith("E767"), out
     listed = out.split("its collections:")[1]
     assert ".environments (environment, map: not added by this command)" in listed and ".environments{}" not in listed
+
+
+def test_step_create_16a_without_impl_context_folder(host: Path, tmp_path: Path) -> None:
+    draft = tmp_path / "plan_draft.json"
+    shutil.copyfile(host / "spec" / PLAN_FILE, draft)
+    shutil.rmtree(host / "spec" / "impl_context")
+    code, out = run_cli("attest", "--prune", *_flags(host))
+    assert code == 0, out
+    code, out = run_cli("step", "create", "16a", "account_recovery", "--from", str(draft), *_flags(host))
+    assert code == 0, out
+    assert _doc(host, PLAN_FILE) == json.loads(draft.read_text(encoding="utf-8"))

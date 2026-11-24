@@ -30,7 +30,7 @@ Bash surface is restricted to these subcommand families only:
 
 | Command | Purpose |
 |---|---|
-| `git diff`, `git log`, `git show` | Read-only git ops — inspect changed files, diffs, commit history |
+| `git diff`, `git log`, `git show`, `git status --short` | Read-only git ops — inspect changed files, diffs, commit history, untracked files |
 | `specdev trace --recipe 16b <plan-item-id>` / `--recipe 16c <milestone-id>` | The pack of an item / of the milestone |
 | `specdev node show <id>` | One spec node, read-only |
 | `specdev spec-check spec --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Gate check against full spec |
@@ -43,6 +43,8 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json read <file> '<filter>'` | Targeted plan/spec content reads — always pass a jq filter |
 | `ls`, `cat`, `head` | File inspection of code files — no write side-effects |
 | `grep` / Grep tool | Pattern search across code and config files |
+| `sort -u` | De-duplicate the output of a command of this table (after a pipe) |
+| `mkdir -p .specdev/findings` | Create the findings folder when it is absent |
 | `jq -n 'now \| floor'` | Compute integer epoch for `generated_at` field |
 
 No writes to spec artifacts or to the plan. No `specdev json patch/insert/delete`, no
@@ -53,7 +55,7 @@ Writing the findings file under `.specdev/findings/` is required by the output c
 - Code files within `plan.summary.target_file_patterns` (the milestone scope)
 - `devspec_toolkit/prompts/prompt_NN_*.md` (step authoring contracts)
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline)
-- Project CLAUDE.md and memory files (for E5 architectural cross-check)
+- Project CLAUDE.md (for E5 architectural cross-check)
 - `.specdev/findings/findings_<scope>_*.json` (own past output, for E2/E5 cross-checks)
 
 Do NOT Read any file under `spec/` directly. Read spec through the packs, `specdev node show`
@@ -103,8 +105,8 @@ Dispatcher (skill) provides:
   before the first group/round dispatch. Used in step 6 for supplemental git diff context
   (informational — git diff is typically empty in the normal uncommitted-work flow).
 
-The dispatcher also provides resolved absolute paths for `--repo-root`, `--spec-root`,
-and `--git-root`. Use them verbatim in every specdev call.
+The dispatch carries no root paths: run every specdev call from the host root with the roots
+of "Flag discipline" (`--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`).
 
 ---
 
@@ -163,7 +165,7 @@ invocation, regardless of scope_kind:
 | **assumptions** — ungrounded inference in code with no upstream source or canon binding | `assumption` |
 | **hallucinations / fabrication** — invented function names, file paths, canonical IDs, CLI commands, and behavior no criterion backs | `hallucination` |
 | **citation drift** — cited primary source no longer matches the reality of the file or URL it points to | `drift` |
-| **architectural violations** — code edit violates a "do NOT" or "never" pattern found in project CLAUDE.md or memory files (E5) | `bug` or `determinism` (per case) |
+| **architectural violations** — code edit violates a "do NOT" or "never" pattern found in project CLAUDE.md (E5) | `bug` or `determinism` (per case) |
 | **ambiguity** — code-phase artifact has multiple valid readings or precedence conflict | `ambiguity` |
 
 Each bucket must be explicitly checked; silently skipping any bucket is a protocol violation.
@@ -172,12 +174,11 @@ this reviewer — not that the check was skipped.
 
 ### E5 architectural-invariants cross-check
 
-Grep project CLAUDE.md and all memory files for "do NOT", "never", "DO NOT", "NEVER", and
+Grep the project CLAUDE.md (at the host root) for "do NOT", "never", "DO NOT", "NEVER", and
 equivalent prohibition patterns:
 
 ```bash
-grep -i "do not\|never\|must not\|forbidden\|banned" CLAUDE.md
-grep -rn "do not\|never\|must not\|forbidden\|banned" .claude/projects/*/memory/
+grep -in "do not\|never\|must not\|forbidden\|banned" CLAUDE.md
 ```
 
 For each prohibition found, check whether any code edit in the current scope's changed files
@@ -223,7 +224,7 @@ A `code_phase_group` review round CONVERGES when ALL of:
    sufficient — zero taxonomy findings is also required.
 3. **Code-phase determinism check** — no language-appropriate wall-clock probes in changed
    code without an approved frozen-time helper. Tests pass with a fixed random seed. No
-   untracked-write side effects (`git status` clean except for in-scope files).
+   untracked-write side effects (`git status --short` lists only in-scope files).
 
    Grep patterns by language:
    - Python: `time.time(`, `time.monotonic(`, `time.perf_counter(`, `datetime.now(`,

@@ -61,7 +61,7 @@ For each upstream artifact ingested, extract the following:
 | ✅ **Strong** | "Profile Update SQLi" | "Unsanitized 'bio' field" | `threatens: ["api-user-profile"]` |
 
 ## Heuristics For Completeness
-- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector). A missing threat is reported as `W583` (message: `API_UNCOVERED_BY_THREAT <api id> has no corresponding threat in Step 11`). Exception: an API is exempt ONLY when its `derives_from` is not empty and names nothing but parked FRs (`scope` `later` or `out`) — an API that derives from no FR is NOT exempt and still requires threat coverage.
+- **Coverage**: Every API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector). A missing threat is reported as `W583` (message: `API_UNCOVERED_BY_THREAT <api id> has no corresponding threat in Step 11`). Exception: an API is exempt ONLY when its `derives_from` is not empty and names nothing but parked FRs (`scope` `later` or `out`) — an API that derives from no FR is NOT exempt and still requires threat coverage.
 - **Specificity**: Avoid "Generic DDOS". Use "Search API Reflection Attack".
 - **Linkage**: If the mitigation is "Enforce Role Check", name the invariant that states the role check in `mitigated_by`.
 
@@ -95,7 +95,7 @@ Before emitting, verify:
 - [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
 - [ ] `mitigated_by` holds bare ids of existing nodes (not strings of prose, not objects)
 - [ ] Every threat has ≥1 node in `mitigated_by` — required for every threat, not only high-severity ones
-- [ ] Every `must-have` FR has at least one threat scenario modeled
+- [ ] Every `must-have` FR is covered through the APIs that derive from it: each such API is named in the `threatens` of at least one threat (a threat names no FR)
 - [ ] Every id in `mitigated_by` is a specific control (not just "add validation")
 - [ ] Attack surfaces align with trust zone boundaries from the system sketch
 - [ ] All `edge_cases` entries have a structured `id` field
@@ -108,7 +108,7 @@ Before emitting, verify:
 5.  `risk_category_ref`: REQUIRED for every threat. Must be a canonical ref object with `kind: "risk_category"` resolving to an entry in `canon/manifest.json`. Resolve the canonical ID from `canon/manifest.json` (kind: `risk_category`); if no matching entry exists, add one via `canonical_proposals` before authoring the artifact. Validated by canonical-integrity lint (E110).
 
 ## Step-Specific Completeness Checklist
-- [ ] **Surface Coverage**: Every `public` API and critical component has at least one mapped threat.
+- [ ] **Surface Coverage**: Every API and critical component has at least one mapped threat.
 - [ ] **Category Diversity**: Threats are not just `authz`; `transport`, `business_logic`, and `data_privacy` are represented.
 - [ ] **Edge Case Rigor**: At least 3 distinct non-malicious failure modes (e.g., timeouts, race conditions) are identified.
 - [ ] **Link Integrity**: Every threat has a valid `threatens` array naming existing Step 05 or Step 02 nodes.

@@ -78,7 +78,7 @@ Before emitting, verify:
 
 ## Step-Specific Completeness Checklist
 - NFRs cover latency, throughput, availability, durability, cost, security/privacy, maintainability, usability, portability, and energy as applicable.
-- Each NFR includes metric, numeric/string target, unit, and measurement_method aligned with Step 18 dashboards/alerts.
+- Each NFR includes metric, numeric/string target, unit, and measurement_method.
 - Stage is set for when the target must be met (dev/ci/staging/prod) and owner is named.
 - `constrains` names the FRs, APIs, components or connections where the NFR applies; `derives_from` names the charter metric it quantifies; `relies_on` names a third party its target depends on.
 - An NFR that is deferred or excluded carries `scope` `later` or `out` with `scope_reason`.
@@ -123,9 +123,9 @@ Before emitting, verify:
       "metric": "p95 login latency",
       "target": 200,
       "unit": "ms",
-      "metric_ref": { "id": "cn:core:metric:p95-response-time", "kind": "metric" },
-      "unit_ref": { "id": "cn:core:unit:ms", "kind": "unit" },
-      "environment_ref": { "id": "cn:core:environment:prod", "kind": "environment" },
+      "metric_ref": { "id": "cn:core:metric:p95-response-time", "kind": "metric", "version": "1.0.0" },
+      "unit_ref": { "id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0" },
+      "environment_ref": { "id": "cn:core:environment:prod", "kind": "environment", "version": "1.0.0" },
       "measurement_method": "P95 latency via APM dashboard, 5-min rolling window",
       "stage": "prod",
       "owner": "api",
@@ -133,6 +133,10 @@ Before emitting, verify:
       "derives_from": ["metric-auth-p95-latency"]
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    { "id": "cn:core:metric:p95-response-time", "kind": "metric", "version": "1.0.0" },
+    { "id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0" },
+    { "id": "cn:core:environment:prod", "kind": "environment", "version": "1.0.0" }
+  ]
 }
 ```

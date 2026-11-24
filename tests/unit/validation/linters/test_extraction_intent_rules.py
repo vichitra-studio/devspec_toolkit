@@ -662,6 +662,19 @@ class TestExtractionIntentCheck(unittest.TestCase):
             parsed = parse_extraction_intent(path)
         self.assertEqual(sorted(parsed.step_entries), ["00"])
 
+    def test_level_three_section_stops_at_the_next_header(self):
+        """A ``###`` header directly after ``### Extraction Intent`` ends the section."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "prompt_04_x.md"
+            path.write_text(
+                "### Extraction Intent\n"
+                "### Operating Flow\n"
+                "- **00_charter.json**: the goals and the scope boundaries of the project\n",
+                encoding="utf-8",
+            )
+            parsed = parse_extraction_intent(path)
+        self.assertEqual(parsed.step_entries, {})
+
     def test_no_e597_on_the_toolkit_prompts(self):
         """On the generated step order every prompt of the toolkit has an entry for each required input."""
         repo_root = str(Path(__file__).resolve().parents[4])

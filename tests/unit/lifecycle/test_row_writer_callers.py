@@ -2,6 +2,9 @@
 
 An AST walk over ``tools/specdev_tools/**/*.py``: a call, a reference or an import of ``write_row_state`` or ``append_close_migration``
 outside ``lifecycle/`` is a finding.  The walk is shown to see a caller (``milestone.py`` calls the writer) and a stranger (a synthetic source).
+
+A third writer of the status and the close record, ``anchor_store.write_legacy_close``, is not in ``WRITERS`` and the walk does not
+look for it: the 1.2.0 migration calls it from ``migration/scripts/v1_2_0/p5_legacy_close.py``, outside ``lifecycle/``.
 """
 from __future__ import annotations
 

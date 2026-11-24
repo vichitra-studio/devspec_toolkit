@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 | Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `verifies` naming every acceptance criterion, API, invariant or NFR this fixture proves (the kinds `verifies` accepts are defined by `schema/08_fixtures.schema.json`, the authority; an FR is never named: name its criteria); MUST ensure `tag_ref` references the appropriate canonical tag entry for fixture categorisation (e.g., the smoke canonical tag for fixtures covering `must-have` FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures verifying criteria of `must-have` FRs; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tags` and `tag_ref` are write-only fields — they are not validated by `step_08.py` or `fixtures_lint.py`; populate them correctly by hand since no automated gate checks their content.
+- MUST add `verifies` naming every acceptance criterion, API, invariant or NFR this fixture proves (the kinds `verifies` accepts are defined by `schema/08_fixtures.schema.json`, the authority; an FR is never named: name its criteria); MUST ensure `tag_ref` references the appropriate canonical tag entry for fixture categorisation (e.g., the smoke canonical tag for fixtures covering `must-have` FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures verifying criteria of `must-have` FRs; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tag_ref` is required on every fixture, its kind is schema-pinned to `tag`, and canonical-integrity resolves its id against the canon registry (`E110`). The schema checks only the pattern of each `tags` label; no automated gate checks which labels a fixture carries, so populate `tags` correctly by hand.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -134,7 +134,7 @@ If Step 06 declares any invariants in a runtime-evaluable language (`cel` or `js
 
 Iterate until every rule reports `evaluable=true` and `result=true`. Any rule that stays unevaluable signals either a missing variable path in the sample or a malformed expression in Step 06 — fix the true root cause; do not weaken the sample to hide the problem. Run with `--strict` (or `SPECDEV_INVARIANTS_STRICT=1`) once the sample is complete so unevaluable rules become CI errors.
 
-**When no sample is needed.** If every invariant in Step 06 uses a non-runtime language (`prose`, `informal`, or similar) and none are runtime-evaluable, the sample file is not required. Make this determination explicitly by inspecting `spec/06_invariants.json` — do not assume.
+**When no sample is needed.** If every invariant in Step 06 uses the non-runtime language `text` and none are runtime-evaluable (`cel`, `jsonlogic`), the sample file is not required. Make this determination explicitly by inspecting `spec/06_invariants.json` — do not assume.
 
 See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 12 (`prompt_12_ci_gates.md`) for the CI gate that consumes this sample.
 
@@ -162,9 +162,11 @@ See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 
         "status": 200
       },
       "verifies": ["ac-auth-login-1", "api-auth-login"],
-      "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag" }
+      "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag", "version": "1.0.0" }
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    { "id": "cn:core:tag:smoke", "kind": "tag", "version": "1.0.0" }
+  ]
 }
 ```

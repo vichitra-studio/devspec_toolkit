@@ -13,7 +13,7 @@ from ._extraction_intent_parser import parse_extraction_intent
 # Pattern to match step number from prompt filenames: prompt_05_interface_contracts.md -> "05"
 _PROMPT_STEP_RE = re.compile(r"prompt_(\d{2}[a-z]?)_")
 
-# Vague-intent trigger words — aligned with dag_lint._VAGUE_MARKERS
+# Vague-intent trigger words: this regex is the one source of the W597 trigger words
 _VAGUE_WORDS_RE = re.compile(
     r"\b(?:relevant|as needed|as appropriate|etc\.?|various|TBD|TODO)\b",
     re.IGNORECASE,

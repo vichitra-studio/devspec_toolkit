@@ -34,6 +34,8 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json insert --id <node-id> '<array-field>' '<value>'` | fix/author-extend | Append to an array field of the node with that id |
 | `specdev json insert --step <NN> '<collection-path>' '<item>'` | fix/author-extend | Add a new node to a collection of step NN, e.g. `.functional_requirements` |
 | `specdev json delete --id <node-id>` | fix | Remove the node with that id |
+| `specdev json read\|patch\|insert <plan> '.plan.ambiguities' ... --repo-root <toolkit>` | fix | Open items of a milestone plan only (section "Answers that another step or a seed owns") |
+| `ls spec/<NN>_*.json` | author/author-extend | Whether the step's file exists |
 | `specdev json structure <file>` | both | Shape probe before composing any filter |
 | `specdev json keys <file> '<path>'` | both | Field names at a path |
 | `specdev json schema <file> '<path>' --repo-root <toolkit>` | both | Typed constraints at a path |
@@ -389,6 +391,20 @@ specdev json insert --step <NN> .ambiguities \
 `proposed_assumption` (the basis on which work proceeds) and `missing_kind` are optional. The
 id is minted. An item is deleted with `specdev json delete --id <item-id>` once its `decision`
 has been applied, in fix mode or in the batch pass that reads `specdev upstream-backlog`.
+
+When the artifact is a milestone plan (`spec/impl_context/ms_<batch_id>_plan.json`, dispatched
+by `/specdev-trinity --phase plan`), the list is `.plan.ambiguities` of that file. A spec holds
+one plan file per milestone and `--step 16a` refuses to choose among several (E767), so write by
+file, and give the item its id yourself (`amb-new-<slug>`; the file form mints none):
+```bash
+specdev json read <plan> '.plan.ambiguities' --repo-root ./devspec_toolkit
+# printed null: create the list with the item
+specdev json patch <plan> '.plan.ambiguities' '[<item>]' --repo-root ./devspec_toolkit
+# printed a list: add to it
+specdev json insert <plan> '.plan.ambiguities' '<item>' --repo-root ./devspec_toolkit
+```
+`<item>` is `{"id": "amb-new-<slug>", "description": "<the question>", "about": ["<node or seed id>"], "decision": "<the chosen option label>"}`.
+Never patch `.plan` itself or any other path of the plan with the file form.
 
 ---
 

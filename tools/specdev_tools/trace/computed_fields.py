@@ -40,7 +40,7 @@ class ComputedView:
 
 COMPUTED_VIEWS: tuple[ComputedView, ...] = (
     ComputedView("a link target's kind", (), None, "the id, through the kind registry", _NO_FIELD),
-    ComputedView("impact, coverage, suspects, replay list", (), None, "specdev coverage, specdev lock", _UNVERIFIED),
+    ComputedView("impact, coverage, suspects, replay list", (), None, "specdev coverage, specdev stale", _UNVERIFIED),
     ComputedView(
         "built, proven, realisation status, release status", (), None, "links, evidence and tags", _UNVERIFIED
     ),

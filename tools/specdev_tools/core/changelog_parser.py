@@ -157,7 +157,12 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
     
     # Parse changes
     changes: List[ChangelogEntry] = []
-    for change_data in data.get("changes", []):
+    raw_changes = data.get("changes", [])
+    if not isinstance(raw_changes, list):
+        raise ValueError(f"Field 'changes' must be a list, got {raw_changes!r} in {yaml_path}")
+    for index, change_data in enumerate(raw_changes):
+        if not isinstance(change_data, dict):
+            raise ValueError(f"Change {index} must be a mapping, got {change_data!r} in {yaml_path}")
         migration = None
         if "migration" in change_data:
             m = change_data["migration"]

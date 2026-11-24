@@ -121,7 +121,7 @@
                 ]
               },
               "policy_ref": {
-                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'policy'. Example: for a JWT attack threat → {\"id\": \"cn:core:policy:authn-required\", \"kind\": \"policy\", \"label\": \"authn-required\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref.",
+                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\", \"label\": \"spec-first\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref.",
                 "allOf": [
                   {
                     "$ref": "vc:core:collections#canonicalRef"

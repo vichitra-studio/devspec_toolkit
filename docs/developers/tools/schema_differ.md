@@ -53,7 +53,7 @@ Analysis of a single step.
 @dataclass
 class StepDiff:
     step_id: str                   # e.g. "15_scaffold"
-    status: str                    # "ok", "missing", "rename", "schema_mismatch"
+    status: str                    # "ok", "needs_rename", "missing", "extension", "unknown"
     source_file: Optional[str]     # e.g. "spec/13_scaffold.json"
     target_file: Optional[str]     # e.g. "spec/15_scaffold.json"
     field_diffs: List[FieldDiff]   # Detailed field-level diffs

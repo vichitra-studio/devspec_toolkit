@@ -6,10 +6,11 @@ children are; a coarse node is built through the obligations derived from it.  A
 a rule, a threat) is ``PENDING_EVIDENCE`` until a provider is registered (``register_built_provider``); ``proof.built_evidence``
 supplies one for a given gate cap (``built_at_cap``), and a node whose proof waits only for a later stage is ``RELIEVED``.
 
-``compute_built`` is a library function: no command shows it and no error is raised for "not built" here.  The close
-gate reads it for the closing milestone and the release gate for every in-scope obligation; the scaffold path check
-reads it for an API.  ``walk_derivations`` is the one traversal along the built verbs, shared with the milestone
-coverage checks, which read no hashes.
+``compute_built`` is a library function: no command shows it and no error is raised for "not built" here.  The release
+gate, the production-deploy gate and the next-release check read it (through ``built_at_cap``) for the in-scope
+obligations; the scaffold path check reads it for an API, in merge mode only.  The milestone close gate does not read
+it.  ``walk_derivations`` is the one traversal along the built verbs, shared with the milestone coverage checks, which
+read no hashes.
 """
 from __future__ import annotations
 

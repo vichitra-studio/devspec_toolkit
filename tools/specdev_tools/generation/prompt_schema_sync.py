@@ -23,11 +23,6 @@ OUTPUT_CONTRACT_HEADING_RE = re.compile(r"(?im)^#\s*Output Contract\b.*$")
 SUBHEADING_RE = re.compile(r"(?im)^##\s+")
 SCHEMA_URI_RE = re.compile(r"(?im)^\s*-\s*Schema URI:\s*(\S+)\s*$")
 SCHEMA_FILE_RE = re.compile(r"(?im)^\s*-\s*Schema File:\s*(\S+)\s*$")
-DRIFT_SENSITIVE_FIELDS = (
-    "dependencies",
-    "trace",
-    "canonical_refs_used",
-)
 
 # Schema-filename → step-key override.  ``schema_contracts`` is keyed by the
 # numeric prefix of the schema filename (``Path(schema_file).name.split("_", 1)[0]``).
@@ -150,14 +145,6 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
                 errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing required {missing}"))
             if extra:
                 errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} extra required {extra}"))
-            errors.extend(
-                _drift_sensitive_property_errors(
-                    prompt_path,
-                    line_no,
-                    schema_props,
-                    prompt_props,
-                )
-            )
             errors.extend(
                 _required_canonical_ref_errors(
                     prompt_path,
@@ -321,37 +308,6 @@ def _schema_reference_errors(
             ))
 
     return errors
-
-
-def _drift_sensitive_property_errors(
-    prompt_path: str,
-    line_no: int,
-    schema_props: dict[str, object],
-    prompt_props: dict[str, object],
-) -> list[SpecError]:
-    fields = DRIFT_SENSITIVE_FIELDS
-    errors: list[SpecError] = []
-    for field in fields:
-        schema_prop = schema_props.get(field)
-        prompt_prop = prompt_props.get(field)
-        if schema_prop is None:
-            continue
-        if prompt_prop is None:
-            errors.append(make_error(
-                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing property field='{field}'"
-            ))
-            continue
-        if not (isinstance(schema_prop, dict) and isinstance(prompt_prop, dict)):
-            continue
-        if _canonical_json(schema_prop) != _canonical_json(prompt_prop):
-            errors.append(make_error(
-                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} property_drift field='{field}'"
-            ))
-    return errors
-
-
-def _canonical_json(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _required_canonical_ref_errors(

@@ -105,7 +105,7 @@ _TEXT_FILES = (
 
 
 def _changelog_texts() -> tuple[list[str], list[str]]:
-    bullets = [b for section in ("Breaking", "Added", "Changed", "Fixed") for b in _md_bullets(section)]
+    bullets = [b for section in ("Breaking Changes", "Added", "Changed", "Fixed") for b in _md_bullets(section)]
     descriptions = [c["description"] for c in yaml.safe_load(_CHANGELOG_YAML.read_text(encoding="utf-8"))["changes"]]
     return bullets, descriptions
 

@@ -25,9 +25,9 @@ Public API (what json_utils consumes)
 list_entries(spec_file, repo_root)
     Return the registered (array_path, id_field, kind) tuples for a file,
     including nested array entries with their full dot-notation path.
-    Returns an empty list if the file has no entry arrays in the registry
-    (e.g. 16).  Returns None for **unknown** files (json_utils indexes
-    no id of such a file).
+    Returns an empty list if the file has no entry arrays in the registry.
+    Returns None for **unknown** files (json_utils indexes no id of such a
+    file).
 
 find_entry(spec_file, id_value, repo_root)
     Return the registered (array_path, id_field, kind) tuple of the array
@@ -51,9 +51,10 @@ Design constraints
 - No global feature list, no plugins, no extension points.
 - Fallback to ``None`` (not empty list) for unknown filenames so callers can
   distinguish "known file with no arrays" from "unknown file".
-- Steps registered with ``arrays: []`` (e.g. 16) return an empty list
-  rather than None — json_utils indexes no id for either, and only ``None``
-  marks the file as unknown.
+- A file registered with no arrays returns an empty list rather than None —
+  json_utils indexes no id for either, and only ``None`` marks the file as
+  unknown.  Every step file the registry holds today has arrays, step 16
+  included.
 """
 
 from __future__ import annotations
@@ -153,7 +154,7 @@ def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]
 
     Returns:
         - ``list`` (possibly empty) if the file is **known** to the registry.
-          Empty list means the step's file has no entry arrays (e.g. 16).
+          Empty list means the step's file has no entry arrays.
         - ``None`` if the file is **unknown** — json_utils indexes no id of
           such a file (there is no broad scan).
 

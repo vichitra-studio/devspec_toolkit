@@ -299,13 +299,13 @@ def test_aggregate_description_coverage() -> None:
 def test_description_coverage_no_regression(schema_path: Path) -> None:
     """Per-schema description coverage must not fall below the per-file floor.
 
-    After Batch 0b enrichment the lowest-coverage schema sits at ~75%
-    (02_system_sketch.schema.json).  The floor is set to 70% — 5 percentage
+    The lowest-coverage schema sits at 75.0% (15_scaffold.schema.json);
+    02_system_sketch.schema.json is at 83.3%.  The floor is set to 70% — 5 percentage
     points below that minimum — so any significant regression on an individual
     schema is caught without failing on minor fluctuations from small refactors.
     """
-    # Per-file floor: 70% — set 5pp below the current minimum of ~75%
-    # (02_system_sketch.schema.json: 3/4 = 75.0%).
+    # Per-file floor: 70% — set 5pp below the current minimum of 75.0%
+    # (15_scaffold.schema.json: 6/8).
     # Raise this value as the lowest-coverage schemas are improved.
     _PER_FILE_FLOOR = 0.70
 

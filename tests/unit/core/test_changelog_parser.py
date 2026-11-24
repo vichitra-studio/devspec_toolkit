@@ -557,6 +557,16 @@ class TestOSErrorHardening:
             pass
 
 
+class TestChangesShape:
+    def test_empty_changes_is_an_error_not_a_traceback(self, tmp_path):
+        _write_format(tmp_path)
+        for changes, wording in ((None, "'changes' must be a list"), (["just a string"], "Change 0 must be a mapping")):
+            _write_version(tmp_path, "1.0.0", {**_valid_base(), "changes": changes})
+            errors = validate_changelog(tmp_path, "1.0.0")
+            assert [e.code for e in errors] == ["E520"]
+            assert wording in errors[0].message
+
+
 class TestMigrationScriptAndKind:
     def test_migration_info_reads_script_and_kind(self, tmp_path):
         _write_format(tmp_path)

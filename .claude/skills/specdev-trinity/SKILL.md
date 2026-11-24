@@ -148,7 +148,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
    reviewers from fan-out). Pass the plan artifact path and scope per reviewer:
    ```json
    {
-     "steps": ["ms-<batch_id>-plan"],
+     "steps": ["16a"],
      "scope_kind": "plan_artifact",
      "reviewer_id": "<reviewer_id from fan_out[]>",
      "round": <current_round>,
@@ -157,6 +157,8 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
      "artifact_path": "spec/impl_context/ms_<batch_id>_plan.json"
    }
    ```
+   `steps` is `["16a"]`, the step of a plan file: the reviewer runs its step gate as
+   `specdev spec-check spec --step 16a`. `scope` names the plan and is used in the findings file name.
 
    Each reviewer writes to:
    `.specdev/findings/findings_ms-<batch_id>-plan_<round>_r<reviewer_id>.json`
@@ -197,7 +199,12 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
       d. Build re-dispatch prompt: original fix dispatch input verbatim
          + `## User answers (from blocker bridge)` section listing each
            `{id, question, selected_label, selected_description, user_notes_if_any}`
-         + `## Context from prior dispatch` section (agent's `context` field).
+         + `## Context from prior dispatch` section (agent's `context` field)
+         + for an answer whose question has an `owner` other than `this-step` (a step id or
+           `seed`): the instruction NOT to apply it to the plan and to record it as an open item in
+           `.plan.ambiguities` of `spec/impl_context/ms_<batch_id>_plan.json` (`description`,
+           `about` = the question's `about` ids, `decision` = the chosen label), with the plan-file
+           forms of `specdev-impl.md` § "Answers that another step or a seed owns".
       e. Increment `blocker_round` counter (per-dispatch-site, scoped to a single subagent
          dispatch chain; starts at 0 on first dispatch; cap = 2 re-dispatches (counter values
          0, 1, 2); does not persist across skill invocations; resets to 0 at the start of each
@@ -407,14 +414,23 @@ empty-findings file is written each successful run; prior files stay as audit tr
 2. Run `specdev status --milestone <ms-id>`: its first line must be `milestone <ms-id>: in_progress`.
 3. Refuse if `derived_phase_position` is not in `{impl_complete, review_pending, review_complete}` or the status
    is not `in_progress`. (An active group in `pending` state means impl must complete first; `closed` means the
-   milestone is already closed.)
+   milestone is already closed; `operator_pending` means the review converged and an open item of the plan
+   still blocks a group.)
 
-   Print refusal:
+   Print refusal (every position but `operator_pending`):
    ```
-   REFUSED: --phase review requires impl_complete or later phase position.
+   REFUSED: --phase review requires the phase position impl_complete, review_pending or review_complete.
    Current state: <derived_phase_position>
    Pending groups: <list of group_ids with state=pending>
    Action: Run /specdev-trinity <batch_id> --phase impl to completion first.
+   ```
+   Print refusal (`operator_pending`):
+   ```
+   REFUSED: an open item of the plan blocks a group; the review cannot close the milestone.
+   Current state: operator_pending
+   Blocked groups: <group_id: blocking_amb_ids, for each group whose blocking_amb_ids is not empty>
+   Action: answer each open item in the step that owns its node, delete the item
+   (specdev json delete --id <amb-id>), then run /specdev-trinity <batch_id> --phase review again.
    ```
    Exit.
 4. Compute `milestone_start_ref` once before the first review round:

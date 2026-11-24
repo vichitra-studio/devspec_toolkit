@@ -32,11 +32,13 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json schema <file> '<path>' --repo-root <toolkit>` | Typed constraints at a path |
 | `specdev spec-check spec --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Current error density, scoped to in-scope paths |
 | `specdev upstream-backlog <spec> --repo-root <toolkit> --json` | Cross-step churn and unresolved upstream items |
-| `git diff --stat` | Change extent (files touched, lines changed) |
+| `git diff --stat` | Change extent (files touched, lines changed per file) |
+| `wc -l spec/<NN>_*.json` | Line count of a step's file (prints the count, no content) |
 
 No other Bash subcommands. No writes. No edits.
 
-Read is allowed for skill files under `devspec_toolkit/.claude/skills/` only.
+Read is allowed for skill files under `devspec_toolkit/.claude/skills/` and for
+`devspec_toolkit/tools/step_order.json` (its `steps` list is the step order) only.
 Grep is allowed for searching skill or prompt files.
 
 Do NOT Read any file under `spec/` directly.
@@ -62,20 +64,24 @@ Dispatcher supplies a JSON object as the invocation prompt:
 }
 ```
 
-`change_set` is optional. When absent, the agent probes artifact size using `specdev json structure`.
+`change_set` is optional. When absent, there is no change share (see "Decision rule"); the agent probes artifact size with `specdev json structure` for the rationale.
 `with_backlog` is optional (default `false`): the `--with-backlog` flag of `/specdev-review`. Decision rule 3 names the two cases that add the cross-step reviewer: this flag, and a `change_set` of `upstream_backlog` whose backlog lists an open item.
 
 ---
 
 ## Decision rule
 
-Execute this rule against the gathered evidence:
+Execute this rule against the gathered evidence. The change share of a step is the lines
+`git diff --stat` reports as changed in the step's file (insertions plus deletions) divided by
+the file's line count (`wc -l`). With no `change_set`, there is no change share and the step
+count alone decides between branches 1 and 2.
 
-1. If the change_set touches >= 80% of artifact bytes OR the scope spans more than 3 steps:
+1. If the change share of an in-scope step is >= 80% OR the scope spans more than 3 steps:
    - Cluster in-scope steps/files by theme or related-file affinity. Never assign one reviewer
      per step or one reviewer per file. Emit each cluster as `scope_kind: "theme_group"`.
    - **Clustering algorithm — spec steps (`spec/NN_*.json`):** walk in-scope steps in the
-     order defined by `tools/step_order.json` (the DAG authority); group consecutive steps
+     order of the `steps` list of `devspec_toolkit/tools/step_order.json` (the DAG authority;
+     Read it); group consecutive steps
      into clusters of ≤6 steps each. Do NOT split below ≤6 unless the cluster must be smaller
      to respect a DAG adjacency boundary visible in `step_order.json`. Cite `step_order.json`
      step order in rationale; do not hardcode a step list.
@@ -94,7 +100,7 @@ Execute this rule against the gathered evidence:
      context for the skill; this agent does NOT enforce wave dispatch (that is the skill's job).
    - `scope_kind` = `theme_group` for each cluster.
 
-2. If the change_set is localized (< 30% of any step's bytes, <= 3 steps total):
+2. If the change_set is localized (the change share of every in-scope step is < 30%, <= 3 steps total):
    - Assign one reviewer covering the whole range (a range of one step too).
    - `scope_kind` = `step_range`.
 
@@ -145,15 +151,15 @@ Return a single JSON object to stdout. Do not print any other text.
 
 Input: `{ "scope": "04", "change_set": "git_diff" }`
 `git diff --stat` shows 3 lines changed in `spec/04_fr_list.json`.
-`specdev json structure spec/04_fr_list.json` reports 42 KB.
-3 changed lines / 42 KB = < 30%. Steps = 1.
+`wc -l spec/04_fr_list.json` reports 1180 lines.
+3 changed lines of 1180 = < 30%. Steps = 1.
 
 Output:
 ```json
 {
   "fan_out": [{ "reviewer_id": "r1", "steps": ["04"], "scope_kind": "step_range" }],
   "max_rounds": 5,
-  "rationale": "3 lines changed in step 04 (42 KB) = <1% of bytes. Single reviewer covers full step."
+  "rationale": "3 lines changed in step 04 (1180 lines) = <1% of its lines (threshold 30%). Single reviewer covers full step."
 }
 ```
 

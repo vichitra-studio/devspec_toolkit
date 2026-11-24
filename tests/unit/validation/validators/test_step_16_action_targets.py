@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import patch
 
-from specdev_tools.validation.validators.step_16 import validate_step_16
+from specdev_tools.validation.validators.step_16 import _is_doc_path, validate_step_16
 
 
 def _plan(actions: list[dict[str, Any]], patterns: list[str], supporting: list[str] | None = None) -> dict[str, Any]:
@@ -71,3 +71,9 @@ def test_a_legacy_closed_plan_is_history_and_is_not_compared(tmp_path) -> None:
     assert len(_boundary_messages(data, str(plan_file))) == 1
     with patch("specdev_tools.validation.validators.step_16.is_legacy_closed_plan", return_value=True):
         assert _boundary_messages(data, str(plan_file)) == []
+
+
+def test_is_doc_path_keeps_a_dot_folder() -> None:
+    assert _is_doc_path(".github/docs/x.md", [".github/**"])
+    assert _is_doc_path("./.github/docs/x.md", [".github/**"])
+    assert not _is_doc_path(".github/docs/x.md", ["github/**"])

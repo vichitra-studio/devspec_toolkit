@@ -202,12 +202,13 @@ def _validate_document_integrity(
     observed_ids = _collect_used_canonical_ref_ids(data)
     missing_ids = sorted(observed_ids - declared_ids)
     extra_ids = sorted(declared_ids - observed_ids)
+    spec_folder = os.path.dirname(rel) or "."
     if missing_ids:
         errors.append(
             make_error(
                 "E210",
                 f"CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids} "
-                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync",
+                f"— run './tools/run_specdev.sh canonical-autofix {spec_folder} --write' to sync",
                 subcode="CROSS_ARTIFACT_DRIFT",
                 file=rel,
                 jq_path=".canonical_refs_used",
@@ -219,7 +220,7 @@ def _validate_document_integrity(
             make_error(
                 "E210",
                 f"CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids} "
-                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync",
+                f"— run './tools/run_specdev.sh canonical-autofix {spec_folder} --write' to sync",
                 subcode="CROSS_ARTIFACT_DRIFT",
                 file=rel,
                 jq_path=".canonical_refs_used",

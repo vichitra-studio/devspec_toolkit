@@ -66,6 +66,28 @@ except Exception:
             json.dump(manifest, fh, indent=2)
         tmp.replace(manifest_path)
 
+def record_suppressed_removals(manifest_path: Path, locations: list[str]) -> None:
+    """Add the removed files whose P0 finding the override suppressed to ``removal_audit_suppressed`` of the manifest.
+
+    A suppressed finding is not in ``tier0_findings.json``; the manifest is the only record of it. A re-run that
+    suppresses nothing new leaves the list as it is.
+    """
+    if not locations:
+        return
+    try:
+        with manifest_path.open(encoding="utf-8") as fh:
+            manifest: dict[str, Any] = json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"WARNING: could not record the suppressed removals in the manifest: {exc}", file=sys.stderr)
+        return
+    manifest["removal_audit_suppressed"] = sorted(set(manifest.get("removal_audit_suppressed", [])) | set(locations))
+    manifest["updated_at"] = int(time.time())
+    tmp = manifest_path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2)
+    tmp.replace(manifest_path)
+
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 # SCRIPT_DIR = .claude/skills/devspec_pr_audit/scripts
 # parents[0] = .claude/skills/devspec_pr_audit
@@ -272,8 +294,17 @@ def main() -> int:
             with output_path.open(encoding="utf-8") as fh:
                 existing_doc = json.load(fh)
             existing_findings = existing_doc.get("findings", [])
-        except (json.JSONDecodeError, KeyError):
-            pass  # Start fresh
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"ERROR: {output_path} is unreadable ({exc}); the Tier-0 findings in it would be lost. "
+                  "Run tier0_checks.py again, then this script.", file=sys.stderr)
+            return 2
+        if not isinstance(existing_findings, list) or any(
+            not isinstance(f, dict) or not all(k in f for k in ("kind", "location", "signature"))
+            for f in existing_findings
+        ):
+            print(f"ERROR: {output_path} holds a finding without kind, location or signature; "
+                  "run tier0_checks.py again, then this script.", file=sys.stderr)
+            return 2
 
     # Dedup by (kind, location, signature)
     seen_keys: set[tuple[str, str, str]] = {
@@ -286,7 +317,9 @@ def main() -> int:
 
     # Filter P0 removal-audit findings BEFORE merging with existing
     # so tier0_checks.py P0s (e.g. T0-06, T0-10) are never dropped.
+    suppressed_p0: list[str] = []
     if "removal-audit" in allow_failures:
+        suppressed_p0 = sorted(str(f["location"]) for f in deduped_new if f.get("severity") == "P0")
         deduped_new = [f for f in deduped_new if f.get("severity") != "P0"]
 
     merged = existing_findings + deduped_new
@@ -314,8 +347,11 @@ def main() -> int:
     # IMPT-2: Always record override in manifest when flag is present, regardless
     # of p0_count (idempotent re-runs where deduped_new is empty must still log).
     if "removal-audit" in allow_failures:
-        print(f"  [OVERRIDE] removal-audit: {p0_count} P0 finding(s) suppressed by --allow-tier0-failure")
+        print(f"  [OVERRIDE] removal-audit: {len(suppressed_p0)} P0 finding(s) suppressed by --allow-tier0-failure")
+        for location in suppressed_p0:
+            print(f"    suppressed P0 removal: {location}")
         update_manifest_overrides(manifest_path, "removal-audit")
+        record_suppressed_removals(manifest_path, suppressed_p0)
         gate = "pass (overridden)"
         print(f"removal-audit: {len(deduped_new)} new findings "
               f"(P0={p0_count} P1={p1_count} P2={p2_count}) — gate: {gate}")

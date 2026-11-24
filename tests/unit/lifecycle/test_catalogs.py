@@ -91,7 +91,7 @@ _TEXT_FILES = (
 
 
 def _changelog_texts() -> tuple[list[str], list[str]]:
-    bullets = [b for section in ("Breaking", "Added", "Changed", "Fixed") for b in _md_bullets(section)]
+    bullets = [b for section in ("Breaking Changes", "Added", "Changed", "Fixed") for b in _md_bullets(section)]
     descriptions = [c["description"] for c in yaml.safe_load(_CHANGELOG_YAML.read_text(encoding="utf-8"))["changes"]]
     return bullets, descriptions
 
@@ -202,7 +202,7 @@ def test_every_m8_changelog_entry_ends_with_a_command_a_reader_can_run():
     bullets, _ = _changelog_texts()
     for marker in M8_CHANGELOG_MARKERS:
         bullet = next(b for b in bullets if _normalised(marker) in _normalised(b))
-        assert re.search(r"Shown by `[^`]+`\.$|Shown by `specdev[^`]+`", bullet), f"the entry {marker!r} does not end with a command"
+        assert re.search(r"Shown by `[^`]+`\.$", bullet), f"the entry {marker!r} does not end with a command"
 
 
 @pytest.mark.parametrize("wording", OLD_WORDINGS)

@@ -105,7 +105,7 @@ class TestStepRegistryCoverage:
         assert step in accounted_steps, (
             f"Step '{step}' is not accounted for in entry_key_registry.json. "
             "It must appear in one of: "
-            "(1) registry (as a basename starting with '{step}_'), "
+            f"(1) registry (as a basename starting with '{step}_'), "
             "(2) steps_without_entry_arrays, or "
             "(3) steps_with_deferred_registration. "
             "Re-run: specdev registry-generate --repo-root <toolkit-path>"

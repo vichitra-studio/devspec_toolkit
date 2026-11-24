@@ -155,14 +155,15 @@ Tier-0 checks run in P0 Bash before any agent is dispatched. Each check emits a 
 | T0-06 | `schema-registry-targets-exist` | For each entry in `tools/schema_registry.json`: target file path must exist on disk | I4 | P0 | Evidence: registry key + missing path. Implementation: `scripts/tier0_checks.py:T0-06` |
 | T0-07 | `no-addl-props-true-regression` | For each changed schema: `additionalProperties: true` must not replace a prior `additionalProperties: false` (diff-check) | D14 | P1 | Evidence: file path + diff hunk. Walks nested schemas (properties, $defs, allOf, anyOf, oneOf, then, else, items, patternProperties). Implementation: `scripts/tier0_checks.py:T0-07` |
 | T0-08 | `unrouted-files` | Files in diff not matched by any `slices.yaml` glob | I2 | P2 | Warning. Listed in `out_of_scope_files[]` (§10). Evidence: file list. Implementation: `scripts/tier0_checks.py:T0-08` |
-| T0-09 | `changelog-entry-present` | If `migration_versioning` slice changed (non-changelog files), any schema changed, or `cli.py` changed: confirm unreleased changelog entry exists | D11 | P1 | Evidence: slice name + list of changed files with no matching entry. Implementation: `scripts/tier0_checks.py:T0-09` |
+| T0-09 | `changelog-entry-present` | If `migration_versioning` slice changed (non-changelog files), any schema changed, or `cli.py` or a command module (`commands.py`, `*_commands.py` under `tools/specdev_tools/`) changed: confirm unreleased changelog entry exists | D11 | P1 | Evidence: slice name + list of changed files with no matching entry. Implementation: `scripts/tier0_checks.py:T0-09` |
 | T0-10 | `generated-artifacts-clean` | Run `specdev registry-generate --repo-root .` with every output redirected to a temp file (`--out`, `--extraction-paths-out`, `--step-order-out`, `--cli-commands-out`, `--checklist-out`; the list is `GENERATED_OUTPUTS` in the script) and diff each against its committed file; any delta = failure | D9 | P0 | Evidence: diff output. Emits P2 informational finding (not P0 halt) if specdev unavailable. User can override with `--allow-tier0-failure=generated-artifacts-clean` (§7). Implementation: `scripts/tier0_checks.py:T0-10` |
 | T0-11 | `new-module-has-test` | For each new `tools/specdev_tools/**/*.py` not previously in `main`: a matching test file must exist under `tests/` (pattern: `test_<module>*.py`) | I8 | P1 | Evidence: new module path + absent test path. Implementation: `scripts/tier0_checks.py:T0-11` |
 
 **Deletion findings (removal audit):** After tier0_checks.py runs, Step 0e.5 invokes
 `scripts/removal_audit.py` to detect deleted files and append catalog-tagged findings
 to `p0/tier0_findings.json`. Deletions in `canon/**` and generator-owned JSON files
-are P0; schema/prompt/validator deletions are P1; others are P2 (D14 fallback).
+are P0; schema/prompt/validator deletions are P1; others are P2. Every removal carries the
+tag D7, except a load-bearing data file (D9).
 Implementation: `scripts/removal_audit.py`.
 
 **Operational halts (T0-01, T0-02) do not write findings.json.** They exit with a human-readable message to stdout and return a non-zero exit code (T0-01) or zero exit code (T0-02).

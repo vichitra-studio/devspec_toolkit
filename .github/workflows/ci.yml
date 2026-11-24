@@ -52,7 +52,9 @@ jobs:
         run: python -m specdev_tools.cli prompt-sync --repo-root .
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
-        run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python -m specdev_tools.cli governance-check spec --message "$PR_TITLE"
       - name: Registry up-to-date check (W6-T5)
         run: |
           # Regenerate registry + extraction_paths + step_order + cli_commands + checklist to tmpfiles; fail if the

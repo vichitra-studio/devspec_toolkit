@@ -251,7 +251,7 @@
                       "docs",
                       "security"
                     ],
-                    "description": "Classification of this checklist item by the type of requirement it represents. Decision rules: 'behavior' — a functional action the system performs (login flow, submit order, redirect after auth); 'constraint' — a limit or boundary condition (rate limit, max file size, character limit); 'validation' — an input/output correctness check (schema valid, format check, referential integrity); 'security' — an auth, authz, encryption, or injection-prevention surface; 'performance' — a latency, throughput, or resource usage requirement; 'logging' — an audit trail, observability, or monitoring event; 'docs' — documentation that must be produced or updated; 'metadata' — canonical reference or traceability field correctness. Anti-pattern: using 'behavior' as the default when 'security' or 'constraint' applies — the type drives per-type rollup reporting."
+                    "description": "Classification of this checklist item by the type of requirement it represents. Decision rules: 'behavior' — a functional action the system performs (login flow, submit order, redirect after auth); 'constraint' — a limit or boundary condition (rate limit, max file size, character limit); 'validation' — an input/output correctness check (schema valid, format check, referential integrity); 'security' — an auth, authz, encryption, or injection-prevention surface; 'perf' — a latency, throughput, or resource usage requirement; 'logging' — an audit trail, observability, or monitoring event; 'docs' — documentation that must be produced or updated; 'metadata' — canonical reference or traceability field correctness. Anti-pattern: using 'behavior' as the default when 'security' or 'constraint' applies — the type drives per-type rollup reporting."
                   },
                   "layer": {
                     "type": "string",
@@ -1229,7 +1229,7 @@
                   "tests",
                   "docs"
                 ],
-                "description": "Category of the finding: bug, gap, scope creep, style, design, tests, or docs."
+                "description": "Category of the finding: bug, gap, scope_creep, style, design, tests, or docs."
               },
               "severity": {
                 "type": "string",
@@ -1248,7 +1248,7 @@
               "description": {
                 "type": "string",
                 "maxLength": 600,
-                "description": "A finding description must include: (1) what was observed (file:line reference where applicable), (2) why it matters (the impact), (3) which spec requirement it violates (checklist item ID or FR/NFR reference). Minimum 40 characters. Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
+                "description": "A finding description must include: (1) what was observed (file:line reference where applicable), (2) why it matters (the impact), (3) which spec requirement it violates (checklist item ID or FR/NFR reference). Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
               },
               "related_checklist_ids": {
                 "type": "array",

@@ -245,8 +245,8 @@ DEFER_DESCRIPTION = (
 )
 SIGNOFF_DESCRIPTION = (
     "Record the sign-off of an in_progress milestone: extras/signoff/so-<milestone>-<NNNN>.json holds the code tree now, the git "
-    "author, the time and what was listed (manual fixtures and how many are attested, deferred and won't-do tasks, open items, "
-    "proof owed at staging or prod). The same view as `specdev status --milestone <id>` is printed. A second "
+    "author, the time and what was listed (manual fixtures and rules enforced by review, how many of them are attested, deferred and "
+    "won't-do tasks, open items, proof owed at staging or prod). The same view as `specdev status --milestone <id>` is printed. A second "
     "sign-off gets the next number. Nothing checks who runs it, whether the review said verified, or whether the tree is the "
     "current one at close. Refused: E801 (the milestone is not in_progress), E803, E800 (no anchor row). Exit 0 recorded, 1 refused."
 )

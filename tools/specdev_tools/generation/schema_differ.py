@@ -117,7 +117,8 @@ def calculate_version_delta(
         Delta string like "1 MINOR update (breaking)" for an upgrade
         (target newer than source), or ``None`` in two cases: when the
         versions are equal, and when the source is *newer* than the target
-        (a downgrade — all major/minor/patch deltas <= 0). Callers that must
+        (a downgrade — the target's (major, minor, patch) tuple is the lower
+        one, whatever its single parts). Callers that must
         distinguish "aligned" from "downgrade" should compare the versions
         directly rather than relying on this return value alone.
     """
@@ -135,7 +136,11 @@ def calculate_version_delta(
     
     src = parse_semver(source_version)
     tgt = parse_semver(target_version)
-    
+
+    if tgt <= src:
+        # Downgrade or same
+        return None
+
     # Determine delta type and count
     major_delta = tgt[0] - src[0]
     minor_delta = tgt[1] - src[1]
@@ -147,12 +152,9 @@ def calculate_version_delta(
     elif minor_delta > 0:
         delta_type = "MINOR"
         delta_count = minor_delta
-    elif patch_delta > 0:
+    else:
         delta_type = "PATCH"
         delta_count = patch_delta
-    else:
-        # Downgrade or same
-        return None
     
     # Check for breaking flag in target version changelog
     breaking = False

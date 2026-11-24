@@ -860,7 +860,7 @@ changes:
   - type: fix
     description: >
       specdev node status and the id writes were refused for a spec file that
-      already had a schema violation elsewhere (DEVSPEC-317): the differential check
+      already had a schema violation elsewhere: the differential check
       compared the message text of the violations. It now compares the path and the
       validator keyword of each violation: on the worked example with step 04 cut to
       one FR (a minItems violation), specdev node status fr-password-reset
@@ -871,7 +871,7 @@ changes:
   - type: fix
     description: >
       specdev diff reported no change when only a seed file outside the spec folder
-      had changed (DEVSPEC-318): seed paths in the seed manifest are relative to the
+      had changed: seed paths in the seed manifest are relative to the
       repository root, and diff read them relative to the spec folder. It now reads
       them from the repository root: on the worked example, one appended line gives
       seed-accounts: changed and the suggested bump patch, and a whitespace-only
@@ -1176,12 +1176,10 @@ changes:
       (specdev stale); a seed that no node links has no signal in the graph
       (E747 to E749 are other conditions: a seed no route names, a route no node
       uses, a link to a seed the route does not reach). W595 stays registered
-      for the messages of specdev seed-index. Closes DEVSPEC-185. Of
-      DEVSPEC-237 it closes the checks that never ran: the closure checks are
-      gone, and specdev extraction-intent-check now reads a "## Extraction
-      Intent" section too (it skipped eight prompts before); an empty seed file
-      is still not reported. A host must delete the CI lines that call either
-      command (both now exit 2).
+      for the messages of specdev seed-index. specdev extraction-intent-check
+      now reads a "## Extraction Intent" section too (it skipped eight prompts
+      before); an empty seed file is still not reported. A host must delete the
+      CI lines that call either command (both now exit 2).
     migration:
       action: none
 
@@ -1502,7 +1500,7 @@ changes:
       p2_plan_milestone_key); until it has run, a 1.1.1 plan
       is read only through specdev status and is not driven through
       /specdev-trinity. Shown by specdev spec-check spec --repo-root
-      ./devspec_toolkit --spec-root ./spec --git-root ., which lists the E520.
+      ./devspec_toolkit --spec-root ./spec --git-root ..
     migration:
       action: ai_assisted
 
@@ -1525,12 +1523,12 @@ changes:
       record lists the manual fixtures and how many are attested, the deferred
       and won't-do tasks, the number of open items the person was shown and the
       criteria whose proof is owed at staging or prod (a binding at staging or
-      prod whose proof is not proven). A person decides sign-off and defer. Shown by specdev milestone close
-      ms-account-recovery --check.
+      prod whose proof is not proven). A person decides sign-off and defer.
       The close gate also reports E761 for a link of the milestone's chain
       that has no lock entry (a plan item added to the plan file by hand and
       never attested), because once the milestone is closed attest refuses
-      that link.
+      that link. Shown by specdev milestone close
+      ms-account-recovery --check.
     migration:
       action: none
 
@@ -1562,11 +1560,11 @@ changes:
       realises only deferred or won't-do tasks), and the new check frozen-plans
       reports E827 for a plan edited after its milestone closed; spec-check now
       runs 30 checks (the third-party-pins check is described with
-      specdev third-party). Shown by specdev plan record --help and specdev review
-      record --help.
+      specdev third-party).
       A record is stale (W825) when the item's realises links were attested
       again after it was written, whether or not the criterion's text changed:
-      the item is carried out and recorded again.
+      the item is carried out and recorded again. Shown by specdev plan record
+      --help; specdev review record --help.
     migration:
       action: none
 
@@ -1684,13 +1682,13 @@ changes:
       and manual attestation: the agent shows specdev status first and never
       answers the host's prompt. The prompts no longer name the plan item's
       spec_ref, milestone_ref, checklist_status, execution_results, fixture_status,
-      fr_coverage, the trace matrix or specdev matrix. Shown by specdev status
-      --milestone ms-account-recovery.
+      fr_coverage, the trace matrix or specdev matrix.
       prompt_16b_impl_coder.md says what 16b does with a test it wrote that no
       binding covers: it binds the test with specdev verify bind, which the
       agent may run. The seed manifest schema,
       docs/prompts/shared_expectations.md and docs/agents/agents.md say which
-      steps a seed can be routed to (see the entry on seed links).
+      steps a seed can be routed to (see the entry on seed links). Shown by
+      specdev status --milestone ms-account-recovery.
     migration:
       action: none
 
@@ -1895,11 +1893,21 @@ changes:
   - type: fix
     description: >
       The wrapper tools/run_specdev.sh that init wrote named devspec_env
-      whatever --venv-name said (DEVSPEC-325). specdev update renders the
+      whatever --venv-name said. specdev update renders the
       wrapper with the name of the venv that runs it, so init --venv-name X now
       gives a wrapper that uses X: on a host with a .venv, the wrapper printed
       VENV_DIR="${ROOT}/.venv" and ran the real CLI through it. Shown by grep -n
       VENV_DIR= tools/run_specdev.sh in a host.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      A top-level integer in a fixture's input or expected (step 08) now
+      validates: the anyJson definition of schema/core/collections.schema.json
+      listed integer beside number in its oneOf, so an integer matched two
+      branches and was refused. The integer branch is removed; the number
+      branch accepts an integer.
     migration:
       action: none
 

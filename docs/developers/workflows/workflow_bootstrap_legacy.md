@@ -21,13 +21,19 @@ Alternatively, `./tools/run_specdev.sh` enforces virtualenv usage automatically 
 To reverse-engineer a **100% Complete Spec Suite (Steps 00–16c)** using a **Prose-First** strategy:
 
 1. **Prepare the Seeds**: Fill out `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md` with project-specific context.
-2. **Generate the Spec**: Use canonical prompts at `prompts/prompt_NN_name.md` to emit each `spec/NN_name.json` artifact.
+2. **Generate the Spec**: Use canonical prompts at `prompts/prompt_NN_name.md` to draft each step artifact; `specdev step create NN --from <draft>` creates `spec/NN_name.json` from the draft.
 3. **Excavate the Code**: Rigorously scan the codebase to backfill the contracts.
 
 Each spec step uses the **two-phase Clarify/Emit protocol**:
 
 - **Clarify** (if Self-Audit Gate score < 0.9): the AI outputs only short bulleted gap questions. No JSON, no code fences. Stop and wait for answers.
-- **Emit**: the AI writes the artifact JSON directly to `spec/NN_name.json`. Do not return fenced JSON as the primary output.
+- **Emit**: the AI writes the artifact to disk through the CLI, never as fenced JSON in the response. A step that does not exist yet is written as a whole draft file outside `spec/` and created with `specdev step create NN --from <draft>`; a step that exists is edited with `specdev json patch|insert|delete --id <node-id>` (a new node: `specdev json insert --step NN <collection-path> '<node>'`). A file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
+
+In a bootstrap every step is new, so each step below ends the same way: the AI writes the draft, and this command creates the step file and writes the lock entry of every link in it (`--dry-run` prints the report and writes nothing):
+
+```bash
+./tools/run_specdev.sh step create NN --from <draft> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
 
 ---
 
@@ -58,7 +64,7 @@ Before writing any new content, check which spec artifacts are missing.
 
 *Seed: `docs/seed/seed_overview.md`*
 
-Fill in `docs/seed/seed_overview.md` with the project's problem statement, target users, and success metrics. Then use the canonical prompt to emit the charter artifact.
+Fill in `docs/seed/seed_overview.md` with the project's problem statement, target users, and success metrics. Then use the canonical prompt to draft the charter artifact.
 
 **User Action:**
 > Open `prompts/prompt_00_project_charter.md` in your AI assistant.
@@ -67,7 +73,7 @@ Fill in `docs/seed/seed_overview.md` with the project's problem statement, targe
 > - Content of `docs/seed/seed_overview.md`
 > - Any existing `README.md` or product brief
 >
-> The AI will clarify gaps first (if needed), then emit `spec/00_charter.json` directly.
+> The AI will clarify gaps first (if needed), then write the charter as a draft outside `spec/`; `specdev step create 00 --from <draft>` creates `spec/00_charter.json`.
 
 **Validation ritual:**
 ```bash
@@ -88,7 +94,7 @@ Scan `package.json`, `pyproject.toml`, `Dockerfile`, `go.mod`, or any infra-as-c
 > - Content of `docs/seed/seed_overview.md`
 > - Dependency manifests (`package.json`, `pyproject.toml`, etc.)
 >
-> The AI will clarify ambiguous versions (e.g., "Is this Postgres 14 or 15?"), then emit `spec/01_capabilities.json`.
+> The AI will clarify ambiguous versions (e.g., "Is this Postgres 14 or 15?"), then draft the capabilities; `specdev step create 01 --from <draft>` creates `spec/01_capabilities.json`.
 
 **Validation ritual:**
 ```bash
@@ -113,7 +119,7 @@ Scan `package.json`, `pyproject.toml`, `Dockerfile`, `go.mod`, or any infra-as-c
 > - `spec/00_charter.json`, `spec/01_capabilities.json`
 > - Directory structure of `src/` or equivalent
 >
-> The AI maps the high-level components and emits `spec/02_system_sketch.json`.
+> The AI maps the high-level components into a draft; `specdev step create 02 --from <draft>` creates `spec/02_system_sketch.json`.
 
 **Validation ritual:**
 ```bash
@@ -133,7 +139,7 @@ Use this step if the project has measurable delivery metrics to capture before P
 > - Content of `docs/seed/seed_tech_stack.md`
 > - Any existing delivery metrics, SLAs, or baseline performance data
 >
-> The AI captures measurable delivery baselines and emits `spec/02a_delivery_baseline.json`.
+> The AI captures measurable delivery baselines in a draft; `specdev step create 02a --from <draft>` creates `spec/02a_delivery_baseline.json`.
 
 **Validation ritual:**
 ```bash
@@ -150,9 +156,9 @@ Use this step if the project has measurable delivery metrics to capture before P
 > **Context to supply**:
 > - Scan results of class names, DB tables, and shared constants from the codebase
 >
-> The AI defines the top domain terms and emits `spec/03_glossary.json`.
+> The AI defines the top domain terms in a draft; `specdev step create 03 --from <draft>` creates `spec/03_glossary.json`.
 
-After emitting, promote project-specific terms to the canon registry:
+After the step file is created, promote project-specific terms to the canon registry:
 
 ```bash
 ./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit --git-root .
@@ -176,7 +182,7 @@ After emitting, promote project-specific terms to the canon registry:
 > - Root `README.md`
 > - Any existing feature documentation
 >
-> The AI extracts every feature and user story, formalizes them into atomic FRs (ID format: `fr-kebab-case`), and emits `spec/04_fr_list.json`.
+> The AI extracts every feature and user story, and formalizes them into atomic FRs (ID format: `fr-kebab-case`) in a draft; `specdev step create 04 --from <draft>` creates `spec/04_fr_list.json`.
 
 **Validation ritual:**
 ```bash
@@ -202,7 +208,7 @@ After emitting, promote project-specific terms to the canon registry:
 > - `spec/04_fr_list.json`
 > - Full scan of controllers, routers, and resolvers in the API layer
 >
-> The AI identifies every public endpoint/method, extracts input/output types, and emits `spec/05_interface_contracts.json`.
+> The AI identifies every public endpoint/method and extracts input/output types into a draft; `specdev step create 05 --from <draft>` creates `spec/05_interface_contracts.json`.
 > Every id in an API's `derives_from` must be an FR from Step 2.4, or a seed the manifest routes to step 05 listed beside an FR.
 
 **Validation ritual:**
@@ -223,7 +229,7 @@ After emitting, promote project-specific terms to the canon registry:
 > **Context to supply**:
 > - Scan of `tests/`, `validators/`, and `config/`
 >
-> The AI extracts business rules and emits `spec/06_invariants.json`.
+> The AI extracts business rules into a draft; `specdev step create 06 --from <draft>` creates `spec/06_invariants.json`.
 
 **Validation ritual:**
 ```bash
@@ -240,7 +246,7 @@ After emitting, promote project-specific terms to the canon registry:
 > **Context to supply**:
 > - Scan of system limits, SLAs, and performance constraints
 >
-> The AI extracts non-functional requirements and emits `spec/07_nfrs.json`.
+> The AI extracts non-functional requirements into a draft; `specdev step create 07 --from <draft>` creates `spec/07_nfrs.json`.
 
 **Validation ritual:**
 ```bash
@@ -257,7 +263,7 @@ After emitting, promote project-specific terms to the canon registry:
 > **Context to supply**:
 > - `db/models`, `tests/conftest`, or equivalent
 >
-> The AI creates concrete JSON examples for every core entity and emits `spec/08_fixtures.json`.
+> The AI creates concrete JSON examples for every core entity in a draft; `specdev step create 08 --from <draft>` creates `spec/08_fixtures.json`.
 
 **Validation ritual:**
 ```bash
@@ -309,7 +315,7 @@ Add potential security threats for the project. Every threat requires `threatens
 *Prompt: `prompts/prompt_12_ci_gates.md`*
 
 **User Action:**
-> Open each prompt in turn and supply the relevant upstream spec context. Each AI session will clarify gaps then emit the artifact directly.
+> Open each prompt in turn and supply the relevant upstream spec context. Each AI session will clarify gaps, then draft the artifact; `specdev step create NN --from <draft>` (`09`, `10`, `11`, `12`) creates the step file.
 
 **Validation ritual after all Phase 4 steps:**
 ```bash
@@ -342,7 +348,7 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 > - `spec/04_fr_list.json`, `spec/02_system_sketch.json`, `spec/01_capabilities.json`
 > - Any plugin or extension points identified during codebase excavation
 >
-> The AI identifies all extension points in the system and emits `spec/13_extension_manifest.json`.
+> The AI identifies all extension points in the system in a draft; `specdev step create 13 --from <draft>` creates `spec/13_extension_manifest.json`.
 
 **Validation ritual:**
 ```bash
@@ -373,7 +379,7 @@ Address the blockers `step ready 14` lists (the gaps owned by steps below 14) be
 > - `spec/09_impl_plan.json`, `spec/04_fr_list.json`
 > - `docs/seed/seed_overview.md`
 >
-> The AI schedules milestones and roadmap items, emitting `spec/14_roadmap.json`.
+> The AI schedules milestones and roadmap items in a draft; `specdev step create 14 --from <draft>` creates `spec/14_roadmap.json`.
 > Each roadmap item ID uses the format `step-kebab-case`.
 
 **Validation ritual:**
@@ -405,7 +411,7 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 > - `spec/02_system_sketch.json`, `spec/05_interface_contracts.json`, `spec/09_impl_plan.json`
 > - `spec/12_ci_gates.json`, `spec/14_roadmap.json`
 >
-> The AI generates the directory layout, stub files, and test scaffolding, then emits `spec/15_scaffold.json`. After generating the artifact, implement the scaffold manually or using your preferred generator/framework CLI.
+> The AI describes the directory layout, stub files, and test scaffolding in a draft; `specdev step create 15 --from <draft>` creates `spec/15_scaffold.json`. After the artifact is created, implement the scaffold manually or using your preferred generator/framework CLI.
 
 **Validation ritual:**
 ```bash
@@ -426,7 +432,7 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 > - `spec/04_fr_list.json`, `spec/05_interface_contracts.json`
 > - `spec/08_fixtures.json`, `spec/09_impl_plan.json`
 >
-> The AI produces the root Trinity Anchor artifact and emits `spec/16_impl_context.json`.
+> The AI writes the root Trinity Anchor as a draft outside `spec/` (`.specdev/drafts/step_16.json`); `specdev step create 16 --from .specdev/drafts/step_16.json` creates `spec/16_impl_context.json`. The command refuses an existing anchor file: the row of one more milestone is added with `specdev json insert --step 16 .plan.milestone_index '<row>'`.
 
 **Validation ritual:**
 ```bash

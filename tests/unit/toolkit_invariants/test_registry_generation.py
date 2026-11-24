@@ -40,6 +40,7 @@ _SCHEMA_PATH = _TOOLKIT_ROOT / "schema" / "entry_key_registry.schema.json"
 _REGISTRY_PATH = _TOOLKIT_ROOT / "tools" / "entry_key_registry.json"
 
 _REQUIRED_TOP_LEVEL_KEYS = frozenset({
+    "$schema",
     "_format_version",
     "_note",
     "registry",

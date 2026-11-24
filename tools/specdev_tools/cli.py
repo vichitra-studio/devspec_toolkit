@@ -594,8 +594,9 @@ def build_parser() -> _SpecdevParser:
     ctx_scope.add_argument("--entry", required=True)
     ctx_scope.add_argument("--repo-root", default=".")
 
-    # DEPRECATED: extract is removed; all args are optional so the handler always
-    # fires and emits the migration message regardless of what the user passed.
+    # DEPRECATED: extract is removed; the words after it are optional, so the handler
+    # fires and emits the migration message for any of them, except a leading
+    # option-like word (--step, --repo-root): argparse rejects it first (exit 2, no message).
     ctx_extract = ctx_sub.add_parser("extract", add_help=False)
     ctx_extract.add_argument("args", nargs=argparse.REMAINDER)
 

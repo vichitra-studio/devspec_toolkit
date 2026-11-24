@@ -34,7 +34,7 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
    └─ specdev_tools/         # Python CLI package
       ├─ cli.py              # entry point
       ├─ core/               # errors, registry, git_base, changelog_parser
-      ├─ validation/         # validate, validators/, linters (fixtures, seed, docs,
+      ├─ validation/         # validate, validators/, linters (fixtures, seed,
       │                      #   quality, hallucination, dependency, invariants, governance,
       │                      #   graph_checks, step gate)
       ├─ generation/         # prompt_generator, prompt_schema_sync, schema_differ

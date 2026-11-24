@@ -68,7 +68,7 @@
                 "$ref": "vc:core:atoms#owner"
               },
               "inputs": {
-                "description": "Data or signals required to exercise this capability. At least one recommended for in-scope capabilities. Name each input and its type or source. Examples: 'user credentials (email + password)', 'OAuth token from identity provider', 'cart ID and selected payment method ID'. Anti-patterns: 'user data' (too vague — specify which data), 'request' (too generic — name the payload fields that matter). At least one input required for any capability that accepts external data.",
+                "description": "Data or signals required to exercise this capability. At least one recommended for in-scope capabilities. Name each input and its type or source. Examples: 'user credentials (email + password)', 'OAuth token from identity provider', 'cart ID and selected payment method ID'. Anti-patterns: 'user data' (too vague — specify which data), 'request' (too generic — name the payload fields that matter). At least one input is recommended for any capability that accepts external data.",
                 "$ref": "vc:core:collections#stringArray"
               },
               "outputs": {
@@ -76,7 +76,7 @@
                 "$ref": "vc:core:collections#stringArray"
               },
               "preconditions": {
-                "description": "Conditions that must be true before this capability can execute. Use declarative present-tense statements. These feed into Step 07 invariants and become invariant candidates.",
+                "description": "Conditions that must be true before this capability can execute. Use declarative present-tense statements. These feed into Step 06 invariants and become invariant candidates.",
                 "$ref": "vc:core:collections#stringArray",
                 "items": {
                   "type": "string",
@@ -84,7 +84,7 @@
                 }
               },
               "postconditions": {
-                "description": "Conditions guaranteed to hold after successful execution of this capability. These become invariant candidates in Step 07. Use declarative present-tense statements describing verifiable state changes.",
+                "description": "Conditions guaranteed to hold after successful execution of this capability. These become invariant candidates in Step 06. Use declarative present-tense statements describing verifiable state changes.",
                 "$ref": "vc:core:collections#stringArray",
                 "items": {
                   "type": "string",
@@ -101,7 +101,7 @@
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:errors#errorState",
-                  "description": "A specific error condition that may arise during this capability's execution. Provide a named error code (SCREAMING_SNAKE_CASE) and a brief description of what triggered it and what the caller should do. Examples: INSUFFICIENT_PERMISSIONS (caller does not have the required role for this operation), RATE_LIMIT_EXCEEDED (too many requests from this IP in the configured window — retry after 60s), RESOURCE_NOT_FOUND (the targeted entity does not exist or is soft-deleted), UPSTREAM_SERVICE_UNAVAILABLE (dependent external service is unreachable — circuit breaker open). Avoid generic codes like ERROR or FAILURE — each error state should be specific enough to handle distinctly."
+                  "description": "A specific error condition that may arise during this capability's execution. Provide a named error code (kebab-case: code is a kebabId, lowercase and hyphens only) and a brief description of what triggered it and what the caller should do. Examples: insufficient-permissions (caller does not have the required role for this operation), rate-limit-exceeded (too many requests from this IP in the configured window — retry after 60s), resource-not-found (the targeted entity does not exist or is soft-deleted), upstream-service-unavailable (dependent external service is unreachable — circuit breaker open). Anti-pattern: SCREAMING_SNAKE_CASE codes (INSUFFICIENT_PERMISSIONS). Avoid generic codes like error or failure — each error state should be specific enough to handle distinctly."
                 }
               },
               "capability_ref": {

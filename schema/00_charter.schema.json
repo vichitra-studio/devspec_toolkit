@@ -665,7 +665,7 @@
                 ]
               },
               "unit": {
-                "description": "Unit of measurement for this metric. Use standard abbreviations: 'ms' (milliseconds), 'percent' (percentage points), 'count' (raw count), 'req/s' (requests per second), 'MB' (megabytes), 'USD' (currency). The `unit_ref` field links this to the canonical unit registry. Always use the abbreviated form from the approved list: 'ms' (not 'milliseconds'), 'percent' (not 'pct' or '%'), 'count' (not 'number' or 'qty'), 'req/s' (not 'rps' or 'requests per second'). Anti-pattern: 'milliseconds' or 'percentage points' — use the canonical abbreviation so unit_ref can reference the exact term in the canon registry.",
+                "description": "Unit of measurement for this metric. Use the abbreviated form. A unit is a canon entry of kind 'unit', and the `unit_ref` field names that entry. The toolkit's canon (canon/kinds/unit.json) holds three: 'ms' (milliseconds, cn:core:unit:ms), 'percent' (percentage points, cn:core:unit:percent), 'count' (raw count, cn:core:unit:count). Write 'ms' (not 'milliseconds'), 'percent' (not 'pct' or '%'), 'count' (not 'number' or 'qty'). A unit the canon does not hold (e.g. 'req/s' for requests per second, 'MB', 'USD') follows the same abbreviation convention, and its unit_ref needs a canon entry of kind 'unit'. Anti-pattern: 'milliseconds' or 'percentage points' — use the canonical abbreviation so unit_ref can reference the exact term in the canon registry.",
                 "type": "string"
               },
               "measurement_method": {

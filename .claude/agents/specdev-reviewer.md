@@ -33,6 +33,7 @@ Bash surface is restricted to these subcommand families only:
 | `specdev stale --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Suspect links and coverage gaps still to be re-read, by step (when `with_backlog` is set); `specdev stale --step <NN> --json` prints one step's entry |
 | `specdev validate <path> --repo-root <toolkit>` | Self-check own findings output before returning |
 | `jq -n 'now | floor'` | Compute integer epoch for `generated_at` field |
+| `mkdir -p .specdev/findings` | Create the findings folder when it is absent |
 
 No writes to spec artifacts. No edits to spec artifacts. No `specdev json patch/insert/delete`. (Writing the findings file under `.specdev/findings/` is required by the output contract — see "Output contract" below.)
 
@@ -83,8 +84,10 @@ Dispatcher (skill or orchestrator) provides:
 - `scope_kind`: one of `step_range | cross_step_relational | plan_artifact | theme_group`.
   - `cross_step_relational`: focus exclusively on cross-step drift, pending replay, and backlog.
   - `plan_artifact`: the scope is a single plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`)
-    dispatched by `/specdev-trinity` (branch 4 of the decision rule in specdev-scope). Step-counting
-    rules do not apply; review the plan structure, milestone bindings, fixture refs, and canon refs.
+    dispatched by `/specdev-trinity` (branch 4 of the decision rule in specdev-scope). `steps` is
+    `["16a"]`, the step of a plan file, so the step gate is `specdev spec-check spec --step 16a`.
+    Step-counting rules do not apply; review the plan structure, milestone bindings, fixture refs,
+    and canon refs.
   - `theme_group`: a cluster of related steps or files assigned by specdev-scope's wave-model
     clustering (branch 1 of the decision rule). Treat as equivalent to `step_range` covering all
     steps in the cluster — apply all the finding-taxonomy checks across every step in `steps[]`.
@@ -92,8 +95,8 @@ Dispatcher (skill or orchestrator) provides:
   as the primary read target. Required for `plan_artifact` scope_kind dispatches (supplied by
   `/specdev-trinity --phase plan`); omitted for spec-step scopes where the path is derived from `steps[]`.
 
-The dispatcher also provides resolved absolute paths for `--repo-root`, `--spec-root`,
-and `--git-root`. Use them verbatim in every specdev call.
+The dispatch carries no root paths: run every specdev call from the host root with the roots
+of "Flag discipline" (`--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`).
 
 ---
 
@@ -268,7 +271,7 @@ If validation fails, fix the output before returning. Do not return an invalid f
    implementation claim conflicts with — or fails to reflect — the seed content.
 8. Write findings file to `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
    (create the directory with `mkdir -p .specdev/findings` if it does not exist).
-   Compute `generated_at` as an integer Unix epoch: `jq -n 'now | floor'` (preferred) or `date +%s`.
+   Compute `generated_at` as an integer Unix epoch: `jq -n 'now | floor'`.
 9. Run `specdev validate` on own output.
 10. Return: "findings written to .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json.
     Finding count: N. Convergence: CONVERGED / NOT CONVERGED."

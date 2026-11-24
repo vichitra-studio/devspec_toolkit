@@ -107,9 +107,10 @@ docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json
       the script source. Mismatched flag → P1 finding `catalog_tag: "D3"`.
 
    b. **D10 — spec ↔ implementation:** Check that the wrapper template
-      (`scripts/templates/run_specdev.sh`) passes the required flags documented in
-      `CLAUDE.md` (--repo-root, etc.). Missing required flag → P1 finding
-      `catalog_tag: "D10"`.
+      (`scripts/templates/run_specdev.sh`) hands the caller's arguments to the CLI
+      unchanged: its last command is `exec ... -m specdev_tools.cli "$@"`. The template
+      adds no flag of its own; the root flags of `CLAUDE.md` are the caller's. A template
+      that drops `"$@"` or runs another module → P1 finding `catalog_tag: "D10"`.
 
    c. **I9 — discoverability:** Confirm `scripts/init_project.py` is referenced from at
       least one docs file in its expansion set. Missing docs reference → P2 finding

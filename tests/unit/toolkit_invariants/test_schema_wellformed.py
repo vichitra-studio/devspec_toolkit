@@ -1,11 +1,15 @@
-"""T-schema-wellformed — every step schema in schema/ is valid JSON with $id and $schema.
+"""T-schema-wellformed — every schema directly under schema/ is valid JSON with $id and $schema.
 
 Covers W6-T3 invariant: toolkit schemas are well-formed.
 
-Sub-schemas (e.g. entry_key_registry.schema.json, seed_*.schema.json,
-step_order.schema.json) and core schemas (schema/core/*.schema.json) are
-included in JSON-parse and $id/$schema checks but are NOT validated against
-step_base.schema.json (they are not step-level artifacts).
+The JSON-parse and $id/$schema checks run over schema/*.schema.json only:
+the step schemas and the sub-schemas at the top level (e.g.
+entry_key_registry.schema.json, seed_*.schema.json, step_order.schema.json).
+The sub-schemas are not checked for a reference to step_base.schema.json
+(they are not step-level artifacts). Core schemas (schema/core/*.schema.json)
+get a JSON-parse check only. Every JSON file under schema/, at any depth
+(core/, extras/, infra/ included), gets the duplicate-key check; for
+schema/extras/ and schema/infra/ it is the only check here.
 
 Step schemas (NN_*.schema.json) are the primary targets.
 
@@ -33,15 +37,6 @@ _SCHEMA_DIR = _TOOLKIT_ROOT / "schema"
 
 # Pattern for step-level schemas (e.g. 04_fr_list.schema.json, 16_impl_context.schema.json)
 _STEP_SCHEMA_RE = re.compile(r"^\d{2}[a-z]?_.*\.schema\.json$")
-
-# Non-step schemas that are legitimately present at the top level
-_NON_STEP_SCHEMAS = frozenset({
-    "entry_key_registry.schema.json",
-    "seed_manifest.schema.json",
-    "seed_requirements.schema.json",
-    "step_order.schema.json",
-})
-
 
 def _all_top_level_schemas() -> list[Path]:
     """Return all *.schema.json files directly under schema/ (excluding core/)."""
@@ -82,8 +77,8 @@ def test_no_schema_file_holds_a_duplicate_key(schema_path: Path) -> None:
 
 
 class TestSchemaWellformed:
-    """Every schema file in schema/ (top-level and core/) parses as valid JSON
-    and has the required $id and $schema fields."""
+    """Every schema file directly under schema/ parses as valid JSON and has the
+    required $id and $schema fields; a schema/core/ file parses as valid JSON."""
 
     @pytest.mark.parametrize("schema_path", _all_top_level_schemas(), ids=lambda p: p.name)
     def test_parses_as_valid_json(self, schema_path: Path) -> None:

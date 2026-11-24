@@ -220,10 +220,10 @@ class CanonSchemaAlignmentTests(unittest.TestCase):
             self.assertEqual(w552, [])
 
     # ------------------------------------------------------------------
-    # 8. The real schemas, with the enums the graph shape added
-    #    (enforcer, scope, disposition value, anchor status, lifecycle)
+    # 8. The real schemas and canon of this repository pass the whole lint
+    #    (the paired enums: environment, stage, NFR category, owner)
     # ------------------------------------------------------------------
-    def test_new_enums_aligned_with_canon(self) -> None:
+    def test_the_real_schemas_pass_the_alignment_lint(self) -> None:
         self.assertEqual(lint_canon_schema_alignment(_TOOLKIT_ROOT), [])
 
 

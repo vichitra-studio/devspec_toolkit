@@ -133,7 +133,9 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
-            self.assertTrue(any("canonical_refs_used_missing" in e.render() for e in errs))
+            drift = [e.render() for e in errs if "canonical_refs_used_missing" in e.render()]
+            self.assertTrue(drift)
+            self.assertTrue(all("canonical-autofix spec --write" in message for message in drift))
 
     def test_extra_canonical_refs_used_entry_is_detected(self):
         with tempfile.TemporaryDirectory() as td:
@@ -172,7 +174,9 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
-            self.assertTrue(any("canonical_refs_used_extra" in e.render() for e in errs))
+            drift = [e.render() for e in errs if "canonical_refs_used_extra" in e.render()]
+            self.assertTrue(drift)
+            self.assertTrue(all("canonical-autofix spec --write" in message for message in drift))
 
     def test_unresolved_semantic_without_proposal_is_detected(self):
         with tempfile.TemporaryDirectory() as td:

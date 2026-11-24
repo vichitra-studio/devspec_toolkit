@@ -233,7 +233,7 @@ DEEP DIVE QUESTIONS:
 ### 7.1 Owners
 - **Expectation**: Who is responsible? List key stakeholders. Format: `[Role]: [Need]`.
 - **Content**:
-  - Owner: [Name] (Team: api/ui/system/ops/data/product/business)
+  - Owner: [Name] (Team: api/ui/system/ops/data/product/business/engineering)
   - Stakeholder: [Role] needs [Requirement] (e.g. Compliance: Audit trail required)
 
 ### 7.2 Process

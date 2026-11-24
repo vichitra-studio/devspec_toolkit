@@ -113,6 +113,10 @@
               },
               "legacy_plan_status": {
                 "description": "The plan.status the plan carried."
+              },
+              "legacy_plan_deferred_reason": {
+                "type": "string",
+                "description": "The plan.deferred_reason the plan carried, present only when it was a string."
               }
             }
           }

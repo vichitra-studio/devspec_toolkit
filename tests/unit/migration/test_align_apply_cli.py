@@ -202,7 +202,7 @@ def test_without_auto_the_old_refusal_stays(host, toolkit):
 
 
 def test_a_host_at_the_toolkit_version_is_a_noop_that_does_not_stamp(tmp_path):
-    """P19: until the version commit the live toolkit is 1.1.1 and a 1.1.1 host is already current: nothing is stamped."""
+    """P19: a 1.1.1 host on a toolkit at 1.1.1 (a fake toolkit root, not the live one) is already current: nothing is stamped."""
     toolkit = make_toolkit(tmp_path, version="1.1.1", listed=("1.0.0", "1.1.0", "1.1.1"))
     host = make_host(tmp_path)
     before = tree_digest(host)

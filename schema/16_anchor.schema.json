@@ -173,7 +173,7 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 300,
-                "description": "Why the milestone was deferred, at most 300 characters. Required when status is 'deferred', and present only while it is. Example: 'Waits for the payment provider contract.'"
+                "description": "Why the milestone was deferred, at most 300 characters. Required when status is 'deferred'. Written by 'specdev milestone defer'; 'specdev milestone start' removes it. Example: 'Waits for the payment provider contract.'"
               },
               "close": {
                 "type": "object",
@@ -186,12 +186,12 @@
                   "signed_off_by": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Who signed the milestone off. The literal 'legacy-migration' marks a milestone that was already done before the migration to this shape; it requires source."
+                    "description": "Who signed the milestone off. The literal 'legacy-migration' marks a milestone that was already done before the migration to this shape; the migration writes source with it."
                   },
                   "source": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Names the legacy status source this close was taken from. Required when signed_off_by is 'legacy-migration'."
+                    "description": "Names the legacy status source this close was taken from. Written by the migration, together with signed_off_by 'legacy-migration'."
                   },
                   "tree": {
                     "type": "string",

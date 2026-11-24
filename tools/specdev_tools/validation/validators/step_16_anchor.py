@@ -251,7 +251,7 @@ def _cross_file_errors(
 def _scan_plan_files(
     spec_root: Path, row_milestones: set[str]
 ) -> tuple[dict[str, dict[str, Any]], list[SpecError]]:
-    """Classify every ``impl_context/*.json`` file; return the plans that take part in drift checks and the notices.
+    """Classify every ``impl_context/ms_*_plan.json`` file; return the plans that take part in drift checks and the notices.
 
     ``find_plan`` decides which file is the plan of a milestone.  The directory is listed as well because
     ``find_plan`` skips, by design, a file it cannot read or that names no milestone, and those are what W588 and
@@ -317,7 +317,7 @@ def _suppressed_error(files_seen: int, usable: int, orphans: list[str]) -> SpecE
         reason = f" Plan file(s) {', '.join(repr(n) for n in orphans)} name a milestone that no anchor row is about."
     return make_error(
         "W611",
-        f"ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains {files_seen} JSON file(s); "
+        f"ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains {files_seen} ms_*_plan.json file(s); "
         f"{usable} take part in E308/E309 drift detection.{reason}  Fix the W588/W589/W608 warnings "
         f"above, or add the anchor row, to restore drift checks.",
     )

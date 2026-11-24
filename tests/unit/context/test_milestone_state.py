@@ -92,7 +92,7 @@ def _edit_plan(spec: Path, edit) -> None:
     (spec / PLAN).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
-def _set_disposition(spec: Path, value: str) -> None:
+def _set_disposition(spec: Path, value: object) -> None:
     document = load(spec, ROADMAP)
     document["milestones"][0]["tasks"][0]["disposition"] = {"value": value, "reason": "Set aside for the test."}
     (spec / ROADMAP).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
@@ -196,6 +196,13 @@ class TestSpecView:
         spec = example_spec(tmp_path)
         _set_disposition(spec, "wont_do")
         assert _state_from_spec(spec, tmp_path)["groups"][0]["state"] == "wont_do"
+
+    @pytest.mark.parametrize("value", [["deferred"], {"deferred": True}], ids=["list", "object"])
+    def test_non_string_disposition_value_is_no_disposition(self, tmp_path: Path, value: object) -> None:
+        spec = example_spec(tmp_path)
+        _set_disposition(spec, value)
+        view = load_spec_view(_plan(spec), str(spec), toolkit_root())
+        assert view.items and all(item.set_aside is None for item in view.items.values())
 
     def test_group_with_one_task_still_planned_is_not_set_aside(self, tmp_path: Path) -> None:
         """An item realising criteria of two tasks, only one of them deferred, stays active."""

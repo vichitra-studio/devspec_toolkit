@@ -344,7 +344,7 @@
           }
         },
         "compliance": {
-          "description": "List of compliance standards or regulatory frameworks this delivery baseline must satisfy. Use canonical short names: 'SOC2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO27001'. Each entry should reflect an actual external or internal obligation — not aspirational standards. If no formal compliance applies, use an empty array rather than inventing entries. This list is consumed by the governance check (step 10) to verify that compliance-gating CI gates are present.",
+          "description": "The compliance regimes this delivery baseline declares: the compliance standards or regulatory frameworks it must satisfy. Use canonical short names: 'SOC2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO27001'. Each entry should reflect an actual external or internal obligation — not aspirational standards. If no formal compliance applies, use an empty array rather than inventing entries.",
           "$ref": "vc:core:collections#stringArray"
         },
         "environment_ref": {

@@ -22,9 +22,10 @@ def _render(errors):
 
 
 class StepValidatorsTests(unittest.TestCase):
-    def test_step_05_duplicate_api(self):
-        errs = step_05.validate_step_05({"apis": [{"api_id": "a", "method": "GET", "path": "/"}, {"api_id": "a", "method": "GET", "path": "/"}]}, ".")
-        self.assertTrue(errs)
+    def test_step_05_duplicate_route(self):
+        """Two APIs with the same method and path are E520, whatever their ids."""
+        errs = step_05.validate_step_05({"apis": [{"api_id": "a", "method": "GET", "path": "/"}, {"api_id": "b", "method": "GET", "path": "/"}]}, ".")
+        self.assertEqual([(e.code, e.message) for e in errs], [("E520", "Duplicate API method/route 'GET /' at index 1")])
 
     def test_step_06_does_not_read_trace_or_scope_object(self):
         rule = {"inv_id": "inv-1", "trace": "not-a-list", "scope": {"components": 7, "apis": "x"}}
@@ -171,15 +172,6 @@ class StepValidatorsTests(unittest.TestCase):
         ]
         findings = spec_check_graph_findings({"12_ci_gates.json": {"jobs": jobs}})
         self.assertEqual([(f["code"], f["owner"]) for f in findings], [("E703", "step:12")])
-
-    def test_step_12_valid_dag(self):
-        errs = step_12.validate_step_12(
-            {"jobs": [
-                {"job_id": "j1", "depends_on": [], "steps": [{"name": "s", "command": "echo"}]},
-                {"job_id": "j2", "depends_on": ["j1"], "steps": [{"name": "s", "command": "echo"}]},
-            ]}, "."
-        )
-        self.assertFalse(any("Circular" in e for e in _render(errs)))
 
 
 def test_step_02a_duplicate_gate_id():

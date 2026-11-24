@@ -107,7 +107,7 @@ Before emitting, verify:
 - **Payloads**: Provide `input_schema_ref`, `output_schema_ref`, and enumerated `errors` so fixtures and clients know exact payloads.
 - **Security**: Define `security` and `auth` expectations explicitly to align with governance and monitoring.
 - **Links**: Populate `derives_from` with the FR ids proving why the interface exists.
-- **Non-HTTP Protocols**: For gRPC methods, use POST method; for MQTT, map routes to topic paths (e.g., `/topic/{id}`).
+- **Non-HTTP Protocols**: For a non-HTTP protocol (gRPC, WebSocket, MQTT), omit `method` and `path`; `protocol` names the protocol.
 
 ## Common Pitfalls
 - **Sync Drift**: Forgetting to sync `path` or `method` with implementation scaffolds, breaking generated clients.
@@ -144,12 +144,16 @@ Before emitting, verify:
       "interface_ref": {"id": "cn:project:interface:example-resource", "kind": "interface"},
       "scope": "in",
       "derives_from": ["fr-example"],
+      "provided_by": ["example-service"],
       "errors": [
         {"error_id": "err-example-unauthenticated", "scope": "in", "derives_from": ["ac-example-auth"], "code": "unauthenticated", "message": "No valid auth token provided"},
-        {"error_id": "err-example-not-found", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "resource-not-found", "message": "The requested resource does not exist"}
+        {"error_id": "err-example-not-found", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "resource-not-found", "message": "The requested resource does not exist"},
+        {"error_id": "err-example-internal", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "internal-error", "message": "An unexpected server failure occurred"}
       ]
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {"id": "cn:project:interface:example-resource", "kind": "interface", "version": "1.0.0"}
+  ]
 }
 ```

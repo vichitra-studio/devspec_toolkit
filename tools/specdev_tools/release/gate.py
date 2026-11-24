@@ -51,7 +51,11 @@ _NO_GRAPH = "no spec graph could be built, so the release checks that read the g
 
 
 class RelievedNode(NamedTuple):
-    """A node that is built but for the proof of a later stage: what the production-deploy gate and the next-release check re-check."""
+    """A node that is built but for the proof of a later stage.
+
+    The gate result records it and nothing reads it from there: the production-deploy gate and the next-release check
+    compute the set again with ``proof.built_evidence.relieved_nodes``.
+    """
 
     node_id: str
     waits_for: str

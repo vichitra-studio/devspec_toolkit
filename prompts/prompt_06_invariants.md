@@ -70,7 +70,7 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every constraint in `spec/04_fr_list.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR if a constraint cannot be expressed in the supported language formats, addressed with a gap question (Clarify mode) per line 77 below.
+- Every constraint in `spec/04_fr_list.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR if a constraint cannot be expressed in the supported language formats, addressed with a gap question (Clarify mode) per the gap-question rule below.
 - Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it.
 - Every id in `constrains` names an FR, an API, a component or a connection of Steps 02, 04 or 05; a system-wide rule leaves `constrains` out.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
@@ -88,7 +88,7 @@ Before emitting, verify:
 
 ## Step-Specific Completeness Checklist
 - Every rule has a precise description, executable `language`, and concrete `expression` when automation is possible.
-- `scope` limits rules to specific components or APIs to avoid false positives.
+- `scope` is the delivery scope of a rule (`in`, `later` or `out`); `constrains` limits the rule to specific FRs, APIs, components or connections to avoid false positives.
 - `severity` must be set deliberately (see schema/06_invariants.schema.json for authoritative enum values); prefer the harder severity for hard guarantees, the softer value for observability-only rules.
 - `enforcement_point` must match one of the canonical values defined in schema/06_invariants.schema.json (see the `enforcement_point` enum in that file for the full authoritative list).
 - `constrains` names the FRs, APIs, components or connections a rule holds over (never a capability or an NFR); `assumes` names the charter assumptions it rests on.
@@ -98,7 +98,7 @@ Before emitting, verify:
 
 ## Best Practices
 - **Language**: Choose the appropriate `language` value (see schema/06_invariants.schema.json for authoritative enum) and write evaluable `expression` strings for automated enforcement.
-- **Scoping**: Describe each invariant in business language first, then map `scope.components` or `scope.apis` to constrain where it applies.
+- **Scoping**: Describe each invariant in business language first, then name in `constrains` the FRs, APIs, components or connections it applies to.
 - **Severity**: Tag `severity` deliberately (see schema/06_invariants.schema.json for authoritative enum values) to guide escalation paths — harder values for hard guarantees, softer values for observability alerts.
 - **Links**: Name what each invariant constrains in `constrains` (bare ids, no notes) so auditors know where the rule holds.
 - **Sample maintenance**: Any PR that adds, modifies, or removes a runtime-evaluable (`cel`/`jsonlogic`) invariant MUST update `spec/samples/invariants_sample.json` in the same PR — see the "Invariant Evaluation Sample" section of `prompt_08_fixtures.md`. The Step 12 CI gate runs `invariants-check` against that sample.

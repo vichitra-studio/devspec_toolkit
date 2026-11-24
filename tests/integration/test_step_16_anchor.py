@@ -1423,7 +1423,7 @@ class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
 
         w611 = [e for e in errors if e.code == "W611"]
         self.assertEqual(len(w611), 1, f"Expected exactly one W611. Got: {errors}")
-        self.assertIn("2 JSON file(s)", w611[0].message)
+        self.assertIn("2 ms_*_plan.json file(s)", w611[0].message)
 
     def test_no_w611_when_at_least_one_valid_milestone(self):
         """W611 does not fire when at least one milestone file passes $schema filtering."""

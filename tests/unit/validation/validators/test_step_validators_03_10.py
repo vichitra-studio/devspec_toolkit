@@ -1,15 +1,7 @@
-import json
-import os
-import tempfile
 import unittest
 
 from specdev_tools.validation.validators.step_03 import validate_step_03
 from specdev_tools.validation.validators.step_04 import validate_step_04
-
-
-def _render(errors):
-    """Render SpecError list to strings for assertion convenience."""
-    return [e.render() for e in errors]
 
 
 class Step0310Tests(unittest.TestCase):
@@ -27,89 +19,25 @@ class Step0310Tests(unittest.TestCase):
 
     def test_step04_accepts_valid_fr_with_trace(self):
         """Validate that FR items with non-empty trace array pass validation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Use an isolated tmpdir so load_upstream_ids finds no capabilities file
-            # and skips capability_ref cross-validation (returns None → skip).
-            # Using "." as toolkit_root is fragile: it picks up the host repo's
-            # live spec/01_capabilities.json, which doesn't contain synthetic IDs.
-            errs = validate_step_04(
-                {
-                    "functional_requirements": [
-                        {
-                            "fr_id": "fr-test-valid-trace",
-                            "statement": "This FR has a valid non-empty trace array",
-                            "acceptance_criteria": [
-                                {"criterion_id": "ac-1", "text": "First acceptance criterion"},
-                                {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
-                            ],
-                            "trace": [
-                                {"type": "capability", "id": "cap-test", "note": "Links to capability"}
-                            ],
-                            "capability_ref": "cap-test"
-                        }
-                    ]
-                },
-                tmpdir,
-            )
-        self.assertEqual([], errs)
-
-    def test_step04_capability_ref_cross_validation(self):
-        """Validate capability_ref cross-checking works with temp fixture."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a temporary spec directory with capabilities file
-            spec_dir = os.path.join(tmpdir, "spec")
-            os.makedirs(spec_dir)
-
-            # Write a valid capabilities fixture
-            capabilities_file = os.path.join(spec_dir, "01_capabilities.json")
-            capabilities_data = {
-                "capabilities": [
-                    {"capability_id": "cap-user-auth"},
-                    {"capability_id": "cap-user-session"}
+        errs = validate_step_04(
+            {
+                "functional_requirements": [
+                    {
+                        "fr_id": "fr-test-valid-trace",
+                        "statement": "This FR has a valid non-empty trace array",
+                        "acceptance_criteria": [
+                            {"criterion_id": "ac-1", "text": "First acceptance criterion"},
+                            {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
+                        ],
+                        "trace": [
+                            {"type": "capability", "id": "cap-test", "note": "Links to capability"}
+                        ]
+                    }
                 ]
-            }
-            with open(capabilities_file, "w") as f:
-                json.dump(capabilities_data, f)
-
-            # Test 1: Valid capability_ref should pass
-            valid_errs = validate_step_04(
-                {
-                    "functional_requirements": [
-                        {
-                            "fr_id": "fr-valid-cap-ref",
-                            "statement": "This FR references a valid capability",
-                            "acceptance_criteria": [
-                                {"criterion_id": "ac-1", "text": "First acceptance criterion"},
-                                {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
-                            ],
-                            "trace": [{"type": "capability", "id": "cap-user-auth"}],
-                            "capability_ref": "cap-user-auth"
-                        }
-                    ]
-                },
-                tmpdir,
-            )
-            self.assertEqual([], valid_errs)
-
-            # Test 2: Invalid capability_ref should fail
-            invalid_errs = validate_step_04(
-                {
-                    "functional_requirements": [
-                        {
-                            "fr_id": "fr-invalid-cap-ref",
-                            "statement": "This FR references a non-existent capability",
-                            "acceptance_criteria": [
-                                {"criterion_id": "ac-1", "text": "First acceptance criterion"},
-                                {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
-                            ],
-                            "trace": [{"type": "capability", "id": "cap-unknown"}],
-                            "capability_ref": "cap-unknown"
-                        }
-                    ]
-                },
-                tmpdir,
-            )
-            self.assertTrue(any("unknown capability" in e for e in _render(invalid_errs)))
+            },
+            ".",
+        )
+        self.assertEqual([], errs)
 
 
 if __name__ == "__main__":

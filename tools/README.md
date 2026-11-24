@@ -27,7 +27,10 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/project --stri
 ### Arguments
 - `--target`: Directory to initialize (defaults to current directory).
 - `--strict`: Enable strict governance mode (installs `commit-msg` hooks and enforces message format).
-- `--toolkit-url`: Custom URL for the submodule (defaults to `vichitracollective/devspec_toolkit`).
+- `--toolkit-url`: Custom URL for the submodule (defaults to `https://github.com/vichitra-studio/devspec_toolkit.git`).
+- `--toolkit-root`: Explicit path to the `devspec_toolkit` source directory.
+- `--venv-name`: Name for the virtual environment (defaults to `devspec_env`).
+- `--force-claude`: Replace existing `.claude` links that differ from the toolkit's.
 
 This utility standardizes directory creation (`spec/`, `spec/common/`, `docs/seed/`), submodule addition, and environment setup (`devspec_env` with pre-commit hooks).
 

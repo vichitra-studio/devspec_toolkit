@@ -35,7 +35,7 @@
             "id": "inv_id"
           },
           "items": {
-            "description": "A single invariant rule with its formal expression, severity, and the nodes it constrains. Each invariant covers one specific, testable property. Worked example 1 — payment invariant triple: inv_id='inv-payment-positive-amount', description='The system ensures payment amounts are always positive', expression='payment.amount > 0' (language='cel'), constrains=['api-payment-create', 'payment-service']. Worked example 2 — user-email invariant triple: inv_id='inv-user-unique-email', description='The system ensures no two active accounts share an email address', expression='size(users.filter(u, u.email == input.email && u.status == \"active\")) <= 1' (language='cel'), constrains=['fr-user-register', 'api-user-register', 'user-service']. Decision rule: if you cannot write a specific inv_id/description/expression triple, the candidate is not an invariant — it may be a design principle or NFR instead.",
+            "description": "A single invariant rule with its formal expression, severity, and the nodes it constrains. Each invariant covers one specific, testable property. Worked example 1 — payment invariant triple: inv_id='inv-payment-positive-amount', description='The system ensures payment amounts are always positive', expression='payment.amount > 0' (language='cel'), policy_ref={\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}, constrains=['api-payment-create', 'payment-service']. Worked example 2 — user-email invariant triple: inv_id='inv-user-unique-email', description='The system ensures no two active accounts share an email address', expression='size(users.filter(u, u.email == input.email && u.status == \"active\")) <= 1' (language='cel'), policy_ref={\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}, constrains=['fr-user-register', 'api-user-register', 'user-service']. Decision rule: if you cannot write a specific inv_id/description/expression triple, the candidate is not an invariant — it may be a design principle or NFR instead.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -102,7 +102,7 @@
                 }
               },
               "policy_ref": {
-                "description": "Canonical reference linking this invariant to a governance or compliance policy. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Omit when the invariant is a pure business rule with no compliance requirement.",
+                "description": "Canonical reference linking this invariant to a governance or compliance policy. Kind is structurally pinned to 'policy'. Required: every rule names the policy it serves. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "policy" } } }

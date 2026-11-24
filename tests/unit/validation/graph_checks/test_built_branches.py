@@ -151,7 +151,7 @@ def test_constraint_third_party_nobody_relies_on_does_not_count() -> None:
     assert compute_built(built_context(nodes))["con-1"].state is NOT_BUILT
 
 
-def test_constraint_derived_by_a_gate_is_pending_and_a_not_built_derivation_wins() -> None:
+def test_constraint_derived_by_a_gate_is_pending() -> None:
     gate = node("gate-1", "gate", "obligation-delivery", step="02a", links=[("derives_from", "con-1")])
     component_unused = node("cn-1", "component", "context", step="02", links=[("derives_from", "con-1")])
     third = node("tp-1", "third-party", "context", step="02", links=[("derives_from", "con-1")])

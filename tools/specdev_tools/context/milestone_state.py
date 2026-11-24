@@ -414,7 +414,7 @@ def _disposition(graph: Graph, criterion_id: str) -> str | None:
     """The set-aside ``disposition.value`` (``deferred`` or ``wont_do``) of the task that holds *criterion_id*; ``None`` for any other case."""
     task = task_of(graph, criterion_id)
     value = task_disposition(graph, task)[0] if task is not None else None
-    return value if value in PAUSED_DISPOSITIONS else None
+    return value if isinstance(value, str) and value in PAUSED_DISPOSITIONS else None
 
 
 def _chain(graph: Graph, item_id: str) -> frozenset[str]:

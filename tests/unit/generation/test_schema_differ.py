@@ -83,10 +83,13 @@ class TestCalculateVersionDelta:
         assert "PATCH" in result
 
     def test_downgrade_returns_none(self):
-        # True downgrade: target minor strictly below source. All deltas <= 0,
-        # so calculate_version_delta falls to the else branch and returns None.
+        # True downgrade: target minor strictly below source, all deltas <= 0.
         result = calculate_version_delta("1.1.0", "1.0.0")
         assert result is None
+
+    def test_downgrade_with_a_larger_lower_number_returns_none(self):
+        assert calculate_version_delta("1.2.0", "1.1.5") is None
+        assert calculate_version_delta("2.0.0", "1.5.0") is None
 
     def test_downgrade_major_returns_none(self):
         # Downgrade along the major axis (and others) — distinct input path from

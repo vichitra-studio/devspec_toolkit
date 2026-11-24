@@ -1,9 +1,9 @@
-"""End-to-end scenarios of the spec-graph design on the worked example, through the CLI (``_shared.md`` section 7.4).
+"""End-to-end scenarios of the spec-graph design on the worked example, through the CLI.
 
 Each test starts from a git copy of the example (``tests/fixtures/graph_example``) with its committed lock and runs
 ``specdev`` commands as an author would.
 
-Scenarios 4 (seed edit), 5 (rename) and 6 (two-branch merge) are covered where they are tested closest to their code:
+The seed edit, the rename and the two-branch merge are covered where they are tested closest to their code:
 ``test_seed_edit_suspects.py``, ``test_node_rename.py`` and ``test_merge_driver_git.py``.
 """
 from __future__ import annotations

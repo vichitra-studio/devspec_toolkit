@@ -174,7 +174,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Trigger**: Fired by the canonical-integrity check when an artifact's `canonical_refs_used[]` array drifts from the canonical references actually present in the document body. Three subcodes: `canonical_refs_used_missing` (a canonical ID is referenced in the body but absent from `canonical_refs_used[]`), `canonical_refs_used_extra` (an ID is listed in `canonical_refs_used[]` but not used in the body), and `unresolved_canonical_semantic` (a semantic field carries a value with no resolved canonical ref).
 
-**Resolution**: For the `canonical_refs_used_*` subcodes, run `./tools/run_specdev.sh canonical-autofix <file> --write` to sync `canonical_refs_used[]` with the body. For `unresolved_canonical_semantic`, supply the missing canonical reference (declare it in `canonical_proposals` and run `canon-accept`, or correct the semantic value).
+**Resolution**: For the `canonical_refs_used_*` subcodes, run `./tools/run_specdev.sh canonical-autofix <spec folder> --write` to sync `canonical_refs_used[]` with the body. For `unresolved_canonical_semantic`, supply the missing canonical reference (declare it in `canonical_proposals` and run `canon-accept`, or correct the semantic value).
 
 **Promotable**: No — error-only; there is no `W210` counterpart.
 
@@ -248,7 +248,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Resolution**: Add extraction intent entries listing each upstream artifact and what to extract from it.
 
-**Promotable**: W591 → E591.
+**Promotable**: No. The check emits E591 only. W591 is catalogued and paired with E591 in the promotion table, but nothing emits it, so there is no warning to promote.
 
 ### E593 / W593 VAGUE_LANGUAGE_FREE_TEXT
 
@@ -299,7 +299,7 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Trigger (E597)**: A step reads an upstream step (its `step_metadata.required_spec_inputs` in step_order.json; every preceding step of the `steps` order when a step has no such list), but the prompt's extraction intent has no entry for that upstream artifact.
 
-**Trigger (W597)**: An extraction intent entry has vague text (fewer than 10 words or contains "relevant", "as needed", "as appropriate", "various", "TBD", "TODO").
+**Trigger (W597)**: An extraction intent entry has vague text (fewer than 10 words or contains "relevant", "as needed", "as appropriate", "etc.", "various", "TBD", "TODO").
 
 **Resolution (E597)**: Add an extraction intent entry for the missing upstream artifact.
 
@@ -455,7 +455,7 @@ Printed: `W588 <anchor file>: ANCHOR_MILESTONE_UNREADABLE: 'ms_bad.json' in impl
 
 **Trigger**: The Trinity Anchor's `impl_context/` directory contains one or more plan files (`ms_<batch>_plan.json`; another JSON file there is not counted), and either none of them takes part in drift detection or some plan file names a milestone that no anchor row is about. A file takes part when it declares `$schema='vc:16-impl-context'` and its file-level `milestone` names a milestone that some anchor row is `about`. With zero participating plans, the cross-milestone E308 (scope drift) and E309 (checklist drift) checks are completely suppressed — the anchor looks clean while contributing nothing to drift detection. Does not fire when `impl_context/` is genuinely empty (no JSON files), which is a valid state for a fresh anchor.
 
-Printed, for a plan of a milestone that has no anchor row: `W611 <anchor file>: ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains 2 JSON file(s); 1 take part in E308/E309 drift detection. Plan file(s) 'ms_account_lockout_plan.json' name a milestone that no anchor row is about.  Fix the W588/W589/W608 warnings above, or add the anchor row, to restore drift checks.`
+Printed, for a plan of a milestone that has no anchor row: `W611 <anchor file>: ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains 2 ms_*_plan.json file(s); 1 take part in E308/E309 drift detection. Plan file(s) 'ms_account_lockout_plan.json' name a milestone that no anchor row is about.  Fix the W588/W589/W608 warnings above, or add the anchor row, to restore drift checks.`
 
 **Resolution**: Fix the W588/W589/W608 warnings reported above the W611 line, or add the anchor row a plan file's `milestone` names, so the per-milestone plans take part. Adding a row is possible only for a milestone the roadmap has: for a plan whose milestone is not in `14_roadmap.json` (run: a plan for `ms-account-lockout` on the worked example) `specdev json insert --step 16 .plan.milestone_index ...` is refused with `E767 ... E700 anchor-ms-account-lockout ... field about, target 'ms-account-lockout': no node has that id`; the milestone has to be in the roadmap (step 14) first. Followed for a roadmap milestone: with the row added, the W611 was gone (and E308 and E309 were then reported where they apply). Once at least one plan takes part, E308/E309 drift detection is restored.
 
@@ -529,9 +529,9 @@ Printed, for a plan of a milestone that has no anchor row: `W611 <anchor file>: 
 
 ### E310 PROMPT_SCHEMA_DRIFT
 
-**Trigger**: Fired by `prompt_schema_sync.py` when a `prompt_NN_*.md` file's documented output contract drifts from its paired JSON Schema — missing/extra required fields, a missing schema-reference section, a missing or malformed schema URI/file reference, a missing property, or a property-level mismatch (type/description drift) between the prompt's documented fields and the schema.
+**Trigger**: Fired by `prompt_schema_sync.py` when a `prompt_NN_*.md` file's documented output contract drifts from its paired JSON Schema — missing/extra required fields, a missing schema-reference section, or a missing or malformed schema URI/file reference.
 
-**Resolution**: Update the prompt's output-contract section to match the paired schema (or vice versa, if the schema is stale) — align required fields, the `$schema` URI reference, and per-property descriptions.
+**Resolution**: Update the prompt's output-contract section to match the paired schema (or vice versa, if the schema is stale) — align required fields and the `$schema` URI reference.
 
 **Promotable**: No (error only).
 
