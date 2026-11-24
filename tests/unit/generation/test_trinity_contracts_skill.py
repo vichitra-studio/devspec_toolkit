@@ -19,6 +19,7 @@ import pytest
 from specdev_tools.core.errors import ERROR_CODES
 from unit.generation._contracts_support import _flags, _item_with_findings
 from unit.graph._synth import run_cli
+from unit.lifecycle._record_support import author  # noqa: F401  (a fixture: `plan record` needs an author)
 from unit.trace._lock_support import git_copy_of_example, run_on_example
 
 ROOT = Path(__file__).parents[3]
@@ -432,7 +433,7 @@ def test_the_jq_merge_the_skill_gives_produces_a_file_that_validates(tmp_path: P
     assert code == 0 and "OK" in out, out
 
 
-def test_a_manual_action_is_recorded_after_the_person_confirms_and_a_verifier_action_is_not(tmp_path: Path) -> None:
+def test_a_manual_action_is_recorded_after_the_person_confirms_and_a_verifier_action_is_not(tmp_path: Path, author: None) -> None:
     host = git_copy_of_example(tmp_path / "host")
     action = {"id": "a02", "type": "manual_verification", "target": "confirm endpoint", "description": "A person tries an expired link in staging."}
     code, out = run_on_example(host, "json", "insert", "--id", ITEM, ".implementation.actions", json.dumps(action))

@@ -67,7 +67,7 @@ def test_previous_release_nearest_ancestor_matching_pattern(tmp_path: Path) -> N
 def test_two_tags_the_same_distance_back_the_newest_is_the_previous_release(tmp_path: Path) -> None:
     host = release_host(tmp_path)
     for name, date in (("v1.0.0", "2026-03-01T00:00:00"), ("v0.9.0", "2026-01-01T00:00:00")):  # the newest tag sorts first by name
-        subprocess.run(["git", "-C", str(host), "tag", "-a", "-m", name, name, "HEAD"], check=True, env={**os.environ, "GIT_COMMITTER_DATE": date})
+        subprocess.run(["git", "-C", str(host), "tag", "-a", "-m", name, name, "HEAD"], check=True, env={**os.environ, "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.invalid", "GIT_COMMITTER_DATE": date})
     advance(host)
     assert previous_release(str(host), "HEAD", PATTERN).tag == "v1.0.0"
 

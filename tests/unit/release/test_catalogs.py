@@ -257,7 +257,12 @@ def test_the_quoted_message_of_an_undeclared_pattern_is_what_the_command_prints(
     _in_entry("E911", _message("E911", out, err))
 
 
-def test_the_first_release_prints_the_quoted_warning(tmp_path):
+_TAGGER = {"GIT_AUTHOR_NAME": "Release Person", "GIT_AUTHOR_EMAIL": "person@example.invalid", "GIT_COMMITTER_NAME": "Release Person", "GIT_COMMITTER_EMAIL": "person@example.invalid"}
+
+
+def test_the_first_release_prints_the_quoted_warning(tmp_path, monkeypatch):
+    for name, value in _TAGGER.items():  # an annotated tag needs an identity; the host carries no git configuration
+        monkeypatch.setenv(name, value)
     host = release_host(tmp_path)
     code, out, err = cli_run(host, "release", "--tag", "v1.0.0")
     assert code == 0, out + err

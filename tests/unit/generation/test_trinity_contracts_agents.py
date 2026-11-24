@@ -16,6 +16,7 @@ import pytest
 
 from unit.generation._contracts_support import _flags, _item_with_findings
 from unit.graph._synth import run_cli
+from unit.lifecycle._record_support import author  # noqa: F401  (a fixture: `plan record` needs an author)
 from unit.trace._lock_support import git_copy_of_example, run_on_example
 
 ROOT = Path(__file__).parents[3]
@@ -186,7 +187,7 @@ def _with_action_id(host: Path) -> None:
     assert code == 0, out
 
 
-def test_the_impl_text_records_an_action_and_writes_an_open_item_by_both_forms(tmp_path: Path) -> None:
+def test_the_impl_text_records_an_action_and_writes_an_open_item_by_both_forms(tmp_path: Path, author: None) -> None:
     host = git_copy_of_example(tmp_path / "host")
     _with_action_id(host)
     plan = _plan_path(host)

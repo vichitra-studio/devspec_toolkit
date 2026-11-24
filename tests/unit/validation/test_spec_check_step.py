@@ -230,7 +230,8 @@ def test_step_with_paths_is_a_usage_error(tmp_path: Path) -> None:
 
 def test_detail_accepts_summary_and_all_only(tmp_path: Path) -> None:
     code, out = run_spec_check(step_gate_host(tmp_path / "host"), "--step", "04", "--detail", "bogus")
-    assert code == 2 and "invalid choice: 'bogus'" in out and "summary, all" in out
+    assert code == 2 and "invalid choice: 'bogus'" in out
+    assert re.search(r"choose from '?summary'?, '?all'?", out), out  # argparse quotes the choices in some Python patch releases
 
 
 @pytest.mark.parametrize("flags", [["--detail", "all"], ["--base-ref", "main"]], ids=["detail", "base-ref"])
