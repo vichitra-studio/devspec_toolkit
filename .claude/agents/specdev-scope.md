@@ -63,7 +63,7 @@ Dispatcher supplies a JSON object as the invocation prompt:
 ```
 
 `change_set` is optional. When absent, the agent probes artifact size using `specdev json structure`.
-`with_backlog` is optional (default `false`): the `--with-backlog` flag of `/specdev-review`; when true, decision rule 3 applies.
+`with_backlog` is optional (default `false`): the `--with-backlog` flag of `/specdev-review`. Decision rule 3 names the two cases that add the cross-step reviewer: this flag, and a `change_set` of `upstream_backlog` whose backlog lists an open item.
 
 ---
 
@@ -98,8 +98,8 @@ Execute this rule against the gathered evidence:
    - Assign one reviewer covering the whole range (a range of one step too).
    - `scope_kind` = `step_range`.
 
-3. Cross-step concerns: `with_backlog` is true, or `specdev upstream-backlog` lists an open item
-   about a node of an in-scope step:
+3. Cross-step concerns: `with_backlog` is true, or `change_set` is `upstream_backlog` and
+   `specdev upstream-backlog` lists an open item about a node of an in-scope step:
    - Always add exactly ONE additional reviewer with `scope_kind` = `cross_step_relational`
      covering all in-scope steps.
    - This reviewer is the consumer of `--with-backlog` output (`specdev upstream-backlog --json`
@@ -110,7 +110,7 @@ Execute this rule against the gathered evidence:
    - Assign exactly one reviewer covering the plan artifact.
    - `scope_kind` = `plan_artifact`.
    - Step-counting and byte-threshold rules (branches 1–2) do not apply.
-   - Cross-step concerns (branch 3) apply only when `with_backlog` is true.
+   - Of branch 3 only the `with_backlog` case applies: the reviewer is added when the flag is true.
 
 The 80% / 30% / 3-step thresholds are starting estimates. They may be exposed as env vars
 after calibration; no env var names have been committed yet. These thresholds are

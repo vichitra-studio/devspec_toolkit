@@ -508,12 +508,15 @@ changes:
       plan.summary.milestone_supporting_files (Action 'a02' of plan item
       'PWRESET_CONFIRM_01' targets 'src/auth/session.ts', which
       plan.summary.target_file_patterns does not cover). The 1.1.1 check
-      compared the files an item listed in implementation.files_touched once the
-      item was in progress; the 1.2.0 loop does not write that list, so the
-      plan's own actions are compared, when the plan is written. The plan of a
-      milestone closed by a migration is exempt. Add a pattern for the path, or
-      change the action. Shown by specdev spec-check spec --repo-root
-      ./devspec_toolkit --spec-root ./spec --git-root ., which lists the E520.
+      compared two lists with the patterns: an item's
+      implementation.files_touched once the item was in progress, and
+      execution.files_touched. The 1.2.0 loop writes neither list, so the plan's
+      own actions are compared, when the plan is written; the actions of the
+      plan of a milestone closed by a migration are not compared. A file listed
+      in execution.files_touched is still compared, in every plan. Add a pattern
+      for the path, or change the action. Shown by specdev spec-check spec
+      --repo-root ./devspec_toolkit --spec-root ./spec --git-root ., which lists
+      the E520.
     migration:
       action: none
 
