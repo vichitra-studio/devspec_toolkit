@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specdev_tools.validation.spec_quality_lint import lint_spec_quality
+from specdev_tools.validation.spec_quality_lint import PLACEHOLDER_RE, lint_spec_quality
 from specdev_tools.core.errors import render_errors
 
 
@@ -132,6 +132,11 @@ class SpecQualityLintTests(unittest.TestCase):
             (spec / "14_roadmap.json").write_text(json.dumps(step14), encoding="utf-8")
             errs = lint_spec_quality(str(spec))
             self.assertFalse(any("TECH_STACK_COHERENCE" in e for e in render_errors(errs)))
+
+    def test_text_in_angle_brackets_is_not_a_placeholder(self):
+        for value in ("<owner>", "Map<string>s", "a<b>c"):
+            self.assertIsNone(PLACEHOLDER_RE.search(value), value)
+        self.assertIsNotNone(PLACEHOLDER_RE.search("owner: TBD"))
 
 
 if __name__ == "__main__":

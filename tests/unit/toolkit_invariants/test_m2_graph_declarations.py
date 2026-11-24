@@ -13,9 +13,10 @@ import pytest
 
 from specdev_tools.registry.annotations import (
     SchemaReader,
+    collect_annotations,
     lint_annotations,
 )
-from specdev_tools.registry.step_order_gen import derive_step_order
+from specdev_tools.registry.step_order_gen import derive_from_decls
 
 from ._declarations_support import _EXCLUDED_FROM_CONTRACT, _GRAPH, _OBLIGATION_ROLES, _ROLE_TABLE, _ROOT, _SCHEMA_DIR, _is_step_schema, _item, _link_fields, _links, _node_arrays, _nodes, _props, _step_of, declared_link_kinds
 
@@ -141,7 +142,7 @@ def test_no_forward_links_in_steps_00_05(decls, fname: str) -> None:
 
 def test_annotation_lints_and_step_order_are_clean_on_m2_schemas(decls) -> None:
     assert lint_annotations(decls) == []
-    assert _M2_STEPS & set(derive_step_order(str(_ROOT))["steps"])
+    assert _M2_STEPS & set(derive_from_decls(collect_annotations(str(_ROOT)))["steps"])
 
 
 @pytest.mark.parametrize("fname", _FILES)

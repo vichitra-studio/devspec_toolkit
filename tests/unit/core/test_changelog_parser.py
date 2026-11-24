@@ -17,6 +17,7 @@ from pathlib import Path
 import yaml
 
 from specdev_tools.core.changelog_parser import (
+    compare_versions,
     get_toolkit_version,
     list_versions,
     load_format,
@@ -572,3 +573,14 @@ class TestMigrationScriptAndKind:
     def test_format_yaml_lists_kind_values(self):
         real = Path(__file__).resolve().parents[3] / "changelog"
         assert load_format(real).migration_kinds == ["mechanical", "judgement", "none"]
+
+
+class TestVersionOrder:
+    def test_a_prerelease_sorts_before_its_release(self, tmp_path):
+        assert compare_versions("1.2.0-rc1", "1.2.0") == -1
+        assert compare_versions("1.2.0", "1.2.0-rc1") == 1
+        assert compare_versions("1.1.9", "1.2.0-rc1") == -1
+        assert compare_versions("1.2.0-rc1", "1.2.0-rc2") == -1
+        for name in ("v1.2.0.yaml", "v1.2.0-rc1.yaml", "v1.1.1.yaml"):
+            (tmp_path / name).write_text("version: x\n", encoding="utf-8")
+        assert list_versions(tmp_path) == ["1.1.1", "1.2.0-rc1", "1.2.0"]

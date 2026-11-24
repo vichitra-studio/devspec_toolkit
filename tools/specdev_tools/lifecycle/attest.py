@@ -140,7 +140,8 @@ def _action_target(graph: Graph, address: Address, env: str) -> ActionTarget:
     """The action *address* when it is marked ``at_deploy`` for *env*.
 
     Raises:
-        FindingError: E824 when there is no such plan item or action, or the action is not marked for *env*.
+        FindingError: E824 when there is no such plan item or action, or the action is not marked for *env*; E803 when the
+            plan of the item has no ``milestone`` key (the at-deploy record needs it).
     """
     item = executed.plan_item_node(graph, address.item)
     if item is None:
@@ -152,6 +153,10 @@ def _action_target(graph: Graph, address: Address, env: str) -> ActionTarget:
     marked = executed.at_deploy_of(actions[0])
     if env not in marked:
         raise refusal("E824", f"{address} is {executed.at_deploy_state(actions[0])}, not for {env}; only an action marked at_deploy for the environment is attested with --env {env}")
+    if item.milestone is None:
+        raise FindingError(make_error(
+            "E803", f"plan {item.file} has no `milestone` key: add it with `specdev json patch <plan file> '.milestone' '\"<milestone-id>\"'`", subcode="MILESTONE_KEY_MISSING", node_id=item.id,
+        ))
     return ActionTarget(address, _text_of(actions[0]))
 
 
@@ -163,7 +168,8 @@ def plan_attest(graph: Graph, ids: Sequence[str], stage: str | None = None, env:
 
     Raises:
         FindingError: E824 for an id that is not attestable (unknown, a fixture that is not manual, a rule not enforced by
-            review, another kind of node, an action not marked ``at_deploy`` for *env*); E334 when a node's stage cannot be told.
+            review, another kind of node, an action not marked ``at_deploy`` for *env*); E334 when a node's stage cannot be told;
+            E803 when the plan of an action has no ``milestone`` key.
     """
     nodes: dict[str, NodeTarget] = {}
     actions: dict[str, ActionTarget] = {}

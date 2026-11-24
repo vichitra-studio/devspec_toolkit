@@ -99,6 +99,20 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
             errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_schema {schema_file} {exc}"))
             continue
         schema_contracts[step] = (schema_file, schema, schema_required, schema_props)
+        for prompt_path in _step_16_reference_prompts(prompt_dir, step):
+            schema_ref, schema_ref_line = _extract_schema_reference(prompt_path)
+            errors.extend(
+                _schema_reference_errors(
+                    prompt_path=prompt_path,
+                    line_no=schema_ref_line,
+                    schema_file=schema_file,
+                    schema=schema,
+                    schema_ref=schema_ref,
+                    registry_map=registry_map,
+                    registry_map_error=registry_map_error,
+                    repo_root=root,
+                )
+            )
         prompt_candidates = _prompt_candidates(prompt_dir, step)
         if not prompt_candidates:
             continue
@@ -169,6 +183,22 @@ def _load_contract(schema_path: str) -> tuple[list[str], dict[str, Any], dict[st
 
 def _prompt_candidates(prompt_dir: Path, step: str) -> list[str]:
     return sorted(glob.glob(str(prompt_dir / f"prompt_{step}_*.md")))
+
+
+def _step_16_reference_prompts(prompt_dir: Path, step: str) -> list[str]:
+    """The step-16 prompts whose Schema URI and Schema File are checked against the schema of *step*.
+
+    ``prompt_{step}_*.md`` does not find them: ``prompt_16_impl_context.md`` has the key ``16anchor``
+    (``_PROMPT_STEP_OVERRIDE``), and ``prompt_16a_*``, ``prompt_16b_*`` and ``prompt_16c_*`` have the key ``16``
+    (``_SUBSTEP_TO_BASE_SCHEMA``).
+    """
+    found: list[str] = []
+    for prompt_path in sorted(glob.glob(str(prompt_dir / "prompt_*.md"))):
+        name = Path(prompt_path).name
+        key = _PROMPT_STEP_OVERRIDE.get(name) or _SUBSTEP_TO_BASE_SCHEMA.get(_step_from_prompt_name(name) or "")
+        if key == step:
+            found.append(prompt_path)
+    return found
 
 
 def _extract_prompt_contract(prompt_path: str) -> tuple[list[str] | None, dict[str, object], dict[str, Any], int]:

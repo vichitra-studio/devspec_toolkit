@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -580,8 +581,9 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
 def check_t11_new_module_has_test(
     base_sha: str,
 ) -> list[dict[str, Any]]:
-    """T0-11: Every new tools/specdev_tools/**/*.py must have tests/**/test_<module>*.py."""
+    """T0-11: every new tools/specdev_tools/**/*.py has a test: tests/**/test_<module>*.py, or a test file that imports it."""
     findings: list[dict[str, Any]] = []
+    test_texts: list[str] | None = None
 
     # Find added Python files in tools/specdev_tools/
     diff_result = subprocess.run(
@@ -606,21 +608,37 @@ def check_t11_new_module_has_test(
         tests_dir = REPO_ROOT / "tests"
         pattern = f"test_{module_name}*.py"
         matches = list(tests_dir.rglob(pattern))
-        if not matches:
-            findings.append(_finding(
-                kind="coverage",
-                location=path,
-                message=(f"New module '{path}' introduced in this PR has no matching test file. "
-                         f"Expected pattern: tests/**/test_{module_name}*.py"),
-                severity="P1",
-                check_id="new-module-has-test",
-                catalog_tag="I8",
-                evidence=[
-                    f"New module introduced in this PR; no matching test file found under tests/",
-                    f"Expected pattern: tests/**/test_{module_name}*.py",
-                ],
-            ))
+        if matches:
+            continue
+        if test_texts is None:
+            test_texts = [p.read_text(encoding="utf-8", errors="replace") for p in tests_dir.rglob("*.py")]
+        if _imported_by_a_test(path, test_texts):
+            continue
+        findings.append(_finding(
+            kind="coverage",
+            location=path,
+            message=(f"New module '{path}' introduced in this PR has no matching test file and no test imports it. "
+                     f"Expected pattern: tests/**/test_{module_name}*.py"),
+            severity="P1",
+            check_id="new-module-has-test",
+            catalog_tag="I8",
+            evidence=[
+                f"New module introduced in this PR; no matching test file found under tests/ and no test imports it",
+                f"Expected pattern: tests/**/test_{module_name}*.py",
+            ],
+        ))
     return findings
+
+
+def _imported_by_a_test(module_path: str, test_texts: list[str]) -> bool:
+    """True when a test file names the dotted path of *module_path* or imports its last name from its package."""
+    parts = Path(module_path).with_suffix("").parts[1:]  # drop the leading "tools"
+    dotted = ".".join(parts)
+    package, name = ".".join(parts[:-1]), parts[-1]
+    wanted = rf"\b{re.escape(name)}\b"
+    from_import = re.compile(rf"from\s+{re.escape(package)}\s+import\s+(?:\([^)]*{wanted}|[^(\n]*{wanted})")
+    dotted_use = re.compile(rf"\b{re.escape(dotted)}\b")
+    return any(dotted_use.search(text) or from_import.search(text) for text in test_texts)
 
 
 # ---------------------------------------------------------------------------

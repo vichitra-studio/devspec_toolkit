@@ -171,7 +171,12 @@ def _check_target_patterns_and_scope(data: dict[str, Any], plan: dict[str, Any],
 
 
 def _load_doc_patterns(spec_path: Optional[str], spec_root: Optional[str], errors: list[SpecError]) -> Optional[list[str]]:
-    """The ``doc_paths`` of the host seed manifest; ``None`` (with a W570) when it is absent, unreadable or empty."""
+    """The ``doc_paths`` of the host seed manifest; ``None`` (with a W570) when it is absent, unreadable or empty.
+
+    With neither *spec_path* nor *spec_root* there is nowhere to look: ``None`` and no finding.
+    """
+    if not spec_path and spec_root is None:
+        return None
     manifest_path = _find_seed_manifest(spec_path, spec_root)
     if not manifest_path:
         errors.append(make_error("W570", "seed_manifest.json not found; cannot validate docs_impact doc paths."))

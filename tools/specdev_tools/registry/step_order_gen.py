@@ -1,6 +1,6 @@
 """Derive the step order from the ``x-node`` / ``x-link`` annotations (E-008a).
 
-``derive_step_order`` turns the link graph between kinds into a step DAG:
+``derive_from_decls`` turns the link graph between kinds into a step DAG:
 
 * a step is every step that owns at least one declared kind (``x-node.step``, else the
   numeric prefix of the schema file name; ``seed`` and other step-less kinds are not steps);
@@ -35,7 +35,6 @@ from specdev_tools.registry.annotations import (
     AnnotationError,
     LinkDecl,
     NodeDecl,
-    collect_annotations,
     lint_annotations,
 )
 
@@ -59,20 +58,6 @@ _NOTES = {
         "(producers that feed into this step) \u2014 kept redundant for O(1) lookup and consistency validation."
     ),
 }
-
-
-@dataclass(frozen=True)
-class Disagreement:
-    """One pair on which the derivation and the hand file differ.
-
-    ``kind`` is ``"missing_in_hand"`` (derivation requires ``consumer`` to read ``input``;
-    the hand file lacks it) or ``"extra_in_hand"`` (the hand file lists it; derivation does not
-    require it).
-    """
-
-    kind: str
-    consumer: str
-    input: str
 
 
 @dataclass(frozen=True)
@@ -305,52 +290,6 @@ def derive_from_decls(decls: AnnotationDecls, extra_edges: Iterable[Pair] = ()) 
             edges.setdefault((h, t), _Edge(h, t, "", "", ""))
     _check_acyclic(steps, edges)
     return _topo_order(steps, edges)
-
-
-def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[str, Any]:
-    """Derive ``steps``, ``step_metadata`` and ``downstream_consumers`` from the annotations.
-
-    ``extra_edges`` are ``(holder, target)`` step pairs counted as required edges.
-    Raises ``AnnotationError`` (ANNOT-20, ANNOT-21, or the annotation lint issues).
-    """
-    return derive_from_decls(collect_annotations(repo_root), extra_edges)
-
-
-def _input_pairs(doc: dict[str, Any]) -> set[Pair]:
-    """``(step, input)`` pairs listed under ``step_metadata[*].required_spec_inputs``."""
-    return {
-        (step, inp)
-        for step, meta in (doc.get("step_metadata") or {}).items()
-        for inp in (meta or {}).get("required_spec_inputs") or []
-    }
-
-
-def _hand_pairs(hand: dict[str, Any]) -> set[Pair]:
-    """Pairs of the hand file: its inputs plus the reverse of ``downstream_consumers``."""
-    reverse = {
-        (c, producer)
-        for producer, consumers in (hand.get("downstream_consumers") or {}).items()
-        for c in consumers or []
-    }
-    return _input_pairs(hand) | reverse
-
-
-def diff_against_hand(
-    generated: dict[str, Any],
-    hand: dict[str, Any],
-    extra_edges: Iterable[Pair] = (),
-) -> list[Disagreement]:
-    """Pairs the derivation requires and the hand file lacks, and the reverse.
-
-    Pairs named in ``extra_edges`` count as required and are never reported.
-    Result is sorted by (kind, consumer, input).
-    """
-    extras = set(_norm_pairs(extra_edges))
-    gen = _input_pairs(generated) | extras
-    old = _hand_pairs(hand)
-    out = [Disagreement("missing_in_hand", c, i) for c, i in gen - old - extras]
-    out += [Disagreement("extra_in_hand", c, i) for c, i in old - gen]
-    return sorted(out, key=lambda d: (d.kind, d.consumer, d.input))
 
 
 def declared_edge_pairs(hand: dict[str, Any]) -> list[Pair]:

@@ -84,7 +84,6 @@ class ParadigmShift:
     source_file: Path
     target_file: Path
     detected: bool = False              # Whether source exists and target missing
-    prompt_template: Optional[str] = None
 
 
 @dataclass
@@ -388,11 +387,8 @@ def compare_step_inventories(
             if step_id in rename_map:
                 continue  # Already handled above
             
-            # Check if it's a project-specific extension (e.g., ext_01_database.json).
-            # Per docs/developers/extension_schemas.md, extensions use ext_NN_<topic>.json
-            # naming. This branch catches user-created specs with a numeric step prefix
-            # (e.g., 02b_custom) that have no corresponding toolkit schema.
-            # Note: Extensions whose schema is in toolkit_ids are handled in the first loop above.
+            # A user-created spec whose step prefix carries a letter (e.g., 02b_custom) and
+            # that has no corresponding toolkit schema is a project-specific extension.
             if re.match(r"^\d{2}[a-z]_", step_id):
                 diffs.append(StepDiff(
                     step_id=step_id,
@@ -520,18 +516,16 @@ def detect_paradigm_shifts(
     
     # Check for common paradigm shifts
     paradigm_checks = [
-        # (source_file, target_file, description, prompt_template)
+        # (source_file, target_file, description)
         (
             project_root / "roadmap.md",
             spec_dir / "14_roadmap.json",
             "Prose roadmap converted to structured JSON",
-            "template_prose_to_json.md",
         ),
         (
             project_root / "docs" / "roadmap.md",
             spec_dir / "14_roadmap.json",
             "Prose roadmap converted to structured JSON",
-            "template_prose_to_json.md",
         ),
     ]
     
@@ -544,24 +538,19 @@ def detect_paradigm_shifts(
                 if source_exists and target_missing:
                     source_path = project_root / source_exists
                     target_path = project_root / target_missing
-                    prompt = None
-                    if change.migration:
-                        prompt = change.migration.prompt
                     paradigm_checks.append((
                         source_path,
                         target_path,
                         change.description or "Paradigm shift",
-                        prompt or "",
                     ))
     
-    for source, target, description, prompt in paradigm_checks:
+    for source, target, description in paradigm_checks:
         if source.exists() and not target.exists():
             shifts.append(ParadigmShift(
                 description=description,
                 source_file=source,
                 target_file=target,
                 detected=True,
-                prompt_template=prompt,
             ))
     
     return shifts

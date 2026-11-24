@@ -9,7 +9,6 @@ def validate_step_03(
     instance: Dict[str, Any],
     toolkit_root: str,
     nfrs_data: Optional[Dict[str, Any]] = None,
-    monitoring_data: Optional[Dict[str, Any]] = None
 ) -> list[SpecError]:
     """
     Validate Step 03 (Glossary) artifacts against deep logical constraints.
@@ -18,7 +17,6 @@ def validate_step_03(
         instance: The loaded JSON instance of the glossary.
         toolkit_root: Absolute path to the toolkit root.
         nfrs_data: Optional loaded NFRs data for coverage checking.
-        monitoring_data: Optional loaded monitoring data for unit consistency.
 
     Returns:
         List of SpecError objects. Empty list if valid.
@@ -58,7 +56,6 @@ def validate_step_03(
 
     # Check coverage against NFRs if provided
     nfrs_data = as_dict(nfrs_data)
-    monitoring_data = as_dict(monitoring_data)
     if 'nfrs' in nfrs_data:
         for nfr in dict_items(nfrs_data['nfrs']):
             metric_name = nfr.get('metric')
@@ -72,38 +69,5 @@ def validate_step_03(
                     units = term.get('units')
                     if not units:
                         errors.append(make_error("E520", f"NFR metric '{metric_name}' missing units in glossary"))
-
-    # Check unit consistency with monitoring data if provided
-    if 'metrics' in monitoring_data:
-        for metric in dict_items(monitoring_data['metrics']):
-            metric_name = metric.get('name')
-            expected_units = metric.get('units')
-
-            if isinstance(metric_name, str) and metric_name and expected_units:
-                if metric_name.lower() in term_lookup:
-                    term = term_lookup[metric_name.lower()]
-                    actual_units = term.get('units')
-                    if actual_units and actual_units != expected_units:
-                        errors.append(make_error("E520", f"Unit mismatch for '{metric_name}': expected '{expected_units}', got '{actual_units}'"))
-
-    # Optional dataset coverage: stage-specific NFR lists.
-    if "stage_nfrs" in nfrs_data:
-        for stage_data in dict_items(nfrs_data.get("stage_nfrs")):
-            for nfr in dict_items(stage_data.get("nfrs")):
-                metric_name = nfr.get("metric")
-                if isinstance(metric_name, str) and metric_name and metric_name.lower() not in term_lookup:
-                    errors.append(
-                        make_error("E590", f"Stage metric '{metric_name}' not found in glossary (stage={stage_data.get('stage', 'unknown')})")
-                    )
-
-    # Optional monitoring dataset coverage: dashboard widgets / alerts.
-    if "dashboards" in monitoring_data:
-        for dashboard in dict_items(monitoring_data.get("dashboards")):
-            for widget in dict_items(dashboard.get("widgets")):
-                metric_name = widget.get("metric")
-                if isinstance(metric_name, str) and metric_name and metric_name.lower() not in term_lookup:
-                    errors.append(
-                        make_error("E590", f"Dashboard metric '{metric_name}' not found in glossary (dashboard={dashboard.get('name', 'unknown')})")
-                    )
 
     return errors

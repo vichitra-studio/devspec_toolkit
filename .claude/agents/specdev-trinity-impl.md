@@ -45,6 +45,7 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json structure <file>` / `keys <file> '<path>'` / `schema <file> '<path>'` | Shape probes before composing a filter |
 | `specdev json read <file> '<filter>'` | Targeted plan reads |
 | `specdev json patch\|insert <plan> '.execution.emergent_ambiguities' '<value>'` | Open items only (section "Open items") |
+| `specdev json delete --id <amb-id> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Undo an open item you wrote in this dispatch with a wrong `about` (section "Open items"); no other id |
 | `ls`, `cat`, `head` | File inspection — no write side-effects |
 
 Network commands (`curl`, `wget`) are **banned** — network calls are non-deterministic and can
@@ -57,7 +58,7 @@ discipline"), never a silent edit.
 
 Edit/Write are scoped to code files matching `target_file_patterns`. Never use them on a file
 under `spec/`; never use `specdev json patch|insert|delete` on a spec file, and on the plan only
-the open-item forms below.
+the open-item forms of the table above (section "Open items" shows each).
 
 Read spec content with the pack, `specdev node show` and `specdev json read`, never with the
 Read tool. Seed documents are not read in this phase: the pack replaces them.
@@ -65,6 +66,8 @@ Read tool. Seed documents are not read in this phase: the pack replaces them.
 Flag discipline:
 - `specdev json` subcommands (`read`, `structure`, `keys`, `schema`, `patch`, `insert`): pass
   `--repo-root` only (the CLI strips the other two roots from these).
+- `specdev json delete --id <amb-id>`: pass all three flags (the id form finds the item through the
+  graph of the spec).
 - `spec-check`, `plan record`, `verify run`, `trace`, `node show`: pass all three flags —
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
 
@@ -260,7 +263,8 @@ specdev json insert <plan> '.execution.emergent_ambiguities' '<item>'
   `about` names spec nodes the question concerns (the criterion the item realises, its task, an
   API), found with `specdev trace --recipe 16b <group_id>` or `specdev node show`. Never name a
   plan item: the write succeeds, then `spec-check` reports E702; undo it (and only it) with
-  `specdev json delete --id <amb-id>` and write the item again.
+  `specdev json delete --id <amb-id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
+  and write the item again.
   Describe the item in words and put no node id in the text.
 - Never patch `.execution` itself: it holds the records `specdev plan record` wrote.
 - An open item about a node of an item's chain blocks that item: stop on it, say so in the return,

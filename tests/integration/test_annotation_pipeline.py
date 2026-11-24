@@ -13,9 +13,9 @@ import pytest
 
 from specdev_tools.core.entry_key_registry import iter_nodes
 from specdev_tools.core.registry import clear_shared_caches
-from specdev_tools.registry.annotations import AnnotationError
+from specdev_tools.registry.annotations import AnnotationError, collect_annotations
 from specdev_tools.registry.generate import generate_registry
-from specdev_tools.registry.step_order_gen import derive_step_order
+from specdev_tools.registry.step_order_gen import derive_from_decls
 
 _ROOT = Path(__file__).parents[2]
 _FIX = _ROOT / "tests" / "fixtures" / "graph"
@@ -102,7 +102,7 @@ def test_shared_node_and_plan_item_shapes(pipeline):
 
 def test_derived_step_order(pipeline):
     root, _, _ = pipeline
-    d = derive_step_order(str(root))
+    d = derive_from_decls(collect_annotations(str(root)))
     meta = {s: m["required_spec_inputs"] for s, m in d["step_metadata"].items()}
     assert meta["01"] == []
     assert meta["04"] == ["01"]  # 01 -> 04
@@ -121,7 +121,7 @@ def test_cycle_between_04_and_05_fails_annot_20(tmp_path):
 
     _edit(root, "schema/04_fr_list.schema.json", wrong)
     with pytest.raises(AnnotationError) as ei:
-        derive_step_order(str(root))
+        derive_from_decls(collect_annotations(str(root)))
     (issue,) = [i for i in ei.value.issues if i.startswith("ANNOT-20")]
     assert "04 -> 05 -> 04" in issue
 

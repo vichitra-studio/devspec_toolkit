@@ -121,7 +121,7 @@ changes:
   - type: remove_validator
     description: >
       Link-existence checks are removed from the step validators of 01
-      (capability to component; validate_step_01 now returns no errors), 02
+      (capability to component), 02
       (connection endpoints) and 05 (API to requirement, with its W590 for a
       missing step 04 file). They are replaced by the graph check of
       spec-check (E700 to E703); a single-file specdev validate of those files
@@ -131,6 +131,13 @@ changes:
       stays; it now reads component derives_from and exempts capabilities
       whose scope is later or out. Other content checks stay, for example the
       duplicate method and route check of step 05 (E520).
+      Three validator modules are deleted: validation/validators/step_01.py
+      (the capability-to-component check), validation/validators/step_02a.py
+      (an E520 for a duplicate ci_gates entry; a gate is a node with a
+      gate_id, and a duplicate id is E704) and
+      validation/validators/step_16b.py (E520 checks of
+      execution.execution_results, a removed plan field; a plan file is
+      checked by the 16a and 16c validators).
     migration:
       action: none
 
@@ -188,7 +195,10 @@ changes:
       schema's own top-level required, properties and additionalProperties, while
       the step schemas keep most or all of their properties under allOf, so they
       miss the changes below, top-level ones included (align diff reports a 1.1.1
-      file of step 07, 08, 11 or 14 as OK). specdev update does not rely on that
+      file of step 07, 08, 11 or 14 as OK). The module migration/planner.py,
+      which ordered such differences into a plan of template steps, is deleted;
+      align apply --auto runs the migration scripts of
+      migration/scripts/v1_2_0/. specdev update does not rely on that
       comparison alone: it does not re-stamp spec/specdev_version on a spec that
       needs a migration, and prints the commands to run instead.
     migration:
@@ -1131,6 +1141,7 @@ changes:
       for the role-rule findings (E740 to E745) and broken links". The
       spec-check checks traceability-closure and completeness-check are gone
       from the summary, and validate-all no longer raises E535, E536 or E560.
+      The module validation/traceability_closure.py is deleted.
       The codes E535, E536, E560, E561, E562, E563, E564, E565, E568, E569,
       E575, E576, W561, W562, W563, W564, W565, W568, W569, W575 and W576 are
       removed from the registry and the catalogue; together with the codes of

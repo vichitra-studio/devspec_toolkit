@@ -554,11 +554,12 @@ def _is_valid_semver(version: str) -> bool:
     return bool(re.match(pattern, version))
 
 
-def _parse_semver(version: str) -> Tuple[int, int, int, str]:
+def _parse_semver(version: str) -> Tuple[int, int, int, int, str]:
     """Parse semantic version into comparable tuple.
-    
-    Returns tuple of (major, minor, patch, prerelease).
-    Prerelease is empty string for release versions.
+
+    Returns tuple of (major, minor, patch, is_release, prerelease).
+    is_release is 0 for a prerelease and 1 for a release, so a prerelease
+    sorts before its release. Prerelease is empty string for release versions.
     """
     # Handle prerelease suffix
     prerelease = ""
@@ -570,9 +571,4 @@ def _parse_semver(version: str) -> Tuple[int, int, int, str]:
     minor = int(parts[1]) if len(parts) > 1 else 0
     patch = int(parts[2]) if len(parts) > 2 else 0
     
-    # Prerelease versions sort before release versions
-    # Using '~' prefix for prereleases makes them sort before empty string
-    if prerelease:
-        prerelease = "~" + prerelease
-    
-    return (major, minor, patch, prerelease)
+    return (major, minor, patch, 0 if prerelease else 1, prerelease)

@@ -119,7 +119,7 @@ def _scan_spec_dir(
     if not os.path.isdir(spec_dir):
         return None
 
-    for fn in os.listdir(spec_dir):
+    for fn in sorted(os.listdir(spec_dir)):
         if fn.startswith(f"{step_prefix}_") and fn.endswith(".json"):
             path = os.path.join(spec_dir, fn)
             try:

@@ -14,7 +14,7 @@ from specdev_tools.lifecycle.attest import attest, attestation_id, plan_attest, 
 from specdev_tools.proof.proof import PROVEN, UNPROVEN, proof, proof_errors, verifier_proof
 from specdev_tools.verify.records import attestations_about, evidence_id, install_check_id, records_folder, write_evidence
 from unit.graph._synth import ROOT
-from unit.lifecycle._record_support import AUTHOR, ITEM, action, author, plan_host, roots
+from unit.lifecycle._record_support import AUTHOR, ITEM, PLAN, action, author, plan_host, roots
 from unit.proof._support import CRITERION, FIXTURE, INVARIANT, NFR, OTHER_FIXTURE, add_fixture, binding_item, context, edit_code, host_with, run
 from unit.trace._lock_support import run_on_example
 from unit.verify._support import commit_all, edit_doc, graph_of
@@ -286,6 +286,15 @@ def test_a_node_and_an_action_in_one_command_write_both(tmp_path: Path) -> None:
     code, output = _attest(host, REVIEW_RULE, f"{ITEM}/a02", "--env", "staging")
     assert code == 0, output
     assert _evidence_names(host) == [f"{attestation_id(REVIEW_RULE)}.json"] and _dep_files(host) == ["dep-0001.json"]
+
+
+def test_an_action_of_a_plan_without_a_milestone_key_is_e803_and_nothing_is_written(tmp_path: Path) -> None:
+    host = _deploy_host(tmp_path)
+    edit_doc(host, PLAN, lambda document: document.pop("milestone"))
+    commit_all(host, "plan without a milestone key")
+    code, output = _attest(host, REVIEW_RULE, f"{ITEM}/a02", "--env", "staging")
+    assert code == 1 and output.startswith("E803"), output
+    assert _dep_files(host) == [] and _evidence_names(host) == []
 
 
 @pytest.mark.parametrize("argv", [(f"{ITEM}/a02",), (REVIEW_RULE, "--env", "staging")])

@@ -4,6 +4,7 @@ Created by FIX-047 (Batch 5).
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import shutil
 from pathlib import Path
@@ -375,6 +376,9 @@ class TestDetectParadigmShifts:
         shifts = detect_paradigm_shifts(spec_dir, tmp_path)
         detected = [s for s in shifts if s.detected]
         assert detected == []
+
+    def test_a_shift_names_no_prompt_template(self):
+        assert [f.name for f in dataclasses.fields(ParadigmShift)] == ["description", "source_file", "target_file", "detected"]
 
 
 # ---------------------------------------------------------------------------

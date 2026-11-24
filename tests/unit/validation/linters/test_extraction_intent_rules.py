@@ -648,6 +648,20 @@ class TestExtractionIntentCheck(unittest.TestCase):
         skipped = [path.name for path in with_section if parse_extraction_intent(path) is None]
         self.assertEqual(skipped, [])
 
+    def test_a_level_one_heading_ends_the_section(self):
+        """An entry after a ``# `` heading is not extraction intent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "prompt_04_x.md"
+            path.write_text(
+                "## Extraction Intent\n\n"
+                "- **00_charter.json**: the goals and the scope boundaries of the project\n\n"
+                "# Operating Flow\n\n"
+                "- **01_capabilities.json**: the capability list read while the step is written\n",
+                encoding="utf-8",
+            )
+            parsed = parse_extraction_intent(path)
+        self.assertEqual(sorted(parsed.step_entries), ["00"])
+
     def test_no_e597_on_the_toolkit_prompts(self):
         """On the generated step order every prompt of the toolkit has an entry for each required input."""
         repo_root = str(Path(__file__).resolve().parents[4])

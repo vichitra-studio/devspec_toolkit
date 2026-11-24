@@ -14,15 +14,13 @@ from specdev_tools.registry.annotations import (
     AnnotationError,
     LinkDecl,
     NodeDecl,
+    collect_annotations,
 )
 from specdev_tools.registry.generate import run as registry_run
 from specdev_tools.registry.step_order_gen import (
-    Disagreement,
     StepOrderError,
     build_step_order_document,
     derive_from_decls,
-    derive_step_order,
-    diff_against_hand,
 )
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -90,7 +88,7 @@ def _toolkit(tmp_path: Path, nodes: list[tuple]) -> Path:
 
 def _derive(root: Path, extra_edges=()):
     clear_shared_caches()
-    return derive_step_order(str(root), extra_edges)
+    return derive_from_decls(collect_annotations(str(root)), extra_edges)
 
 
 def _N(step, kind, links=(), role="obligation-system"):
@@ -217,36 +215,12 @@ def test_deterministic_and_ties_by_step_id(tmp_path):
     assert json.dumps(d1, sort_keys=True) == json.dumps(d2, sort_keys=True)
 
 
-def test_extra_edge_shapes_order_and_is_not_a_disagreement(tmp_path):
+def test_extra_edge_shapes_order(tmp_path):
     root = _toolkit(tmp_path, [_N("04", "fr"), _N("05", "api")])
     assert _derive(root)["steps"] == ["04", "05"]
     d = _derive(root, extra_edges=[("04", "05")])
     assert d["steps"] == ["05", "04"]
     assert d["step_metadata"]["04"]["required_spec_inputs"] == ["05"]
-    hand = {"step_metadata": {"04": {"required_spec_inputs": []}, "05": {"required_spec_inputs": []}}}
-    assert diff_against_hand(d, hand, extra_edges=[("04", "05")]) == []
-    assert diff_against_hand(d, hand) == [Disagreement("missing_in_hand", "04", "05")]
-
-
-def test_diff_against_hand_reports_planted_disagreements():
-    generated = {
-        "step_metadata": {
-            "01": {"required_spec_inputs": []},
-            "04": {"required_spec_inputs": ["01"]},
-            "05": {"required_spec_inputs": ["04", "01"]},
-        }
-    }
-    hand = {
-        "step_metadata": {
-            "04": {"required_spec_inputs": ["01"]},
-            "05": {"required_spec_inputs": ["04", "03"]},
-        },
-        "downstream_consumers": {"04": ["05"]},
-    }
-    assert diff_against_hand(generated, hand) == [
-        Disagreement("extra_in_hand", "05", "03"),
-        Disagreement("missing_in_hand", "05", "01"),
-    ]
 
 
 def test_toolkit_without_kinds_derives_no_steps(tmp_path):

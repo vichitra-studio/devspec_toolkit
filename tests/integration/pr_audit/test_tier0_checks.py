@@ -216,3 +216,30 @@ def test_t10_clean_tree_test_skips_when_specdev_is_not_found():
     with patch("subprocess.run", return_value=not_found), pytest.raises(pytest.skip.Exception):
         test_t10_clean_tree_has_no_generator_drift()
 
+
+
+@pytest.mark.parametrize(
+    "test_text",
+    [
+        "import specdev_tools.trace.lockfile as lockfile\n",
+        "from specdev_tools.trace.lockfile import read_lock\n",
+        "from specdev_tools.trace import lockfile\n",
+        "from specdev_tools.trace import (\n    attest,\n    lockfile,\n)\n",
+    ],
+)
+def test_t11_accepts_a_module_that_a_test_imports(test_text):
+    """A new module needs no ``test_<module>*.py`` when a test file imports it."""
+    assert _tier0._imported_by_a_test("tools/specdev_tools/trace/lockfile.py", [test_text])
+
+
+@pytest.mark.parametrize(
+    "test_text",
+    [
+        "from specdev_tools.trace import attest\n",
+        "from specdev_tools.graph import lockfile\n",
+        "lockfile = 'a word in a test, not an import'\n",
+    ],
+)
+def test_t11_does_not_accept_a_module_that_no_test_imports(test_text):
+    """Another module of the package, the same name in another package and a bare word are not an import."""
+    assert not _tier0._imported_by_a_test("tools/specdev_tools/trace/lockfile.py", [test_text])

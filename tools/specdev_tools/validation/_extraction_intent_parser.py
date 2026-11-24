@@ -107,7 +107,7 @@ def parse_extraction_intent(prompt_path: Path) -> ParsedIntent | None:
         line = lines[i]
         stripped = line.strip()
         # A level-two section keeps its ### subsections; a level-three section stops at the next ###
-        if stripped.startswith("## ") or (
+        if stripped.startswith(("# ", "## ")) or (
             header_level == 3 and stripped.startswith("### ") and i > intent_start
         ):
             break

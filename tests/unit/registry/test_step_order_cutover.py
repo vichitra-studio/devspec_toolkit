@@ -16,12 +16,12 @@ from pathlib import Path
 import pytest
 
 from specdev_tools.core.registry import clear_shared_caches
+from specdev_tools.registry.annotations import collect_annotations
 from specdev_tools.registry.generate import run as registry_run
 from specdev_tools.registry.step_order_gen import (
     build_step_order_document,
     declared_edge_pairs,
-    derive_step_order,
-    diff_against_hand,
+    derive_from_decls,
 )
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -103,12 +103,27 @@ def _generate(out: Path) -> bytes:
     return out.read_bytes()
 
 
-def _computed_diff() -> list:
-    committed = _load(_COMMITTED)
-    declared = declared_edge_pairs(committed)
+def _derive(declared: list) -> dict:
     clear_shared_caches()
-    derived = derive_step_order(str(_ROOT), declared)
-    return diff_against_hand(derived, _load(_FIXTURE_1_1_1), declared)
+    return derive_from_decls(collect_annotations(str(_ROOT)), declared)
+
+
+def _input_pairs(doc: dict) -> set:
+    """``(step, input)`` pairs listed under ``step_metadata[*].required_spec_inputs``."""
+    return {(step, inp) for step, meta in doc.get("step_metadata", {}).items() for inp in meta.get("required_spec_inputs", [])}
+
+
+def _computed_diff() -> tuple[set, set]:
+    """The pairs the derivation requires and the 1.1.1 hand file lacks, and the reverse.
+
+    A pair of the hand file is an input or the reverse of a ``downstream_consumers`` entry; a declared edge counts
+    as required and is never an added pair.
+    """
+    declared = declared_edge_pairs(_load(_COMMITTED))
+    hand = _load(_FIXTURE_1_1_1)
+    required = _input_pairs(_derive(declared)) | set(declared)
+    listed = _input_pairs(hand) | {(c, producer) for producer, consumers in hand.get("downstream_consumers", {}).items() for c in consumers}
+    return required - listed - set(declared), listed - required
 
 
 def test_registry_generate_step_order_is_byte_deterministic(tmp_path):
@@ -121,8 +136,7 @@ def test_steps_is_topological_order_of_derived_plus_declared_edges():
     doc = _load(_COMMITTED)
     position = {s: i for i, s in enumerate(doc["steps"])}
     declared = declared_edge_pairs(doc)
-    clear_shared_caches()
-    derived = derive_step_order(str(_ROOT), declared)
+    derived = _derive(declared)
     pairs = {(c, p) for c, meta in derived["step_metadata"].items() for p in meta["required_spec_inputs"]}
     assert pairs >= set(declared)
     assert [(c, p) for c, p in sorted(pairs) if position[p] >= position[c]] == []
@@ -130,19 +144,16 @@ def test_steps_is_topological_order_of_derived_plus_declared_edges():
 
 def test_steps_contains_every_derived_step():
     doc = _load(_COMMITTED)
-    clear_shared_caches()
-    derived = derive_step_order(str(_ROOT), declared_edge_pairs(doc))
+    derived = _derive(declared_edge_pairs(doc))
     assert set(derived["steps"]) <= set(doc["steps"])
     assert set(doc["step_metadata"]) == set(doc["downstream_consumers"]) == set(doc["steps"])
 
 
 def test_expected_diff_list_is_pinned():
-    diff = _computed_diff()
-    added = {(d.consumer, d.input) for d in diff if d.kind == "missing_in_hand"}
-    removed = {(d.consumer, d.input) for d in diff if d.kind == "extra_in_hand"}
+    added, removed = _computed_diff()
     assert added == set(_ADDED_EDGES)
     assert removed == _REMOVED_EDGES
-    assert (len(added), len(removed), len(diff)) == (15, 38, 53)
+    assert (len(added), len(removed)) == (15, 38)
 
 
 def test_w595_narrowing_lists_consumers_that_lose_a_context_read():

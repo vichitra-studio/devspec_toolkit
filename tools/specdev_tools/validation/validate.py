@@ -409,21 +409,6 @@ def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
     return None
 
 
-def _load_monitoring_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
-    """Load full monitoring data dict for step_03 cross-ref validation (AUDIT-019)."""
-    for prefix in ("16",):
-        artifact_dir = os.path.dirname(file_path) if file_path else ""
-        for d in (artifact_dir, os.path.join(repo_root, "spec")):
-            if not d or not os.path.isdir(d):
-                continue
-            for fn in os.listdir(d):
-                if fn.startswith(f"{prefix}_") and fn.endswith(".json"):
-                    data = load_json_artifact(os.path.join(d, fn))
-                    if data:
-                        return data
-    return None
-
-
 def _build_validation_context(
     repo_root: str,
     path: str,
@@ -437,7 +422,6 @@ def _build_validation_context(
         "artifact_path": path,
         "spec_root": effective_spec_root,
         "nfrs_data": _load_nfrs_data(repo_root, path),
-        "monitoring_data": _load_monitoring_data(repo_root, path),
     }
 
 
@@ -454,7 +438,6 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
         instance,
         root,
         ctx.get("nfrs_data"),
-        ctx.get("monitoring_data"),
     ),
     "04": lambda instance, root, ctx: step_04.validate_step_04(instance, root, ctx.get("spec_root")),
     "05": lambda instance, root, ctx: step_05.validate_step_05(instance, root, ctx.get("spec_root")),

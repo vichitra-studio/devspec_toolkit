@@ -24,7 +24,6 @@ from specdev_tools.core.registry import SchemaRegistry, clear_shared_caches
 from specdev_tools.registry.annotation_scan import scan_annotations
 from specdev_tools.registry.annotations import SchemaRefs
 from specdev_tools.registry import generate as generate_mod
-from specdev_tools.registry import step_order_gen
 from specdev_tools.registry.generate import _serialize, generate_registry
 from specdev_tools.validation.registry_check import run_registry_check
 
@@ -672,8 +671,7 @@ def test_run_collects_annotations_once_with_step_order_out(tmp_path, monkeypatch
     calls = []
     real = generate_mod.collect_annotations
     counting = lambda r: calls.append(r) or real(r)  # noqa: E731
-    for module in (generate_mod, step_order_gen):
-        monkeypatch.setattr(module, "collect_annotations", counting)
+    monkeypatch.setattr(generate_mod, "collect_annotations", counting)
     clear_shared_caches()
     generate_mod.run(
         str(root), str(tmp_path / "r.json"), str(tmp_path / "e.json"),

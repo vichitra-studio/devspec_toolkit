@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from ..graph.model import Graph
 
 
-PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|XXX|placeholder|<[^>]+>)\b", re.IGNORECASE)
+PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|XXX|placeholder)\b", re.IGNORECASE)
 STEP_ARTIFACT_RE = re.compile(r"^\d{2}[a-z]?_[a-z0-9_]+\.json$")
 ASSUMPTION_ID_RE = re.compile(r"\b((?:fr|api|cap|nfr|inv|fix|comp|job|step|role|env|unit|stage|owner|trace|gov)-[a-z0-9]+(?:-[a-z0-9]+)*)\b")
 # Spec baseline: few|some|many|several|various — extended with safe additions: fast|reliable|easy|hard|quick

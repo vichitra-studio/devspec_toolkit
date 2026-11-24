@@ -13,7 +13,7 @@ def _render(errors):
 
 
 class Step0310Tests(unittest.TestCase):
-    def test_step_03_optional_dataset_checks(self):
+    def test_step_03_reads_the_nfr_metrics_and_no_other_key(self):
         errs = validate_step_03(
             {
                 "terms": [
@@ -21,10 +21,9 @@ class Step0310Tests(unittest.TestCase):
                 ]
             },
             ".",
-            nfrs_data={"stage_nfrs": [{"stage": "prod", "nfrs": [{"metric": "Error Rate"}]}]},
-            monitoring_data={"dashboards": [{"name": "api", "widgets": [{"metric": "Error Rate"}]}]},
+            nfrs_data={"nfrs": [{"metric": "Error Rate"}], "other": [{"nfrs": [{"metric": "Throughput"}]}]},
         )
-        self.assertTrue(any("not found in glossary" in e for e in _render(errs)))
+        self.assertEqual(["NFR metric 'Error Rate' not found in glossary"], [e.message for e in errs])
 
     def test_step04_accepts_valid_fr_with_trace(self):
         """Validate that FR items with non-empty trace array pass validation."""

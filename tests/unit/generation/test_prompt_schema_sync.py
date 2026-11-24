@@ -573,6 +573,50 @@ class PromptSchemaSyncTests(unittest.TestCase):
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("schema_uri_mismatch" in e for e in render_errors(errs)))
 
+    def test_detects_schema_reference_mismatch_in_the_step_16_prompts(self):
+        """The Schema URI and Schema File of the anchor prompt and of the 16a, 16b and 16c prompts are checked."""
+        anchor = ("vc:16-anchor", "schema/16_anchor.schema.json")
+        plan = ("vc:16-impl-context", "schema/16_impl_context.schema.json")
+        prompts = {
+            "prompt_16_impl_context.md": anchor,
+            "prompt_16a_impl_planner.md": plan,
+            "prompt_16b_impl_coder.md": plan,
+            "prompt_16c_impl_reviewer.md": plan,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for folder in ("tools", "schema", "prompts"):
+                (root / folder).mkdir()
+            (root / "tools" / "schema_registry.json").write_text(json.dumps(dict([anchor, plan])), encoding="utf-8")
+            draft = "https://json-schema.org/draft/2020-12/schema"
+            for uri, rel in (anchor, plan):
+                (root / rel).write_text(
+                    json.dumps({"$schema": draft, "$id": uri, "type": "object", "properties": {}, "required": []}),
+                    encoding="utf-8",
+                )
+
+            def reference_errors(cited: dict[str, tuple[str, str]]) -> list[str]:
+                for name, (uri, rel) in cited.items():
+                    (root / "prompts" / name).write_text(
+                        "# Schema Reference\n"
+                        f"- Schema URI: {uri}\n"
+                        f"- Schema File: {rel}\n\n"
+                        "# Output Contract\n"
+                        "```json\n"
+                        f"{{\"$schema\": \"{prompts[name][0]}\"}}\n"
+                        "```\n",
+                        encoding="utf-8",
+                    )
+                rendered = render_errors(run_prompt_schema_sync(str(root)))
+                return [e for e in rendered if "schema_uri_mismatch" in e or "schema_file_mismatch" in e or "schema reference" in e]
+
+            self.assertEqual(reference_errors(prompts), [])
+            swapped = {name: (plan if cited == anchor else anchor) for name, cited in prompts.items()}
+            errs = reference_errors(swapped)
+            for name in prompts:
+                self.assertTrue(any(name in e and "schema_uri_mismatch" in e for e in errs), f"{name}: {errs}")
+                self.assertTrue(any(name in e and "schema_file_mismatch" in e for e in errs), f"{name}: {errs}")
+
     def test_step_from_prompt_name_returns_substep_id(self):
         """_step_from_prompt_name should return '16a', not '16'."""
         from specdev_tools.generation.prompt_schema_sync import _step_from_prompt_name

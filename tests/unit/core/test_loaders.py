@@ -5,6 +5,7 @@ Created by FIX-043 (Batch 5).
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -164,8 +165,8 @@ class TestLoadUpstreamIds:
         result = load_upstream_ids(tmp_path, "04", "requirements", "fr_id")
         assert result == {"fr-a"}
 
-    def test_multiple_files_takes_first(self, tmp_path):
-        """Only the first matching file is read (os.listdir order may vary)."""
+    def test_multiple_files_takes_first_by_name(self, tmp_path, monkeypatch):
+        """Only the first matching file by name is read, whatever order the directory lists them in."""
         spec = tmp_path / "spec"
         spec.mkdir()
         (spec / "04_a.json").write_text(
@@ -176,10 +177,9 @@ class TestLoadUpstreamIds:
             json.dumps({"items": [{"id": "b"}]}),
             encoding="utf-8",
         )
-        result = load_upstream_ids(tmp_path, "04", "items", "id")
-        assert result is not None
-        # Should have found one of the files
-        assert len(result) == 1
+        real_listdir = os.listdir
+        monkeypatch.setattr(os, "listdir", lambda path: sorted(real_listdir(path), reverse=True))
+        assert load_upstream_ids(tmp_path, "04", "items", "id") == {"a"}
 
     def test_spec_root_fallback_used_when_toolkit_spec_missing(self, tmp_path):
         """spec_root is consulted when toolkit spec/ has no matching file."""

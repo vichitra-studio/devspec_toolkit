@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specdev_tools.validation.validators.step_16 import _find_seed_manifest
+from specdev_tools.validation.validators.step_16 import _find_seed_manifest, validate_step_16
 from specdev_tools.validation.validators.step_16a import validate_step_16a
 
 
@@ -180,6 +180,11 @@ class TestStep16aFeedbackLoop(unittest.TestCase):
         codes_with_path = {e.code for e in errors_with_path}
         self.assertIn("W584", codes_no_path)
         self.assertIn("W584", codes_with_path)
+
+
+def test_no_w570_for_the_seed_manifest_without_spec_path_and_spec_root(tmp_path):
+    assert [e.code for e in validate_step_16({}, ".")] == []
+    assert [e.code for e in validate_step_16({}, ".", spec_root=str(tmp_path))] == ["W570"]
 
 
 class TestFindSeedManifest(unittest.TestCase):

@@ -98,8 +98,8 @@ Execute this rule against the gathered evidence:
    - Assign one reviewer covering the whole range (a range of one step too).
    - `scope_kind` = `step_range`.
 
-3. Cross-step concerns (`with_backlog` true, backlog or pending-replay data present) OR any
-   `cross_step_relational` need:
+3. Cross-step concerns: `with_backlog` is true, or `specdev upstream-backlog` lists an open item
+   about a node of an in-scope step:
    - Always add exactly ONE additional reviewer with `scope_kind` = `cross_step_relational`
      covering all in-scope steps.
    - This reviewer is the consumer of `--with-backlog` output (`specdev upstream-backlog --json`
@@ -110,7 +110,7 @@ Execute this rule against the gathered evidence:
    - Assign exactly one reviewer covering the plan artifact.
    - `scope_kind` = `plan_artifact`.
    - Step-counting and byte-threshold rules (branches 1–2) do not apply.
-   - Cross-step concerns (branch 3) do not apply unless explicitly flagged.
+   - Cross-step concerns (branch 3) apply only when `with_backlog` is true.
 
 The 80% / 30% / 3-step thresholds are starting estimates. They may be exposed as env vars
 after calibration; no env var names have been committed yet. These thresholds are

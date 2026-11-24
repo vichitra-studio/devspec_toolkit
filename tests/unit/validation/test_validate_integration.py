@@ -245,7 +245,6 @@ class ValidateIntegrationTests(unittest.TestCase):
             context = {
                 "artifact_path": artifact_path,
                 "nfrs_data": {"nfrs": []},
-                "monitoring_data": {"metrics": []},
             }
             with patch("specdev_tools.validation.validate._build_validation_context", return_value=context) as p_ctx, patch(
                 "specdev_tools.validation.validate.step_02.validate_step_02",
@@ -267,7 +266,6 @@ class ValidateIntegrationTests(unittest.TestCase):
             context = {
                 "artifact_path": artifact_path,
                 "nfrs_data": None,
-                "monitoring_data": None,
             }
             with patch("specdev_tools.validation.validate._build_validation_context", return_value=context) as p_ctx, patch(
                 "specdev_tools.validation.validate.step_02.validate_step_02",
