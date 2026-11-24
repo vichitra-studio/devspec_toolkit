@@ -53,10 +53,10 @@ def no_identity(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 def action(action_id: str, kind: str = "file_edit", **fields: Any) -> dict[str, Any]:
-    """A plan action: a ``file_edit`` of ``src/hello.txt`` unless *kind* and *fields* say otherwise."""
+    """A plan action: a ``file_edit`` of the file the plan of the worked example covers, unless *kind* and *fields* say otherwise."""
     body: dict[str, Any] = {"id": action_id, "type": kind, "description": f"Action {action_id}."}
     if kind in ("file_edit", "file_create"):
-        body["target"] = "src/hello.txt"
+        body["target"] = "src/routes/password-resets/confirm.ts"
     return {**body, **fields}
 
 

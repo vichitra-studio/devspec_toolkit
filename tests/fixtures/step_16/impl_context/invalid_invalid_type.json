@@ -14,7 +14,8 @@
         "extras"
       ],
       "target_file_patterns": [
-        "src/main.py"
+        "src/main.py",
+        "src/auth.py"
       ]
     },
     "spec_alignment": {

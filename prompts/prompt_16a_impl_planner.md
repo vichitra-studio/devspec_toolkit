@@ -123,7 +123,7 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `functional_summary`: A 1-paragraph summary of what this step accomplishes in the global architecture. Tightly anchor the step in the global architecture and local sub-threads.
 *   `scope_in`: List explicit concerns that are IN scope.
 *   `scope_out`: List explicit concerns that are OUT of scope.
-*   `target_file_patterns`: List **ALL** likely files that will be modified.
+*   `target_file_patterns`: List **ALL** likely files that will be modified. The `target` of every `file_create` and `file_edit` action must match one of these patterns or be listed in `milestone_supporting_files`; `spec-check` reports E520 for a target outside them.
     *   *Rule*: Use glob patterns (e.g. `src/auth/*.py`).
     *   *Expectation*: If a file is not matched here, the coder is forbidden from touching it.
 *   `milestone_supporting_files` (optional): Array of file paths that span multiple checklist items (READMEs, shared fixtures, build config, cross-cutting e2e specs). Files listed here are exempt from per-checklist-item scope tracking (W603). Use sparingly — prefer pinning files to a specific checklist item when possible.

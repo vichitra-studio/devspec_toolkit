@@ -16,6 +16,7 @@
             ],
             "target_file_patterns": [
                 "src/reservations.ts",
+                "src/desk_flow.ts",
                 "tests/reservations.test.ts"
             ]
         },

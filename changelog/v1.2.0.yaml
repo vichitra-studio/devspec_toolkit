@@ -500,6 +500,23 @@ changes:
     migration:
       action: none
 
+  - type: change_config
+    description: >
+      Step 16 plan (16_impl_context): specdev spec-check and specdev validate
+      report E520 when the target of a file_create or file_edit action matches
+      no pattern of plan.summary.target_file_patterns and is not listed in
+      plan.summary.milestone_supporting_files (Action 'a02' of plan item
+      'PWRESET_CONFIRM_01' targets 'src/auth/session.ts', which
+      plan.summary.target_file_patterns does not cover). The 1.1.1 check
+      compared the files an item listed in implementation.files_touched once the
+      item was in progress; the 1.2.0 loop does not write that list, so the
+      plan's own actions are compared, when the plan is written. The plan of a
+      milestone closed by a migration is exempt. Add a pattern for the path, or
+      change the action. Shown by specdev spec-check spec --repo-root
+      ./devspec_toolkit --spec-root ./spec --git-root ., which lists the E520.
+    migration:
+      action: none
+
   - type: change_schema
     description: >
       While a host migrates it meets these states: the 21 migration templates

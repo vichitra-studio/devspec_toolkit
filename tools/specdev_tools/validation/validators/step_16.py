@@ -170,6 +170,37 @@ def _check_target_patterns_and_scope(data: dict[str, Any], plan: dict[str, Any],
             errors.append(make_error("E520", f"File '{f}' is touched by implementation but not covered by target_file_patterns."))
 
 
+def _check_action_targets(plan: dict[str, Any], checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
+    """E520: the target of a ``file_create`` or ``file_edit`` action lies outside the plan's own file boundary.
+
+    The boundary is ``plan.summary.target_file_patterns`` and the files of ``plan.summary.milestone_supporting_files``.
+    """
+    summary = as_dict(plan.get("summary"))
+    patterns = str_items(summary.get("target_file_patterns"))
+    supporting = {_norm_path(f) for f in str_items(summary.get("milestone_supporting_files"))}
+    for item in checklist:
+        for action in dict_items(as_dict(item.get("implementation")).get("actions")):
+            target = action.get("target")
+            if action.get("type") not in ("file_create", "file_edit") or not isinstance(target, str) or not target:
+                continue
+            path = _norm_path(target)
+            if path in supporting or any(fnmatch.fnmatch(path, _norm_path(pattern)) for pattern in patterns):
+                continue
+            errors.append(make_error(
+                "E520",
+                f"Action '{action.get('id', 'unknown')}' of plan item '{item.get('id', 'unknown')}' targets '{target}', which "
+                f"plan.summary.target_file_patterns does not cover: add a pattern for it, or change the action.",
+            ))
+
+
+def _norm_path(path: str) -> str:
+    """*path* with forward slashes and no leading ``./``."""
+    norm = path.replace("\\", "/")
+    while norm.startswith("./"):
+        norm = norm[2:]
+    return norm
+
+
 def _load_doc_patterns(spec_path: Optional[str], spec_root: Optional[str], errors: list[SpecError]) -> Optional[list[str]]:
     """The ``doc_paths`` of the host seed manifest; ``None`` (with a W570) when it is absent, unreadable or empty.
 
@@ -333,10 +364,13 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
 
     _check_type_and_layer(checklist, errors)
     _check_target_patterns_and_scope(data, plan, checklist, errors)
+    legacy_closed = bool(spec_path) and is_legacy_closed_plan(spec_path, spec_root)
+    if not legacy_closed:
+        _check_action_targets(plan, checklist, errors)
     _check_docs_impact(plan, checklist, spec_path, spec_root, errors)
     if spec_path:
         _check_plan_file_size(spec_path, errors)
-        if not _is_anchor(spec_path, data) and not is_legacy_closed_plan(spec_path, spec_root):
+        if not _is_anchor(spec_path, data) and not legacy_closed:
             _check_roadmap(data, checklist, spec_path, errors)
 
     return errors
