@@ -2699,8 +2699,9 @@ changes:
       manifest.json alone (no kinds/) is now listed by context canon and
       checked by the lint, and a project entry of the same id as a toolkit
       entry now wins in context canon (the toolkit entry won there).
-      Toolkit entries that only canon/manifest.json holds are listed by
-      context canon too, and its entries come in id order.
+      The toolkit's example entries (canon/examples/, which the registry loads
+      and no canon/kinds/ file holds) are listed by context canon too, and its
+      entries come in id order.
       canonical-lint no longer carries its own copy of the manifest merge.
     migration:
       action: none
