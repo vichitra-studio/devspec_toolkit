@@ -91,6 +91,15 @@ class TestCheckCommitMessage:
         assert "E303" in rendered
         assert "not a valid regular expression" in rendered
 
+    def test_non_string_pattern_is_an_e303_finding_not_a_traceback(self, tmp_path):
+        for pattern in (5, ["a"]):
+            _write_governance(str(tmp_path), {"require_spec_ids": True, "pattern": pattern})
+            errors = check_commit_message(str(tmp_path), "feat: x")
+            assert len(errors) == 1
+            rendered = errors[0].render()
+            assert "E303" in rendered
+            assert "not a valid regular expression" in rendered
+
     def test_custom_error_message(self, tmp_path):
         _write_governance(str(tmp_path), {
             "require_spec_ids": True,

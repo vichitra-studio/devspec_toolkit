@@ -112,6 +112,29 @@ def test_json_structure_accepts_repo_root(tmp_path: Path) -> None:
     assert "a: int" in plain[1]
 
 
+def test_id_form_refusal_names_its_own_command(host: Path) -> None:
+    """Without ``$schema`` the write is refused as E767, and the refusal names the verb that was typed."""
+    document = _doc(host, FR_FILE)
+    del document["$schema"]
+    _write_doc(host, FR_FILE, document)
+    before = _snapshot(host)
+    forms = {
+        "patch": ("patch", "--id", FR, ".priority", '"should-have"'),
+        "insert": ("insert", "--id", FR, ".acceptance_criteria", '{"text": "x", "scope": "in"}'),
+        "insert --step": ("insert", "--step", "04", ".functional_requirements", json.dumps({"fr_id": "fr-x"})),
+    }
+    for verb, args in forms.items():
+        status, out = _run(host, *args)
+        command = verb.split()[0]
+        assert status == 1 and out.startswith("E767"), (verb, out)
+        assert f"json {command} validates writes" in out, (verb, out)
+        if command == "patch":
+            assert "json insert validates writes" not in out
+        else:
+            assert "json patch validates writes" not in out
+    assert _snapshot(host) == before
+
+
 # --- the id forms: lookup, validation, lock ---------------------------------------------------------------------------
 
 def test_patch_by_id_resolves_validates_and_writes_lock_entry(host: Path) -> None:

@@ -191,7 +191,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
       c. Chunk questions ≤4. Call `AskUserQuestion` once per chunk, sequentially.
          Collect answers keyed by `question.id`.
          If the user dismisses or does not answer an AskUserQuestion call (empty answer set
-         returned), HALT immediately. Surface: "Blocker unresolved: user did not answer
+         returned), HALT immediately. Surface: "HALT (blocker unresolved): user did not answer
          clarification questions. Re-invoke /specdev-trinity <batch_id> --phase plan to retry."
          Write a HALT artifact noting `aborted_by_user` to
          `.specdev/blockers/blocker_ms-<batch_id>-plan_aborted_<unix_ts>.json`.
@@ -235,7 +235,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    Do not silently accept partial convergence. HALT is a first-class verdict.
 
-   Set verdict = "HALT (N unresolved findings)". Proceed to Step 3 regardless (HALT is a valid verdict to gate on).
+   Set verdict = "HALT at round 5". Proceed to Step 3 regardless (HALT is a valid verdict to gate on).
 
 ### Step 3 — Human gate
 
@@ -244,7 +244,7 @@ three options:
 
 ```
 Plan phase review complete.
-Verdict: <CONVERGED at round N | HALT at round 5 with N findings remaining | HALT (blocker unresolved): <reason>>
+Verdict: <CONVERGED at round N | HALT at round 5 (N findings remain) | HALT (blocker unresolved): <reason>>
 [On HALT at round 5: Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json. A HALT (blocker unresolved) has no findings file; the blocker is under .specdev/blockers/]
 
 How would you like to proceed?

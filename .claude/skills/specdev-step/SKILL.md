@@ -135,7 +135,7 @@ After Agent returns:
    review step if the artifact is structurally invalid.
 3. If `status == "blocker"` (see `specdev-impl.md` § "Blocker emission protocol"):
    a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-      If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
+      If malformed → print `HALT (blocker unresolved): malformed blocker payload` and surface to user (do NOT re-dispatch on a malformed payload).
       Malformed includes: `questions[]` empty, any entry missing required fields, artifact
       written AND `status: "blocker"` simultaneously (timing-constraint violation).
    b. Persist audit trail:
@@ -146,7 +146,7 @@ After Agent returns:
    c. Chunk questions into groups of ≤4. Call `AskUserQuestion` once per chunk, sequentially.
       Collect all answers keyed by `question.id`.
       If the user dismisses or does not answer an AskUserQuestion call (empty answer set
-      returned), HALT immediately. Surface: "Blocker unresolved: user did not answer
+      returned), HALT immediately. Surface: "HALT (blocker unresolved): user did not answer
       clarification questions. Re-invoke /specdev-step <NN> to retry." Write a HALT artifact
       noting `aborted_by_user` to `.specdev/blockers/blocker_step-<NN>_author_aborted_<unix_ts>.json`.
       Do not re-dispatch. Re-invoke the skill to retry from round 1.
@@ -169,7 +169,7 @@ After Agent returns:
    e. Increment `author_blocker_round` counter (per-dispatch-site, scoped to this author
       dispatch chain, independent of fix-phase counter; starts at 0 on first dispatch; cap = 2
       re-dispatches (counter values 0, 1, 2); does not persist across skill invocations).
-   f. If `author_blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
+   f. If `author_blocker_round > 2`: print `HALT (blocker unresolved): author_blocker_round exceeded 2`, surface to user (persistent blocking — no auto-retry).
    g. Fresh Agent dispatch with the augmented prompt. Continue from step 1.
    Note: lossy re-dispatch — accepted cost; the re-dispatched agent re-reads all context
    from scratch; user answers are the ONLY persistence across the bridge.
@@ -218,7 +218,7 @@ After Agent returns:
    review step if the artifact is structurally invalid.
 3. If `status == "blocker"` (see `specdev-impl.md` § "Blocker emission protocol"):
    a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-      If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
+      If malformed → print `HALT (blocker unresolved): malformed blocker payload` and surface to user (do NOT re-dispatch on a malformed payload).
       Malformed includes: `questions[]` empty, any entry missing required fields, edits applied
       AND `status: "blocker"` simultaneously (timing-constraint violation).
    b. Persist audit trail:
@@ -229,7 +229,7 @@ After Agent returns:
    c. Chunk questions into groups of ≤4. Call `AskUserQuestion` once per chunk, sequentially.
       Collect all answers keyed by `question.id`.
       If the user dismisses or does not answer an AskUserQuestion call (empty answer set returned),
-      HALT immediately. Surface: "Blocker unresolved: user did not answer clarification questions.
+      HALT immediately. Surface: "HALT (blocker unresolved): user did not answer clarification questions.
       Re-invoke /specdev-step <NN> --extend ... to retry." Write a HALT artifact noting
       `aborted_by_user` to `.specdev/blockers/blocker_step-<NN>_author-extend_aborted_<unix_ts>.json`.
       Do not re-dispatch.
@@ -244,7 +244,7 @@ After Agent returns:
       author-extend dispatch chain, independent of author-phase and fix-phase counters;
       starts at 0 on first dispatch; cap = 2 re-dispatches (counter values 0, 1, 2); does not
       persist across skill invocations).
-   f. If `author_extend_blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
+   f. If `author_extend_blocker_round > 2`: print `HALT (blocker unresolved): author_extend_blocker_round exceeded 2`, surface to user (persistent blocking — no auto-retry).
    g. Fresh Agent dispatch with the augmented prompt. Continue from step 1.
    Note: lossy re-dispatch — accepted cost; user answers are the ONLY persistence across the bridge.
 4. On clean gate: surface the `pending_replay` list (step ids) from the return JSON to the user. It names

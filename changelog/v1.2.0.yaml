@@ -2499,7 +2499,7 @@ changes:
   - type: add_constraint
     description: >
       Step 13: required_schema_sections of an extension holds at least 3
-      names (minItems 3, the "at least 3 dedicated schema sections" of the
+      names (minItems 3, the ">=3 dedicated schema sections" of the
       prompt). A 1.1.1 extension with fewer is E520 from align validate; add
       sections or remove the extension (specdev json delete --id
       <extension-id>; when it is the only extension, remove it and set
@@ -2521,11 +2521,11 @@ changes:
 
   - type: add_constraint
     description: >
-      Step 06: severity is required on every rule (rules[].required gains
-      severity; the schema description already said so). A 1.1.1 rule without
+      Step 06: severity is required on every rule (the schema description
+      said so, the required list did not; rules[].required gains severity). A 1.1.1 rule without
       it is E520 from align validate; set it with specdev json patch --id
       <inv-id> .severity '"error"'. Which rules are error stays an authoring
-      and review rule that no tool checks (prompt 06 says so).
+      and review rule that no tool checks (prompt 06).
     migration:
       action: ai_assisted
 

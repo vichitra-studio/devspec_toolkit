@@ -34,7 +34,7 @@ def check_commit_message(spec_dir: str, message: str) -> list[SpecError]:
     if require_ids and pattern:
         try:
             matched = re.match(pattern, message or "")
-        except re.error as exc:
+        except (re.error, TypeError) as exc:
             errs.append(make_error("E303", f"commit_message_rules.pattern is not a valid regular expression: {exc}"))
             return errs
         if not matched:
