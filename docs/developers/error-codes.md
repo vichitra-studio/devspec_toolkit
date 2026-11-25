@@ -388,7 +388,7 @@ A plan item of 1.2.0 stores no status, no `evidence` and no execution result: wh
 
 ### E303 COMMIT_MESSAGE_MISMATCH
 
-**Trigger**: `specdev governance-check --message "<commit message>"` (`validation/governance.py`): `10_governance.json` has `commit_message_rules` with `require_spec_ids` true and a `pattern`, and the message does not match the pattern. Printed, with the rule `^(feat|fix): .+ \(fr-[a-z-]+\)$` and the message `bad message`: `E303 Commit message mismatch. Must match regex: '^(feat|fix): .+ \(fr-[a-z-]+\)$' (defined in spec/10_governance.json)`; when the rule has an `error_message`, the message is `E303 Commit message mismatch. <error_message>`. Before 1.2.0 the same code was also used for a plan check on `review.fixture_status.ci_status`; that field and that check are gone, and the code means only this.
+**Trigger**: `specdev governance-check --message "<commit message>"` (`validation/governance.py`): `10_governance.json` has `commit_message_rules` with `require_spec_ids` true and a `pattern`, and the message does not match the pattern. Printed, with the rule `^(feat|fix): .+ \(fr-[a-z-]+\)$` and the message `bad message`: `E303 Commit message mismatch. Must match regex: '^(feat|fix): .+ \(fr-[a-z-]+\)$' (defined in spec/10_governance.json)`; when the rule has an `error_message`, the message is `E303 Commit message mismatch. <error_message>`. A `pattern` that is not a valid regular expression is reported under the same code (`E303 commit_message_rules.pattern is not a valid regular expression: <reason>`), not as a traceback. Before 1.2.0 the same code was also used for a plan check on `review.fixture_status.ci_status`; that field and that check are gone, and the code means only this.
 
 **Resolution**: Write a message that matches the pattern, or change `commit_message_rules` in `10_governance.json`. Followed: `fix: reset link (fr-password-reset-request)` printed `OK`.
 
@@ -1785,7 +1785,7 @@ Removed in 1.2.0: the fields it read are gone and no emitter is left.
 
 ### E573 / W573 ASSUMPTION_UNBOUND_ID (removed)
 
-Removed in 1.2.0: an id written in the text of an assumption is E752 (node id in prose).
+Removed in 1.2.0. It reported an id-like word in an assumption that names no node; no check reports that any more (it is a review item). An id in an assumption that does name a node is E752 (node id in prose).
 
 ### E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP (removed)
 

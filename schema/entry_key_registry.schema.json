@@ -262,7 +262,7 @@
         },
         "rationale": {
           "type": "string",
-          "description": "Human-readable explanation for why this step has no or deferred entry arrays.",
+          "description": "Human-readable explanation for why this step registers no node kind of its own.",
           "minLength": 1
         }
       }

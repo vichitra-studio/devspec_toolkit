@@ -560,6 +560,18 @@ def _ws1_differential_check(
     except json.JSONDecodeError as exc:
         raise JsonUtilsError(f"Internal: could not parse document for validation: {exc}") from exc
 
+    if new is None:
+        raise JsonUtilsError(
+            f"Refusing to write: `{command}` at the path '.' would replace the whole document with null. "
+            "Name a value inside the document."
+        )
+    if not isinstance(new, dict) or not isinstance(original, dict):
+        raise JsonUtilsError(
+            f"Refusing to write: `{command}` validates a write against the document's `$schema`, "
+            "and the document is not a JSON object"
+            + (" after this edit." if isinstance(original, dict) else ".")
+        )
+
     # Step 1: Detect $schema change (content-based, robust to any jq form).
     if new.get("$schema") != original.get("$schema"):
         raise JsonUtilsError(
@@ -658,14 +670,16 @@ def _added_violations(
     return sorted(added, key=lambda v: (v.keyword == "unevaluatedProperties", v.path, v.message))
 
 
-def check_edit(file_path: str, content: str, new_content: str, repo_root: Optional[str]) -> None:
+def check_edit(
+    file_path: str, content: str, new_content: str, repo_root: Optional[str], *, command: str = "json patch",
+) -> None:
     """Refuse (``JsonUtilsError``) *new_content* when it adds a schema violation to *content*, the text of *file_path*.
 
     The same differential check ``json patch`` and ``json insert`` run before they write (the refusal names
-    ``json patch``), for a caller that holds the edited text in memory.  Violations that *content* already had are ignored.
+    *command*, ``json patch`` by default), for a caller that holds the edited text in memory.  Violations that *content* already had are ignored.
     """
     _ws1_differential_check(
-        file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command="json patch",
+        file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command=command,
     )
 
 
@@ -762,10 +776,11 @@ def _count_targets(content: str, path_selector: str, *, existing_only: bool) -> 
         return None
 
 
-def _warn_if_many(path_selector: str, count: Optional[int]) -> None:
-    """Print the multi-match warning to stderr when *count* is above one."""
+def _warn_if_many(path_selector: str, count: Optional[int], dry_run: bool = False) -> None:
+    """Print the multi-match warning to stderr when *count* is above one (``would be changed`` on a dry run)."""
     if count is not None and count > 1:
-        print(f"warning: '{path_selector}' matches {count} values; all {count} are changed.", file=sys.stderr)
+        verb = "would be changed" if dry_run else "are changed"
+        print(f"warning: '{path_selector}' matches {count} values; all {count} {verb}.", file=sys.stderr)
 
 
 def _edit_counted(
@@ -862,7 +877,7 @@ def json_patch(
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
         _ws1_differential_check(file_path, content, new_content, eff_root, command="json patch")
-    _warn_if_many(path_selector, count)
+    _warn_if_many(path_selector, count, dry_run)
 
     if dry_run:
         return _dry_run_text(
@@ -952,7 +967,7 @@ def json_patch_batch(
         file_path, original, running, resolve_effective_toolkit_root(repo_root), command="json patch --batch",
     )
     for path, count in counts:
-        _warn_if_many(path, count)
+        _warn_if_many(path, count, dry_run)
     if not dry_run:
         json_write_atomic(file_path, running)
         return f"Applied {len(ops)} operations to {file_path}"
@@ -1041,7 +1056,7 @@ def json_delete(
     Returns a confirmation message, or a preview string when *dry_run* is True
     (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
 
-    ``validate`` defaults to False: the classic ``json delete`` and ``node status <id> active`` validate nothing.  When
+    ``validate`` defaults to False as a library default; the ``json delete`` command passes True.  When
     True, the edit is checked against the document's own ``$schema`` as ``json patch`` is: only a violation the
     deletion adds refuses it.  When the deletion removes an array item, the violations of the later items are compared
     at their new index, so a violation a later sibling already had is not counted as added.
@@ -1056,7 +1071,7 @@ def json_delete(
     )
     if validate:
         _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command="json delete")
-    _warn_if_many(path_selector, count)
+    _warn_if_many(path_selector, count, dry_run)
     if dry_run:
         return _dry_run_text(
             "delete", path_selector, file_path, content, new_content, new=None, show_old=True, show_file=show_file,

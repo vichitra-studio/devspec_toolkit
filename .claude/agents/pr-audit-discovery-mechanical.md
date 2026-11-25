@@ -151,8 +151,9 @@ the Step 0 slice-gate early-return document (with `"findings": []`) is always sc
 and will pass `self_validate.py` without modification.
 
 **Forbidden top-level keys** (the schema rejects them outright):
-`$schema`, `run_id`, `agent`, `bin_id`, `slice_name`, `semantic_work`, `summary`,
+`run_id`, `agent`, `bin_id`, `slice_name`, `semantic_work`, `summary`,
 `procedure`, `files_analyzed`, `null_results`, `agent_id`, `iteration`.
+`$schema` is allowed on a findings file (its only value is `vc:infra:findings`).
 
 **Required top-level keys**: `round`, `scope`, `generated_at`, `findings`.
 

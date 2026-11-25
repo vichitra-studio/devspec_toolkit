@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from specdev_tools.validation.validate import validate_file
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PROMPT = REPO_ROOT / "prompts" / "prompt_09_impl_plan.md"
 WORKED_EXAMPLE = REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec" / "09_impl_plan.json"
@@ -20,3 +22,5 @@ def test_prompt_09_target_date_is_a_should() -> None:
 def test_worked_example_milestone_without_target_date_is_valid() -> None:
     milestones = json.loads(WORKED_EXAMPLE.read_text(encoding="utf-8"))["milestones"]
     assert any("target_date" not in milestone for milestone in milestones)
+    errors = validate_file(str(REPO_ROOT), str(WORKED_EXAMPLE))  # checked against schema/09_impl_plan.schema.json
+    assert not [error for error in errors if "target_date" in error.message or "target_date" in (error.jq_path or "")]

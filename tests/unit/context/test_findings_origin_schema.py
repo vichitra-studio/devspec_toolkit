@@ -14,7 +14,7 @@ def _errors(tmp_path: Path, **finding_fields: str) -> list[str]:
     document = {"$schema": "vc:infra:findings", "round": 1, "scope": "step-04", "generated_at": 1700000000, "findings": [finding | finding_fields]}
     path = tmp_path / "findings.json"
     path.write_text(json.dumps(document), encoding="utf-8")
-    return [error.message for error in validate_file(str(ROOT), str(path))]
+    return [error.message.split("findings.json:", 1)[-1] for error in validate_file(str(ROOT), str(path))]
 
 
 def test_bug_with_origin_introduced_on_branch_validates(tmp_path: Path) -> None:
@@ -22,7 +22,9 @@ def test_bug_with_origin_introduced_on_branch_validates(tmp_path: Path) -> None:
 
 
 def test_regression_with_origin_introduced_on_branch_is_rejected(tmp_path: Path) -> None:
-    assert _errors(tmp_path, kind="regression", origin="introduced-on-branch")
+    errors = _errors(tmp_path, kind="regression", origin="introduced-on-branch")
+    assert errors
+    assert all("origin" in message and "introduced-on-branch" in message for message in errors)
 
 
 def test_regression_with_pre_existing_origin_validates(tmp_path: Path) -> None:
@@ -30,7 +32,9 @@ def test_regression_with_pre_existing_origin_validates(tmp_path: Path) -> None:
 
 
 def test_unknown_origin_is_rejected(tmp_path: Path) -> None:
-    assert _errors(tmp_path, origin="made-up")
+    errors = _errors(tmp_path, origin="made-up")
+    assert errors
+    assert all("origin" in message and "made-up" in message for message in errors)
 
 
 def test_a_finding_without_origin_still_validates(tmp_path: Path) -> None:

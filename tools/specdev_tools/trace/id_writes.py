@@ -281,10 +281,10 @@ def _read_file(spec_root: str, rel: str) -> str:
         raise _refuse(f"cannot read {rel}: {error.strerror or error}") from None
 
 
-def _edited(rel: str, content: str, new_text: str, repo_root: str, node_id: str, jq_path: str, minted: Sequence[str] = ()) -> _Edit:
+def _edited(rel: str, content: str, new_text: str, repo_root: str, node_id: str, jq_path: str, minted: Sequence[str] = (), verb: str = "patch") -> _Edit:
     """The edit of *rel*, after the schema check of ``json patch`` (refused as E767 when the edit adds a violation)."""
     try:
-        check_edit(rel, content, new_text, repo_root)
+        check_edit(rel, content, new_text, repo_root, command=f"json {verb}")
         document = json.loads(new_text)
     except (JsonUtilsError, ValueError) as error:
         raise _refuse(str(error), node_id=node_id) from None
@@ -299,7 +299,7 @@ def _plan_delete(node: Node, content: str, repo_root: str) -> _Edit:
         new_text = delete_text(content, node.jq_path)
     except JsonUtilsError as error:
         raise _refuse(str(error), node_id=node.id) from None
-    return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path)
+    return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, verb="delete")
 
 
 def _declared_array(spec_root: str, node: Node, field: str, repo_root: str) -> bool:
@@ -359,7 +359,7 @@ def _plan_field_write(graph: Graph, spec_root: str, node: Node, content: str, re
             new_text = insert_text(content, path, request.value or "" if request.raw else json.dumps(item), not request.raw, create=create)
     except JsonUtilsError as error:
         raise _refuse(str(error), node_id=node.id) from None
-    return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, minted)
+    return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, minted, verb=request.action)
 
 
 def _plan_node_edit(graph: Graph, spec_root: str, repo_root: str, request: WriteRequest) -> _Edit:
@@ -423,7 +423,7 @@ def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: Wri
         new_text = insert_text(content, path, json.dumps(item), True, create=True)
     except JsonUtilsError as error:
         raise _refuse(str(error)) from None
-    return _edited(rel, content, new_text, repo_root, str(item[decl.id_field]), path, minted)
+    return _edited(rel, content, new_text, repo_root, str(item[decl.id_field]), path, minted, verb="insert")
 
 
 # --- judging the candidate graph ------------------------------------------------------------------------------------

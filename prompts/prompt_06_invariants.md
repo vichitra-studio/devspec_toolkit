@@ -138,9 +138,11 @@ Before emitting, verify:
       "severity": "error",
       "enforcement_point": "api-gateway",
       "constrains": ["fr-auth-login", "api-auth-login", "auth-service"],
-      "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy" }
+      "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy", "version": "1.0.0" }
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    { "id": "cn:core:policy:spec-first", "kind": "policy", "version": "^1.0.0" }
+  ]
 }
 ```

@@ -88,7 +88,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 ## Step 10 Troubleshooting
 - **Rules**: The artifact needs `rules` (at least one) and `commit_message_rules`. Each rule needs `rule_id`, `text` and `derives_from` (at least one id of a constraint, risk, scope item, gate, environment or stakeholder). `pr_rules`, `spec_first_policy`, `review_policy`, `reviewers`, `trace` and `links` are not part of the schema.
 - **Enforcer**: `enforcer` accepts only `review`, and a rule that carries `enforcer` must not carry `cli_command`.
-- **Regex Errors**: `commit_message_rules.pattern` must be a valid regular expression. Invalid patterns will fail the verification script.
+- **Regex Errors**: `commit_message_rules.pattern` must be a valid regular expression. An invalid pattern is reported by `specdev governance-check` as E303 (`commit_message_rules.pattern is not a valid regular expression`).
 - **Schema Detection**: Ensure your file is named `spec/10_governance.json` or has an ID starting with `governance-` so tooling can detect it.
 - **Enforcement**: the rules are checked by the merge check (`specdev spec-check --merge`, run by the `specdev-merge-check.yml` workflow); the toolkit does not block a pull request.
 

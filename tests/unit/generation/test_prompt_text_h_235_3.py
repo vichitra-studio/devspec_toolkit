@@ -9,7 +9,7 @@ _TEXT = (Path(__file__).resolve().parents[3] / "prompts" / "prompt_16b_impl_code
 def test_prompt_16b_says_test_commands_are_not_run_by_a_tool():
     assert "No tool runs `test_commands` for you (an authoring rule)" in _TEXT
     assert "every action is recorded done (E812)" in _TEXT
-    assert "`specdev verify run` (E811)" in _TEXT
+    assert "`specdev verify attest` for a manual fixture (E811)" in _TEXT
 
 
 def test_prompt_16b_says_amb_new_is_a_convention():

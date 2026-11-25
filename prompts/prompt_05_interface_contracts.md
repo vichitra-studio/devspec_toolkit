@@ -93,7 +93,7 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - Each API entry has version, protocol and owner; an `http` API also has `path` and `method` (the schema requires both, E520 otherwise).
 - Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
-- An API that names a third party in `relies_on` and has a parameter that declares an `enum` needs an `enum_provenance`: where the value set comes from (source, date, resolver). E311 reports a missing one.
+- An API that names a third party in `relies_on` and has a parameter that declares an `enum` needs an `enum_provenance`: where the value set comes from (`source_url`, `source_date`, `resolved_at`; `resolver` is optional). E311 reports a missing one.
 - `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
 - `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` field (see schema/05_interface_contracts.schema.json → `vc:core:atoms#apiSecurity`).
 - `derives_from` names the FRs that justify the API; each entry of `errors` has an `error_id`, a `scope` and a `derives_from` naming the acceptance criteria it comes from.

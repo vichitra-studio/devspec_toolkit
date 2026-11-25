@@ -155,6 +155,7 @@ Before emitting, verify:
 - Use a short string describing how legacy work is migrated, or `"none"` if not applicable.
 - Keep it to one or two sentences; avoid rehashing Step 09.
 - If not `"none"`, use at least three words and keep it under 40 words.
+- Guidance, not checked (no tool measures the length).
 
 ### Invariant-Fixture Cross-Check
 - An invariant from Step 06 is proven by a fixture of Step 08 whose `verifies` names it (`E743` reports an invariant with none). The criterion that refines the invariant lists that fixture in `verified_by`. A missing fixture is a gap question for Step 08, not a reason to leave the invariant unrefined.
