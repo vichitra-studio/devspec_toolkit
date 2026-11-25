@@ -113,7 +113,7 @@
           "minLength": 1
         },
         "severity": {
-          "description": "Priority bucket. P0 = blocking (convergence cannot ignore); P1 = should-fix this round; P2 = nice-to-fix. Matches the P0/P1/P2 language used in Proposal K §4 / §7.6.",
+          "description": "Severity by impact, not by kind. P0 = a defect: someone who builds from the text as written builds the wrong thing or cannot build. P1 = a defect that leaves the builder or a later step to guess. P2 = wording or preference: the spec would say the same and the build would be the same. `specdev loop` does not converge while a P0 or P1 is open; a P2 is a note of the report. There is no P3: what is not worth a P2 is not reported.",
           "type": "string",
           "enum": [
             "P0",

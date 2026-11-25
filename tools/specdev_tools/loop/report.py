@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any
 
-from specdev_tools.loop import store
+from specdev_tools.loop import machine, store
 from specdev_tools.loop.machine import RESOLVED, REVIEW, SETTLED, RunState
 
 CLOSED = (RESOLVED, SETTLED)
@@ -31,6 +31,18 @@ def as_finding(key: str, info: dict[str, Any]) -> dict[str, Any]:
     if str(info.get("instruction") or "").startswith(GUIDANCE):
         out["suggested_fix"] = info["instruction"]  # the operator's guidance travels with the finding
     return out
+
+
+def stop_rule(state: RunState) -> dict[str, Any]:
+    """The rule this run stops by, for its summary and report: the values are the run's own."""
+    blocking, attempts = list(machine.BLOCKING), machine.MAX_ATTEMPTS
+    at_cap = "the operator is asked" if state.kind in machine.CODE_KINDS and not state.defer else "it ends HALT(cap)"
+    parked = "ends the run HALT(stuck)" if state.defer else "is put to the operator"
+    text = (f"the run converges when every node of the scope was read in its current content and no "
+            f"{' or '.join(blocking)} finding is open (a P2 is a note); at {state.cap} rounds {at_cap}; "
+            f"a finding whose fix failed {attempts} times {parked}.")
+    return {"blocking": blocking, "cap": state.cap, "max_attempts": attempts, "defer": state.defer,
+            "readers": state.readers, "text": text}
 
 
 def findings_document(scope: str, round_no: int, findings: list[dict[str, Any]]) -> dict[str, Any]:
@@ -64,6 +76,7 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
         "verdict": verdict, "rounds": meta.get("rounds", []), "findings": findings, "notes": meta.get("notes", {}),
         "gate": meta.get("gate", {}), "links": meta.get("links", {}), "rejected": meta.get("rejected", 0),
         "unasked_changes": meta.get("unasked_changes", []), "noticed": meta.get("noticed", []),
+        "stop_rule": stop_rule(state),
     })
     counts: dict[str, int] = {}
     for f in state.findings.values():
@@ -71,6 +84,7 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
     lines = [
         f"# Run `{meta['run_id']}`: {verdict}", "",
         f"Scope {scope}; rounds used {state.rounds_used} of {state.cap}.", "",
+        f"Stop rule: {stop_rule(state)['text']}", "",
         "| Round | P0 | P1 | P2 | Refused | Reviewers | Nodes read |", "|---|---|---|---|---|---|---|",
         *[f"| {r['round']} | {r['P0']} | {r['P1']} | {r['P2']} | {r['rejected']} | {r['reviewers']} | {r['read']} |"
           for r in meta.get("rounds", [])], "",

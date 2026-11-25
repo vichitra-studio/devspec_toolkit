@@ -78,7 +78,9 @@ SEVERITY = """A finding is P0 or P1 when it is a defect, however small: it affec
 assumption, an ambiguity or a hallucination, in the spec or in what would be built from it. It is also P0 or P1 when
 the artifact breaks a rule of its own contract and you quote that rule from the step's prompt or schema. It is P2 when
 it is wording or preference: the spec would say the same thing and the build would be the same without the change.
-The finding's kind does not set the severity."""
+The finding's kind does not set the severity. Between the two: P0 when someone who builds from the text as written
+builds the wrong thing or cannot build, P1 when the text leaves the builder or a later step to guess. Both are fixed
+before the run converges. The `message` of a P0 or P1 says the impact in one sentence: what goes wrong if it stays."""
 
 NO_QUESTIONS = """You ask nobody. If the contract or an upstream node settles a choice, make it and quote that source as `basis`. If
 nothing settles it, record an open item in this step's artifact (`about` names the upstream node or seed that is

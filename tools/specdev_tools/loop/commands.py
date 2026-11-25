@@ -199,6 +199,7 @@ def _load_worklist(path: str, io: SpecIO, state: RunState, meta: dict[str, Any],
         raise _refuse(f"{path} is not a findings file")
     folder = os.path.dirname(os.path.abspath(path))
     prior: dict[str, dict[str, Any]] = {}
+    settled: dict[str, tuple[machine.Finding, dict[str, Any]]] = {}
     carry = None
     sidecar = intake.load_json(path + ".state.json")
     beside = os.path.join(folder, "run.json")
@@ -210,6 +211,8 @@ def _load_worklist(path: str, io: SpecIO, state: RunState, meta: dict[str, Any],
         for key, f in old_state.findings.items():
             prior[key] = {"status": f.status, "attempts": f.attempts, "instruction": f.instruction,
                           "fixer": old_meta.get("detail", {}).get(key, {}).get("fixer", "")}
+            if f.source == REVIEW and f.status == machine.SETTLED:
+                settled[key] = (f, old_meta.get("detail", {}).get(key, {}))
     by_tool = isinstance(sidecar, dict) or carry is not None
     rejected: list[dict[str, Any]] = []
     for finding in document["findings"]:
@@ -241,6 +244,13 @@ def _load_worklist(path: str, io: SpecIO, state: RunState, meta: dict[str, Any],
             "evidence": list(finding.get("evidence") or []), "origin": finding.get("origin"),
             "upstream_refs": list(finding.get("upstream_refs") or []),
         }
+    for key, (old, detail) in settled.items():
+        # what the earlier run settled (a decline a reviewer upheld, a finding the operator left as is) is known to
+        # this run too: a reviewer that raises it again on unchanged text does not open it again
+        if key not in state.findings and io.in_scope(old.target) and io.exists(old.target):
+            state.findings[key] = machine.Finding(key=key, source=REVIEW, status=machine.SETTLED, target=old.target,
+                                                  settled_hash=old.settled_hash, left_as_is=old.left_as_is)
+            meta["detail"][key] = dict(detail)
     if rejected:
         store.write_json(os.path.join(run_dir, "rejected.json"), rejected)
         meta["rejected"] += len(rejected)

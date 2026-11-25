@@ -3072,6 +3072,22 @@ changes:
       action: none
   - type: add_script
     description: >
+      A run of `specdev loop` records the rule it stops by: `summary.json`
+      (`stop_rule`) and `report.md` give the blocking severities, the cap, the
+      failed fixes before a finding is parked, `--defer` and the readers
+      (DEVSPEC-172).
+    migration:
+      action: none
+  - type: add_script
+    description: >
+      `specdev loop start --worklist <run>/final.json` also carries what that
+      run settled (a decline a reviewer upheld, a finding the operator left as
+      is, a recorded open item), so a reviewer that raises it again on unchanged
+      text does not open it again (DEVSPEC-174).
+    migration:
+      action: none
+  - type: add_script
+    description: >
       `specdev json read --compact` prints a section view for reading: one line
       per leaf (`<path>: <value>`), a list of scalars on one line, and an object (or a list that holds objects or lists) equal to one printed earlier as `<path>: = <the earlier path>`
       (DEVSPEC-228). It is not JSON and is refused together with `--json`.

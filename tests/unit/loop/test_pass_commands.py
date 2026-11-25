@@ -281,3 +281,18 @@ def test_two_pass_starts_in_one_second_get_two_folders(host: Path, monkeypatch: 
     assert first["pass_id"] == "pass-review-20260101T000000Z" and second["pass_id"] == first["pass_id"] + "b"
     assert not second["resumed"]
     assert _pass_json(host, first["pass_id"])["meta"]["entry_args"] != _pass_json(host, second["pass_id"])["meta"]["entry_args"]
+
+
+def test_an_open_item_question_names_the_nodes_it_is_about_with_their_labels(host: Path) -> None:
+    """DEVSPEC-204: no bare internal id in a question to the operator; a node id comes with its label."""
+    path = next((host / "spec").glob("04_*.json"))
+    document = json.loads(path.read_text())
+    document["ambiguities"] = [{"id": "amb-token-lifetime", "description": "How long is a reset token valid?",
+                                "about": ["cap-account-recovery"]}]
+    path.write_text(json.dumps(document, indent=2) + "\n")
+    pass_id = pas(host, "start", "04")["pass_id"]
+    pump(host, pas(host, "next", pass_id)["run_id"])
+    ask = pas(host, "next", pass_id)
+    assert ask["type"] == "ask", ask
+    (question,) = [q for q in ask["questions"] if q["id"] == "item:amb-token-lifetime"]
+    assert "about cap-account-recovery (" in question["question"], question["question"]

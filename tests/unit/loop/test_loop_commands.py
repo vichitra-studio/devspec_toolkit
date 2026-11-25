@@ -358,3 +358,93 @@ def test_what_a_reviewer_cites_and_the_origin_reach_the_final_file(host: Path) -
     loop(host, "next", again, "--stop")
     (kept,) = json.loads(Path(loop(host, "next", again)["final"]).read_text())["findings"]
     assert (kept["origin"], kept["evidence"]) == (final["origin"], final["evidence"])  # and a worklist run keeps them
+
+
+# --- what a run records and carries (DEVSPEC-172, 174, 197, 222) ----------------------------------------------------
+
+
+def test_the_summary_and_the_report_state_the_stop_rule_of_the_run(host: Path) -> None:
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1", "--cap", "3", "--defer")["run_id"]
+    review(host, run_id, loop(host, "next", run_id))
+    done = loop(host, "next", run_id)
+    rule = json.loads(Path(done["summary"]).read_text())["stop_rule"]
+    assert (rule["blocking"], rule["cap"], rule["max_attempts"], rule["defer"], rule["readers"]) == (["P0", "P1"], 3, 2, True, 1)
+    assert "at 3 rounds it ends HALT(cap)" in rule["text"] and "ends the run HALT(stuck)" in rule["text"]
+    assert f"Stop rule: {rule['text']}" in Path(done["report"]).read_text()
+
+
+def test_a_finding_with_no_quote_or_an_unknown_source_is_refused_and_counted(host: Path) -> None:
+    run_id = loop(host, "start", "--kind", "step", "04", "--review-only", "--readers", "1")["run_id"]
+    no_quote = {k: v for k, v in FINDING.items() if k != "evidence_quotes"}
+    no_source = dict(FINDING, kind="gap", evidence_quotes=[{"source": "no-such-node", "text": "fr-password-reset"}])
+    review(host, run_id, loop(host, "next", run_id), [no_quote, no_source])
+    done = loop(host, "next", run_id)
+    assert done["verdict"] == "CLEAN"  # neither reached the run
+    rejected = json.loads((host / ".specdev" / "runs" / run_id / "d1" / "rejected.json").read_text())
+    assert [r["reason"] for r in rejected] == ["no evidence quote", "a quote does not occur in 'no-such-node'"]
+    assert json.loads(Path(done["summary"]).read_text())["rejected"] == 2
+    assert "Findings refused at intake: 2" in Path(done["report"]).read_text()
+
+
+def test_a_decline_a_reviewer_upheld_is_known_to_the_run_that_follows(host: Path) -> None:
+    first = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    review(host, first, loop(host, "next", first), [FINDING])
+    fix = loop(host, "next", first)
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps({"outcomes": [{
+        "key": KEY, "outcome": "declined", "quote": {"source": "fr-password-reset", "text": "fr-password-reset"}}]}))
+    review(host, first, loop(host, "next", first), verdict="decline_right")
+    done = loop(host, "next", first)
+    assert done["verdict"] == "CONVERGED" and run_json(host, first)["state"]["findings"][KEY]["status"] == "settled"
+    assert json.loads(Path(done["final"]).read_text())["findings"] == []  # the final file holds only what is left
+    second = loop(host, "start", "--kind", "step", "04", "--worklist", done["final"])["run_id"]
+    known = run_json(host, second)["state"]["findings"][KEY]
+    assert known["status"] == "settled" and known["settled_hash"] == run_json(host, first)["state"]["findings"][KEY]["settled_hash"]
+    assert loop(host, "next", second)["verdict"] == "CONVERGED"  # nothing changed: nothing is read or raised again
+
+
+def _break_the_priority_of(host: Path, node_id: str) -> None:
+    path = next((host / "spec").glob("04_*.json"))
+    text = path.read_text()
+    document = json.loads(text)
+
+    def walk(value: Any) -> bool:
+        if isinstance(value, dict):
+            if value.get("fr_id") == node_id:
+                value["priority"] = "no-such-priority"
+                return True
+            return any(walk(v) for v in value.values())
+        return isinstance(value, list) and any(walk(v) for v in value)
+
+    assert walk(document)
+    path.write_text(json.dumps(document, indent=2) + "\n")
+
+
+def test_a_gate_error_is_a_finding_of_its_own_and_stays_when_the_fixer_leaves_it(host: Path) -> None:
+    _break_the_priority_of(host, "fr-password-reset-request")
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    fix = loop(host, "next", run_id)  # the tool read the gate itself: the error is handed to a fixer before any review
+    assert [e["agent"] for e in fix["entries"]] == ["specdev-impl"]
+    (gate_key,) = run_json(host, run_id)["state"]["dispatch"]["keys"]
+    assert gate_key.startswith("E") and "[gate]" in Path(fix["entries"][0]["brief"]).read_text()
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps({"outcomes": []}))  # the fixer leaves it
+    loop(host, "next", run_id)
+    run = run_json(host, run_id)
+    left = run["state"]["findings"][gate_key]
+    assert (left["source"], left["status"], left["attempts"]) == ("gate", "open", 1)  # still there, one failed attempt
+    assert run["meta"]["unasked_changes"] == []
+
+
+def test_an_edit_outside_the_findings_is_listed_in_the_report(host: Path) -> None:
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    review(host, run_id, loop(host, "next", run_id), [FINDING])
+    fix = loop(host, "next", run_id)
+    _patch_statement(host)
+    code, out = run_on_example(host, "json", "patch", "--id", "fr-password-reset-request", ".statement",
+                               json.dumps("A member asks for a reset token by email; the answer never says whether the address is known."))
+    assert code == 0, out  # an edit of a node no finding names
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps(
+        {"outcomes": [{"key": KEY, "outcome": "fixed", "changed": ["fr-password-reset"]}]}))
+    loop(host, "next", run_id)
+    assert run_json(host, run_id)["meta"]["unasked_changes"] == ["fr-password-reset-request"]
+    done = loop(host, "next", run_id, "--stop")
+    assert "## Changed without a finding\n- fr-password-reset-request" in Path(done["report"]).read_text()

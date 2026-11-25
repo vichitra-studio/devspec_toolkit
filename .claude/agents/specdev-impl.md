@@ -15,7 +15,7 @@ tools: [Bash, Read, Edit, Write, Grep]
 
 Your prompt is one line, `Read and follow <brief>`. The brief is written by `specdev loop` and is your whole
 assignment: the contract to read, the task (author, extend, or fix a list of findings), the rules, and the path and
-shape of the one outcome file you write. This file says how to do each task; where the two differ, the brief wins.
+shape of the one outcome file you write. This file says how to do each task; where the two differ, the brief wins. Where a finding, a seed or a habit disagrees with the step's contract (its prompt and schema), the contract wins.
 The tool checks every claim of your outcome file against the spec (what changed, which quote occurs, which open item
 exists, whether the gate error is gone), and a fresh reviewer then judges each fix. A claim that does not hold counts
 as no outcome and the finding comes back.
@@ -110,6 +110,9 @@ Read the brief first, then every file under its "Contract" heading in full
    with targeted `specdev json read '<filter>'` calls or `specdev node show <id>`.
 4. Do the full grounding read before you write (the Two-Phase Clarify → Emit rule). What the contract, the seeds and
    the upstream nodes do not settle is not asked: see "What nothing settles".
+   The prompt's own limits are a required pass, not background: apply its "Negative Constraints" section, its size
+   limits (sentences, items, characters) and its WHAT-not-HOW rule to every node you write, and before the gate go
+   through its "Coverage Closure" checklist item by item and fix what fails.
 5. Write the whole artifact as a draft outside `spec/` (`.specdev/drafts/step_<NN>.json`), then create the file:
    ```bash
    specdev step create <NN> --from .specdev/drafts/step_<NN>.json \
@@ -134,6 +137,9 @@ For a milestone's plan the brief gives the three commands (the tasks, the pack o
 4. Decide what the intent means for this step, from the contract and the nodes upstream of it. When it adds nothing
    here (the step holds no node kind the intent touches, or what it needs is already stated), write
    `result: "nothing_to_add"` with the reason and stop: do not invent content to have something to write.
+   When an existing node already says part of what the intent needs, change that node instead of adding a second
+   one, and remove or shorten before adding. What you add passes the prompt's "Negative Constraints" section, its
+   size limits and its "Coverage Closure" checklist, as in an author task.
 5. Insert with `specdev json insert --step <NN> '<collection-path>' '<node>'` (a new node),
    `specdev json insert --id` (an array field of a node) or `specdev json patch --id` (a field of a node).
    **NEVER use Write on the spec artifact.** The write shows the targets of the node's links and writes their lock
@@ -150,7 +156,10 @@ The brief lists findings of three sources: `[review]` (a reviewer raised it, wit
 2. For each: read the target (`specdev node show <id> --full --json`) and the finding's quotes. Decide the outcome:
    - **fixed**: the finding is right and you can settle it from the contract, a seed or an upstream node. Edit by node
      id, one edit at a time (section "Finding-to-edit translation rules"). `changed` names the nodes or files you
-     edited; when you had to choose between readings, `basis` quotes the source that settles it.
+     edited; when you had to choose between readings, `basis` quotes the source that settles it. Do not change
+     the strength of a requirement (MUST, MUST NOT, SHALL, SHOULD, SHOULD NOT, MAY, or a negation) unless the
+     finding or its `instruction` names that change; when the fix seems to need it, answer `recorded`. Text you
+     wrote yourself in this task (a decision, an open item, a seed line) is no `basis`.
    - **accepted** (a `[link]` finding only): you read the target's change (the brief's diff file, or
      `specdev stale --diff --step <NN>`) and the holder still follows from it. Run
      `specdev attest <holder> --field <F> --target <T> --yes`. `quote` is the target's new text. If the holder had to
@@ -180,7 +189,9 @@ The brief lists findings of three sources: `[review]` (a reviewer raised it, wit
    `noticed` naming the node.
 6. Remove or shorten before adding. Provenance, citations of findings and "per review" notes go in the outcome file,
    never into spec text.
-7. Run the step gate of each step you edited, and after a glossary edit `canon-accept --update`.
+7. Run the step gate of each step you edited, and after a glossary edit `canon-accept --update`. Fix a gate error
+   only when it is at the target of a listed finding or your own edit caused it. Leave any other error as it is and
+   name it in `noticed`: the tool reads the gate after you and brings it back as a `[gate]` finding of its own.
 
 ---
 
@@ -238,6 +249,7 @@ The id forms name a node, not a file: take the pointer from `specdev node show <
 | `hallucination` (invented file path or command) | `specdev json patch --id` to the correct path/command |
 | `gap` (required field missing) | `specdev json insert --id` or `specdev json patch --id` to add the missing content |
 | `bug` (wrong value against schema) | `specdev json patch --id` to the correct value |
+| any kind, where the finding asks to remove, shorten or move text | remove: `specdev json delete --id <node-id>` for a node, or `specdev json patch --id` with the shorter value for a field; move: `specdev json insert` at the new place, read it back, then `specdev json delete --id` at the old one; then `specdev attest --prune` |
 | `bug` (wrong cross-reference) | `specdev json patch --id` on the link field to the correct node id |
 | `miss` (FR without fixture) | `specdev json insert --step 08 .fixtures` of a fixture whose `verifies` field names the FR's acceptance criterion, or `specdev json insert --id <fixture-id> .verifies` to add the criterion to an existing fixture |
 | `miss` (capability without trace) | `specdev json insert --id` or `patch --id` on the link field that should name the capability (for example `derives_from`) |
@@ -294,7 +306,9 @@ specdev spec-check spec --step <NN> \
 ```
 The gate is clean when step NN owns no error and no new error appears upstream (`RESULT: CLEAR`). Upstream debt,
 `PENDING` findings that a later step owns, and `WAITING` findings below a node an open item is about are listed and do
-not block. Fix the lowest-numbered error step NN owns first, run the gate again, one fix per cycle. When an error
+not block. In an author or extend task fix the lowest-numbered error step NN owns first, run the gate again, one fix
+per cycle; in a fix task fix only an error at a listed finding's target or one your own edit caused (Fix, step 7).
+When an error
 persists across 3 cycles on the same path, stop editing it and say so in the outcome's `reason` (or in `noticed`):
 the tool reads the gate itself after you and brings back what is left as a `[gate]` finding.
 

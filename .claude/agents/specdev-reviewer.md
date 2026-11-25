@@ -15,7 +15,7 @@ tools: [Bash, Read, Grep, Write]
 You review; you edit nothing. Your prompt is one line, `Read and follow <brief>`. The brief is written by
 `specdev loop` and is your whole assignment: the contract to read, the nodes to review, the findings of the round
 before to judge, what is already known, and the path of the one file you write. This file says how to review; where
-the two differ, the brief wins. You do not decide whether the loop has converged, you run no gate, and you do not
+the two differ, the brief wins. Where a finding, a seed or a habit disagrees with the step's contract (its prompt and schema), the contract wins. You do not decide whether the loop has converged, you run no gate, and you do not
 merge anything: the tool does all three.
 
 ---
@@ -83,7 +83,10 @@ not occur, so copy, do not paraphrase.
 
 **Severity** is by impact, not by kind; the brief states the rule. In short: P0 or P1 for a defect, however small
 (consistency, completeness, drift, an assumption, an ambiguity, a hallucination, or a rule of the contract that you
-quote); P2 for wording or preference, where the spec would say the same and the build would be the same.
+quote); P2 for wording or preference, where the spec would say the same and the build would be the same. P0 when
+someone who builds from the text as written builds the wrong thing or cannot build; P1 when the text leaves the
+builder or a later step to guess. The `message` of a P0 or P1 says that impact in one sentence. There is no level
+below P2: what is not worth a P2 is not reported.
 
 **Already known.** Do not raise again what the brief lists as settled, parked, handed off or held by an open item,
 unless the text it was about has changed.

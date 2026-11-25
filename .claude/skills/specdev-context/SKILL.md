@@ -135,6 +135,10 @@ Run when the task is to apply edits driven by a source of findings.
 
 ### Step 1 — Acquire findings
 
+Before any edit, read the contract of each step you will edit: `prompts/prompt_<NN>_*.md` under `$TOOLKIT_ROOT`
+(its limits and its "Negative Constraints" section), and `docs/prompts/shared_expectations.md`. Where a finding
+disagrees with the contract, the contract wins: do not apply that finding.
+
 | Source | Command |
 |---|---|
 | Backlog | `specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT --json` |

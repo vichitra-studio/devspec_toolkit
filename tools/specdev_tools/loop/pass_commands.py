@@ -335,7 +335,7 @@ class _Pass:
         inside = set(steps)
         for step in steps:
             for item in facts[step]["items"]:
-                about = ", ".join(item.about_ids) or "nothing named"
+                about = ", ".join(self.io.label(a) for a in item.about_ids) or "nothing named"
                 seed = any(self.io.step_of(a) == "seed" for a in item.about_ids)
                 proposal = item.raw.get("proposed_assumption")
                 if seed:

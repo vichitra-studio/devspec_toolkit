@@ -337,6 +337,8 @@ The tool keeps the loop: it decides every next action, checks every file an agen
    - `wait`: files are missing, or arrived and failed the tool's checks (`refused` gives the reason for each). If a subagent of this session is still running, wait for it, then go to 1. If none is
      running (all returned, or this is a new session), call `specdev loop next <run-id> --redispatch <roots>` and treat
      its action as in 1.
+     A folder that has been quiet for a while does not show that the agents are done: go by a subagent that
+     returned and by the action the tool prints, never by watching the files.
    - `ask`: put every question of `questions` to the operator with AskUserQuestion, as given (question text, option
      labels and descriptions), at most 4 questions per call. If a chosen option carries a `command`, run it now. Write
      one JSON object `{"<question id>": {"label": "<chosen label>", "notes": "<the operator's notes or free text>"}}`

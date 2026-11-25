@@ -235,6 +235,8 @@ do not write `signature`.
   requires it (`source` a file path or a node id). The tool refuses a finding whose quote does not occur.
   `evidence` holds what is not a quote (a failing test's output line).
 - `severity`: by impact, as the brief states: P0 or P1 for a defect however small, P2 for wording or preference.
+  P0 when the code does the wrong thing or cannot run as the plan item requires; P1 when it works but leaves a case
+  of the item unhandled or untested. The `message` of a P0 or P1 says that impact in one sentence.
   `suggested_fix` is required for P0 and P1.
 - `upstream_refs`: the plan items the finding concerns, each written as a plan-item id. Each must be an item of the
   plan, or `review record` refuses the file (E823).
