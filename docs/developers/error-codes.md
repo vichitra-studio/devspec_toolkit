@@ -1775,7 +1775,7 @@ Removed in 1.2.0: the fields it read are gone and no emitter is left.
 
 ### E573 / W573 ASSUMPTION_UNBOUND_ID (removed)
 
-Removed in 1.2.0: an id written in the text of an assumption is E752 (node id in prose).
+Removed in 1.2.0. It reported an id-like word in an assumption that names no node; no check reports that any more (it is a review item). An id in an assumption that does name a node is E752 (node id in prose).
 
 ### E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP (removed)
 

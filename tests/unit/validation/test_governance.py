@@ -100,6 +100,11 @@ class TestCheckCommitMessage:
             assert "E303" in rendered
             assert "not a valid regular expression" in rendered
 
+    def test_rules_that_are_not_an_object_give_no_finding_and_no_traceback(self, tmp_path):
+        for rules in (["a"], "text", 5, None):
+            _write_governance(str(tmp_path), rules)
+            assert check_commit_message(str(tmp_path), "feat: x") == []
+
     def test_custom_error_message(self, tmp_path):
         _write_governance(str(tmp_path), {
             "require_spec_ids": True,

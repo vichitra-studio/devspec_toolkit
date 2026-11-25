@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,10 @@ _SUFFIXES = {".md", ".json", ".py", ".yaml"}
 
 
 def _tracked_files() -> list[Path] | None:
-    """The files git tracks under FOLDERS, or ``None`` when git fails or REPO_ROOT is not a checkout."""
+    """The files git tracks under FOLDERS, or ``None`` when git fails, REPO_ROOT is not a checkout or git lists none.
+
+    Git lists none when the toolkit is an untracked folder inside another work tree: the scan then walks the folders.
+    """
     try:
         result = subprocess.run(
             ["git", "ls-files", "-z", "--", *FOLDERS], cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
@@ -29,7 +33,7 @@ def _tracked_files() -> list[Path] | None:
         return None
     if result.returncode != 0:
         return None
-    return [REPO_ROOT / name for name in result.stdout.split("\0") if name]
+    return [REPO_ROOT / name for name in result.stdout.split("\0") if name] or None
 
 
 def _text_files() -> list[Path]:
@@ -61,11 +65,15 @@ def test_the_scope_agent_states_the_reviewer_id_form() -> None:
     assert "written `r<N>` (`r1`, `r2`, ...)" in scope.read_text(encoding="utf-8")
 
 
-def test_text_files_are_the_files_git_tracks() -> None:
-    tracked = _tracked_files()
-    if tracked is None:
-        pytest.skip("not a git checkout")
+def test_the_scan_reads_only_the_files_git_tracks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An untracked draft under FOLDERS is no part of the scan: the scan is the tracked list, filtered by suffix."""
+    tracked = [REPO_ROOT / ".claude" / "agents" / "specdev-scope.md", REPO_ROOT / "prompts" / "a_picture.png"]
+    monkeypatch.setattr(sys.modules[__name__], "_tracked_files", lambda: tracked)
+    assert _text_files() == [tracked[0]]
+
+
+def test_the_scan_walks_the_folders_when_git_lists_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys.modules[__name__], "_tracked_files", lambda: None)
     scanned = _text_files()
-    assert scanned, "the scan found no file"
-    assert set(scanned) <= set(tracked)
+    assert REPO_ROOT / ".claude" / "agents" / "specdev-scope.md" in scanned
     assert all(p.suffix in _SUFFIXES for p in scanned)

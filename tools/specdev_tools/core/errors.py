@@ -55,8 +55,8 @@ class FindingError(Exception):
 #   the trace matrix and the coverage thresholds: E592, W592, E604, W604;
 #   the proof and review checks of the step-16 validator, whose inputs the plan schema no longer has (a milestone closes
 #   on the close gate, E810 to E814): E301, E302, E305, E306, E307, W599, W600, W601.
-#   the assumption id scan and the derivation token-overlap check, which the graph replaced (an id in prose is E752,
-#   derivation is `derives_from`): E573, W573, E594, W594.
+#   the assumption id scan and the derivation token-overlap check, which are gone (an id in prose that names a node is E752; one
+#   that names nothing is a review item; derivation is `derives_from`): E573, W573, E594, W594.
 # E303 stays: `governance-check` raises it for a commit message that does not match the governance rule.
 # `tests/unit/core/test_error_code_registry.py` (REMOVED_CODES) fails if one of them is registered or written as a code literal again.
 ERROR_CODES = {

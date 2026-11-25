@@ -2582,9 +2582,12 @@ changes:
   - type: remove_validator
     description: >
       W573 (ASSUMPTION_UNBOUND_ID) and W594 (CONTENT_DERIVATION_LOW_OVERLAP) are
-      removed with E573 and E594: an id written in the text of an assumption is
-      E752, and derivation is stated by derives_from links. The nine-key token-
-      overlap heuristic is gone; the worked example gives W555 only.
+      removed with E573 and E594. W573 reported an id-like word in an assumption
+      that names no node; no check reports that any more (it is a review item).
+      An id in an assumption that does name a node is E752, reported by
+      spec-check (not by validate <file>). Derivation is stated by derives_from
+      links. The nine-key token-overlap heuristic is gone; the worked example
+      gives W555 only.
     migration:
       action: none
 
