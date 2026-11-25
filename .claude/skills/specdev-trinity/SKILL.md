@@ -161,7 +161,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
    `specdev spec-check spec --step 16a`. `scope` names the plan and is used in the findings file name.
 
    Each reviewer writes to:
-   `.specdev/findings/findings_ms-<batch_id>-plan_<round>_r<reviewer_id>.json`
+   `.specdev/findings/findings_ms-<batch_id>-plan_<round>_<reviewer_id>.json`
 
    Once: `mkdir -p .specdev/findings`. Before the reviewers of a round are dispatched, remove what an earlier run left for this plan and round, so that the merge in 2b sees only the files of this run: `rm -f .specdev/findings/findings_ms-<batch_id>-plan_<round>_r*.json .specdev/findings/findings_ms-<batch_id>-plan_<round>.json`
 

@@ -667,25 +667,46 @@ class TestDryRunSummary:
         assert lines[0].endswith("8 value(s)") and lines[-1] == "  ... and 3 more" and len(lines) == 12
 
 
-def test_file_form_delete_refuses_a_required_field(tmp_path: Path) -> None:
-    """H round 1 A3-1: ``specdev json delete <file> <path>`` runs the differential schema check as patch does."""
-    import shutil
-    import sys
-
-    from specdev_tools.core import json_utils
-    from unit.graph._synth import ROOT
+def _glossary_copy(tmp_path: pathlib.Path) -> pathlib.Path:
     from unit.trace._lock_support import EXAMPLE_HOST
 
     path = tmp_path / "03_glossary.json"
     shutil.copyfile(EXAMPLE_HOST / "spec" / "03_glossary.json", path)
-    before = path.read_bytes()
-    argv = ["json", "delete", str(path), ".terms[0].term", "--repo-root", str(ROOT)]
-    old = sys.argv
-    sys.argv = argv
+    return path
+
+
+def _run_main(monkeypatch: pytest.MonkeyPatch, *argv: str) -> int:
+    from specdev_tools.core import json_utils
+
+    monkeypatch.setattr(sys, "argv", ["json", *argv])
     try:
-        with pytest.raises(SystemExit) as stop:
-            json_utils.main()
-    finally:
-        sys.argv = old
-    assert stop.value.code == 1
+        json_utils.main()
+    except SystemExit as stop:
+        return int(stop.code or 0)
+    return 0
+
+
+def test_file_form_delete_refuses_a_required_field(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """H round 1 A3-1: ``specdev json delete <file> <path>`` runs the differential schema check as patch does."""
+    from unit.graph._synth import ROOT
+
+    path = _glossary_copy(tmp_path)
+    before = path.read_bytes()
+    assert _run_main(monkeypatch, "delete", str(path), ".terms[0].term", "--repo-root", str(ROOT)) == 1
     assert path.read_bytes() == before
+
+
+def test_many_match_warning_is_not_printed_for_a_refused_write(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """H round 2 B-2: "all N are changed" is printed only when the edit passed its schema check."""
+    from unit.graph._synth import ROOT
+
+    path = _glossary_copy(tmp_path)
+    before = path.read_bytes()
+    assert _run_main(monkeypatch, "delete", str(path), ".terms[]", "--repo-root", str(ROOT)) == 1
+    captured = capsys.readouterr()
+    assert "Write refused" in captured.err and "are changed" not in captured.err
+    assert path.read_bytes() == before
+    assert _run_main(monkeypatch, "patch", str(path), ".terms[].domain", '"general"', "--repo-root", str(ROOT)) == 0
+    assert "are changed" in capsys.readouterr().err

@@ -104,3 +104,25 @@ def test_show_file_without_dry_run_is_a_usage_error(repo: Path, monkeypatch: pyt
     code, _, err = _main(monkeypatch, capsys, *command, "--show-file")
     assert code == 2 and "--dry-run" in err
     assert (repo / FILE).read_bytes() == before
+
+
+def test_a_failed_write_of_the_ref_copy_leaves_no_temp_folder(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """H round 2 D-7: when the copy cannot be written, its temporary folder is removed."""
+    import tempfile
+
+    made: list[str] = []
+    real_mkdtemp = tempfile.mkdtemp
+
+    def tracking_mkdtemp(*args: object, **kwargs: object) -> str:
+        folder = real_mkdtemp(*args, **kwargs)  # type: ignore[arg-type]
+        made.append(folder)
+        return folder
+
+    def boom(self: Path, data: bytes) -> int:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(tempfile, "mkdtemp", tracking_mkdtemp)
+    monkeypatch.setattr(Path, "write_bytes", boom)
+    with pytest.raises(OSError):
+        json_utils._materialise_at_ref(FILE, "main")
+    assert len(made) == 1 and not Path(made[0]).exists()

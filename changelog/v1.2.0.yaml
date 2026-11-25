@@ -2452,8 +2452,9 @@ changes:
       03_glossary.json '.terms[500]'` exits 1. `json patch` with an index past
       the end of an array fails the same way. The file form of `json delete`
       is now checked against the schema before it writes, as `patch` and
-      `insert` are: a delete that leaves a required field out is refused with
-      E767.
+      `insert` are: a delete that leaves a required field out is refused (exit 1,
+      `Write refused: this edit introduces schema violation(s)`, no code; only
+      the --id forms print E767).
     migration:
       action: none
 
@@ -2963,7 +2964,8 @@ changes:
       no longer says to re-run canon-accept plainly (it leaves an entry that
       exists alone): patch the term or the proposal, or put the new text in
       canonical_proposals and run specdev canon-accept --from <file>
-      --namespace cn:project: --update (add --dry-run first), which rewrites
+      --namespace cn:project: --update --repo-root ./devspec_toolkit --git-root .
+      (add --dry-run first), which rewrites
       the entry in manifest.json and in kinds/<kind>.json when the canon has
       one.
     migration:

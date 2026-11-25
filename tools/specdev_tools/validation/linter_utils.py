@@ -205,10 +205,11 @@ def is_resolved_canonical_ref(value: Any) -> bool:
 
 
 def load_canonical_stages(canon_dir: str) -> set[str] | None:
-    """Load canonical stage values from the ``stage`` entries of the canon (``canon/kinds/stage.json``).
+    """Load canonical stage values: the ``stage`` entries of the canon, read through the registry loader.
 
-    Falls back to canon/manifest.json legacy format.  Returns None if
-    neither source can be loaded (caller falls back to KNOWN_STAGES).
+    That is the union of ``canon/manifest.json`` and ``canon/kinds/*.json`` (not ``kinds/stage.json`` alone);
+    a retired entry does not count.  Falls back to the legacy ``stages.values`` list of ``canon/manifest.json``.
+    Returns None if neither source can be loaded (caller falls back to KNOWN_STAGES).
 
     Parameters
     ----------

@@ -1668,12 +1668,12 @@ class TestChangedEntriesAndUpdate:
     def test_update_adds_the_old_label_to_aliases_once(self, tmp_repo: Path, tmp_path: Path) -> None:
         manifest, kind_file = _write_canon(tmp_repo, [_stored_entry()])
 
-        for label in ("Renamed", "My Term", "Renamed"):
+        for label in ("Renamed", "Third", "Renamed"):
             _accept(tmp_repo, tmp_path, [_proposal(proposed_label=label)], update=True)
 
         for path in (manifest, kind_file):
             entry = json.loads(path.read_text(encoding="utf-8"))["entries"][0]
-            assert entry["preferred_label"] == "Renamed"
+            assert entry["preferred_label"] == "Third"
             assert entry["aliases"] == ["My Term", "Renamed"]
 
     def test_update_adds_an_entry_missing_from_its_kind_file(self, tmp_repo: Path, tmp_path: Path) -> None:
@@ -1756,3 +1756,51 @@ class TestAcceptFixesRound1:
         _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")], update=True)
 
         assert manifest.stat().st_mode & 0o777 == 0o600
+
+
+class TestAcceptFixesRound2:
+    def test_a_label_differing_by_case_or_equal_to_an_alias_is_unchanged(self, tmp_repo: Path, tmp_path: Path) -> None:
+        stored = _stored_entry()
+        stored["aliases"] = ["Old Name"]
+        _write_canon(tmp_repo, [stored])
+
+        for label in ("MY TERM", "Old Name"):
+            result = _accept(tmp_repo, tmp_path, [_proposal(proposed_label=label)])
+            assert result["skipped"] == ["cn:project:entity:my-term"], label
+            assert result["changed"] == [], label
+
+        result = _accept(tmp_repo, tmp_path, [_proposal(proposed_label="Something Else")])
+        assert result["changed"] == [{"id": "cn:project:entity:my-term", "fields": ["preferred_label"]}]
+
+    def test_accepted_from_is_relative_through_a_symlinked_git_root(self, tmp_repo: Path, tmp_path: Path) -> None:
+        host = tmp_path / "real" / "host"
+        (host / "spec").mkdir(parents=True)
+        link = tmp_path / "link"
+        link.symlink_to(tmp_path / "real")
+        (tmp_repo / "canon" / "manifest.json").write_text(json.dumps(_make_manifest()) + "\n", encoding="utf-8")
+        spec_file = host / "spec" / "03_glossary.json"
+        _write_json(spec_file, _make_spec([_proposal()]))
+
+        run_canon_accept(
+            spec_file=str(spec_file), namespace="cn:project:", repo_root=str(tmp_repo),
+            git_root=str(link / "host"),
+        )
+
+        entry = json.loads((tmp_repo / "canon" / "manifest.json").read_text(encoding="utf-8"))["entries"][0]
+        assert entry["lifecycle"]["accepted_from"] == "spec/03_glossary.json"
+
+    def test_accepted_from_is_relative_when_from_goes_through_a_symlink(self, tmp_repo: Path, tmp_path: Path) -> None:
+        host = tmp_path / "real" / "host"
+        (host / "spec").mkdir(parents=True)
+        link = tmp_path / "link"
+        link.symlink_to(tmp_path / "real")
+        (tmp_repo / "canon" / "manifest.json").write_text(json.dumps(_make_manifest()) + "\n", encoding="utf-8")
+        _write_json(host / "spec" / "03_glossary.json", _make_spec([_proposal()]))
+
+        run_canon_accept(
+            spec_file=str(link / "host" / "spec" / "03_glossary.json"), namespace="cn:project:",
+            repo_root=str(tmp_repo), git_root=str(host),
+        )
+
+        entry = json.loads((tmp_repo / "canon" / "manifest.json").read_text(encoding="utf-8"))["entries"][0]
+        assert entry["lifecycle"]["accepted_from"] == "spec/03_glossary.json"

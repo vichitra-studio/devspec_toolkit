@@ -36,6 +36,7 @@ from typing import Any, NamedTuple
 
 from ..core.json_utils import detect_indent
 from ..graph.contract import normalise_text
+from .registry import label_matches_entry
 from ..trace.lockfile import replace_file_atomically
 
 CANON_ID_RE = re.compile(r'^cn:[a-z0-9.]+:[a-z_][a-z0-9_]*:[a-z0-9-]+$')
@@ -67,13 +68,14 @@ def _same_text(stored: Any, proposed: str) -> bool:
 def _changed_fields(entry: dict[str, Any], label: str, definition: str) -> list[str]:
     """The fields of *entry* whose stored text differs from the proposal.
 
-    Texts are compared as E606 and E607 compare them (``graph.contract.normalise_text``): a difference of
-    whitespace, Unicode form, curly quote or dash is not a change.
+    Texts are compared as E606 and E607 compare them: a definition by ``graph.contract.normalise_text`` (layout,
+    Unicode form, curly quote and dash are not a change); a label by ``registry.label_matches_entry`` (case and
+    an alias of the entry are not a change either).
     """
     fields = []
     if not _same_text(entry.get("definition"), definition):
         fields.append("definition")
-    if not _same_text(entry.get("preferred_label"), label):
+    if not label_matches_entry(label, entry):
         fields.append("preferred_label")
     return fields
 
@@ -239,7 +241,7 @@ def run_canon_accept(
 
     # lifecycle.accepted_from: the spec file's path relative to the host root (else the toolkit root), never absolute
     base = Path(os.path.abspath(git_root)) if git_root else root
-    accepted_from = Path(os.path.relpath(spec_path, base)).as_posix()
+    accepted_from = Path(os.path.relpath(os.path.realpath(spec_path), os.path.realpath(base))).as_posix()
 
     # Index the existing entries by id for duplicate and change detection
     existing_by_id: dict[str, dict[str, Any]] = {}

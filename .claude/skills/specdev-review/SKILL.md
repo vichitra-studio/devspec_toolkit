@@ -23,12 +23,13 @@ stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdi
 ## Arguments
 
 ```
-/specdev-review <scope> [--with-backlog] [--review-only]
+/specdev-review <scope-arg> [--with-backlog] [--review-only]
 ```
 
-- `<scope>`: step number (e.g. `04`), step range (e.g. `04-07`), a file path, or `all`.
-  For a file of `spec/common/` the findings `scope` is the file name without folder and extension (`spec/common/seed_manifest.json` is `seed_manifest`): the schema allows only `[a-z0-9_-]+`
-  there. Below, `<scope>` in a file name or a dispatch is that name; `specdev-scope` in Step 1 still gets the path.
+- `<scope-arg>`: step number (e.g. `04`), step range (e.g. `04-07`), `all`, or a file of `spec/common/` (e.g. `spec/common/seed_manifest.json`).
+  For that file the findings `scope` is the file name without folder and extension (`spec/common/seed_manifest.json` is `seed_manifest`): the schema allows only `[a-z0-9_-]+`
+  there. A file of `spec/common/` is reviewed read-only: the loop behaves as with `--review-only` (one round, prints the findings path, stops) and a person edits the seed files.
+  Below, `<scope-arg>` is the argument as typed and `<scope>` the name used in file names and dispatches (the same, except for such a file); `specdev-scope` in Step 1 gets `<scope-arg>`.
 - `--with-backlog`: wire `specdev upstream-backlog --json` and `specdev stale --json` output
   into a `cross_step_relational` reviewer. Surfaces `assumption` and `coverage` findings tied
   to unresolved upstream items, and `regression` and `drift` findings caused by changes above a
@@ -41,7 +42,7 @@ stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdi
   what an upstream edit makes suspect is listed by `specdev stale`, and the author accepts a link with
   `specdev attest` after reading it.
 
-When `--with-backlog` is set, `specdev-scope` always adds at least one `cross_step_relational`
+When `--with-backlog` is set, `specdev-scope` adds exactly one `cross_step_relational`
 reviewer to the fan-out plan, alongside any per-step reviewers.
 Per-step reviewers receive only their step's slice of the relational output to avoid
 context bloat.
@@ -61,7 +62,7 @@ Dispatch `specdev-scope` (Haiku agent) with:
 }
 ```
 
-If `--with-backlog` is set, include the flag in the dispatch input so
+If `--with-backlog` is set, add `"with_backlog": true` to the dispatch input so
 specdev-scope includes a `cross_step_relational` reviewer.
 
 Wait for the fan-out plan JSON:
@@ -109,7 +110,7 @@ Each reviewer receives its cluster slice from the fan-out plan:
   "scope_kind": "...",
   "reviewer_id": "r1",
   "round": <current_round>,
-  "scope": "<scope-identifier>",
+  "scope": "<scope>",
   "flags": {
     "with_backlog": <bool>
   }
@@ -132,7 +133,7 @@ specdev upstream-backlog spec --json \
 only the entry for its step (`specdev stale --step <NN> --json` prints that one).
 
 Each reviewer writes its own file:
-`.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
+`.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json`
 
 (Ensure the directory exists once per loop: `mkdir -p .specdev/findings`.)
 
@@ -158,7 +159,7 @@ If `findings[]` in `.specdev/findings/findings_<scope>_<round>.json` is empty:
 - Print: "CONVERGED at round <N>. No findings remain."
 - Return.
 
-If `--review-only` is set and `findings[]` is not empty:
+If `--review-only` is set, or the scope is a file of `spec/common/`, and `findings[]` is not empty:
 - Print: `REVIEW-ONLY: <N> findings (<P0_count> P0, <P1_count> P1, <P2_count> P2). Findings path: .specdev/findings/findings_<scope>_1.json`
 - Return. Do not dispatch Step 2d.
 
@@ -177,16 +178,16 @@ If findings remain, dispatch `specdev-impl` with:
 After Agent returns (blocker handling — canonical contract: `specdev-impl.md` § "Blocker emission protocol"):
 1. Parse return JSON.
 2. If `status != "blocker"`: check `gate_status`. If `gate_status: "errors"` and
-   `errors_remaining` is non-empty, carry those forward as context for the next round.
+   `errors_remaining` is non-empty, they are not dispatched again: the next round's reviewers read the artifact and raise what is still true.
    A finding of the merged file that is in neither `findings_closed` nor `findings_open` counts as open.
    Check one write per closed finding yourself before you count it: run `specdev node show <node> --json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
    (for a record with `file` and `pointer`: `specdev json read <file> '<pointer>' --repo-root ./devspec_toolkit`) and compare the field of `nodes[0].content` in the output with the record's `value`.
    A record with `deleted` (a node removed by `json delete --id`) reads back when that `node show <id>` exits 1 with `E706`. Match a record to its finding by `signature` and `location`.
-   A record whose value is not there moves its finding to open: carry it forward as context for the next round, as the `errors_remaining` are.
+   A record whose value is not there moves its finding to open (it counts in `O`; the next round's reviewers raise it again if it is still true).
    Print one line: `Round <N>: <C> findings closed by <E> edits, <O> open.` (`C` the closed findings that read back, `E` = `edits_applied`, `O` the open ones.)
 3. If `status == "blocker"`:
    a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-      If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
+      If malformed → print `HALT (blocker unresolved): malformed blocker payload` and surface to user (do NOT re-dispatch on a malformed payload).
       Malformed includes: `questions[]` empty, any entry missing required fields, edits
       written AND `status: "blocker"` simultaneously (timing-constraint violation).
    b. Persist audit trail:
@@ -197,7 +198,7 @@ After Agent returns (blocker handling — canonical contract: `specdev-impl.md` 
    c. Chunk questions into groups of ≤4. Call `AskUserQuestion` once per chunk, sequentially.
       Collect all answers keyed by `question.id`.
       If the user dismisses or does not answer an AskUserQuestion call (empty answer set
-      returned), HALT immediately. Surface: "Blocker unresolved: user did not answer
+      returned), HALT immediately. Print: "HALT (blocker unresolved): user did not answer
       clarification questions. Re-invoke /specdev-review <scope> to retry." Write a HALT
       artifact noting `aborted_by_user` to `.specdev/blockers/blocker_<scope>_aborted_<unix_ts>.json`.
       Do not re-dispatch.
@@ -215,7 +216,7 @@ After Agent returns (blocker handling — canonical contract: `specdev-impl.md` 
       dispatch chain; starts at 0 on first dispatch; cap = 2 re-dispatches (counter values 0,
       1, 2); does not persist across skill invocations; resets to 0 at the start of each new
       outer review-fix round (R1/R2/.../R5)).
-   f. If `blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
+   f. If `blocker_round > 2`: print `HALT (blocker unresolved): blocker_round exceeded 2` and surface to user (persistent blocking — no auto-retry).
    g. Fresh Agent dispatch with the augmented prompt. Continue from step 1.
    Note: lossy re-dispatch — accepted cost; the re-dispatched agent re-reads all context
    from scratch; user answers are the ONLY persistence across the bridge.
@@ -237,13 +238,15 @@ Do not promote it to a canonical name. The timestamped file IS the record.
 
 Print:
 ```
-HALT: max_rounds=5 reached with unresolved findings.
+HALT at round 5: max_rounds=5 reached with unresolved findings.
 Findings path: .specdev/findings/findings_<scope>_5_<unix_timestamp>.json
 Finding count: <N> (<P0_count> P0, <P1_count> P1, <P2_count> P2)
 Human action required: proceed-with-gaps | replay | hand-edit then re-invoke /specdev-review <scope>
 ```
 
 Do not silently accept partial convergence. HALT is a first-class verdict.
+
+The loop ends in one of three outcomes, named as `/specdev-step` names them: `CONVERGED at round <N>` (2c), `HALT at round 5` (this step), `HALT (blocker unresolved)` (the blocker bridge; no findings file).
 
 ---
 

@@ -29,8 +29,13 @@ resolution: |
      source `canon-accept` reads, so `canonical_proposals` must hold an item
      with the new text (with no proposals it prints `OK (no proposals found)`
      and changes nothing). For a glossary term the proposal must also equal the
-     term (E606): insert it when it is missing, or patch its `definition` and
-     `proposed_label`. Then see what would change, and write it:
+     term (E606): add it when it is missing (the array empty or absent:
+       specdev json patch spec/03_glossary.json '.canonical_proposals' '[<item>]' --repo-root ./devspec_toolkit
+     it has items:
+       specdev json insert spec/03_glossary.json '.canonical_proposals' '<item>' --repo-root ./devspec_toolkit
+     `json insert --step 03` is refused; the item holds `temp_id`, `kind`
+     (`term`), `proposed_label`, `definition` and `source_field`
+     (`terms[0].term`)), or patch its `definition` and `proposed_label`. Then see what would change, and write it:
        specdev canon-accept --from spec/03_glossary.json --namespace cn:project: --update --dry-run --repo-root ./devspec_toolkit --git-root .
        specdev canon-accept --from spec/03_glossary.json --namespace cn:project: --update --repo-root ./devspec_toolkit --git-root .
      It prints `~ updated: <canon-id>`. `--update` rewrites `definition`,

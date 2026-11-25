@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
@@ -53,8 +53,6 @@ _STREAMING_FILTER_RE = re.compile(r'\[\s*\]')
 
 # --- Configuration ---
 JQ_INDENT = 4  # Indent of a new file; an existing file keeps its own (see detect_indent)
-
-# jq starts with no environment: a filter such as ``$ENV.TOKEN`` or ``env.TOKEN`` reads null.
 
 
 def _jq_command(args: List[str]) -> List[str]:
@@ -100,6 +98,7 @@ def validate_jq_filter(jq_filter: str) -> Optional[str]:
     try:
         # Wrap in try/catch so runtime-only errors (null iteration, missing keys)
         # don't block valid filters — we only want to catch syntax errors here.
+        # jq starts with no environment (env={}): a filter such as ``$ENV.TOKEN`` or ``env.TOKEN`` reads null.
         result = subprocess.run(
             _jq_command(['-n', f'try ({jq_filter}) catch null']),
             capture_output=True, text=True, timeout=5, env={},
@@ -431,7 +430,7 @@ def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
 
 
 def _call_validate_or_raise(
-    eff_root: str, doc: dict, file_path: str, command: str = "json patch",
+    eff_root: str, doc: dict, file_path: str, command: str,
 ) -> List[SchemaViolation]:
     """Run schema_violations, mapping every schema-validation failure
     to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
@@ -469,7 +468,8 @@ def _ws1_differential_check(
     content: str,
     new_content: str,
     eff_root: str,
-    command: str = "json patch",
+    *,
+    command: str,
 ) -> None:
     """Run the WS1 differential validation algorithm.
 
@@ -599,10 +599,12 @@ def _added_violations(
 def check_edit(file_path: str, content: str, new_content: str, repo_root: Optional[str]) -> None:
     """Refuse (``JsonUtilsError``) *new_content* when it adds a schema violation to *content*, the text of *file_path*.
 
-    The same differential check ``json patch`` and ``json insert`` run before they write, for a caller that holds the
-    edited text in memory.  Violations that *content* already had are ignored.
+    The same differential check ``json patch`` and ``json insert`` run before they write (the refusal names
+    ``json patch``), for a caller that holds the edited text in memory.  Violations that *content* already had are ignored.
     """
-    _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root))
+    _ws1_differential_check(
+        file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command="json patch",
+    )
 
 
 def _run_value_filter(filter_expr: str, content: str, value: str, is_json: bool) -> str:
@@ -704,12 +706,15 @@ def _warn_if_many(path_selector: str, count: Optional[int]) -> None:
         print(f"warning: '{path_selector}' matches {count} values; all {count} are changed.", file=sys.stderr)
 
 
-def _edit_counted(content: str, path_selector: str, location: str, edit: Any, *, existing_only: bool) -> str:
-    """Run ``edit()`` (a patch or delete of *path_selector* in the text *content*) and return the new text.
+def _edit_counted(
+    content: str, path_selector: str, location: str, edit: Callable[[], str], *, existing_only: bool,
+) -> tuple[str, Optional[int]]:
+    """Run ``edit()`` (a patch or delete of *path_selector* in the text *content*) and return the new text and count.
 
     Raises ``JsonUtilsError`` before the edit when the selector matches nothing (with *existing_only*, nothing that
     exists and can be deleted); warns on stderr when it matches several values.  The one place both ``json patch`` /
-    ``json delete`` and a batch item get this refusal.
+    ``json delete`` and a batch item get this refusal.  Returns ``(new text, match count)``; the caller warns
+    (``_warn_if_many``) once the edit has passed its schema check, so the warning is true.
     """
     count = _count_targets(content, path_selector, existing_only=existing_only)
     if count == 0 and existing_only:
@@ -722,9 +727,7 @@ def _edit_counted(content: str, path_selector: str, location: str, edit: Any, *,
             f"The selector '{path_selector}' matches nothing in {location}: nothing was changed. "
             "Check the filter (a select() that names no item, or an index past the end of an array?)."
         )
-    new_content = edit()
-    _warn_if_many(path_selector, count)
-    return new_content
+    return edit(), count
 
 
 _SUMMARY_MAX_MATCHES = 5
@@ -790,13 +793,14 @@ def json_patch(
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    new_content = _edit_counted(
+    new_content, count = _edit_counted(
         content, path_selector, file_path, lambda: patch_text(content, path_selector, value, is_json), existing_only=False,
     )
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
-        _ws1_differential_check(file_path, content, new_content, eff_root)
+        _ws1_differential_check(file_path, content, new_content, eff_root, command="json patch")
+    _warn_if_many(path_selector, count)
 
     if dry_run:
         return _dry_run_text(
@@ -810,10 +814,10 @@ def json_patch(
 _BATCH_VERBS = {"patch": "update", "insert": "insert into", "delete": "delete"}
 
 
-def _apply_batch_item(index: int, item: Any, content: str, location: str) -> tuple[str, str, str]:
+def _apply_batch_item(index: int, item: Any, content: str, location: str) -> tuple[str, str, str, Optional[int]]:
     """Apply one item of a batch file to the JSON text *content*.
 
-    Returns ``(verb, path, new_content)``.  Raises ``JsonUtilsError("batch item <i> (<op> <path>): <reason>")`` for a
+    Returns ``(verb, path, new_content, match count)`` (the count is None for an insert).  Raises ``JsonUtilsError("batch item <i> (<op> <path>): <reason>")`` for a
     malformed item, a selector that matches nothing or a failing jq filter.
     """
     op = item.get("op") if isinstance(item, dict) else None
@@ -827,16 +831,18 @@ def _apply_batch_item(index: int, item: Any, content: str, location: str) -> tup
         raise JsonUtilsError(f"{label}: 'value' is missing")
     try:
         if op == "delete":
-            new_content = _edit_counted(content, path, location, lambda: delete_text(content, path), existing_only=True)
-            return _BATCH_VERBS[op], path, new_content
+            new_content, count = _edit_counted(
+                content, path, location, lambda: delete_text(content, path), existing_only=True,
+            )
+            return _BATCH_VERBS[op], path, new_content, count
         value = json.dumps(item["value"], ensure_ascii=False)
         if op == "patch":
-            new_content = _edit_counted(
+            new_content, count = _edit_counted(
                 content, path, location, lambda: patch_text(content, path, value, True), existing_only=False,
             )
         else:
-            new_content = insert_text(content, path, value, True)
-        return _BATCH_VERBS[op], path, new_content
+            new_content, count = insert_text(content, path, value, True), None
+        return _BATCH_VERBS[op], path, new_content, count
     except JsonUtilsError as error:
         raise JsonUtilsError(f"{label}: {error}") from error
 
@@ -869,16 +875,22 @@ def json_patch_batch(
         original = f.read()
     running = original
     reports: list[str] = []
+    counts: list[tuple[str, Optional[int]]] = []
     for index, item in enumerate(ops):
         before = running
-        verb, path, running = _apply_batch_item(index, item, before, file_path)
+        verb, path, running, count = _apply_batch_item(index, item, before, file_path)
+        counts.append((path, count))
         if dry_run and not show_file and index < _SUMMARY_MAX_MATCHES:
             new = None if verb == "delete" else (item["value"],)
             reports.append(_dry_run_text(
                 verb, path, file_path, before, running, new=new, show_old=verb != "insert into", show_file=False,
             ))
 
-    _ws1_differential_check(file_path, original, running, resolve_effective_toolkit_root(repo_root))
+    _ws1_differential_check(
+        file_path, original, running, resolve_effective_toolkit_root(repo_root), command="json patch --batch",
+    )
+    for path, count in counts:
+        _warn_if_many(path, count)
     if not dry_run:
         json_write_atomic(file_path, running)
         return f"Applied {len(ops)} operations to {file_path}"
@@ -936,7 +948,7 @@ def json_insert(
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
-        _ws1_differential_check(file_path, content, new_content, eff_root, "json insert")
+        _ws1_differential_check(file_path, content, new_content, eff_root, command="json insert")
 
     if dry_run:
         return _dry_run_text(
@@ -977,11 +989,12 @@ def json_delete(
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    new_content = _edit_counted(
+    new_content, count = _edit_counted(
         content, path_selector, file_path, lambda: delete_text(content, path_selector), existing_only=True,
     )
     if validate:
-        _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root), "json delete")
+        _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command="json delete")
+    _warn_if_many(path_selector, count)
     if dry_run:
         return _dry_run_text(
             "delete", path_selector, file_path, content, new_content, new=None, show_old=True, show_file=show_file,
@@ -1857,7 +1870,10 @@ def build_json_parser() -> argparse.ArgumentParser:
     p_del.add_argument("path", help="jq path to target")
     p_del.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
     p_del.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
-    _add_repo_root(p_del, "delete")
+    p_del.add_argument(
+        "--repo-root", default=".",
+        help="Toolkit root for the schema check (as for patch); falls back to the package-relative toolkit root",
+    )
 
     # Keys
     p_keys = subparsers.add_parser("keys", help="List keys")

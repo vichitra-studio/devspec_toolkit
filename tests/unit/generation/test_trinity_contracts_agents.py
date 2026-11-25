@@ -81,7 +81,8 @@ def test_no_open_item_carries_a_severity_and_no_example_names_a_plan_item_in_abo
 def test_the_impl_agent_has_the_allow_list_once() -> None:
     text = " ".join(_text("impl").split())
     sentence = (
-        "This agent writes code under `target_file_patterns`, runs `specdev plan record`, runs `specdev verify run`, and writes "
+        "This agent writes code under `target_file_patterns`, runs `specdev plan record`, runs `specdev verify run`, runs "
+        "`specdev verify bind` (it writes the tool-owned `spec/extras/verification/<binding-id>.json`), and writes "
         "open items into the plan's `execution.emergent_ambiguities`; nothing else."
     )
     assert text.count(sentence) == 1

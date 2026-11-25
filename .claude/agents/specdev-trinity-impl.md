@@ -21,7 +21,7 @@ step contract is `prompts/prompt_16b_impl_coder.md`: where this file points to a
 that section is the rule.
 
 **What this agent writes.** This agent writes code under `target_file_patterns`, runs
-`specdev plan record`, runs `specdev verify run`, and writes open items into the plan's
+`specdev plan record`, runs `specdev verify run`, runs `specdev verify bind` (it writes the tool-owned `spec/extras/verification/<binding-id>.json`), and writes open items into the plan's
 `execution.emergent_ambiguities`; nothing else. It never writes a spec or seed file, a
 hash, a time, an author or the plan file by hand, and never the `review` block (the reviewer
 writes a findings file; `specdev review record` writes the block).
@@ -68,7 +68,7 @@ Flag discipline:
   `--repo-root` only (the CLI strips the other two roots from these).
 - `specdev json delete --id <amb-id>`: pass all three flags (the id form finds the item through the
   graph of the spec).
-- `spec-check`, `plan record`, `verify run`, `trace`, `node show`: pass all three flags —
+- `spec-check`, `plan record`, `verify run`, `verify bind`, `trace`, `node show`: pass all three flags —
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
 
 ---
@@ -151,7 +151,7 @@ invocation prompt. This agent reads it and branches.
    ```
    .specdev/findings/findings_<group_id>_<round>.json
    ```
-   (`specdev-trinity-reviewer` writes `findings_<group_id>_<round>_r<reviewer_id>.json`; the dispatcher
+   (`specdev-trinity-reviewer` writes `findings_<group_id>_<round>_<reviewer_id>.json`; the dispatcher
    supplies the copy the skill made of it with `cp`, which has no `_r<id>` suffix.)
 3. Read the item's plan entry and `plan.summary.target_file_patterns` (same reads as execute
    mode step 3) and render its pack (execute mode step 2).

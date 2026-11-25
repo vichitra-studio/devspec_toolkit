@@ -209,6 +209,7 @@ def test_t09_a_python_without_pyyaml_says_so(tmp_path, monkeypatch):
     result = _t09_findings(tmp_path, [_T09_TRIGGER])
     assert len(result) == 1, f"Expected one finding, got {result}"
     assert "PyYAML is not installed" in result[0]["message"]
+    assert "PyYAML is not installed" in " ".join(result[0]["evidence"])
     assert "no changelog YAML entry found" not in result[0]["message"]
 
 

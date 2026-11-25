@@ -71,7 +71,7 @@ Dispatcher (skill or orchestrator) provides:
   "scope_kind": "step_range",
   "reviewer_id": "r1",
   "round": 1,
-  "scope": "steps-04-05",
+  "scope": "04-05",
   "flags": {
     "with_backlog": false
   }
@@ -157,7 +157,7 @@ Tie-breaks between kinds that overlap (pick the first that fits):
 `near-duplicate` is review judgement, not a check: two nodes of one kind with the same upstream link and
 overlapping downstream links that state one obligation, or two nodes of different kinds that state the same
 obligation (an API error and an invariant that both say an unknown id returns 404). Report it as kind `drift`, severity P2, with a
-`message` that STARTS with the fixed word `near-duplicate:` followed by the two node ids and the advice
+`message` that STARTS with the fixed word `near-duplicate:` followed by the two node ids in alphabetical order (`location` is the first of them) and the advice
 to merge or delete one (the signature is a hash of the message, so the fixed word keeps it stable
 across reviewers).
 
@@ -205,7 +205,7 @@ positions, no time-of-day-dependent behavior, no non-deterministic resolution or
 
 Write the findings file to:
 ```
-.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json
+.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json
 ```
 
 The `.specdev/findings/` directory is scratch.
@@ -217,7 +217,7 @@ The file MUST conform to `vc:infra:findings` (schema URI). Wrapper shape:
 {
   "$schema": "vc:infra:findings",
   "round": 1,
-  "scope": "steps-04-05",
+  "scope": "04-05",
   "generated_at": 1716220800,
   "findings": [
     {
@@ -260,7 +260,7 @@ The merge step is performed by the skill using a jq one-liner; it is the only me
 After writing the findings file, validate it:
 
 ```bash
-specdev validate .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json \
+specdev validate .specdev/findings/findings_<scope>_<round>_<reviewer_id>.json \
   --repo-root ./devspec_toolkit
 ```
 
@@ -304,11 +304,11 @@ If validation fails, fix the output before returning. Do not return an invalid f
    checks: verify the artifact's content does not contradict or ignore the seed docs read in
    step 1b. Emit `seed-grounding` findings where an FR, NFR, invariant, fixture, or
    implementation claim conflicts with — or fails to reflect — the seed content.
-8. Write findings file to `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
+8. Write findings file to `.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json`
    (create the directory with `mkdir -p .specdev/findings` if it does not exist).
    Compute `generated_at` as an integer Unix epoch: `jq -n 'now | floor'`.
 9. Run `specdev validate` on own output.
-10. Return: "findings written to .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json.
+10. Return: "findings written to .specdev/findings/findings_<scope>_<round>_<reviewer_id>.json.
     Finding count: N. Convergence: CONVERGED / NOT CONVERGED."
 
 ---

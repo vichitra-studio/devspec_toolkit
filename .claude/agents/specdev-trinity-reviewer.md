@@ -271,7 +271,7 @@ the findings; no tool enforces them and you never say one does.
 
 Write the findings file to:
 ```
-.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json
+.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json
 ```
 
 The `.specdev/findings/` directory is scratch that nothing in the toolkit adds to `.gitignore`: write the findings
@@ -326,7 +326,7 @@ The merge step is performed by the skill using the jq one-liner.
 After writing the findings file, validate it:
 
 ```bash
-specdev validate .specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json \
+specdev validate .specdev/findings/findings_<scope>_<round>_<reviewer_id>.json \
   --repo-root ./devspec_toolkit
 ```
 
@@ -397,11 +397,11 @@ If validation fails, fix the output before returning. Do not return an invalid f
 10. Apply all E-pattern enforcement checks in order: E2 full-sweep (all nine buckets),
     E5 architectural invariants, E8 citations, then the stop predicates of the scope. Build
     findings array.
-11. Write findings file to `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`
+11. Write findings file to `.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json`
     (create the directory with `mkdir -p .specdev/findings` if it does not exist).
     Compute `generated_at` as an integer Unix epoch: `jq -n 'now | floor'`.
 12. Run `specdev validate` on own output.
-13. Return: "findings written to `.specdev/findings/findings_<scope>_<round>_r<reviewer_id>.json`.
+13. Return: "findings written to `.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json`.
     Finding count: N. Convergence: CONVERGED / NOT CONVERGED."
 
 ---

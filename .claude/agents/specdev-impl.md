@@ -30,10 +30,10 @@ Bash surface is restricted to these subcommand families only:
 | Command | Mode | Purpose |
 |---|---|---|
 | `specdev step create <NN> --from <draft>` | author | Write the whole artifact of step NN from a draft file; refuses a step that already has a file |
-| `specdev json patch --id <node-id> '<field-path>' '<value>'` | fix/author-extend | Replace a field of the node with that id |
-| `specdev json insert --id <node-id> '<array-field>' '<value>'` | fix/author-extend | Append to an array field of the node with that id |
+| `specdev json patch --id <node-id> '<field-path>' '<value>'` | all | Replace a field of the node with that id |
+| `specdev json insert --id <node-id> '<array-field>' '<value>'` | all | Append to an array field of the node with that id |
 | `specdev json insert --step <NN> '<collection-path>' '<item>'` | fix/author-extend | Add a new node to a collection of step NN, e.g. `.functional_requirements` |
-| `specdev json delete --id <node-id>` | fix | Remove the node with that id |
+| `specdev json delete --id <node-id>` | all | Remove the node with that id |
 | `specdev json read\|patch\|insert <plan> '.plan.ambiguities' ... --repo-root <toolkit>` | fix | Open items of a milestone plan only (section "Answers that another step or a seed owns") |
 | `ls spec/<NN>_*.json` | author/author-extend | Whether the step's file exists |
 | `specdev json structure <file>` | both | Shape probe before composing any filter |
@@ -42,13 +42,13 @@ Bash surface is restricted to these subcommand families only:
 | `specdev node candidates --kind <kind> --field <link-field>` (or `--for <node-id>`) | both | Ids a link field may point at |
 | `specdev stale` | author-extend | Steps pending replay and the suspect links in them |
 | `specdev node show <id> [--json] --repo-root <toolkit> --spec-root <spec> --git-root <root>` | fix | Read a node or an open item back after a write (steps 4b and 4c); prints its content |
-| `specdev json read <file> '<filter>' --repo-root <toolkit>` | fix | Read one field back (step 4b); `<file>` is `spec/<file>` |
+| `specdev json read <file> '<filter>' --repo-root <toolkit>` | all | Read upstream content or one field back (step 4b); `<file>` is `spec/<file>` |
 | `specdev upstream-backlog spec --repo-root <toolkit> --json` | all | Open items of the spec, read before a blocker or a new open item (section "Blocker emission protocol") |
 | `specdev spec-check spec --step <NN> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | both | Step gate — runs after every edit batch |
 | `specdev validate <path> --repo-root <toolkit>` | both | Single-file validation during iterative fix |
-| `specdev canon-accept --from <file> --repo-root <toolkit> --git-root <root> --namespace cn:project: --owner product` | fix | Promote new project terms to canon |
+| `specdev canon-accept --from <file> --repo-root <toolkit> --git-root <root> --namespace cn:project: --owner product` | author (after step 03), fix | Promote new project terms to canon |
 | `specdev canon-accept --from <file> --repo-root <toolkit> --git-root <root> --namespace cn:project: --owner product --update` | fix | Refresh the canon entries of glossary terms whose text was edited |
-| `specdev governance-check <spec> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | both | Governance gate after any commit-ready batch |
+| `specdev json read\|patch\|insert spec/03_glossary.json '.canonical_proposals...' ... --repo-root <toolkit>` | fix | File form, for the canon proposals of the glossary only: add an entry, find the index of one, change its `definition` (section "Two-tier canon write rules") |
 
 No `specdev findings emit/merge/dedup`. No `specdev validate-all`.
 Do NOT use bare `specdev validate` as the primary gate — use `specdev spec-check` (resolves
@@ -71,7 +71,7 @@ or a skill file). Do NOT use Edit on any `spec/*.json` file — use `specdev jso
 Write is allowed ONLY for the draft file of author mode, which lives outside `spec/`
 (`.specdev/drafts/step_<NN>.json`). The step file itself is created by `specdev step create`,
 never by Write. Never use Write on anything under `spec/` — use `specdev json patch/insert/delete`
-with `--id` or `--step` in author-extend and fix modes.
+with `--id` or `--step` in author-extend and fix modes; the one exception is the file form on `.canonical_proposals` of `spec/03_glossary.json` (section "Two-tier canon write rules").
 
 Edits by node id write the trace lock themselves and show the link targets they touch. Never
 write a hash or a lock entry by hand and never ask the dispatcher for one.
@@ -85,7 +85,7 @@ Flag discipline:
 - `specdev json patch|insert|delete --id`, `specdev json insert --step`, `step create`,
   `node candidates`: pass all three flags — `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`.
   Without `--spec-root` they read `./spec` of the current folder.
-- `spec-check`, `governance-check`: pass all three flags —
+- `spec-check`: pass all three flags —
   `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
 - `validate`: pass `--repo-root` only. `specdev validate <path> --repo-root ./devspec_toolkit`.
 - `canon-accept`: uses `--git-root`, NOT `--spec-root`. Never pass `--spec-root` to canon-accept.
@@ -404,7 +404,7 @@ specdev json insert --step <NN> .ambiguities \
   '{"description": "<the question>", "about": ["<node or seed id>"], "decision": "<the chosen option label>"}' \
   --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
-`description` and `about` are required; leave `decision` out when there is no answer yet.
+`description` and `about` are required; leave `decision` out when there is no answer yet. `about` names a seed or a node of an EARLIER step; a node of the same step is refused (`E767` with `E702 ... the target is in the same step`, nothing written; `specdev node candidates --kind ambiguity-item --field about` lists the valid targets).
 `proposed_assumption` (the basis on which work proceeds) and `missing_kind` are optional. The
 id is minted. An item is deleted with `specdev json delete --id <item-id>` once its `decision`
 has been applied, in fix mode or in the batch pass that reads `specdev upstream-backlog`.
@@ -481,10 +481,12 @@ The `cn:project:` namespace scopes entries to the host repo's `spec/canon/`. The
 When a fix edits the `definition` or the `term` text of a glossary term whose canon entry exists (its `term_ref` names it), edit the term and
 its `canonical_proposals` entry together (E606 compares them), then run the command above with `--update` after the edit batch. The canon
 entry is stale until you do: `spec-check` reports `E607 GLOSSARY_CANON_DRIFT`. The command prints `~ updated: <canon id>` for each entry it
-rewrites in both `spec/canon/manifest.json` and `spec/canon/kinds/<kind>.json`; without `--update` it prints `! changed (not updated, use --update)`
-and writes nothing. When `canonical_proposals` has no entry for the term, `--update` prints `OK (no proposals found)` and changes nothing: first add one,
+rewrites in `spec/canon/manifest.json` and, when the host has `spec/canon/kinds/<kind>.json`, in it (it creates no kind file); without `--update` it prints `! changed (not updated, use --update)`
+and writes nothing. When `canonical_proposals` is empty, `--update` prints `OK (no proposals found)` and changes nothing (when it holds only other entries, `--update` adds those: `+ added:`): first add one for the term,
 `specdev json patch spec/03_glossary.json '.canonical_proposals' '[{"temp_id": "<canon id without cn:project:term:>", "kind": "term", "proposed_label": "<term>", "definition": "<the new definition>", "source_field": "terms[*].term_ref"}]' --repo-root ./devspec_toolkit`
-(`specdev json insert spec/03_glossary.json '.canonical_proposals' '<item>' --repo-root ./devspec_toolkit` when the array already has items), then run `--update`. Never edit `spec/canon/` by hand or with a script.
+(`specdev json insert spec/03_glossary.json '.canonical_proposals' '<item>' --repo-root ./devspec_toolkit` when the array already has items), then run `--update`. To change the `definition` of an existing entry, find its index, then patch it (keep it equal to the term's, E606):
+`specdev json read spec/03_glossary.json '.canonical_proposals | to_entries[] | select(.value.temp_id=="<canon id without cn:project:term:>") | .key' --repo-root ./devspec_toolkit` prints `<i>`;
+`specdev json patch spec/03_glossary.json '.canonical_proposals[<i>].definition' '"<the new definition>"' --repo-root ./devspec_toolkit`. Never edit `spec/canon/` by hand or with a script.
 
 ---
 
@@ -536,6 +538,8 @@ write commands that touched the finding; `parts` the number of parts you read ba
 A finding you fixed with `specdev json delete --id <id>` has `"deleted": "<id>"` in place of `node`, `field` and `value`: its read-back is
 `specdev node show <id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` exiting 1 with `E706 no node with the id`.
 Every finding of the file is in exactly one of the two lists; the skill matches a record to its finding by `signature` together with `location`.
+
+For `author` mode the summary is `{"mode": "author", "edits_applied": <number of write commands>, "gate_status": "clean", "errors_remaining": []}`.
 
 For `author-extend` mode, include a `pending_replay` field naming the steps that
 `specdev stale` lists (an empty list when it lists none):

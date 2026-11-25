@@ -44,7 +44,7 @@ def test_batch_equals_sequential_patches(tmp_path: Path, target: Path) -> None:
 
 def test_batch_validates_once(tmp_path: Path, target: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
-    monkeypatch.setattr(json_utils, "_ws1_differential_check", lambda *args: calls.append("check"))
+    monkeypatch.setattr(json_utils, "_ws1_differential_check", lambda *args, **kwargs: calls.append("check"))
     json_patch_batch(str(target), str(_ops(tmp_path, _text_ops())))
     assert calls == ["check"]
 

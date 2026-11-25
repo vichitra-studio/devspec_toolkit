@@ -4,10 +4,10 @@ import json
 import os
 from typing import Any
 
-from ..canonical.registry import load_tier_entries
+from ..canonical.registry import label_matches_entry, load_tier_entries
 from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
-from ..graph.contract import normalise_text
+from ..graph.contract import normalise_text as _normalise
 
 _PROJECT_PREFIX = "cn:project:"
 _GLOSSARY_FILE = "03_glossary.json"
@@ -17,11 +17,6 @@ _SNIPPET_LENGTH = 30
 def _load_json(path: str) -> Any:
     with open(path, encoding="utf-8") as f:
         return json.load(f)
-
-
-def _normalise(text: str) -> str:
-    """The one text normalisation of the toolkit (``graph.contract.normalise_text``): layout, Unicode form, curly quotes and dashes are not drift."""
-    return normalise_text(text)
 
 
 def _fold(text: str) -> str:
@@ -70,10 +65,9 @@ def _label_texts(entry: dict[str, Any]) -> list[str]:
 
 def _label_difference(label: str, entry: dict[str, Any]) -> str | None:
     """Detail suffix when *label* is neither the entry's preferred label nor an alias, else None."""
-    labels = _label_texts(entry)
-    if not labels or any(_fold(label) == _fold(known) for known in labels):
+    if label_matches_entry(label, entry):
         return None
-    return _difference_detail("spec", _fold(label), "canon", _fold(labels[0]))
+    return _difference_detail("spec", _fold(label), "canon", _fold(_label_texts(entry)[0]))
 
 
 def _check_term_proposal_drift(

@@ -107,10 +107,7 @@ Dispatch `specdev-impl` with `mode: "author"`:
 ```json
 {
   "mode": "author",
-  "step": "<NN>",
-  "repo_root": "./devspec_toolkit",
-  "spec_root": "./spec",
-  "git_root": "."
+  "step": "<NN>"
 }
 ```
 

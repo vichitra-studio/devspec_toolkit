@@ -63,6 +63,7 @@ def test_one_indent_detector_serves_the_migration_writer() -> None:
     assert writer.detect_indent is detect_indent
     assert detect_indent('{\r\n\t"a": 1\r\n}\r\n') == "\t"
     assert detect_indent('{\n  "a": 1\n}') == "  "
+    assert detect_indent('{\r\n  \r\n\t"a": 1\r\n}') == "\t"  # a blank CRLF line is not an indented line
 
 
 def test_json_write_atomic_keeps_the_file_mode(tmp_path: Path) -> None:

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..core.errors import SpecError, make_error
+from ..graph.contract import normalise_text
 
 
 @dataclass(frozen=True)
@@ -86,7 +87,7 @@ class CanonicalRegistry:
         alias_lifecycle: dict[tuple[str, str], dict] = {}
 
         def register_alias(kind: str, alias_value: str, target_id: str, status: str = "active") -> None:
-            normalized = _norm(alias_value)
+            normalized = normalise_label(alias_value)
             if not normalized:
                 return
             key = (kind, normalized)
@@ -129,7 +130,7 @@ class CanonicalRegistry:
             register_alias(kind, normalized, target_id, status=alias.get("status", "active"))
             lc = alias.get("lifecycle")
             if isinstance(lc, dict):
-                alias_lifecycle[(kind, _norm(normalized))] = lc
+                alias_lifecycle[(kind, normalise_label(normalized))] = lc
 
         return cls(entries=entries, aliases=aliases, alias_status=alias_status, load_errors=load_errors, alias_lifecycle=alias_lifecycle)
 
@@ -137,20 +138,20 @@ class CanonicalRegistry:
         return self.entries.get(canonical_id)
 
     def resolve_alias(self, kind: str, value: str) -> str | None:
-        key = (kind, _norm(value))
+        key = (kind, normalise_label(value))
         targets = self.aliases.get(key, set())
         if len(targets) == 1:
             return next(iter(targets))
         return None
 
     def alias_candidates(self, kind: str, value: str) -> list[str]:
-        return sorted(self.aliases.get((kind, _norm(value)), set()))
+        return sorted(self.aliases.get((kind, normalise_label(value)), set()))
 
     def alias_is_deprecated(self, kind: str, value: str) -> bool:
-        return self.alias_status.get((kind, _norm(value))) == "deprecated"
+        return self.alias_status.get((kind, normalise_label(value))) == "deprecated"
 
     def alias_is_sunset(self, kind: str, value: str) -> bool:
-        key = (kind, _norm(value))
+        key = (kind, normalise_label(value))
         lc = self.alias_lifecycle.get(key)
         if not isinstance(lc, dict):
             return False
@@ -190,7 +191,7 @@ class CanonicalRegistry:
             if len(candidates) > 1:
                 errs.append(make_error("E140", f"AMBIGUOUS_ALIAS kind={kind} alias={alias_used} candidates={candidates}"))
             elif self.alias_is_deprecated(kind, alias_used):
-                lc = self.alias_lifecycle.get((kind, _norm(alias_used)), {})
+                lc = self.alias_lifecycle.get((kind, normalise_label(alias_used)), {})
                 replaced_by = lc.get("replaced_by", "")
                 if self.alias_is_sunset(kind, alias_used):
                     errs.append(make_error("E125", f"ALIAS_SUNSET_EXPIRED kind={kind} alias={alias_used} replaced_by={replaced_by}"))
@@ -214,7 +215,17 @@ def load_tier_entries(
     return [entry.payload for entry in sorted(registry.entries.values(), key=lambda e: e.id)]
 
 
-def _norm(value: str) -> str:
+def label_matches_entry(label: str, entry: dict[str, Any]) -> bool:
+    """Whether *label* is the preferred label or an alias of *entry*, ignoring case, layout, quote and dash forms.
+
+    The one comparison of E607 and ``canon-accept`` for "is this the entry's label".
+    """
+    known = [entry["preferred_label"]] if isinstance(entry.get("preferred_label"), str) else []
+    known.extend(a for a in (entry.get("aliases") or []) if isinstance(a, str))
+    return not known or any(normalise_text(label).casefold() == normalise_text(k).casefold() for k in known)
+
+
+def normalise_label(value: str) -> str:
     # Treat whitespace, underscores, and hyphens as equivalent separators.
     tokens = [part for part in re.split(r"[\s_-]+", (value or "").lower().strip()) if part]
     return " ".join(tokens)
@@ -232,8 +243,8 @@ def _version_matches(actual: str, expected: str) -> bool:
 def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | None, list[SpecError]]:
     load_errors: list[SpecError] = []
     manifest_path = root / canon_dir / "manifest.json"
-    manifest = _read_json_file(manifest_path, load_errors, "invalid_manifest") if manifest_path.exists() else None
-    modular = _load_modular_manifest(root / canon_dir, load_errors)
+    manifest = read_json_file(manifest_path, load_errors, "invalid_manifest") if manifest_path.exists() else None
+    modular = load_modular_manifest(root / canon_dir, load_errors)
     if manifest is None and modular is None:
         combined = None
     elif manifest is None:
@@ -262,7 +273,7 @@ def _load_examples_manifests(canon_root: Path, load_errors: list[SpecError]) -> 
     found_any = False
 
     for example_file in sorted(examples_dir.glob("*.json")):
-        doc = _read_json_file(example_file, load_errors, "invalid_examples_file")
+        doc = read_json_file(example_file, load_errors, "invalid_examples_file")
         if not isinstance(doc, dict):
             continue
         raw_entries = doc.get("entries")
@@ -287,21 +298,30 @@ def _load_examples_manifests(canon_root: Path, load_errors: list[SpecError]) -> 
     }
 
 
-def _load_modular_manifest(canon_root: Path, load_errors: list[SpecError]) -> dict[str, Any] | None:
+def load_modular_manifest(canon_root: Path, load_errors: list[SpecError]) -> dict[str, Any] | None:
     aliases_path = canon_root / "aliases.json"
-    aliases_doc = _read_json_file(aliases_path, load_errors, "invalid_aliases") if aliases_path.exists() else None
+    aliases_doc = read_json_file(aliases_path, load_errors, "invalid_aliases") if aliases_path.exists() else None
 
     kinds_dir = canon_root / "kinds"
     kind_docs: list[tuple[Path, dict[str, Any]]] = []
     if kinds_dir.exists() and kinds_dir.is_dir():
         for kind_file in sorted(kinds_dir.glob("*.json")):
-            kind_doc = _read_json_file(kind_file, load_errors, "invalid_kind_file")
+            kind_doc = read_json_file(kind_file, load_errors, "invalid_kind_file")
             if isinstance(kind_doc, dict):
                 kind_docs.append((kind_file, kind_doc))
 
     if aliases_doc is None and not kind_docs:
         return None
+    return compose_modular_manifest(aliases_doc, aliases_path, kind_docs, load_errors)
 
+
+def compose_modular_manifest(
+    aliases_doc: dict[str, Any] | None,
+    aliases_path: Path,
+    kind_docs: list[tuple[Path, dict[str, Any]]],
+    load_errors: list[SpecError],
+) -> dict[str, Any]:
+    """The manifest-shaped view of already-read ``aliases.json`` and ``kinds/*.json`` documents; problems go to *load_errors*."""
     entries: list[dict[str, Any]] = []
     registry_version: str | None = None
     for kind_file, kind_doc in kind_docs:
@@ -353,21 +373,21 @@ def _load_modular_manifest(canon_root: Path, load_errors: list[SpecError]) -> di
 
 def merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> dict[str, Any]:
     entries_by_id: dict[str, dict[str, Any]] = {}
-    for raw in _iter_dicts(manifest.get("entries", [])):
+    for raw in iter_dicts(manifest.get("entries", [])):
         entry_id = raw.get("id")
         if isinstance(entry_id, str) and entry_id:
             entries_by_id[entry_id] = dict(raw)
-    for raw in _iter_dicts(modular.get("entries", [])):
+    for raw in iter_dicts(modular.get("entries", [])):
         entry_id = raw.get("id")
         if isinstance(entry_id, str) and entry_id:
             entries_by_id[entry_id] = dict(raw)
 
     aliases_by_key: dict[tuple[str, str, str, str], dict[str, Any]] = {}
-    for raw in _iter_dicts(manifest.get("aliases", [])):
+    for raw in iter_dicts(manifest.get("aliases", [])):
         key = _alias_key(raw)
         if key is not None:
             aliases_by_key[key] = dict(raw)
-    for raw in _iter_dicts(modular.get("aliases", [])):
+    for raw in iter_dicts(modular.get("aliases", [])):
         key = _alias_key(raw)
         if key is not None:
             aliases_by_key[key] = dict(raw)
@@ -383,7 +403,7 @@ def merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> di
     return merged
 
 
-def _read_json_file(path: Path, load_errors: list[SpecError], error_kind: str) -> dict[str, Any] | None:
+def read_json_file(path: Path, load_errors: list[SpecError], error_kind: str) -> dict[str, Any] | None:
     try:
         with path.open("r", encoding="utf-8") as f:
             data = json.load(f)
@@ -396,7 +416,7 @@ def _read_json_file(path: Path, load_errors: list[SpecError], error_kind: str) -
     return data
 
 
-def _iter_dicts(values: Any) -> list[dict[str, Any]]:
+def iter_dicts(values: Any) -> list[dict[str, Any]]:
     if not isinstance(values, list):
         return []
     return [value for value in values if isinstance(value, dict)]
@@ -409,4 +429,4 @@ def _alias_key(alias: dict[str, Any]) -> tuple[str, str, str, str] | None:
     status = alias.get("status", "active")
     if not isinstance(kind, str) or not isinstance(normalized, str) or not isinstance(target_id, str):
         return None
-    return (kind, _norm(normalized), target_id, str(status))
+    return (kind, normalise_label(normalized), target_id, str(status))

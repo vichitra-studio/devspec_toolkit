@@ -21,11 +21,11 @@ from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry, get_schema_validator, get_shared_registry
 from .registry import (
-    _iter_dicts,
-    _load_modular_manifest,
-    _norm,
-    _read_json_file,
+    compose_modular_manifest,
+    iter_dicts,
     merge_manifest_data,
+    normalise_label,
+    read_json_file,
 )
 
 CANON_ALIASES_SCHEMA_URI = "vc:canon:aliases"
@@ -53,8 +53,8 @@ def lint_canon_dir(
     fallback_registry_path = sr_root / "schema_registry.json"
 
     errs: list[SpecError] = []
-    manifest = _read_json_file(manifest_path, errs, "invalid_manifest") if manifest_path.exists() else None
-    aliases_doc = _read_json_file(aliases_path, errs, "invalid_aliases") if aliases_path.exists() else None
+    manifest = read_json_file(manifest_path, errs, "invalid_manifest") if manifest_path.exists() else None
+    aliases_doc = read_json_file(aliases_path, errs, "invalid_aliases") if aliases_path.exists() else None
     kind_docs = _load_kind_docs(kinds_dir, errs) if kinds_dir.exists() else []
     canonical_docs_present = manifest is not None or aliases_doc is not None or bool(kind_docs)
 
@@ -90,7 +90,7 @@ def lint_canon_dir(
     if manifest is None and manifest_path.exists() and not modular_present:
         return errs
 
-    modular_manifest = _load_modular_manifest_once(canon_root, errs) if modular_present else None
+    modular_manifest = compose_modular_manifest(aliases_doc, aliases_path, kind_docs, errs) if modular_present else None
 
     if manifest is not None and modular_manifest is not None:
         errs.extend(_detect_manifest_modular_drift(manifest, modular_manifest, manifest_file=str(manifest_path.relative_to(root))))
@@ -156,7 +156,7 @@ def lint_manifest(manifest: dict[str, Any]) -> list[SpecError]:
                 continue
             if kind is None or cid is None:
                 continue
-            key = (kind, _norm(alias))
+            key = (kind, normalise_label(alias))
             entry_alias_targets.setdefault(key, set()).add(cid)
 
     for i, alias in enumerate(aliases):
@@ -181,7 +181,7 @@ def lint_manifest(manifest: dict[str, Any]) -> list[SpecError]:
             continue
 
         kind = kind_raw
-        normalized = _norm(normalized_raw)
+        normalized = normalise_label(normalized_raw)
         key = (kind, normalized)
         if status == "active":
             if key in seen_aliases:
@@ -225,21 +225,13 @@ def _validate_lifecycle(entry: dict[str, Any]) -> list[SpecError]:
     return errs
 
 
-def _load_modular_manifest_once(canon_root: Path, errs: list[SpecError]) -> dict[str, Any] | None:
-    """The registry loader's view of ``aliases.json`` and ``kinds/*.json``; an error already in *errs* is not added twice."""
-    load_errors: list[SpecError] = []
-    modular = _load_modular_manifest(canon_root, load_errors)
-    errs.extend(error for error in load_errors if error not in errs)
-    return modular
-
-
 def _load_kind_docs(kinds_dir: Path, errs: list[SpecError]) -> list[tuple[Path, dict[str, Any]]]:
     docs: list[tuple[Path, dict[str, Any]]] = []
     if not kinds_dir.is_dir():
         errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kinds_dir {kinds_dir}"))
         return docs
     for kind_file in sorted(kinds_dir.glob("*.json")):
-        doc = _read_json_file(kind_file, errs, "invalid_kind_file")
+        doc = read_json_file(kind_file, errs, "invalid_kind_file")
         if doc is None:
             continue
         docs.append((kind_file, doc))
@@ -298,7 +290,7 @@ def _detect_manifest_modular_drift(
 
 def _entries_by_id(entries: Any) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for entry in _iter_dicts(entries):
+    for entry in iter_dicts(entries):
         entry_id = entry.get("id")
         if isinstance(entry_id, str) and entry_id:
             out[entry_id] = entry
@@ -308,7 +300,7 @@ def _entries_by_id(entries: Any) -> dict[str, dict[str, Any]]:
 def _alias_signature(alias: dict[str, Any]) -> str:
     normalized = dict(alias)
     if isinstance(normalized.get("normalized"), str):
-        normalized["normalized"] = _norm(normalized["normalized"])
+        normalized["normalized"] = normalise_label(normalized["normalized"])
     return _json_sig(normalized)
 
 
@@ -318,7 +310,7 @@ def _json_sig(value: Any) -> str:
 
 def _effective_alias_signatures(manifest: dict[str, Any]) -> set[str]:
     aliases: set[str] = set()
-    for entry in _iter_dicts(manifest.get("entries")):
+    for entry in iter_dicts(manifest.get("entries")):
         kind = entry.get("kind")
         entry_id = entry.get("id")
         if not isinstance(kind, str) or not isinstance(entry_id, str):
@@ -329,7 +321,7 @@ def _effective_alias_signatures(manifest: dict[str, Any]) -> set[str]:
                 _json_sig(
                     {
                         "kind": kind,
-                        "normalized": _norm(preferred_label),
+                        "normalized": normalise_label(preferred_label),
                         "target_id": entry_id,
                         "status": "active",
                     }
@@ -343,13 +335,13 @@ def _effective_alias_signatures(manifest: dict[str, Any]) -> set[str]:
                         _json_sig(
                             {
                                 "kind": kind,
-                                "normalized": _norm(alias),
+                                "normalized": normalise_label(alias),
                                 "target_id": entry_id,
                                 "status": "active",
                             }
                         )
                     )
-    for alias in _iter_dicts(manifest.get("aliases")):
+    for alias in iter_dicts(manifest.get("aliases")):
         aliases.add(_alias_signature(alias))
     return aliases
 

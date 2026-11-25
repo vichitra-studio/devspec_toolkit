@@ -444,9 +444,9 @@ def check_t09_changelog_entry_present(
         catalog_tag="D11",
         evidence=[
             (
-                f"Slice '{trigger_slices[0]}' has changed files but no unreleased changelog entry found"
+                f"Slice '{trigger_slices[0]}' has changed files but {unreadable or 'no unreleased changelog entry found'}"
                 if len(trigger_slices) == 1
-                else f"Slices {', '.join(trigger_slices)} have changed files but no unreleased changelog entry found"
+                else f"Slices {', '.join(trigger_slices)} have changed files but {unreadable or 'no unreleased changelog entry found'}"
             ),
             f"Changed files in triggering slices: {', '.join(trigger_files[:10])}{' ...' if len(trigger_files) > 10 else ''}",
         ],
