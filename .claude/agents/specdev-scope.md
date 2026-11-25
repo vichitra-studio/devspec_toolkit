@@ -95,7 +95,7 @@ count alone decides between branches 1 and 2.
      to the cluster whose directory bucket shares the longest common leading path prefix with the
      file's path; if two clusters tie on prefix length, choose the one with the lexicographically
      smallest bucket name.
-   - Record the full ordered cluster list in `fan_out[]`. Each cluster gets a unique `reviewer_id`.
+   - Record the full ordered cluster list in `fan_out[]`. Each cluster gets a unique `reviewer_id`, written `r<N>` (`r1`, `r2`, ...): the skills name and glob the reviewer files by it (`findings_<scope>_<round>_r*.json`).
    - Cite `SPECDEV_REVIEW_CONCURRENCY` (default 6) in rationale to document the wave-dispatch
      context for the skill; this agent does NOT enforce wave dispatch (that is the skill's job).
    - `scope_kind` = `theme_group` for each cluster.

@@ -23,7 +23,7 @@
       "minimum": 1
     },
     "scope": {
-      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan', or a plan-item id as the plan schema spells it ('PWRESET_CONFIRM_EXPIRED_01'). Lowercase letters, digits, '_' and '-', or uppercase letters, digits and '_' (no mixing). Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename under .specdev/findings/ using one of three patterns per §11.7: per-reviewer 'findings_<scope>_<round>_r<reviewer_id>.json', merged 'findings_<scope>_<round>.json', or HALT 'findings_<scope>_5_<unix_timestamp>.json'.",
+      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan', or a plan-item id as the plan schema spells it ('PWRESET_CONFIRM_EXPIRED_01'). Lowercase letters, digits, '_' and '-', or uppercase letters, digits and '_' (no mixing). Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename under .specdev/findings/ using one of three patterns per §11.7: per-reviewer 'findings_<scope>_<round>_<reviewer_id>.json' (reviewer ids are 'r1', 'r2', ...), merged 'findings_<scope>_<round>.json', or HALT 'findings_<scope>_5_<unix_timestamp>.json'.",
       "type": "string",
       "minLength": 1,
       "pattern": "^([a-z0-9_-]+|[A-Z0-9_]+)$"

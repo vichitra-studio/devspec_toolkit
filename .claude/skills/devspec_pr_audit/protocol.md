@@ -208,7 +208,8 @@ evidence: ["File does not match any glob in slices.yaml; excluded from audit sco
 **T0-09 (`changelog-entry-present`):**
 ```
 location: "CHANGELOG.md"
-evidence: ["Slice '<slice-name>' has changed files but no matching unreleased changelog entry found",
+evidence: ["Slice '<slice-name>' has changed files but no unreleased changelog entry found",
+           (or, when the YAML could not be read: "... but PyYAML is not installed for this python3, so changelog/unreleased.yaml was not read" / "... but changelog/unreleased.yaml is unreadable (<error>)")
            "Changed files in slice: <file1>, <file2>, ..."]
 ```
 

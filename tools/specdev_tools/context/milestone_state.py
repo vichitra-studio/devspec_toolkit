@@ -234,8 +234,8 @@ def _blocking_ids(ambiguities: list[dict], chain: frozenset[str]) -> list[str]:
 def _is_per_reviewer_file(basename: str, group_id: str) -> bool:
     """Return True iff *basename* is a per-reviewer findings file.
 
-    Matches ``findings_<group_id>_<N>_r<reviewer_id>.json`` and
-    ``findings_<group_id>_<N>_rr<reviewer_id>.json`` (double-r variant).
+    Matches ``findings_<group_id>_<N>_<reviewer_id>.json`` with a reviewer id
+    ``r<digits>``, and the double-r variant ``rr<digits>`` that older runs wrote.
     The last underscore-separated token must be ``r<digits>`` or ``rr<digits>``.
     Fixer files (``_fixer-discovered``) are explicitly excluded.
     """

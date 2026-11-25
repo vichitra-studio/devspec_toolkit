@@ -180,7 +180,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    After Agent returns (blocker handling — canonical contract: `specdev-impl.md` § "Blocker emission protocol"):
    1. Parse return JSON.
-   2. If `status != "blocker"`: check `gate_status` and `errors_remaining`; carry forward. A finding in neither `findings_closed` nor `findings_open` counts as open. Check one write per closed finding as `/specdev-review` does (its step 2 of "After Agent returns"), then print `Round <N>: <C> findings closed by <E> edits, <O> open.`
+   2. If `status != "blocker"`: check `gate_status`; `errors_remaining` are not dispatched again (the next round's reviewers raise what is still true). A finding in neither `findings_closed` nor `findings_open` counts as open. Check one write per closed finding as `/specdev-review` does (its step 2 of "After Agent returns"), then print `Round <N>: <C> findings closed by <E> edits, <O> open.`
    3. If `status == "blocker"`:
       a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
          If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
@@ -227,7 +227,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    Print:
    ```
-   HALT: max_rounds=5 reached with unresolved findings.
+   HALT at round 5: max_rounds=5 reached with unresolved findings.
    Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json
    Finding count: <N> (<P0_count> P0, <P1_count> P1, <P2_count> P2)
    Human action required: proceed-with-gaps | replay | hand-edit then re-invoke /specdev-trinity <batch_id> --phase plan

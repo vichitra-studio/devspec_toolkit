@@ -117,7 +117,7 @@ Each reviewer receives its cluster slice from the fan-out plan:
 }
 ```
 
-A `manifest_artifact` reviewer also gets `"artifact_path": "<the path given as <scope>>"`.
+A `manifest_artifact` reviewer also gets `"artifact_path": "<the path given as <scope-arg>>"`.
 
 For `cross_step_relational` reviewers: pre-run the relational commands and pass their
 output inline in the dispatch (do not have the reviewer re-run them):
@@ -246,7 +246,7 @@ Human action required: proceed-with-gaps | replay | hand-edit then re-invoke /sp
 
 Do not silently accept partial convergence. HALT is a first-class verdict.
 
-The loop ends in one of three outcomes, named as `/specdev-step` names them: `CONVERGED at round <N>` (2c), `HALT at round 5` (this step), `HALT (blocker unresolved)` (the blocker bridge; no findings file).
+A fix loop ends in one of three outcomes, named as `/specdev-step` names them: `CONVERGED at round <N>` (2c), `HALT at round 5` (this step), `HALT (blocker unresolved)` (the blocker bridge; no findings file). A review-only run prints its `REVIEW-ONLY:` line (2c) and stops.
 
 ---
 

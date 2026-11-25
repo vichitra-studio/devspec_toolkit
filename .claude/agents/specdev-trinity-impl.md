@@ -152,7 +152,7 @@ invocation prompt. This agent reads it and branches.
    .specdev/findings/findings_<group_id>_<round>.json
    ```
    (`specdev-trinity-reviewer` writes `findings_<group_id>_<round>_<reviewer_id>.json`; the dispatcher
-   supplies the copy the skill made of it with `cp`, which has no `_r<id>` suffix.)
+   supplies the copy the skill made of it with `cp`, which has no `_<reviewer_id>` suffix.)
 3. Read the item's plan entry and `plan.summary.target_file_patterns` (same reads as execute
    mode step 3) and render its pack (execute mode step 2).
 4. For each finding in `findings[]`, apply the finding-to-edit translation rule from the
