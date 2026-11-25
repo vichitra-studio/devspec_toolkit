@@ -84,6 +84,8 @@ If any of these apply to capabilities with `scope` `in`, they MUST generate FRs 
 
 ## Negative Constraints
 - **DO NOT** use implementation details (function names, DB tables) in statements.
+- **DO NOT** put storage or implementation detail (table, column, class or file names) in `preconditions` or `postconditions`: write them as observable behaviour.
+- In `rationale`, say in words what the requirement or constraint is; do not quote regulation text or give clause numbers. These two rules are authoring and review rules; no tool checks them.
 - **DO NOT** bundle multiple behaviors into one FR.
 - **DO NOT** leave acceptance criteria vague ('it works').
 - **DO NOT** name ids in `derives_from` that are neither a capability of `spec/01_capabilities.json` nor a seed routed to step 04.

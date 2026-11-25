@@ -13,7 +13,10 @@ def _section(text: str, heading: str) -> str:
     return match.group(0)
 
 
-def test_e607_resolution_does_not_send_to_canon_accept() -> None:
+def test_e607_resolution_names_the_guide_and_canon_accept_update() -> None:
     section = _section(ERROR_CODES_MD.read_text(encoding="utf-8"), "E607")
+    assert "specdev canon-accept" in section
+    assert "--update" in section
+    # The resolution tells the reader what to do, not to run the same check again.
     assert "re-run" not in section
     assert "specdev guide E607" in section

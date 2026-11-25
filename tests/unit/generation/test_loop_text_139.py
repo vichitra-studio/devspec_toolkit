@@ -7,6 +7,10 @@ import pytest
 
 AGENTS = Path(__file__).resolve().parents[3] / ".claude" / "agents"
 KIND = "manifest_artifact"
+DEFINITIONS = {
+    "specdev-scope.md": "`scope_kind` = `manifest_artifact`; `steps` = `[]`",
+    "specdev-reviewer.md": "`manifest_artifact`: the scope is one file of `spec/common/`",
+}
 
 
 def _text(name: str) -> str:
@@ -15,7 +19,7 @@ def _text(name: str) -> str:
 
 @pytest.mark.parametrize("name", ["specdev-scope.md", "specdev-reviewer.md"])
 def test_the_agent_names_the_manifest_artifact_kind(name: str) -> None:
-    assert KIND in _text(name)
+    assert DEFINITIONS[name] in _text(name)
 
 
 def test_the_reviewer_lists_the_kind_among_the_scope_kinds() -> None:

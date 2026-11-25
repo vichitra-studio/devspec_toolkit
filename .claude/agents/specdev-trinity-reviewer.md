@@ -100,7 +100,7 @@ Dispatcher (skill) provides:
   - `code_phase_group`: requires `group_id`; per-item review during `--phase impl`.
   - `code_phase_milestone`: `group_id` omitted; milestone-wide sweep during `--phase review`.
 - `plan_path`: path to the plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`).
-- `reviewer_id`: string identifier, used in the output filename suffix.
+- `reviewer_id`: `r<N>` (`r1`, `r2`, ...) as supplied by the dispatcher, used in the output filename suffix.
 - `milestone_start_ref`: the git commit SHA computed by the skill via `git rev-parse HEAD`
   before the first group/round dispatch. Used in step 6 for supplemental git diff context
   (informational — git diff is typically empty in the normal uncommitted-work flow).
@@ -128,7 +128,7 @@ Emit findings across all applicable kinds. Trigger conditions:
 | `gap` | Required content is missing from the artifact |
 | `miss` | Incomplete coverage: a criterion the item realises that no changed test exercises, an NFR without measurement |
 | `bug` | Content is factually wrong against schema, upstream artifact, or canon |
-| `regression` | Code or a test that worked before this scope's edits is broken by them (shown by running the tests) |
+| `regression` | Code or a test that worked before this scope's edits is broken by them (shown by running the tests). Code-phase findings carry no `origin`; the `origin` rule of the findings schema is for spec-phase findings |
 | `assumption` | Un-grounded inference: no upstream source, no canon binding, no fixture |
 | `ambiguity` | Multiple valid readings of the same content, or precedence conflict between artifacts |
 | `hallucination` | Invented ID, enum value, CLI command, file path, or canonical reference |

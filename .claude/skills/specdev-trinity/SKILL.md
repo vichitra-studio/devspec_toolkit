@@ -183,7 +183,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
    2. If `status != "blocker"`: check `gate_status`; `errors_remaining` are not dispatched again (the next round's reviewers raise what is still true). A finding in neither `findings_closed` nor `findings_open` counts as open. Check one write per closed finding as `/specdev-review` does (its step 2 of "After Agent returns"), then print `Round <N>: <C> findings closed by <E> edits, <O> open.`
    3. If `status == "blocker"`:
       a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-         If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
+         If malformed → set verdict = "HALT (blocker unresolved): malformed blocker payload" and surface to user (do NOT re-dispatch on a malformed payload).
          Malformed includes: `questions[]` empty, any entry missing required fields, edits
          written AND `status: "blocker"` simultaneously (timing-constraint violation).
       b. Persist: `mkdir -p .specdev/blockers/` then write
@@ -209,7 +209,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
          dispatch chain; starts at 0 on first dispatch; cap = 2 re-dispatches (counter values
          0, 1, 2); does not persist across skill invocations; resets to 0 at the start of each
          new outer review-fix round (R1/R2/.../R5)).
-      f. If `blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
+      f. If `blocker_round > 2`: set verdict = "HALT (blocker unresolved): blocker_round exceeded 2", surface to user (persistent blocking — no auto-retry).
       g. Fresh Agent dispatch with augmented prompt. Continue from step 1.
       Note: re-dispatch is lossy; user answers are the ONLY persistence across the bridge.
       Note: the Step 3 human gate (proceed/replay/abort) fires AFTER the entire review-fix
@@ -244,8 +244,8 @@ three options:
 
 ```
 Plan phase review complete.
-Verdict: <CONVERGED at round N | HALT at round 5 with N findings remaining>
-[On HALT: Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json]
+Verdict: <CONVERGED at round N | HALT at round 5 with N findings remaining | HALT (blocker unresolved): <reason>>
+[On HALT at round 5: Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json. A HALT (blocker unresolved) has no findings file; the blocker is under .specdev/blockers/]
 
 How would you like to proceed?
 A) Proceed — accept the plan and continue to downstream phases.

@@ -235,7 +235,7 @@
                       "$ref": "vc:core:atoms#kebabId"
                     },
                     "enum": {
-                      "description": "Closed list of the values this parameter accepts. Optional; declare it when the parameter takes a fixed value set. An API that declares a parameter enum carries enum_provenance, which records where the value set comes from.",
+                      "description": "Closed list of the values this parameter accepts. Optional; declare it when the parameter takes a fixed value set. An API that names a third party in `relies_on` and declares a parameter enum carries `enum_provenance`, which records where the value set comes from; omit it for a first-party value set.",
                       "type": "array",
                       "items": {
                         "type": "string"

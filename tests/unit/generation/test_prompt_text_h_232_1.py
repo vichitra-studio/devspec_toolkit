@@ -1,6 +1,7 @@
 """H-232-1: prompt 01 names no field the charter schema lacks and says which of its rules no tool checks."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -8,9 +9,9 @@ import pytest
 PROMPT = (Path(__file__).resolve().parents[3] / "prompts" / "prompt_01_capabilities.md").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("phrase", ["goals", "glossary nouns"])
-def test_prompt_01_names_no_charter_goals(phrase: str) -> None:
-    assert phrase not in PROMPT
+def test_prompt_01_names_no_charter_goals() -> None:
+    assert re.search(r"charter[^\n]*\bgoals?\b", PROMPT, re.I) is None
+    assert "glossary nouns" not in PROMPT
 
 
 @pytest.mark.parametrize(

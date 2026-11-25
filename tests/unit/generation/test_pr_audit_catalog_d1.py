@@ -14,4 +14,4 @@ _D1_SECTION_RE = re.compile(r"^### D1 .*?(?=^### D2 )", re.DOTALL | re.MULTILINE
 def test_d1_names_the_description_vs_negative_constraint_case() -> None:
     match = _D1_SECTION_RE.search(_CATALOGS.read_text(encoding="utf-8"))
     assert match, "catalogs.md has no D1 section"
-    assert "Negative Constraints" in match.group(0)
+    assert "a schema field description that invites what the prompt of the same step forbids in its Negative Constraints" in match.group(0)

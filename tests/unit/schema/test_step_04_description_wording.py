@@ -7,6 +7,11 @@ from pathlib import Path
 import pytest
 
 SCHEMA = Path(__file__).resolve().parents[3] / "schema" / "04_fr_list.schema.json"
+REQUIRED = {
+    "rationale": "do not quote regulation text",
+    "preconditions": "not storage or implementation detail",
+    "postconditions": "not storage or implementation detail",
+}
 FORBIDDEN = ("cite the regulation", "session_tokens", "users table", " table ")
 
 
@@ -29,11 +34,12 @@ def _find_property(node: object, name: str) -> dict | None:
 
 
 @pytest.mark.parametrize("field", ["rationale", "preconditions", "postconditions"])
-def test_fr_descriptions_are_behavioural(field: str) -> None:
+def test_fr_descriptions_avoid_implementation_wording(field: str) -> None:
     fr_items = _find_property(json.loads(SCHEMA.read_text(encoding="utf-8")), "functional_requirements")
     assert fr_items is not None
     prop = _find_property(fr_items, field)
     assert prop is not None
     description = prop["description"]
+    assert REQUIRED[field] in description, f"{field} description lacks {REQUIRED[field]!r}"
     for phrase in FORBIDDEN:
         assert phrase not in description, f"{field} description holds {phrase!r}"

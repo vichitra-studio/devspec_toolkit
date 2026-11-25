@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-FOLDERS = ("prompts", "docs/agents", "docs/developers", "docs/prompts", "schema", ".claude/agents", ".claude/skills", "tools/specdev_tools")
+FOLDERS = ("prompts", "docs/agents", "docs/developers", "docs/prompts", "schema", ".claude/agents", ".claude/skills", "tools/specdev_tools", "docs/architecture", "scripts", "changelog")
 OLD_SPELLING = re.compile(r"_r<(?:reviewer_id|id)>")
 
 
@@ -34,5 +34,5 @@ def test_no_file_writes_the_reviewer_file_name_with_a_second_r() -> None:
 
 def test_the_scope_agent_states_the_reviewer_id_form() -> None:
     scope = REPO_ROOT / ".claude" / "agents" / "specdev-scope.md"
-    if scope.is_file():
-        assert "written `r<N>` (`r1`, `r2`, ...)" in scope.read_text(encoding="utf-8")
+    assert scope.is_file(), f"{scope} is absent"
+    assert "written `r<N>` (`r1`, `r2`, ...)" in scope.read_text(encoding="utf-8")

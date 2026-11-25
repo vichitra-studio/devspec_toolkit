@@ -396,7 +396,7 @@
         "migration_plan": {
           "type": "string",
           "minLength": 1,
-          "description": "Short strategy for migrating from existing systems or data, in one or two sentences and under 40 words, or the string \"none\" when nothing is migrated. Name what is replaced and how the migration is reversed or confirmed. Example: 'Move auth from session cookies to JWT behind a strangler facade over three milestones; roll back by re-enabling cookies; done when no cookie session is created.'"
+          "description": "Short strategy for migrating from existing systems or data, in one or two sentences and under 40 words, or the string \"none\" when nothing is migrated. Name what is replaced and how the migration is reversed or confirmed. Example: 'Move auth from session cookies to JWT behind a strangler facade over three milestones; roll back by re-enabling cookies; done when no cookie session is created.' Guidance, not checked: no keyword or validator enforces the length."
         }
       },
       "required": [

@@ -60,7 +60,7 @@ class TestR9ErrorCodes(unittest.TestCase):
             self.assertIn(code, ERROR_CODES, f"{code} not registered in ERROR_CODES")
 
     def test_promotable_pairs_match_expected_list(self):
-        """PROMOTABLE_PAIRS equals the explicit W->E list above (10 pairs)."""
+        """PROMOTABLE_PAIRS equals the explicit W->E list above (8 pairs)."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
         self.assertEqual(PROMOTABLE_PAIRS, EXPECTED_PROMOTABLE_PAIRS)
         self.assertEqual(len(PROMOTABLE_PAIRS), 8)

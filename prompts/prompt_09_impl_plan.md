@@ -70,7 +70,7 @@ Before emitting, verify:
 
 ## Step-Specific Completeness Checklist
 - Milestones include clear names, `target_date`, `schedules`, risks, and spikes for unknowns.
-- `migration_plan` describes data or API migration if replacing existing systems, in 2 to 4 sentences (the bound of `schema/09_impl_plan.schema.json`: what is replaced, the sequence, the rollback and the acceptance test).
+- `migration_plan` describes data or API migration if replacing existing systems, in 2 to 4 sentences (guidance, not checked: the schema description asks for it and no keyword or tool enforces it; say what is replaced, the sequence, the rollback and the acceptance test).
 
 ## Best Practices
 - **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`. Name the FRs/APIs a milestone delivers in `schedules` (bare ids, no notes).

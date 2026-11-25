@@ -2455,6 +2455,10 @@ changes:
       `insert` are: a delete that leaves a required field out is refused (exit 1,
       `Write refused: this edit introduces schema violation(s)`, no code; only
       the --id forms print E767).
+      On a dry run the multi-match warning says `would be changed`.
+      `json delete <file> .` (the whole document) is refused (exit 1, file
+      unchanged, `Refusing to write: ... would replace the whole document with
+      null`); it wrote `null` over the file and exited 0.
     migration:
       action: none
 
@@ -2533,6 +2537,9 @@ changes:
       specdev json patch spec/10_governance.json
       .commit_message_rules.pattern '"<regex>"', or set require_spec_ids to
       false.
+      A pattern that is not a valid regular expression makes governance-check
+      report `E303 commit_message_rules.pattern is not a valid regular
+      expression: <reason>` (it ended in a traceback).
     migration:
       action: ai_assisted
 
@@ -2621,7 +2628,9 @@ changes:
       and says the capability owner and the cap- prefix are review rules; prompt
       15 says no tool runs validators and that step ready 15 checks step 05,
       not 04 or 09; prompt 16c and the 16c reviewer ask for the file and the function,
-      class or text of a finding, not a line number.
+      class or text of a finding, not a line number. In the 16c prompt the tag
+      of the rating-evidence rule is now ENF-144 and the tag of the remediation
+      rule is ENF-140 (they were the other way round).
     migration:
       action: none
 

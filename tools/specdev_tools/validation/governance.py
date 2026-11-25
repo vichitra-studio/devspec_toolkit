@@ -32,7 +32,12 @@ def check_commit_message(spec_dir: str, message: str) -> list[SpecError]:
     custom_msg = rules.get("error_message")
     # The schema requires `pattern` whenever `require_spec_ids` is true.
     if require_ids and pattern:
-        if not re.match(pattern, message or ""):
+        try:
+            matched = re.match(pattern, message or "")
+        except re.error as exc:
+            errs.append(make_error("E303", f"commit_message_rules.pattern is not a valid regular expression: {exc}"))
+            return errs
+        if not matched:
             if custom_msg:
                 errs.append(make_error("E303", f"Commit message mismatch. {custom_msg}"))
             else:
