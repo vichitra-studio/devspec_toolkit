@@ -81,3 +81,26 @@ def test_read_multi_keys_structure_accept_ref(repo: Path, monkeypatch: pytest.Mo
     assert "problem_statement" in out
     _, out, _ = _main(monkeypatch, capsys, "structure", FILE, "--ref", "main")
     assert "problem_statement: str" in out
+
+
+def test_ref_through_a_symlinked_folder(repo: Path, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """H round 1 B1-1: a path given through a symlink to the repository still reads at the ref."""
+    link = tmp_path_factory.mktemp("links") / "repo-link"
+    link.symlink_to(repo, target_is_directory=True)
+    code, out, err = _main(monkeypatch, capsys, "read", str(link / FILE), ".problem_statement", "--ref", "main")
+    assert (code, out.strip(), err) == (0, "A", "")
+
+
+def test_ref_error_names_the_file_and_ref_not_the_copy(repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """H round 1 B1-8: a jq error names ``<file> at <ref>``, not the temporary copy."""
+    code, _, err = _main(monkeypatch, capsys, "read", FILE, '.problem_statement | error("boom")', "--ref", "main")
+    assert code == 1 and f"{FILE} at main" in err and "tmp" not in err
+
+
+@pytest.mark.parametrize("command", [["patch", FILE, ".other.k", "2"], ["delete", FILE, ".other.k"]])
+def test_show_file_without_dry_run_is_a_usage_error(repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], command: list[str]) -> None:
+    """H round 1 B1-9: ``--show-file`` without ``--dry-run`` exits 2 and writes nothing."""
+    before = (repo / FILE).read_bytes()
+    code, _, err = _main(monkeypatch, capsys, *command, "--show-file")
+    assert code == 2 and "--dry-run" in err
+    assert (repo / FILE).read_bytes() == before

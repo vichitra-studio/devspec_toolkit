@@ -53,3 +53,23 @@ def test_a_four_space_file_and_a_new_file_stay_four_space(tmp_path: Path) -> Non
 @pytest.mark.parametrize("text", ["{}", ""])
 def test_detect_indent_defaults_when_nothing_is_indented(text: str) -> None:
     assert detect_indent(text) == "    "
+
+
+def test_one_indent_detector_serves_the_migration_writer() -> None:
+    """H round 1 D-2: ``migration.writer`` imports ``detect_indent`` instead of keeping a second copy."""
+    from specdev_tools.migration import writer
+
+    assert not hasattr(writer, "_detect_indent")
+    assert writer.detect_indent is detect_indent
+    assert detect_indent('{\r\n\t"a": 1\r\n}\r\n') == "\t"
+    assert detect_indent('{\n  "a": 1\n}') == "  "
+
+
+def test_json_write_atomic_keeps_the_file_mode(tmp_path: Path) -> None:
+    """H round 1 D-1: the write goes through ``replace_file_atomically``, which keeps the mode of the file."""
+    path = tmp_path / "f.json"
+    path.write_text('{"a": 1}\n', encoding="utf-8")
+    path.chmod(0o640)
+    json_write_atomic(str(path), '{"a": 2}')
+    assert path.stat().st_mode & 0o777 == 0o640
+    assert json.loads(path.read_text(encoding="utf-8")) == {"a": 2}

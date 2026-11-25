@@ -1,7 +1,6 @@
 """H-170-1 and H-133-1: the fix agent reads each fix back and returns a record per finding.
 
-These tests read agent and skill text under ``.claude``; they pass once the orchestrator has applied
-the edits listed in the H builder report (CLAUDE-EDITS of B6).
+These tests read agent and skill text under ``.claude``.
 """
 from __future__ import annotations
 

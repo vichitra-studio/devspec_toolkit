@@ -1,7 +1,6 @@
 """H-211-2: the fix agent and the reviewer read `specdev json schema` for the pointers they write or judge.
 
-Reads text under ``.claude``; passes once the orchestrator has applied the edits listed in the H builder report
-(CLAUDE-EDITS of B7).
+Reads text under ``.claude``.
 """
 from __future__ import annotations
 

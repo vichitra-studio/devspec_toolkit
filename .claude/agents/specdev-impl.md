@@ -41,6 +41,9 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json schema <file> '<path>' --repo-root <toolkit>` | both | Typed constraints at a path |
 | `specdev node candidates --kind <kind> --field <link-field>` (or `--for <node-id>`) | both | Ids a link field may point at |
 | `specdev stale` | author-extend | Steps pending replay and the suspect links in them |
+| `specdev node show <id> [--json] --repo-root <toolkit> --spec-root <spec> --git-root <root>` | fix | Read a node or an open item back after a write (steps 4b and 4c); prints its content |
+| `specdev json read <file> '<filter>' --repo-root <toolkit>` | fix | Read one field back (step 4b); `<file>` is `spec/<file>` |
+| `specdev upstream-backlog spec --repo-root <toolkit> --json` | all | Open items of the spec, read before a blocker or a new open item (section "Blocker emission protocol") |
 | `specdev spec-check spec --step <NN> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | both | Step gate — runs after every edit batch |
 | `specdev validate <path> --repo-root <toolkit>` | both | Single-file validation during iterative fix |
 | `specdev canon-accept --from <file> --repo-root <toolkit> --git-root <root> --namespace cn:project: --owner product` | fix | Promote new project terms to canon |
@@ -322,9 +325,10 @@ canonical contract; skill files cite this section by name.
 
 **Does NOT trigger blocker:**
 - A question that an open item of the spec already asks. Before you emit a blocker or insert an open item, run
-  `specdev upstream-backlog spec --repo-root ./devspec_toolkit` and read the items whose `about` names the same node or seed.
-  When such an item has a `decision`, that is the answer: apply it and delete the item with `specdev json delete --id <item-id>`.
-  When it has none, leave it, go on with its `proposed_assumption` when it has one, and name the item id in your return instead of asking again.
+  `specdev upstream-backlog spec --repo-root ./devspec_toolkit --json` and read the `records[]` whose `about` names the same node or seed.
+  When the `decision` of such a record is not empty, that is the answer: apply it and delete the item with `specdev json delete --id <item_id>`.
+  When it is empty, leave the item and name its `item_id` in your return instead of asking again. The output has no `proposed_assumption`:
+  `specdev node show <item_id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` prints the item, and when it has one, go on with it.
 - Pre-existing E-codes from spec-check (→ `errors_remaining`).
 - Findings whose `suggested_fix` is concrete.
 - Style/verbosity preferences.
@@ -427,6 +431,8 @@ Before every `specdev json patch`, `insert` or `delete` (author-extend, fix and 
 `specdev json schema <file> '<pointer>' --repo-root ./devspec_toolkit` for the pointer you are about to write and
 honour what it prints: `minItems`, `maxItems`, `minLength`, `maxLength`, `pattern`, `enum`, `const`, `required`
 and `items_constraints`. A value that breaks one of them is refused by the write; do not retry with a guess.
+The id forms name a node, not a file: take the pointer from `specdev node show <node-id> --json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
+(`file` written as `spec/<file>`, and `jq_path`, with the field you write appended); `<file>` without `spec/` prints `File not found`.
 
 | Finding kind | Typical edit shape |
 |---|---|
@@ -476,7 +482,9 @@ When a fix edits the `definition` or the `term` text of a glossary term whose ca
 its `canonical_proposals` entry together (E606 compares them), then run the command above with `--update` after the edit batch. The canon
 entry is stale until you do: `spec-check` reports `E607 GLOSSARY_CANON_DRIFT`. The command prints `~ updated: <canon id>` for each entry it
 rewrites in both `spec/canon/manifest.json` and `spec/canon/kinds/<kind>.json`; without `--update` it prints `! changed (not updated, use --update)`
-and writes nothing. Never edit `spec/canon/` by hand or with a script.
+and writes nothing. When `canonical_proposals` has no entry for the term, `--update` prints `OK (no proposals found)` and changes nothing: first add one,
+`specdev json patch spec/03_glossary.json '.canonical_proposals' '[{"temp_id": "<canon id without cn:project:term:>", "kind": "term", "proposed_label": "<term>", "definition": "<the new definition>", "source_field": "terms[*].term_ref"}]' --repo-root ./devspec_toolkit`
+(`specdev json insert spec/03_glossary.json '.canonical_proposals' '<item>' --repo-root ./devspec_toolkit` when the array already has items), then run `--update`. Never edit `spec/canon/` by hand or with a script.
 
 ---
 
@@ -511,7 +519,7 @@ Return a structured JSON summary:
   "mode": "fix",
   "edits_applied": 7,
   "findings_closed": [
-    {"signature": "abc123ef", "location": "fr-password-reset#description", "node": "fr-password-reset", "field": ".description",
+    {"signature": "abc123ef", "location": "fr-password-reset#statement", "node": "fr-password-reset", "field": ".statement",
      "value": "The system shall let a registered member set a new password ...", "edits": 2, "parts": 1}
   ],
   "findings_open": [
@@ -525,7 +533,9 @@ Return a structured JSON summary:
 `findings_closed` has one record per finding of the findings file that you fixed and read back: `signature` and `location` are the finding's; `node` and `field` name the
 place you read back (for a finding about no node, `file` and `pointer`, a jq path, instead); `value` is what you read there after the write; `edits` is the number of
 write commands that touched the finding; `parts` the number of parts you read back. `findings_open` has one record per finding you did not fix, with the reason.
-Every finding of the file is in exactly one of the two lists.
+A finding you fixed with `specdev json delete --id <id>` has `"deleted": "<id>"` in place of `node`, `field` and `value`: its read-back is
+`specdev node show <id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` exiting 1 with `E706 no node with the id`.
+Every finding of the file is in exactly one of the two lists; the skill matches a record to its finding by `signature` together with `location`.
 
 For `author-extend` mode, include a `pending_replay` field naming the steps that
 `specdev stale` lists (an empty list when it lists none):
@@ -546,6 +556,10 @@ Or on partial success:
 {
   "mode": "fix",
   "edits_applied": 5,
+  "findings_closed": [],
+  "findings_open": [
+    {"signature": "9e107d9d", "location": "fr-nonexistent-feature", "reason": "needs author-mode content, see errors_remaining"}
+  ],
   "gate_status": "errors",
   "errors_remaining": [
     {

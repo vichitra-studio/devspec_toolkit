@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-import unicodedata
 from typing import Any
 
 from ..canonical.registry import load_tier_entries
 from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
+from ..graph.contract import normalise_text
 
 _PROJECT_PREFIX = "cn:project:"
 _GLOSSARY_FILE = "03_glossary.json"
@@ -20,8 +20,8 @@ def _load_json(path: str) -> Any:
 
 
 def _normalise(text: str) -> str:
-    """Collapse whitespace runs and compose Unicode (NFC) so that layout is not drift."""
-    return unicodedata.normalize("NFC", " ".join(text.split()))
+    """The one text normalisation of the toolkit (``graph.contract.normalise_text``): layout, Unicode form, curly quotes and dashes are not drift."""
+    return normalise_text(text)
 
 
 def _fold(text: str) -> str:
@@ -105,6 +105,28 @@ def _check_term_proposal_drift(
     return errors
 
 
+def _compare_with_entry(
+    base: str, path: str, side: str, definition: Any, label: Any, entry: dict[str, Any], *, name_field: bool,
+) -> list[SpecError]:
+    """E607 for the definition and the label of one spec text (*side*: ``spec`` or ``proposal``) against its canon entry.
+
+    *name_field* puts ``field=definition`` in the definition message (the proposal form; the term form has none).
+    """
+    errors: list[SpecError] = []
+    if isinstance(definition, str):
+        spec_text = _normalise(definition)
+        canon_text = _normalise(entry.get("definition", ""))
+        if spec_text != canon_text:
+            field = " field=definition" if name_field else ""
+            errors.append(make_error(
+                "E607", f"{base}{field}" + _difference_detail(side, spec_text, "canon", canon_text), path=path,
+            ))
+    label_detail = _label_difference(label, entry) if isinstance(label, str) else None
+    if label_detail:
+        errors.append(make_error("E607", f"{base} field=preferred_label{label_detail}", path=path))
+    return errors
+
+
 def _check_term_canon_drift(
     terms: list[dict[str, Any]], canon_entries: dict[str, dict[str, Any]],
 ) -> list[SpecError]:
@@ -115,20 +137,11 @@ def _check_term_canon_drift(
         canon_id = (term.get("term_ref") or {}).get("id", "")
         if not term_id or canon_id not in canon_entries:
             continue
-        entry = canon_entries[canon_id]
-        base = f"GLOSSARY_CANON_DRIFT term={term_id} canon={canon_id}"
-        spec_text = _normalise(term.get("definition", ""))
-        canon_text = _normalise(entry.get("definition", ""))
-        if spec_text != canon_text:
-            errors.append(make_error(
-                "E607", base + _difference_detail("spec", spec_text, "canon", canon_text),
-                path=f"terms[{term_id}]",
-            ))
-        label_detail = _label_difference(term["term"], entry) if isinstance(term.get("term"), str) else None
-        if label_detail:
-            errors.append(make_error(
-                "E607", f"{base} field=preferred_label{label_detail}", path=f"terms[{term_id}]",
-            ))
+        errors.extend(_compare_with_entry(
+            f"GLOSSARY_CANON_DRIFT term={term_id} canon={canon_id}", f"terms[{term_id}]",
+            "spec", term.get("definition", ""), term.get("term"), canon_entries[canon_id],
+            name_field=False,
+        ))
     return errors
 
 
@@ -136,25 +149,11 @@ def _check_proposal_against_canon(
     proposal: dict[str, Any], canon_id: str, file_name: str, entry: dict[str, Any],
 ) -> list[SpecError]:
     """E607 for one proposal of a non-glossary step whose canon entry differs from it."""
-    base = f"CANON_PROPOSAL_DRIFT kind={proposal['kind']} canon={canon_id} file={file_name}"
-    path = f"{file_name}:{canon_id}"
-    errors: list[SpecError] = []
-    if isinstance(proposal.get("definition"), str):
-        proposal_text = _normalise(proposal["definition"])
-        canon_text = _normalise(entry.get("definition", ""))
-        if proposal_text != canon_text:
-            errors.append(make_error(
-                "E607",
-                f"{base} field=definition" + _difference_detail("proposal", proposal_text, "canon", canon_text),
-                path=path,
-            ))
-    label_detail = (
-        _label_difference(proposal["proposed_label"], entry)
-        if isinstance(proposal.get("proposed_label"), str) else None
+    return _compare_with_entry(
+        f"CANON_PROPOSAL_DRIFT kind={proposal['kind']} canon={canon_id} file={file_name}",
+        f"{file_name}:{canon_id}", "proposal", proposal.get("definition"), proposal.get("proposed_label"), entry,
+        name_field=True,
     )
-    if label_detail:
-        errors.append(make_error("E607", f"{base} field=preferred_label{label_detail}", path=path))
-    return errors
 
 
 def _check_artifact_proposals(
@@ -214,7 +213,8 @@ def lint_glossary_drift(
 ) -> list[SpecError]:
     """Check the glossary, its proposals and the project canon against each other.
 
-    Text is compared after collapsing whitespace and composing Unicode; a
+    Text is compared after collapsing whitespace, composing Unicode and folding
+    curly quotes and dashes; a
     message names the first differing position. Returns E606 (term vs its
     proposal), E607 (term or ``canonical_proposals`` item of any step vs the
     project canon entry: definition and label) and W606 (orphan entry), or

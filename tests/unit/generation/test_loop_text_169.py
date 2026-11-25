@@ -1,7 +1,6 @@
 """H-169-1 and H-169-2: a question an open item already asks is not asked again; a decision kept only in a commit message is no record.
 
-These tests read agent text under ``.claude``; they pass once the orchestrator has applied the edits
-listed in the H builder reports (CLAUDE-EDITS of B8 for the reviewer, of the bundle of H-169-1 for the fix agent).
+These tests read agent text under ``.claude``.
 """
 from __future__ import annotations
 

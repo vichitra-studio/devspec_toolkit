@@ -170,6 +170,23 @@ class TestAutofixValidatesTheFinishedDocument(unittest.TestCase):
             self.assertFalse(any("autofix_result_invalid" in r for r in rendered), rendered)
             self.assertEqual(json.loads(target.read_text(encoding="utf-8"))["note"], "written")
 
+    def test_autofix_does_not_write_a_result_it_could_not_validate(self):
+        real = autofix._violations
+        calls = []
+
+        def validation_fails_after_the_edit(validator, data, *, with_message):
+            calls.append(1)
+            return real(validator, data, with_message=with_message) if len(calls) == 1 else None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._repo(Path(tmp), {"canonical_refs_used": [], "items": [1]})
+            original = target.read_bytes()
+            with self._edit_with("note", "written"), patch.object(autofix, "_violations", validation_fails_after_the_edit):
+                changes = canonical_autofix(tmp, str(Path(tmp) / "spec"), write=True, require_manifest_schema_registration=False)
+            rendered = [item.render() if hasattr(item, "render") else str(item) for item in changes[str(target)]]
+            self.assertTrue(any("E520" in r and "autofix_result_unvalidated" in r for r in rendered), rendered)
+            self.assertEqual(target.read_bytes(), original)
+
     def test_autofix_still_writes_a_valid_result(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = self._repo(Path(tmp), {"canonical_refs_used": [], "items": [1]})

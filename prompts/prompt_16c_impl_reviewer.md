@@ -36,9 +36,9 @@ The reviewer agent writes its findings as a file under `.specdev/findings/` (`fi
   "findings": [
     {
       "kind": "bug",
-      "location": "src/routes/password-resets/confirm.ts#L14",
+      "location": "src/routes/password-resets/confirm.ts#confirmPasswordReset",
       "signature": "reused-token-second-redemption-returns-200",
-      "message": "src/routes/password-resets/confirm.ts:14 marks the token used after the password update, so a concurrent second redemption can still succeed; this violates the item PWRESET_CONFIRM_REUSED_01 and its criterion tc-confirm-reused-token.",
+      "message": "src/routes/password-resets/confirm.ts, confirmPasswordReset, marks the token used after the password update, so a concurrent second redemption can still succeed; this violates the item PWRESET_CONFIRM_REUSED_01 and its criterion tc-confirm-reused-token.",
       "severity": "P0",
       "evidence": ["npm run test:contract: FAILED reused token, expected 410, got 200"],
       "suggested_fix": "Mark the token used in the same transaction that sets the password, and return 410 when the update finds it already used.",
@@ -97,10 +97,10 @@ Allowed verdicts: `verified`, `needs_work`, `blocked`, `deferred` (the `review.v
 `review record` checks input only. Each rule below is reviewer judgement: apply it yourself, and say which one held a `verified` back: as a finding, and in a manual run also in `--next-actions`.
 1.  **Blocking finding forbids `verified`** — reviewer judgement: with a `blocking` (P0) finding the verdict is not `verified`.
 2.  **Security RED forbids `verified`** — reviewer judgement: with `--security-status red` the verdict is not `verified`.
-3.  **Rating evidence (ENF-140)** — reviewer judgement: a rating of 3 or less cites the evidence that lowers it; a rating above 3 is not given while any evidence is missing, and 5 not without verified security checks.
-4.  **Remediation for every finding (ENF-144)** — reviewer judgement: every finding says how to fix it (a `suggested_fix`); a finding you will not fix says why.
+3.  **Rating evidence (ENF-144)** — reviewer judgement: a rating of 3 or less cites the evidence that lowers it; a rating above 3 is not given while any evidence is missing, and 5 not without verified security checks.
+4.  **Remediation for every finding (ENF-140)** — reviewer judgement: every finding says how to fix it (a `suggested_fix`); a finding you will not fix says why.
 5.  **Rating bounds** — reviewer judgement: the scale of section 2 bounds the verdict; `verified` takes 4-5.
-6.  **Vague findings** — reviewer judgement: a finding cites a specific location and line and the item or criterion it violates; "the code has issues" is not a finding.
+6.  **Vague findings** — reviewer judgement: a finding cites a specific location (`<file>#<function or class>`, no line number) and the item or criterion it violates; "the code has issues" is not a finding.
 7.  **Per-item verdicts** — reviewer judgement: every plan item is either executed or proven, or named by a finding; no item is left unaddressed.
 
 ## 5. Security and delivery gates
@@ -328,8 +328,8 @@ Before recording, verify:
         "id": "finding-01",
         "type": "bug",
         "severity": "blocking",
-        "spec_ref": { "type": "code", "id": "ms-account-recovery", "note": "src/routes/password-resets/confirm.ts#L14" },
-        "description": "src/routes/password-resets/confirm.ts:14 marks the token used after the password update, so a concurrent second redemption can still succeed; this violates the item PWRESET_CONFIRM_REUSED_01 and its criterion tc-confirm-reused-token.",
+        "spec_ref": { "type": "code", "id": "ms-account-recovery", "note": "src/routes/password-resets/confirm.ts#confirmPasswordReset" },
+        "description": "src/routes/password-resets/confirm.ts, confirmPasswordReset, marks the token used after the password update, so a concurrent second redemption can still succeed; this violates the item PWRESET_CONFIRM_REUSED_01 and its criterion tc-confirm-reused-token.",
         "metadata": { "source": "findings round 1, scope ms-account-recovery", "impact": "npm run test:contract: FAILED reused token, expected 410, got 200" },
         "related_checklist_ids": ["PWRESET_CONFIRM_REUSED_01"],
         "remediation_task": {

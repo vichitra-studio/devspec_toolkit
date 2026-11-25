@@ -725,15 +725,15 @@ The codes of `specdev verify bind|run`, `specdev third-party pin|check`, the `re
 
 ### E606 GLOSSARY_PROPOSAL_DRIFT
 
-**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` `terms[]` entry's `definition` differs from the `definition` on its matching `canonical_proposals` entry (matched by `term-{temp_id}`, `kind == "term"` proposals only — acronym proposals are excluded since acronyms have no `terms[]` counterpart). Both texts are compared after collapsing whitespace and composing Unicode, and the message names the first differing position (`first_difference_at=<n>`).
+**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` `terms[]` entry's `definition` differs from the `definition` on its matching `canonical_proposals` entry (matched by `term-{temp_id}`, `kind == "term"` proposals only — acronym proposals are excluded since acronyms have no `terms[]` counterpart). Both texts are compared after collapsing whitespace, composing Unicode and folding curly quotes and dashes, and the message names the first differing position (`first_difference_at=<n>`).
 
 **Resolution**: Reconcile the term's `definition` in `terms[]` with the corresponding `canonical_proposals` entry so both describe the same definition.
 
 ### E607 GLOSSARY_CANON_DRIFT
 
-**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` term's `definition` differs from the `definition` of the already-accepted `cn:project:` canon entry it's bound to via `term_ref`, or when the term's label (`term`) is neither that entry's `preferred_label` nor one of its `aliases` (compared ignoring case; message has `field=preferred_label`), or, for a `canonical_proposals` item of any other step (for example a capability or a metric), when its `definition` or `proposed_label` differs from the canon entry `cn:project:<kind>:<temp_id>` it was made into (message starts `CANON_PROPOSAL_DRIFT`). Texts are compared after collapsing whitespace and composing Unicode, and the message names the first differing position (`first_difference_at=<n>`).
+**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` term's `definition` differs from the `definition` of the already-accepted `cn:project:` canon entry it's bound to via `term_ref`, or when the term's label (`term`) is neither that entry's `preferred_label` nor one of its `aliases` (compared ignoring case; message has `field=preferred_label`), or, for a `canonical_proposals` item of any other step (for example a capability or a metric), when its `definition` or `proposed_label` differs from the canon entry `cn:project:<kind>:<temp_id>` it was made into (message starts `CANON_PROPOSAL_DRIFT`). Texts are compared after collapsing whitespace, composing Unicode and folding curly quotes and dashes (a text that differs only so is not drift), and the message names the first differing position (`first_difference_at=<n>`).
 
-**Resolution**: Decide which text is right. Either update the glossary term's `definition` to match the canon entry, or edit the canon entry's `definition` in both `spec/canon/kinds/<kind>.json` and `spec/canon/manifest.json` (`canon-accept` does not update an entry that exists, and `canonical-autofix` does not touch definitions). `specdev guide E607` prints the steps.
+**Resolution**: Decide which text is right. Either patch the glossary term (or the proposal) to match the canon entry, or update the canon entry from the proposal with `specdev canon-accept --from spec/03_glossary.json --namespace cn:project: --update` (add `--dry-run` first to see what would change; the proposal in `canonical_proposals` must hold the new text, and with no proposal the command prints `OK (no proposals found)` and changes nothing). `--update` rewrites `definition`, `preferred_label` and `aliases` in `manifest.json` and in `kinds/<kind>.json` when the canon has one; `canonical-autofix` does not touch definitions. `specdev guide E607` prints the steps for each case (definition, label, proposal of another step).
 
 ### W606 GLOSSARY_CANON_ORPHAN
 
@@ -1773,8 +1773,6 @@ Removed in 1.2.0 with W607: the step 16 anchor no longer emits it (see W607 abov
 
 Removed in 1.2.0: the fields it read are gone and no emitter is left.
 
-## Exception Classes
-
 ### E573 / W573 ASSUMPTION_UNBOUND_ID (removed)
 
 Removed in 1.2.0: an id written in the text of an assumption is E752 (node id in prose).
@@ -1782,6 +1780,8 @@ Removed in 1.2.0: an id written in the text of an assumption is E752 (node id in
 ### E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP (removed)
 
 Removed in 1.2.0: derivation is stated by `derives_from` links and checked by the graph; the token-overlap heuristic read nine hand-listed text keys.
+
+## Exception Classes
 
 ### SubmoduleDetectionError
 

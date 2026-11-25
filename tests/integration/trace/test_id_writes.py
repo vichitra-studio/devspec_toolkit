@@ -87,10 +87,13 @@ def _lock_keys(host: Path) -> set[tuple[str, str, str]]:
 # --- DEVSPEC-155: --repo-root on json delete, keys and structure ---------------------------------------------------------
 
 def test_json_delete_accepts_repo_root(tmp_path: Path) -> None:
+    """``--repo-root`` is accepted; a delete validates as patch does, so a file without ``$schema`` is refused by name."""
     scratch = tmp_path / "scratch.json"
     scratch.write_text(json.dumps({"a": 1, "b": 2}), encoding="utf-8")
+    before = scratch.read_bytes()
     code, out = run_cli("json", "delete", str(scratch), ".a", "--repo-root", str(ROOT))
-    assert code == 0 and "Deleted .a" in out and json.loads(scratch.read_text(encoding="utf-8")) == {"b": 2}
+    assert code == 1 and "declares no $schema; json delete validates writes" in out
+    assert scratch.read_bytes() == before
 
 
 def test_json_keys_accepts_repo_root(tmp_path: Path) -> None:
@@ -375,13 +378,21 @@ def test_classic_jq_path_forms_unchanged(host: Path, tmp_path: Path) -> None:
     assert Path(lock_path(str(host / "spec"))).read_bytes() == before_lock
 
 
-def test_node_status_active_and_classic_delete_still_write_without_validation(host: Path) -> None:
+def test_node_status_active_writes_and_classic_delete_validates_as_patch_does(host: Path) -> None:
     assert run_cli("node", "status", FR, "deprecated", *_flags(host))[0] == 0
     assert run_cli("node", "status", FR, "active", *_flags(host))[0] == 0
     assert "lifecycle" not in _item(host, FR_FILE, "functional_requirements", "fr_id", FR)
-    status, out = run_cli("json", "delete", str(host / "spec" / FR_FILE), ".functional_requirements[1]", *_flags(host))
+    path = str(host / "spec" / FR_FILE)
+    before = (host / "spec" / FR_FILE).read_bytes()
+    status, out = run_cli("json", "delete", path, ".functional_requirements[1]", *_flags(host))
+    assert status == 1 and "Write refused" in out, out
+    assert (host / "spec" / FR_FILE).read_bytes() == before
+    extra = {"criterion_id": "ac-password-reset-request-3", "scope": "in", "text": "Given a registered member, when a reset is requested twice, then only the latest link works."}
+    status, out = run_cli("json", "insert", path, ".functional_requirements[1].acceptance_criteria", json.dumps(extra), *_flags(host))
     assert status == 0, out
-    assert [item["fr_id"] for item in _doc(host, FR_FILE)["functional_requirements"]] == [FR]
+    status, out = run_cli("json", "delete", path, ".functional_requirements[1].acceptance_criteria[2]", *_flags(host))
+    assert status == 0, out
+    assert len(_item(host, FR_FILE, "functional_requirements", "fr_id", FR_REQUEST)["acceptance_criteria"]) == 2
 
 
 def test_edit_refused_only_for_the_violation_it_adds_not_for_an_unrelated_existing_resolver_error(host: Path) -> None:

@@ -115,8 +115,8 @@ def test_16c_never_writes_a_milestone_status() -> None:
 REVIEWER_JUDGEMENT = (
     "Blocking finding forbids `verified`",
     "Security RED forbids `verified`",
-    "Rating evidence (ENF-140)",
-    "Remediation for every finding (ENF-144)",
+    "Rating evidence (ENF-144)",
+    "Remediation for every finding (ENF-140)",
     "Rating bounds",
     "Vague findings",
     "Per-item verdicts",

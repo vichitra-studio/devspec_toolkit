@@ -44,6 +44,7 @@ from specdev_tools.core.schema_validate import (
     schema_violations,
     violation_text,
 )
+from specdev_tools.trace.lockfile import replace_file_atomically
 
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
 # Used to guard read-multi, whose {key: value} construct produces one output object per
@@ -54,7 +55,6 @@ _STREAMING_FILTER_RE = re.compile(r'\[\s*\]')
 JQ_INDENT = 4  # Indent of a new file; an existing file keeps its own (see detect_indent)
 
 # jq starts with no environment: a filter such as ``$ENV.TOKEN`` or ``env.TOKEN`` reads null.
-_JQ_ENV: dict[str, str] = {}
 
 
 def _jq_command(args: List[str]) -> List[str]:
@@ -102,7 +102,7 @@ def validate_jq_filter(jq_filter: str) -> Optional[str]:
         # don't block valid filters — we only want to catch syntax errors here.
         result = subprocess.run(
             _jq_command(['-n', f'try ({jq_filter}) catch null']),
-            capture_output=True, text=True, timeout=5, env=_JQ_ENV,
+            capture_output=True, text=True, timeout=5, env={},
         )
         if result.returncode != 0 and result.stderr:
             stderr = result.stderr.strip()
@@ -137,9 +137,9 @@ def run_jq(args: List[str], input_data: Optional[str] = None, file_path: Optiona
 
     try:
         if input_data is not None:
-            result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout, env=_JQ_ENV)
+            result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout, env={})
         else:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout, env=_JQ_ENV)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout, env={})
         return result.stdout.strip()
     except FileNotFoundError:
         raise JsonUtilsError("jq is not installed or not on PATH. Install with: brew install jq")
@@ -363,10 +363,11 @@ def json_keys(file_path: str, path_selector: str) -> Optional[str]:
 def detect_indent(text: str, default: str = " " * JQ_INDENT) -> str:
     """The indentation unit of the JSON *text*: the leading whitespace of its first indented non-blank line
     (``"\t"`` for a tab), else *default*."""
-    for line in text.splitlines():
+    for line in text.split("\n"):
         stripped = line.lstrip(" \t")
-        if stripped and len(stripped) < len(line):
-            return line[: len(line) - len(stripped)]
+        lead = line[: len(line) - len(stripped)]
+        if stripped.strip("\r") and lead:
+            return "\t" if lead.startswith("\t") else lead
     return default
 
 
@@ -382,7 +383,8 @@ def _jq_indent_args(indent: str) -> List[str]:
 def json_write_atomic(file_path: str, data_str: str) -> None:
     """Write *data_str* to *file_path* atomically in the file's own indentation (new file: ``JQ_INDENT`` spaces).
 
-    Raises JsonUtilsError on empty content or a jq failure; a failed write leaves no temp file.
+    Raises JsonUtilsError on empty content or a jq failure; a failed write leaves no temp file (the write is
+    ``trace.lockfile.replace_file_atomically``: the file keeps its mode).
     """
     if not data_str or not data_str.strip():
         raise JsonUtilsError(
@@ -403,27 +405,7 @@ def json_write_atomic(file_path: str, data_str: str) -> None:
             f"jq formatting produced empty output for {file_path}. Input may be invalid JSON."
         )
 
-    dirname = os.path.dirname(file_path) or '.'
-    # Preserve original file permissions (temp files default to 0o600)
-    try:
-        original_mode = os.stat(file_path).st_mode
-    except OSError:
-        original_mode = None
-
-    tf = tempfile.NamedTemporaryFile('w', dir=dirname, delete=False, encoding='utf-8')
-    temp_name = tf.name
-    try:
-        with tf:
-            tf.write(formatted + '\n')
-        os.replace(temp_name, file_path)
-    except BaseException:
-        try:
-            os.unlink(temp_name)
-        except OSError:
-            pass
-        raise
-    if original_mode is not None:
-        os.chmod(file_path, original_mode)
+    replace_file_atomically(file_path, formatted + '\n')
 
 
 # --- WS1: Differential schema validation helpers ---
@@ -448,14 +430,16 @@ def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
     return os.path.normpath(os.path.join(this_dir, "..", "..", ".."))
 
 
-def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> List[SchemaViolation]:
+def _call_validate_or_raise(
+    eff_root: str, doc: dict, file_path: str, command: str = "json patch",
+) -> List[SchemaViolation]:
     """Run schema_violations, mapping every schema-validation failure
     to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
     try:
         return schema_violations(eff_root, doc)
     except NoSchemaError:
         raise JsonUtilsError(
-            f"{file_path} declares no $schema; json patch validates writes against "
+            f"{file_path} declares no $schema; {command} validates writes against "
             "the file's schema and cannot proceed without one. "
             "If this is a spec artifact, restore its $schema."
         )
@@ -485,6 +469,7 @@ def _ws1_differential_check(
     content: str,
     new_content: str,
     eff_root: str,
+    command: str = "json patch",
 ) -> None:
     """Run the WS1 differential validation algorithm.
 
@@ -522,20 +507,20 @@ def _ws1_differential_check(
     # Step 2: Refuse if resulting doc has no $schema.
     if not new.get("$schema"):
         raise JsonUtilsError(
-            f"{file_path} declares no $schema; json patch validates writes against "
+            f"{file_path} declares no $schema; {command} validates writes against "
             "the file's schema and cannot proceed without one. "
             "If this is a spec artifact, restore its $schema."
         )
 
     # Step 3: Validate post-edit doc — wrapped per catch strategy (fail closed).
-    errors_after = _call_validate_or_raise(eff_root, new, file_path)
+    errors_after = _call_validate_or_raise(eff_root, new, file_path, command)
 
     # Fast path: no errors after edit → write is safe.
     if not errors_after:
         return
 
     # Step 4: Compute errors_before to distinguish pre-existing from newly introduced.
-    errors_before = _call_validate_or_raise(eff_root, original, file_path)
+    errors_before = _call_validate_or_raise(eff_root, original, file_path, command)
     errors_before = _reindexed_after_removal(errors_before, _removed_array_item(original, new))
 
     added = _added_violations(errors_before, errors_after)
@@ -688,7 +673,12 @@ def _insert_filter(path_selector: str, *, create: bool) -> str:
     )
 
 
-_COUNT_PATHS = '[path({sel})] | length'
+# A path through an array index at or past the end of that array does not exist: a patch there would pad the array.
+_COUNT_PATHS = (
+    '. as $d | [path({sel}) | select(. as $p | all(range(0; length); . as $i | (($p[$i] | type) != "number") or '
+    '(try ($d | getpath($p[:$i]) | if type == "array" then ($p[$i] < length and $p[$i] >= -length) else true end) '
+    'catch true)))] | length'
+)
 _COUNT_EXISTING_PATHS = (
     '. as $d | [path({sel}) | select(length==0 or (. as $p | try ($d | getpath($p[:-1]) | '
     'if type=="array" then ($p[-1]|type)=="number" and $p[-1] < length and $p[-1] >= -length '
@@ -712,6 +702,29 @@ def _warn_if_many(path_selector: str, count: Optional[int]) -> None:
     """Print the multi-match warning to stderr when *count* is above one."""
     if count is not None and count > 1:
         print(f"warning: '{path_selector}' matches {count} values; all {count} are changed.", file=sys.stderr)
+
+
+def _edit_counted(content: str, path_selector: str, location: str, edit: Any, *, existing_only: bool) -> str:
+    """Run ``edit()`` (a patch or delete of *path_selector* in the text *content*) and return the new text.
+
+    Raises ``JsonUtilsError`` before the edit when the selector matches nothing (with *existing_only*, nothing that
+    exists and can be deleted); warns on stderr when it matches several values.  The one place both ``json patch`` /
+    ``json delete`` and a batch item get this refusal.
+    """
+    count = _count_targets(content, path_selector, existing_only=existing_only)
+    if count == 0 and existing_only:
+        raise JsonUtilsError(
+            f"Nothing to delete at '{path_selector}' in {location}: the selector matches nothing, "
+            "or the index is out of range. Nothing was changed."
+        )
+    if count == 0:
+        raise JsonUtilsError(
+            f"The selector '{path_selector}' matches nothing in {location}: nothing was changed. "
+            "Check the filter (a select() that names no item, or an index past the end of an array?)."
+        )
+    new_content = edit()
+    _warn_if_many(path_selector, count)
+    return new_content
 
 
 _SUMMARY_MAX_MATCHES = 5
@@ -777,15 +790,9 @@ def json_patch(
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    _require_valid_filter(path_selector)
-    count = _count_targets(content, path_selector, existing_only=False)
-    if count == 0:
-        raise JsonUtilsError(
-            f"The selector '{path_selector}' matches nothing in {file_path}: nothing was changed. "
-            "Check the filter (a select() that names no item?)."
-        )
-    new_content = patch_text(content, path_selector, value, is_json)
-    _warn_if_many(path_selector, count)
+    new_content = _edit_counted(
+        content, path_selector, file_path, lambda: patch_text(content, path_selector, value, is_json), existing_only=False,
+    )
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
@@ -803,11 +810,11 @@ def json_patch(
 _BATCH_VERBS = {"patch": "update", "insert": "insert into", "delete": "delete"}
 
 
-def _apply_batch_item(index: int, item: Any, content: str) -> tuple[str, str, str]:
+def _apply_batch_item(index: int, item: Any, content: str, location: str) -> tuple[str, str, str]:
     """Apply one item of a batch file to the JSON text *content*.
 
     Returns ``(verb, path, new_content)``.  Raises ``JsonUtilsError("batch item <i> (<op> <path>): <reason>")`` for a
-    malformed item or a failing jq filter.
+    malformed item, a selector that matches nothing or a failing jq filter.
     """
     op = item.get("op") if isinstance(item, dict) else None
     path = item.get("path") if isinstance(item, dict) else None
@@ -820,10 +827,16 @@ def _apply_batch_item(index: int, item: Any, content: str) -> tuple[str, str, st
         raise JsonUtilsError(f"{label}: 'value' is missing")
     try:
         if op == "delete":
-            return _BATCH_VERBS[op], path, delete_text(content, path)
+            new_content = _edit_counted(content, path, location, lambda: delete_text(content, path), existing_only=True)
+            return _BATCH_VERBS[op], path, new_content
         value = json.dumps(item["value"], ensure_ascii=False)
-        edit = patch_text if op == "patch" else insert_text
-        return _BATCH_VERBS[op], path, edit(content, path, value, True)
+        if op == "patch":
+            new_content = _edit_counted(
+                content, path, location, lambda: patch_text(content, path, value, True), existing_only=False,
+            )
+        else:
+            new_content = insert_text(content, path, value, True)
+        return _BATCH_VERBS[op], path, new_content
     except JsonUtilsError as error:
         raise JsonUtilsError(f"{label}: {error}") from error
 
@@ -858,7 +871,7 @@ def json_patch_batch(
     reports: list[str] = []
     for index, item in enumerate(ops):
         before = running
-        verb, path, running = _apply_batch_item(index, item, before)
+        verb, path, running = _apply_batch_item(index, item, before, file_path)
         if dry_run and not show_file and index < _SUMMARY_MAX_MATCHES:
             new = None if verb == "delete" else (item["value"],)
             reports.append(_dry_run_text(
@@ -914,21 +927,16 @@ def json_insert(
         # Seed path: create the file content in memory; do NOT call _check_file.
         content = json.dumps({"$schema": create_schema})
         using_seed = True
-        active_filter = _insert_filter(path_selector, create=True)
     else:
         _check_file(file_path)
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        active_filter = _insert_filter(path_selector, create=False)
 
-    _require_valid_filter(path_selector)
-
-    _refuse_array_item_target(content, path_selector)
-    new_content = _run_value_filter(active_filter, content, value, is_json)
+    new_content = insert_text(content, path_selector, value, is_json, create=using_seed)
 
     if validate:
         eff_root = resolve_effective_toolkit_root(repo_root)
-        _ws1_differential_check(file_path, content, new_content, eff_root)
+        _ws1_differential_check(file_path, content, new_content, eff_root, "json insert")
 
     if dry_run:
         return _dry_run_text(
@@ -969,17 +977,11 @@ def json_delete(
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    _require_valid_filter(path_selector)
-    count = _count_targets(content, path_selector, existing_only=True)
-    if count == 0:
-        raise JsonUtilsError(
-            f"Nothing to delete at '{path_selector}' in {file_path}: the selector matches nothing, "
-            "or the index is out of range. Nothing was changed."
-        )
-    new_content = delete_text(content, path_selector)
-    _warn_if_many(path_selector, count)
+    new_content = _edit_counted(
+        content, path_selector, file_path, lambda: delete_text(content, path_selector), existing_only=True,
+    )
     if validate:
-        _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root))
+        _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root), "json delete")
     if dry_run:
         return _dry_run_text(
             "delete", path_selector, file_path, content, new_content, new=None, show_old=True, show_file=show_file,
@@ -1721,9 +1723,12 @@ def _materialise_at_ref(file_path: str, ref: str) -> str:
     Raises ``JsonUtilsError`` (``cannot read <path> at <ref>: <git reason>``) when git is missing, the folder is not in
     a repository, the ref is unknown or the path is absent at the ref.  The caller removes the folder.
     """
+    # Imported here: ``graph`` is heavy, and only ``--ref`` needs it.
     from specdev_tools.graph.gitview import GitViewError, git_reason, run_git
 
-    abs_path = os.path.abspath(file_path)
+    # Resolve the folder as git does (``--show-toplevel`` is a real path), so a path through a symlink gets a ``rel``.
+    absolute = os.path.abspath(file_path)
+    abs_path = os.path.join(os.path.realpath(os.path.dirname(absolute)), os.path.basename(absolute))
     folder = os.path.dirname(abs_path)
     while not os.path.isdir(folder):
         folder = os.path.dirname(folder)
@@ -1740,7 +1745,11 @@ def _materialise_at_ref(file_path: str, ref: str) -> str:
         raise JsonUtilsError(f"cannot read {rel} at {ref}: {git_reason(shown)}")
     copy_dir = tempfile.mkdtemp()
     copy_path = os.path.join(copy_dir, os.path.basename(abs_path))
-    pathlib.Path(copy_path).write_bytes(shown.stdout)
+    try:
+        pathlib.Path(copy_path).write_bytes(shown.stdout)
+    except BaseException:
+        shutil.rmtree(copy_dir, ignore_errors=True)
+        raise
     return copy_path
 
 
@@ -1753,6 +1762,8 @@ def _read_source(file_path: str, ref: Optional[str]) -> Iterator[str]:
     copy_path = _materialise_at_ref(file_path, ref)
     try:
         yield copy_path
+    except JsonUtilsError as error:
+        raise JsonUtilsError(str(error).replace(copy_path, f"{file_path} at {ref}")) from error
     finally:
         shutil.rmtree(os.path.dirname(copy_path), ignore_errors=True)
 
@@ -1916,6 +1927,8 @@ def main():
     parser = build_json_parser()
 
     args = parser.parse_args()
+    if getattr(args, "show_file", False) and not getattr(args, "dry_run", False):
+        parser.error("--show-file needs --dry-run (it prints the file a dry run would write)")
 
     try:
         result = None
@@ -1953,7 +1966,8 @@ def main():
             )
         elif args.command == "delete":
             result = json_delete(
-                args.file, args.path, dry_run=getattr(args, "dry_run", False), show_file=args.show_file,
+                args.file, args.path, dry_run=getattr(args, "dry_run", False),
+                repo_root=os.path.abspath(args.repo_root), validate=True, show_file=args.show_file,
             )
         elif args.command == "keys":
             with _read_source(args.file, args.ref) as path:

@@ -44,7 +44,8 @@ changes:
   - type: fix
     description: >
       extraction_paths.json also lists the nested and map-keyed paths of each
-      file (.milestones[].tasks[].acceptance_criteria,
+      file (.stakeholders[].needs, .milestones[].tasks,
+      .milestones[].tasks[].acceptance_criteria,
       .functional_requirements[].acceptance_criteria, .apis[].errors) beside
       the top-level ones.
     migration:
@@ -2085,7 +2086,8 @@ changes:
       Migration script p3_remove (mechanical). Removes the fields 1.2.0 dropped
       (the *_refs_ingested lists, tech_stack, task status and assumptions,
       stored computed names (on node objects only; a key of that name inside a
-      fixture's payload stays), ...) after capture.json holds the values a later
+      fixture's payload stays), line_range of a plan's
+      context.existing_structures entries, ...) after capture.json holds the values a later
       pass reads; a plan that was done before 1.2.0 loses from this script only
       the stored computed names (content_hash, chain_stamp, and the
       milestone_ref, nfr_refs and fixture_ref of a checklist item); the
@@ -2390,10 +2392,13 @@ changes:
     description: >
       specdev json read --json keeps JSON quoting of strings. specdev json patch --batch OPS_FILE applies a JSON array of {op, path,
       value} items (patch, insert, delete) with one validation and one atomic
-      write; a failing item names itself and nothing is written. --dry-run of json
+      write; a failing item names itself (batch item <i>), and a patch or delete
+      item whose selector matches nothing fails like the single command, so
+      nothing is written. --dry-run of json
       patch|insert|delete now prints a short summary of the matches instead of the
       whole resulting file (a change in what the command prints); --show-file
-      prints the file as before.
+      (only with --dry-run; alone it is a usage error, exit 2) prints the file
+      as before.
     migration:
       action: none
 
@@ -2444,7 +2449,11 @@ changes:
       out of range; they printed `Updated` / `Deleted` and exited 0. A selector
       that matches several values prints `warning: '<sel>' matches N values; all N
       are changed.` on stderr first. On the worked example `json delete
-      03_glossary.json '.terms[500]'` exits 1.
+      03_glossary.json '.terms[500]'` exits 1. `json patch` with an index past
+      the end of an array fails the same way. The file form of `json delete`
+      is now checked against the schema before it writes, as `patch` and
+      `insert` are: a delete that leaves a required field out is refused with
+      E767.
     migration:
       action: none
 
@@ -2453,17 +2462,6 @@ changes:
       `specdev json schema` prints `minItems`, `maxItems`, `minLength`,
       `maxLength`, `pattern`, `additionalProperties`, `const` and the items
       constraints of the node.
-    migration:
-      action: none
-
-  - type: fix
-    description: >
-      specdev-trinity-impl and specdev-trinity-reviewer check git rev-parse
-      --show-toplevel against the --git-root of the dispatch before they write
-      and stop with "worktree mismatch" when the two differ; the three
-      dispatched agents (specdev-trinity-impl, specdev-trinity-reviewer,
-      specdev-scope) are told to use the absolute paths of the dispatch
-      verbatim.
     migration:
       action: none
 
@@ -2499,7 +2497,9 @@ changes:
       names (minItems 3, the "at least 3 dedicated schema sections" of the
       prompt). A 1.1.1 extension with fewer is E520 from align validate; add
       sections or remove the extension (specdev json delete --id
-      <extension-id>).
+      <extension-id>; when it is the only extension, remove it and set
+      extension_decision.status to none-required in one specdev json patch
+      <file> --batch, since either alone is refused).
     migration:
       action: ai_assisted
 
@@ -2507,8 +2507,9 @@ changes:
     description: >
       Step 14: a milestone with risk_status high or critical needs at least
       one entry in risks. A 1.1.1 milestone without one is E520 from align
-      validate; add a risk (specdev json insert --id <milestone-id> .risks
-      '"<risk>"') or lower risk_status. The target_date description now says
+      validate; add a risk (specdev json patch --id <milestone-id> .risks
+      '["<risk>"]'; json insert is refused when the milestone has no risks
+      key) or lower risk_status. The target_date description now says
       what the validator checks: non-decreasing order, equal dates allowed.
     migration:
       action: ai_assisted
@@ -2639,7 +2640,11 @@ changes:
       OK. It now lists the changed ones ("! changed (not updated, use
       --update)", a WARN summary line, exit 0), and the new flag --update
       rewrites definition, preferred_label and aliases in manifest.json and
-      kinds/<kind>.json together (the old label becomes an alias). The text
+      in kinds/<kind>.json together when the canon has a file for the kind
+      (the old label becomes an alias; --update of an entry that only
+      manifest.json holds creates no kinds/ file). A proposal text that
+      differs from the stored text only by whitespace, Unicode form, curly
+      quotes or dashes counts as unchanged. The text
       output says "unchanged" where it said "skipped (duplicate)"; the JSON key
       skipped stays, and the JSON output gains changed, updated and
       would_update.
@@ -2699,8 +2704,8 @@ changes:
 
   - type: fix
     description: >
-      E606 and E607 compare text after collapsing whitespace and composing
-      Unicode and name the first differing position (first_difference_at=N);
+      E606 and E607 compare text after collapsing whitespace, composing
+      Unicode and folding curly quotes and dashes, and name the first differing position (first_difference_at=N);
       E607 also reports a glossary term whose label is not the canon entry's
       preferred_label (or an alias; case is ignored), and a
       canonical_proposals item of any step (capability, metric, ...) whose
@@ -2937,7 +2942,9 @@ changes:
       and writes nothing, with E520 ... autofix_result_invalid, when the
       result adds a violation the file did not have (counted by path and
       keyword, so a violation the file already had does not block the write;
-      a dry run reports the refusal too).
+      a dry run reports the refusal too). When the file or the result cannot
+      be validated at all, it writes nothing either, with E520 ...
+      autofix_result_unvalidated validation_raised.
     migration:
       action: none
 
@@ -2951,10 +2958,14 @@ changes:
 
   - type: fix
     description: >
-      specdev guide E607 prints a playbook; the E607 resolution no longer says
-      to re-run canon-accept for an existing entry (it does not update one):
-      edit the definition in spec/canon/kinds/<kind>.json and
-      spec/canon/manifest.json, or patch the glossary term.
+      specdev guide E607 prints a playbook for the three E607 cases (term
+      definition, term label, proposal of another step). The E607 resolution
+      no longer says to re-run canon-accept plainly (it leaves an entry that
+      exists alone): patch the term or the proposal, or put the new text in
+      canonical_proposals and run specdev canon-accept --from <file>
+      --namespace cn:project: --update (add --dry-run first), which rewrites
+      the entry in manifest.json and in kinds/<kind>.json when the canon has
+      one.
     migration:
       action: none
 

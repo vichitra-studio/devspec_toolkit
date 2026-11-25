@@ -204,3 +204,20 @@ class TestCollectIdsAndRefs:
         refs: list[tuple[str, str, str]] = []
         collect_ids_and_refs({"fr_id": "fr-a"}, "other.json", ids, refs, skip_ids_for_files={"04_fr_list.json"})
         assert ids == {"fr-a"}
+
+
+def test_canonical_stages_are_read_through_the_registry_loader(tmp_path):
+    """A stage entry in ``manifest.json`` counts, as it does for every other canon reader; a retired one does not."""
+    import json
+
+    from specdev_tools.validation.linter_utils import load_canonical_stages
+
+    canon = tmp_path / "canon"
+    canon.mkdir()
+    entries = [
+        {"id": f"cn:core:stage:{name}", "kind": "stage", "preferred_label": name, "status": status}
+        for name, status in (("dev", "active"), ("qa", "active"), ("old", "retired"))
+    ]
+    (canon / "manifest.json").write_text(json.dumps({"registry_version": "1.0.0", "entries": entries}), encoding="utf-8")
+
+    assert load_canonical_stages(str(canon)) == {"dev", "qa"}

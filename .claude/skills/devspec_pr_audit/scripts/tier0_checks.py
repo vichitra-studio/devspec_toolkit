@@ -401,6 +401,7 @@ def check_t09_changelog_entry_present(
     # The entry is the YAML (the migration reads it): a `changes` item in changelog/unreleased.yaml, or a
     # changelog/v<X.Y.Z>.yaml that the diff itself changes. A Markdown entry alone does not count.
     has_entry = any(re.fullmatch(r"changelog/v\d+\.\d+\.\d+\.yaml", f) for f in changed_files)
+    unreadable = ""
     if not has_entry:
         unreleased_yaml = REPO_ROOT / "changelog" / "unreleased.yaml"
         if unreleased_yaml.exists():
@@ -408,8 +409,12 @@ def check_t09_changelog_entry_present(
                 import yaml
 
                 document = yaml.safe_load(unreleased_yaml.read_text(encoding="utf-8"))
-            except Exception:
+            except ImportError:
                 document = None
+                unreadable = "PyYAML is not installed for this python3, so changelog/unreleased.yaml was not read"
+            except Exception as exc:
+                document = None
+                unreadable = f"changelog/unreleased.yaml is unreadable ({type(exc).__name__})"
             changes = document.get("changes") if isinstance(document, dict) else None
             has_entry = isinstance(changes, list) and len(changes) > 0
 
@@ -429,8 +434,10 @@ def check_t09_changelog_entry_present(
     return [_finding(
         kind="gap",
         location="CHANGELOG.md",
-        message=(f"Slices {', '.join(trigger_slices)} have changed files but no changelog YAML entry found. "
-                 "Add a `changes` item to changelog/unreleased.yaml (or change changelog/v<version>.yaml in this diff); "
+        message=(f"Slices {', '.join(trigger_slices)} have changed files but "
+                 + (f"{unreadable}, so the check cannot tell whether an entry exists. " if unreadable
+                    else "no changelog YAML entry found. ")
+                 + "Add a `changes` item to changelog/unreleased.yaml (or change changelog/v<version>.yaml in this diff); "
                  "the Markdown is rendered from it and does not count."),
         severity="P1",
         check_id="changelog-entry-present",

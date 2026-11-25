@@ -72,7 +72,7 @@ def effective_schema(
     :param include_conditionals: When ``True``, properties from ``oneOf``,
         ``anyOf``, ``then``, and ``else`` branches are unioned into ``props``
         (but never into ``required``).  Defaults to ``False``.  ``merge_allof``
-        and ``_get_all_properties`` call it twice and add the conditional-only
+        calls it twice and adds the conditional-only
         properties under the allOf-only ones.
     :param _seen: **Internal — do not pass.**  A frozenset of ``$ref`` strings
         already resolved on the current recursion path.  Used as a cycle guard:

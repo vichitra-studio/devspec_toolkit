@@ -1,7 +1,6 @@
 """H-152-3: the fix-mode agent refreshes the canon with ``canon-accept --update``.
 
-Reads ``.claude/agents/specdev-impl.md``; passes once the orchestrator has applied the edit listed in the
-H builder report (CLAUDE-EDITS of B6).
+Reads ``.claude/agents/specdev-impl.md``.
 """
 from __future__ import annotations
 

@@ -35,6 +35,8 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from ..core.json_utils import detect_indent
+from ..graph.contract import normalise_text
+from ..trace.lockfile import replace_file_atomically
 
 CANON_ID_RE = re.compile(r'^cn:[a-z0-9.]+:[a-z_][a-z0-9_]*:[a-z0-9-]+$')
 
@@ -57,12 +59,21 @@ def _empty_result(error: str) -> dict[str, Any]:
     return {"added": [], "skipped": [], "changed": [], "updated": [], "would_update": [], "malformed": 0, "error": error}
 
 
+def _same_text(stored: Any, proposed: str) -> bool:
+    """Whether the stored value is the proposed text once both are normalised."""
+    return isinstance(stored, str) and normalise_text(stored) == normalise_text(proposed)
+
+
 def _changed_fields(entry: dict[str, Any], label: str, definition: str) -> list[str]:
-    """The fields of *entry* whose stored text differs from the proposal (exact string comparison)."""
+    """The fields of *entry* whose stored text differs from the proposal.
+
+    Texts are compared as E606 and E607 compare them (``graph.contract.normalise_text``): a difference of
+    whitespace, Unicode form, curly quote or dash is not a change.
+    """
     fields = []
-    if entry.get("definition") != definition:
+    if not _same_text(entry.get("definition"), definition):
         fields.append("definition")
-    if entry.get("preferred_label") != label:
+    if not _same_text(entry.get("preferred_label"), label):
         fields.append("preferred_label")
     return fields
 
@@ -78,15 +89,8 @@ def _apply_update(entry: dict[str, Any], label: str, definition: str) -> None:
 
 
 def _write_json_atomic(path: Path, data: Any, indent: str) -> None:
-    """Write *data* as JSON in *indent* with a final newline, through a temp file and ``os.replace``."""
-    tmp = path.with_name(path.name + ".tmp")
-    try:
-        with tmp.open("w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=indent, ensure_ascii=False)
-            fh.write("\n")
-        os.replace(tmp, path)
-    finally:
-        tmp.unlink(missing_ok=True)
+    """Write *data* as JSON in *indent* with a final newline, through ``replace_file_atomically``."""
+    replace_file_atomically(str(path), json.dumps(data, indent=indent, ensure_ascii=False) + "\n")
 
 
 def _load_kind_file(kind_file: Path, kind: str) -> tuple[dict[str, Any], str | None] | None:
@@ -110,13 +114,15 @@ def _write_kind_files(
 ) -> None:
     """Mirror the new and updated entries into ``kinds/<kind>.json``, each file in the indentation it has.
 
-    An updated id missing from its kind file is appended as the manifest holds it. A kind file that cannot be
-    read or written is logged and skipped.
+    An updated id missing from its kind file is appended as the manifest holds it; an update of a kind that has
+    no kind file (a manifest-only canon) does not create one. A kind file that cannot be read or written is
+    logged and skipped.
     """
-    kinds_dir.mkdir(parents=True, exist_ok=True)
-    kinds = {e["kind"] for e in new_entries} | {u.kind for u in updates}
-    for kind in sorted(kinds):
+    new_kinds = {e["kind"] for e in new_entries}
+    for kind in sorted(new_kinds | {u.kind for u in updates}):
         kind_file = kinds_dir / f"{kind}.json"
+        if kind not in new_kinds and not kind_file.exists():
+            continue
         loaded = _load_kind_file(kind_file, kind)
         if loaded is None:
             continue
@@ -127,12 +133,14 @@ def _write_kind_files(
         for entry in new_entries:
             if entry["kind"] == kind and entry["id"] not in by_id:
                 entries.append(entry)
+                by_id[entry["id"]] = entry
         for update in (u for u in updates if u.kind == kind):
             if update.canon_id in by_id:
                 _apply_update(by_id[update.canon_id], update.label, update.definition)
             else:
                 entries.append(manifest_entries[update.canon_id])
         try:
+            kinds_dir.mkdir(parents=True, exist_ok=True)
             _write_json_atomic(kind_file, kind_data, indent)
         except OSError as exc:
             logger.warning("canon-accept: failed to write kind file %s: %s", kind_file, exc)

@@ -1250,26 +1250,19 @@ class TestWriteFailureAdded:
         """Simulate an OSError on manifest write and assert `added` is non-empty
         and `write_failed` is True in the returned dict.
 
-        accept.py uses Path.open(), so we patch pathlib.Path.open to intercept
-        the write call while allowing all read calls to pass through.
+        accept.py writes through ``replace_file_atomically``, so we patch that name.
         """
         import unittest.mock as mock
-        from pathlib import Path as _Path
-
         manifest_path = tmp_repo / "canon" / "manifest.json"
         _write_json(manifest_path, _make_manifest())
 
         spec_file = tmp_path / "spec.json"
         _write_json(spec_file, _make_spec([_proposal()]))
 
-        real_path_open = _Path.open
+        def failing_write(path, text):
+            raise OSError("simulated write failure")
 
-        def patched_path_open(self_path, mode="r", **kwargs):
-            if "w" in mode and "manifest.json" in str(self_path):
-                raise OSError("simulated write failure")
-            return real_path_open(self_path, mode, **kwargs)
-
-        with mock.patch.object(_Path, "open", patched_path_open):
+        with mock.patch("specdev_tools.canonical.accept.replace_file_atomically", failing_write):
             result = run_canon_accept(
                 spec_file=str(spec_file),
                 namespace="cn:project:",
@@ -1289,7 +1282,6 @@ class TestWriteFailureAdded:
     ) -> None:
         """skipped and malformed counts must be present even when a write failure occurs."""
         import unittest.mock as mock
-        from pathlib import Path as _Path
 
         existing_entry = {
             "id": "cn:project:entity:existing",
@@ -1314,14 +1306,10 @@ class TestWriteFailureAdded:
             bad,  # malformed
         ]))
 
-        real_path_open = _Path.open
+        def failing_write(path, text):
+            raise OSError("simulated write failure")
 
-        def patched_path_open(self_path, mode="r", **kwargs):
-            if "w" in mode and "manifest.json" in str(self_path):
-                raise OSError("simulated write failure")
-            return real_path_open(self_path, mode, **kwargs)
-
-        with mock.patch.object(_Path, "open", patched_path_open):
+        with mock.patch("specdev_tools.canonical.accept.replace_file_atomically", failing_write):
             result = run_canon_accept(
                 spec_file=str(spec_file),
                 namespace="cn:project:",
@@ -1718,3 +1706,53 @@ class TestChangedEntriesAndUpdate:
         assert result["skipped"] == ["cn:project:entity:my-term"]
         assert result["changed"] == result["updated"] == result["would_update"] == []
         assert (manifest.read_bytes(), kind_file.read_bytes()) == before
+
+
+class TestAcceptFixesRound1:
+    def test_a_curly_quote_or_dash_is_not_a_change(self, tmp_repo: Path, tmp_path: Path) -> None:
+        stored = _stored_entry()
+        stored["definition"] = "The user's name - required"
+        manifest, kind_file = _write_canon(tmp_repo, [stored])
+        before = (manifest.read_bytes(), kind_file.read_bytes())
+
+        result = _accept(
+            tmp_repo, tmp_path, [_proposal(definition="The user’s  name — required")], update=True
+        )
+
+        assert result["skipped"] == ["cn:project:entity:my-term"]
+        assert result["changed"] == result["updated"] == []
+        assert (manifest.read_bytes(), kind_file.read_bytes()) == before
+
+    def test_an_added_and_updated_id_is_written_once_to_the_kind_file(self, tmp_repo: Path, tmp_path: Path) -> None:
+        (tmp_repo / "canon" / "manifest.json").write_text(json.dumps(_make_manifest()) + "\n", encoding="utf-8")
+
+        result = _accept(
+            tmp_repo, tmp_path,
+            [_proposal(definition="First."), _proposal(definition="Second.")],
+            update=True,
+        )
+
+        assert result["error"] is None
+        kind_entries = json.loads((tmp_repo / "canon" / "kinds" / "entity.json").read_text(encoding="utf-8"))["entries"]
+        assert [e["id"] for e in kind_entries] == ["cn:project:entity:my-term"]
+        assert kind_entries[0]["definition"] == "Second."
+
+    def test_update_of_a_manifest_only_entry_creates_no_kind_file(self, tmp_repo: Path, tmp_path: Path) -> None:
+        (tmp_repo / "canon" / "manifest.json").write_text(
+            json.dumps(_make_manifest([_stored_entry()])) + "\n", encoding="utf-8"
+        )
+
+        result = _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")], update=True)
+
+        assert result["updated"] == ["cn:project:entity:my-term"]
+        assert not (tmp_repo / "canon" / "kinds").exists()
+        manifest = json.loads((tmp_repo / "canon" / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["entries"][0]["definition"] == "A new definition."
+
+    def test_the_write_keeps_the_file_mode(self, tmp_repo: Path, tmp_path: Path) -> None:
+        manifest, _kind_file = _write_canon(tmp_repo, [_stored_entry()])
+        manifest.chmod(0o600)
+
+        _accept(tmp_repo, tmp_path, [_proposal(definition="A new definition.")], update=True)
+
+        assert manifest.stat().st_mode & 0o777 == 0o600

@@ -30,7 +30,7 @@ Before starting, ensure your current specs are clean and valid.
 
 0.  **Seeds**:
     *   **Check**: Does the feature need a seed of its own (a new subject, not an edit of the overview or tech-stack seed)?
-    *   **Action**: Run `/specdev-seed`: it drafts the seed from `seed_templates/seed_extension.md`, registers it in `spec/common/seed_manifest.json`, routes it to the steps that distil it (`step_requirements`) and lints it. A change to an existing seed is an edit of its file; `specdev stale` then lists the nodes that link to it.
+    *   **Action**: Write the seed by hand, in four moves. (1) Copy `seed_templates/seed_extension.md` to a file under the seed folder (for example `docs/seed/seed_<subject>.md`) and fill every section, including the acceptance posture. (2) Register it: `specdev json insert spec/common/seed_manifest.json .seeds '{"seed_id": "seed-<subject>", "path": "docs/seed/seed_<subject>.md", "description": "...", "required": false, "source_type": "doc"}' --repo-root ./devspec_toolkit`, and add the id to `.global_seed_order`. (3) Route it to the steps that distil it: `specdev json patch spec/common/seed_manifest.json '.step_requirements."04"' '["seed-<subject>"]' --repo-root ./devspec_toolkit` (one entry per step; keep the ids already listed there). (4) Lint it: `./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`. A change to an existing seed is an edit of its file; `specdev stale` then lists the nodes that link to it.
     *   *Reference*: `docs/prompts/shared_expectations.md` section 7.
 1.  **Step 00: Seed Docs & Charter**:
     *   **Check**: Does this feature change the project overview (Success Metrics/Users)?

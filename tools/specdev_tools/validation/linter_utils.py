@@ -12,6 +12,7 @@ import re
 from collections.abc import Collection
 from typing import Any, Iterator
 
+from ..canonical.registry import load_tier_entries
 from ..core.json_utils import resolve_effective_toolkit_root
 from ..core.loaders import iter_spec_artifacts
 from ..graph.build import build_graph
@@ -204,7 +205,7 @@ def is_resolved_canonical_ref(value: Any) -> bool:
 
 
 def load_canonical_stages(canon_dir: str) -> set[str] | None:
-    """Load canonical stage values from canon/kinds/stage.json.
+    """Load canonical stage values from the ``stage`` entries of the canon (``canon/kinds/stage.json``).
 
     Falls back to canon/manifest.json legacy format.  Returns None if
     neither source can be loaded (caller falls back to KNOWN_STAGES).
@@ -214,24 +215,15 @@ def load_canonical_stages(canon_dir: str) -> set[str] | None:
     canon_dir : str
         Path to the canon directory (e.g. ``<toolkit_root>/canon``).
     """
-    # Primary: canon/kinds/stage.json
-    stage_path = os.path.join(canon_dir, "kinds", "stage.json")
-    try:
-        with open(stage_path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-        entries = data.get("entries", [])
-        if isinstance(entries, list) and entries:
-            labels = {
-                e["preferred_label"]
-                for e in entries
-                if isinstance(e, dict)
-                and isinstance(e.get("preferred_label"), str)
-                and e.get("status") != "retired"
-            }
-            if labels:
-                return labels
-    except (OSError, json.JSONDecodeError, ValueError, TypeError):
-        pass
+    # Primary: the stage entries of the canon, read through the registry loader (manifest.json and kinds/)
+    canon_root = os.path.abspath(canon_dir)
+    labels = {
+        e["preferred_label"]
+        for e in load_tier_entries(os.path.dirname(canon_root), os.path.basename(canon_root))
+        if e.get("kind") == "stage" and isinstance(e.get("preferred_label"), str) and e.get("status") != "retired"
+    }
+    if labels:
+        return labels
 
     # Fallback: canon/manifest.json (legacy)
     manifest_path = os.path.join(canon_dir, "manifest.json")

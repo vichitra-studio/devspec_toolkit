@@ -665,3 +665,27 @@ class TestDryRunSummary:
         f = self._items_file(tmp_path)
         lines = json_patch(str(f), ".items[]", "0", dry_run=True, validate=False).splitlines()
         assert lines[0].endswith("8 value(s)") and lines[-1] == "  ... and 3 more" and len(lines) == 12
+
+
+def test_file_form_delete_refuses_a_required_field(tmp_path: Path) -> None:
+    """H round 1 A3-1: ``specdev json delete <file> <path>`` runs the differential schema check as patch does."""
+    import shutil
+    import sys
+
+    from specdev_tools.core import json_utils
+    from unit.graph._synth import ROOT
+    from unit.trace._lock_support import EXAMPLE_HOST
+
+    path = tmp_path / "03_glossary.json"
+    shutil.copyfile(EXAMPLE_HOST / "spec" / "03_glossary.json", path)
+    before = path.read_bytes()
+    argv = ["json", "delete", str(path), ".terms[0].term", "--repo-root", str(ROOT)]
+    old = sys.argv
+    sys.argv = argv
+    try:
+        with pytest.raises(SystemExit) as stop:
+            json_utils.main()
+    finally:
+        sys.argv = old
+    assert stop.value.code == 1
+    assert path.read_bytes() == before

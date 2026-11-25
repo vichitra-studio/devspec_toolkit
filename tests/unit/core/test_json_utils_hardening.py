@@ -36,19 +36,6 @@ def test_a_filter_cannot_read_the_environment(tmp_path: Path, monkeypatch: pytes
     assert "leakme" not in (result or "")
 
 
-def test_validate_jq_filter_runs_with_an_empty_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    seen: list[dict] = []
-
-    def fake_run(cmd, **kwargs):
-        seen.append(kwargs)
-        return subprocess.CompletedProcess(cmd, 0, stdout='{"a":1}', stderr="")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    assert validate_jq_filter(".a") is None
-    run_jq([".a"], input_data='{"a":1}')
-    assert [kwargs["env"] for kwargs in seen] == [{}, {}]
-
-
 def test_a_failed_atomic_write_leaves_no_temp_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "a.json"
     path.write_text('{"a": 0}\n', encoding="utf-8")

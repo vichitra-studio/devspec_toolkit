@@ -1,7 +1,6 @@
 """H-280-2 and H-281-1: the reviewer has one finding class for a node whose text disagrees with the node it points at.
 
-Reads ``.claude/agents/specdev-reviewer.md``; passes once the orchestrator has applied the edit listed in the
-H builder report (CLAUDE-EDITS of B6).
+Reads ``.claude/agents/specdev-reviewer.md``.
 """
 from __future__ import annotations
 

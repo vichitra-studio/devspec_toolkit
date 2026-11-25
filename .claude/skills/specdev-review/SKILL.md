@@ -27,6 +27,8 @@ stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdi
 ```
 
 - `<scope>`: step number (e.g. `04`), step range (e.g. `04-07`), a file path, or `all`.
+  For a file of `spec/common/` the findings `scope` is the file name without folder and extension (`spec/common/seed_manifest.json` is `seed_manifest`): the schema allows only `[a-z0-9_-]+`
+  there. Below, `<scope>` in a file name or a dispatch is that name; `specdev-scope` in Step 1 still gets the path.
 - `--with-backlog`: wire `specdev upstream-backlog --json` and `specdev stale --json` output
   into a `cross_step_relational` reviewer. Surfaces `assumption` and `coverage` findings tied
   to unresolved upstream items, and `regression` and `drift` findings caused by changes above a
@@ -39,7 +41,7 @@ stays thin: plan, dispatch in parallel, merge, dispatch fix, loop, surface verdi
   what an upstream edit makes suspect is listed by `specdev stale`, and the author accepts a link with
   `specdev attest` after reading it.
 
-When the flag is set, `specdev-scope` always adds at least one `cross_step_relational`
+When `--with-backlog` is set, `specdev-scope` always adds at least one `cross_step_relational`
 reviewer to the fan-out plan, alongside any per-step reviewers.
 Per-step reviewers receive only their step's slice of the relational output to avoid
 context bloat.
@@ -114,6 +116,8 @@ Each reviewer receives its cluster slice from the fan-out plan:
 }
 ```
 
+A `manifest_artifact` reviewer also gets `"artifact_path": "<the path given as <scope>>"`.
+
 For `cross_step_relational` reviewers: pre-run the relational commands and pass their
 output inline in the dispatch (do not have the reviewer re-run them):
 ```bash
@@ -177,6 +181,7 @@ After Agent returns (blocker handling — canonical contract: `specdev-impl.md` 
    A finding of the merged file that is in neither `findings_closed` nor `findings_open` counts as open.
    Check one write per closed finding yourself before you count it: run `specdev node show <node> --json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
    (for a record with `file` and `pointer`: `specdev json read <file> '<pointer>' --repo-root ./devspec_toolkit`) and compare the field of `nodes[0].content` in the output with the record's `value`.
+   A record with `deleted` (a node removed by `json delete --id`) reads back when that `node show <id>` exits 1 with `E706`. Match a record to its finding by `signature` and `location`.
    A record whose value is not there moves its finding to open: carry it forward as context for the next round, as the `errors_remaining` are.
    Print one line: `Round <N>: <C> findings closed by <E> edits, <O> open.` (`C` the closed findings that read back, `E` = `edits_applied`, `O` the open ones.)
 3. If `status == "blocker"`:

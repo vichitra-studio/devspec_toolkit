@@ -14,14 +14,19 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry, get_schema_validator, get_shared_registry
-from .registry import merge_manifest_data
+from .registry import (
+    _iter_dicts,
+    _load_modular_manifest,
+    _norm,
+    _read_json_file,
+    merge_manifest_data,
+)
 
 CANON_ALIASES_SCHEMA_URI = "vc:canon:aliases"
 CANON_KIND_SCHEMA_URI = "vc:canon:kind"
@@ -48,8 +53,8 @@ def lint_canon_dir(
     fallback_registry_path = sr_root / "schema_registry.json"
 
     errs: list[SpecError] = []
-    manifest = _load_json_object(manifest_path, "invalid_manifest", errs) if manifest_path.exists() else None
-    aliases_doc = _load_json_object(aliases_path, "invalid_aliases", errs) if aliases_path.exists() else None
+    manifest = _read_json_file(manifest_path, errs, "invalid_manifest") if manifest_path.exists() else None
+    aliases_doc = _read_json_file(aliases_path, errs, "invalid_aliases") if aliases_path.exists() else None
     kind_docs = _load_kind_docs(kinds_dir, errs) if kinds_dir.exists() else []
     canonical_docs_present = manifest is not None or aliases_doc is not None or bool(kind_docs)
 
@@ -85,7 +90,7 @@ def lint_canon_dir(
     if manifest is None and manifest_path.exists() and not modular_present:
         return errs
 
-    modular_manifest = _compose_modular_manifest(aliases_doc, aliases_path, kind_docs, errs) if modular_present else None
+    modular_manifest = _load_modular_manifest_once(canon_root, errs) if modular_present else None
 
     if manifest is not None and modular_manifest is not None:
         errs.extend(_detect_manifest_modular_drift(manifest, modular_manifest, manifest_file=str(manifest_path.relative_to(root))))
@@ -220,22 +225,12 @@ def _validate_lifecycle(entry: dict[str, Any]) -> list[SpecError]:
     return errs
 
 
-def _norm(value: str) -> str:
-    tokens = [part for part in re.split(r"[\s_-]+", (value or "").strip().lower()) if part]
-    return " ".join(tokens)
-
-
-def _load_json_object(path: Path, error_kind: str, errs: list[SpecError]) -> dict[str, Any] | None:
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError) as exc:
-        errs.append(make_error("E520", f"UNRESOLVED_INPUT {error_kind} {path} {exc}"))
-        return None
-    if not isinstance(data, dict):
-        errs.append(make_error("E520", f"UNRESOLVED_INPUT {error_kind} {path} root must be an object"))
-        return None
-    return data
+def _load_modular_manifest_once(canon_root: Path, errs: list[SpecError]) -> dict[str, Any] | None:
+    """The registry loader's view of ``aliases.json`` and ``kinds/*.json``; an error already in *errs* is not added twice."""
+    load_errors: list[SpecError] = []
+    modular = _load_modular_manifest(canon_root, load_errors)
+    errs.extend(error for error in load_errors if error not in errs)
+    return modular
 
 
 def _load_kind_docs(kinds_dir: Path, errs: list[SpecError]) -> list[tuple[Path, dict[str, Any]]]:
@@ -244,67 +239,11 @@ def _load_kind_docs(kinds_dir: Path, errs: list[SpecError]) -> list[tuple[Path, 
         errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kinds_dir {kinds_dir}"))
         return docs
     for kind_file in sorted(kinds_dir.glob("*.json")):
-        doc = _load_json_object(kind_file, "invalid_kind_file", errs)
+        doc = _read_json_file(kind_file, errs, "invalid_kind_file")
         if doc is None:
             continue
         docs.append((kind_file, doc))
     return docs
-
-
-def _compose_modular_manifest(
-    aliases_doc: dict[str, Any] | None,
-    aliases_path: Path,
-    kind_docs: list[tuple[Path, dict[str, Any]]],
-    errs: list[SpecError],
-) -> dict[str, Any]:
-    entries: list[dict[str, Any]] = []
-    registry_version: str | None = None
-
-    for kind_file, doc in kind_docs:
-        kind = doc.get("kind")
-        if registry_version is None and isinstance(doc.get("registry_version"), str):
-            registry_version = doc["registry_version"]
-        if not isinstance(kind, str) or not kind:
-            errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} missing kind"))
-            continue
-        raw_entries = doc.get("entries")
-        if not isinstance(raw_entries, list):
-            errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} entries must be an array"))
-            continue
-        for idx, raw in enumerate(raw_entries):
-            if not isinstance(raw, dict):
-                errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} entries[{idx}] must be an object"))
-                continue
-            entry = dict(raw)
-            entry_kind = entry.get("kind")
-            if entry_kind is None:
-                entry["kind"] = kind
-            elif entry_kind != kind:
-                errs.append(
-                    make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} entries[{idx}] kind mismatch expected={kind} got={entry_kind}")
-                )
-                continue
-            entries.append(entry)
-
-    aliases: list[dict[str, Any]] = []
-    if aliases_doc is not None:
-        if registry_version is None and isinstance(aliases_doc.get("registry_version"), str):
-            registry_version = aliases_doc["registry_version"]
-        raw_aliases = aliases_doc.get("aliases")
-        if not isinstance(raw_aliases, list):
-            errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_aliases {aliases_path} aliases must be an array"))
-            raw_aliases = []
-        for idx, raw in enumerate(raw_aliases):
-            if not isinstance(raw, dict):
-                errs.append(make_error("E520", f"UNRESOLVED_INPUT invalid_aliases aliases[{idx}] must be an object"))
-                continue
-            aliases.append(dict(raw))
-
-    return {
-        "registry_version": registry_version or "1.0.0",
-        "entries": entries,
-        "aliases": aliases,
-    }
 
 
 def _detect_manifest_modular_drift(
@@ -364,12 +303,6 @@ def _entries_by_id(entries: Any) -> dict[str, dict[str, Any]]:
         if isinstance(entry_id, str) and entry_id:
             out[entry_id] = entry
     return out
-
-
-def _iter_dicts(values: Any) -> list[dict[str, Any]]:
-    if not isinstance(values, list):
-        return []
-    return [value for value in values if isinstance(value, dict)]
 
 
 def _alias_signature(alias: dict[str, Any]) -> str:

@@ -16,5 +16,5 @@ def test_prompt_16c_does_not_demand_file_line() -> None:
 
 @pytest.mark.skipif(not REVIEWER_AGENT.is_file(), reason=".claude is absent")
 def test_trinity_reviewer_agent_does_not_demand_file_line() -> None:
-    """Fails until the orchestrator applies the agent-file edit given under CLAUDE-EDITS in the B4 report."""
+    """The trinity reviewer agent file asks for no line number either."""
     assert "file:line" not in REVIEWER_AGENT.read_text(encoding="utf-8")

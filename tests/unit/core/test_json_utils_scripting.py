@@ -119,3 +119,26 @@ def test_read_without_json_flag_prints_raw_scalar(tmp_path: Path) -> None:
     path = tmp_path / "f.json"
     path.write_text('{"title": "Title"}', encoding="utf-8")
     assert json_utils.json_read(str(path), ".title") == "Title"
+
+
+def test_a_batch_item_that_matches_nothing_refuses_the_batch(tmp_path: Path, target: Path) -> None:
+    """H round 1 B1-2: a stale selector in a batch is refused as it is on its own, and nothing is written."""
+    before = target.read_bytes()
+    for stale in (
+        {"op": "patch", "path": '.rules[]|select(.id=="no-such-rule").text', "value": "x"},
+        {"op": "delete", "path": ".zzz"},
+        {"op": "delete", "path": ".rules[9]"},
+    ):
+        ops = _ops(tmp_path, [_text_ops(1)[0], stale])
+        with pytest.raises(JsonUtilsError, match=r"batch item 1 \(.*matches nothing"):
+            json_patch_batch(str(target), str(ops), repo_root=str(ROOT))
+        assert target.read_bytes() == before
+
+
+def test_patch_with_an_index_past_the_end_matches_nothing(tmp_path: Path, target: Path) -> None:
+    """H round 1 C-03: an index past the end of an array is "matches nothing", not a padded array."""
+    before = target.read_bytes()
+    with pytest.raises(JsonUtilsError, match="matches nothing"):
+        json_patch(str(target), ".rules[500].text", '"x"', validate=False)
+    assert target.read_bytes() == before
+    json_patch(str(target), ".rules[-1].text", '"Rule is checked on every pull request."', validate=False)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 from importlib import resources
 from pathlib import Path
@@ -12,13 +13,14 @@ from specdev_tools.migration.maps import legacy_ref_fields, shape_map, shape_row
 
 PACKAGE_DIR = Path(__file__).resolve().parents[3] / "tools" / "specdev_tools"
 PYPROJECT = PACKAGE_DIR.parent / "pyproject.toml"
+CHECKLIST_IDS = {row["id"] for row in json.loads((PACKAGE_DIR.parent / "schema_changes.json").read_text(encoding="utf-8"))["rows"]}
 
 
 def test_map_loads_through_importlib_resources():
     folder = resources.files("specdev_tools.migration.maps")
     names = {entry.name for entry in folder.iterdir()}
     assert {"v1_2_0.yaml", "legacy_ref_fields.yaml"} <= names
-    assert len(shape_map()["rows"]) == 325
+    assert {row["id"] for row in shape_map()["rows"]} == CHECKLIST_IDS, "every checklist row has a map row and no other"
     assert shape_map()["retired_files"] and shape_map()["host_canon"]["renamed_kinds"] == {"inv": "invariant"}
     assert legacy_ref_fields()["fields"]
 

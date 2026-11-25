@@ -25,10 +25,7 @@ def test_assumption_object_placeholder_e512(tmp_path):
     assert any("E512" in line for line in _codes(tmp_path, [_node("The vendor API is TBD")]))
 
 
-def test_assumption_naming_an_id_is_e752_not_w573(tmp_path):
-    text = "Existing fr-x keeps its contract"
-    assert not any("W573" in line for line in _codes(tmp_path, [_node(text)]))
-
+def test_assumption_naming_an_id_is_e752(tmp_path):
     def name_an_id(doc):
         doc["assumptions"][0]["text"] = "The flow of cap-account-recovery is unchanged."
 
@@ -39,4 +36,4 @@ def test_assumption_naming_an_id_is_e752_not_w573(tmp_path):
 
 def test_clean_assumption_object_gives_no_finding(tmp_path):
     lines = _codes(tmp_path, [_node("The legacy database schema stays unchanged during the migration")])
-    assert not any(code in line for line in lines for code in ("W571", "W572", "W573", "E512"))
+    assert not any(code in line for line in lines for code in ("W571", "W572", "E512"))

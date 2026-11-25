@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from specdev_tools.core.json_utils import detect_indent
 from specdev_tools.trace.lockfile import replace_file_atomically
 
 DEFAULT_INDENT = "    "
@@ -52,19 +53,9 @@ def render(data: Any, style: FileStyle) -> str:
     return text.replace("\n", style.line_ending)
 
 
-def _detect_indent(text: str) -> str:
-    """Return the leading whitespace of the first indented line of *text*, or four spaces when no line is indented."""
-    for line in text.split("\n"):
-        stripped = line.lstrip(" \t")
-        lead = line[: len(line) - len(stripped)]
-        if stripped.strip("\r") and lead:
-            return "\t" if lead.startswith("\t") else lead
-    return DEFAULT_INDENT
-
-
 def detect_style(text: str, data: Any) -> FileStyle:
     """Detect the style of the file whose *text* parsed to *data*; ``irregular`` when no regular style reproduces it."""
-    indent = _detect_indent(text)
+    indent = detect_indent(text, DEFAULT_INDENT)
     final_newline = text.endswith("\n")
     line_ending = "\r\n" if "\r\n" in text else "\n"
     escaped = bool(_UNICODE_ESCAPE.search(text)) and text.isascii()

@@ -1,7 +1,6 @@
 """H-159-1 and H-159-2: the review loops remove a round's findings files first, and a finding's location is the node id.
 
-The skill and agent tests read text under ``.claude``; they pass once the orchestrator has applied the edits listed in
-the H builder report (CLAUDE-EDITS of B7).
+The skill and agent tests read text under ``.claude``.
 """
 from __future__ import annotations
 
@@ -31,7 +30,7 @@ def test_the_loop_skill_removes_the_findings_of_the_round_before_it_merges(skill
 @_needs_claude
 def test_the_reviewer_agent_gives_the_node_id_form_of_location() -> None:
     text = _REVIEWER.read_text(encoding="utf-8")
-    assert "fr-password-reset#description" in text
+    assert "fr-password-reset#statement" in text
     assert "functional_requirements/3" not in text
 
 

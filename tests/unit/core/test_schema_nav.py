@@ -68,7 +68,7 @@ def test_own_properties_survive_allof_merge():
 def test_allof_branch_wins_collision_with_own_property():
     """When own and allOf define the same key, the branch (later) wins.
 
-    merge_allof / _get_all_properties both use .update() (branch-wins semantics).
+    merge_allof uses .update() (branch-wins semantics).
     Our helper must match.
     """
     node = {
@@ -144,7 +144,7 @@ def test_nested_allof_merged_recursively():
 def test_conditionals_not_surfaced_when_flag_off():
     """With include_conditionals=False (default), properties in oneOf/anyOf/then/else
     are NOT merged into the output (the latent-gap behaviour preserved for
-    merge_allof / _get_all_properties callers)."""
+    merge_allof callers)."""
     node = {
         "properties": {"base_field": {}},
         "oneOf": [

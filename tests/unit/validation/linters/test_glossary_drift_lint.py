@@ -550,3 +550,23 @@ def test_orphans_come_from_the_same_loaded_entries(tmp_path):
     _write(canon / "kinds" / "term.json", _kinds_term_file([_canon_entry(_FOO, "Orphan.")]))
     (w606,) = lint_glossary_drift(str(spec), project_canon_dir=str(canon))
     assert w606.code == "W606"
+
+
+def test_curly_quote_and_dash_are_not_drift(tmp_path):
+    """E606 and E607 compare texts as the graph contract does: a curly quote or a dash is not drift."""
+    spec = tmp_path / "spec"
+    spec.mkdir()
+    canon = spec / "canon"
+    stored = "The user's name - required."
+    typed = "The user’s name — required."
+    _write(
+        spec / "03_glossary.json",
+        _glossary(
+            terms=[_term("term-foo", typed, "cn:project:term:foo")],
+            proposals=[_proposal("foo", stored)],
+            refs_used=[{"id": "cn:project:term:foo", "kind": "term", "version": "1.0.0"}],
+        ),
+    )
+    _write(canon / "manifest.json", _manifest([_canon_entry("cn:project:term:foo", stored)]))
+
+    assert lint_glossary_drift(str(spec), project_canon_dir=str(canon)) == []

@@ -12,6 +12,7 @@ Coverage:
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -197,6 +198,27 @@ def test_t09_an_unreleased_yaml_with_a_change_satisfies(tmp_path):
         tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges:\n  - type: fix\n    description: x\n'
     )
     assert _t09_findings(tmp_path, [_T09_TRIGGER]) == []
+
+
+def test_t09_a_python_without_pyyaml_says_so(tmp_path, monkeypatch):
+    """T0-09: without PyYAML the finding names the missing module, not a missing entry."""
+    _write_changelog_file(
+        tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges:\n  - type: fix\n    description: x\n'
+    )
+    monkeypatch.setitem(sys.modules, "yaml", None)  # `import yaml` raises ImportError
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+    assert "PyYAML is not installed" in result[0]["message"]
+    assert "no changelog YAML entry found" not in result[0]["message"]
+
+
+def test_t09_an_unreadable_yaml_says_so(tmp_path):
+    """T0-09: a YAML file that does not parse is reported as unreadable, not as missing."""
+    _write_changelog_file(tmp_path, "unreleased.yaml", "changes: [unclosed\n")
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+    assert "unreadable" in result[0]["message"]
+    assert "no changelog YAML entry found" not in result[0]["message"]
 
 
 def test_t09_a_version_yaml_in_the_diff_satisfies(tmp_path):

@@ -20,8 +20,11 @@
 ## 4. Constraints and rules
 [Limits the change must respect: legal, performance, compatibility, deadlines. A number where there is one.]
 
-## 5. Out of scope
+## 5. Acceptance posture
+[How a person will know the change is done: what they would see or try, and what result counts as accepted. Observable outcomes, not implementation steps.]
+
+## 6. Out of scope
 [What this seed deliberately does not cover.]
 
-## 6. Open questions
+## 7. Open questions
 [`[UNKNOWN: reason]` items, each with the person who can answer.]

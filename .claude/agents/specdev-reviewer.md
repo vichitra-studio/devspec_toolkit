@@ -29,6 +29,8 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json keys <file> '<path>'` | Field names at a path |
 | `specdev json schema <file> '<path>' --repo-root <toolkit>` | Typed constraints at a path |
 | `specdev spec-check spec --step <NN> --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Step gate check for one step |
+| `specdev spec-check spec --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Whole-spec gate (`manifest_artifact` scope: there is no step) |
+| `specdev seed-lint spec --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Seed routes of `spec/common/seed_manifest.json` (`manifest_artifact` scope) |
 | `specdev upstream-backlog <spec> --repo-root <toolkit> --json` | Cross-step unresolved items (when `with_backlog` is set) |
 | `specdev stale --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Suspect links and coverage gaps still to be re-read, by step (when `with_backlog` is set); `specdev stale --step <NN> --json` prints one step's entry |
 | `specdev validate <path> --repo-root <toolkit>` | Self-check own findings output before returning |
@@ -76,7 +78,7 @@ Dispatcher (skill or orchestrator) provides:
 }
 ```
 
-- `scope` is used verbatim in the output filename.
+- `scope` is used verbatim in the output filename. For a `manifest_artifact` it is the file name without folder and extension (`seed_manifest`), and the path arrives in `artifact_path`.
 - `flags.with_backlog`: if true, use the output of `specdev upstream-backlog --json` (include miss/assumption
   findings) and of `specdev stale --json` (include regression/drift findings for suspect links not yet
   re-read). The skill passes both outputs inline in the dispatch; a reviewer for one step gets that step's
@@ -95,8 +97,8 @@ Dispatcher (skill or orchestrator) provides:
     clustering (branch 1 of the decision rule). Treat as equivalent to `step_range` covering all
     steps in the cluster — apply all the finding-taxonomy checks across every step in `steps[]`.
 - `artifact_path` (optional): explicit path to the artifact under review. When present, use it
-  as the primary read target. Required for `plan_artifact` scope_kind dispatches (supplied by
-  `/specdev-trinity --phase plan`); omitted for spec-step scopes where the path is derived from `steps[]`.
+  as the primary read target. Required for `plan_artifact` (supplied by `/specdev-trinity --phase plan`) and
+  `manifest_artifact` (supplied by `/specdev-review`) dispatches; omitted for spec-step scopes where the path is derived from `steps[]`.
 
 The dispatch carries no root paths: run every specdev call from the host root with the roots
 of "Flag discipline" (`--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`).
@@ -125,7 +127,7 @@ Emit findings across all applicable kinds. Trigger conditions:
 | `gap` | Required content is missing from the artifact |
 | `miss` | Incomplete upstream coverage: FR without fixture, NFR without measurement, capability without trace |
 | `bug` | Content is factually wrong against schema, upstream artifact, or canon |
-| `regression` | A downstream artifact is broken by an upstream change: its link is suspect (E763 in `specdev stale` output). Not for text that was changed against the base ref: that is a `bug` or `drift` with `origin: introduced-on-branch` |
+| `regression` | A downstream artifact is broken by an upstream change: its link is suspect (`specdev stale` lists it under the node id as `<field> -> <target> (<cause>, roots: ...)`; `spec-check` reports the same link as E763). Not for text that was changed against the base ref: that is a `bug` or `drift` with `origin: introduced-on-branch` |
 | `assumption` | Un-grounded inference: no upstream source, no canon binding, no fixture |
 | `ambiguity` | Multiple valid readings of the same content, or precedence conflict between artifacts |
 | `hallucination` | Invented ID, enum value, CLI command, file path, or canonical reference |
@@ -144,7 +146,7 @@ Severity defaults:
 These are defaults. Reviewer may upgrade severity when impact is higher than default.
 
 Evidence and origin:
-- A `regression` finding's `evidence[]` names the `specdev stale` line it rests on (the E763 line with the node id and the changed target). Without one, it is not a `regression`.
+- A `regression` finding's `evidence[]` names the `specdev stale` line it rests on (the node id and its line `<field> -> <target> (<cause>, roots: ...)`). Without one, it is not a `regression`.
 - Set `origin` when you know it: `introduced-on-branch` for text this branch changed, `pre-existing-on-main` for a defect the base ref already had, `stale-after-fix` for a defect an earlier round's fix left.
 
 Tie-breaks between kinds that overlap (pick the first that fits):
@@ -238,7 +240,7 @@ Field discipline:
 - `generated_at`: Unix epoch seconds (numeric, not string).
 - `findings`: array of finding-records. Empty array = CONVERGED for this reviewer.
 - Each finding: `kind` (enum from taxonomy above), `location` (the id of the node the finding is about, with
-  `#<field>` when it is about one field of it: `fr-password-reset#description`; a finding about no node uses
+  `#<field>` when it is about one field of it: `fr-password-reset#statement`; a finding about no node uses
   `<file>#/json/pointer`; never an array index of a node. Two reviewers must write the same string for the same
   place, because `unique_by({kind, location, signature})` merges on it),
   `signature` (stable short hash of normalized message — SHA-1 first 8 chars of lowercased

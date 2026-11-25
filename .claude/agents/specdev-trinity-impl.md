@@ -28,14 +28,6 @@ writes a findings file; `specdev review record` writes the block).
 
 ---
 
-## Worktree dispatch
-
-The session may run in a git worktree, and a relative path may resolve against another checkout. Use the absolute `--repo-root`, `--spec-root` and `--git-root` of the dispatch
-verbatim, and an absolute path for every Read, Write, Edit and Bash call. Before your first write run `git rev-parse --show-toplevel` and compare it with the `--git-root` of the
-dispatch; when they differ, write nothing and return `worktree mismatch: <toplevel> is not <git-root>` as the only entry of `errors_remaining`.
-
----
-
 ## Tools
 
 Bash surface is restricted to these subcommand families only:

@@ -1,7 +1,6 @@
 """H-134-1: `/specdev-step` runs its review-fix loop by invoking `/specdev-review`, which holds the loop once.
 
-These tests read skill text under ``.claude``; they pass once the orchestrator has applied the edit
-listed in the H builder report (CLAUDE-EDITS of B8).
+These tests read skill text under ``.claude``.
 """
 from __future__ import annotations
 

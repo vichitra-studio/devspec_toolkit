@@ -1,7 +1,6 @@
 """Behavior-preservation gate for merge_allof / effective_schema (F2, §5 WS3).
 
-WS3 rerouted ``merge_allof`` (context/_utils.py) and ``_get_all_properties``
-(registry/generate.py) through ``core/schema_nav.py::effective_schema``.  The
+WS3 rerouted ``merge_allof`` (context/_utils.py) through ``core/schema_nav.py::effective_schema``.  The
 critical invariant to preserve is the **own-first UNION merge**: a step's OWN
 properties must survive alongside the step-base properties contributed by the
 ``allOf: [$ref vc:core:step-base]`` branch.
@@ -186,93 +185,6 @@ class TestMergeAllofUnionInvariant:
 
 
 # ---------------------------------------------------------------------------
-# _get_all_properties (registry/generate.py) — WS3 second reroute guard
-# ---------------------------------------------------------------------------
-
-# Own root-level properties for the two steps whose own keys are declared at
-# the schema ROOT (alongside allOf step-base $ref).  The no-op resolver in
-# _get_all_properties intentionally does NOT resolve vc:core:step-base, so
-# step-base keys will be ABSENT from the result — that is the expected behavior.
-#
-# Steps selected:
-#   "09"  — root properties: milestones, migration_plan, environment_ref, …
-#   "16"  — root properties: extensions, plan, execution, review, …
-_GET_ALL_PROPS_CASES: list[tuple[str, frozenset[str]]] = [
-    ("09", frozenset({"milestones", "migration_plan"})),
-    ("16", frozenset({"plan", "execution"})),
-]
-
-
-def _get_all_props_for_step(step_id: str) -> dict:
-    """Return the _get_all_properties result for *step_id*.
-
-    Loads the schema file of the step and calls the function directly.
-    """
-    from specdev_tools.registry import generate  # noqa: PLC0415
-
-    schema_dir = str(_TOOLKIT_ROOT / "schema")
-    schema_path = generate._schema_file_for_step(step_id, schema_dir)
-    assert schema_path, f"No schema file found for step {step_id!r}"
-    schema = generate._load_json(schema_path)
-    return generate._get_all_properties(schema)
-
-
-class TestGetAllPropertiesNoopResolver:
-    """Behavior-preservation gate for _get_all_properties (WS3 second reroute).
-
-    _get_all_properties uses a no-op resolver — it intentionally does NOT
-    resolve the vc:core:step-base $ref branch.  The critical invariant is:
-
-    1. Own root-level properties SURVIVE the merge (regression guard: an
-       overwrite bug would clobber root props to empty).
-    2. Step-base keys are ABSENT (proves the no-op resolver is genuinely
-       exercised and the allOf $ref branch is correctly skipped).
-
-    This contrasts with TestMergeAllofUnionInvariant where step-base keys ARE
-    expected to be present (merge_allof resolves the $ref fully).
-    """
-
-    @pytest.mark.parametrize("step_id,expected_own_keys", _GET_ALL_PROPS_CASES)
-    def test_own_root_keys_survive(
-        self, step_id: str, expected_own_keys: frozenset[str]
-    ) -> None:
-        """Own root-level keys must be present in _get_all_properties output.
-
-        These keys are declared directly in ``properties`` at the schema root.
-        Under the original overwrite regression, the allOf merge would clobber
-        root properties to empty, dropping all own keys.
-        """
-        props = _get_all_props_for_step(step_id)
-        missing = expected_own_keys - set(props)
-        assert not missing, (
-            f"Step {step_id!r}: own root keys dropped from _get_all_properties "
-            f"output — missing: {sorted(missing)}. "
-            f"Actual props: {sorted(props)}"
-        )
-
-    @pytest.mark.parametrize("step_id", [c[0] for c in _GET_ALL_PROPS_CASES])
-    def test_step_base_keys_absent_with_noop_resolver(
-        self, step_id: str
-    ) -> None:
-        """Step-base keys must be ABSENT from _get_all_properties output.
-
-        The no-op resolver in _get_all_properties returns None for any $ref
-        node, causing effective_schema to treat the vc:core:step-base allOf
-        branch as empty.  Step-base keys (id, owner, created_at,
-        canonical_refs_used) must therefore NOT appear — their presence would
-        indicate the no-op resolver is not being applied correctly.
-        """
-        props = _get_all_props_for_step(step_id)
-        unexpectedly_present = _STEP_BASE_KEYS & set(props)
-        assert not unexpectedly_present, (
-            f"Step {step_id!r}: step-base keys unexpectedly present in "
-            f"_get_all_properties output (no-op resolver should have skipped "
-            f"the $ref branch) — found: {sorted(unexpectedly_present)}. "
-            f"Actual props: {sorted(props)}"
-        )
-
-
-# ---------------------------------------------------------------------------
 # Conditional-branch properties (DEVSPEC-95)
 # ---------------------------------------------------------------------------
 
@@ -295,16 +207,10 @@ def _merge_allof_of_conditional_schema() -> dict[str, Any]:
     return merge_allof(_CONDITIONAL_SCHEMA, _load_registry())["properties"]
 
 
-def _get_all_properties_of_conditional_schema() -> dict[str, Any]:
-    from specdev_tools.registry import generate  # noqa: PLC0415
-
-    return generate._get_all_properties(_CONDITIONAL_SCHEMA)
-
-
 _CONDITIONAL_MERGES = pytest.mark.parametrize(
     "merged_props",
-    [_merge_allof_of_conditional_schema, _get_all_properties_of_conditional_schema],
-    ids=["merge_allof", "_get_all_properties"],
+    [_merge_allof_of_conditional_schema],
+    ids=["merge_allof"],
 )
 
 

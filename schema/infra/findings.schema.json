@@ -73,7 +73,7 @@
           ]
         },
         "location": {
-          "description": "Where the finding sits: the id of the node it is about, with '#<field>' for one field of it (e.g. 'fr-password-reset#description'); a finding about no node holds a file path, a JSON pointer or 'file#pointer', and a code-phase finding a file and line. A string, not a pattern.",
+          "description": "Where the finding sits: the id of the node it is about, with '#<field>' for one field of it (e.g. 'fr-password-reset#statement'); a finding about no node holds a file path, a JSON pointer or 'file#pointer'; a code-phase finding holds '<file>#<function or class>' (e.g. 'src/routes/confirm.ts#confirmPasswordReset'), no line number. A string, not a pattern.",
           "type": "string",
           "minLength": 1
         },

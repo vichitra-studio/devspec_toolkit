@@ -19,8 +19,7 @@ description: >
 
 # /specdev-step — Waterfall Step Author + Review
 
-Author mode: emits a fresh artifact. Review mode: uses the same review-fix loop as
-`/specdev-review`. This skill composes both.
+Author mode: emits a fresh artifact. Review mode: runs the `/specdev-review` loop on that step.
 
 ---
 
@@ -264,8 +263,8 @@ After the author step completes with a clean gate, run the review-fix loop by in
 of the findings files, the fix dispatch, the blocker bridge, the cap of 5 rounds and the HALT artifact. The rule that a finding in neither
 `findings_closed` nor `findings_open` of the fix agent's return counts as open, and the read-back of each closed finding, are part of that loop.
 
-Its outcome is this skill's outcome: `CONVERGED at round <N>`, or `HALT` with the findings path
-`.specdev/findings/findings_<NN>_5_<unix_timestamp>.json`. After a HALT print what `/specdev-review` printed and go to the hand-off; do not run the loop again.
+Its outcome is this skill's outcome: `CONVERGED at round <N>`; `HALT at round 5` with the findings path
+`.specdev/findings/findings_<NN>_5_<unix_timestamp>.json`; or `HALT (blocker unresolved)`, which has no such file (the blocker is under `.specdev/blockers/`). After a HALT print what `/specdev-review` printed and go to the hand-off; do not run the loop again.
 
 The review scope for this step is `<NN>` (e.g. `04`, `02a`), as `/specdev-review` takes it; the findings files are named from it (`findings_<NN>_<round>.json`).
 
@@ -289,11 +288,11 @@ Then report the final verdict:
 ```
 /specdev-step <NN> complete.
 Author gate: <clean | errors>
-Review verdict: CONVERGED at round <N> | HALT at round 5
+Review verdict: CONVERGED at round <N> | HALT at round 5 | HALT (blocker unresolved)
 Artifact: spec/<NN>_*.json
 Blocking (own, new upstream): <node ids, or none>
 Pending (not blocking): upstream debt <node ids>; later steps <step: node ids>; waiting <node ids, with the open item ids>
-Findings path (on HALT): .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
+Findings path (on HALT at round 5): .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
 ```
 
 ---
@@ -329,7 +328,6 @@ as an alias. Deleting a node is `specdev json delete --id`.
   phase writes only through `specdev plan record` and `specdev review record` (trinity phases belong to
   `/specdev-trinity`).
 - Does not commit changes. User authorizes commits separately.
-- Does not run reviewers sequentially within a round. Parallel dispatch is required.
 - Does not skip AskUserQuestion on a blocker payload. Blocker questions must be presented
   to the user via the harness before re-dispatching.
 - Does not author a fresh artifact when `spec/<NN>_*.json` already exists (Step 1
