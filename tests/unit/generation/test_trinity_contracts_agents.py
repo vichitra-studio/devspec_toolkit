@@ -104,7 +104,7 @@ def test_the_impl_agent_writes_the_plan_only_through_plan_record_and_the_open_it
 
 def test_the_reviewer_agent_writes_only_a_findings_file_and_does_not_record_the_review() -> None:
     text = _text("reviewer")
-    assert "does not run\n`specdev review record`: the skill records the review from the converged findings file" in text
+    assert "you do not run `specdev review record`: the skill records the review from the run's final findings file" in " ".join(text.split())
     assert "Does not run `specdev plan record` or `specdev review record`" in text
     assert "No `specdev json patch/insert/delete`, no\n`specdev plan record`, no `specdev review record`" in text
     assert '"$schema": "vc:infra:findings"' in text
@@ -139,7 +139,7 @@ def test_the_two_open_item_forms_are_the_ones_of_the_16b_prompt() -> None:
 @pytest.mark.parametrize(
     ("key", "command"),
     [("impl", "plan record"), ("impl", "verify run"), ("impl", "trace"), ("impl", "spec-check"), ("reviewer", "verify run"),
-     ("reviewer", "trace"), ("reviewer", "spec-check"), ("reviewer", "validate"), ("reviewer", "upstream-backlog")],
+     ("reviewer", "trace"), ("reviewer", "spec-check"), ("reviewer", "upstream-backlog")],
 )
 def test_every_flag_an_agent_gives_a_command_is_one_its_parser_has(key: str, command: str) -> None:
     flags = _flags(_text(key), command)
@@ -233,3 +233,24 @@ def test_impl_agent_states_the_ambiguity_gate() -> None:
     """H-235-3: the agent that runs an item carries the Ambiguity Gatekeeper rule of prompt 16b."""
     text = _text("impl")
     assert "Ambiguity gate" in text and "Ambiguity Gatekeeper" in text
+
+
+@pytest.mark.parametrize("key", ALL)
+def test_each_agent_is_started_by_a_brief_and_answers_with_one_file(key: str) -> None:
+    """The harness contract: one brief in, one file out, no question, no validation or merge by the agent."""
+    text = " ".join(_text(key).split())
+    assert "Your prompt is one line, `Read and follow <brief>`" in text
+    assert "under the `.tmp` name first" in text
+    for gone in ("Dispatcher includes `mode:", '"status": "blocker"', "specdev validate", "jq one-liner", "errors_remaining"):
+        assert gone not in text, gone
+
+
+def test_the_impl_outcome_examples_have_the_shapes_the_briefs_give() -> None:
+    from specdev_tools.loop.briefs import EXEC_SHAPE, FIX_SHAPE
+
+    blocks = [json.loads(b) for b in re.findall(r"```json\n(.*?)\n```", _text("impl"), flags=re.DOTALL)]
+    executed = next(b for b in blocks if b.get("result") == "executed")
+    fixed = next(b for b in blocks if "outcomes" in b)
+    assert set(executed) <= set(EXEC_SHAPE)
+    for entry in fixed["outcomes"]:
+        assert set(entry) <= set(FIX_SHAPE["outcomes"][0])

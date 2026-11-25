@@ -1,7 +1,8 @@
 """The prose that describes ``specdev milestone-state`` agrees with what the command prints and accepts.
 
-``.claude/agents/specdev-scope.md`` (the scope agent's milestone_state mode) quotes the output contract; the reference
-doc lists the flags.  Both are compared with the engine and the parser, not with a copy of them.
+The reference doc quotes the output contract and lists the flags.  Both are compared with the engine and the parser,
+not with a copy of them.  (The scope agent that once quoted the contract is retired: `/specdev-trinity` runs the
+command itself.)
 """
 from __future__ import annotations
 
@@ -14,18 +15,21 @@ from specdev_tools.cli import build_parser
 from specdev_tools.context.milestone_state import ItemView, SpecView, compute_milestone_state, derive_group_state
 
 ROOT = Path(__file__).resolve().parents[3]
-SCOPE_AGENT = ROOT / ".claude" / "agents" / "specdev-scope.md"
 REFERENCE = ROOT / "docs" / "developers" / "reference.md"
-_CONTRACT_BLOCK = re.compile(r"\*\*Output contract\*\*[^\n]*\n```json\n(.*?)\n```", re.DOTALL)
-_STATE_ENUM = re.compile(r'"state": "([a-z_|]+)"')
+_CONTRACT_BLOCK = re.compile(r"\*\*Output contract\*\*[^\n]*\n+```json\n(.*?)\n```", re.DOTALL)
+_STATE_ENUM = re.compile(r'"state": "<?([a-z_|]+)>?"')
 _FLAG_ROW = re.compile(r"^\| `(--[a-z-]+)[^`]*` \| (Yes|No) \|", re.MULTILINE)
 
 
+def _entry() -> str:
+    text = REFERENCE.read_text(encoding="utf-8")
+    start = text.index("#### `milestone-state`")
+    return text[start:start + re.search(r"\n#{2,4} ", text[start + 1:]).start()]  # type: ignore[union-attr]
+
+
 def _scope_contract_text() -> str:
-    text = SCOPE_AGENT.read_text(encoding="utf-8")
-    start = text.index("## Mode: milestone_state")
-    match = _CONTRACT_BLOCK.search(text, start)
-    assert match is not None, "the scope agent doc has no output contract block in its milestone_state section"
+    match = _CONTRACT_BLOCK.search(_entry())
+    assert match is not None, "the reference has no output contract block in its milestone-state entry"
     return match.group(1)
 
 
@@ -48,7 +52,7 @@ def _emitted_states(tmp_path: Path) -> set[str]:
     return states
 
 
-def test_scope_agent_doc_lists_the_states_the_cli_emits(tmp_path: Path) -> None:
+def test_the_reference_lists_the_states_the_cli_emits(tmp_path: Path) -> None:
     contract = _scope_contract_text()
     documented = set(_STATE_ENUM.search(contract).group(1).split("|"))  # type: ignore[union-attr]
     assert documented == _emitted_states(tmp_path)
@@ -59,10 +63,9 @@ def test_scope_agent_doc_lists_the_states_the_cli_emits(tmp_path: Path) -> None:
     assert list(re.findall(r'^      "([a-z_]+)":', contract, re.MULTILINE)) == list(emitted["groups"][0])
 
 
-def test_scope_agent_doc_names_no_retired_input() -> None:
-    text = SCOPE_AGENT.read_text(encoding="utf-8")
-    section = text[text.index("## Mode: milestone_state"):]
-    for retired in ("implementation.status", "checklist_status", "blocking_amb_health", "well_formed", "fixtures_exercised", "verified"):
+def test_the_reference_entry_names_no_retired_input_and_no_scope_agent() -> None:
+    section = _entry()
+    for retired in ("implementation.status", "checklist_status", "well_formed", "specdev-scope"):
         assert retired not in section, retired
 
 

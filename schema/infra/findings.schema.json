@@ -18,12 +18,12 @@
       "description": "The schema this document conforms to. Required by `specdev validate` (E520 without it); optional here so that a plain JSON Schema check also accepts the file the review loop merges."
     },
     "round": {
-      "description": "1+ (no hard cap; spec-phase skills cap at 5 procedurally; K2 trinity uses soft-warn semantics). Increments per review-fix iteration.",
+      "description": "1+ (the schema has no cap; a run of `specdev loop` stops at its `--cap`, default 5). Increments per review-fix iteration.",
       "type": "integer",
       "minimum": 1
     },
     "scope": {
-      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan', or a plan-item id as the plan schema spells it ('PWRESET_CONFIRM_EXPIRED_01'). Lowercase letters, digits, '_' and '-', or uppercase letters, digits and '_' (no mixing). Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename under .specdev/findings/ using one of three patterns per §11.7: per-reviewer 'findings_<scope>_<round>_<reviewer_id>.json' (reviewer ids are 'r1', 'r2', ...), merged 'findings_<scope>_<round>.json', or HALT 'findings_<scope>_5_<unix_timestamp>.json'.",
+      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan', or a plan-item id as the plan schema spells it ('PWRESET_CONFIRM_EXPIRED_01'). Lowercase letters, digits, '_' and '-', or uppercase letters, digits and '_' (no mixing). In a run of `specdev loop` the brief gives the value and the tool refuses a file with another one; the files of a run are in its folder (.specdev/runs/<run-id>/), and a code run also writes 'findings_<group_id>_<n>.json' or 'findings_<batch>_review_<n>.json' under .specdev/findings/ for `specdev milestone-state`.",
       "type": "string",
       "minLength": 1,
       "pattern": "^([a-z0-9_-]+|[A-Z0-9_]+)$"
@@ -32,6 +32,31 @@
       "description": "Unix-epoch seconds (integer) when this document was emitted. Used for run correlation; not a uniqueness key.",
       "type": "integer",
       "minimum": 0
+    },
+    "coverage": {
+      "description": "What the reviewer was given and what it read, for a file handed to `specdev loop`: `assigned` and `read` hold node ids and contract paths, `not_run` what it could not read. `specdev loop next` refuses a file whose `read` lacks an assigned entry or whose `not_run` is not empty. Optional: a file that is not handed to `specdev loop` may omit it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read"],
+      "properties": {
+        "assigned": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "read": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "not_run": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "judgements": {
+      "description": "The reviewer's verdict on each finding of an earlier round that `specdev loop` asked it to judge: `resolved` or `not_resolved` for a fix (or an accepted link), `decline_right` or `finding_right` for a decline. `key` is the finding's key as the brief gives it; `quote` is the text that shows the verdict.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "verdict"],
+        "properties": {
+          "key": {"type": "string", "minLength": 1},
+          "verdict": {"type": "string", "enum": ["resolved", "not_resolved", "decline_right", "finding_right"]},
+          "quote": {"type": "string"}
+        }
+      }
     },
     "findings": {
       "description": "Array of finding-records emitted by the reviewer(s). May be empty (zero findings is the CONVERGED predicate per §4.1).",
@@ -78,7 +103,7 @@
           "minLength": 1
         },
         "signature": {
-          "description": "Deterministic short hash of the finding's normalized message (Proposal K §5.4). Used together with kind+location for cross-reviewer dedup via the jq unique_by({kind, location, signature}) merge. Reviewer is responsible for generating the hash; the schema does not constrain the algorithm beyond requiring a stable string.",
+          "description": "The key of the finding. In a run of `specdev loop` the tool sets it to '<kind>|<location>' when it takes the file in, whatever the reviewer wrote, and merges the findings of a round by it; a file written by hand holds any stable string.",
           "type": "string",
           "minLength": 1
         },
@@ -104,6 +129,20 @@
             "minLength": 1
           },
           "minItems": 1
+        },
+        "evidence_quotes": {
+          "description": "Quotes that `specdev loop` checks: `text` must occur in `source` (a node id, or a file path from the host root or the toolkit root), whitespace apart. A finding handed to `specdev loop` with no quote, or with a quote that does not occur, is refused and listed in the run's `rejected.json`. For something missing, quote the contract, seed or upstream node that requires it.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "text"],
+            "properties": {
+              "source": {"type": "string", "minLength": 1},
+              "text": {"type": "string", "minLength": 1}
+            }
+          }
         },
         "suggested_fix": {
           "description": "Optional reviewer-proposed remediation (free text). The fix agent treats this as advisory, not authoritative.",

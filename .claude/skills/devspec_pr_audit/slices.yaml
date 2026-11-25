@@ -183,6 +183,7 @@ slices:
     - "tools/specdev_tools/verify/**/*.py"        # 1.2.0: verification runs and records
     - "tools/specdev_tools/proof/**/*.py"         # 1.2.0: proof of a criterion
     - "tools/specdev_tools/thirdparty/**/*.py"    # 1.2.0: third-party checks
+    - "tools/specdev_tools/loop/**/*.py"          # 1.2.0: the review-fix loop and the pass (specdev loop, specdev pass)
     - "tools/error_ownership.json"                # hand-maintained: the owner of each finding code
     - "tools/graph_recipes.json"                  # hand-maintained: context recipes read by trace
     - "tools/specdev_tools/*.py"                # top-level lint/validate modules (validate.py, fixtures_lint.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)

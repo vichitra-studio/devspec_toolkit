@@ -15,14 +15,17 @@ _REVIEWER = _AGENTS / "specdev-reviewer.md"
 pytestmark = pytest.mark.skipif(not _IMPL.is_file(), reason=".claude is absent")
 
 
-def _does_not_trigger_blocker_list() -> str:
+def _what_nothing_settles() -> str:
     text = _IMPL.read_text(encoding="utf-8")
-    start = text.index("**Does NOT trigger blocker:**")
-    return text[start : text.index("\n\n", start)]
+    start = text.index("## What nothing settles")
+    return text[start : text.index("\n## ", start + 1)]
 
 
-def test_the_fix_agent_reads_the_open_items_before_it_asks() -> None:
-    assert "specdev upstream-backlog spec --repo-root ./devspec_toolkit" in _does_not_trigger_blocker_list()
+def test_the_fix_agent_reads_the_open_items_before_it_records_one_and_asks_nobody() -> None:
+    section = _what_nothing_settles()
+    look, record = section.index("specdev upstream-backlog spec --repo-root ./devspec_toolkit"), section.index("specdev json insert --step <NN> .ambiguities")
+    assert look < record, "the look for an existing open item comes before the insert"
+    assert "You ask nobody" in section and '"status": "blocker"' not in _IMPL.read_text(encoding="utf-8")
 
 
 def test_the_reviewer_says_a_commit_message_is_no_record() -> None:

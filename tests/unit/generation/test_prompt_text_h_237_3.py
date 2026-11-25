@@ -32,10 +32,12 @@ def test_shared_expectations_closure_runs_before_emitting() -> None:
     assert "Coverage Closure AFTER emitting" not in text
 
 
-def test_shared_expectations_names_the_blocker_payload() -> None:
+def test_shared_expectations_says_an_agent_records_its_gap_questions() -> None:
+    """An agent in a run of `specdev loop` asks nobody: a gap is an open item (the agent file's section is named)."""
     text = _shared()
-    assert "returned as a blocker payload instead" in text
-    assert 'section "Blocker emission protocol"' in text
+    assert "it asks nobody: each gap is recorded as an open item of the artifact" in text
+    assert 'section "What nothing settles"' in text
+    assert "## What nothing settles" in (ROOT / ".claude" / "agents" / "specdev-impl.md").read_text(encoding="utf-8")
 
 
 def test_shared_expectations_output_contract_is_not_a_restatement() -> None:

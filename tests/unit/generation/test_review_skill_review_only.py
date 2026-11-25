@@ -13,9 +13,9 @@ SKILL = Path(__file__).resolve().parents[3] / ".claude" / "skills" / "specdev-re
     "text",
     [
         "--review-only",
-        "REVIEW-ONLY:",
+        "the verdict is `CLEAN` or `FINDINGS`",
         "Upstream reconciliation (confirming or refuting what earlier steps reported) is not a review output",
     ],
 )
 def test_review_skill_documents_review_only(text: str) -> None:
-    assert text in SKILL.read_text(encoding="utf-8")
+    assert text in " ".join(SKILL.read_text(encoding="utf-8").split())

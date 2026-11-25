@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 _AGENTS = Path(__file__).resolve().parents[3] / ".claude" / "agents"
-_PROBE = "specdev json schema <file> '<pointer>' --repo-root ./devspec_toolkit"
+_PROBE = "specdev json schema <file> '<jq-path>' --repo-root <toolkit>"
 
 pytestmark = pytest.mark.skipif(not _AGENTS.is_dir(), reason=".claude/agents is absent")
 
@@ -30,6 +30,6 @@ def test_the_reviewer_procedure_probes_the_pointer_of_a_bug_or_hallucination() -
 def test_the_fix_agent_reads_the_open_items_before_it_asks_or_inserts_one() -> None:
     """H-169-1: a question an open item already asks is not asked again."""
     text = (_AGENTS / "specdev-impl.md").read_text(encoding="utf-8")
-    blocker_list = text.split("**Does NOT trigger blocker:**", 1)[1].split("\n- Findings whose `suggested_fix` is concrete.", 1)[0]
-    assert "specdev upstream-backlog spec --repo-root ./devspec_toolkit" in blocker_list
+    section = text.split("## What nothing settles", 1)[1].split("\n## ", 1)[0]
+    assert "specdev upstream-backlog spec --repo-root ./devspec_toolkit" in section
     assert "unless an open item already asks the same question" in text

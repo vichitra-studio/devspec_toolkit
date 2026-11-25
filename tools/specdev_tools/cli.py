@@ -552,8 +552,7 @@ def build_parser() -> _SpecdevParser:
             "Read ms_<batch_id>_plan.json from <spec-root>/impl_context/ and probe "
             ".specdev/findings/ under <git-root> to derive per-group state and the "
             "milestone-level derived_phase_position.  Emits a single JSON object to "
-            "stdout; no extra text.  (DEVSPEC-38 D7 — replaces the LLM-evaluated "
-            "milestone_state mode of specdev-scope.)"
+            "stdout; no extra text.  The findings files are written by `specdev loop`."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -665,6 +664,10 @@ def build_parser() -> _SpecdevParser:
     # --- release commands (release, release check, release rollback) and the release sections of `status` ---
     from .release.commands import add_release_parsers
     add_release_parsers(sub, _discover_project_canon_dir)
+    from .loop.commands import add_loop_parsers
+    add_loop_parsers(sub, _discover_project_canon_dir)
+    from .loop.pass_commands import add_pass_parsers
+    add_pass_parsers(sub)
     from .release.status_sections import install as install_release_sections
     install_release_sections(_discover_project_canon_dir)
     # `stale`, `coverage` and `step ready` read the coverage gaps; the role gap provider they ask is installed by a call.

@@ -1419,6 +1419,16 @@ Four codes belong to the migration of a 1.1.1 host to 1.2.0 (the procedure is in
 
 **Promotable**: No (error only).
 
+## Review Loop (85x)
+
+### E850 LOOP_REFUSED
+
+**Trigger**: `specdev loop` or `specdev pass` refuses a command and changes nothing. The command prints one JSON object and exits 1, for example `{"type": "error", "code": "E850", "message": "the artifact of step 04 exists; review it, or add to it with --extend"}`. The reasons: a scope that names no step, milestone or plan item of the spec; a mode that does not fit the kind or the state of the artifact (`--author` on a step that has a file, `--extend` on a range, `--execute` outside `code-group`, `--batch` without `--kind plan --author`); a second mode for a scope that has an unfinished run; a worklist that is no findings file; an unknown run or pass id; an answers file that is no JSON object; a spec root that is not a folder; a `--batch` that is no batch id; a `pass start` with no entry or a mixed one (`--seed` or `--from` without `--extend`, `--about` without `--review`). The list names the common reasons: the message of each refusal says which it is.
+
+**Resolution**: The message names what to change. An unfinished run of the same scope and mode is not refused: `loop start` returns it with `"resumed": true`. To end a run that is in the way, `specdev loop next <run-id> --stop`.
+
+**Promotable**: No (error only). It refuses a command, so it carries no owner.
+
 ## Merge and Release Gates (90x / 91x / 92x / 93x)
 
 Five commands print the codes below. `specdev spec-check --merge` runs the merge gate: two checks that plain `spec-check` does not run (`merge-open-items`, `merge-bindings`), so E900 and E901 are findings of that check and E631 and W633 reach it from their own entries. E336 to E338 are reported by every `spec-check` run, merge or not (check `third-party-pins`, step 02's own findings), and by no other check. `specdev release --tag <name>` cuts a release: it refuses a dirty tree, an undeclared tag pattern and a bad tag name (E910, E911, E912), then runs the release gate and writes the annotated tag only when the gate finds no error. The release gate is also what `specdev release prep` lists (it writes no tag) and what the section "Merge-check and release-gate errors" of `specdev status` prints. `specdev release check --stage prod --tag <name>` is the production gate (E921, E923, E924, W934, and E347 / E348 with the owner `release-gate`). `specdev release rollback <tag> --reason <text>` refuses with E911 or E925 to E927. `specdev update` and `init` print W930, W931, W932 and W935 (the host installer). Exit codes: `release`, `release check` and `release rollback` exit 0 when they wrote or passed, 1 when they refused, 2 for a usage error; `update` exits 0 with these warnings, which are never promoted. Every message below was printed by a run on a git copy of the worked example (or of a release-ready copy of it, made by parking every obligation) or on a scratch host, and every Resolution was followed on that copy to the state it states; where a clause could not be followed, it says so.

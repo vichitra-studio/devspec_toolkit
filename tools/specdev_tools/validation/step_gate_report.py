@@ -36,6 +36,7 @@ _SUSPECT_HINT = "(incl. suspects: specdev stale)"
 _WAITING_PREFIX = "waiting on "
 _TITLE_WIDTH = 19
 _LABEL_WIDTH = 20
+_NEW_MARK = "  (new since the base)"
 _NO_OWNER = "unowned"
 _NO_BASELINE = "unavailable"
 _UNAVAILABLE = BaseResolution(None, None, "unavailable")
@@ -78,12 +79,14 @@ def _block(result: StepGateResult, base: str, full: bool) -> list[str]:
     lines += _debt_lines(result, full)
     lines += _pending_lines(result, full)
     lines += _gate_owned_lines(result, full)
+    lines += _listed("NO LONGER PRESENT", result.no_longer_present, "(the base had them; --detail all to list)", full)
     lines.append(f"RESULT: {'CLEAR' if result.clear else 'BLOCKED'}")
     return lines
 
 
 def _title(name: str, count: int, summary: str) -> str:
-    return f"{f'{name} ({count})':<{_TITLE_WIDTH}}{summary}".rstrip()
+    head = f"{name} ({count})"
+    return f"{head:<{max(_TITLE_WIDTH, len(head) + 2)}}{summary}".rstrip()
 
 
 def _row(error: SpecError, label: str) -> str:
@@ -118,9 +121,10 @@ def _warning_lines(result: StepGateResult) -> list[str]:
     count = len(result.own_warnings) + len(result.new_upstream_warnings)
     if not count:
         return []
-    summary = f"own {len(result.own_warnings)}, new upstream {len(result.new_upstream_warnings)}"
+    new = result.new_own_warnings
+    summary = f"own {len(result.own_warnings)}" + (f" ({len(new)} new)" if new else "") + f", new upstream {len(result.new_upstream_warnings)}"
     lines = [_title("WARNINGS", count, summary)]
-    lines += [_row(error, f"{result.step} own") for error in result.own_warnings]
+    lines += [_row(error, f"{result.step} own") + (_NEW_MARK if error in new else "") for error in result.own_warnings]
     lines += [_row(error, f"{_who(error)} new upstream") for error in result.new_upstream_warnings]
     return lines
 
@@ -157,6 +161,8 @@ def _gate_owned_lines(result: StepGateResult, full: bool) -> list[str]:
 def step_gate_json(results: Sequence[StepGateResult], baseline: BaselineResult) -> dict[str, Any]:
     """The ``step_gate`` object of the ``--json`` payload.
 
+    ``new_own_warnings`` is the part of ``own_warnings`` the base did not have, and ``no_longer_present`` what the base had
+    (owned by a listed step or a step above it) and the tree no longer has; both are empty without a base and neither blocks.
     ``blocking`` and ``own_warnings`` hold finding objects (``error_to_dict``); ``waiting`` holds ``{"error", "waiting_on"}``;
     ``new_upstream_warnings`` and ``upstream_debt`` and ``gate_owned`` are finding lists; ``pending`` maps an owner step to
     its findings.  With several steps every bucket is the union over the steps.
@@ -167,6 +173,8 @@ def step_gate_json(results: Sequence[StepGateResult], baseline: BaselineResult) 
         "blocking": _dicts(union_errors(result.blocking.errors for result in results)),
         "waiting": [_waiting_json(entry) for entry in union_waiting(results)],
         "own_warnings": _dicts(union_errors(result.own_warnings for result in results)),
+        "new_own_warnings": _dicts(union_errors(result.new_own_warnings for result in results)),
+        "no_longer_present": _dicts(union_errors(result.no_longer_present for result in results)),
         "new_upstream_warnings": _dicts(union_errors(result.new_upstream_warnings for result in results)),
         "upstream_debt": _dicts(union_errors(result.upstream_debt for result in results)),
         "pending": _pending_json(results),

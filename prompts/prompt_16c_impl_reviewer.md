@@ -25,7 +25,7 @@ Before a `verified` is recorded, check that every task criterion of the mileston
 # Field Definitions & Rules (MANDATORY)
 
 ## 1. The findings file and `specdev review record`
-The reviewer agent writes its findings as a file under `.specdev/findings/` (`findings_<scope>_<round>_<reviewer_id>.json`, reviewer ids `r1`, `r2`, ...); the skill copies the milestone-wide one to `findings_<batch>_review_<round>.json`, the name `specdev milestone-state` reads; in a manual run you write it. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`). Who runs `specdev review record`: under `/specdev-trinity` the skill records the review from the converged findings file and the reviewer agent writes findings only; a person running 16c by hand, without the skill, runs `specdev review record` themselves. A findings file:
+Under `/specdev-trinity` the reviewer agent writes its findings to the file its brief names, inside the run folder (`.specdev/runs/<run-id>/`); `specdev loop` merges the rounds, and at the end of the milestone-wide run writes the findings it did not close to `final.json` of the run and a copy to `.specdev/findings/findings_<batch>_review_<n>.json`, the name `specdev milestone-state` reads (the copy is written when the run converges or ends with findings left; not on `HALT(blocked)`); in a manual run you write that file. It is a `vc:infra:findings` document (`schema/infra/findings.schema.json`). Who runs `specdev review record`: under `/specdev-trinity` the skill records the review from the converged findings file and the reviewer agent writes findings only; a person running 16c by hand, without the skill, runs `specdev review record` themselves. A findings file:
 
 ```json
 {

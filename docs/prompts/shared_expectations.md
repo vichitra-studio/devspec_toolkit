@@ -75,7 +75,7 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ### 8.1 Self-Audit Gate (input sufficiency)
 
-Each gate item is a pass/fail check on whether upstream inputs are sufficient to proceed. If ALL items pass → enter Emit mode. If ANY item cannot be satisfied → enter Clarify mode: output only short bulleted gap questions, no JSON, no code fences. Stop and wait for user input. When an agent runs the step for an orchestrator (`specdev-impl`), the gap questions are returned as a blocker payload instead (`.claude/agents/specdev-impl.md`, section "Blocker emission protocol"); the questions are the same, only the envelope differs.
+Each gate item is a pass/fail check on whether upstream inputs are sufficient to proceed. If ALL items pass → enter Emit mode. If ANY item cannot be satisfied → enter Clarify mode: output only short bulleted gap questions, no JSON, no code fences. Stop and wait for user input. When an agent runs the step for a run of `specdev loop` (`specdev-impl`), it asks nobody: each gap is recorded as an open item of the artifact, and nothing that depends on the answer is written (`.claude/agents/specdev-impl.md`, section "What nothing settles"); the run or the pass puts the open items to the person in one batch.
 
 Output quality verification is in the Coverage Closure section — run Coverage Closure BEFORE emitting the artifact (8.2), and run `specdev spec-check` after writing it.
 

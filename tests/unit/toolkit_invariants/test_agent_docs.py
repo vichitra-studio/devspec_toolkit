@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 AGENTS_MD = REPO_ROOT / "docs" / "agents" / "agents.md"
 MANIFEST = REPO_ROOT / "docs" / "agents" / "manifest.json"
 AGENT_FILES = REPO_ROOT / ".claude" / "agents"
-SPECDEV_AGENTS = ("specdev-scope", "specdev-reviewer", "specdev-impl", "specdev-trinity-impl", "specdev-trinity-reviewer")
+SPECDEV_AGENTS = ("specdev-reviewer", "specdev-impl", "specdev-trinity-impl", "specdev-trinity-reviewer")
 
 
 def _agents_md() -> str:
@@ -21,10 +21,11 @@ def _manifest() -> dict:
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
 
-def test_agents_md_describes_the_five_specdev_agents() -> None:
+def test_agents_md_describes_the_four_specdev_agents() -> None:
     section = _agents_md().split("## 9. The specdev agents and the review-fix loop", 1)[1]
     for name in SPECDEV_AGENTS:
         assert f"| `{name}` |" in section, name
+    assert "specdev-scope" not in _agents_md() and not (AGENT_FILES / "specdev-scope.md").exists()
 
 
 def test_agents_md_has_no_two_retries_or_silent_autocorrect() -> None:
@@ -43,11 +44,12 @@ def test_manifest_version_equals_first_changelog_version() -> None:
     assert manifest["version"] == manifest["changelog"][0]["version"]
 
 
-def test_clarify_contract_allows_the_blocker_json() -> None:
+def test_a_dispatched_agent_records_an_open_item_instead_of_asking() -> None:
     contract = _manifest()["modes"]["clarify"]["output_contract"]
-    assert contract["format"] == "markdown_bullets_or_blocker_json"
-    assert any("blocker JSON" in restriction for restriction in contract["restrictions"])
-    assert "blocker" in _agents_md().split("## 3.", 1)[1].split("## 4.", 1)[0]
+    assert contract["format"] == "markdown_bullets_or_open_items"
+    assert any("records an open item" in restriction for restriction in contract["restrictions"])
+    flow = _agents_md().split("## 3.", 1)[1].split("## 4.", 1)[0]
+    assert "asks nobody" in flow and "open item" in flow and '"blocker"' not in _agents_md()
 
 
 @pytest.mark.skipif(not AGENT_FILES.is_dir(), reason=".claude/agents is absent (a host install without the links)")

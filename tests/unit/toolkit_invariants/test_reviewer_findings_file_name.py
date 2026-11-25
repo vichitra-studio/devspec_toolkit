@@ -1,7 +1,8 @@
-"""The per-reviewer findings file has one spelling: findings_<scope>_<round>_<reviewer_id>.json, ids r1, r2, ...
+"""No file writes a reviewer's file name with a second ``r``.
 
-The dispatch sends ``"reviewer_id": "r1"``; a template that writes ``_r<reviewer_id>`` yields ``_rr1.json``,
-which the skills' ``cp ..._r1.json`` and ``_r*.json`` lines then miss.
+``specdev loop`` names every file an agent writes (``.specdev/runs/<run-id>/d<n>/<entry>.t<try>.json``), and the
+ids of a round's reviewer entries begin with ``r``. A template that writes ``_r<reviewer_id>`` or ``_r<id>`` in a
+file name would double that letter; no text under the folders of ``FOLDERS`` may hold that spelling.
 """
 from __future__ import annotations
 
@@ -31,8 +32,3 @@ def test_no_file_writes_the_reviewer_file_name_with_a_second_r() -> None:
     ]
     assert hits == []
 
-
-def test_the_scope_agent_states_the_reviewer_id_form() -> None:
-    scope = REPO_ROOT / ".claude" / "agents" / "specdev-scope.md"
-    if scope.is_file():
-        assert "written `r<N>` (`r1`, `r2`, ...)" in scope.read_text(encoding="utf-8")

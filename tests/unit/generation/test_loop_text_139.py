@@ -1,23 +1,21 @@
-"""The review loop has a scope kind for a file of `spec/common/` that is not a step file (DEVSPEC-139)."""
+"""The review loop takes a file of `spec/common/` that is not a step file as a scope (DEVSPEC-139).
+
+The tool part (a read-only run on `spec/common/seed_manifest.json`) is tested in ``tests/unit/loop/test_loop_kinds.py``.
+"""
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-AGENTS = Path(__file__).resolve().parents[3] / ".claude" / "agents"
-KIND = "manifest_artifact"
+CLAUDE = Path(__file__).resolve().parents[3] / ".claude"
 
 
-def _text(name: str) -> str:
-    return (AGENTS / name).read_text(encoding="utf-8")
+def test_the_reviewer_agent_says_how_a_spec_common_file_is_reviewed() -> None:
+    text = (CLAUDE / "agents" / "specdev-reviewer.md").read_text(encoding="utf-8")
+    line = next(line for line in text.splitlines() if "`specdev seed-lint spec <roots>`" in line)
+    assert "`spec/common/`" in line and "`specdev spec-check spec <roots>`" in line
 
 
-@pytest.mark.parametrize("name", ["specdev-scope.md", "specdev-reviewer.md"])
-def test_the_agent_names_the_manifest_artifact_kind(name: str) -> None:
-    assert KIND in _text(name)
-
-
-def test_the_reviewer_lists_the_kind_among_the_scope_kinds() -> None:
-    line = next(line for line in _text("specdev-reviewer.md").splitlines() if line.startswith("- `scope_kind`: one of"))
-    assert KIND in line
+def test_the_review_skill_names_the_scope() -> None:
+    text = " ".join((CLAUDE / "skills" / "specdev-review" / "SKILL.md").read_text(encoding="utf-8").split())
+    assert "the name of a file of `spec/common/` (`seed_manifest.json`)" in text
+    assert "A `spec/common/` file is reviewed with `--review-only`" in text

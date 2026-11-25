@@ -2723,13 +2723,14 @@ changes:
       The fix-mode agent reads each fix back (specdev node show) before its
       finding counts as closed (DEVSPEC-170), checks every part of a
       multi-part finding, reads the other fields of an edited node for a new
-      contradiction, and returns findings_closed and findings_open with a
-      record per finding (signature, location, the node and field read back
-      with its value, edits). /specdev-review and the trinity plan loop print
-      "Round N: C findings closed by E edits, O open.", so two findings of one
-      root cause closed by one edit show as "2 findings closed by 1 edits"
-      (DEVSPEC-133). A claimed fix that did not persist is a findings_open
-      entry instead of a closed finding.
+      contradiction, and returns one outcome per finding (fixed with the nodes it changed,
+      accepted, declined with the text that refutes the finding, recorded or
+      upstream). specdev loop checks each claim: a fixed whose named nodes did
+      not change is not a fix, and a fix counts as closed only when a reviewer
+      of the next round judges it resolved; one edit can close two findings of
+      one root cause, each judged on its own (DEVSPEC-133). The report of a run
+      (report.md, summary.json) gives the findings of each round by severity
+      and every finding with its status and attempts.
     migration:
       action: none
 
@@ -2751,9 +2752,9 @@ changes:
 
   - type: fix
     description: >
-      The review loops (/specdev-review, /specdev-trinity plan review) remove
-      the findings files of a round before they dispatch its reviewers, so a
-      file of an earlier run is not merged; a reviewer writes a finding's
+      A run of specdev loop gives every dispatch its own folder and file names
+      (.specdev/runs/<run-id>/d<n>/), and a round reads only the files of its
+      own dispatch, so a file of an earlier round or run is not merged; a reviewer writes a finding's
       location as the node id (fr-password-reset#description), so two reviewers
       agree on the merge key. The location description of
       schema/infra/findings.schema.json says so (DEVSPEC-159).
@@ -3028,5 +3029,76 @@ changes:
       ^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$ (it accepted nfr-latency, which the schema
       rejects); the schema pattern nfr-<category>-<condition> is the one
       check, reported as E520.
+    migration:
+      action: none
+  - type: add_module
+    description: >
+      `specdev loop start|next|status` keeps the review-fix loop of one scope as
+      code (DEVSPEC-203, 177, 228): `loop start --kind
+      step|plan|code-group|code-milestone <scope>` creates a run under
+      `.specdev/runs/<run-id>/` (or returns the unfinished one), and `loop next
+      <run-id>` takes in the files that arrived, checks them (shape, coverage,
+      that every quote occurs, that a fixer's claim of a change is a change) and
+      prints one action: `dispatch` (agents to start, each with a brief the tool
+      wrote), `wait`, `ask` (questions for the person) or `done` with a verdict
+      (`CONVERGED`, `CLEAN`, `FINDINGS`,
+      `HALT(cap|agent_failed|operator|stuck|blocked)`). The tool merges a round
+      by key (`<kind>|<location>`), counts rounds (`--cap`, default 5), reads
+      the step gate and the suspect links itself, and writes `final.json`,
+      `handoffs.json`, `summary.json` and `report.md`. A refusal is `E850`.
+    migration:
+      action: none
+  - type: add_module
+    description: >
+      `specdev pass start|next` runs several steps top down, once (`pass start
+      <NN-MM|all>`, `--extend TEXT [--seed PATH]`, `--review --about NODE`,
+      `--replay`): it creates one run per step that has work, carries what a
+      step hands to a later step, asks the person one batch of questions between
+      steps, and ends `COMPLETE` or `INCOMPLETE` with what is left, or with the `HALT(operator)` or `HALT(agent_failed)` of a run (`pass next --retry` goes on). The skill
+      `/specdev-pass` drives it; `specdev update` links it into a host.
+    migration:
+      action: none
+  - type: add_script
+    description: >
+      `specdev json read --compact` prints a section view for reading: one line
+      per leaf (`<path>: <value>`), a list of scalars on one line, and an object (or a list that holds objects or lists) equal to one printed earlier as `<path>: = <the earlier path>`
+      (DEVSPEC-228). It is not JSON and is refused together with `--json`.
+    migration:
+      action: none
+  - type: add_script
+    description: >
+      `spec-check --step` marks a warning of the step that the base did not have
+      with `(new since the base)` and lists `NO LONGER PRESENT`: the findings
+      the base had, owned by the step or a step above it, whose key the tree has fewer of (`--json`: `step_gate.new_own_warnings`,
+      `step_gate.no_longer_present`). Neither changes the exit code
+      (DEVSPEC-207).
+    migration:
+      action: none
+  - type: change_config
+    description: >
+      The skills `/specdev-review`, `/specdev-step` and `/specdev-trinity` no
+      longer keep a loop in their text: each starts a run with `specdev loop
+      start` and repeats `specdev loop next`, starting the agent each `dispatch`
+      entry names with the prompt `Read and follow <brief>` and asking the
+      person each `ask`. The agents `specdev-reviewer`, `specdev-impl`,
+      `specdev-trinity-impl` and `specdev-trinity-reviewer` take one brief and
+      write one file; they ask nobody, and what nothing settles becomes an open
+      item. An author's Clarify questions are recorded as open items and put to
+      the person in one batch, not asked before the step is written. Severity is
+      by impact (P0 or P1 for a defect however small, P2 for wording or
+      preference), not by the finding's kind. The agent `specdev-scope` is
+      removed (the tool plans the fan-out; `specdev milestone-state` is run
+      directly); `specdev update` removes the link to it that it wrote in a
+      host. `SPECDEV_REVIEW_CONCURRENCY` is now read by `specdev loop start` and kept for the run (the
+      most agents one `dispatch` hands out).
+    migration:
+      action: none
+  - type: change_schema
+    description: >
+      `findings.schema.json` (`vc:infra:findings`): optional `coverage`
+      (`assigned`, `read`, `not_run`) and `judgements` of a reviewer's file, and
+      `evidence_quotes` of a finding; in a run of `specdev loop` the tool sets
+      `signature` to `<kind>|<location>`. A findings file written for 1.1.1
+      stays valid.
     migration:
       action: none

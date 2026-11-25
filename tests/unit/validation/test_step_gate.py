@@ -311,3 +311,33 @@ def test_repeated_step_blocks_if_any_listed_step_blocks() -> None:
     assert [r.step for r in results] == ["05", "08"]
     assert [r.clear for r in results] == [True, False]
     assert results[0].pending == {"08": tuple(errors)}
+
+
+# --- DEVSPEC-207: own warnings compared with the base, and what the base had and the tree no longer has -----------
+
+
+def _w(code: str, node: str, step: str, message: str = "m") -> SpecError:
+    return SpecError(code=code, message=message, node_id=node, owner=f"step:{step}")
+
+
+def test_an_own_warning_the_base_did_not_have_is_marked_new_and_does_not_block() -> None:
+    order = {"04": 0, "05": 1, "06": 2}
+    old, new = _w("W576", "fr-a", "05"), _w("W576", "fr-b", "05")
+    result = classify_for_step([old, new], "05", declared_owner, order, BaselineResult("ok", (old,)))
+    assert result.own_warnings == (old, new) and result.new_own_warnings == (new,) and result.clear
+    without = classify_for_step([old, new], "05", declared_owner, order, BaselineResult("unavailable"))
+    assert without.new_own_warnings == () and without.no_longer_present == ()
+
+
+def test_what_the_base_had_and_the_tree_no_longer_has_is_listed_for_the_step_and_the_steps_above() -> None:
+    order = {"04": 0, "05": 1, "06": 2}
+    stays, fixed_here, fixed_above, below = _w("E743", "fr-a", "05"), _w("W576", "fr-b", "05"), _w("E700", "cap-a", "04"), _w("E744", "inv-a", "06")
+    base = BaselineResult("ok", (stays, fixed_here, fixed_above, below))
+    result = classify_for_step([stays], "05", declared_owner, order, base)
+    assert result.no_longer_present == (fixed_here, fixed_above)  # step 06's finding is not this step's to report
+    from specdev_tools.validation.step_gate_report import DETAIL_ALL, render_step_gate, step_gate_json
+
+    text = render_step_gate([result], base, DETAIL_ALL)
+    assert "NO LONGER PRESENT (2)" in text and "fr-b" in text and "cap-a" in text
+    payload = step_gate_json([result], base)
+    assert [e["node_id"] for e in payload["no_longer_present"]] == ["fr-b", "cap-a"] and payload["new_own_warnings"] == []

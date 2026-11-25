@@ -58,7 +58,8 @@ For toolkit-internal development (cwd = toolkit root), the flags default sensibl
 2. **Spec context loads through the /specdev-context skill** (`devspec_toolkit/.claude/skills/specdev-context/SKILL.md`). The skill exposes two flows — Orientation (load context for a step) and Action (apply surgical edits driven by a source of findings). Never read `spec/*.json` files directly. For targeted reads, use `specdev json read|read-multi` or `specdev node show <id>`; for targeted edits, use `specdev json patch|insert|delete --id <id>` (by node id: it also keeps the trace lock in step). Direct file ops miss cross-step dependencies and bypass schema awareness.
 3. **Read `docs/prompts/shared_expectations.md`** before executing any `prompt_NN_*.md`.
 4. **Forward-only waterfall** — a spec is a graph of nodes with ids, linked by id (`derives_from`, `refines`, `verifies`, ...). An edit of a node makes every link that points at it suspect (E763): `specdev stale` lists them by step; replay each step it names, top down, and accept each link you have re-read with `specdev attest`. Don't fix downstream failures by silently rewriting upstream artifacts.
-5. **A milestone's loop is `/specdev-trinity`** — it runs `specdev milestone start|close`, `plan record`, `review record` and `verify run`. A person decides `milestone sign-off`, `milestone defer`, `verify attest` and `release`; an agent never answers their prompt. Never write a plan, a record or a milestone status by hand.
+5. **The review-fix loop is kept by the tool** — `specdev loop start|next|status` holds the state of one run (a step, a milestone plan, a plan item's code, a milestone's code) under `.specdev/runs/`, and `specdev pass start|next` the state of a pass over several steps. The skills `/specdev-review`, `/specdev-step`, `/specdev-pass` and `/specdev-trinity` only start the agent each `dispatch` action names (prompt: `Read and follow <brief>`) and ask the person each `ask` action. Never merge findings, count rounds or decide convergence by hand.
+6. **A milestone's loop is `/specdev-trinity`** — it runs `specdev milestone start|close`, `plan record`, `review record` and `verify run`. A person decides `milestone sign-off`, `milestone defer`, `verify attest` and `release`; an agent never answers their prompt. Never write a plan, a record or a milestone status by hand.
 
 ---
 
@@ -185,7 +186,7 @@ Full E/W code catalog: `docs/developers/error-codes.md`. Generic step/schema pat
 | `SPECDEV_PROMOTE_CODES=W571,W593` | Selective promotion of listed W-codes. A listed code that is not promotable (absent from `PROMOTABLE_PAIRS`, e.g. `W590`/`W597`) or unrecognised is **ignored with a one-time stderr warning** naming the code (emitted by `validate-all` and `spec-check`), rather than silently dropped. |
 | `SPECDEV_INVARIANTS_STRICT=1` | Promote `invariants-check` unevaluable rules (`W_INVARIANT_UNEVALUABLE`) to fatal errors (`E_INVARIANT_UNEVALUABLE`); equivalent to `invariants-check --strict` |
 | `SPECDEV_REPLAY_BASE_REF=<ref>` | The base ref of the step gate and the merge gate when `--base-ref` is not given (default: `origin/HEAD`) |
-| `SPECDEV_REVIEW_CONCURRENCY=N` | Max simultaneous reviewer agents per wave in the `/specdev-review` loop (default 6); controls wave width, not total fan-out |
+| `SPECDEV_REVIEW_CONCURRENCY=N` | The most agents one `dispatch` action of `specdev loop next` hands out (default 6); it limits how many run at once, not how many a round has |
 
 Inspect active config: `specdev env-check --repo-root <toolkit>`.
 

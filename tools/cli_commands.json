@@ -160,6 +160,18 @@
       "path": "lock merge"
     },
     {
+      "path": "loop"
+    },
+    {
+      "path": "loop next"
+    },
+    {
+      "path": "loop start"
+    },
+    {
+      "path": "loop status"
+    },
+    {
       "path": "milestone"
     },
     {
@@ -191,6 +203,15 @@
     },
     {
       "path": "node status"
+    },
+    {
+      "path": "pass"
+    },
+    {
+      "path": "pass next"
+    },
+    {
+      "path": "pass start"
     },
     {
       "path": "plan"

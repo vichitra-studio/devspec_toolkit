@@ -275,6 +275,8 @@ ERROR_CODES = {
     "E748": "SEED_ROUTE_UNUSED",
     "E749": "SEED_LINK_NOT_ROUTED",
     "E752": "NODE_ID_IN_PROSE",
+    # Review loop (850): ``specdev loop`` and ``specdev pass`` refuse a command with E850 and change nothing.
+    "E850": "LOOP_REFUSED",
     # Migration (880 to 884): ``specdev align apply --auto`` refuses with E880 (a host the runner cannot start on) and
     # stops with E881 (a script broke an invariant; nothing was written); E884 is a finding of the changelog check (an
     # ``auto`` entry that names no script).  E882 is the baseline residue finding of the trace check; E883 is unassigned.

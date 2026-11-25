@@ -313,6 +313,68 @@ def json_read(file_path: str, jq_filter: str, as_json: bool = False) -> Optional
     return result
 
 
+_COMPACT_QUOTED = re.compile(r"-?\d|(?:true|false|null)$|=|.*[,\[\]\n]", re.DOTALL)
+"""A string that would read as another value when printed bare: a number, a JSON word, a back-reference, part of a list."""
+
+
+def _compact_scalar(value: Any) -> str:
+    if isinstance(value, str) and value and value == value.strip() and not _COMPACT_QUOTED.match(value):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def render_compact(values: List[Any]) -> str:
+    """The section view of ``json read --compact``: one line per leaf, ``<path>: <value>``.
+
+    A list of scalars is one line. An object, or a list that holds objects or lists, that is equal to one
+    printed earlier is printed as ``<path>: = <the earlier path>`` and not again, so a block that repeats
+    (the same links, the same owner record) costs one line. A string is printed bare unless it would read
+    as something else (a number, ``true``, ``false``, ``null``, a text with a comma, a bracket or a line
+    break, or one that starts with ``=``): then it keeps its JSON quotes. With several results (a filter such as ``.items[]``) the paths start
+    with ``[n]``. The output is for reading: it is not JSON, and ``--json`` is the form to parse.
+    """
+    lines: List[str] = []
+    seen: dict = {}
+
+    def walk(value: Any, path: str) -> None:
+        label = path or "."
+        if isinstance(value, (dict, list)) and value:
+            if isinstance(value, list) and not any(isinstance(v, (dict, list)) for v in value):
+                lines.append(f"{label}: [{', '.join(_compact_scalar(v) for v in value)}]")
+                return
+            key = json.dumps(value, sort_keys=True, ensure_ascii=False)
+            if key in seen:
+                lines.append(f"{label}: = {seen[key]}")
+                return
+            seen[key] = label
+            if isinstance(value, dict):
+                for name, child in value.items():
+                    simple = re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is not None
+                    walk(child, f"{path}.{name}" if simple else f"{path}[{json.dumps(name)}]")
+            else:
+                for index, child in enumerate(value):
+                    walk(child, f"{path}[{index}]")
+            return
+        lines.append(f"{label}: {_compact_scalar(value) if not isinstance(value, (dict, list)) else json.dumps(value)}")
+
+    for number, value in enumerate(values):
+        walk(value, f"[{number}]" if len(values) > 1 else "")
+    return "\n".join(lines)
+
+
+def json_read_compact(file_path: str, jq_filter: str) -> str:
+    """``json read --compact``: the filter's results as the section view of :func:`render_compact`."""
+    if jq_filter == ".":
+        raise JsonUtilsError(
+            "Full JSON reads are not allowed. Specify a targeted path (e.g. .title, .items[0])."
+        )
+    _check_file(file_path)
+    _require_valid_filter(jq_filter)
+    result = run_jq(["-c", jq_filter], file_path=file_path, timeout=10)
+    values = [json.loads(line) for line in (result or "").splitlines() if line.strip()]
+    return render_compact(values) if values else "(no results)"
+
+
 def json_read_multi(file_path: str, filters: List[str]) -> Optional[str]:
     """Read multiple jq filters in a single pass, returning keyed-by-filter JSON.
 
@@ -1795,6 +1857,11 @@ def build_json_parser() -> argparse.ArgumentParser:
         "--json", dest="as_json", action="store_true",
         help="Print the value as JSON (strings quoted) instead of raw text",
     )
+    p_read.add_argument(
+        "--compact", action="store_true",
+        help="Print a section view for reading: one line per leaf ('<path>: <value>'), a list of scalars on one line, "
+             "and an object (or a list of objects) equal to an earlier one as '= <the earlier path>'. Not JSON: use --json to parse",
+    )
     _add_ref(p_read)
 
     # Read-multi
@@ -1949,8 +2016,10 @@ def main():
     try:
         result = None
         if args.command == "read":
+            if args.compact and args.as_json:
+                raise JsonUtilsError("--compact is a view for reading and --json is the form to parse: give one of them.")
             with _read_source(args.file, args.ref) as path:
-                result = json_read(path, args.filter, as_json=args.as_json)
+                result = json_read_compact(path, args.filter) if args.compact else json_read(path, args.filter, as_json=args.as_json)
         elif args.command == "read-multi":
             with _read_source(args.file, args.ref) as path:
                 result = json_read_multi(path, args.filters)

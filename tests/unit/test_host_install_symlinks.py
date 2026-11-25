@@ -210,3 +210,27 @@ class TestForceClaudeThroughTheDelegate:
             run_main(True)
         assert os.readlink(stale) == "../../devspec_toolkit/.claude/skills/specdev-step"
         assert "claude-links" in capsys.readouterr().out
+
+
+class TestRetiredLinks:
+    """A skill or an agent the toolkit no longer has: the host's link to it is removed, and nothing else is."""
+
+    def test_the_link_to_a_retired_agent_is_removed_and_a_hosts_own_link_is_left(self, host, toolkit):
+        (toolkit / ".claude" / "agents" / "specdev-scope.md").write_text("# retired later\n", encoding="utf-8")
+        hi.install_claude_links(make_ctx(host, toolkit))
+        own = host / ".claude" / "agents" / "my-own.md"
+        own.symlink_to("../../somewhere/else.md")  # broken, and not a link this installer wrote
+        (toolkit / ".claude" / "agents" / "specdev-scope.md").unlink()  # the toolkit bump retires the agent
+
+        dry = hi.install_claude_links(make_ctx(host, toolkit, dry_run=True))
+        assert dry.status == hi.WOULD_INSTALL and "1 to remove (the toolkit no longer has it)" in dry.detail
+        assert os.path.lexists(host / ".claude" / "agents" / "specdev-scope.md")
+
+        result = hi.install_claude_links(make_ctx(host, toolkit))
+        assert result.status == hi.REFRESHED and "1 removed (the toolkit no longer has it)" in result.detail
+        assert not os.path.lexists(host / ".claude" / "agents" / "specdev-scope.md")
+        assert own.is_symlink() and (host / ".claude" / "agents" / "specdev-impl.md").is_symlink()
+        assert hi.install_claude_links(make_ctx(host, toolkit)).status == hi.CURRENT
+
+    def test_the_pass_skill_is_one_a_host_gets(self):
+        assert "specdev-pass" in hi.KNOWN_SKILLS and (REPO / ".claude" / "skills" / "specdev-pass" / "SKILL.md").is_file()

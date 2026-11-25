@@ -1,335 +1,131 @@
 ---
 name: specdev-step
 description: >
-  Author, extend, and review a single waterfall step. Dispatches specdev-impl in author mode
-  to emit a fresh spec/NN_*.json from the step's prompt contract, or in author-extend mode to
-  additively insert new operator-intent content into an EXISTING artifact, then runs the full
-  review-fix loop via the /specdev-review protocol. Returns CONVERGED or HALT.
+  Author, extend, and review a single waterfall step. Starts a `specdev loop` run that first has
+  specdev-impl author a fresh spec/NN_*.json from the step's prompt contract (or, with --extend, add
+  content for an operator intent to an EXISTING artifact), then runs the review-fix loop on it;
+  this skill pumps that run. Returns CONVERGED or HALT.
   When spec/NN_*.json exists and operator intent is propagation → `specdev stale`, then /specdev-review.
   When spec/NN_*.json exists and operator intent is to extend with NL-authored content →
-  /specdev-step <NN> --extend "<intent>" (dispatches author-extend mode).
-  NOT for step 16 trinity phases (→ /specdev-trinity). NOT for context-only or read-only
-  questions about a step (→ /specdev-context).
+  /specdev-step <NN> --extend "<intent>".
+  NOT for several steps top down or a feature through all steps (→ /specdev-pass).
+  NOT for step 16 trinity phases (→ /specdev-trinity). NOT for context-only or read-only questions
+  about a step (→ /specdev-context).
   Sibling skills: specdev-context (orientation/read), specdev-review (review existing artifact),
-  specdev-trinity (trinity phases 16a/16b/16c).
+  specdev-pass (several steps), specdev-trinity (trinity phases 16a/16b/16c).
   Trigger on: "author step NN", "implement step NN", "/specdev-step NN",
   "/specdev-step NN --extend", "add content to step NN", or any request to produce or extend
   a spec artifact for a step.
 ---
 
-# /specdev-step — Waterfall Step Author + Review
-
-Author mode: emits a fresh artifact. Review mode: runs the `/specdev-review` loop on that step.
-
----
-
-## Arguments
+# /specdev-step: author or extend one step, then review it
 
 ```
 /specdev-step <NN> [--extend "<intent>" [--seed <seed_path>]]
 ```
 
-- `<NN>`: step number, e.g. `04`, `02a`, `16`. Must match a step in the toolkit pipeline.
-- `--extend "<intent>"`: (optional) NL description of what to add to an EXISTING artifact.
-  When supplied and the artifact already exists, dispatches author-extend mode instead of
-  stopping. The subagent authors the full structured content from `intent` + prompt contract +
-  upstream context — do NOT supply a pre-built content object.
-- `--seed <seed_path>`: (optional, requires `--extend`) path to a seed/source doc the subagent
-  reads as source material when authoring the new content.
+- `<NN>`: a step of `00` to `15` (`04`, `02a`).
+- `--extend "<intent>"`: what to add to an EXISTING artifact, in plain words. The author agent writes the structured
+  content from the intent, the step's prompt contract and the upstream nodes. Do not supply a content object.
+- `--seed <seed_path>`: with `--extend`, the seed document the intent comes from.
 
----
+A feature that touches several steps is `/specdev-pass --extend "<intent>" [--seed <seed_path>]`: it walks every step
+once, top down.
 
 ## Protocol
 
-### Step 1 — Author the artifact
+### Step 1: preflight
+
+**Unfinished run:** Run `specdev loop status --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`. If it
+lists a run of step `<NN>` whose `verdict` is `null`, that run is continued: go to Step 2 with the same arguments
+(`loop start` prints its id).
 
 **Migration worklist:** If `spec/extras/migration/worklist.json` exists, the host is in the middle of the
 1.2.0 migration. Run `specdev align triage spec --step <NN>` first. Treat the `audience: agent` items as
 input to this step's pass, ask the operator about each `audience: operator` item, and mark each item when
 it is done: `specdev align triage spec --resolve <id> --note "<what was done>"`.
 
-**Pre-dispatch existence check:** Before dispatching `specdev-impl`, probe for an existing artifact:
+**Pre-dispatch existence check:** `ls spec/<NN>_*.json 2>/dev/null`.
+
+- No file: run `specdev step ready <NN> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`. Exit 0 prints
+  `step <NN>: ready`: go to Step 2 with `--author`. Exit 1 (E773) means an input step has no spec file yet or has
+  pending replay; the last line of the output says what to do first. Print the output and stop.
+- A file, and `--extend` was given: go to Step 2 with `--extend`.
+- A file, and no `--extend`: stop and print:
+
+```
+Artifact spec/<NN>_*.json already exists. /specdev-step authors a new artifact or extends one.
+
+  Propagate an upstream change to this step:   specdev stale --step <NN>, then /specdev-review <NN>
+                                               (the review takes each suspect link of the step as a finding)
+  Insert content you already have as JSON:     specdev json insert --step <NN> <collection-path> '<node-json>'
+                                               specdev json patch --id <node-id> <field-path> '<value>'
+                                               specdev json delete --id <node-id>
+                                               then /specdev-review <NN>
+  Add content from a description:              /specdev-step <NN> --extend "<what to add>" [--seed <seed_path>]
+```
+
+### Step 2: the run
+
 ```bash
-ls spec/<NN>_*.json 2>/dev/null
-```
-If a match is found, check whether `--extend` was supplied:
-
-**If `--extend "<intent>"` was supplied** — the operator wants to add NL-authored content to the
-existing artifact. Proceed to the **author-extend dispatch** below (do NOT print the stop message).
-
-**If `--extend` was NOT supplied** — stop and print:
-```
-Artifact spec/<NN>_*.json already exists. /specdev-step only authors new artifacts.
-
-Choose a path based on your intent:
-
-  Sub-case A — Propagate an upstream change to this step:
-    specdev stale --step <NN>
-    then /specdev-review <NN>
-    (Lists the links of this step that point at a node that changed above it. Read what
-    changed, fix the step, then `specdev attest <node-id> --yes` for a link you checked;
-    /specdev-review then validates the result.)
-
-  Sub-case B — Insert known content directly (you already have the JSON):
-    specdev json insert --step <NN> <collection-path> '<new-node-json>'   (a new node)
-    specdev json patch --id <node-id> <field-path> '<value>'              (a field of a node)
-    specdev json insert --id <node-id> <array-field> '<item>'             (an item of an array field)
-    specdev json delete --id <node-id>                                    (a node)
-    then /specdev-review <NN>
-    (Surgically changes what you've already composed; /specdev-review then validates it.)
-
-  Sub-case C — Add new content from a natural-language description:
-    /specdev-step <NN> --extend "<what to add>" [--seed <seed_path>]
-    (Dispatches author-extend mode; the subagent authors the structured content from your
-    intent + the step prompt contract + upstream context, then inserts it and gates.)
-```
-If no existing artifact is found, proceed to the **author dispatch** below.
-
-#### Author dispatch (new artifact)
-
-**Readiness check:** before dispatching, run
-```bash
-specdev step ready <NN> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-The step has no file yet, so the command checks its declared inputs (the `required_spec_inputs`
-of `<NN>` in `tools/step_order.json`): each has a spec file and holds no pending replay (a suspect
-link, or a coverage gap E740, E742 or E743 that the input step owns). Exit 0 prints
-`step <NN>: ready`; go on. Exit 1 (E773) means an input has no spec file yet or has pending
-replay, and the output names it (for example `step 04: no spec file yet` and `write step 04
-first`, or, on a copy of the worked example with the files from step 08 on removed, `step 08: not
-ready, 1 blocker`, `step 07: coverage gap E740: metric-reset-completion-rate`). The last line says
-what to do first; when a link is suspect it can name a step above the inputs (for example `replay
-step 01 first`), because the replay begins at the earliest suspect step. Print that output
-and stop; do not dispatch.
-
-Dispatch `specdev-impl` with `mode: "author"`:
-
-```json
-{
-  "mode": "author",
-  "step": "<NN>"
-}
+specdev loop start --kind step <NN> --author --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+specdev loop start --kind step <NN> --extend "<intent>" [--seed <seed_path>] --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-The agent:
-1. Reads `devspec_toolkit/docs/prompts/shared_expectations.md` first.
-2. Reads `devspec_toolkit/prompts/prompt_<NN>_*.md`.
-3. Probes upstream artifact shapes and reads needed upstream content via `specdev json read`.
-4. Writes the whole artifact as a draft file outside `spec/` (`.specdev/drafts/step_<NN>.json`), then creates the step file with
-   `specdev step create <NN> --from .specdev/drafts/step_<NN>.json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
-   (ids of sub-items may be left out; the command refuses a step that already has a file, E767).
-   The agent never Writes into `spec/`.
-5. Runs the scoped gate:
-   ```bash
-   specdev spec-check spec --step <NN> \
-     --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-   ```
-   Clean (`RESULT: CLEAR`) means no error owned by step `<NN>` and none new in an earlier
-   step. Upstream debt and findings that wait on later steps are shown, not blocking.
-6. Returns structured summary `{mode: "author", edits_applied: ..., gate_status: ..., errors_remaining: [...]}`.
+One of the two. It prints `{"run_id": ..., "resumed": ...}`. If it prints `"type": "error"`, print the message and
+stop. The run begins with one author dispatch (`specdev-impl`, from its brief), then the step gate, then the same
+review-fix loop `/specdev-review` runs; with `--extend` only what the author changed is reviewed. An author asks no
+question: what the contract and the upstream nodes do not settle it records as an open item in the artifact, and the
+report lists those items.
 
-After Agent returns:
-1. Parse return JSON.
-2. If `status != "blocker"`: check `gate_status`. If `gate_status: "errors"` and errors cannot
-   be resolved within specdev-impl's budget, surface them to the user. Do not proceed to the
-   review step if the artifact is structurally invalid.
-3. If `status == "blocker"` (see `specdev-impl.md` § "Blocker emission protocol"):
-   a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-      If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
-      Malformed includes: `questions[]` empty, any entry missing required fields, artifact
-      written AND `status: "blocker"` simultaneously (timing-constraint violation).
-   b. Persist audit trail:
-      ```bash
-      mkdir -p .specdev/blockers/
-      ```
-      Write `.specdev/blockers/blocker_step-<NN>_author_<unix_ts>.json` with the full payload.
-   c. Chunk questions into groups of ≤4. Call `AskUserQuestion` once per chunk, sequentially.
-      Collect all answers keyed by `question.id`.
-      If the user dismisses or does not answer an AskUserQuestion call (empty answer set
-      returned), HALT immediately. Surface: "Blocker unresolved: user did not answer
-      clarification questions. Re-invoke /specdev-step <NN> to retry." Write a HALT artifact
-      noting `aborted_by_user` to `.specdev/blockers/blocker_step-<NN>_author_aborted_<unix_ts>.json`.
-      Do not re-dispatch. Re-invoke the skill to retry from round 1.
-   d. Build re-dispatch prompt:
-      - Original dispatch input verbatim.
-      - PLUS a `## User answers (from blocker bridge)` section listing each
-        `{id, question, selected_label, selected_description, user_notes_if_any}`.
-      - PLUS a `## Context from prior dispatch` section quoting the agent's `context` field.
-      - PLUS, for each answer whose question has an `owner` other than `this-step` (a step id or
-        `seed`), the instruction: record the answer as an open item with
-        `specdev json insert --step <NN> .ambiguities '<item>'` (`description` is the question,
-        `about` is the question's `about` ids, `decision` is the chosen label), and proceed
-        without applying it to this step. `about` must name nodes the schema allows there
-        (`specdev node candidates --kind ambiguity-item --field about` lists them); a node of the
-        same step is refused (E767). Answers the step owns are applied as today.
-      Each question carries `owner` and `about`; show both to the user with the question.
-      The item is deleted with `specdev json delete --id <item-id>` once its decision is applied;
-      `specdev upstream-backlog spec --repo-root ./devspec_toolkit` lists the open items by the step
-      of their `about` nodes, for the pass that applies them.
-   e. Increment `author_blocker_round` counter (per-dispatch-site, scoped to this author
-      dispatch chain, independent of fix-phase counter; starts at 0 on first dispatch; cap = 2
-      re-dispatches (counter values 0, 1, 2); does not persist across skill invocations).
-   f. If `author_blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
-   g. Fresh Agent dispatch with the augmented prompt. Continue from step 1.
-   Note: lossy re-dispatch — accepted cost; the re-dispatched agent re-reads all context
-   from scratch; user answers are the ONLY persistence across the bridge.
-   SendMessage-based clean resumption is deferred.
+## The pump
 
-If the author step returns with `gate_status: "errors"` and the errors cannot be resolved
-within specdev-impl's budget, surface them to the user. Do not proceed to the review step
-if the artifact is structurally invalid.
+`<roots>` is `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .` on every `specdev loop` and `specdev pass` command.
+The tool keeps the loop: it decides every next action, checks every file an agent writes, runs the step gate and
+`specdev stale`, and writes the report. This session only carries out the action it prints.
 
-#### Author-extend dispatch (extend existing artifact)
-
-When `--extend "<intent>"` was supplied and the artifact already exists, dispatch
-`specdev-impl` with `mode: "author-extend"`:
-
-```json
-{
-  "mode": "author-extend",
-  "target": "spec/<NN>_*.json",
-  "intent": "<the --extend intent string verbatim>",
-  "seed_path": "<value of --seed if supplied, else omit field>"
-}
-```
-
-Pass `target` and `intent`. Pass `seed_path` only if `--seed` was supplied. Do NOT pass
-`insert_pointer` — the subagent derives the correct jq-path from the prompt contract.
-Do NOT build a content payload — the subagent does the authoring from `intent`.
-
-The agent:
-1. Reads `devspec_toolkit/docs/prompts/shared_expectations.md` first.
-2. Probes the existing artifact structure via `specdev json structure` / `json keys`.
-3. Reads `devspec_toolkit/prompts/prompt_<NN>_*.md`.
-4. Authors the new structured content object from `intent` + optional `seed_path` + contract + upstream.
-5. Applies via `specdev json insert --step <NN> <collection-path>` for a new node, and
-   `specdev json patch|insert|delete --id <node-id>` for an existing one — NEVER Write.
-6. Runs the scoped gate:
-   ```bash
-   specdev spec-check spec --step <NN> \
-     --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-   ```
-7. Returns structured summary `{mode: "author-extend", edits_applied: ..., gate_status: ..., errors_remaining: [...], pending_replay: ["<step>", ...]}`.
-
-After Agent returns:
-1. Parse return JSON.
-2. If `status != "blocker"`: check `gate_status`. If `gate_status: "errors"` and errors cannot
-   be resolved within specdev-impl's budget, surface them to the user. Do not proceed to the
-   review step if the artifact is structurally invalid.
-3. If `status == "blocker"` (see `specdev-impl.md` § "Blocker emission protocol"):
-   a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-      If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
-      Malformed includes: `questions[]` empty, any entry missing required fields, edits applied
-      AND `status: "blocker"` simultaneously (timing-constraint violation).
-   b. Persist audit trail:
-      ```bash
-      mkdir -p .specdev/blockers/
-      ```
-      Write `.specdev/blockers/blocker_step-<NN>_author-extend_<unix_ts>.json` with the full payload.
-   c. Chunk questions into groups of ≤4. Call `AskUserQuestion` once per chunk, sequentially.
-      Collect all answers keyed by `question.id`.
-      If the user dismisses or does not answer an AskUserQuestion call (empty answer set returned),
-      HALT immediately. Surface: "Blocker unresolved: user did not answer clarification questions.
-      Re-invoke /specdev-step <NN> --extend ... to retry." Write a HALT artifact noting
-      `aborted_by_user` to `.specdev/blockers/blocker_step-<NN>_author-extend_aborted_<unix_ts>.json`.
-      Do not re-dispatch.
-   d. Build re-dispatch prompt:
-      - Original dispatch input verbatim.
-      - PLUS a `## User answers (from blocker bridge)` section listing each
-        `{id, question, selected_label, selected_description, user_notes_if_any}`.
-      - PLUS a `## Context from prior dispatch` section quoting the agent's `context` field.
-      - PLUS the `owner` / `about` instruction of the author dispatch above (step d): an answer
-        owned by another step or by a seed is recorded as an open item in `.ambiguities`, not applied.
-   e. Increment `author_extend_blocker_round` counter (per-dispatch-site, scoped to this
-      author-extend dispatch chain, independent of author-phase and fix-phase counters;
-      starts at 0 on first dispatch; cap = 2 re-dispatches (counter values 0, 1, 2); does not
-      persist across skill invocations).
-   f. If `author_extend_blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
-   g. Fresh Agent dispatch with the augmented prompt. Continue from step 1.
-   Note: lossy re-dispatch — accepted cost; user answers are the ONLY persistence across the bridge.
-4. On clean gate: surface the `pending_replay` list (step ids) from the return JSON to the user. It names
-   the steps that `specdev stale` lists after the extend (links that point at a node the extend
-   changed, and coverage gaps of later steps). The operator re-reads those steps, fixes them, and
-   clears a link they checked with `specdev attest <node-id> --yes` (read the shown old and new
-   text first; never edit the lock file by hand).
-
-### Step 2 — Review-fix loop
-
-After the author step completes with a clean gate, run the review-fix loop by invoking the `/specdev-review` skill for scope `<NN>`
-(the Skill tool, skill `specdev-review`, args `<NN>`). The loop is written in that skill only: scope planning, reviewers in waves, the merge
-of the findings files, the fix dispatch, the blocker bridge, the cap of 5 rounds and the HALT artifact. The rule that a finding in neither
-`findings_closed` nor `findings_open` of the fix agent's return counts as open, and the read-back of each closed finding, are part of that loop.
-
-Its outcome is this skill's outcome: `CONVERGED at round <N>`; `HALT at round 5` with the findings path
-`.specdev/findings/findings_<NN>_5_<unix_timestamp>.json`; or `HALT (blocker unresolved)`, which has no such file (the blocker is under `.specdev/blockers/`). After a HALT print what `/specdev-review` printed and go to the hand-off; do not run the loop again.
-
-The review scope for this step is `<NN>` (e.g. `04`, `02a`), as `/specdev-review` takes it; the findings files are named from it (`findings_<NN>_<round>.json`).
-
----
+1. Call `specdev loop next <run-id> <roots>`. It prints one JSON action. Do what its `type` says:
+   - `dispatch`: start one subagent per entry of `entries`, all in one message. The subagent type is the entry's
+     `agent`; the prompt is exactly `Read and follow <the entry's brief>`. Add nothing to the prompt. When all have
+     returned, go to 1.
+   - `wait`: files are missing, or arrived and failed the tool's checks (`refused` gives the reason for each). If a subagent of this session is still running, wait for it, then go to 1. If none is
+     running (all returned, or this is a new session), call `specdev loop next <run-id> --redispatch <roots>` and treat
+     its action as in 1.
+   - `ask`: put every question of `questions` to the operator with AskUserQuestion, as given (question text, option
+     labels and descriptions), at most 4 questions per call. If a chosen option carries a `command`, run it now. Write
+     one JSON object `{"<question id>": {"label": "<chosen label>", "notes": "<the operator's notes or free text>"}}`
+     with every answer to `answers_path`, call `specdev loop next <run-id> --answers <answers_path> <roots>`, and
+     treat its action as in 1. If the operator dismisses a question, stop here and print
+     `Stopped at a question; run the same command again to go on.` The run is kept.
+   - `done`: print the file at `report` and the line `<verdict>: <report path>`. Go on with the hand-off below.
+   - `error`: print `message` and stop. Do not work around it.
+2. If the operator asks to stop, call `specdev loop next <run-id> --stop <roots>` and print its report.
+3. Between `loop start` and `done` this session reads no spec file, findings file or brief, edits no spec, code or
+   findings file, runs no gate, and gives an agent nothing but the brief path. Every agent is a fresh subagent: never
+   continue an earlier one.
 
 ## Hand-off
 
-After the review loop completes, run the step gate once more and read `step_gate` from its JSON:
-```bash
-specdev spec-check spec --step <NN> --json \
-  --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-`step_gate.result` is `clear` or `blocked`. `blocking` holds the errors owned by step `<NN>` and the
-new errors of earlier steps; only these block the step. `upstream_debt` (errors of earlier steps
-that were there before), `pending` (a map from a later step to the findings that clear when that
-step runs) and `waiting` (errors below a node that an open item is about) are shown and do not
-block. List each finding by its node id.
+Print the report; it ends with the step gate's result (`clear` or `blocked`) and the open items the run recorded.
 
-Then report the final verdict:
-
-```
-/specdev-step <NN> complete.
-Author gate: <clean | errors>
-Review verdict: CONVERGED at round <N> | HALT at round 5 | HALT (blocker unresolved)
-Artifact: spec/<NN>_*.json
-Blocking (own, new upstream): <node ids, or none>
-Pending (not blocking): upstream debt <node ids>; later steps <step: node ids>; waiting <node ids, with the open item ids>
-Findings path (on HALT at round 5): .specdev/findings/findings_<NN>_5_<unix_timestamp>.json
-```
-
----
+| Verdict | Then |
+|---|---|
+| `CONVERGED` | Run `specdev stale <roots>`. If it lists steps below `<NN>`, or the report lists handoffs or open items, print: `Next: /specdev-pass --replay` (it takes the handoffs and the suspect links, asks the open items in one batch, and applies the answers) |
+| `HALT(cap)` | Five rounds were used and findings are open. Print: `Hand-edit, or go on with /specdev-review <NN> --worklist <the done action's final>` |
+| `HALT(agent_failed)` | The author refused (the report gives its reason: a missing prerequisite, an artifact that exists), or an agent wrote no usable file twice. Print the report and stop |
+| `HALT(operator)` | The operator stopped the run |
 
 ## Flag discipline
 
-Three-flag protocol for all validation/governance commands:
-```
---repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
+`--repo-root ./devspec_toolkit --spec-root ./spec --git-root .` on `loop`, `pass`, `spec-check`, `step ready`, `stale`,
+`attest` and the id forms of `json` (`json patch|insert|delete --id`, `json insert --step`). `specdev json`
+read and shape subcommands take `--repo-root` only. `canon-accept` takes `--git-root`, not `--spec-root`.
 
-`specdev json` read/shape subcommands (`read`, `structure`, `keys`, ...) and `json patch|insert|delete`
-on a file path: pass `--repo-root` only.
-Exceptions: `specdev json resolve-pointers` accepts `--git-root`. The id forms, `json patch|insert|delete --id`
-and `json insert --step`, take all three flags, as do `step create`, `step ready`, `stale`, `attest`,
-`node status` and `node rename`.
-`canon-accept`: pass `--git-root`, NOT `--spec-root`.
-
-Never read `spec/*.json` directly. Never edit the lock file by hand: `specdev attest` writes it, and
-only after you have read the old and new text it shows. `specdev node status <id> <lifecycle>` marks a
-node `deprecated` (or `active` again); `not_applicable` is only for a step-14 node of a closed milestone
-and is refused elsewhere (E705). `specdev node rename <old> <new>` renames a node and keeps the old id
-as an alias. Deleting a node is `specdev json delete --id`.
-
----
+Never read `spec/*.json` directly, and never edit the lock file by hand: `specdev attest` writes it.
 
 ## What this skill does NOT do
 
-- Does not review existing artifacts without authoring. Use `/specdev-review` for that.
-- Does not manage trinity-plan gating. Use `/specdev-trinity --phase plan` for that.
-- Does not handle 16a/16b/16c. Discovery-phase steps only: a milestone's plan is created by
-  `/specdev-trinity --phase plan` with `specdev step create 16a <batch> --from <draft>`, and the code
-  phase writes only through `specdev plan record` and `specdev review record` (trinity phases belong to
-  `/specdev-trinity`).
-- Does not commit changes. User authorizes commits separately.
-- Does not skip AskUserQuestion on a blocker payload. Blocker questions must be presented
-  to the user via the harness before re-dispatching.
-- Does not author a fresh artifact when `spec/<NN>_*.json` already exists (Step 1
-  pre-dispatch check short-circuits). For upstream propagation read `specdev stale --step <NN>`,
-  then `/specdev-review <NN>`. For NL-intent-driven new content use
-  `/specdev-step <NN> --extend "<intent>"` (author-extend mode). For direct JSON changes
-  of already-composed content use `specdev json insert|patch|delete` (`--id` or `--step` forms),
-  then `/specdev-review <NN>`.
+- It does not review an existing artifact without authoring or extending: that is `/specdev-review`.
+- It does not handle 16a, 16b or 16c: a milestone's plan is created by `/specdev-trinity --phase plan` with
+  `specdev step create 16a <batch> --from <draft>`, and its code belongs to `/specdev-trinity` too.
+- It does not commit.

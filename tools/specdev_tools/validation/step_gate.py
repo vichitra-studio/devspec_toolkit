@@ -268,6 +268,10 @@ class StepGateResult:
     waiting: tuple[WaitingError, ...] = ()
     gate_owned: tuple[SpecError, ...] = ()
     pending: Mapping[str, tuple[SpecError, ...]] = field(default_factory=dict)
+    new_own_warnings: tuple[SpecError, ...] = ()
+    """The warnings of ``own_warnings`` that the base did not have (empty when there is no base).  They do not block."""
+    no_longer_present: tuple[SpecError, ...] = ()
+    """What the base had, owned by this step or a step above it, and the tree no longer has (empty when there is no base)."""
 
     @property
     def clear(self) -> bool:
@@ -287,6 +291,8 @@ class _Draft:
     waiting: list[WaitingError] = field(default_factory=list)
     gate_owned: list[SpecError] = field(default_factory=list)
     pending: dict[str, list[SpecError]] = field(default_factory=dict)
+    new_own_warnings: list[SpecError] = field(default_factory=list)
+    no_longer_present: list[SpecError] = field(default_factory=list)
 
     def freeze(self, step: str) -> StepGateResult:
         return StepGateResult(
@@ -298,6 +304,8 @@ class _Draft:
             tuple(self.waiting),
             tuple(self.gate_owned),
             {owner_step: tuple(found) for owner_step, found in self.pending.items()},
+            tuple(self.new_own_warnings),
+            tuple(self.no_longer_present),
         )
 
 
@@ -348,10 +356,18 @@ def classify_for_step(
             draft.gate_owned.append(error)
         elif owner_step == step:
             _place_own(draft, error, waiting.reasons(error, step) if waiting else ())
+            if new and baseline.mode == "ok" and error in draft.own_warnings[-1:]:
+                draft.new_own_warnings.append(error)
         elif rank(owner_step, order) < rank(step, order):
             _place_upstream(draft, error, not new)
         else:
             draft.pending.setdefault(owner_step, []).append(error)
+    if baseline.mode == "ok":
+        before = dedupe_by_identity(baseline_errors, owner_of, canonical_id)
+        for error, gone in zip(before, new_since_baseline(before, unique, owner_of, canonical_id)):
+            owner_step = _owner_step(owner_of(error))
+            if gone and owner_step is not None and rank(owner_step, order) <= rank(step, order):
+                draft.no_longer_present.append(error)
     return draft.freeze(step)
 
 

@@ -28,7 +28,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
    - Build a private ledger per step (e.g., FR ledger, API ledger) as described in `Operating Flow` (do not output it).
 3. **Phase A — Clarify**
    - Apply the `Self‑Audit Gate`. If the private completeness score is < 0.9 or any gating item is missing:
-     - In an interactive session, output only a short, bulleted list of targeted gap questions (no code fences, no JSON). An agent dispatched by a skill (`specdev-impl`) returns a `status: "blocker"` JSON with `questions[]` instead (the shape of "Blocker emission protocol" in `.claude/agents/specdev-impl.md`); the skill asks the person and re-dispatches.
+     - In an interactive session, output only a short, bulleted list of targeted gap questions (no code fences, no JSON). An agent dispatched by a skill (`specdev-impl`) asks nobody: what the contract, the seeds and the upstream nodes do not settle it records as an open item of the artifact (section "What nothing settles" in `.claude/agents/specdev-impl.md`), writes nothing that depends on the answer, and goes on; `/specdev-pass` puts the open items to the person in one batch.
      - Group questions by field/impact (e.g., “Success Metrics”, “Security”, “Schemas”).
      - Stop and wait for human answers.
 4. **Phase B — Emit**
@@ -63,7 +63,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 16c | `spec/impl_context/ms_<batch>_plan.json` | Trinity Review: Verification (`review record`); a person signs off, `milestone close` closes |
 
 ## 5. Escalation Triggers
-- `spec-check --step NN` still blocks after `/specdev-review` has run its `max_rounds` (5) → HALT; report the findings path and wait for a person. A blocker unanswered, or raised more than twice in one dispatch chain, also halts.
+- Findings are still open after the five rounds of a `/specdev-review` run → `HALT(cap)`; report the path of the run's `final.json` and wait for a person. A finding that two fixes did not settle is parked and put to the person (or, inside a pass, ends the run `HALT(stuck)` and joins the pass's one batch of questions).
 - Phase A repeated twice without sufficient answers → summarize blockers and request escalation/decisions.
 - A referenced ID is missing from expected step → highlight the missing ID and halt.
 - `fixtures-lint` produces new warnings, or `spec-check --step NN` reports BLOCKED → include the command output in your response and stop.
@@ -79,7 +79,7 @@ When reporting back to humans, include:
 2. Commands executed and whether they succeeded.
 3. Outstanding issues or reasons for escalation.
 
-During Phase A (Clarify), output only a bulleted list of questions grouped by topic (an agent dispatched by a skill returns the blocker JSON of section 9 instead). During Phase B (Emit), write the JSON artifact to disk (a new step with `specdev step create NN --from <draft>`, an existing step with `specdev json patch|insert|delete --id`) and return only a concise status/path confirmation.
+During Phase A (Clarify), output only a bulleted list of questions grouped by topic (an agent dispatched by a skill records open items instead, section 9). During Phase B (Emit), write the JSON artifact to disk (a new step with `specdev step create NN --from <draft>`, an existing step with `specdev json patch|insert|delete --id`) and return only a concise status/path confirmation.
 
 ## 8. Runner Tips
 - Treat prompts as the contract; do not modify them at runtime.
@@ -97,16 +97,15 @@ During Phase A (Clarify), output only a bulleted list of questions grouped by to
 - Keep file paths relative to the repo root in user‑visible output; avoid absolute paths.
 
 ## 9. The specdev agents and the review-fix loop
-The skills `/specdev-step`, `/specdev-review` and `/specdev-trinity` dispatch five agents (`.claude/agents/`). An agent never dispatches another; the skill does.
+The tool keeps the loop, agents judge, and the session only pumps. `specdev loop` (one scope) and `specdev pass` (several steps) hold all state under `.specdev/runs/` and `.specdev/passes/`, decide every next action, check every file an agent writes, and read the step gate and `specdev stale` themselves. The skills `/specdev-review`, `/specdev-step`, `/specdev-pass` and `/specdev-trinity` call `specdev loop next` and start the agents its action names, each with the one-line prompt `Read and follow <brief>`; they add nothing to it. An agent never dispatches another and never asks a question. The design: `docs/architecture/agent-harness/agent_harness_design.md`; the commands: `docs/developers/reference.md`, "The review-fix loop".
 
 | Agent | Model | Tools | Reads | Writes | Stops when |
 |---|---|---|---|---|---|
-| `specdev-scope` | haiku | Bash, Read, Grep | default mode: the change set; mode `milestone_state`: the milestone state (`specdev milestone-state`) | default mode: a fan-out plan; mode `milestone_state`: that command's JSON (both returned, not written) | the plan or the state is returned |
-| `specdev-reviewer` | sonnet | Bash, Read, Grep, Write | its cluster of spec artifacts, by `specdev json read` (never `Read` on `spec/`) | one findings file `.specdev/findings/findings_<scope>_<round>_<reviewer_id>.json` (`vc:infra:findings`; reviewer ids are `r1`, `r2`, ...); no spec edit | the file is written |
-| `specdev-impl` | sonnet | Bash, Read, Edit, Write, Grep | the prompt contract, upstream nodes by `specdev json read` | author: `specdev step create`; fix and author-extend: `specdev json patch|insert|delete --id`; returns status JSON | the step gate ran, or a blocker is returned before the first edit |
-| `specdev-trinity-impl` | sonnet | Bash, Read, Edit, Write | mode `execute`: one plan item and its actions; mode `fix`: a per-item findings file; mode `milestone_fix`: a milestone-wide findings file | host code inside `target_file_patterns`; `specdev plan record` | `execute`: every action is recorded; `fix` and `milestone_fix`: every finding is addressed or reported back |
-| `specdev-trinity-reviewer` | sonnet | Bash, Read, Grep, Write | code and the plan item | a findings file; no code edit | the file is written |
+| `specdev-reviewer` | sonnet | Bash, Read, Grep, Write | the nodes its brief lists, by `specdev node show` (never `Read` on `spec/`), the step's contract and seeds | one findings file, at the path the brief names (`vc:infra:findings`, with `coverage`, `judgements` and a quote for every finding); no spec edit | the file is written |
+| `specdev-impl` | sonnet | Bash, Read, Edit, Write, Grep | the prompt contract, upstream nodes by `specdev json read` and `specdev node show` | author: `specdev step create`; extend and fix: `specdev json patch|insert|delete --id`, `specdev attest` for a re-read link, open items; one outcome file | the outcome file is written |
+| `specdev-trinity-impl` | sonnet | Bash, Read, Edit, Write | one plan item and its actions (execute), or the findings of a code review (fix) | host code inside `target_file_patterns`; `specdev plan record`; open items of the plan; one outcome file | the outcome file is written |
+| `specdev-trinity-reviewer` | sonnet | Bash, Read, Grep, Write | the code files its brief lists, the plan item or the milestone's pack | one findings file; no code edit | the file is written |
 
-The review-fix loop (`/specdev-review`): `specdev-scope` plans clusters; each round dispatches every cluster to a fresh `specdev-reviewer` in waves of at most `SPECDEV_REVIEW_CONCURRENCY` (default 6) and waits for the whole round; the findings files are merged with one `jq` command and de-duplicated on `(kind, location, signature)`; the round converges when the merged findings are empty; otherwise `specdev-impl` (fix mode) repairs the findings and the next round starts, at most 5 rounds, after which the loop halts with the findings path. A blocker returned by `specdev-impl` is put to the person by the skill and the agent is re-dispatched with the answers, at most twice per dispatch chain.
+A run (`specdev loop`): round 1 gives every node of the scope to fresh `specdev-reviewer` agents (two readers for spec steps, up to six steps per reviewer, at most `SPECDEV_REVIEW_CONCURRENCY` entries handed out at a time). The tool checks each file (shape, coverage of what was assigned, a judgement for every fix of the round before), refuses a finding whose target does not exist or whose quote does not occur in its source, and merges the rest by `kind` and `location`. Together with the step gate's own errors and the suspect links `specdev attest` could accept, they go to one fixer, which answers each with `fixed`, `accepted`, `declined`, `recorded` (an open item) or `upstream`; the tool checks every claim. The next round's reviewers read only what changed and judge the fixes and declines. The run ends `CONVERGED` when every node was read in its current content and nothing is open; a finding two fixes did not settle is put to the person; five rounds without convergence end `HALT(cap)`. A finding about a node of another step is not fixed there: it is a handoff, and `/specdev-pass --replay` works it at its own step, top down.
 
 Following this contract keeps the spec workflow repeatable and predictable for both automated and human contributors.

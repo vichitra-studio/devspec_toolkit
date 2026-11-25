@@ -15,7 +15,7 @@
     "step_gate": {
       "type": "object",
       "required": [
-        "steps", "baseline", "blocking", "waiting", "own_warnings", "new_upstream_warnings",
+        "steps", "baseline", "blocking", "waiting", "own_warnings", "new_own_warnings", "no_longer_present", "new_upstream_warnings",
         "upstream_debt", "pending", "gate_owned", "result"
       ],
       "additionalProperties": false,
@@ -45,6 +45,8 @@
           }
         },
         "own_warnings": {"$ref": "#/$defs/findings"},
+        "new_own_warnings": {"$ref": "#/$defs/findings"},
+        "no_longer_present": {"$ref": "#/$defs/findings"},
         "new_upstream_warnings": {"$ref": "#/$defs/findings"},
         "upstream_debt": {"$ref": "#/$defs/findings"},
         "pending": {

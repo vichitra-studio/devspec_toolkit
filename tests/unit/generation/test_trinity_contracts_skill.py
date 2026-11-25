@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -208,76 +207,49 @@ def test_the_skill_stops_on_a_plan_without_a_milestone_key() -> None:
 # --- the skill and the agent files -----------------------------------------------------------------------------------------
 
 
-def _keys(block_pattern: str) -> set[str]:
-    match = re.search(block_pattern, _skill(), re.S)
-    assert match, block_pattern
-    return set(re.findall(r'"(\w+)":', match.group(0)))
+def test_each_phase_is_a_run_of_the_tool_and_the_skill_gives_its_start_command() -> None:
+    skill = _skill()
+    for form in (
+        "specdev loop start --kind plan <ms-id> [--author --batch <batch_id>]",
+        "specdev loop start --kind code-group <ms-id>/<group_id> --execute --base-ref <milestone_start_ref> --cap <soft-warn-rounds>",
+        "specdev loop start --kind code-milestone <ms-id> --base-ref <milestone_start_ref> --cap <soft-warn-rounds>",
+    ):
+        assert form in skill, form
+    assert _flat(skill).count("Pump the run (section \"The pump\")") == 3
+    code, help_text = run_cli("loop", "start", "--help")
+    assert code == 0
+    for flag in _flags(skill, "loop start") | _flags(skill, "loop next"):
+        assert flag in help_text or flag in run_cli("loop", "next", "--help")[1], flag
 
 
-def _agent_example_keys(agent: str, anchor: str) -> set[str]:
-    text = _agent(agent)
-    start = text.index(anchor)
-    block = re.search(r"\{.*?\n\}", text[start:], re.S)
-    assert block
-    return set(re.findall(r'^  "(\w+)":', block.group(0), re.M))
+def test_the_skill_dispatches_no_agent_itself_and_names_no_retired_one() -> None:
+    skill = _skill()
+    for gone in ("specdev-scope", '"mode": "execute"', '"mode": "milestone_fix"', "scope_kind", "with_backlog", "jq -s", "max_rounds",
+                 "reviewer_id", "findings_path"):
+        assert gone not in skill, gone
+    assert not (AGENTS / "specdev-scope.md").exists()
+    assert "run `specdev milestone-state --batch-id <batch_id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`" in skill
 
 
-def test_the_impl_dispatches_carry_the_keys_the_impl_agent_reads() -> None:
-    execute = _keys(r'\{\s*"mode": "execute".*?\}')
-    fix = _keys(r'\{\s*"mode": "fix".*?\}')
-    milestone_fix = _keys(r'\{\s*"mode": "milestone_fix".*?\}')
-    agent = _agent("specdev-trinity-impl.md")
-    assert execute == {"mode", "plan_path", "group_id", "batch_id"}
-    assert fix == {"mode", "findings_path", "group_id", "batch_id"}
-    assert milestone_fix == {"mode", "findings_path", "milestone_id", "batch_id", "plan_path"}
-    assert 'Dispatcher includes `mode: "execute"` | `"fix"` | `"milestone_fix"` as the first line' in agent
-    assert re.search(r'"milestone_id": "ms-account-recovery"', agent), "the milestone_fix return carries the milestone id"
+def test_the_executor_outcome_keys_are_the_ones_the_agent_writes_and_the_brief_gives() -> None:
+    from specdev_tools.loop.briefs import EXEC_SHAPE
 
-
-def test_the_impl_return_keys_are_the_ones_the_agent_returns() -> None:
     skill, agent = _skill(), _agent("specdev-trinity-impl.md")
-    for key in ("recorded", "awaiting_confirmation", "skipped_at_deploy", "ambiguities_raised", "errors_remaining", "gate_status"):
-        assert f'"{key}"' in agent, key
-        assert f"`{key}`" in skill, key
+    for key in ("recorded", "awaiting_confirmation", "skipped_at_deploy"):
+        assert key in EXEC_SHAPE and f'"{key}"' in agent and f"`{key}`" in skill, key
     assert "an action that names a verifier is proven by `specdev verify run`, not recorded" in _flat(skill)
     assert "`manual_verification`: do not record it; list it in `awaiting_confirmation`" in _flat(agent)
 
 
-def test_the_reviewer_dispatches_carry_the_keys_the_reviewer_agent_reads() -> None:
-    group = _keys(r'\{\s*"milestone_id": "<ms-id>",\s*"batch_id": "<batch_id>",\s*"group_id".*?\}')
-    milestone = _keys(r'\{\s*"milestone_id": "<ms-id>",\s*"batch_id": "<batch_id>",\s*"scope_kind": "code_phase_milestone".*?\}')
-    agent_keys = _agent_example_keys("specdev-trinity-reviewer.md", "## Dispatch input")
-    assert group == agent_keys
-    assert milestone == agent_keys - {"group_id"}
-    agent = _flat(_agent("specdev-trinity-reviewer.md"))
-    assert "`milestone_id` is the roadmap milestone id (the `milestone` key of `specdev milestone-state`)" in agent
-    assert "a plan-item id for `code_phase_group`, the milestone id for `code_phase_milestone`" in agent
+def test_the_findings_file_names_agree_with_the_tool_and_with_milestone_state() -> None:
     skill = _skill()
-    assert '"scope": "<ms-id>"' in skill and '"scope": "<group_id>"' in skill
-
-
-def test_the_plan_review_dispatch_has_no_retired_flag_and_the_scope_dispatch_matches_the_scope_agent() -> None:
-    skill = _skill()
-    assert '"flags": { "with_backlog": false }' in skill
-    reviewer = _agent("specdev-reviewer.md")
-    assert '"with_backlog": false' in reviewer and "with_replay" not in reviewer
-    scope = _agent("specdev-scope.md")
-    assert '"mode": "milestone_state"' in scope and '"batch_id": "<batch-id>"' in scope
-    assert '"milestone": "<the plan\'s file-level milestone key, or null>"' in scope
-    assert '{ "mode": "milestone_state", "batch_id": "<batch_id>" }' in skill
-
-
-def test_the_findings_file_names_agree_with_the_reviewer_and_with_milestone_state() -> None:
-    skill = _skill()
-    assert ".specdev/findings/findings_<ms-id>_<round>_r1.json" in skill
-    assert ".specdev/findings/findings_<batch_id>_review_<round>.json" in skill
-    assert ".specdev/findings/findings_<scope>_<round>_<reviewer_id>.json" in _agent("specdev-trinity-reviewer.md")
-    impl = _agent("specdev-trinity-impl.md")  # milestone_fix reads the milestone-wide file under the one name the skill passes
-    assert ".specdev/findings/findings_<batch_id>_review_<round>.json" in impl and "findings_<milestone_id>_review" not in impl
+    assert ".specdev/findings/findings_<group_id>_<N>.json" in skill
+    assert ".specdev/findings/findings_<batch_id>_review_<N>.json" in skill
+    tool = (ROOT / "tools" / "specdev_tools" / "loop" / "commands.py").read_text(encoding="utf-8")
+    assert 'f"findings_{self.io.group}_" if self.io.group else f"findings_{self.io.batch}_review_"' in tool
     state = (ROOT / "tools" / "specdev_tools" / "context" / "milestone_state.py").read_text(encoding="utf-8")
     assert 'f"findings_{batch_id}_review_*"' in state
     assert 'f"findings_{group_id}_*"' in state
-    assert ".specdev/findings/findings_<group_id>_<round>_r1.json" in skill
 
 
 # --- the skill and the prompts ------------------------------------------------------------------------------------------
@@ -310,7 +282,7 @@ def test_the_step_skill_names_the_route_to_a_plan_in_one_sentence() -> None:
 COMMANDS = (
     "milestone start", "milestone defer", "milestone sign-off", "milestone close", "plan record", "review record",
     "verify run", "verify bind", "verify attest", "status", "step ready", "step create", "trace", "attest", "stale",
-    "spec-check", "validate", "milestone-state",
+    "spec-check", "validate", "milestone-state", "loop start", "loop next",
 )
 
 
@@ -409,28 +381,6 @@ def test_the_loop_files_move_milestone_state_as_the_skill_says_and_review_record
     assert code == 0 and "verdict verified, 0 finding(s)" in out, out
     code, out = run_on_example(host, "status", "--milestone", MILESTONE)
     assert code == 0 and "E813" not in out, "the review is recorded: E813 no longer owed"
-
-
-def test_the_jq_merge_the_skill_gives_produces_a_file_that_validates(tmp_path: Path) -> None:
-    if shutil.which("jq") is None:
-        pytest.skip("jq is not installed")
-    match = re.search(r"jq -s '(.*?)' \\\n", _skill())
-    assert match, "the merge one-liner is in the skill"
-    expression = match.group(1)
-    assert '"$schema": "vc:infra:findings"' in expression
-    host = git_copy_of_example(tmp_path / "host")
-    finding = {"kind": "gap", "location": "spec/impl_context/ms_account_recovery_plan.json", "message": "example finding", "severity": "P2"}
-    for reviewer in ("r1", "r2"):
-        document = _converged("ms-account_recovery-plan") | {"findings": [finding | {"signature": f"sig-{reviewer}"}]}
-        _write(host, f"findings_ms-account_recovery-plan_1_{reviewer}.json", document)
-    folder = host / ".specdev" / "findings"
-    merged = folder / "findings_ms-account_recovery-plan_1.json"
-    inputs = sorted(str(path) for path in folder.glob("findings_ms-account_recovery-plan_1_r*.json"))
-    done = subprocess.run(["jq", "-s", expression, *inputs], capture_output=True, text=True, check=True)
-    merged.write_text(done.stdout, encoding="utf-8")
-    assert len(json.loads(done.stdout)["findings"]) == 2
-    code, out = run_cli("validate", str(merged), "--repo-root", str(ROOT))
-    assert code == 0 and "OK" in out, out
 
 
 def test_a_manual_action_is_recorded_after_the_person_confirms_and_a_verifier_action_is_not(tmp_path: Path, author: None) -> None:

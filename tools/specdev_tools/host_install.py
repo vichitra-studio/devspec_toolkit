@@ -1060,7 +1060,7 @@ def install_wrappers(ctx: InstallContext) -> PieceResult:
 
 CLAUDE_LINKS_PIECE = "claude-links"
 CLAUDE_DIR = ".claude"
-KNOWN_SKILLS = frozenset({"specdev-context", "specdev-step", "specdev-review", "specdev-trinity", "devspec_pr_audit"})
+KNOWN_SKILLS = frozenset({"specdev-context", "specdev-step", "specdev-review", "specdev-pass", "specdev-trinity", "devspec_pr_audit"})
 """The skills of the toolkit that a host gets.  A new toolkit skill that hosts should have is one more name here."""
 KNOWN_AGENT_PREFIXES = ("specdev-", "pr-audit-")
 """The name prefixes of the toolkit's agent files that a host gets."""
@@ -1073,6 +1073,8 @@ _LINK_REAL = "real"
 _LINK_ERROR = "error"
 _LINK_WOULD_CREATE = "would_create"
 _LINK_WOULD_REFRESH = "would_refresh"
+_LINK_REMOVED = "removed"
+_LINK_WOULD_REMOVE = "would_remove"
 
 
 def _install_one_symlink(dst: Path, rel_target: str, *, force: bool, dry_run: bool) -> tuple[str, str]:
@@ -1132,6 +1134,27 @@ def _link_candidates(ctx: InstallContext) -> tuple[list[tuple[str, str]], list[s
     return offered, unlisted
 
 
+def _retired_links(ctx: InstallContext, offered: list[tuple[str, str]]) -> list[Path]:
+    """The host's links into the toolkit's ``.claude`` whose skill or agent the toolkit no longer has.
+
+    Only a link is ever named, only one whose text is the path this installer writes for that name, and only when the
+    toolkit has nothing at that path any more: a link the host made itself, or one that points elsewhere, is not ours.
+    """
+    kept = set(offered)
+    out: list[Path] = []
+    for kind in ("skills", "agents"):
+        folder = ctx.git_root / CLAUDE_DIR / kind
+        if not folder.is_dir():
+            continue
+        for entry in sorted(folder.iterdir()):
+            if not entry.is_symlink() or (kind, entry.name) in kept:
+                continue
+            ours = posixpath.relpath(posixpath.join("/host", ctx.toolkit_rel, CLAUDE_DIR, kind, entry.name), posixpath.join("/host", CLAUDE_DIR, kind))
+            if os.readlink(entry) == ours and not (ctx.toolkit_root / CLAUDE_DIR / kind / entry.name).exists():
+                out.append(entry)
+    return out
+
+
 def install_claude_links(ctx: InstallContext) -> PieceResult:
     """Link the toolkit's skills and agents into the host's ``.claude`` folder (relative links through ``toolkit_rel``).
 
@@ -1152,13 +1175,23 @@ def install_claude_links(ctx: InstallContext) -> PieceResult:
             findings.append(Finding(W_TEMPLATE_DRIFT, rel, None, "", f"{note}, so it is left as it is; move it aside and run 'specdev update' to link the toolkit's"))
         elif outcome == _LINK_ERROR:
             findings.append(Finding(W_INSTALL_REFUSED, rel, None, "", note))
+    for link in _retired_links(ctx, offered):
+        if ctx.dry_run:
+            counts[_LINK_WOULD_REMOVE] = counts.get(_LINK_WOULD_REMOVE, 0) + 1
+            continue
+        try:
+            link.unlink()
+            counts[_LINK_REMOVED] = counts.get(_LINK_REMOVED, 0) + 1
+        except OSError as exc:
+            counts[_LINK_ERROR] = counts.get(_LINK_ERROR, 0) + 1
+            findings.append(Finding(W_INSTALL_REFUSED, str(link.relative_to(ctx.git_root)), None, "", f"could not remove the link: {exc}"))
     if counts.get(_LINK_ERROR):
         status = REFUSED
     elif counts.get(_LINK_STALE) or counts.get(_LINK_REAL):
         status = DRIFT
-    elif counts.get(_LINK_WOULD_CREATE) or counts.get(_LINK_WOULD_REFRESH):
+    elif counts.get(_LINK_WOULD_CREATE) or counts.get(_LINK_WOULD_REFRESH) or counts.get(_LINK_WOULD_REMOVE):
         status = WOULD_INSTALL
-    elif counts.get(_LINK_REFRESHED):
+    elif counts.get(_LINK_REFRESHED) or counts.get(_LINK_REMOVED):
         status = REFRESHED
     elif counts.get(_LINK_CREATED):
         status = CREATED
@@ -1181,6 +1214,8 @@ _LINK_LABELS = (
     (_LINK_IN_SYNC, "already in place"),
     (_LINK_STALE, "stale (left)"),
     (_LINK_REAL, "real file or folder (left)"),
+    (_LINK_REMOVED, "removed (the toolkit no longer has it)"),
+    (_LINK_WOULD_REMOVE, "to remove (the toolkit no longer has it)"),
     (_LINK_ERROR, "failed"),
 )
 
