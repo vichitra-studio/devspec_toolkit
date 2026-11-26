@@ -23,8 +23,8 @@ from specdev_tools.core.errors import FindingError
 from specdev_tools.graph.commands import add_root_flags, roots
 from specdev_tools.loop import commands as loop_commands
 from specdev_tools.loop import intake, pass_machine, report, store
-from specdev_tools.loop.commands import _handled, _refuse, _spec_steps, about_set, create_run, parse_scope
-from specdev_tools.loop.machine import AWAITING, CONTESTED, GATE, LINK, OPEN, PARKED, REVIEW
+from specdev_tools.loop.commands import _handled, _refuse, _spec_steps, about_set, create_run, parse_scope, settled_record
+from specdev_tools.loop.machine import AWAITING, CONTESTED, GATE, LINK, OPEN, PARKED, REVIEW, SETTLED
 from specdev_tools.loop.pass_machine import PassState, RunRef, StepView, View
 from specdev_tools.loop.spec_io import Roots, SpecIO
 
@@ -140,10 +140,10 @@ def run_pass_start(args: argparse.Namespace) -> int:
     meta = {
         "pass_id": pass_id, "entry": entry, "entry_args": entry_args, "roots": asdict(rts), "readers": args.readers,
         "cap": args.cap, "base_ref": args.base_ref, "created": int(time.time()), "kept": [], "guidance": {},
-        "absorbed": [], "parked_gate": {}, "outside": [], "asked": [], "first_run": None,
+        "absorbed": [], "parked_gate": {}, "outside": [], "asked": [], "first_run": None, "settled": {},
     }
     if entry == "replay":
-        _absorb_earlier_runs(git_root, pool, SpecIO(rts, known, loop_commands._canon_dir))
+        _absorb_earlier_runs(git_root, pool, SpecIO(rts, known, loop_commands._canon_dir), meta["settled"])
     _save(_dir(git_root, pass_id), PassState(entry=entry), meta, pool)
     print(json.dumps({"pass_id": pass_id, "resumed": False}, indent=2))
     return 0
@@ -165,11 +165,20 @@ def _pool_entry(info: dict[str, Any], step: str | None, run_id: str, **over: Any
     return entry
 
 
-def _absorb(run_id: str, git_root: str, pool: dict[str, dict[str, Any]], io: SpecIO, meta: dict[str, Any] | None) -> None:
-    """Take a finished run into the pool: what it closed is closed, what it left or handed off is there to do."""
+def _absorb(run_id: str, git_root: str, pool: dict[str, dict[str, Any]], io: SpecIO, meta: dict[str, Any] | None,
+            settled: dict[str, dict[str, Any]] | None = None) -> None:
+    """Take a finished run into the pool: what it closed is closed, what it left or handed off is there to do.
+
+    What the run settled goes into *settled*: every later run of the pass is started with it, so its reviewers do
+    not open it again on unchanged text."""
     state, run_meta = store.load(os.path.join(store.runs_root(git_root), run_id))
     detail = run_meta.get("detail", {})
     for key, f in state.findings.items():
+        if settled is not None and f.source == REVIEW and not f.from_upstream:
+            if f.status == SETTLED:
+                settled[key] = settled_record(f, detail.get(key, {}))
+            else:
+                settled.pop(key, None)  # a later run opened it again
         if f.source != REVIEW:
             if f.status == PARKED and meta is not None:
                 meta["parked_gate"][key] = {"step": run_meta["steps"][0], "target": f.target,
@@ -190,11 +199,11 @@ def _absorb(run_id: str, git_root: str, pool: dict[str, dict[str, Any]], io: Spe
             pool.setdefault(key, _pool_entry(info, io.step_of(info.get("target", "")), run_id))
 
 
-def _absorb_earlier_runs(git_root: str, pool: dict[str, dict[str, Any]], io: SpecIO) -> None:
+def _absorb_earlier_runs(git_root: str, pool: dict[str, dict[str, Any]], io: SpecIO, settled: dict[str, dict[str, Any]]) -> None:
     for run_id in store.list_runs(git_root):
         state, run_meta = store.load(os.path.join(store.runs_root(git_root), run_id))
         if state.verdict is not None and run_meta["kind"] == "step":  # a plan's or a code run's findings are no step's work
-            _absorb(run_id, git_root, pool, io, None)
+            _absorb(run_id, git_root, pool, io, None, settled)
     for key in [k for k, e in pool.items() if e["status"] == CLOSED or not io.exists(e["target"])]:
         del pool[key]  # closed by a later run, or about something that is gone
 
@@ -254,7 +263,7 @@ class _Pass:
                 if state.verdict is not None:
                     ref.verdict = state.verdict
                     if state.verdict not in pass_machine.FAILED and ref.run_id not in self.meta["absorbed"]:
-                        _absorb(ref.run_id, self.roots.git, self.pool, self.io, self.meta)
+                        _absorb(ref.run_id, self.roots.git, self.pool, self.io, self.meta, self.meta.setdefault("settled", {}))
                         self.meta["absorbed"].append(ref.run_id)
 
     def present(self) -> list[str]:
@@ -345,6 +354,7 @@ class _Pass:
                     if isinstance(proposal, str) and proposal.strip():
                         options.insert(0, {"label": "Accept the proposal", "description": proposal})
                 questions.append({
+                    **({"recommended": "Accept the proposal"} if options[0]["label"] == "Accept the proposal" else {}),
                     "id": f"item:{item.id}", "step": step, "options": options, "free_text": not seed,
                     "question": f"Step {step}, open item {item.id} (about {about}): {item.description}",
                 })
@@ -434,7 +444,7 @@ class _Pass:
     def start_run(self, action: pass_machine.PassAction) -> str:
         m, args = self.meta, self.meta["entry_args"]
         common: dict[str, Any] = {"readers": m["readers"], "cap": m["cap"], "base_ref": m.get("base_ref"),
-                                  "pass_id": m["pass_id"], "about": args.get("about")}
+                                  "pass_id": m["pass_id"], "about": args.get("about"), "settled": m.get("settled", {})}
         if action.step is None:
             return create_run(self.roots, "step", action.steps, "review-only", **common)
         step, common["defer"], common["guidance"] = action.step, True, m["guidance"]
@@ -447,8 +457,29 @@ class _Pass:
 
     def finish(self, verdict: str, view: View, facts: dict[str, dict[str, Any]]) -> dict[str, Any]:
         lines = [f"# Pass `{self.meta['pass_id']}`: {verdict}", "", f"Entry: {self.meta['entry']} {json.dumps(self.meta['entry_args'])}", "",
-                 "| Run | Step | Walk | Verdict |", "|---|---|---|---|",
-                 *[f"| {r.run_id} | {r.step or 'survey'} | {r.walk} | {r.verdict} |" for r in self.state.runs]]
+                 "| Run | Step | Walk | Verdict | Rounds | P0 | P1 | P2 |", "|---|---|---|---|---|---|---|---|"]
+        kind_of: dict[str, str] = {}  # a finding that several runs carried is one finding
+        for r in self.state.runs:
+            folder = os.path.join(store.runs_root(self.roots.git), r.run_id)
+            if not os.path.isfile(os.path.join(folder, "run.json")):
+                lines.append(f"| {r.run_id} | {r.step or 'survey'} | {r.walk} | {r.verdict} | run folder gone | | | |")
+                continue
+            _, run_meta = store.load(folder)
+            rounds = run_meta.get("rounds", [])
+            raised = [sum(x[sev] for x in rounds) for sev in ("P0", "P1", "P2")]
+            lines.append(f"| {r.run_id} | {r.step or 'survey'} | {r.walk} | {r.verdict} | {len(rounds)} | "
+                         + " | ".join(str(n) for n in raised) + " |")
+            for key, info in run_meta.get("detail", {}).items():
+                if info.get("kind") not in (GATE, LINK):  # the tool's own findings are no reviewer's
+                    kind_of[key] = info.get("kind", "?")
+        kinds: dict[str, int] = {}
+        for kind in kind_of.values():
+            kinds[kind] = kinds.get(kind, 0) + 1
+        if kinds:
+            lines += ["", "Findings by kind, over the runs: " + ", ".join(f"{k} {n}" for k, n in sorted(kinds.items())) + "."]
+        gate = self.io.gate(self.meta.get("base_ref"))
+        gate_lines = [f"- step {s}: {gate.result[s]}" for s in sorted(gate.result) if s in {sv.step for sv in view.steps}]
+        gate_lines += [f"- new since the base: {w}" for w in gate.new_warnings]
         left: list[str] = []
         for sv in view.steps:
             f = facts[sv.step]
@@ -468,7 +499,7 @@ class _Pass:
         outside += [f"step {s}: suspect links" for s in self.known if facts[s]["suspect"] and s not in steps]
         kept = [f"- {k}" for k in self.meta["kept"]]
         for title, values in (("Left, by step", left), ("Outside the pass", [f"- {o}" for o in outside]),
-                              ("Kept by the operator", kept)):
+                              ("Kept by the operator", kept), ("Step gate at the end", gate_lines)):
             if values:
                 lines += ["", f"## {title}", *values]
         if verdict == "INCOMPLETE":

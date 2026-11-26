@@ -25,6 +25,18 @@ INDEX = re.compile(r"/\d+(?:/|$)|\[\d+\]")
 """A line number, or an array index in the pointer after ``#``: a position, which is never identity."""
 
 
+STRENGTH = re.compile(r"\b(MUST NOT|SHALL NOT|SHOULD NOT|NOT RECOMMENDED|MUST|SHALL|SHOULD|REQUIRED|RECOMMENDED|MAY|OPTIONAL)\b")
+"""The requirement keywords of BCP 14 (RFC 2119, RFC 8174): in capitals only, the longer form first."""
+
+
+def strength_words(text: str) -> dict[str, int]:
+    """How often each requirement keyword occurs in *text*."""
+    counts: dict[str, int] = {}
+    for word in STRENGTH.findall(text):
+        counts[word] = counts.get(word, 0) + 1
+    return counts
+
+
 def is_position(location: str) -> bool:
     _, _, pointer = location.partition("#")
     return bool(LINE.search(location) or INDEX.search(pointer))

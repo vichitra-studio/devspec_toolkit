@@ -220,3 +220,26 @@ def test_the_stop_rule_of_a_code_run_says_the_operator_is_asked_at_the_cap_even_
     answers.write_text(json.dumps({"cap": "Stop"}))
     done = loop(host, "next", run_id, "--answers", str(answers))
     assert "at 1 rounds the operator is asked" in json.loads(Path(done["summary"]).read_text())["stop_rule"]["text"]
+
+
+def test_the_manual_verification_question_says_what_the_action_is(host: Path) -> None:
+    """DEVSPEC-204: an action id in a question comes with the action's own description."""
+    run_id = loop(host, "start", "--kind", "code-group", f"{MS}/{ITEM}", "--execute")["run_id"]
+    ask = execute(host, run_id, recorded=[], awaiting_confirmation=["a01"])
+    assert ask["type"] == "ask", ask
+    assert f"{ITEM}/a01 (Reject expired tokens before the password update.) carried out?" in ask["questions"][0]["question"]
+
+
+def test_a_warning_the_base_did_not_have_is_listed_and_does_not_block(host: Path, monkeypatch: Any) -> None:
+    """DEVSPEC-207: the run lists the own warnings that are new since the base; the exit code and the verdict do not change."""
+    from types import SimpleNamespace as N
+
+    from specdev_tools.loop import spec_io
+
+    warning = N(code="W576", node_id="fr-password-reset", message="a task has no test")
+    result = N(step="04", clear=True, blocking=N(errors=[]), new_own_warnings=[warning], waiting=[])
+    monkeypatch.setattr(spec_io, "gate_run", lambda *a, **k: N(results=[result], notes=[]))
+    roots = spec_io.Roots(str(Path(__file__).resolve().parents[3]), str(host / "spec"), str(host))
+    view = spec_io.SpecIO(roots, ["04"]).gate(None)
+    assert view.new_warnings == ["step 04: W576 fr-password-reset a task has no test"] and not view.blocking
+    assert view.result == {"04": "clear"}

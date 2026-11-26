@@ -51,6 +51,7 @@ class GateView:
     blocked_by: list[str] = field(default_factory=list)  # "step NN: CODE message", outside the scope
     waiting: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    new_warnings: list[str] = field(default_factory=list)  # own warnings the base did not have (they do not block)
 
 
 @dataclass
@@ -208,6 +209,10 @@ class SpecIO:
                     line = f"{err.owner}: {err.code} {err.message}"
                     if line not in view.blocked_by:
                         view.blocked_by.append(line)
+            for warning in result.new_own_warnings:
+                line = f"step {result.step}: {warning.code} {warning.node_id or ''} {warning.message}".replace("  ", " ")
+                if line not in view.new_warnings:
+                    view.new_warnings.append(line)
             for waiting in result.waiting:
                 view.waiting.append(f"{waiting.error.code} {waiting.error.node_id or ''} waits on {', '.join(waiting.reasons)}")
         return view

@@ -94,7 +94,7 @@ The tool keeps the loop: it decides every next action, checks every file an agen
      A folder that has been quiet for a while does not show that the agents are done: go by a subagent that
      returned and by the action the tool prints, never by watching the files.
    - `ask`: put every question of `questions` to the operator with AskUserQuestion, as given (question text, option
-     labels and descriptions), at most 4 questions per call. If a chosen option carries a `command`, run it now. Write
+     labels and descriptions), at most 4 questions per call. A question that asks for a fact (was an action carried out, was a file edited) gets no recommendation. Before the options of every other question say in one sentence which option you recommend and why, from the question's own text; when the question carries `recommended`, recommend that option. Put the recommended option first with ` (Recommended)` after its label, and write the label without that suffix in the answers. If a chosen option carries a `command`, run it now. Write
      one JSON object `{"<question id>": {"label": "<chosen label>", "notes": "<the operator's notes or free text>"}}`
      with every answer to `answers_path`, call `specdev loop next <run-id> --answers <answers_path> <roots>`, and
      treat its action as in 1. If the operator dismisses a question, stop here and print
@@ -131,3 +131,7 @@ Never read `spec/*.json` directly, and never edit the lock file by hand: `specde
 - It does not handle 16a, 16b or 16c: a milestone's plan is created by `/specdev-trinity --phase plan` with
   `specdev step create 16a <batch> --from <draft>`, and its code belongs to `/specdev-trinity` too.
 - It does not commit.
+
+## Words for the operator
+
+When you number the parts of your own progress for the operator, call them `Stage N`. `step` means a pipeline step (00 to 16) and `phase` a trinity phase (plan, impl, review): use neither word for anything else.

@@ -189,6 +189,7 @@ def test_a_missing_step_is_authored_and_a_refusal_of_its_author_ends_the_pass(ho
     assert (action["type"], action["step"]) == ("run", "15")
     assert run_json(host, action["run_id"])["meta"]["mode"] == "author"
     author = loop(host, "next", action["run_id"])
+    assert "Provenance and citations" in Path(author["entries"][0]["brief"]).read_text()  # DEVSPEC-220: in the author brief too
     Path(author["entries"][0]["expect"]).write_text(json.dumps({"refusal": "the roadmap names no first milestone"}))
     assert loop(host, "next", action["run_id"])["verdict"] == "HALT(agent_failed)"
     assert pas(host, "next", pass_id)["verdict"] == "HALT(agent_failed)"
@@ -288,7 +289,7 @@ def test_an_open_item_question_names_the_nodes_it_is_about_with_their_labels(hos
     path = next((host / "spec").glob("04_*.json"))
     document = json.loads(path.read_text())
     document["ambiguities"] = [{"id": "amb-token-lifetime", "description": "How long is a reset token valid?",
-                                "about": ["cap-account-recovery"]}]
+                                "about": ["cap-account-recovery"], "proposed_assumption": "30 minutes."}]
     path.write_text(json.dumps(document, indent=2) + "\n")
     pass_id = pas(host, "start", "04")["pass_id"]
     pump(host, pas(host, "next", pass_id)["run_id"])
@@ -296,3 +297,31 @@ def test_an_open_item_question_names_the_nodes_it_is_about_with_their_labels(hos
     assert ask["type"] == "ask", ask
     (question,) = [q for q in ask["questions"] if q["id"] == "item:amb-token-lifetime"]
     assert "about cap-account-recovery (" in question["question"], question["question"]
+    assert question["recommended"] == "Accept the proposal" == question["options"][0]["label"]  # the item's own proposal
+
+
+def test_a_pass_keeps_what_its_runs_settled_and_a_replay_takes_it_from_earlier_runs(host: Path) -> None:
+    """DEVSPEC-174: a decline a reviewer upheld is handed to every later run of the pass, and to a replay."""
+    key = f"{FINDING['kind']}|{FINDING['location']}"
+    pass_id = pas(host, "start", "04")["pass_id"]
+    pump(host, pas(host, "next", pass_id)["run_id"], [FINDING])
+    walk = pas(host, "next", pass_id)["run_id"]
+    fix = loop(host, "next", walk)
+    target = FINDING["location"].split("#")[0]
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps(
+        {"outcomes": [{"key": key, "outcome": "declined", "quote": {"source": target, "text": target}}]}))
+    review(host, walk, loop(host, "next", walk), verdict="decline_right")
+    assert loop(host, "next", walk)["verdict"] == "CONVERGED"
+    done = pas(host, "next", pass_id)
+    assert done["type"] == "done", done
+    kept = _pass_json(host, pass_id)["meta"]["settled"]
+    assert kept[key]["target"] == target and kept[key]["settled_hash"]
+    text = Path(done["report"]).read_text()
+    assert "| Rounds | P0 | P1 | P2 |" in text and "Findings by kind, over the runs:" in text and "## Step gate at the end" in text
+    replay = pas(host, "start", "--replay")["pass_id"]
+    assert _pass_json(host, replay)["meta"]["settled"][key] == kept[key]
+    from specdev_tools.loop.pass_commands import _Pass
+    from specdev_tools.loop.pass_machine import PassAction
+
+    started = _Pass(str(host), replay).start_run(PassAction(type="run", step="04", mode="worklist"))
+    assert run_json(host, started)["state"]["findings"][key]["status"] == "settled"  # the run the pass starts knows it

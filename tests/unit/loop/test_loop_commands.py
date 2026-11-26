@@ -124,10 +124,19 @@ def test_fix_then_confirm_converges(host: Path) -> None:
     assert state["dispatch"]["entries"][0]["judge"] == [KEY]
     assert state["dispatch"]["entries"][0]["nodes"] == ["fr-password-reset"]  # only what changed is read again
     review(host, run_id, confirm)
+    full = loop(host, "next", run_id)  # the scope changed since round 1 read all of it: one reviewer reads it all again
+    state = run_json(host, run_id)["state"]
+    assert [e["id"] for e in state["dispatch"]["entries"]] == ["full0"] and state["final_read"]
+    assert sorted(state["dispatch"]["entries"][0]["nodes"]) == sorted(state["content"])
+    assert "full re-read before it converges" in Path(full["entries"][0]["brief"]).read_text()
+    review(host, run_id, full)
     done = loop(host, "next", run_id)
     assert done["verdict"] == "CONVERGED", done
+    summary = json.loads(Path(done["summary"]).read_text())
+    assert [r["final_read"] for r in summary["rounds"]] == [False, False, True] and summary["stop_rule"]["final_read"]
+    assert "| 3 (full re-read) |" in Path(done["report"]).read_text()
     status = loop(host, "status", run_id)["runs"][0]
-    assert status["verdict"] == "CONVERGED" and status["rounds"] == 2 and status["findings"] == {"resolved": 1}
+    assert status["verdict"] == "CONVERGED" and status["rounds"] == 3 and status["findings"] == {"resolved": 1}
 
 
 def test_a_fix_that_changed_nothing_is_not_a_fix(host: Path) -> None:
@@ -506,3 +515,60 @@ def test_a_node_a_fixer_deleted_without_a_finding_is_listed(host: Path) -> None:
     loop(host, "next", run_id)
     listed = run_json(host, run_id)["meta"]["unasked_changes"]
     assert listed == ["ac-password-reset-1"], listed  # the node is gone: it is in no later reading of the spec
+
+
+def test_a_fix_that_changes_a_requirement_keyword_is_listed_with_its_size(host: Path) -> None:
+    """DEVSPEC-191, DEVSPEC-175: the tool compares the BCP 14 keywords and the size of each node around a fix."""
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    review(host, run_id, loop(host, "next", run_id), [FINDING])
+    fix = loop(host, "next", run_id)
+    code, out = run_on_example(host, "json", "patch", "--id", "fr-password-reset", ".statement", json.dumps(
+        "A user who holds a valid reset token MUST be able to set a new password; open sessions SHOULD end."))
+    assert code == 0, out
+    code, out = run_on_example(host, "json", "patch", "--id", "fr-password-reset-request", ".statement", json.dumps(
+        "A user MAY ask for a reset link by email."))
+    assert code == 0, out  # a node no finding names
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps(
+        {"outcomes": [{"key": KEY, "outcome": "fixed", "changed": ["fr-password-reset"]}]}))
+    confirm = loop(host, "next", run_id)
+    meta = run_json(host, run_id)["meta"]
+    asked, unasked = sorted(meta["strength_changes"])
+    assert asked.startswith("fr-password-reset (") and "MUST 0 to 1" in asked and "SHOULD 0 to 1" in asked
+    assert asked.endswith(f"(fix of {KEY})")
+    assert unasked.startswith("fr-password-reset-request (") and "MAY 0 to 1" in unasked
+    assert unasked.endswith("(no finding names this node)")
+    (size,) = meta["fix_sizes"]
+    assert size["findings"] == 1 and size["at_target"][KEY] != 0 and size["added"] + size["removed"] > 0
+    brief = Path(confirm["entries"][0]["brief"]).read_text()
+    assert "Requirement keywords the last fix changed" in brief and "MAY 0 to 1" in brief  # the reviewer is told
+    review(host, run_id, confirm)
+    for _ in range(3):
+        action = loop(host, "next", run_id)
+        if action["type"] == "done":
+            break
+        assert "MAY 0 to 1" not in Path(action["entries"][0]["brief"]).read_text()  # told once, to the round after the fix
+        review(host, run_id, action)
+    text = Path(action["report"]).read_text()
+    assert "## Requirement keywords a fix changed" in text and "## Size of each fix" in text
+    assert json.loads(Path(action["summary"]).read_text())["strength_changes"] == meta["strength_changes"]
+
+
+def test_a_run_started_with_what_earlier_runs_settled_does_not_open_it_again(host: Path) -> None:
+    """DEVSPEC-174: the settled findings a pass hands to a run are known to that run's reviewers."""
+    from specdev_tools.loop.commands import create_run
+    from specdev_tools.loop.spec_io import Roots, SpecIO
+
+    roots = Roots(str(Path(__file__).resolve().parents[3]), str(host / "spec"), str(host))
+    now = SpecIO(roots, ["04"]).content()["fr-password-reset"]
+    settled = {KEY: {"target": "fr-password-reset", "settled_hash": now, "left_as_is": False,
+                     "detail": {"kind": "gap", "location": FINDING["location"], "messages": ["known"], "fixer": "declined: upheld"}}}
+    run_id = create_run(roots, "step", ["04"], None, readers=1, settled=settled)
+    assert run_json(host, run_id)["state"]["findings"][KEY]["status"] == "settled"
+    action = loop(host, "next", run_id)
+    assert KEY in Path(action["entries"][0]["brief"]).read_text()  # under "Already known"
+    review(host, run_id, action, [FINDING])
+    assert loop(host, "next", run_id)["verdict"] == "CONVERGED"  # raised again on unchanged text: not opened
+    stale = {KEY: dict(settled[KEY], settled_hash="0" * 16)}
+    again = create_run(roots, "step", ["04"], None, readers=1, settled=stale)
+    review(host, again, loop(host, "next", again), [FINDING])
+    assert loop(host, "next", again)["entries"][0]["agent"] == "specdev-impl"  # the text changed since: it is open again

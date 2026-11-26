@@ -40,12 +40,14 @@ def stop_rule(state: RunState) -> dict[str, Any]:
     parked = "ends the run HALT(stuck)" if state.defer else "is put to the operator"
     text = (f"the run converges when every node of the scope was read in its current content and no "
             f"{' or '.join(blocking)} finding is open (a P2 is a note); at {state.cap} rounds {at_cap}; "
-            f"a finding whose fix failed {attempts} times {parked}.")
+            f"a finding whose fix failed {attempts} times {parked}; when a fix changed the scope after the round that read all "
+            f"of it, one fresh reviewer reads the whole scope once more before the run converges, if a round is left "
+            f"under the cap.")
     if state.mode == "review-only":
         text = (f"review-only: one round and nothing is fixed; CLEAN when no {' or '.join(blocking)} finding is "
                 f"raised, else FINDINGS (a P2 is a note).")
     return {"blocking": blocking, "cap": state.cap, "max_attempts": attempts, "defer": state.defer,
-            "readers": state.readers, "text": text}
+            "readers": state.readers, "final_read": state.final_read, "text": text}
 
 
 def findings_document(scope: str, round_no: int, findings: list[dict[str, Any]]) -> dict[str, Any]:
@@ -80,6 +82,7 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
         "gate": meta.get("gate", {}), "links": meta.get("links", {}), "rejected": meta.get("rejected", 0),
         "unasked_changes": meta.get("unasked_changes", []), "noticed": meta.get("noticed", []),
         "stop_rule": stop_rule(state), "recorded_items": meta.get("recorded_items", []),
+        "strength_changes": meta.get("strength_changes", []), "fix_sizes": meta.get("fix_sizes", []),
     })
     counts: dict[str, int] = {}
     for f in state.findings.values():
@@ -89,11 +92,13 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
         f"Scope {scope}; rounds used {state.rounds_used} of {state.cap}.", "",
         f"Stop rule: {stop_rule(state)['text']}", "",
         "| Round | P0 | P1 | P2 | Refused | Reviewers | Nodes read |", "|---|---|---|---|---|---|---|",
-        *[f"| {r['round']} | {r['P0']} | {r['P1']} | {r['P2']} | {r['rejected']} | {r['reviewers']} | {r['read']} |"
+        *[f"| {r['round']}{' (full re-read)' if r.get('final_read') else ''} | {r['P0']} | {r['P1']} | {r['P2']} | {r['rejected']} | {r['reviewers']} | {r['read']} |"
           for r in meta.get("rounds", [])], "",
         "| Status | Findings |", "|---|---|", *[f"| {k} | {v} |" for k, v in sorted(counts.items())], "",
         f"Handoffs to other steps: {len(handoffs)}. Findings refused at intake: {meta.get('rejected', 0)}.",
     ]
+    if verdict == "CONVERGED" and state.rounds_used > 1 and not state.final_read and state.full_read != machine._reviewed(state):
+        lines += ["", "No full re-read before this verdict: the run was at its cap. The last rounds read only what a fix changed."]
     sections = (
         ("Not closed", [f"{f['key']} ({f['status']}): {' / '.join(f['messages'])}" for f in findings if f["status"] not in CLOSED]),
         ("Left as is by the operator", [f["key"] for f in findings if f["left_as_is"]]),
@@ -102,8 +107,12 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
         ("Notes (P2)", [f"{k}: {v}" for k, v in sorted(meta.get("notes", {}).items())]),
         ("Open items recorded by a fixer", meta.get("recorded_items", [])),
         ("Changed without a finding", meta.get("unasked_changes", [])),
+        ("Requirement keywords a fix changed", meta.get("strength_changes", [])),
+        ("Size of each fix", [f"fix {x['dispatch']}: {x['findings']} findings, {x['added']} bytes added, {x['removed']} removed"
+                              for x in meta.get("fix_sizes", [])]),
         ("Noticed by the fixer", meta.get("noticed", [])),
         ("Step gate", [f"step {s}: {r}" for s, r in sorted(meta.get("gate", {}).get("result", {}).items())]),
+        ("Warnings new since the base (they do not block)", meta.get("gate", {}).get("new_warnings", [])),
         ("Blocked by other steps", meta.get("gate", {}).get("blocked_by", [])),
         ("Waiting on open items", meta.get("gate", {}).get("waiting", [])),
         ("Suspect links that wait on a node above", meta.get("links", {}).get("waiting", [])),

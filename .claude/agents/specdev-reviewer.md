@@ -94,6 +94,10 @@ below P2: what is not worth a P2 is not reported.
 **Already known.** Do not raise again what the brief lists as settled, parked, handed off or held by an open item,
 unless the text it was about has changed.
 
+**Requirement keywords a fix changed.** The brief lists under "Already known" each node in which the last fix changed the count of a requirement keyword (MUST, SHOULD, MAY and the like, in capitals), with the finding it was a fix of. For each one read the node, that finding's message and the node's sources (what it derives from or refines). The change alone is no finding. Raise one (kind `drift`, quoting the node's text as it is now) only when the requirement is now stronger or weaker than its sources say, by the severity rule of the brief.
+
+**The full re-read.** When the brief says it is the run's full re-read, review every listed node as in a first round, and also how the nodes fit together: a contradiction between two nodes that each read well alone is a finding.
+
 **You do not write** `signature` (the tool computes the key from kind and location), and you do not validate the
 file yourself.
 

@@ -54,7 +54,7 @@ It prints `{"pass_id": ..., "resumed": ...}`: a new pass, or the unfinished pass
    - `run`: a run was created (or is unfinished). Print one line, `step <step>, walk <walk>: <run_id>`, then pump
      that run with **The pump** below until its `done`. Print only its `<verdict>: <report path>` line, not the
      report. Then go to 1, whatever the verdict.
-   - `ask`: the batch. Put every question to the operator with AskUserQuestion, as given, at most 4 per call. A
+   - `ask`: the batch. Put every question to the operator with AskUserQuestion, as given, at most 4 per call. A question that asks for a fact (was an action carried out, was a file edited) gets no recommendation. Before the options of every other question say in one sentence which option you recommend and why, from the question's own text; when the question carries `recommended`, recommend that option. Put the recommended option first with ` (Recommended)` after its label, and write the label without that suffix in the answers. A
      question with `"free_text": true` takes the operator's own answer as its notes. Write
      `{"<question id>": {"label": "<chosen label>", "notes": "<notes or free text>"}}` with every answer to
      `answers_path`, call `specdev pass next <pass-id> --answers <answers_path> <roots>` and treat its action as in 1.
@@ -82,7 +82,7 @@ The tool keeps the loop: it decides every next action, checks every file an agen
      A folder that has been quiet for a while does not show that the agents are done: go by a subagent that
      returned and by the action the tool prints, never by watching the files.
    - `ask`: put every question of `questions` to the operator with AskUserQuestion, as given (question text, option
-     labels and descriptions), at most 4 questions per call. If a chosen option carries a `command`, run it now. Write
+     labels and descriptions), at most 4 questions per call. A question that asks for a fact (was an action carried out, was a file edited) gets no recommendation. Before the options of every other question say in one sentence which option you recommend and why, from the question's own text; when the question carries `recommended`, recommend that option. Put the recommended option first with ` (Recommended)` after its label, and write the label without that suffix in the answers. If a chosen option carries a `command`, run it now. Write
      one JSON object `{"<question id>": {"label": "<chosen label>", "notes": "<the operator's notes or free text>"}}`
      with every answer to `answers_path`, call `specdev loop next <run-id> --answers <answers_path> <roots>`, and
      treat its action as in 1. If the operator dismisses a question, stop here and print
@@ -103,3 +103,7 @@ The tool keeps the loop: it decides every next action, checks every file an agen
 | `HALT(agent_failed)`, `HALT(operator)` | Print the report of the run that ended it, and the `--retry` command of step 2 above |
 
 This skill does not commit, and edits no spec file itself.
+
+## Words for the operator
+
+When you number the parts of your own progress for the operator, call them `Stage N`. `step` means a pipeline step (00 to 16) and `phase` a trinity phase (plan, impl, review): use neither word for anything else.

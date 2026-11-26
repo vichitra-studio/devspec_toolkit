@@ -89,6 +89,10 @@ silent or unclear, `proposed_assumption` your best answer if you have one), writ
 and go on. List the ids an item may be about with `specdev node candidates --kind ambiguity-item --field about`."""
 
 
+PROVENANCE = """Provenance and citations (which seed, which finding, which run) go in your outcome file, never into spec text. Write
+each node as short as the contract allows: one statement, no restating of a node it links to."""
+
+
 def _fence(value: Any) -> str:
     return "```json\n" + json.dumps(value, indent=2) + "\n```"
 
@@ -132,7 +136,7 @@ def _output(expect: str, shape: Any) -> list[str]:
 
 
 def reviewer(meta: dict[str, Any], *, round_no: int, nodes: list[str], context: list[str], judge: list[dict[str, Any]],
-             known: dict[str, list[Any]], expect: str, retry_reason: str = "") -> str:
+             known: dict[str, list[Any]], expect: str, retry_reason: str = "", final: bool = False) -> str:
     lines = _head("reviewer", meta, f", round {round_no}")
     if retry_reason:
         lines += ["## Your first file was refused", retry_reason, ""]
@@ -141,6 +145,8 @@ def reviewer(meta: dict[str, Any], *, round_no: int, nodes: list[str], context: 
         "Review each of these, against the contract and against the nodes it links to. "
         + (HOW_TO_READ["common"] if (meta.get("scope") or {}).get("file") else HOW_TO_READ[meta["kind"]])
         + " You edit nothing.",
+        *(["This is the run's full re-read before it converges: the rounds before it read only what a fix changed. "
+           "Read every node as it is now, and how the nodes fit together."] if final else []),
         *[f"- `{n}`" for n in nodes],
         "",
         "Context, not to be reviewed again: " + (", ".join(f"`{c}`" for c in context) or "none"),
@@ -260,7 +266,7 @@ def author(meta: dict[str, Any], *, expect: str) -> str:
             *( [f"Seed: `{arg['seed']}`. Quote from it no more than the contract allows; no file-and-line reference in spec text."] if arg.get("seed") else [] ),
             "",
         ]
-    lines += ["## Rules", NO_QUESTIONS, ""]
+    lines += ["## Rules", NO_QUESTIONS, PROVENANCE, ""]
     return "\n".join(lines + _output(expect, AUTHOR_SHAPE))
 
 

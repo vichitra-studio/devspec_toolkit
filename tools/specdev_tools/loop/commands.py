@@ -17,6 +17,7 @@ from typing import Any
 
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.graph.commands import add_root_flags, roots
+from specdev_tools.graph.queries import own_content
 from specdev_tools.graph.trace import trace_node
 from specdev_tools.loop import briefs, intake, machine, report, store
 from specdev_tools.loop.machine import AWAITING, CONTESTED, GATE, LINK, OPEN, PARKED, REVIEW, RunState
@@ -244,17 +245,25 @@ def _load_worklist(path: str, io: SpecIO, state: RunState, meta: dict[str, Any],
             "evidence": list(finding.get("evidence") or []), "origin": finding.get("origin"),
             "upstream_refs": list(finding.get("upstream_refs") or []),
         }
-    for key, (old, detail) in settled.items():
-        # what the earlier run settled (a decline a reviewer upheld, a finding the operator left as is) is known to
-        # this run too: a reviewer that raises it again on unchanged text does not open it again
-        if key not in state.findings and io.in_scope(old.target) and io.exists(old.target):
-            state.findings[key] = machine.Finding(key=key, source=REVIEW, status=machine.SETTLED, target=old.target,
-                                                  settled_hash=old.settled_hash, left_as_is=old.left_as_is)
-            meta["detail"][key] = dict(detail)
+    seed_settled({key: settled_record(old, detail) for key, (old, detail) in settled.items()}, io, state, meta)
     if rejected:
         store.write_json(os.path.join(run_dir, "rejected.json"), rejected)
         meta["rejected"] += len(rejected)
     return carry
+
+
+def settled_record(f: machine.Finding, detail: dict[str, Any]) -> dict[str, Any]:
+    return {"target": f.target, "settled_hash": f.settled_hash, "left_as_is": f.left_as_is, "detail": dict(detail)}
+
+
+def seed_settled(settled: dict[str, dict[str, Any]], io: SpecIO, state: RunState, meta: dict[str, Any]) -> None:
+    """What an earlier run settled (a decline a reviewer upheld, a finding the operator left as is, a recorded open
+    item) is known to this run too: a reviewer that raises it again on unchanged text does not open it again."""
+    for key, old in settled.items():
+        if key not in state.findings and io.in_scope(old["target"]) and io.exists(old["target"]):
+            state.findings[key] = machine.Finding(key=key, source=REVIEW, status=machine.SETTLED, target=old["target"],
+                                                  settled_hash=old["settled_hash"], left_as_is=bool(old["left_as_is"]))
+            meta["detail"][key] = dict(old["detail"])
 
 
 def create_run(
@@ -262,6 +271,7 @@ def create_run(
     worklist: str | None = None, carry: str | None = None, about: str | None = None, readers: int = 2,
     defer: bool = False, cap: int = 5, base_ref: str | None = None, pass_id: str | None = None,
     guidance: dict[str, str] | None = None, scope: dict[str, Any] | None = None,
+    settled: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     """Create a run and return its id. The checks of ``loop start`` that need the spec are here, so the pass tool gets them too."""
     io = make_io(rts, kind, steps, scope)
@@ -329,6 +339,7 @@ def create_run(
     if worklist:
         named = _load_worklist(worklist, io, state, meta, run_dir)
         carry = carry or named
+    seed_settled(settled or {}, io, state, meta)
     if carry:
         old_dir = os.path.join(store.runs_root(rts.git), carry)
         if not os.path.isfile(os.path.join(old_dir, "run.json")):
@@ -512,7 +523,9 @@ class _Run:
                 f.instruction = f"The reviewer of round {self.state.rounds_used} judged this {verdict}: {merged.reasons.get(key, '')}"
         counts = {sev: sum(1 for e in merged.detail.values() if e["severity"] == sev) for sev in ("P0", "P1", "P2")}
         self.meta["rounds"].append({"round": self.state.rounds_used, **counts, "rejected": len(merged.rejected),
-                                    "reviewers": len(d.entries), "read": len(read)})
+                                    "reviewers": len(d.entries), "read": len(read),
+                                    "final_read": d.entries[0].id.startswith("full")})
+        self.meta["strength_last"] = []  # the reviewers of this round were told what the last fix changed
         machine.close_dispatch(self.state)
 
     def _take_fix(self, d: machine.Dispatch, files: dict[str, str]) -> None:
@@ -555,7 +568,50 @@ class _Run:
                               if was.get(n) != is_now.get(n) and n not in targets and n not in items)
         self.meta["unasked_changes"] = sorted(set(self.meta["unasked_changes"]) | set(changed))
         self.meta["noticed"] += [n for n in noticed if n not in self.meta["noticed"]]
+        measured = os.path.join(store.dispatch_dir(self.dir, self._dnum()), "before.json")
+        if os.path.isfile(measured):  # absent in a run that was dispatched by an older toolkit
+            self._note_fix_measures(d, store.read_json(measured))
         machine.close_dispatch(self.state)
+
+    def _measure(self) -> dict[str, dict[str, Any]]:
+        """The size of each thing in the scope and, in a spec run, the requirement keywords of each node."""
+        out: dict[str, dict[str, Any]] = {}
+        spec = self.state.kind in machine.SPEC_KINDS
+        for name in self.state.content:
+            node = self.io.graph.find(name)
+            if node is not None:
+                text = json.dumps(own_content(self.io.graph, node, full=False), ensure_ascii=False, default=str)
+            elif spec:
+                continue  # an artifact file holds its nodes: counting it too would count every edit twice
+            else:
+                text = self.io.text_of(name) or ""
+            out[name] = {"size": len(text.encode("utf-8")),
+                         "words": intake.strength_words(text) if spec and node is not None else {}}
+        return out
+
+    def _note_fix_measures(self, d: machine.Dispatch, was: dict[str, dict[str, Any]]) -> None:
+        """What a fix did besides closing findings: the requirement keywords it changed in a node, and its size."""
+        now = self._measure()
+        by_target: dict[str, list[str]] = {}
+        for key in d.keys:
+            if key in self.state.findings:
+                by_target.setdefault(self.state.findings[key].target, []).append(key)
+        changes = []
+        for name in sorted(set(was) & set(now)):
+            old, new = was[name]["words"], now[name]["words"]
+            if old != new:
+                parts = "; ".join(f"{w} {old.get(w, 0)} to {new.get(w, 0)}" for w in sorted(set(old) | set(new))
+                                  if old.get(w, 0) != new.get(w, 0))
+                why = f"fix of {', '.join(by_target[name])}" if name in by_target else "no finding names this node"
+                changes.append(f"{self.io.label(name)}: {parts} ({why})")
+        self.meta["strength_last"] = self.meta.get("strength_last", []) + changes  # until a round was told
+        self.meta["strength_changes"] = self.meta.get("strength_changes", []) + changes
+        delta = {n: now.get(n, {}).get("size", 0) - was.get(n, {}).get("size", 0) for n in set(was) | set(now)}
+        self.meta.setdefault("fix_sizes", []).append({
+            "dispatch": self._dnum(), "findings": len(d.keys),
+            "added": sum(v for v in delta.values() if v > 0), "removed": -sum(v for v in delta.values() if v < 0),
+            "at_target": {k: delta.get(self.state.findings[k].target, 0) for k in d.keys if k in self.state.findings},
+        })
 
     def _take_author(self, d: machine.Dispatch, files: dict[str, str]) -> None:
         document = intake.load_json(files[d.entries[0].id]) or {}
@@ -598,7 +654,8 @@ class _Run:
             f = self.state.findings.get(key)
             if f is not None and not f.instruction:
                 f.instruction = f"The operator: {text}"
-        self.meta["gate"] = {"result": gate.result, "blocked_by": gate.blocked_by, "waiting": gate.waiting, "notes": gate.notes}
+        self.meta["gate"] = {"result": gate.result, "blocked_by": gate.blocked_by, "waiting": gate.waiting, "notes": gate.notes,
+                             "new_warnings": gate.new_warnings}
         self.meta["links"] = {"waiting": links.waiting, "gaps": links.gaps}
 
     # ---- actions
@@ -610,6 +667,7 @@ class _Run:
         if first:
             store.write_json(os.path.join(folder, "hashes.json"), self.state.content)
             if d.role == "fix":  # what the fixer may not change, to list what it changed all the same
+                store.write_json(os.path.join(folder, "before.json"), self._measure())
                 store.write_json(os.path.join(folder, "outside.json"), self.io.outside_content(set(self.state.content)))
         out = []
         for entry in action.entries:
@@ -637,9 +695,11 @@ class _Run:
                 "Parked for the operator": [f.key for f in machine.with_status(state, PARKED)],
                 "Handoffs recorded": list(state.handoffs),
                 "Open items about these nodes": [f"{i['id']} (about {', '.join(i['about'])})" for i in self.io.open_items_about(scope_ids)],
+                "Requirement keywords the last fix changed (check each node against its sources)": self.meta.get("strength_last", []),
             }
             return briefs.reviewer(self.meta, round_no=state.rounds_used + 1, nodes=entry.nodes, context=context[:60],
-                                   judge=judge, known=known, expect=expect, retry_reason=self.meta["retry"].get(entry.id, ""))
+                                   judge=judge, known=known, expect=expect, retry_reason=self.meta["retry"].get(entry.id, ""),
+                                   final=entry.id.startswith("full"))
         if d.role == "fix":
             findings = []
             for key in d.keys:
@@ -664,9 +724,12 @@ class _Run:
                      "options": [{"label": "Continue 2 more rounds"}, {"label": "Continue 5 more rounds"}, {"label": "Stop"}]}]
         if action.ask == "confirm":
             group, flags = (self.meta.get("scope") or {}).get("group"), briefs.roots_text(self.meta["roots"])
+            said = {str(a.get("id")): str(a.get("description") or a.get("target") or "")
+                    for a in (self.io.actions() if isinstance(self.io, CodeIO) else [])}
             for action_id in action.keys:
                 command = f'specdev plan record {group}/{action_id} --outcome done --note "operator confirmed" {flags}'
-                questions.append({"id": action_id, "question": f"Was the manual-verification action {group}/{action_id} carried out?",
+                questions.append({"id": action_id, "question": f"Was the manual-verification action {group}/{action_id}"
+                                                                + (f" ({said[action_id]})" if said.get(action_id) else "") + " carried out?",
                                   "options": [{"label": "Yes, it was carried out", "command": command}, {"label": "No"}]})
             return questions
         held = self.meta.get("answers_held", {})

@@ -35,6 +35,8 @@ def test_every_run_reaches_a_verdict_and_keeps_its_promises(kind, mode):
         if verdict == "CONVERGED":
             assert not _blocking_left(s), (seed, [f.key for f in _blocking_left(s)])
             assert not m.unread(s), (seed, m.unread(s))
+            # after partial rounds the whole scope was read once more, unless the cap left no round for it
+            assert s.rounds_used <= 1 or s.final_read or s.rounds_used >= s.cap or s.full_read == m._reviewed(s), seed
         if verdict == "HALT(stuck)":
             assert s.defer and m.with_status(s, m.PARKED)
             assert not m.with_status(s, m.OPEN, m.AWAITING, m.CONTESTED), seed
@@ -127,8 +129,10 @@ def test_one_step_two_fixes_one_upheld_decline_converges_in_three_rounds():
     _fix(s, {"gap|c": {"outcome": "fixed", "changed": True},
              "gap|b#new": {"outcome": "fixed", "changed": True}}, edits=["b", "c"])
     _round(s, [], {"gap|c": "resolved", "gap|b#new": "resolved"})
+    d = _round(s)  # the full re-read: one reviewer, every node, whatever was read before
+    assert [e.id for e in d.entries] == ["full0"] and sorted(d.entries[0].nodes) == sorted(s.content)
     assert m.decide(s).verdict == "CONVERGED"
-    assert s.rounds_used == 3 and s.notes == ["style|a"]
+    assert s.rounds_used == 4 and s.notes == ["style|a"]
 
 
 def test_a_clean_first_round_converges_at_once():
@@ -183,6 +187,31 @@ def test_the_operator_is_asked_last_and_guidance_gives_one_more_attempt():
     assert s.findings["gap|a"].status == m.PARKED
     m.decide(s)
     m.apply_answers(s, {"gap|a": "leave"})
+    assert _round(s).entries[0].id == "full0"
+    assert m.decide(s).verdict == "CONVERGED"
+
+
+def test_the_full_re_read_happens_once_and_never_past_the_cap():
+    s = _state()
+    _round(s, [_f("gap|a", "a")])
+    _fix(s, {"gap|a": {"outcome": "fixed", "changed": True}}, edits=["a"])
+    _round(s, [], {"gap|a": "resolved"})
+    _round(s, [_f("gap|b", "b")])  # the full re-read finds something
+    assert s.final_read
+    _fix(s, {"gap|b": {"outcome": "fixed", "changed": True}}, edits=["b"])
+    _round(s, [], {"gap|b": "resolved"})
+    assert m.decide(s).verdict == "CONVERGED" and s.rounds_used == 4  # no second full re-read
+    s = _state(cap=2)
+    _round(s, [_f("gap|a", "a")])
+    _fix(s, {"gap|a": {"outcome": "fixed", "changed": True}}, edits=["a"])
+    _round(s, [], {"gap|a": "resolved"})
+    assert m.decide(s).verdict == "CONVERGED" and not s.final_read  # at the cap: no round is left for it
+    s = _state()
+    s.read = {"c": "0"}  # counted as read from the start (--extend, --about, a carried read-record)
+    _round(s, [_f("gap|a", "a")])
+    _fix(s, {"gap|a": {"outcome": "fixed", "changed": True}}, edits=["a"])
+    _round(s, [], {"gap|a": "resolved"})
+    assert sorted(_round(s).entries[0].nodes) == ["a", "b"]  # the re-read keeps to what the run reviews
     assert m.decide(s).verdict == "CONVERGED"
 
 

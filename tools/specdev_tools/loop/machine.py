@@ -98,6 +98,9 @@ class RunState:
     notes: list[str] = field(default_factory=list)
     handoffs: list[str] = field(default_factory=list)
     pending_ask: str | None = None  # parked | cap | confirm
+    final_read: bool = False  # the one full re-read before CONVERGED was handed out
+    full_read: dict[str, str] | None = None  # the content when one round last read everything in ``seen``
+    seen: list[str] = field(default_factory=list)  # what a reviewer of this run was given to read, ever
 
 
 @dataclass
@@ -274,6 +277,9 @@ def apply_review(
     s.rounds_used += 1
     s.fix_streak = 0
     s.read.update(read)
+    s.seen = sorted(set(s.seen) | set(read))
+    if set(_reviewed(s)) <= set(read):
+        s.full_read = {n: read[n] for n in _reviewed(s)}
     for r in raised:
         key = r["key"]
         f = s.findings.get(key)
@@ -389,6 +395,21 @@ def _review_dispatch(s: RunState) -> Dispatch:
     return Dispatch(role="review", entries=entries)
 
 
+def _reviewed(s: RunState) -> dict[str, str]:
+    """What this run reviews, as it is now: the nodes a reviewer of the run was given. A node counted as read from
+    the start (``--extend``, ``--about``, a carried read-record) is not among them."""
+    return {n: s.content[n] for n in s.seen if n in s.content}
+
+
+def _final_dispatch(s: RunState) -> Dispatch:
+    """The full re-read before CONVERGED: every node the run reviews, as it is now, one reviewer per cluster."""
+    by_cluster: dict[int, list[str]] = {}
+    for n in sorted(_reviewed(s)):
+        by_cluster.setdefault(s.cluster.get(n, 0), []).append(n)
+    entries = [Entry(id=f"full{c}", agent="reviewer", nodes=by_cluster[c]) for c in sorted(by_cluster)]
+    return Dispatch(role="review", entries=entries)
+
+
 def _at_cap(s: RunState) -> Action:
     if _is_spec(s):
         return _done(s, "HALT(cap)")
@@ -457,6 +478,11 @@ def decide(s: RunState, redispatch: bool = False) -> Action:
     # 10
     if s.kind in CODE_KINDS and s.plan_blocked:
         return _done(s, "HALT(blocked)")
+    # 11: the rounds after the first read only what a fix changed, so one reviewer reads the whole scope once more,
+    # when the scope changed since a round last read all of it and a round is left under the cap
+    if 1 < s.rounds_used < s.cap and not s.final_read and _reviewed(s) and s.full_read != _reviewed(s):
+        s.final_read = True
+        return _start(s, _final_dispatch(s))
     return _done(s, "CONVERGED")
 
 

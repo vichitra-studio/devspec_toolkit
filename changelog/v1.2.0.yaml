@@ -3080,6 +3080,32 @@ changes:
       action: none
   - type: add_script
     description: >
+      Before a run of `specdev loop` converges, one fresh reviewer reads the
+      whole scope once more when a fix changed it after the round that read
+      all of it (once in a run, and only when a round is left under the cap).
+      Around every fix the tool counts the requirement keywords of each node
+      (MUST, SHOULD, MAY and the other BCP 14 words in capitals) and its size:
+      a change of a keyword is listed in the report and `summary.json`
+      (`strength_changes`) and told to the reviewers of the next round, and
+      `fix_sizes` gives the bytes each fix added and removed. The report also
+      lists the own warnings that are new since the base; they do not block
+      (DEVSPEC-239, DEVSPEC-227, DEVSPEC-191, DEVSPEC-175, DEVSPEC-207).
+    migration:
+      action: none
+  - type: add_script
+    description: >
+      A pass hands what its runs settled to every later run it starts, and
+      `pass start --replay` takes what earlier runs settled: a reviewer that
+      raises a settled finding again on unchanged text does not open it. The
+      pass report gives the rounds and the findings raised per run, the
+      findings by kind, and the step gate at the end. The author brief carries
+      the provenance rule of the fix brief; the manual-verification question
+      says what the action is; the skills state a recommendation on every
+      question (DEVSPEC-174, DEVSPEC-220, DEVSPEC-204).
+    migration:
+      action: none
+  - type: add_script
+    description: >
       `specdev loop start --worklist <run>/final.json` also carries what that
       run settled (a decline a reviewer upheld, a finding the operator left as
       is, a recorded open item), so a reviewer that raises it again on unchanged

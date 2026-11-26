@@ -299,7 +299,9 @@ After taking in whatever arrived, `loop next` applies the first row that fits. T
 | 7 | A finding is `open` | `dispatch` the fixer with every `open` finding. When its outcome arrives the tool updates the statuses |
 | 8 | A finding is `awaiting` or `contested`, or the unread set is not empty | `dispatch` a round on the unread set if one fits under the cap; if none fits, as row 6. An unread set of more than one cluster gets one reviewer per cluster (section 6.10) |
 | 9 | A finding is `parked` | Without `--defer`: `ask` the operator, one batch with every parked finding. With `--defer`: `done HALT(stuck)` |
-| 10 | Otherwise | `done CONVERGED`. In a code run, `done HALT(blocked)` instead when an open item of the plan is in the way: for a `code-group`, the executor left actions unrecorded because of one, or the fixer recorded one in this run; for a `code-milestone`, the plan holds one |
+| 10 | A code run, and an open item of the plan is in the way | `done HALT(blocked)`: for a `code-group`, the executor left actions unrecorded because of one, or the fixer recorded one in this run; for a `code-milestone`, the plan holds one |
+| 11 | More than one round was used, a fix changed the scope after the round that last read all of it, the full re-read was not yet handed out, and a round is left under the cap | `dispatch` the full re-read: one reviewer per cluster reads every node the run reviews, as it is now (a node counted as read from the start, by `--extend`, `--about` or a carried read-record, is not read). It is a round like any other (findings, cap); it happens once in a run |
+| 12 | Otherwise | `done CONVERGED` |
 
 Properties that follow from the table:
 
@@ -932,7 +934,7 @@ How each of the 64 in-scope tickets is treated.
 | 133 | F + K | On the branch: the fix agent's per-finding record ("N findings closed by M edits"). Here: key = kind + location, with no LLM-made signature in it |
 | 260 | K (also W: 297) | The target is a node id and the tool checks that it resolves; fixes are by `--id` |
 | 173 | K | Handoff bucket: findings about other steps do not block |
-| 174 | K | Statuses inside the run: contested, settled, parked; nothing durable (decision 2) |
+| 174 | K | Statuses inside the run: contested, settled, parked; nothing durable (decision 2). What a run settled reaches a later run only when it is handed over: `--worklist <run>/final.json`, and a pass hands what its runs settled (for `--replay`: what earlier runs settled) to every run it starts |
 | 180 | P (also W: 299) | Handoffs go to the pool of a pass and are fixed at the owning step in one walk; later briefs list them. No seed-defect registry; a seed handoff is the operator's to act on |
 | 162 | P | A brief carries no exclusion list, only settled findings, open items and handoffs. Cleaning a host's own exclusion lists is host work |
 | 166 | W (297, 300) | — |
@@ -1078,7 +1080,13 @@ The build followed sections 4 to 12. Where a review of the code or a run on a re
 | Stop rule | Fixed in the tool, shown nowhere | `summary.json` (`stop_rule`) holds the run's own values (blocking severities, cap, failed fixes before a finding is parked, `--defer`, readers) and `report.md` states the rule in one sentence (DEVSPEC-172) |
 | A run that follows another | `--worklist final.json` carries the open findings and the read-record | It also carries what the earlier run settled (a decline a reviewer upheld, a finding left as is, a recorded open item), with the content hash it was settled at: a reviewer that raises it again on unchanged text does not open it again (DEVSPEC-174). A pass walk does not carry them; it re-reads only what changed |
 | Severity | P0 or P1 for a defect | The brief, the reviewer files and the findings schema also say when a defect is P0 (the build is wrong or impossible) and when P1 (the builder must guess), ask for the impact in the `message`, and record that there is no P3 (DEVSPEC-179) |
-| Fix scope | Only the findings' targets | The fix agent's gate step says the same: a gate error at no listed target is left and named in `noticed`; the tool brings it back as a `[gate]` finding (DEVSPEC-222). A fix does not change MUST/SHOULD/MAY unasked (a procedure of the agent file; the tool does not compare keywords, DEVSPEC-191) |
+| Fix scope | Only the findings' targets | The fix agent's gate step says the same: a gate error at no listed target is left and named in `noticed`; the tool brings it back as a `[gate]` finding (DEVSPEC-222). A fix does not change MUST/SHOULD/MAY unasked (a procedure of the agent file; the tool lists a changed keyword and refuses nothing, see "Requirement keywords" below, DEVSPEC-191) |
 | Open-item questions | The item id and the ids it is about | Each node id comes with its label (DEVSPEC-204) |
+| Before CONVERGED | The rounds after the first read only what a fix changed | Row 11 of section 6.3: one full re-read by a fresh reviewer, once, under the cap (ruled 2026-11-26; DEVSPEC-239, DEVSPEC-227) |
+| Requirement keywords | Not compared | Around every fix the tool counts the BCP 14 keywords (in capitals) of each node; a change is listed in the report and `summary.json` (`strength_changes`) with the finding it was a fix of, or "no finding names this node", and the reviewers of the next round are told. Listed, never refused (ruled 2026-11-26; DEVSPEC-191) |
+| Size of a fix | Not measured | `fix_sizes` in `summary.json` and "Size of each fix" in the report: bytes added and removed over the scope, and the change at each finding's target (DEVSPEC-175) |
+| New warnings | In the gate's own report only | The run's report lists the own warnings that are new since the base; they do not block and the exit code does not change (ruled 2026-11-26; DEVSPEC-207) |
+| A pass and settled findings | A pass run starts with no settled finding | See the row of 174 above; the pass report gives rounds and findings raised per run, findings by kind, and the step gate at the end (DEVSPEC-174, DEVSPEC-220) |
+| Questions | As printed | The manual-verification question says what the action is; an open-item question with a proposal carries `recommended`; the skills state a recommendation on every question and call their own stages `Stage N` (DEVSPEC-204) |
 | Reviewer file | The reviewer writes `generated_at` | The tool stamps it when it takes the file in (an agent has no clock), and the brief's shape leaves it out; the shape names the optional `evidence` and `origin` |
 | Unasked changes | Every changed node no finding names | A new open item is listed apart ("Open items recorded by a fixer", `recorded_items`): recording one is what a fixer may do. A node of another step or a seed document that changed during a fix is listed too, marked `(outside the scope)`; the fix agent edits no seed, prompt, schema, skill or agent file (DEVSPEC-222). Found in a live run on the worked example (review, fix, confirming review with real agents) |
