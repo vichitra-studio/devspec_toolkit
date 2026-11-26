@@ -472,3 +472,23 @@ def test_the_tool_stamps_the_arrival_time_and_a_recorded_open_item_is_not_an_una
     meta = run_json(host, run_id)["meta"]
     assert meta["recorded_items"] == [item_id] and item_id not in meta["unasked_changes"]
     assert run_json(host, run_id)["state"]["findings"][KEY]["status"] == "settled"
+
+
+def test_an_edit_of_another_steps_node_or_of_a_seed_during_a_fix_is_listed(host: Path) -> None:
+    """DEVSPEC-222: what a fixer changed outside the run's scope is in the report, whatever its outcome file says."""
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    review(host, run_id, loop(host, "next", run_id), [FINDING])
+    fix = loop(host, "next", run_id)
+    _patch_statement(host)
+    code, out = run_on_example(host, "json", "patch", "--id", "cap-account-recovery", ".description",
+                               json.dumps("Members regain access to an account they are locked out of, by email."))
+    assert code == 0, out  # a node of step 01
+    seed = host / "docs" / "seed" / "seed_accounts.md"
+    seed.write_text(seed.read_text() + "\nA reset token is valid for 45 minutes.\n")
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps(
+        {"outcomes": [{"key": KEY, "outcome": "fixed", "changed": ["fr-password-reset"]}]}))
+    loop(host, "next", run_id)
+    listed = run_json(host, run_id)["meta"]["unasked_changes"]
+    assert "cap-account-recovery (outside the scope)" in listed, listed
+    assert any(entry.startswith("seed document ") and entry.endswith("(outside the scope)") for entry in listed), listed
+    assert "fr-password-reset" not in " ".join(listed).replace("fr-password-reset-request", "")  # the target is no unasked change

@@ -67,8 +67,10 @@ Do NOT Read any `spec/NN_*.json` file directly.
 Use `specdev json read` with a filter for any spec content read.
 Before composing any `json read` filter, run `json structure` or `json keys` first.
 
-Edit is allowed narrowly: only for non-spec files (e.g., fixing a typo in a seed document
-or a skill file). Do NOT use Edit on any `spec/*.json` file — use `specdev json patch/insert/delete`.
+Edit is for your own draft and outcome files only. Do NOT use Edit on any `spec/*.json` file: use
+`specdev json patch/insert/delete`. Do not edit a seed document, a prompt, a schema, a skill or an agent file:
+a finding about one of them is answered `recorded` (an open item `about` the seed) or `upstream`, and the tool lists
+any node or seed outside the run's scope that changed during your task.
 
 Write is allowed ONLY for the draft file of author mode, which lives outside `spec/`
 (`.specdev/drafts/step_<NN>.json`; for a milestone plan `.specdev/drafts/plan_<batch>.json`, the path the brief names). The step file itself is created by `specdev step create`,

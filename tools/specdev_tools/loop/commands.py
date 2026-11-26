@@ -548,6 +548,11 @@ class _Run:
         recorded = [n for n in changed if n not in before and n in items]  # a new open item is what a fixer may add
         self.meta["recorded_items"] = sorted(set(self.meta.get("recorded_items", [])) | set(recorded))
         changed = [n for n in changed if n not in recorded]
+        outside_path = os.path.join(store.dispatch_dir(self.dir, self._dnum()), "outside.json")
+        if os.path.isfile(outside_path):  # absent in a run that was dispatched by an older toolkit
+            was, is_now = store.read_json(outside_path), self.io.outside_content(set(now))
+            changed += sorted(f"{n} (outside the scope)" for n in set(was) | set(is_now)
+                              if was.get(n) != is_now.get(n) and n not in targets and n not in items)
         self.meta["unasked_changes"] = sorted(set(self.meta["unasked_changes"]) | set(changed))
         self.meta["noticed"] += [n for n in noticed if n not in self.meta["noticed"]]
         machine.close_dispatch(self.state)
@@ -604,6 +609,8 @@ class _Run:
         folder = store.dispatch_dir(self.dir, self._dnum())
         if first:
             store.write_json(os.path.join(folder, "hashes.json"), self.state.content)
+            if d.role == "fix":  # what the fixer may not change, to list what it changed all the same
+                store.write_json(os.path.join(folder, "outside.json"), self.io.outside_content(set(self.state.content)))
         out = []
         for entry in action.entries:
             expect = store.entry_path(self.dir, self._dnum(), entry.id, entry.tries)

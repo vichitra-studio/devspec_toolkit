@@ -122,6 +122,14 @@ class SpecIO:
                 out[self.file_key(spec_file)] = _hash(top)
         return out
 
+    def outside_content(self, inside: set[str]) -> dict[str, str]:
+        """The content hash of what a fixer of this run may not change: every node that is not in *inside* (the keys
+        of the run's own content), and the text of every seed document."""
+        out = {n.id: _hash(own_content(self.graph, n, full=False)) for n in self.graph.nodes if n.id not in inside}
+        for seed_id, text in read_seed_texts(self.graph, self.roots.git).items():
+            out[f"seed document {seed_id}"] = _hash(text)
+        return out
+
     def clusters(self) -> dict[str, int]:
         """Reviewer cluster per node and file: up to six consecutive steps each."""
         index = {step: i // CLUSTER_STEPS for i, step in enumerate(self.steps)}
