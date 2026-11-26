@@ -453,7 +453,7 @@ class HallucinationLintTests(unittest.TestCase):
             (spec / "01_capabilities.json").write_text(json.dumps(capabilities), encoding="utf-8")
             (spec / "02a_delivery_baseline.json").write_text(json.dumps(delivery), encoding="utf-8")
             errs = render_errors(lint_hallucinations(str(spec), repo_root=str(Path(__file__).resolve().parents[4])))
-        self.assertEqual([], [e for e in errs if "E530" in e or "E541" in e], errs)
+        self.assertEqual([], [e for e in errs if "E530" in e], errs)
 
 
 class ExtractPathFromStringTests(unittest.TestCase):
@@ -1218,6 +1218,37 @@ class CollectPathValuePairsTests(unittest.TestCase):
             assert e530[0].jq_path == ".plan.tasks[0].existing_structures", (
                 f"Expected precise nested jq_path, got: {e530[0].jq_path!r}"
             )
+
+
+class FreeTextTermMentionTests(unittest.TestCase):
+    """A text field that mentions a canon term needs no `*_ref`: a term is used by its label (a term no node uses is E741)."""
+
+    def test_description_mentioning_a_canon_term_gives_no_e541(self):
+        from specdev_tools.core.errors import ERROR_CODES, make_error
+
+        entry = {
+            "id": "cn:project:term:zebracrossing", "kind": "term", "preferred_label": "zebracrossing",
+            "definition": "A marked place to cross.", "version": "1.0.0", "status": "active", "owners": ["product"],
+            "aliases": [], "lifecycle": {"introduced_at": "2024-01-01T00:00:00Z"},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon = root / "canon"
+            (canon / "kinds").mkdir(parents=True)
+            (canon / "manifest.json").write_text(json.dumps(
+                {"$schema": "vc:core:canon", "registry_version": "1.0.0", "entries": [entry], "aliases": []}), encoding="utf-8")
+            (canon / "kinds" / "term.json").write_text(json.dumps(
+                {"$schema": "vc:canon:kind", "registry_version": "1.0.0", "kind": "term", "entries": [entry]}), encoding="utf-8")
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / "04_fr_list.json").write_text(json.dumps(
+                {"description": "The zebracrossing is used by the walker.", "rationale": "A zebracrossing is safe."}), encoding="utf-8")
+            errs = render_errors(lint_hallucinations(
+                str(spec), repo_root=str(Path(__file__).resolve().parents[4]), project_canon_dir=str(canon)))
+        self.assertEqual([], [e for e in errs if not e.startswith("W570")], errs)
+        self.assertNotIn("E541", ERROR_CODES)
+        with self.assertRaises(ValueError):
+            make_error("E541", "UNBOUND_CANONICAL_TERM x.json:description")
 
 
 if __name__ == "__main__":

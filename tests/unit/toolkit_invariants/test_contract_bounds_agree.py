@@ -34,6 +34,25 @@ def test_step_09_migration_plan_bound_agrees_between_prompt_and_schema() -> None
     assert "2 to 4 sentences" in _prompt("prompt_09_impl_plan.md")
 
 
+def test_migration_plan_is_not_asked_for_the_acceptance_test() -> None:
+    """What is replaced and what confirms a migration are graph matters (links, a criterion's `verified_by`), not words in the string."""
+    descriptions = {
+        "09": _schema("09_impl_plan.schema.json")["properties"]["migration_plan"]["description"],
+        "14": _schema("14_roadmap.schema.json")["allOf"][1]["properties"]["migration_plan"]["description"],
+    }
+    prompts = {"09": _prompt("prompt_09_impl_plan.md"), "14": _prompt("prompt_14_roadmap.md")}
+    for step, text in [*descriptions.items(), *prompts.items()]:
+        assert "acceptance test that confirms" not in text, step
+    for step, text in descriptions.items():
+        assert "`replaces`" in text and "`removes`" in text, step
+    assert "a node id written in it is not a link" in descriptions["09"]
+    assert "a node id written in it is not a link" in prompts["09"]
+    assert "task criterion with a verifier in `verified_by`" in descriptions["14"]
+    assert "task criterion with a verifier in `verified_by`" in prompts["14"]
+    assert "task criterion of step 14 with a verifier in `verified_by`" in descriptions["09"]
+    assert "task criterion of step 14 with a verifier in `verified_by`" in prompts["09"]
+
+
 def test_16a_and_16c_scope_the_verbose_rule() -> None:
     assert "apply to the `description` of a checklist item" in _prompt("prompt_16a_impl_planner.md")
     assert 'only text the "verbose" rule covers' in _prompt("prompt_16c_impl_reviewer.md")

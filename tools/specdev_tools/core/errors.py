@@ -57,6 +57,8 @@ class FindingError(Exception):
 #   on the close gate, E810 to E814): E301, E302, E305, E306, E307, W599, W600, W601.
 #   the assumption id scan and the derivation token-overlap check, which are gone (an id in prose that names a node is E752; one
 #   that names nothing is a review item; derivation is `derives_from`): E573, W573, E594, W594.
+#   the free-text term binding check, which asked for a `*_ref` beside any text that mentions a term (a 1.2.0 spec uses a term by
+#   its label; a term no node uses is E741): E541.
 # E303 stays: `governance-check` raises it for a commit message that does not match the governance rule.
 # `tests/unit/core/test_error_code_registry.py` (REMOVED_CODES) fails if one of them is registered or written as a code literal again.
 ERROR_CODES = {
@@ -117,7 +119,6 @@ ERROR_CODES = {
     "E521": "VALIDATOR_RUNTIME",
     "E530": "INVENTED_ENUM_OR_ID",
     "E540": "SELF_OR_FORWARD_DEPENDENCY",
-    "E541": "UNBOUND_CANONICAL_TERM",
     "E543": "STEP_METADATA_INCONSISTENT",
     "E551": "SCHEMA_ENUM_EXTRA",
     "E552": "MISSING_PAIRED_SCHEMA",

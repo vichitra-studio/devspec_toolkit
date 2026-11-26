@@ -152,7 +152,8 @@ Before emitting, verify:
 - Guidance, not checked: write each spike as one string that names the question, the time budget and the expected output. Review judges it.
 
 ### migration_plan
-- Use a short string describing how legacy work is migrated, or `"none"` if not applicable.
+- Use a short string giving the migration sequence and how it is reversed, or `"none"` if not applicable.
+- What is replaced is stated by links (`replaces` on the node that takes the place of a deleted one, a criterion's `removes`), and what confirms the migration is a task criterion with a verifier in `verified_by`: a criterion refines an upstream node, and when none states the bar, raise an open item instead. Neither goes in this string: no tool reads a link out of it.
 - Keep it to one or two sentences; avoid rehashing Step 09.
 - If not `"none"`, use at least three words and keep it under 40 words.
 - Guidance, not checked (no tool measures the length).

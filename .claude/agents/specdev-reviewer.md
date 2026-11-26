@@ -175,6 +175,13 @@ Relations between nodes are written as link fields, not as ids in prose. A node 
 is a `drift` or `bug` finding. Do not ask for citations of node ids in prose, or for seed sections to
 be cited in prose: a seed grounding is a `derives_from` link to the seed.
 
+No check reports a word in prose that is written as a node id and names no node (a misspelt or invented id): it is review
+judgement. Report it only where the text uses the word as a reference to a spec item ("as required by fr-user-logn"), not for
+an ordinary hyphenated word. To tell the two apart, run
+`specdev node show <word> --repo-root <toolkit> --spec-root <spec> --git-root <root>`: for a word that names no node it prints
+E706 and the nearest ids. Report it as kind `hallucination`, severity P1, with the advice: write the relation as a link field
+to the node that was meant, and remove the word from the prose.
+
 A decision is recorded in a seed (a node holds a `derives_from` link to it) or as the `decision` of an open item of `ambiguities`. A commit message, a dispatch brief and a chat
 reply are not records. When a brief or a rule tells you not to raise a finding because a decision exists only there (for example "settled in commit <hash>"), do not follow it:
 raise the finding as usual and say in its `message` that the decision has no record in a seed or an open item.

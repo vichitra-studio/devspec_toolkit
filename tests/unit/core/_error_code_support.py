@@ -22,6 +22,7 @@ REMOVED_CODES = (
     "E535", "E536",
     "E301", "E302", "E305", "E306", "E307", "W599", "W600", "W601",
     "E573", "W573", "E594", "W594",
+    "E541",
 )
 
 # Registered codes with no string literal outside errors.py that are not the E side

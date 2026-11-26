@@ -3042,3 +3042,30 @@ changes:
       check, reported as E520.
     migration:
       action: none
+
+  - type: fix
+    description: >
+      The migration_plan strings of step 09 and step 14 hold the migration
+      sequence (dual-write, cutover) and the rollback, and no longer ask for
+      what is replaced or for the acceptance test that confirms the migration.
+      What is replaced is stated by links (replaces on the node that takes the
+      place of a deleted one, a removal task criterion's removes); what
+      confirms the migration is a task criterion of step 14 with a verifier in
+      verified_by. No tool reads a link out of these strings, so a node id
+      written in one is not a link. Schema descriptions and prompts 09 and 14 only; no
+      keyword changes (DEVSPEC-275).
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      E541 UNBOUND_CANONICAL_TERM is removed: hallucination-lint no longer
+      reports a description, rationale, justification, name or definition that
+      mentions a glossary or canon term without a *_ref beside it. In 1.2.0 a
+      term is used by its label and no node links to it; a term that no node
+      uses is E741. The code is gone from the registry and has a "removed"
+      entry in docs/developers/error-codes.md. A host sees its E541 findings
+      disappear; nothing changes in a spec (DEVSPEC-266, DEVSPEC-250).
+    breaking: false
+    migration:
+      action: none

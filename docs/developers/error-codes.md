@@ -65,42 +65,6 @@ A second case is owned by step 10: a rule whose `cli_command` is not a command o
 
 **Resolution**: Update the stale artifact(s) to use the current canonical ID. The error message includes per-artifact paths showing which file uses which canonical ID.
 
-### E541 UNBOUND_CANONICAL_TERM
-
-**Trigger**: A free-text field (e.g. a `description`, `rationale`, or `intent`) mentions a canonical term registered in `canon/` without a sibling binding reference (a `*_ref` slot) that pins the term to its canonical ID. The mention reads as an unbound, hallucination-prone reference.
-
-**Resolution**: Add the appropriate `*_ref` (e.g. `fr_ref`, `capability_ref`, `term_ref`) alongside the free-text field to bind the canonical term to its ID, or reword the field so it no longer names the canonical term.
-
-**Note**: E541 is suppressed through four independent mechanisms; a free-text field is checked only if none of them apply:
-
-1. **Structural suppression** (as of 1.1.0) — fields whose enclosing object is *structurally unbindable*: the object's schema sets `additionalProperties: false` and declares no `*_ref`/`*_refs` slot, so it physically cannot carry a binding reference.
-
-2. **Namespace-aware slot-kind suppression** (as of 1.1.0, round 4) — an object whose schema sets `additionalProperties: false` and declares only *purpose-specific* ref slots (e.g. `fr_refs`, `capability_refs`, `metric_ref`) that cannot accept a `term`/`acronym` canonical ID is also suppressed. The check extracts the kind labels from each `*_ref`/`*_refs` slot name (e.g. `fr_refs` → kind `fr`; `capability_refs` → kind `capability`) and suppresses E541 for a given term when the term's canonical kind (e.g. `term`) is absent from the slot-kind set. Example: an object that declares only `fr_refs` and `capability_refs` has slot kinds `{"fr", "capability"}`; a `term`-kind canonical ID has no namespace overlap → E541 is suppressed. Objects that DO have a matching slot (e.g. `03_glossary.json` `terms[]` items with `term_ref`) are NOT suppressed by this mechanism — they fall through to mechanism 3 (runtime binding check).
-
-3. **Term-specific runtime suppression** (the `bound_refs` path) — when a sibling `*_ref`/`*_refs` key is present at the same object level, it suppresses E541 only for the specific term(s) it binds: suppression applies when one of the ref's *values* is one of the mentioned term's canonical IDs. An unrelated reference (binding a different ID) does **not** suppress, so a genuinely unbound term in the same object still fires. (Prior to this release the check was object-level — any ref present suppressed every free-text field — which over-suppressed legitimate unbound mentions.)
-
-4. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs. The complete set of exempted keys, sourced from `_E541_SKIP_KEYS` and `_E541_SKIP_KEYS_BY_FILE` in `hallucination_lint.py`:
-
-   **Global skips (`_E541_SKIP_KEYS`):**
-
-   *Category A — canonical vocabulary subtrees:*
-   - **`canonical_proposals`**, **`canonical_refs_used`**, **`canonical_conflicts`** — canonical metadata; not spec content that should bind refs
-   - **`tech_stack`**, **`user_segments`**, **`seeds`** — structured enumerations whose values are not canonical term-binding sites
-
-   *Category B — Step 16 implementation/narrative subtrees (belt-and-suspenders for `impl_context/` artifacts with variable filenames where `$schema` lookup is unreliable):*
-   - **`actions`**, **`coding_examples`** — Step 16a/16b implementation subtrees
-   - **`emergent_ambiguities`**, **`docs_impact`** — Step 16 narrative subtrees; **`ambiguities`** — the open-ambiguity list, a top-level array in steps 00 to 15 and `plan.ambiguities` in the step 16 anchor and plans
-   - **`review_requirements`** — Step 16 operational verification instructions (test commands, NFR measurement methods); these are not canonical term-binding sites. Note: structural suppression cannot reliably cover these because `test_commands[]` uses `oneOf` and `nfr_measurement_methods` uses `patternProperties`, both of which can cause `slot_kinds` to resolve as `None` under certain schema-navigation paths.
-
-   *Category C — free-form runner output:*
-   - **`execution`** — holds execution records (`execution.records[]`, whose free-text `note` is not a vocabulary slot), file lists and configuration-validation flags: run output, not bindable spec vocabulary. The structural rule would not suppress every such property, so a key-name skip is necessary. It applies to `16_impl_context.schema.json` only.
-
-   **File-scoped skips (`_E541_SKIP_KEYS_BY_FILE`):**
-   - **`edge_cases` in `11_redteam.json`** — unbindable narrative subtree; the red-team schema sets `additionalProperties: false` with no `*_ref` field on `edge_cases` items. Scoped to that file to avoid silently exempting a future `edge_cases` key in another artifact.
-   - **`definition` in `03_glossary.json`** — glossary definitions are vocabulary prose; requiring `term_ref` bindings for every cross-term mention in the definition text is semantically incorrect. This skip applies only when the file's basename is `03_glossary.json`; a `definition` field in any other file is still checked normally. Note: the glossary `terms[]` object DOES have `term_ref`/`acronym_ref` slots (used to pin the entry's own canonical ID), so the namespace-aware structural rule does NOT suppress it — this explicit skip is required.
-
-   For artifacts with no resolvable `$schema` (where structural suppression and namespace-aware slot-kind suppression are inactive), two mechanisms remain active: the key-name skip (mechanism 4) and the term-specific runtime `bound_ref_ids` suppression (mechanism 3). Mechanism 3 — the `bound_ref_ids` collection in `_check_free_text_terms` of `hallucination_lint.py` — is unconditional and has no guard on `schema_node`; the check `if cids & bound_ref_ids: continue` fires regardless of whether `$schema` resolved. A sibling `*_ref` binding the mentioned term therefore suppresses E541 for that specific term even in a schema-free artifact.
-
 ### E566 UNCOVERED_FR_MILESTONE
 
 **Trigger**: A functional requirement that is in scope (its `scope` is not `later` or `out` and its lifecycle is not `not_applicable`) and that no task criterion of step 14 reaches. A task criterion reaches an FR when it refines the FR, a node the FR contains (an acceptance criterion) or a node derived from either: the check follows the links `refines`, `realises`, `derives_from` and `mitigated_by` that point at the FR and at its acceptance criteria, then those that point at the nodes it found, until none is left; it reads no hash and no milestone state. So an API that lists the FR in `derives_from` covers it when a task criterion refines the API. Reported by `spec-check` and by the step gate (check `milestone-numbers`), not by `validate` of one file; with no graph the check is skipped (run: `--repo-root` pointing at a toolkit copy without `tools/entry_key_registry.json` gave an E520 for the missing registry and `[SKIP] milestone-numbers (graph could not be built (see the `graph` check))`). An FR that is `later` or `out` is not checked and stays listed by `specdev coverage` as exempt. Example, from the worked example, which is a partial spec: `E566 fr fr-password-reset-request is in scope but no task criterion reaches it: add a task criterion that refines it, one of its acceptance criteria or a node derived from it, or set its scope to later or out with a scope_reason`.
@@ -1780,6 +1744,10 @@ Removed in 1.2.0. It reported an id-like word in an assumption that names no nod
 ### E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP (removed)
 
 Removed in 1.2.0: derivation is stated by `derives_from` links and checked by the graph; the token-overlap heuristic read nine hand-listed text keys.
+
+### E541 UNBOUND_CANONICAL_TERM (removed)
+
+Removed in 1.2.0. It reported a text field that mentions a glossary term without a `*_ref` beside it. In 1.2.0 a term is used by its label and no node links to it; a term that no node uses is E741.
 
 ## Exception Classes
 

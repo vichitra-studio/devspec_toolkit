@@ -37,7 +37,7 @@ For each upstream artifact ingested, extract the following:
 **Extraction Mandate**: Every in-scope capability from `01_capabilities.json` must be reached by ≥1 milestone: a milestone's `schedules` names an FR of the capability. List any capability not reached and explain why (e.g., deferred with `scope` `later` in Step 01, handled by infrastructure).
 
 ## Heuristics For Completeness
-- SHOULD populate `target_date` on every milestone and list the milestones in ascending date order (the schema and `spec-check` accept a milestone without a date; a date that is present must be ISO `YYYY-MM-DD` and the dates must not decrease, E520 otherwise). Include `migration_plan` when the plan replaces a running system or data schema, or breaks a public API contract (an authoring and review rule: no tool decides whether the plan does).
+- SHOULD populate `target_date` on every milestone and list the milestones in ascending date order (the schema and `spec-check` accept a milestone without a date; a date that is present must be ISO `YYYY-MM-DD` and the dates must not decrease, E520 otherwise). Include `migration_plan` (the sequence and the rollback) when the plan replaces a running system or data schema, or breaks a public API contract (an authoring and review rule: no tool decides whether the plan does).
 - Ambiguity scrub: milestones should schedule the FRs/APIs they deliver and name the CI gates that pass them.
 
 ## Self-Audit Gate
@@ -70,12 +70,12 @@ Before emitting, verify:
 
 ## Step-Specific Completeness Checklist
 - Milestones include clear names, `target_date`, `schedules`, risks, and spikes for unknowns.
-- `migration_plan` describes data or API migration if replacing existing systems, in 2 to 4 sentences (guidance, not checked: the schema description asks for it and no keyword or tool enforces it; say what is replaced, the sequence, the rollback and the acceptance test).
+- `migration_plan` describes data or API migration if replacing existing systems, in 2 to 4 sentences (guidance, not checked: the schema description asks for it and no keyword or tool enforces it; say the migration sequence and the rollback. What is replaced is stated by links: `replaces` on the node that takes the place of a deleted one, and the `removes` of a removal task criterion in step 14. What confirms the migration is a task criterion of step 14 with a verifier in `verified_by`. No tool reads a link out of this string: a node id written in it is not a link).
 
 ## Best Practices
 - **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`. Name the FRs/APIs a milestone delivers in `schedules` (bare ids, no notes).
 - **Adaptability**: Document `risks` and `spikes` with clear mitigation steps to keep delivery adaptable.
-- **Migration**: Detail the `migration_plan` when replacing legacy systems, calling out cutover criteria and rollback triggers.
+- **Migration**: Detail the `migration_plan` when replacing legacy systems, calling out the cutover sequence and rollback triggers; the acceptance test of the migration is a task criterion of step 14, not a sentence here.
 - **Third parties**: Put a third party's lead time or rate limit into the `risks` or `spikes` of the milestone it affects, so integration work is scheduled early.
 
 ## Common Pitfalls

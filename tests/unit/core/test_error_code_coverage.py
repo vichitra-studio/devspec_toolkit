@@ -22,7 +22,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Canonical registry (4xx)
             "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)
-            "E510", "E512", "E520", "E521", "E530", "E540", "E541", "E543",
+            "E510", "E512", "E520", "E521", "E530", "E540", "E543",
             "E551", "E552", "E553", "E554",
             "E566", "E567",
             "E571", "E572",
