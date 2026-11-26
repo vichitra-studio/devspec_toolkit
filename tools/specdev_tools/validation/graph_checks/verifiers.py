@@ -1,4 +1,4 @@
-"""The verifier rules: an unused verifier (E742) and an obligation no verifier names (E743).
+"""The verifier rules: an unused verifier (E742), an obligation no verifier names (E743) and the outcome rules of a fixture (E754 to E756).
 
 **Unused (E742).**  A verifier (a fixture or a job) is used when a node that is in play lists it in ``verified_by`` (a
 criterion of a closed milestone counts: the fixture is used, not unused), when a record names it (the ``record_users``
@@ -11,6 +11,8 @@ be verified by a job as well as by a fixture, and the message names both fixes. 
 never reported: an API error (proven with its API), a threat, an edge case, a rule, a node a closed milestone's removal
 criterion ``removes``.  The owner is the one the ownership table gives (step 14 for E742, step 08 for E743).
 
+**Outcome (E754 to E756).**  The rules of a fixture that expects an error status: see ``fixture_outcomes``.  Their owner is step 08.
+
 ``missing_verifiers`` is the detector of E743; ``check_verifier_rules`` in this module is its only caller.
 """
 from __future__ import annotations
@@ -20,6 +22,7 @@ from specdev_tools.graph.model import Graph, Node
 
 from .codes import MISSING_VERIFIER, UNUSED_VERIFIER
 from .context import GraphCheckContext, Mode
+from .fixture_outcomes import check_fixture_outcomes
 from specdev_tools.graph.names import FIXTURE, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES, link_targets
 from .removal import links_clause
 
@@ -93,7 +96,7 @@ def _fixes(graph: Graph, kind: str) -> str:
 
 
 def check_verifier_rules(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
-    """E742 for each verifier in play that nothing uses, then E743 for each node a verifier should name and none does; each group in step then id order."""
+    """E742 for each verifier in play that nothing uses, then E743 for each node a verifier should name and none does, then E754 to E756 for the fixtures that expect an error status; each group in step then id order."""
     unused = [
         ctx.finding(
             UNUSED_VERIFIER, verifier,
@@ -112,4 +115,4 @@ def check_verifier_rules(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
         )
         for node in missing_verifiers(ctx)
     ]
-    return unused + missing
+    return unused + missing + check_fixture_outcomes(ctx)

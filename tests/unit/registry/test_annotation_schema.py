@@ -11,11 +11,11 @@ from specdev_tools.core.registry import SchemaRegistry
 _ROOT = Path(__file__).resolve().parents[3]
 _URI = "vc:core:graph"
 
-# The 19 link field names of the design's verb table (DOC L463-486, 17 rows).
+# The 20 link field names of the design's verb table.
 _DOC_VERBS = {
     "derives_from", "refines", "realises", "mitigated_by", "assumes", "constrains",
     "provided_by", "relies_on", "connects_to", "verifies", "verified_by", "threatens",
-    "schedules", "justified_by", "depends_on", "part_of", "replaces", "removes", "about",
+    "schedules", "justified_by", "depends_on", "part_of", "replaces", "removes", "about", "expects",
 }
 
 
@@ -99,7 +99,7 @@ def test_xlink_rejects(registry, instance) -> None:
 
 def test_link_verb_set_matches_design(registry) -> None:
     verbs = registry.load(_URI)["$defs"]["linkVerb"]["enum"]
-    assert len(verbs) == 19 and set(verbs) == _DOC_VERBS
+    assert len(verbs) == 20 and set(verbs) == _DOC_VERBS
     assert _ok(registry, "linkVerb", "about")
     assert not _ok(registry, "linkVerb", "trace")
 

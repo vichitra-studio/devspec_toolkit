@@ -14,7 +14,8 @@
       "constrains": [
         "fr-password-reset",
         "api-password-reset-confirm",
-        "identity-service"
+        "identity-service",
+        "err-password-reset-confirm-token-expired"
       ],
       "policy_ref": {
         "id": "cn:core:policy:spec-first",

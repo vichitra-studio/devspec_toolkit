@@ -99,7 +99,7 @@ def test_plan_holds_the_suspect_links_grouped_by_holder_step_in_step_order(examp
     plan = _plan(example)
     assert [step.step for step in plan.steps] == ["05", "06", "07", "08", "09", "11", "14", "15", "16a"]
     assert {link.key for step in plan.steps for node in step.nodes for link in node.links} == CLOSURE_OF_CRITERION_EDIT
-    assert (plan.node_count, plan.link_count) == (13, 21)
+    assert (plan.node_count, plan.link_count) == (13, 24)
     assert all(link.holder_step == step.step for step in plan.steps for node in step.nodes for link in node.links)
 
 
@@ -147,7 +147,7 @@ def test_gaps_are_a_group_of_their_own_in_the_step_that_owns_them(example: Examp
     assert [(gap.code, gap.node) for gap in _step(plan, "05").coverage_gaps] == [("E740", "b-node"), ("E742", "z-node")]
     assert _step(plan, "05").nodes
     assert plan.gap_count == 3
-    assert plan_to_dict(plan)["totals"] == {"suspect_nodes": 13, "suspect_links": 21, "coverage_gaps": 3}
+    assert plan_to_dict(plan)["totals"] == {"suspect_nodes": 13, "suspect_links": 24, "coverage_gaps": 3}
 
 
 def test_pending_replay_keeps_the_requested_steps_in_plan_order(example: Example) -> None:

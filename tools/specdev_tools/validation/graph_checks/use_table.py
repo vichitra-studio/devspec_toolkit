@@ -14,10 +14,10 @@ from typing import NamedTuple
 from specdev_tools.graph.kinds import RECORD_ROLE, KindDecl
 from specdev_tools.graph.model import SpecShape
 
-from specdev_tools.graph.names import REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES
+from specdev_tools.graph.names import EXPECTS, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES
 
-EXCLUDED_VERBS = frozenset({"about", "replaces", REMOVES, VERIFIES, VERIFIED_BY})
-"""Verbs that are never a use: a record's ``about``, the id-history links, and the verifier verbs (a fixture that verifies a node does not use it)."""
+EXCLUDED_VERBS = frozenset({"about", "replaces", EXPECTS, REMOVES, VERIFIES, VERIFIED_BY})
+"""Verbs that are never a use: a record's ``about``, the id-history links, the verifier verbs (a fixture that verifies a node does not use it) and ``expects`` (a fixture that expects an error does not use it)."""
 NON_HOLDER_ROLES = frozenset({RECORD_ROLE, VERIFIER_ROLE})
 VERIFIER_USE_VERB = REALISES
 """The one verb through which a verifier is a use: a job that ``realises`` a rule uses it (DOC: a job is used through what it realises)."""

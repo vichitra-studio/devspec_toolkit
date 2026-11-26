@@ -29,7 +29,10 @@
         "id": "cn:core:tag:critical-path",
         "kind": "tag",
         "version": "1.0.0"
-      }
+      },
+      "expects": [
+        "err-password-reset-confirm-token-expired"
+      ]
     },
     {
       "fixture_id": "fix-password-reset-reused-token",
@@ -55,7 +58,10 @@
         "id": "cn:core:tag:critical-path",
         "kind": "tag",
         "version": "1.0.0"
-      }
+      },
+      "expects": [
+        "err-password-reset-confirm-token-expired"
+      ]
     }
   ],
   "canonical_refs_used": [

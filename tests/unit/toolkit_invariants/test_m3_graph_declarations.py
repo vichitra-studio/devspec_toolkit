@@ -79,7 +79,7 @@ _REFINABLE_KINDS = [
 # Every ``x-link`` of the M3 schemas: (schema file, JSON pointer of the link field, sorted ``kinds`` or "*").
 # Written out by hand on purpose: a change of one link's ``kinds`` list must be a deliberate change of this table.
 _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
-    ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/constrains", ["api", "component", "connection", "fr"]),
+    ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/constrains", ["api", "api-error", "component", "connection", "fr"]),
     ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/assumes", ["assumption"]),
     ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/replaces", "*"),
     ("06_invariants.schema.json", "/allOf/1/properties/rules/items/properties/derives_from", ["seed"]),
@@ -89,6 +89,7 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/assumes", ["assumption"]),
     ("07_nfrs.schema.json", "/allOf/1/properties/nfrs/items/properties/replaces", "*"),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/verifies", ["api", "criterion", "invariant", "nfr"]),
+    ("08_fixtures.schema.json", "/properties/fixtures/items/properties/expects", ["api-error"]),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/removes", "*"),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/replaces", "*"),
     ("08_fixtures.schema.json", "/properties/fixtures/items/properties/derives_from", ["seed"]),
@@ -293,7 +294,7 @@ def test_step_06_invariant_declares_constrains_and_assumes_links(decls) -> None:
     _assert_links(
         decls, fname,
         {
-            "constrains": (["api", "component", "connection", "fr"], False),
+            "constrains": (["api", "api-error", "component", "connection", "fr"], False),
             "assumes": (["assumption"], False),
             "derives_from": (["seed"], False),
             "replaces": ("*", False),
@@ -316,12 +317,13 @@ def test_step_07_nfr_declares_constrains_relies_on_and_derives_from(decls) -> No
     assert _link(decls, fname, "derives_from").value["built"] is True
 
 
-def test_step_08_fixture_declares_verifies_and_removes_links(decls) -> None:
+def test_step_08_fixture_declares_verifies_expects_and_removes_links(decls) -> None:
     fname = "08_fixtures.schema.json"
     _assert_links(
         decls, fname,
         {
             "verifies": (["api", "criterion", "invariant", "nfr"], False),
+            "expects": (["api-error"], False),
             "removes": ("*", False),
             "derives_from": (["seed"], False),
             "replaces": ("*", False),

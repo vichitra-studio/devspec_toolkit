@@ -263,8 +263,8 @@ ERROR_CODES = {
     "E773": "STEP_NOT_READY",
     "E774": "RECORD_INVALID",
     "E778": "STALE_ALIAS_USE",
-    # Graph role checks (74x): findings about the spec, each with an owner and a node id (E743 and E747 owned by a fixed
-    # step).  E750, E751 and E753 are unassigned; E754..E759 are reserved.
+    # Graph role checks (74x): findings about the spec, each with an owner and a node id (E743, E747 and E754 to E756 owned by a
+    # fixed step).  E750, E751 and E753 are unassigned; E757..E759 are reserved.
     "E740": "NODE_DANGLING",
     "E741": "TERM_NOT_USED_BY_LABEL",
     "E742": "UNUSED_VERIFIER",
@@ -276,6 +276,9 @@ ERROR_CODES = {
     "E748": "SEED_ROUTE_UNUSED",
     "E749": "SEED_LINK_NOT_ROUTED",
     "E752": "NODE_ID_IN_PROSE",
+    "E754": "FIXTURE_ERROR_NOT_NAMED",
+    "E755": "FIXTURE_STATUS_DIFFERS_FROM_ERROR",
+    "E756": "FIXTURE_ERROR_NOT_CONSTRAINED",
     # Migration (880 to 884): ``specdev align apply --auto`` refuses with E880 (a host the runner cannot start on) and
     # stops with E881 (a script broke an invariant; nothing was written); E884 is a finding of the changelog check (an
     # ``auto`` entry that names no script).  E882 is the baseline residue finding of the trace check; E883 is unassigned.

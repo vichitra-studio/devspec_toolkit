@@ -78,14 +78,14 @@
                 "enum": ["database", "service", "api-gateway", "client", "queue", "cache"]
               },
               "constrains": {
-                "description": "Ids of the nodes this invariant constrains: functional requirements, APIs, components or connections. Optional; an invariant states a rule over something, and this field says over what. Omit it only for a system-wide invariant. Example: [\"fr-user-login\", \"api-session-create\", \"identity-service\"]. Anti-pattern: listing capabilities or NFRs here (an invariant constrains a requirement, an interface or a part of the system, not a goal).",
+                "description": "Ids of the nodes this invariant constrains: functional requirements, APIs, API errors, components or connections. Optional; an invariant states a rule over something, and this field says over what. Omit it only for a system-wide invariant. Example: [\"fr-user-login\", \"api-session-create\", \"err-session-create-unknown-id\", \"identity-service\"]. Anti-pattern: listing capabilities or NFRs here (an invariant constrains a requirement, an interface, an error or a part of the system, not a goal).",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
                 },
                 "uniqueItems": true,
                 "x-link": {
-                  "kinds": ["fr", "api", "component", "connection"],
+                  "kinds": ["fr", "api", "api-error", "component", "connection"],
                   "required": false
                 }
               },

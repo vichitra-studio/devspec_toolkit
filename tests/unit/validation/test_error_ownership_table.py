@@ -31,6 +31,9 @@ M6B_OWNERS = {
     "E748": "node_step",
     "E749": "node_step",
     "E752": "node_step",
+    "E754": "fixed_step:08",
+    "E755": "fixed_step:08",
+    "E756": "fixed_step:08",
 }
 
 

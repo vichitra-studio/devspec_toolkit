@@ -59,7 +59,7 @@ def test_a_link_with_no_lock_file_is_e761_in_the_graph_check_only(host: Path) ->
     Path(lock_path(str(host / "spec"))).unlink()
     checks = _checks(host)
     assert {finding["code"] for finding in checks["graph"]["findings"]} == {"E761"}
-    assert len(checks["graph"]["findings"]) == 64
+    assert len(checks["graph"]["findings"]) == 67
     assert checks["trace-lock"]["status"] == "PASS"
 
 

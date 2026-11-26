@@ -1043,9 +1043,9 @@ changes:
       seed-routes (E747: a seed no route names; E748: a route no node of its
       step uses; E749: a node links a seed that the manifest does not route to
       its step) and prose-ids (E752: a node id written in the text of a node).
-      The new codes are E740 to E749 and E752 (E750 and E751 do not exist); each has an entry in docs/developers/error-codes.md
+      The new codes are E740 to E749, E752 and E754 to E756 (E750 and E751 do not exist); each has an entry in docs/developers/error-codes.md
       and an owner in tools/error_ownership.json: step 14 for E741, E742, E744
-      and E745, step 08 for E743, step 15 for E746, step 00 for E747, the step
+      and E745, step 08 for E743 and E754 to E756, step 15 for E746, step 00 for E747, the step
       of the route for E748, the step of the node for E749 and E752, and for
       E740 the latest step whose nodes can use the kind. None is promotable.
       The checks run on every spec: none is skipped because the files look
@@ -1780,8 +1780,8 @@ changes:
       two checks appended after the registered ones (merge-open-items for E631
       and W633, merge-bindings for E901 and E900).
       Plain spec-check, --step and --paths do not run them, so a plain run on
-      the worked example is unchanged (30 checks run, 25 errors, 1 warnings;
-      with --merge 31 checks run, 25 errors, 1 warnings). A pin finding (E336
+      the worked example is unchanged (30 checks run, 24 errors, 1 warnings;
+      with --merge 31 checks run, 24 errors, 1 warnings). A pin finding (E336
       to E338) is the registered check third-party-pins's, which every run
       makes, and is listed and counted once. merge-bindings runs,
       without recording evidence, the dev and CI bindings of each milestone that
@@ -3066,6 +3066,61 @@ changes:
       uses is E741. The code is gone from the registry and has a "removed"
       entry in docs/developers/error-codes.md. A host sees its E541 findings
       disappear; nothing changes in a spec (DEVSPEC-266, DEVSPEC-250).
+    breaking: false
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      An API error (step 05) has an optional http_status: the HTTP status of the
+      response that carries it, an integer from 100 to 599. It is the one place
+      the number is written; a message no longer states it. http_status is part of
+      the contract view of an API error, so changing it makes suspect the
+      links that point at the error (E763). A spec that has not given its
+      errors an http_status is valid as before.
+    breaking: false
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      A fixture (step 08) has an optional expects: the id of the API error it
+      expects as its outcome, at most one. It is the twentieth link verb
+      (linkVerb of vc:core:graph, with the verbs table of the design
+      document). It is not a proof (an API error is proven through the
+      criterion it derives from; verifies still does not accept an error) and
+      not a use of the error (E740 does not count it). The links of a fixture
+      are part of its contract view, so a fixture that gains expects makes the
+      links that point at the fixture suspect (E763).
+    breaking: false
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      The constrains field of an invariant (step 06) also accepts the id of an
+      API error. An invariant that constrains an error uses it: the error is no
+      longer reported by E740 when an invariant in play constrains it (the
+      worked example reports 16 E740, not 17). No path of a schema changes,
+      so the migration has nothing to write.
+    breaking: false
+    migration:
+      action: none
+
+  - type: add_constraint
+    description: >
+      Three findings of the verifier-rules check of spec-check, owned by step
+      08, for a fixture that expects an error status. E754: expected.status is
+      400 or more and the fixture has no expects (a fixture that holds
+      removes is skipped). E755: the fixture expects an API error and its
+      expected.status differs from the http_status of the error, or the error has
+      none. E756: the fixture expects an API error and verifies an invariant
+      that does not constrain that error; one finding for each such
+      invariant. Each message ends with the fix and the attest step. None is
+      promotable and none is a coverage gap. A host spec that states an error
+      status in a fixture gets E754 until the fixture names the error in
+      expects and the error has that http_status; this is a judgement of the author,
+      not a change a script can make, so the migration has nothing to write.
     breaking: false
     migration:
       action: none

@@ -878,6 +878,11 @@ rows:
   change: add
   disposition: none
   note: 'addition: nothing to migrate'
+- id: SC-05-21
+  path: apis[].errors[].http_status
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
 - id: SC-06-03
   path: ambiguities
   change: add
@@ -1907,6 +1912,11 @@ rows:
   note: 'addition: nothing to migrate'
 - id: SC-08-13
   path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-14
+  path: fixtures[].expects
   change: add
   disposition: none
   note: 'addition: nothing to migrate'

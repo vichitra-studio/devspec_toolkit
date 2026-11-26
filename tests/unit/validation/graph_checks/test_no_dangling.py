@@ -308,8 +308,8 @@ def test_a_fresh_process_counts_the_role_gap_of_a_node(command: tuple[str, ...],
     assert f'"{_PROBE_CAPABILITY}"' in done.stdout and '"E740"' in done.stdout
 
 
-EXAMPLE_GAPS = {"07": {"E740": 1}, "08": {"E743": 5}, "12": {"E740": 5}, "14": {"E740": 11}}
-"""The role gaps of the unchanged worked example by owner step and code: 17 E740 and 5 E743."""
+EXAMPLE_GAPS = {"07": {"E740": 1}, "08": {"E743": 5}, "12": {"E740": 5}, "14": {"E740": 10}}
+"""The role gaps of the unchanged worked example by owner step and code: 16 E740 and 5 E743."""
 
 
 def _gaps_by_step(command: str, report: dict[str, Any]) -> dict[str, dict[str, int]]:
@@ -320,14 +320,14 @@ def _gaps_by_step(command: str, report: dict[str, Any]) -> dict[str, dict[str, i
 
 @pytest.mark.parametrize("command", ["stale", "coverage"])
 def test_the_unchanged_example_has_its_role_gaps_per_step_and_code_in_a_fresh_process(command: str, tmp_path: Path) -> None:
-    """The real provider on the unchanged example: 17 E740 and 5 E743, at the steps that own them (the tally of ``spec-check``)."""
+    """The real provider on the unchanged example: 16 E740 and 5 E743, at the steps that own them (the tally of ``spec-check``)."""
     host = git_copy_of_example(tmp_path / "host")
     done = run_specdev(command, "--json", "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
     assert done.returncode == 0, done.stderr
     report = json.loads(done.stdout)
     assert _gaps_by_step(command, report) == EXAMPLE_GAPS
     if command == "coverage":
-        assert report["role_findings"]["counts"] == {"E740": 17, "E743": 5}
+        assert report["role_findings"]["counts"] == {"E740": 16, "E743": 5}
 
 
 def test_a_fresh_process_names_the_role_gaps_that_block_step_ready(tmp_path: Path) -> None:

@@ -77,7 +77,7 @@ def _add_successor_fr(host: Example) -> None:
 def test_scenario_upstream_criterion_change_is_replayed_step_by_step_to_a_clean_check(host: Example) -> None:
     assert _findings(host, "trace-lock") == []
     out = _run(host, "json", "patch", "--id", CRITERION, ".text", json.dumps(EDITED_TEXT))
-    assert "newly suspect: 21 links (step 05: 2, step 06: 2, step 07: 1, step 08: 3, step 09: 1, step 11: 6, step 14: 4, step 15: 1, step 16a: 1)" in out
+    assert "newly suspect: 24 links (step 05: 2, step 06: 3, step 07: 1, step 08: 5, step 09: 1, step 11: 6, step 14: 4, step 15: 1, step 16a: 1)" in out
 
     listing = _stale(host)
     assert [step["step"] for step in listing["steps"]] == DAG_ORDER

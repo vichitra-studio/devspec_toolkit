@@ -20,7 +20,7 @@ SEED_FILE = Path("docs") / "seed" / "seed_accounts.md"
 ANCHOR = "anchor-ms-account-recovery"
 CRITERION = "ac-password-reset-3"
 
-# The 21 links DOC 13.1 names (PD-3 with chain(T)): (holder, field, target).
+# The 24 links DOC 13.1 names (PD-3 with chain(T)) and the three the fixtures' `expects` and the invariant's `constrains` of the API error add: (holder, field, target).
 CLOSURE_OF_CRITERION_EDIT = {
     ("PWRESET_CONFIRM_EXPIRED_01", "realises", "tc-confirm-expired-token"),
     ("api-password-reset-confirm", "derives_from", "fr-password-reset"),
@@ -28,10 +28,13 @@ CLOSURE_OF_CRITERION_EDIT = {
     ("ec-token-at-expiry-second", "mitigated_by", "fix-password-reset-expired-token"),
     ("ec-token-at-expiry-second", "threatens", "api-password-reset-confirm"),
     ("err-password-reset-confirm-token-expired", "derives_from", CRITERION),
+    ("fix-password-reset-expired-token", "expects", "err-password-reset-confirm-token-expired"),
     ("fix-password-reset-expired-token", "verifies", CRITERION),
     ("fix-password-reset-expired-token", "verifies", "api-password-reset-confirm"),
+    ("fix-password-reset-reused-token", "expects", "err-password-reset-confirm-token-expired"),
     ("fix-password-reset-reused-token", "verifies", "inv-reset-token-single-use"),
     ("inv-reset-token-single-use", "constrains", "api-password-reset-confirm"),
+    ("inv-reset-token-single-use", "constrains", "err-password-reset-confirm-token-expired"),
     ("inv-reset-token-single-use", "constrains", "fr-password-reset"),
     ("milestone-account-recovery", "schedules", "fr-password-reset"),
     ("nfr-latency-reset-email", "constrains", "fr-password-reset"),

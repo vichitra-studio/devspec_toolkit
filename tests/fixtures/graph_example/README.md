@@ -7,7 +7,7 @@ invented.
 
 ## It is partial on purpose
 
-`specdev spec-check` on this folder does **not** pass. Run on a git copy, it reports 25 errors and 7 warnings (8 when the copy lives under a symlinked path such as `/tmp` on macOS: W570). A person
+`specdev spec-check` on this folder does **not** pass. Run on a git copy, it reports 24 errors and 1 warning (2 when the copy lives under a symlinked path such as `/tmp` on macOS: W570). A person
 who copies the folder as a starting point should expect that: the design's table "In a real spec, each 'no use shown'
 node gets its user before merge" says the example stops short of a finished spec, and the folder stops short in the
 same places.
@@ -18,10 +18,14 @@ The errors, by code (run `specdev spec-check spec --repo-root <toolkit> --spec-r
 | Code | Count | Check | What it says |
 |---|---|---|---|
 | E608 | 1 | `toolkit-version` | The folder has no `spec/specdev_version`. Write `toolkit_version: <the toolkit version>` into it first (the tests that stamp a copy do so before they run anything); every other count below holds with the stamp. |
-| E740 | 17 | `no-dangling` | A node that nothing uses: three environments (`dev`, `staging`, `prod`), two secrets, `metric-reset-completion-rate`, the criteria `ac-password-reset-1`, `-2`, `ac-password-reset-request-1`, `-2`, `fr-password-reset-request`, `err-password-reset-confirm-token-expired`, `nfr-latency-reset-email`, the rules `rule-security-review-of-token-handling` and `rule-spec-check-on-every-pr`, `ec-token-at-expiry-second` and `threat-reset-token-replay`. |
+| E740 | 16 | `no-dangling` | A node that nothing uses: three environments (`dev`, `staging`, `prod`), two secrets, `metric-reset-completion-rate`, the criteria `ac-password-reset-1`, `-2`, `ac-password-reset-request-1`, `-2`, `fr-password-reset-request`, `nfr-latency-reset-email`, the rules `rule-security-review-of-token-handling` and `rule-spec-check-on-every-pr`, `ec-token-at-expiry-second` and `threat-reset-token-replay`. |
 | E743 | 5 | `verifier-rules` | A criterion or an NFR with no verifier: `ac-password-reset-1`, `-2`, `ac-password-reset-request-1`, `-2` and `nfr-latency-reset-email`. |
 | E744 | 1 | `cross-cutting` | `task-implement-password-reset-confirm` falls under `nfr-latency-reset-email` but no criterion of the task refines it. |
 | E566 | 1 | `milestone-numbers` | `fr-password-reset-request` is in scope and no task criterion reaches it. |
+
+The API error `err-password-reset-confirm-token-expired` is used: the invariant `inv-reset-token-single-use` names it in
+`constrains`. It carries its `http_status` (410), and both fixtures name it in `expects` (a fixture whose `expected.status`
+is 400 or more must, E754).
 
 The warning is W555 (the seed has no out-of-scope bullets).
 
@@ -33,7 +37,7 @@ finding changes those on purpose.
 
 ## What it holds beyond the design's blocks
 
-Section 12 shows 11 nodes with no use. The folder holds six more, and a second requirement that has no task criterion:
+Section 12 shows 10 nodes with no use. The folder holds six more, and a second requirement that has no task criterion:
 
 - `fr-password-reset-request`, with its two criteria `ac-password-reset-request-1` and `-2`;
 - the criteria `ac-password-reset-1` and `-2` of `fr-password-reset`, beside `ac-password-reset-3`, which the task criterion refines;

@@ -47,6 +47,16 @@
       "authority": "DOC L824-840 row 5; DS L420"
     },
     {
+      "class": "fixture-outcome",
+      "owner": "fixed_step:08",
+      "codes": [
+        "E754",
+        "E755",
+        "E756"
+      ],
+      "authority": "the fixture is the verifier of an outcome, so step 08 owns it as it owns E743 (DOC L824-840 row 5; DS L420)"
+    },
+    {
       "class": "unused-verifier",
       "owner": "fixed_step:14",
       "codes": [

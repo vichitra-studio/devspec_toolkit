@@ -1,6 +1,6 @@
 """``spec-check --merge`` on git copies of the worked example: each merge check provoked and cleared, and which milestones a branch closes.
 
-The example's own known findings (25 errors, see ``tests/fixtures/step_gate/spec_check_summary.golden``) are in every mode, so the exit code of a
+The example's own known findings (24 errors, see ``tests/fixtures/step_gate/spec_check_summary.golden``) are in every mode, so the exit code of a
 merge run on it is 1 whatever the merge checks say: these tests read the per-check lines and the codes of the output.  A host here is the example on
 ``main`` (its anchor row ``in_progress``, its binding a command that passes) with a ``feature`` branch that changes it; the commands are the real ones.
 """
@@ -140,7 +140,7 @@ def test_the_example_on_a_clean_branch_adds_only_clean_merge_lines(host: Path) -
     report = merge(host, "--base-ref", "main")
     assert report.status("merge-open-items") == "PASS" and report.status("third-party-pins") == "PASS" and report.status("merge-bindings") == "SKIP"
     assert report.codes == plain(host).codes, "the merge mode adds no finding to the example"
-    assert "spec-check: 31 checks run, 25 errors, 1 warnings" in report.out
+    assert "spec-check: 31 checks run, 24 errors, 1 warnings" in report.out
 
 
 # --- open items -----------------------------------------------------------------------------------------------------

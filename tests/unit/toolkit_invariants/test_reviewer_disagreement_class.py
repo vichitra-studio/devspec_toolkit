@@ -17,4 +17,4 @@ def test_reviewer_names_disagreement_for_refines_verifies_and_shared_outcome():
     assert "`disagreement:`" in text
     assert "each node it `refines`" in text
     assert "each node it `verifies`" in text
-    assert "an API error and an invariant that govern the same outcome" in text
+    assert "an invariant and each API error it `constrains`" in text

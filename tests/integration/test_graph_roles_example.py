@@ -45,8 +45,8 @@ USED = (
     "tp-argon2", "tp-mailrelay", "seg-registered-member", "metric-recovery-time", "identity-service", "term-reset-token",
 )
 
-# The 17 dangling nodes with their owners (R9: the design's table shows 11 "No use shown" rows; the fixture holds six more
-# unused nodes), each with the part the example leaves out (DS H3).
+# The 16 dangling nodes with their owners (R9: the design's table shows 10 "No use shown" rows, the error is used by the
+# invariant's `constrains`; the fixture holds six more unused nodes), each with the part the example leaves out (DS H3).
 DANGLING: dict[str, tuple[str, str]] = {
     "metric-reset-completion-rate": ("step:07", "no requirement derives from this metric: the NFR of the example derives from metric-recovery-time only"),
     "ac-password-reset-1": ("step:14", "no task criterion refines the criterion (the task has criteria for 3 only)"),
@@ -54,7 +54,6 @@ DANGLING: dict[str, tuple[str, str]] = {
     "ac-password-reset-request-1": ("step:14", "the request requirement is not covered by any task criterion"),
     "ac-password-reset-request-2": ("step:14", "the request requirement is not covered by any task criterion"),
     "fr-password-reset-request": ("step:14", "none of its criteria is refined, so nothing below uses the requirement"),
-    "err-password-reset-confirm-token-expired": ("step:14", "no task criterion refines the error (the API has its own fixture)"),
     "nfr-latency-reset-email": ("step:14", "no task criterion refines it; no fixture and no job verifies it (and a verifier is not a use)"),
     "threat-reset-token-replay": ("step:14", "no task criterion refines the threat"),
     "ec-token-at-expiry-second": ("step:14", "no task criterion refines the edge case"),
@@ -146,15 +145,15 @@ def test_used_nodes_have_no_e740(example_checks: dict[str, Any]) -> None:
 
 
 def test_dangling_nodes_are_exactly_the_no_use_shown_rows_with_owners(example_checks: dict[str, Any]) -> None:
-    """The 17 E740 of the example (R9), each with its owner step; the design's 11 rows are among them."""
+    """The 16 E740 of the example (R9), each with its owner step; the design's 10 rows are among them."""
     assert _triples(example_checks, "no-dangling") == DANGLING_TRIPLES
     design_rows = {
-        "err-password-reset-confirm-token-expired", NFR, "threat-reset-token-replay", "ec-token-at-expiry-second",
+        NFR, "threat-reset-token-replay", "ec-token-at-expiry-second",
         "rule-spec-check-on-every-pr", "rule-security-review-of-token-handling", "dev", "staging", "prod",
         "secret-mailrelay-api-key", "secret-reset-token-signing-key",
     }
     assert design_rows <= set(DANGLING)
-    assert example_checks["no-dangling"]["status"] == "FAIL" and example_checks["no-dangling"]["error_count"] == 17
+    assert example_checks["no-dangling"]["status"] == "FAIL" and example_checks["no-dangling"]["error_count"] == 16
 
 
 def test_every_dangling_node_has_its_left_out_part_named(example_checks: dict[str, Any]) -> None:
@@ -172,7 +171,7 @@ def test_every_dangling_node_has_its_left_out_part_named(example_checks: dict[st
 def test_dangling_owners_are_unchanged_without_the_step_14_artifact_and_pending_in_the_gate(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], example_checks: dict[str, Any]
 ) -> None:
-    """DOC 13.2 row 3, 13.9 rows 3-4: delete 14_roadmap.json; the 17 E740 keep their owners, those of 12 and 14 are pending at step 11, none blocks."""
+    """DOC 13.2 row 3, 13.9 rows 3-4: delete 14_roadmap.json; the 16 E740 keep their owners, those of 12 and 14 are pending at step 11, none blocks."""
     half = _host(tmp_path / "half", attested=False)
     (half / "spec" / "14_roadmap.json").unlink()
     assert _triples(_checks(half), "no-dangling") == DANGLING_TRIPLES == _triples(example_checks, "no-dangling")

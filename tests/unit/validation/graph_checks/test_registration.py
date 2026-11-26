@@ -154,7 +154,7 @@ def test_the_rules_run_in_a_process_that_imports_only_the_package() -> None:
         "print(len(found), 'specdev_tools.validation.spec_check' in sys.modules)\n"
     )
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(ROOT / "tools")}, check=True)
-    assert done.stdout.split() == ["23", "False"]
+    assert done.stdout.split() == ["22", "False"]
 
 
 @pytest.fixture

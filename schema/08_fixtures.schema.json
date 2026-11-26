@@ -39,7 +39,7 @@
             "type": "string"
           },
           "verifies": {
-            "description": "Ids of the nodes this fixture proves: acceptance criteria (step 04), APIs (step 05), invariants (step 06) or NFRs (step 07). Not functional requirements: a functional requirement is proven through its criteria. Example: [\"ac-user-login-1\", \"api-auth-login\"]. A fixture must carry verifies or removes.",
+            "description": "Ids of the nodes this fixture proves: acceptance criteria (step 04), APIs (step 05), invariants (step 06) or NFRs (step 07). Not functional requirements: a functional requirement is proven through its criteria. Example: [\"ac-user-login-1\", \"api-auth-login\"]. An API error is not listed here: name it in `expects`. A fixture must carry verifies or removes.",
             "type": "array",
             "items": {
               "$ref": "vc:core:atoms#kebabId"
@@ -48,6 +48,20 @@
             "minItems": 1,
             "x-link": {
               "kinds": ["criterion", "api", "invariant", "nfr"],
+              "required": false
+            }
+          },
+          "expects": {
+            "description": "Id of the API error (step 05) this fixture expects as its outcome. At most one. Not a proof: an API error is proven through the criterion it derives from, so `expects` does not make anything verified. Give the error's `http_status` as `expected.status` when you name it. Example: [\"err-auth-token-expired\"] with expected {\"status\": 410, \"body\": {\"error\": \"token-expired\"}}. Anti-pattern: naming an error here and a different status in `expected`; listing an error in `verifies`.",
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 1,
+            "x-link": {
+              "kinds": ["api-error"],
               "required": false
             }
           },
@@ -73,7 +87,7 @@
             "$ref": "vc:core:collections#anyJson"
           },
           "expected": {
-            "description": "The expected system behavior after applying the input. Each outcome should be: (1) specific — reference exact field names, status codes, or system states; (2) verifiable — an engineer should be able to write an assertion from this; (3) complete — cover all observable effects of the operation. Example: 'Response status 201, response body contains user_id and auth_token, database record created with correct email hash'.",
+            "description": "The expected system behavior after applying the input. Each outcome should be: (1) specific — reference exact field names, status codes, or system states; (2) verifiable — an engineer should be able to write an assertion from this; (3) complete — cover all observable effects of the operation. Example: 'Response status 201, response body contains user_id and auth_token, database record created with correct email hash'. When the outcome is an API error named in `expects`, `expected.status` equals the `http_status` of that error.",
             "$ref": "vc:core:collections#anyJson"
           },
           "tags": {

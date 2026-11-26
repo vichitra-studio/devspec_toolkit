@@ -1,6 +1,6 @@
 """Builders the release tests share: a git host whose release gate is clear, tags, stamps and the gate run on a host.
 
-The worked example is not release-ready (spec-check reports its own 25 errors).  ``release_host`` makes a copy that is: every
+The worked example is not release-ready (spec-check reports its own 24 errors).  ``release_host`` makes a copy that is: every
 obligation is parked (scope ``later``, W933 listed), the two nodes parking leaves unused (a metric, a job) are ``not_applicable``,
 the scaffold file is tracked, the spec is stamped with the active toolkit version and the host declares a release tag pattern.
 ``leave`` names obligations that stay in scope.

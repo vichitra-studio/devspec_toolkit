@@ -61,8 +61,11 @@ def test_down_impact_from_criterion(example: Graph) -> None:
     assert _down(example, _CRITERION) == {
         "err-password-reset-confirm-token-expired",
         "fix-password-reset-expired-token",
+        "fix-password-reset-reused-token",  # expects the error
+        "inv-reset-token-single-use",  # constrains the error
         "ec-token-at-expiry-second",
         "tc-confirm-expired-token",
+        "tc-confirm-reused-token",
         "threat-reset-token-replay",
         "PWRESET_CONFIRM_EXPIRED_01",
     }
@@ -124,7 +127,7 @@ def test_depth_and_kind_filters(example: Graph) -> None:
     assert _up(example, _CRITERION, TraceOptions(depth=1)) == {"fr-password-reset"}
     assert _up(example, _CRITERION, TraceOptions(depth=2)) == {"fr-password-reset", "cap-account-recovery"}
     assert _up(example, _CRITERION, TraceOptions(kinds=frozenset({"seed", "capability"}))) == {"seed-accounts", "cap-account-recovery"}
-    assert _down(example, _CRITERION, TraceOptions(kinds=frozenset({"fixture"}))) == {"fix-password-reset-expired-token"}
+    assert _down(example, _CRITERION, TraceOptions(kinds=frozenset({"fixture"}))) == {"fix-password-reset-expired-token", "fix-password-reset-reused-token"}
 
 
 def test_verb_filter_limits_the_links_followed(example: Graph) -> None:

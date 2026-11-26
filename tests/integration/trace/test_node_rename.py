@@ -347,7 +347,7 @@ def test_label_rename_rewrites_exact_uses_and_lists_each(host: Example) -> None:
     assert changed == {f"spec/{name}" for name in ("03_glossary.json", FR_FILE, "05_interface_contracts.json", "06_invariants.json", "14_roadmap.json")}
     assert before["spec/extras/trace.lock.json"] == _snapshot(host)["spec/extras/trace.lock.json"]
     # The new label is a contract change of the term and of each use: the links into them are suspect until attested.
-    assert len(host.suspect_keys()) == 21 and ("err-password-reset-confirm-token-expired", "derives_from", CRITERION) in host.suspect_keys()
+    assert len(host.suspect_keys()) == 24 and ("err-password-reset-confirm-token-expired", "derives_from", CRITERION) in host.suspect_keys()
 
 
 def _rename_json(host: Example, *args: str) -> str:

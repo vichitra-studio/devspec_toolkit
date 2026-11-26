@@ -24,13 +24,13 @@ For each upstream artifact ingested, extract the following:
 - **02a_delivery_baseline.json**: Environment definitions and deployment topology to determine which invariants apply at which deployment stage and to validate that enforcement mechanisms are feasible within the infrastructure
 - **03_glossary.json**: Entity definitions and domain term IDs to ensure invariant descriptions use canonical terminology
 - **04_fr_list.json**: Acceptance criteria with negative cases, error conditions, preconditions, and postconditions to encode each falsifiable constraint as a machine-checkable rule with correct severity
-- **05_interface_contracts.json**: API IDs, error response definitions, and security settings to ensure every enumerated error has a corresponding invariant and that security boundaries are enforced by rules scoped to the correct APIs
+- **05_interface_contracts.json**: API IDs, error response definitions (`error_id`, `code`, `http_status`), and security settings to ensure every enumerated error has a corresponding invariant that names it in `constrains` and that security boundaries are enforced by rules scoped to the correct APIs
 
 ## Operating Flow: Discover → Formalize → Verify → Link → Emit
 - **Discover**: Scan FRs, APIs, and glossary for state machines, uniqueness rules, referential integrity needs, and business rules. Use the Invariant Discovery Checklist.
 - **Formalize**: Express each invariant as a precise predicate (pre/postcondition or always-true assertion). Avoid informal language.
 - **Verify**: Cross-check that every invariant is independently falsifiable. Remove duplicates and contradictions.
-- **Link**: Name in `constrains` the FR(s), API(s), component(s) or connection(s) each invariant constrains. Include entity state fields from FR preconditions/postconditions — not glossary lifecycle stages.
+- **Link**: Name in `constrains` the FR(s), API(s), API error(s), component(s) or connection(s) each invariant constrains. Include entity state fields from FR preconditions/postconditions — not glossary lifecycle stages.
 - **Emit**: Write the artifact only when all invariants are formal, non-redundant, and linked.
 
 ### Invariant Discovery Checklist
@@ -71,8 +71,8 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 ## Coverage Closure
 Before emitting, verify:
 - Every constraint in `spec/04_fr_list.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR if a constraint cannot be expressed in the supported language formats, addressed with a gap question (Clarify mode) per the gap-question rule below.
-- Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it.
-- Every id in `constrains` names an FR, an API, a component or a connection of Steps 02, 04 or 05; a system-wide rule leaves `constrains` out.
+- Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it, which names the error in `constrains`.
+- Every id in `constrains` names an FR, an API, an API error, a component or a connection of Steps 02, 04 or 05; a system-wide rule leaves `constrains` out.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - No business rule, security boundary, or data integrity constraint is silently omitted.
 - If any constraint cannot be expressed in the supported `language` formats: add a gap question (Clarify mode) rather than skipping it.
@@ -89,17 +89,17 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - Every rule has a precise description, executable `language`, and concrete `expression` when automation is possible.
 - `policy_ref` is required on every rule: a canonical reference with `kind: "policy"` to the governance or compliance policy the rule serves (see the Output Contract example); `canonical-integrity` reports one that does not resolve (E110).
-- `scope` is the delivery scope of a rule (`in`, `later` or `out`); `constrains` limits the rule to specific FRs, APIs, components or connections to avoid false positives.
+- `scope` is the delivery scope of a rule (`in`, `later` or `out`); `constrains` limits the rule to specific FRs, APIs, API errors, components or connections to avoid false positives.
 - `severity` is required and must be set deliberately (see schema/06_invariants.schema.json for authoritative enum values); prefer the harder severity for hard guarantees, the softer value for observability-only rules.
 - `enforcement_point` must match one of the canonical values defined in schema/06_invariants.schema.json (see the `enforcement_point` enum in that file for the full authoritative list).
-- `constrains` names the FRs, APIs, components or connections a rule holds over (never a capability or an NFR); `assumes` names the charter assumptions it rests on.
+- `constrains` names the FRs, APIs, API errors, components or connections a rule holds over (never a capability or an NFR); `assumes` names the charter assumptions it rests on.
 - A rule that is deferred or excluded carries `scope` `later` or `out` with `scope_reason`.
 - `risk_category_ref`: populate when this invariant maps to a known risk domain for red-team alignment (Step 11 cross-reference); use a canonicalRef object pointing to the appropriate risk category in canon/kinds/risk_category.json. Only a rule that carries it is checked for red-team coverage (W615 at step 11); a rule without it is not checked.
 - Avoid purely textual rules unless automation is truly not feasible.
 
 ## Best Practices
 - **Language**: Choose the appropriate `language` value (see schema/06_invariants.schema.json for authoritative enum) and write evaluable `expression` strings for automated enforcement.
-- **Scoping**: Describe each invariant in business language first, then name in `constrains` the FRs, APIs, components or connections it applies to.
+- **Scoping**: Describe each invariant in business language first, then name in `constrains` the FRs, APIs, API errors, components or connections it applies to.
 - **Severity**: Tag `severity` deliberately (see schema/06_invariants.schema.json for authoritative enum values) to guide escalation paths — harder values for hard guarantees, softer values for observability alerts.
 - **Links**: Name what each invariant constrains in `constrains` (bare ids, no notes) so auditors know where the rule holds.
 - **Sample maintenance**: Any PR that adds, modifies, or removes a runtime-evaluable (`cel`/`jsonlogic`) invariant MUST update `spec/samples/invariants_sample.json` in the same PR — see the "Invariant Evaluation Sample" section of `prompt_08_fixtures.md`. The Step 12 CI gate runs `invariants-check` against that sample. Nothing checks that the sample changed in the same PR; a stale sample shows only when `invariants-check` fails on it (authoring and review rule).
@@ -115,7 +115,7 @@ Before emitting, verify:
 - Where can we encode these as executable rules (jsonlogic or CEL)? Provide expressions or field-level specs.
 - What scope should each rule have (components, APIs) to reduce noise and false alerts?
 - Which rules are hard errors vs warnings? Who is accountable for remediation?
-- Which FRs, APIs, components or connections does each invariant constrain?
+- Which FRs, APIs, API errors, components or connections does each invariant constrain?
 
 # Schema Reference
 - Schema URI: vc:06-invariants
@@ -137,7 +137,7 @@ Before emitting, verify:
       "expression": "request.authenticated == true && request.token != null",
       "severity": "error",
       "enforcement_point": "api-gateway",
-      "constrains": ["fr-auth-login", "api-auth-login", "auth-service"],
+      "constrains": ["fr-auth-login", "api-auth-login", "err-auth-login-invalid-credentials", "auth-service"],
       "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy", "version": "1.0.0" }
     }
   ],

@@ -156,7 +156,7 @@ Tie-breaks between kinds that overlap (pick the first that fits):
 
 `near-duplicate` is review judgement, not a check: two nodes of one kind with the same upstream link and
 overlapping downstream links that state one obligation, or two nodes of different kinds that state the same
-obligation (an API error and an invariant that both say an unknown id returns 404). Report it as kind `drift`, severity P2, with a
+obligation (an invariant whose text restates the outcome of an API error instead of naming the error in `constrains`). Report it as kind `drift`, severity P2, with a
 `message` that STARTS with the fixed word `near-duplicate:` followed by the two node ids in alphabetical order (`location` is the first of them) and the advice
 to merge or delete one (the signature is a hash of the message, so the fixed word keeps it stable
 across reviewers).
@@ -164,8 +164,10 @@ across reviewers).
 `disagreement` is review judgement, not a check: a node whose text contradicts the text of a node it points at. Read the
 text of both for these pairs: a task criterion and each node it `refines` (a weaker threshold, a removed condition, or a
 stricter threshold or new condition that no upstream node states); a fixture and each node it `verifies` (an expected status
-or outcome that differs from what the target says); an API error and an invariant that govern the same outcome (404 in one,
-422 in the other). Report it as kind `drift`, severity P1, with a `message` that STARTS with the fixed word `disagreement:`
+or outcome that differs from what the target says); an invariant and each API error it `constrains` (the invariant's text states
+a status or an outcome other than the error's `http_status` and `message`). `spec-check` compares the numbers where the links exist:
+a fixture's `expected.status` with the `http_status` of the error it `expects` (E755), and the error a fixture expects with the
+`constrains` of the invariant it verifies (E756). The text of the nodes is yours to read. Report it as kind `drift`, severity P1, with a `message` that STARTS with the fixed word `disagreement:`
 followed by the two node ids, what each says, and the advice: change the downstream node, or, when the upstream node is the
 wrong one, record an open item (`specdev json insert --step <NN> .ambiguities '<item>'`, `about` names the upstream node).
 

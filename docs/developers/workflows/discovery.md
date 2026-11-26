@@ -68,7 +68,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Missing Parameters**: Validation fails if `parameters` are needed but not defined in the new array format.
 - **Invalid Schema Refs**: `input_schema_ref` and `output_schema_ref` are a path relative to the repository root, a JSON Pointer into the current document or an absolute URL; use `-tbd` while the schema is not defined, and omit the field when the endpoint has no body.
 - **Protocol Mismatch**: Non-HTTP protocols like `grpc` must mapping their methods (e.g., to `POST`) as per proper guidance.
-- **Error Objects**: each `errors[]` entry is an object with `error_id`, `code`, `message`, `scope` and `derives_from` (acceptance criteria ids); `severity` is optional. A string entry or an `http_status` field fails schema validation. The schema does not require the list to be non-empty; include at least one 4xx and one 5xx error by convention.
+- **Error Objects**: each `errors[]` entry is an object with `error_id`, `code`, `message`, `scope` and `derives_from` (acceptance criteria ids); `severity` is optional, and so is `http_status` (an integer from 100 to 599: the HTTP status of the response that carries the error, the one place the number is written). A string entry fails schema validation. The schema does not require the list to be non-empty; include at least one 4xx and one 5xx error by convention.
 
 ## Step 07 Troubleshooting
 - **Invalid ID Pattern**: NFR IDs must follow the `nfr-<category>-<metric>` pattern (e.g., `nfr-latency-p95`).
@@ -79,6 +79,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Orphan Fixtures**: Validation fails if a fixture carries neither `verifies` nor `removes`. `verifies` takes one or more ids of acceptance criteria, APIs, invariants or NFRs (not FRs).
 - **Link Targets**: `specdev spec-check` reports a `verifies` id that no node has (E700) and one that names a node of a kind the field does not accept (E701); `specdev validate` of the fixtures file alone does not.
 - **Mode Strictness**: If `mode` is `contract`, you must provide an `expected` object with `status` (integer 100-599).
+- **Error Outcomes**: A fixture whose `expected.status` is 400 or more names the API error it expects in `expects` (at most one id; E754 otherwise, except for a fixture that holds `removes`). The `expected.status` equals the `http_status` of that error (E755), and when the fixture verifies an invariant, that invariant names the error in `constrains` (E756). `expects` is not a proof: the error is proven through the criterion it derives from.
 - **Manual Mode**: `mode: manual` requires `manual_reason`, a string of at least 10 characters.
 
 ## Step 09 Troubleshooting

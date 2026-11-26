@@ -22,7 +22,7 @@ LEGACY = ROOT / "tests" / "fixtures" / "graph_checks" / "legacy"
 GOLDEN = ROOT / "tests" / "fixtures" / "step_gate" / "spec_check_summary.golden"
 
 STEP_14_FILE = "14_roadmap.json"
-DANGLING_AT_14 = ("err-password-reset-confirm-token-expired", "nfr-latency-reset-email", "threat-reset-token-replay", "ec-token-at-expiry-second")
+DANGLING_AT_14 = ("nfr-latency-reset-email", "threat-reset-token-replay", "ec-token-at-expiry-second")
 DANGLING_AT_12 = ("dev", "staging", "prod", "secret-mailrelay-api-key", "secret-reset-token-signing-key")
 
 
@@ -62,7 +62,7 @@ def _spec_check_json(capsys: pytest.CaptureFixture[str], host: Path, *flags: str
 
 
 def test_new_check_entries_appear_on_the_example(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """The eight entries come after trace-lock and ``third-party-pins`` (step 02's pin check), then ``milestone-numbers`` (M6c) and ``removal-rules`` (M7; their counts are not pinned here), then open-items, frozen-plans and plan-records (M8); none skips, and the counts of the eight are the example's (17, 0, 5, 1, 0, 0, 0, 0)."""
+    """The eight entries come after trace-lock and ``third-party-pins`` (step 02's pin check), then ``milestone-numbers`` (M6c) and ``removal-rules`` (M7; their counts are not pinned here), then open-items, frozen-plans and plan-records (M8); none skips, and the counts of the eight are the example's (16, 0, 5, 1, 0, 0, 0, 0)."""
     code, report, _err = _spec_check_json(capsys, git_copy_of_example(tmp_path / "host"))
     names = list(report["checks"])
     assert names[names.index("trace-lock") + 1 : -3] == ["third-party-pins", *GRAPH_CHECKS, "milestone-numbers", "removal-rules"] and names[-3:] == ["open-items", "frozen-plans", "plan-records"]
@@ -71,8 +71,8 @@ def test_new_check_entries_appear_on_the_example(tmp_path: Path, capsys: pytest.
         "no-dangling": "FAIL", "term-use": "PASS", "verifier-rules": "FAIL", "cross-cutting": "FAIL",
         "refinement": "PASS", "scaffold-paths": "PASS", "seed-routes": "PASS", "prose-ids": "PASS",
     }
-    assert [report["checks"][name]["error_count"] for name in GRAPH_CHECKS] == [17, 0, 5, 1, 0, 0, 0, 0]
-    assert code == 1 and report["error_count"] == 24 + report["checks"]["milestone-numbers"]["error_count"]  # the eight checks are the 23 findings; the other is E608 (no specdev_version)
+    assert [report["checks"][name]["error_count"] for name in GRAPH_CHECKS] == [16, 0, 5, 1, 0, 0, 0, 0]
+    assert code == 1 and report["error_count"] == 23 + report["checks"]["milestone-numbers"]["error_count"]  # the eight checks are the 22 findings; the other is E608 (no specdev_version)
 
 
 def test_plain_spec_check_summary_matches_golden_with_the_new_entries(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

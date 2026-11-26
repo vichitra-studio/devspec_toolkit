@@ -30,7 +30,7 @@ def test_pin_prints_the_suspect_count_by_step_and_the_change_milestone_reminder(
     code, out = run_on_example(host, "third-party", "pin", ARGON, "0.42.0")
     assert code == 0
     assert "patched tp-argon2 (02_system_sketch.json .third_parties[0])" in out
-    assert "newly suspect: 14 links (step 05: 1, step 06: 1, step 08: 2" in out
+    assert "newly suspect: 17 links (step 05: 1, step 06: 2, step 08: 4" in out
     assert "change milestone whose task criteria refine the obligations that rely on the third party" in out
 
 
@@ -38,7 +38,7 @@ def test_pin_json_carries_the_suspect_count_and_the_reminder(host: Path) -> None
     code, out = run_on_example(host, "third-party", "pin", ARGON, "0.42.0", "--json")
     document = json.loads(out)
     assert code == 0 and document["command"] == "third-party pin" and document["written"] is True
-    assert sum(item["count"] for item in document["newly_suspect"]) == 14 and "change milestone" in document["reminder"]
+    assert sum(item["count"] for item in document["newly_suspect"]) == 17 and "change milestone" in document["reminder"]
 
 
 def test_pin_writes_no_lock_entry_for_the_pin_edit(host: Path) -> None:

@@ -85,7 +85,7 @@ def test_stale_lists_pending_by_step_in_dag_order(host: Example) -> None:
     assert [line.split(":")[0] for line in text.splitlines() if line.startswith("step ")] == [f"step {step}" for step in DAG_ORDER]
     assert text.splitlines()[0] == "stale: pending replay by step"
     assert "  api-password-reset-confirm\n    derives_from -> fr-password-reset (content_changed, roots: ac-password-reset-3)" in text
-    assert text.splitlines()[-1] == "total: 21 suspect links in 13 nodes, 0 coverage gaps"
+    assert text.splitlines()[-1] == "total: 24 suspect links in 13 nodes, 0 coverage gaps"
 
 
 def test_stale_with_nothing_pending_exits_0(host: Example) -> None:
@@ -100,8 +100,8 @@ def test_stale_step_slice_only_upstream_into_nn(host: Example) -> None:
     sliced = _stale_json(host, "--step", "06")
     assert [step["step"] for step in sliced["steps"]] == ["06"]
     assert [node["node"] for node in sliced["steps"][0]["suspect_nodes"]] == [INVARIANT]
-    assert [(link["target"], link["roots"]) for link in sliced["steps"][0]["suspect_nodes"][0]["links"]] == [(API, [API])]
-    assert sliced["totals"] == {"suspect_nodes": 1, "suspect_links": 1, "coverage_gaps": 0}
+    assert [(link["target"], link["roots"]) for link in sliced["steps"][0]["suspect_nodes"][0]["links"]] == [(API, [API]), (ERR_HOLDER, [API])]  # the invariant also constrains the API error, which belongs to the API
+    assert sliced["totals"] == {"suspect_nodes": 1, "suspect_links": 2, "coverage_gaps": 0}
     assert _stale_json(host, "--step", "05")["steps"] == []
     assert _stale_json(host, "--step", "10")["steps"] == []
 
@@ -251,8 +251,8 @@ def _diffs_of(example: Example, root: str) -> list[dict[str, Any]]:
 def test_diff_after_one_holder_of_the_root_was_attested_still_shows_the_change(host: Example) -> None:
     """A1-02: the holders attested first had accepted the change; the first entry in lock order must not decide the old text."""
     _set_criterion_text(host, " #1")
-    for holder in (API, "fix-password-reset-expired-token", "ec-token-at-expiry-second"):
-        _attest(host, holder)
+    # the fixtures `expects` the error, so everything below them waits for the error: the API is the holder of the root that can accept first
+    _attest(host, API)
     assert ERR_HOLDER in {node["node"] for step in _stale_json(host)["steps"] for node in step["suspect_nodes"]}
     code, out = _stale(host, "--diff")
     assert code == 0 and UNCHANGED_NOTE not in out, out

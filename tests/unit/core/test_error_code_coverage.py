@@ -72,7 +72,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E800", "E801", "E802", "E803", "E810", "E811", "E812", "E813", "E814",
             "E820", "E821", "E822", "E823", "E824", "E827", "E830", "W825", "W826", "W837",
             # Graph role checks (74x)
-            "E740", "E741", "E742", "E743", "E744", "E745", "E746", "E747", "E748", "E749", "E752",
+            "E740", "E741", "E742", "E743", "E744", "E745", "E746", "E747", "E748", "E749", "E752", "E754", "E755", "E756",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

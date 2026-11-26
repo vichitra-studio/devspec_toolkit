@@ -1106,6 +1106,7 @@
                 "code",
                 "message",
                 "severity",
+                "http_status",
                 "scope",
                 "scope_reason"
               ],
@@ -1200,6 +1201,7 @@
               "kinds": [
                 "fr",
                 "api",
+                "api-error",
                 "component",
                 "connection"
               ],
@@ -1386,6 +1388,15 @@
                 "api",
                 "invariant",
                 "nfr"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "expects",
+              "kinds": [
+                "api-error"
               ],
               "required": false,
               "same_step_kinds": []

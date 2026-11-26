@@ -18,11 +18,12 @@
           "error_id": "err-password-reset-confirm-token-expired",
           "code": "token-expired",
           "severity": "error",
-          "message": "HTTP 410: the reset token has expired or was already used.",
+          "message": "The reset token has expired or was already used.",
           "scope": "in",
           "derives_from": [
             "ac-password-reset-3"
-          ]
+          ],
+          "http_status": 410
         }
       ],
       "scope": "in",

@@ -137,7 +137,8 @@
       "enum": [
         "derives_from", "refines", "realises", "mitigated_by", "assumes", "constrains",
         "provided_by", "relies_on", "connects_to", "verifies", "verified_by", "threatens",
-        "schedules", "justified_by", "depends_on", "part_of", "replaces", "removes", "about"
+        "schedules", "justified_by", "depends_on", "part_of", "replaces", "removes", "about",
+        "expects"
       ],
       "description": "The closed vocabulary of link field names. A field name never changes meaning between steps."
     },

@@ -33,7 +33,7 @@ For each upstream artifact ingested, extract the following:
 - **URL structure**: Nest resources to show ownership (`/users/{id}/sessions`). Keep nesting ≤2 levels deep.
 - **Method semantics**: See the schema's `method` field (→ `vc:core:atoms#httpMethod`) for the authoritative decision rules per HTTP verb.
 - **Pagination**: All collection endpoints MUST support `limit`/`offset` or cursor-based pagination. Default and max page sizes must be defined.
-- **Error responses**: Every endpoint MUST define at least one 4xx and one 5xx error response. Include `code` and `message` in all error bodies. No tool checks the status classes (an authoring and review rule); `code` and `message` are required by the schema.
+- **Error responses**: Every endpoint MUST define at least one 4xx and one 5xx error response. Include `code` and `message` in all error bodies. An error of an HTTP API gives the HTTP status of its response in `http_status` (an integer from 100 to 599): the one place the number is written, so the `message` does not state it. No tool checks the status classes (an authoring and review rule); `code` and `message` are required by the schema, `http_status` is optional; a fixture that expects the error needs it (`E755`).
 - **Versioning**: Use URL path versioning (`/v1/`) unless the charter specifies otherwise. Version bump required on breaking changes.
 
 ### Implicit API Discovery
@@ -94,7 +94,7 @@ Before emitting, verify:
 - Each API entry has version, protocol and owner; an `http` API also has `path` and `method` (the schema requires both, E520 otherwise).
 - Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
 - An API that names a third party in `relies_on` and has a parameter that declares an `enum` needs an `enum_provenance`: where the value set comes from (`source_url`, `source_date`, `resolved_at`; `resolver` is optional). E311 reports a missing one.
-- `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
+- `errors` enumerates meaningful error states (codes, names, and for an HTTP API the `http_status`) to enable negative fixtures; a fixture names the error in `expects` and an invariant in `constrains`.
 - `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` field (see schema/05_interface_contracts.schema.json → `vc:core:atoms#apiSecurity`).
 - `derives_from` names the FRs that justify the API; each entry of `errors` has an `error_id`, a `scope` and a `derives_from` naming the acceptance criteria it comes from.
 - No mixed concerns: separate entries for distinct behaviors or versioned variants.
@@ -108,12 +108,13 @@ Before emitting, verify:
 - **Payloads**: Provide `input_schema_ref`, `output_schema_ref`, and enumerated `errors` so fixtures and clients know exact payloads.
 - **Security**: Define `security` and `auth` expectations explicitly to align with governance and monitoring.
 - **Links**: Populate `derives_from` with the FR ids proving why the interface exists.
-- **Non-HTTP Protocols**: For a non-HTTP protocol (gRPC, WebSocket, MQTT), omit `method` and `path`; `protocol` names the protocol.
+- **Non-HTTP Protocols**: For a non-HTTP protocol (gRPC, WebSocket, MQTT), omit `method` and `path`; `protocol` names the protocol; its errors have no `http_status`.
 
 ## Common Pitfalls
 - **Sync Drift**: Forgetting to sync `path` or `method` with implementation scaffolds, breaking generated clients.
 - **Mixed Concerns**: Mixing multiple behaviors into a single API entry, hiding error handling and version strategy.
 - **Empty Errors**: Leaving `errors` empty, which prevents negative fixture coverage and red-team planning.
+- **Status in the Message**: Writing the HTTP status into a `message` (`HTTP 410: token expired`): the number lives in `http_status`, and a fixture or invariant that needs it names the error.
 - **Bad Versioning**: Using free-form version strings that violate the schema pattern and confuse change management.
 
 # Clarification Questions
@@ -149,9 +150,9 @@ Before emitting, verify:
       "derives_from": ["fr-example"],
       "provided_by": ["example-service"],
       "errors": [
-        {"error_id": "err-example-unauthenticated", "scope": "in", "derives_from": ["ac-example-auth"], "code": "unauthenticated", "message": "No valid auth token provided"},
-        {"error_id": "err-example-not-found", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "resource-not-found", "message": "The requested resource does not exist"},
-        {"error_id": "err-example-internal", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "internal-error", "message": "An unexpected server failure occurred"}
+        {"error_id": "err-example-unauthenticated", "scope": "in", "derives_from": ["ac-example-auth"], "code": "unauthenticated", "message": "No valid auth token provided", "http_status": 401},
+        {"error_id": "err-example-not-found", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "resource-not-found", "message": "The requested resource does not exist", "http_status": 404},
+        {"error_id": "err-example-internal", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "internal-error", "message": "An unexpected server failure occurred", "http_status": 500}
       ]
     }
   ],

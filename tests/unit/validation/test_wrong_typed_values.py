@@ -414,6 +414,8 @@ def test_a_free_form_payload_with_every_guarded_field_name_leaves_every_reader_o
     existing = target.get(path[-1]) if isinstance(target, dict) else None
     if isinstance(existing, dict):
         existing.update(_payload())
+    elif isinstance(existing, list) and path[-1] == "errors":
+        existing.append(_payload())  # the API error stays: fixtures and an invariant link to it
     else:
         target[path[-1]] = [_payload()] if path[-1] in _ARRAYS_OF_OBJECTS else _payload()
     (clean / name).write_text(json.dumps(document), encoding="utf-8")

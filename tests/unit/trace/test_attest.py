@@ -20,6 +20,7 @@ from ._suspects_support import CLOSED_HOLDERS, CRITERION, Example
 API = "api-password-reset-confirm"
 FIX_EXPIRED = "fix-password-reset-expired-token"
 FIX_REUSED = "fix-password-reset-reused-token"
+ERROR = "err-password-reset-confirm-token-expired"  # the fixtures `expects` it
 INVARIANT = "inv-reset-token-single-use"
 TASK_CRITERION = "tc-confirm-expired-token"
 NEED = "need-fewer-reset-tickets"
@@ -84,7 +85,7 @@ def test_attest_refused_while_target_is_suspect_node(example: Example) -> None:
     code, out = _attest(example, TASK_CRITERION, "--yes")
     assert code == 1 and out.startswith("E764") and FIX_EXPIRED in out
     assert _lock_text(example) == before
-    for node in (API, FIX_EXPIRED, TASK_CRITERION):
+    for node in (API, ERROR, FIX_EXPIRED, TASK_CRITERION):
         code, out = _attest(example, node, "--yes")
         assert code == 0, out
     assert TASK_CRITERION not in _suspect_holders(example)
@@ -195,6 +196,7 @@ def test_attest_group_orders_upward_first_in_one_invocation(example: Example) ->
 def test_attest_step_writes_what_it_can_and_names_the_blocked_nodes(example: Example) -> None:
     example.edit_criterion()
     assert _attest(example, API, "--yes")[0] == 0
+    assert _attest(example, ERROR, "--yes")[0] == 0
     document = _attest_json(example, "--step", "08", "--yes", code=1)
     assert _holders(document) == [FIX_EXPIRED] and document["written"] is True
     assert [blocked["node"] for blocked in document["blocked"]] == [FIX_REUSED]

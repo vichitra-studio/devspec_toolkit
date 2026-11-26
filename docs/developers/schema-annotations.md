@@ -34,11 +34,11 @@ Declares that each item of an array, or each value of a map, is a graph node.
 
 ## Link verbs (`linkVerb`)
 
-A closed set of 19 field names; a field name never changes meaning between steps.
+A closed set of 20 field names; a field name never changes meaning between steps.
 
 `derives_from`, `refines`, `realises`, `mitigated_by`, `assumes`, `constrains`, `provided_by`, `relies_on`,
 `connects_to`, `verifies`, `verified_by`, `threatens`, `schedules`, `justified_by`, `depends_on`, `part_of`,
-`replaces`, `removes`, `about`.
+`replaces`, `removes`, `about`, `expects`.
 
 ## Shared fields and attachment rule
 

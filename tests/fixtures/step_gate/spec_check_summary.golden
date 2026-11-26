@@ -1,4 +1,4 @@
-spec-check: 30 checks run, 25 errors, 1 warnings
+spec-check: 30 checks run, 24 errors, 1 warnings
 
   [PASS] schema-validation              0 errors  0 warnings
   [FAIL] toolkit-version                1 errors  0 warnings
@@ -17,7 +17,7 @@ spec-check: 30 checks run, 25 errors, 1 warnings
   [PASS] glossary-drift-check           0 errors  0 warnings
   [PASS] trace-lock                     0 errors  0 warnings
   [PASS] third-party-pins               0 errors  0 warnings
-  [FAIL] no-dangling                    17 errors  0 warnings
+  [FAIL] no-dangling                    16 errors  0 warnings
   [PASS] term-use                       0 errors  0 warnings
   [FAIL] verifier-rules                 5 errors  0 warnings
   [FAIL] cross-cutting                  1 errors  0 warnings

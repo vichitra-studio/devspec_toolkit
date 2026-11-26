@@ -24,7 +24,7 @@ For each upstream artifact ingested, extract the following:
 - **02a_delivery_baseline.json**: Environment definitions and CI pipeline configuration to determine which fixture tags map to which pipeline stages and to validate that fixture execution is feasible in each environment
 - **03_glossary.json**: Canonical term IDs, entity field names, and domain vocabulary to ensure all fixture input payloads and expected output fields use exact glossary terms rather than invented or inconsistent field names
 - **04_fr_list.json**: Functional requirement IDs, acceptance criteria including happy-path and negative cases, preconditions, and postconditions to generate at least one fixture per acceptance criterion that verifies it
-- **05_interface_contracts.json**: API IDs, request/response schema references, error definitions with status codes, and security requirements to build contract-mode fixtures with exact payload shapes and negative fixtures for every enumerated error
+- **05_interface_contracts.json**: API IDs, request/response schema references, error definitions (with `http_status`), and security requirements to build contract-mode fixtures with exact payload shapes and negative fixtures for every enumerated error
 - **06_invariants.json**: Invariant IDs with severity error and their executable expressions to create negative-case fixtures that verify each critical invariant is enforced and that violations produce the expected rejection behavior
 - **07_nfrs.json**: NFR IDs with category latency or throughput, their numeric targets, and units to generate benchmark and load-test fixtures tagged appropriately for performance validation in CI pipelines
 
@@ -48,6 +48,7 @@ For each upstream artifact ingested, extract the following:
 ## Heuristics For Completeness
 - MUST add `verifies` naming every acceptance criterion, API, invariant or NFR this fixture proves (the kinds `verifies` accepts are defined by `schema/08_fixtures.schema.json`, the authority; an FR is never named: name its criteria); MUST ensure `tag_ref` references the appropriate canonical tag entry for fixture categorisation (e.g., the smoke canonical tag for fixtures covering `must-have` FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures verifying criteria of `must-have` FRs; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tag_ref` is required on every fixture, its kind is schema-pinned to `tag`, and canonical-integrity resolves its id against the canon registry (`E110`). The schema checks only the pattern of each `tags` label; no automated gate checks which labels a fixture carries, so populate `tags` correctly by hand.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
+- MUST name in `expects` the API error a fixture expects as its outcome, when its `expected.status` is 400 or more (at most one id; `E754` otherwise, except for a fixture that holds `removes`). `expects` is not a proof: the error is proven through the criterion it derives from, so it is never listed in `verifies`. The `expected.status` equals the `http_status` of that error (`E755`); when the fixture verifies an invariant, that invariant names the error in `constrains` (`E756`: expect an error the invariant constrains, or add the error to the invariant with `specdev json insert --id <inv-id> .constrains '"<error-id>"'` and accept the links with `specdev attest <inv-id> --yes`; the second is an edit of step 06, so replay step 06). When step 05 has no API error for the status, do not invent one: raise a gap question (Clarify mode) for step 05.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
 ## Self-Audit Gate
@@ -70,7 +71,7 @@ Before emitting, verify:
 - Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
 
-Run `specdev spec-check <spec_dir> --step 08` to see what is still unproven: a criterion, API, invariant or NFR that no fixture names in `verifies` is reported as `E743` (an NFR may instead be proven by a job of Step 12). That check holds only that something proves each node; the choice of mode, the negative-case fixture per error invariant and the benchmark fixture per performance NFR stay authoring checks, as `step_08.py` and `fixtures_lint.py` check the shape of a fixture, not what it proves. A fixture that verifies something is also listed in `verified_by` of a task criterion in Step 14; until then the gate reports it as an unused verifier (`E742`) under pending steps, and Step 14 owns it.
+Run `specdev spec-check <spec_dir> --step 08` to see what is still unproven: a criterion, API, invariant or NFR that no fixture names in `verifies` is reported as `E743` (an NFR may instead be proven by a job of Step 12). That check holds only that something proves each node; the choice of mode, the negative-case fixture per error invariant and the benchmark fixture per performance NFR stay authoring checks, as `step_08.py` and `fixtures_lint.py` check the shape of a fixture, not what it proves. A fixture that verifies something is also listed in `verified_by` of a task criterion in Step 14; until then the gate reports it as an unused verifier (`E742`) under pending steps, and Step 14 owns it. The same run reports a fixture with an error `expected.status` and no `expects` (`E754`), a status that differs from the `http_status` of the error it names (`E755`) and an invariant it verifies that does not constrain that error (`E756`).
 - Every id in `verifies` resolves to a criterion, API, invariant or NFR present in the upstream spec files.
 - No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
@@ -86,12 +87,12 @@ Run `specdev spec-check <spec_dir> --step 08` to see what is still unproven: a c
 - Fixtures cover happy-path, edge, and failure scenarios for `must-have` FRs and APIs.
 - Mix `mode` values across layers (see schema/08_fixtures.schema.json → `vc:core:atoms#testingMode` for the authoritative mode enum) to prove behavior.
 - Each fixture has minimal `input` and precise `expected` output/state; ambiguous assertions are avoided.
-- `verifies` links fixtures to the criteria, APIs, invariants and NFRs they prove, to enable coverage reporting; a `manual` fixture also has `manual_reason`.
+- `verifies` links fixtures to the criteria, APIs, invariants and NFRs they prove, to enable coverage reporting; a `manual` fixture also has `manual_reason`. `expects` names the one API error a fixture expects as its outcome; it proves nothing.
 - Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
 
 ## Cross-Step Synthesis Notes
 - **contract mode**: `expected` MUST have `status` (an HTTP status 100-599, checked by `fixtures-lint`) and SHOULD have `body`, and optionally `headers`. `fixtures-lint` does not require `body`; a `body` that is present is only checked to be JSON-serializable. Author `body` anyway per the authoring contract above; no tool reports its absence.
-- **expected**: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
+- **expected**: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases, with `status` equal to the `http_status` of the API error named in `expects`.
 
 ## Best Practices
 - **Coverage**: Cover happy-path, edge, and failure scenarios by mixing `mode` values (unit, contract, e2e, redteam).
@@ -152,16 +153,18 @@ See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 
   "created_at": "2025-01-01T00:00:00Z",
   "fixtures": [
     {
-      "fixture_id": "fix-auth-login-success",
+      "fixture_id": "fix-auth-login-wrong-password",
       "mode": "contract",
       "input": {
         "email": "user@example.com",
-        "password": "valid-password"
+        "password": "wrong-password"
       },
       "expected": {
-        "status": 200
+        "status": 401,
+        "body": { "error": "invalid-credentials" }
       },
-      "verifies": ["ac-auth-login-1", "api-auth-login"],
+      "verifies": ["ac-auth-login-2", "api-auth-login"],
+      "expects": ["err-auth-login-invalid-credentials"],
       "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag", "version": "1.0.0" }
     }
   ],
