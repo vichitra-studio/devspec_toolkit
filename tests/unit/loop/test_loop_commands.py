@@ -492,3 +492,17 @@ def test_an_edit_of_another_steps_node_or_of_a_seed_during_a_fix_is_listed(host:
     assert "cap-account-recovery (outside the scope)" in listed, listed
     assert any(entry.startswith("seed document ") and entry.endswith("(outside the scope)") for entry in listed), listed
     assert "fr-password-reset" not in " ".join(listed).replace("fr-password-reset-request", "")  # the target is no unasked change
+
+
+def test_a_node_a_fixer_deleted_without_a_finding_is_listed(host: Path) -> None:
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    review(host, run_id, loop(host, "next", run_id), [FINDING])
+    fix = loop(host, "next", run_id)
+    _patch_statement(host)
+    code, out = run_on_example(host, "json", "delete", "--id", "ac-password-reset-1")
+    assert code == 0, out  # a criterion no finding names (the finding is about the requirement's statement)
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps(
+        {"outcomes": [{"key": KEY, "outcome": "fixed", "changed": ["fr-password-reset"]}]}))
+    loop(host, "next", run_id)
+    listed = run_json(host, run_id)["meta"]["unasked_changes"]
+    assert listed == ["ac-password-reset-1"], listed  # the node is gone: it is in no later reading of the spec
