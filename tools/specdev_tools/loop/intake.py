@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -68,6 +69,7 @@ def check_review_file(
         if isinstance(finding, dict):
             finding["signature"] = key_of(finding)  # the key is computed here, never by an agent
     document["$schema"] = FINDINGS_SCHEMA
+    document["generated_at"] = int(time.time())  # when the tool took the file in: an agent has no clock to read
     try:
         violations = schema_violations(repo_root, document)
     except SchemaValidationError as exc:

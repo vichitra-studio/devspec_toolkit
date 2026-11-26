@@ -36,11 +36,14 @@ def as_finding(key: str, info: dict[str, Any]) -> dict[str, Any]:
 def stop_rule(state: RunState) -> dict[str, Any]:
     """The rule this run stops by, for its summary and report: the values are the run's own."""
     blocking, attempts = list(machine.BLOCKING), machine.MAX_ATTEMPTS
-    at_cap = "the operator is asked" if state.kind in machine.CODE_KINDS and not state.defer else "it ends HALT(cap)"
+    at_cap = "the operator is asked" if state.kind in machine.CODE_KINDS else "it ends HALT(cap)"
     parked = "ends the run HALT(stuck)" if state.defer else "is put to the operator"
     text = (f"the run converges when every node of the scope was read in its current content and no "
             f"{' or '.join(blocking)} finding is open (a P2 is a note); at {state.cap} rounds {at_cap}; "
             f"a finding whose fix failed {attempts} times {parked}.")
+    if state.mode == "review-only":
+        text = (f"review-only: one round and nothing is fixed; CLEAN when no {' or '.join(blocking)} finding is "
+                f"raised, else FINDINGS (a P2 is a note).")
     return {"blocking": blocking, "cap": state.cap, "max_attempts": attempts, "defer": state.defer,
             "readers": state.readers, "text": text}
 
@@ -76,7 +79,7 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
         "verdict": verdict, "rounds": meta.get("rounds", []), "findings": findings, "notes": meta.get("notes", {}),
         "gate": meta.get("gate", {}), "links": meta.get("links", {}), "rejected": meta.get("rejected", 0),
         "unasked_changes": meta.get("unasked_changes", []), "noticed": meta.get("noticed", []),
-        "stop_rule": stop_rule(state),
+        "stop_rule": stop_rule(state), "recorded_items": meta.get("recorded_items", []),
     })
     counts: dict[str, int] = {}
     for f in state.findings.values():
@@ -97,6 +100,7 @@ def write(run_dir: str, state: RunState, meta: dict[str, Any], verdict: str) -> 
         ("Settled", [f"{f['key']}: {f['fixer']}" for f in findings if f["status"] == SETTLED and not f["left_as_is"]]),
         ("Handoffs", [f"{k}: {(handoffs[k].get('messages') or [''])[0]}" for k in sorted(handoffs)]),
         ("Notes (P2)", [f"{k}: {v}" for k, v in sorted(meta.get("notes", {}).items())]),
+        ("Open items recorded by a fixer", meta.get("recorded_items", [])),
         ("Changed without a finding", meta.get("unasked_changes", [])),
         ("Noticed by the fixer", meta.get("noticed", [])),
         ("Step gate", [f"step {s}: {r}" for s, r in sorted(meta.get("gate", {}).get("result", {}).items())]),

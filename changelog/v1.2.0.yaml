@@ -3073,9 +3073,9 @@ changes:
   - type: add_script
     description: >
       A run of `specdev loop` records the rule it stops by: `summary.json`
-      (`stop_rule`) and `report.md` give the blocking severities, the cap, the
-      failed fixes before a finding is parked, `--defer` and the readers
-      (DEVSPEC-172).
+      (`stop_rule`) gives the blocking severities, the cap, the failed fixes
+      before a finding is parked, `--defer` and the readers, and `report.md`
+      states the rule in one sentence (DEVSPEC-172).
     migration:
       action: none
   - type: add_script

@@ -207,3 +207,16 @@ def test_a_milestone_run_with_an_open_item_of_the_plan_ends_blocked(host: Path) 
     done = loop(host, "next", run_id)
     assert (done["type"], done["verdict"]) == ("done", "HALT(blocked)"), done
     assert done["open_items"] == ["amb-where-to-store"] and "milestone_state_file" not in done
+
+
+def test_the_stop_rule_of_a_code_run_says_the_operator_is_asked_at_the_cap_even_with_defer(host: Path) -> None:
+    run_id = loop(host, "start", "--kind", "code-group", f"{MS}/{ITEM}", "--execute", "--cap", "1", "--defer")["run_id"]
+    finding = {"kind": "bug", "location": f"{CODE}#confirm", "severity": "P1", "message": "Reused tokens are accepted.",
+               "evidence_quotes": [{"source": CODE, "text": "rejects expired tokens"}]}
+    review(host, run_id, execute(host, run_id), [finding])
+    cap = loop(host, "next", run_id)
+    assert cap["type"] == "ask" and cap["questions"][0]["id"] == "cap"  # what the machine does
+    answers = Path(cap["answers_path"])
+    answers.write_text(json.dumps({"cap": "Stop"}))
+    done = loop(host, "next", run_id, "--answers", str(answers))
+    assert "at 1 rounds the operator is asked" in json.loads(Path(done["summary"]).read_text())["stop_rule"]["text"]

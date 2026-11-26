@@ -167,10 +167,13 @@ The brief lists findings of three sources: `[review]` (a reviewer raised it, wit
    - **declined**: the finding is wrong, or it demands content the contract excludes. `quote` is text that refutes it,
      copied from a node or a contract file; without a quote that occurs there the decline is no outcome. A `[gate]`
      finding and a finding with an `instruction` cannot be declined.
-   - **recorded**: the fix needs an answer nothing gives you. Record an open item ("What nothing settles") and name
-     its id as `item_id`.
+   - **recorded**: the fix needs an answer nothing gives you: no node, seed or contract file states it. Record an
+     open item ("What nothing settles") and name its id as `item_id`. A finding that holds several questions gets
+     one open item per question: `item_id` is the first, `reason` names the others. A finding you can fix in part:
+     make that edit, record an open item for the rest, and answer `recorded` (`changed` names what you edited).
    - **upstream**: the node here is right and a node it links to is wrong. `named` is the kind and location of that
-     node. Do not edit a node outside the listed findings' targets.
+     node. Do not edit a node outside the listed findings' targets. Between the two: `upstream` when a node that
+     exists states the wrong thing, `recorded` when nothing states the answer at all.
 3. `json patch`/`insert` validate every write against the file's `$schema` and **refuse** an edit that *introduces* a
    new schema violation. Validation is differential, so fixing one field while another is still invalid is fine, but
    flipping a conditionally-gated field (a `status`/`severity`/`verdict` value that makes sibling fields required) is
@@ -249,7 +252,7 @@ The id forms name a node, not a file: take the pointer from `specdev node show <
 | `hallucination` (invented file path or command) | `specdev json patch --id` to the correct path/command |
 | `gap` (required field missing) | `specdev json insert --id` or `specdev json patch --id` to add the missing content |
 | `bug` (wrong value against schema) | `specdev json patch --id` to the correct value |
-| any kind, where the finding asks to remove, shorten or move text | remove: `specdev json delete --id <node-id>` for a node, or `specdev json patch --id` with the shorter value for a field; move: `specdev json insert` at the new place, read it back, then `specdev json delete --id` at the old one; then `specdev attest --prune` |
+| any kind, where the finding asks to remove, shorten or move text | remove: `specdev json delete --id <node-id>` for a node, or `specdev json patch --id` with the shorter value for a field; move: read the text, `specdev json delete --id` at the old place, `specdev json insert` at the new one, and read it back; then `specdev attest --prune` |
 | `bug` (wrong cross-reference) | `specdev json patch --id` on the link field to the correct node id |
 | `miss` (FR without fixture) | `specdev json insert --step 08 .fixtures` of a fixture whose `verifies` field names the FR's acceptance criterion, or `specdev json insert --id <fixture-id> .verifies` to add the criterion to an existing fixture |
 | `miss` (capability without trace) | `specdev json insert --id` or `patch --id` on the link field that should name the capability (for example `derives_from`) |

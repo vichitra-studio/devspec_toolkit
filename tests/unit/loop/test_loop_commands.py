@@ -371,6 +371,10 @@ def test_the_summary_and_the_report_state_the_stop_rule_of_the_run(host: Path) -
     assert (rule["blocking"], rule["cap"], rule["max_attempts"], rule["defer"], rule["readers"]) == (["P0", "P1"], 3, 2, True, 1)
     assert "at 3 rounds it ends HALT(cap)" in rule["text"] and "ends the run HALT(stuck)" in rule["text"]
     assert f"Stop rule: {rule['text']}" in Path(done["report"]).read_text()
+    once = loop(host, "start", "--kind", "step", "05", "--review-only", "--readers", "1")["run_id"]
+    review(host, once, loop(host, "next", once))
+    text = json.loads(Path(loop(host, "next", once)["summary"]).read_text())["stop_rule"]["text"]
+    assert text.startswith("review-only: one round and nothing is fixed") and "HALT" not in text
 
 
 def test_a_finding_with_no_quote_or_an_unknown_source_is_refused_and_counted(host: Path) -> None:
@@ -448,3 +452,23 @@ def test_an_edit_outside_the_findings_is_listed_in_the_report(host: Path) -> Non
     assert run_json(host, run_id)["meta"]["unasked_changes"] == ["fr-password-reset-request"]
     done = loop(host, "next", run_id, "--stop")
     assert "## Changed without a finding\n- fr-password-reset-request" in Path(done["report"]).read_text()
+
+
+def test_the_tool_stamps_the_arrival_time_and_a_recorded_open_item_is_not_an_unasked_change(host: Path) -> None:
+    run_id = loop(host, "start", "--kind", "step", "04", "--readers", "1")["run_id"]
+    action = loop(host, "next", run_id)
+    review(host, run_id, action, [FINDING], generated_at="not a number")  # an agent has no clock: the tool sets it
+    fix = loop(host, "next", run_id)
+    assert [e["agent"] for e in fix["entries"]] == ["specdev-impl"], fix
+    merged = json.loads((host / ".specdev" / "runs" / run_id / "d1" / "r0.0.t1.json").read_text())
+    assert merged["generated_at"] == "not a number"  # the agent's file is left as written; the stamp is the tool's own
+    item = {"description": "What happens to open sessions?", "about": ["cap-account-recovery"]}
+    code, out = run_on_example(host, "json", "insert", "--step", "04", ".ambiguities", json.dumps(item))
+    assert code == 0, out
+    (item_id,) = [i["id"] for i in json.loads(next((host / "spec").glob("04_*.json")).read_text())["ambiguities"]]
+    Path(fix["entries"][0]["expect"]).write_text(json.dumps(
+        {"outcomes": [{"key": KEY, "outcome": "recorded", "item_id": item_id}]}))
+    loop(host, "next", run_id)
+    meta = run_json(host, run_id)["meta"]
+    assert meta["recorded_items"] == [item_id] and item_id not in meta["unasked_changes"]
+    assert run_json(host, run_id)["state"]["findings"][KEY]["status"] == "settled"

@@ -13,7 +13,6 @@ REVIEW_SHAPE = {
     "$schema": "vc:infra:findings",
     "round": "<the round, a number>",
     "scope": "<scope>",
-    "generated_at": "<unix seconds, a number>",
     "coverage": {"assigned": ["<every id and path of 'Read'>"], "read": ["<what you read>"], "not_run": []},
     "judgements": [{"key": "<key from 'To judge'>", "verdict": "resolved | not_resolved | decline_right | finding_right", "quote": "<the text that shows it>"}],
     "findings": [
@@ -23,6 +22,8 @@ REVIEW_SHAPE = {
             "message": "<what is wrong and why it matters, at most 600 characters>",
             "severity": "P0 | P1 | P2",
             "evidence_quotes": [{"source": "<node id or file path>", "text": "<exact text that occurs there>"}],
+            "evidence": ["<optional: what else you cite, in your own words>"],
+            "origin": "<optional: introduced-on-branch | pre-existing-on-main | stale-after-fix>",
             "suggested_fix": "<optional>",
         }
     ],

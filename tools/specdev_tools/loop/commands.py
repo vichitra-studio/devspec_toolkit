@@ -544,6 +544,10 @@ class _Run:
                     self.state.findings[named].instruction = OUTSIDE_INSTRUCTION
         self._refresh(after_fix=True, links=links)
         changed = sorted(n for n, h in now.items() if before.get(n) != h and n not in targets)
+        items = self.io.open_item_ids()
+        recorded = [n for n in changed if n not in before and n in items]  # a new open item is what a fixer may add
+        self.meta["recorded_items"] = sorted(set(self.meta.get("recorded_items", [])) | set(recorded))
+        changed = [n for n in changed if n not in recorded]
         self.meta["unasked_changes"] = sorted(set(self.meta["unasked_changes"]) | set(changed))
         self.meta["noticed"] += [n for n in noticed if n not in self.meta["noticed"]]
         machine.close_dispatch(self.state)

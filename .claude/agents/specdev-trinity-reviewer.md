@@ -45,7 +45,6 @@ Bash surface is restricted to these subcommand families only:
 | `mv <output>.tmp <output>` | The rename of your one output file, the path the brief names; nothing else is moved |
 | `sort -u` | De-duplicate the output of a command of this table (after a pipe) |
 | `python`, `pytest`, `npm`, `node` | Run the plan's `review_requirements.test_commands` (read-only: a command that writes outside a temp folder is not run) |
-| `jq -n 'now \| floor'` | Compute integer epoch for `generated_at` field |
 
 No writes to spec artifacts or to the plan. No `specdev json patch/insert/delete`, no
 `specdev plan record`, no `specdev review record`.
@@ -222,7 +221,7 @@ the findings; no tool enforces them and you never say one does.
 ## Findings file
 
 Write the one file the brief names, in the shape the brief gives (`"$schema": "vc:infra:findings"`, `round` and
-`scope` as the brief states them, `generated_at` from `jq -n 'now | floor'`), under the `.tmp` name first, then `mv`.
+`scope` as the brief states them; the tool stamps `generated_at` itself), under the `.tmp` name first, then `mv`.
 The tool checks the file and hands the assignment out again when it fails; you do not validate it yourself and you
 do not write `signature`.
 

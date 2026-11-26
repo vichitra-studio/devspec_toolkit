@@ -48,7 +48,8 @@ probe the shape first.
 1. Read the brief, then every file under its "Contract" heading, in full.
 2. Seeds. For each step of the nodes you review, `specdev json read spec/common/seed_manifest.json '.step_requirements."<NN>"' --repo-root <toolkit>`
    lists the seed ids the step must ingest (there is no fallback to `global_seed_order`, which is read order only);
-   `'.seeds[] | {seed_id, path}'` maps ids to paths. Read each seed document.
+   `'.seeds[] | {seed_id, path}'` maps ids to paths. Read each seed document that entry names. A step with no entry
+   (`null`) ingests no seed: read none for it, and do not list a seed in `coverage.read`.
 3. Read every node of the brief's "Read" list with `specdev node show <id> --full --json`, and the nodes each links to
    as far as you need to judge it. A listed spec file stands for what is in the file and is no node: its top-level
    fields and its open items (`.ambiguities`).
@@ -60,6 +61,8 @@ probe the shape first.
 5. Judge every entry of "To judge": read the target as it is now and answer with a verdict and the text that shows it.
    A fix that changed the text without removing the defect is `not_resolved`. A decline is right only when its quote
    refutes the finding. An accepted link is right only when the holder still follows from its target as changed.
+   When the fix removed the node the finding was about, the `quote` is the text that now stands in its place (the
+   parent's list of ids, or the node that took over its content).
 6. Write the file in the shape the brief gives. `coverage.read` lists what you read of the "Read" list and the
    contract: list a node only if you read it. If you could not read something, put it in `coverage.not_run`; the tool
    then hands the assignment out again, which is better than a review that claims more than it did.
