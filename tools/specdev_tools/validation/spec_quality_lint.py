@@ -6,6 +6,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from ..core.errors import SpecError, make_error
+from ..core.step_paths import is_extension_file
 from .linter_utils import (
     build_lint_graph,
     collect_ids_and_refs,
@@ -46,13 +47,16 @@ CRITICAL_ARRAY_KEYS = {"functional_requirements", "terms", "apis", "rules", "nfr
 _ASSUMPTION_THRESHOLD = 10
 
 
-def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[SpecError]:
+def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None, spec_root: str | None = None) -> list[SpecError]:
     """Quality checks over every artifact of *spec_dir*, plus reference closure over the ids the spec defines.
 
     Definitions come from *graph* (built here when ``None``) for the files it covers and from a scan of the file
-    for the others.  Returns the findings; never raises.
+    for the others.  *spec_root* is the spec folder the caller was told (``--spec-root``; default: *spec_dir*, the
+    folder it was handed): a file of its extensions folder is step 13's whatever its name, and no step artifact
+    here.  Returns the findings; never raises.
     """
     errors: list[SpecError] = []
+    spec_root = spec_root or spec_dir
     graph = build_lint_graph(spec_dir) if graph is None else graph
     covered = graph_covered_files(graph)
     known_ids = graph_known_ids(graph)
@@ -66,7 +70,7 @@ def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[Spec
             rel = os.path.relpath(path, spec_dir)
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_json {exc}"))
             continue
-        if not _is_step_artifact(path, data):
+        if not _is_step_artifact(path, data, spec_root):
             continue
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_check_required_top_level(rel, data))
@@ -83,7 +87,7 @@ def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[Spec
                 data = json.load(f)
         except (OSError, json.JSONDecodeError):
             continue
-        if not _is_step_artifact(path, data):
+        if not _is_step_artifact(path, data, spec_root):
             continue
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_check_assumptions(rel, data))
@@ -245,7 +249,10 @@ def _check_critical_arrays(rel: str, data: dict[str, Any]) -> list[SpecError]:
     return errs
 
 
-def _is_step_artifact(path: str, data: dict[str, Any] | None = None) -> bool:
+def _is_step_artifact(path: str, data: dict[str, Any] | None = None, spec_root: str | None = None) -> bool:
+    """Whether *path* is a step artifact by its name or its ``$schema``; never a file of the extensions folder of *spec_root*."""
+    if spec_root is not None and is_extension_file(path, spec_root):
+        return False
     if STEP_ARTIFACT_RE.match(os.path.basename(path)):
         return True
     if isinstance(data, dict):

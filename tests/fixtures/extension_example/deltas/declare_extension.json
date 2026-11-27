@@ -1,0 +1,54 @@
+{
+  "description": "The manifest of the worked example declares the extension ext-01-database (the files of spec/extensions/ are copied beside it). With this delta and the two files the example reports what the plain example reports.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/13_extension_manifest.json",
+      "path": [
+        "extension_decision"
+      ],
+      "value": {
+        "status": "extensions-required",
+        "rationale": "The identity service keeps reset tokens and member credentials in a relational store. Its datastores, tables and validation rules are three dedicated sections that the core steps 05 to 07 cannot express."
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/13_extension_manifest.json",
+      "path": [
+        "extensions"
+      ],
+      "value": {
+        "extension_id": "ext-01-database",
+        "title": "Database Extension",
+        "area_of_concern": "Data",
+        "justification": "The password reset requirement needs a stored, single-use token and the identity service owns that storage; no core step describes a table.",
+        "required_schema_sections": [
+          "datastores",
+          "tables",
+          "validation_rules"
+        ],
+        "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for datastore and table ids (ds-{name}, tbl-{name}). Every table names its datastore and the requirement it exists for. Include validation_rules that a test can verify; avoid engine-specific options.",
+        "governance_label_ref": {
+          "id": "cn:core:governance_label:mandatory",
+          "kind": "governance_label",
+          "version": "^1.0.0"
+        }
+      }
+    },
+    {
+      "op": "set",
+      "file": "spec/13_extension_manifest.json",
+      "path": [
+        "canonical_refs_used"
+      ],
+      "value": [
+        {
+          "id": "cn:core:governance_label:mandatory",
+          "kind": "governance_label",
+          "version": "^1.0.0"
+        }
+      ]
+    }
+  ]
+}

@@ -27,10 +27,11 @@ from ..core.constants import SEED_MANIFEST_FILE
 from ..core.errors import FindingError, SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
+from ..core.step_paths import step_of_spec_file
 from ..graph.check import run_graph_check
 from ..graph.gitview import read_seed_texts, read_seed_texts_noting
 from ..graph.model import Graph
-from ..graph.ownership import STEP_PREFIX, stamp_file_owner, step_for_file
+from ..graph.ownership import STEP_PREFIX, stamp_file_owner
 from ..lifecycle.frozen import check_frozen_plans
 from ..lifecycle.plan_records import check_plan_records
 from ..proof.built_evidence import bind_proof_seams
@@ -179,13 +180,16 @@ def lock_link_findings(
 
 
 
-def _owned_by_file(errors: Sequence[SpecError], spec_dir: str) -> list[SpecError]:
-    """*errors* with the step of the spec file each one names (``file``, relative to *spec_dir*) as its owner, where it has none."""
+def _owned_by_file(errors: Sequence[SpecError], spec_dir: str, spec_root: str) -> list[SpecError]:
+    """*errors* with the step of the spec file each one names (``file``, relative to *spec_dir*) as its owner, where it has none.
+
+    *spec_root* is the spec folder: the place of a file says whether it is step 13's (``step_paths.step_of_spec_file``).
+    """
     stamped: list[SpecError] = []
     for err in errors:
         if err.owner is None and err.file:
             path = err.file if os.path.isabs(err.file) else os.path.join(spec_dir, err.file)
-            err = stamp_file_owner([err], step_for_file(path, read_json_object(path)))[0]
+            err = stamp_file_owner([err], step_of_spec_file(path, read_json_object(path), spec_root))[0]
         stamped.append(err)
     return stamped
 
@@ -194,6 +198,7 @@ def _owned_by_file(errors: Sequence[SpecError], spec_dir: str) -> list[SpecError
 
 def _check_schema_validation(ctx: CheckContext) -> dict[str, Any]:
     from .validate import validate_file
+    from .validators.step_13 import folder_errors_of_a_walk
 
     schema_errs: list[SpecError] = []
     if os.path.isdir(ctx.spec_dir):
@@ -206,10 +211,12 @@ def _check_schema_validation(ctx: CheckContext) -> dict[str, Any]:
                 git_root=ctx.git_root,
                 spec_root=ctx.spec_root,
                 include_id_slice=False,
+                schema_spec_root=ctx.effective_spec_root,
             )
             where = os.path.relpath(file_path, ctx.spec_dir)
-            owned = stamp_file_owner(file_errs, step_for_file(file_path, read_json_object(file_path)))
+            owned = stamp_file_owner(file_errs, step_of_spec_file(file_path, read_json_object(file_path), ctx.effective_spec_root))
             schema_errs.extend(err if err.file is not None else replace(err, file=where) for err in owned)
+        schema_errs.extend(folder_errors_of_a_walk(ctx.repo_root, ctx.spec_dir, ctx.effective_spec_root))
     return check_result(schema_errs)
 
 
@@ -220,7 +227,7 @@ def _check_toolkit_version_result(ctx: CheckContext) -> dict[str, Any]:
 def _check_spec_quality_lint(ctx: CheckContext) -> dict[str, Any]:
     from .spec_quality_lint import lint_spec_quality
 
-    return check_result(lint_spec_quality(ctx.spec_dir, graph=ctx.lint_graph))
+    return check_result(lint_spec_quality(ctx.spec_dir, graph=ctx.lint_graph, spec_root=ctx.effective_spec_root))
 
 
 def _check_canonical_lint(ctx: CheckContext) -> dict[str, Any]:
@@ -237,6 +244,7 @@ def _check_canonical_integrity(ctx: CheckContext) -> dict[str, Any]:
             ctx.repo_root, ctx.spec_dir,
             require_manifest_schema_registration=True,
             project_canon_dir=ctx.project_canon_dir,
+            spec_root=ctx.effective_spec_root,
         )
     )
 
@@ -255,7 +263,7 @@ def _check_hallucination_lint(ctx: CheckContext) -> dict[str, Any]:
         git_root=ctx.git_root,
         graph=ctx.lint_graph,
     )
-    return check_result(_owned_by_file(hall_errs, ctx.spec_dir))
+    return check_result(_owned_by_file(hall_errs, ctx.spec_dir, ctx.effective_spec_root))
 
 
 def _check_seed_lint(ctx: CheckContext) -> dict[str, Any]:

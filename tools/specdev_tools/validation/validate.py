@@ -37,6 +37,9 @@ from .spec_check import lock_link_findings
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
+from ..core.host_schemas import (
+    SCHEMA_SUFFIX, is_file_of_the_folder, project_canon_of_file, schema_uri_problem, spec_root_for,
+)
 from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import get_shared_registry
 from ..graph.build import build_file_graph
@@ -65,7 +68,8 @@ from .validators import (
 )
 
 
-from ..core.step_paths import get_step_from_path, refine_impl_context_substep
+from ..core.step_paths import EXTENSION_STEP, get_step_from_path, is_extension_file, refine_impl_context_substep
+from .validators.step_13 import folder_errors_of_a_walk, schema_file_errors
 from .validators.step_16 import is_legacy_closed_plan
 
 
@@ -86,16 +90,33 @@ def validate_file(
     git_root: str | None = None,
     spec_root: str | None = None,
     include_id_slice: bool = True,
+    schema_spec_root: str | None = None,
 ) -> list[SpecError]:
     """Validate one spec file: schema, deep per-step checks and, by default, duplicate ids inside the file (E704).
 
     ``include_id_slice=False`` drops the duplicate-id check; ``spec-check`` passes it because its ``graph`` check
     covers the same duplicates across all files.
+
+    ``schema_spec_root`` is the spec folder *path* belongs to, from a caller that validates a whole folder and so
+    knows it whether or not ``--spec-root`` was given (``spec_root`` stays what the per-step checks have always been
+    handed).  The folder's extension schemas (``extensions/*.schema.json``, ``core/host_schemas.py``) are known beside
+    the toolkit's, and the step-13 manifest is compared with the folder's files.  Default: ``spec_root``; with neither,
+    a file of an ``extensions`` folder belongs to the folder above it (``spec_root_for``, the path alone).  With the
+    spec folder known, the place of a file says whether it is a file of the extensions folder, and so step 13's
+    (``step_paths.is_extension_file``).
+    The data file of an extension is judged by the schema its file name gives and by no other, and that schema judges
+    no other file (``schema_uri_problem``).  A schema file of the ``extensions`` folder is no spec artifact: the answer
+    for it is what the folder check says of that file (``step_13.schema_file_errors``).
     """
+    known_root = schema_spec_root or spec_root
+    host_root = spec_root_for(path, known_root)
+    project_canon_dir = project_canon_of_file(path, known_root, project_canon_dir)
     try:
         get_shared_registry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
         return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e)}")]
+    if path.endswith(SCHEMA_SUFFIX) and is_file_of_the_folder(path, known_root) and os.path.isfile(path):
+        return schema_file_errors(repo_root, host_root, os.path.basename(path))
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -107,6 +128,10 @@ def validate_file(
                     f"expected=object got={type(data).__name__}",
                 )
             ]
+
+        mismatch = schema_uri_problem(path, data, known_root)
+        if mismatch:
+            return [make_error("E520", f"{path}: {mismatch}")]
 
         schema_uri = data.get("$schema")
         if schema_uri is None:
@@ -124,7 +149,7 @@ def validate_file(
             return [make_error("E520", f"{path}: missing_schema_uri")]
 
         try:
-            raw_errors = validate_data_against_schema(repo_root, data)
+            raw_errors = validate_data_against_schema(repo_root, data, host_root)
         except SchemaBootstrapError as e:
             # TOCTOU / reordering defence: helper's own bootstrap failed after the
             # probe above succeeded.  Emit the byte-identical message the probe would
@@ -147,7 +172,7 @@ def validate_file(
         # Resolve step once — use content-based refinement for impl_context/
         # artifacts so the 16c validator actually runs during
         # validate_file (path-only routing always yielded "16a").
-        step = refine_impl_context_substep(get_step_from_path(path), data)
+        step = refine_impl_context_substep(get_step_from_path(path, known_root), data)
         # Ruling L2: a plan of a legacy-closed milestone keeps its 1.1.1 shape as history, so the schema does not judge it.
         if step in ("16a", "16c") and is_legacy_closed_plan(path, spec_root):
             errors = []
@@ -164,14 +189,23 @@ def validate_file(
 
             enhanced_errors.append(make_error("E520", error_msg, jq_path=jq_path_of(path_tuple)))
 
-        deep_errors = _run_deep_validation(step, data, repo_root, path, git_root=git_root, spec_root=spec_root)
+        # A file of the extensions folder belongs to step 13, but the deep checks of that step read the manifest: they run on it alone.
+        deep_errors = [] if is_extension_file(path, known_root) else _run_deep_validation(
+            step, data, repo_root, path, git_root=git_root, spec_root=spec_root, schema_spec_root=host_root,
+        )
         if deep_errors:
+            # The manifest's findings about an entry or a file keep their place: the step gate tells them apart by it.
+            place_kept = step == EXTENSION_STEP
             for de in deep_errors:
                 enhanced_errors.append(
-                    SpecError(code=de.code, message=f"{path}: {de.message}", path=de.path)
+                    SpecError(
+                        code=de.code, message=f"{path}: {de.message}", path=de.path,
+                        jq_path=de.jq_path if place_kept else None, node_id=de.node_id if place_kept else None,
+                        file=de.file,
+                    )
                 )
 
-        if include_quality_lint:
+        if include_quality_lint and not (known_root is not None and is_extension_file(path, known_root)):
             quality_errors = lint_spec_quality_file(path, spec_dir=os.path.dirname(path))
             if quality_errors:
                 enhanced_errors.extend(quality_errors)
@@ -182,6 +216,7 @@ def validate_file(
                 enforce_unresolved_semantics=False,
                 require_manifest_schema_registration=True,
                 project_canon_dir=project_canon_dir,
+                spec_root=host_root,
             )
             if canonical_errors:
                 enhanced_errors.extend(canonical_errors)
@@ -212,6 +247,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
         print(f"specdev: {spec_dir} contains no .json files; nothing to validate.", file=_sys.stderr)
         return []
 
+    known_root = spec_root or spec_dir  # the spec folder is the one the command is told: --spec-root, else the folder it was handed
     failures: list[SpecError] = []
     # Surface (once per run) any SPECDEV_PROMOTE_CODES entries that will be
     # silently ignored because they are not promotable.
@@ -237,11 +273,13 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                 include_canonical_integrity=False,
                 git_root=git_root,
                 spec_root=spec_root,
+                schema_spec_root=known_root,
             )
         )
+    failures.extend(folder_errors_of_a_walk(repo_root, spec_dir, known_root))
 
     lint_graph = build_lint_graph(spec_dir, repo_root)
-    failures.extend(lint_spec_quality(spec_dir, graph=lint_graph))
+    failures.extend(lint_spec_quality(spec_dir, graph=lint_graph, spec_root=known_root))
     if canonical_preflight_errors:
         failures.extend(canonical_preflight_errors)
     else:
@@ -262,6 +300,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                 spec_dir,
                 require_manifest_schema_registration=True,
                 project_canon_dir=project_canon_dir,
+                spec_root=known_root,
             )
         )
 
@@ -448,7 +487,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "10": lambda instance, root, ctx: step_10.validate_step_10(instance, root),
     "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root, ctx.get("artifact_path")),
     "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root, ctx.get("spec_root")),
-    "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root, ctx.get("spec_root")),
+    "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root, ctx.get("schema_spec_root")),
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
     # "16" → Trinity Anchor validator (spec/16_impl_context.json, not in impl_context/).
@@ -472,11 +511,15 @@ def _run_deep_validation(
     path: str,
     git_root: str | None = None,
     spec_root: str | None = None,
+    schema_spec_root: str | None = None,
 ) -> list[SpecError]:
     validator = DEEP_VALIDATORS.get(step)
     if validator is None or not isinstance(data, dict):  # a non-object document is reported by the schema
         return []
     context = _build_validation_context(repo_root, path, git_root=git_root, spec_root=spec_root)
+    # The spec folder the file is known to belong to (``validate_file``); ``None`` for a file validated alone, whose
+    # manifest is then not compared with any folder.  Not ``spec_root``: that one is guessed from ``git_root`` too.
+    context = {**context, "schema_spec_root": schema_spec_root}
     try:
         return validator(data, repo_root, context)
     except Exception as e:

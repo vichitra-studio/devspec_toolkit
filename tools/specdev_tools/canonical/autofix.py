@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator
 from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
+from ..core.host_schemas import schema_uri_problem
 from ..core.loaders import iter_spec_artifacts
 from ..core.registry import SchemaRegistry, get_schema_validator, get_shared_registry
 from ..core.constants import INFERENCE_RULES
@@ -25,7 +26,13 @@ def canonical_autofix(
     canon_dir: str = "canon",
     require_manifest_schema_registration: bool = True,
     project_canon_dir: str | None = None,
+    spec_root: str | None = None,
 ) -> dict[str, list[str | SpecError]]:
+    """Propose (or with *write*, make) the canonical fixes of every artifact under *spec_dir*.
+
+    *spec_root* is the spec folder the caller was told (``--spec-root``); *spec_dir* itself when absent.  Its
+    extension schemas are known beside the toolkit's, and its place says which file is an extension's data file.
+    """
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
         return {spec_dir_abs: [make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}")]}
@@ -39,7 +46,8 @@ def canonical_autofix(
         canon_root = os.path.join(os.path.abspath(repo_root), canon_dir)
         return {canon_root: _uniq(preflight_errors)}
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
-    schema_registry, schema_registry_error = _load_schema_registry(repo_root)
+    known_root = spec_root or spec_dir_abs
+    schema_registry, schema_registry_error = _load_schema_registry(repo_root, known_root)
     changes: dict[str, list[str | SpecError]] = {}
     if registry.load_errors:
         canon_root = os.path.join(os.path.abspath(repo_root), canon_dir)
@@ -54,7 +62,9 @@ def canonical_autofix(
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
             changes[path] = [make_error("E520", f"UNRESOLVED_INPUT {path} invalid_json {str(exc)}")]
             continue
-        schema_validator, schema_error = _build_schema_validator(schema_registry, data, schema_registry_error)
+        schema_error = schema_uri_problem(path, data, known_root)  # an extension schema and its data file judge each other only
+        if schema_error is None:
+            schema_validator, schema_error = _build_schema_validator(schema_registry, data, schema_registry_error)
         if schema_error:
             changes[path] = [make_error("E520", f"UNRESOLVED_INPUT {path} {schema_error}")]
             continue
@@ -152,9 +162,10 @@ def _iter_json(spec_dir: str):
     yield from iter_spec_artifacts(spec_dir)
 
 
-def _load_schema_registry(repo_root: str) -> tuple[SchemaRegistry | None, str | None]:
+def _load_schema_registry(repo_root: str, spec_root: str | None = None) -> tuple[SchemaRegistry | None, str | None]:
+    """The schema registry of the toolkit, with the extension schemas of the spec folder *spec_root* when it has any."""
     try:
-        return get_shared_registry(repo_root), None
+        return get_shared_registry(repo_root, spec_root), None
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, str(exc)
 

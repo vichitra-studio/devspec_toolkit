@@ -1,0 +1,99 @@
+{
+  "$schema": "vc:ext-01-database",
+  "id": "ext-database-password-reset",
+  "owner": "data",
+  "created_at": "2026-11-15T00:00:00Z",
+  "datastores": [
+    {
+      "datastore_id": "ds-identity",
+      "name": "Identity store",
+      "engine": "postgresql",
+      "description": "The relational store of the identity service: member credentials and the tokens of a password reset.",
+      "derives_from": [
+        "identity-service"
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "table_id": "tbl-reset-token",
+      "name": "reset_token",
+      "description": "One row for each password reset a member asked for: the hash of the token, when it expires and when it was used.",
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "text"
+        },
+        {
+          "name": "member_id",
+          "type": "uuid"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "used_at",
+          "type": "timestamptz",
+          "nullable": true
+        }
+      ],
+      "term_ref": {
+        "id": "cn:project:term:reset-token",
+        "kind": "term",
+        "version": "1.0.0"
+      },
+      "scope": "in",
+      "derives_from": [
+        "fr-password-reset"
+      ],
+      "part_of": [
+        "ds-identity"
+      ]
+    },
+    {
+      "table_id": "tbl-member-credential",
+      "name": "member_credential",
+      "description": "One row for each member: the hash of the current password and when it was last changed.",
+      "columns": [
+        {
+          "name": "member_id",
+          "type": "uuid"
+        },
+        {
+          "name": "password_hash",
+          "type": "text"
+        },
+        {
+          "name": "changed_at",
+          "type": "timestamptz"
+        }
+      ],
+      "scope": "later",
+      "scope_reason": "The credential table exists already and this release does not change it; it is described here so that a later release can.",
+      "derives_from": [
+        "fr-password-reset"
+      ],
+      "part_of": [
+        "ds-identity"
+      ]
+    }
+  ],
+  "validation_rules": [
+    {
+      "name": "a reset token expires",
+      "check": "Every row of reset_token has an expires_at later than the moment the row was written."
+    },
+    {
+      "name": "a reset token is used once",
+      "check": "A row of reset_token whose used_at is set is never accepted for a second reset."
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:project:term:reset-token",
+      "kind": "term",
+      "version": "^1.0.0"
+    }
+  ]
+}

@@ -109,6 +109,11 @@ def _discover_project_canon_dir(
     return None
 
 
+def _told(spec_root: str | None) -> dict[str, str]:
+    """The ``spec_root`` argument of a folder command when ``--spec-root`` was given; with no flag the call is unchanged."""
+    return {"spec_root": spec_root} if spec_root else {}
+
+
 def _refuse_spec_check(error: SpecError, json_output: bool) -> NoReturn:
     """Print a refusal of ``spec-check`` (one finding: E520, E706, E708) and exit 1."""
     from .core.json_output import format_errors_json
@@ -940,6 +945,7 @@ def main():
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
+            **_told(spec_root),
         )
         if getattr(args, "json_output", False):
             _json_exit(errs, "canonical-integrity")
@@ -967,6 +973,7 @@ def main():
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
+            **_told(spec_root),
         )
         if getattr(args, "json_output", False):
             # Flatten changes dict into a list of SpecError / str items
@@ -1040,7 +1047,8 @@ def main():
     elif args.cmd == "spec-quality-lint":
         from .validation.spec_quality_lint import lint_spec_quality
         spec_dir = os.path.abspath(args.spec_dir)
-        errs = lint_spec_quality(spec_dir)
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        errs = lint_spec_quality(spec_dir, **_told(spec_root))
         if getattr(args, "json_output", False):
             _json_exit(errs, "spec-quality-lint")
         else:

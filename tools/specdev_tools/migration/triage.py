@@ -175,7 +175,7 @@ def legacy_text(spec_dir: str | os.PathLike[str], toolkit_root: str | os.PathLik
     except (OSError, WriterError, KeyError, TypeError):
         raise TriageError(f"there is no capture ({capture_path} is missing or not a capture): `specdev align apply --auto` writes it") from None
     wanted = normalize_step(step)
-    chosen = [rel for rel in files if get_step_from_path(rel) == wanted]
+    chosen = [rel for rel in files if get_step_from_path(os.path.join(context.spec_root, rel), context.spec_root) == wanted]
     if not chosen:
         raise TriageError(f"the capture lists no file of step {wanted} (it lists the files of the spec as they were at {commit[:12]})")
     parts: list[str] = []

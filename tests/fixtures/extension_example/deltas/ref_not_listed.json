@@ -1,0 +1,13 @@
+{
+  "description": "The data file carries a canonical ref (the term_ref of tbl-reset-token) that its canonical_refs_used does not list.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/extensions/ext_01_database.json",
+      "path": [
+        "canonical_refs_used"
+      ],
+      "value": []
+    }
+  ]
+}

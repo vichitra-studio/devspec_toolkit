@@ -185,6 +185,7 @@ def violation_text(item: SchemaViolation) -> str:
 def validate_data_against_schema(
     repo_root: str,
     data: dict,
+    spec_root: str | None = None,
 ) -> list[tuple[tuple, str]]:
     """Validate *data* against the schema declared by its ``"$schema"`` key.
 
@@ -198,6 +199,12 @@ def validate_data_against_schema(
         The document to validate.  Must be a ``dict``; the ``"$schema"``
         field is read from it and then stripped from the validation payload
         (mirrors ``validate.py``).
+    spec_root:
+        The spec folder *data* belongs to.  Its extension schemas
+        (``<spec_root>/extensions/*.schema.json``, see ``core/host_schemas.py``)
+        are known beside the toolkit's, so an extension's data file validates.
+        ``None`` (the default), or a folder with no such schema, gives the
+        toolkit's schemas alone, exactly as before the argument existed.
 
     Returns
     -------
@@ -234,20 +241,20 @@ def validate_data_against_schema(
     All of the above are subclasses of ``SchemaValidationError`` so a single
     ``except SchemaValidationError`` clause handles the whole family.
     """
-    return [(tuple(e.path), e.message) for e in _schema_errors(repo_root, data)]
+    return [(tuple(e.path), e.message) for e in _schema_errors(repo_root, data, spec_root)]
 
 
-def schema_violations(repo_root: str, data: dict) -> list[SchemaViolation]:
+def schema_violations(repo_root: str, data: dict, spec_root: str | None = None) -> list[SchemaViolation]:
     """The violations of *data* against its own ``$schema``, each with the keyword that failed.
 
-    Same contract and exceptions as ``validate_data_against_schema``; the list is unsorted.  A caller that must tell a
+    Same contract, *spec_root* and exceptions as ``validate_data_against_schema``; the list is unsorted.  A caller that must tell a
     violation that already existed from one an edit caused compares ``(path, keyword)``: the message of a keyword such
     as ``minItems`` or ``anyOf`` quotes the instance and so changes with any edit inside it.
     """
-    return [SchemaViolation(tuple(e.path), str(e.validator), e.message) for e in _schema_errors(repo_root, data)]
+    return [SchemaViolation(tuple(e.path), str(e.validator), e.message) for e in _schema_errors(repo_root, data, spec_root)]
 
 
-def _schema_errors(repo_root: str, data: dict) -> list[ValidationError]:
+def _schema_errors(repo_root: str, data: dict, spec_root: str | None = None) -> list[ValidationError]:
     """The raw ``jsonschema`` errors of *data*; the typed exceptions are those of ``validate_data_against_schema``."""
     # --- Step 1: validate and extract $schema ---
     schema_uri = data.get("$schema")
@@ -261,7 +268,7 @@ def _schema_errors(repo_root: str, data: dict) -> list[ValidationError]:
 
     # --- Step 2: bootstrap registry (wrapped as typed exception) ---
     try:
-        registry = get_shared_registry(repo_root)
+        registry = get_shared_registry(repo_root, spec_root)
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         raise SchemaBootstrapError(original=exc) from exc
 

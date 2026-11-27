@@ -227,11 +227,14 @@ class SchemaResolverCtx:
     Holds the built id_index and a ref cache; ``make_resolve_fn`` returns a closure suitable for use with
     schema_nav's ``effective_schema``.  Only the id_index scan (once per schema dir) is expensive.  If the schema
     dir is unavailable the instance is still usable but every lookup returns ``None``.
+
+    *spec_root* is the spec folder of the files: its extension schemas (``build_id_index``) are resolved beside the
+    toolkit's.  ``None`` gives the toolkit's schemas alone.
     """
 
-    def __init__(self, repo_root: str | None) -> None:
+    def __init__(self, repo_root: str | None, spec_root: str | None = None) -> None:
         schema_dir = find_schema_dir(repo_root)
-        self._id_index: dict[str, str] = build_id_index(schema_dir) if schema_dir else {}
+        self._id_index: dict[str, str] = build_id_index(schema_dir, spec_root) if schema_dir else {}
         self._ref_cache: dict[str, dict] = {}
 
     def make_resolve_fn(self, root_schema: dict):

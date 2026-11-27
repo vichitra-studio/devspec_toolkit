@@ -10,6 +10,7 @@ Path                                      Steps
 ========================================  ==========================================================
 ``<spec>/NN_*.json``                      ``NN`` (the anchor ``16_impl_context.json`` gives ``16``)
 ``<spec>/impl_context/ms_*_plan.json``    ``16a``, ``16b``, ``16c``
+``<spec>/extensions/*.json``              ``13`` (a JSON file directly in the folder; the manifest owns them)
 a seed listed in the manifest             steps whose nodes ``derives_from`` it, plus the steps the
                                           manifest routes it to; step ``00`` when there are none
 ``<spec>/common/seed_manifest.json``      step ``00`` and every step of ``step_requirements``
@@ -32,7 +33,7 @@ from specdev_tools.core.ambiguity_items import PLAN_FILE_RE
 from specdev_tools.core.constants import SEED_MANIFEST_FILE
 from specdev_tools.core.scope_helpers import as_dict, as_str, dict_items
 from specdev_tools.core.seed_routing import resolve_seeds_for_step
-from specdev_tools.core.step_paths import PLAN_DIR_NAME, STEP_JSON_RE
+from specdev_tools.core.step_paths import EXTENSION_FILE_SUFFIX, EXTENSION_STEP, EXTENSIONS_DIR_NAME, PLAN_DIR_NAME, STEP_JSON_RE
 from specdev_tools.graph import names
 from specdev_tools.graph.gitview import git_top_level, host_root_of, relative_inside, spec_path_in_repo
 from specdev_tools.graph.model import Graph
@@ -149,6 +150,8 @@ def _spec_file_steps(relative: str, manifest: Mapping[str, Any]) -> set[str]:
     directory, name = posixpath.split(relative)
     if directory == PLAN_DIR_NAME and PLAN_FILE_RE.match(name):
         return set(PLAN_FILE_STEPS)
+    if directory == EXTENSIONS_DIR_NAME and name.endswith(EXTENSION_FILE_SUFFIX):
+        return {EXTENSION_STEP}
     match = None if directory else STEP_JSON_RE.match(name)
     return {match.group(1)} if match else set()
 
@@ -182,9 +185,19 @@ def steps_without_artifact(steps: Iterable[str], spec_dir: str) -> tuple[str, ..
     return tuple(step for step in steps if step not in present)
 
 
+def _has_a_json_file(folder: str) -> bool:
+    try:
+        with os.scandir(folder) as entries:
+            return any(entry.name.endswith(EXTENSION_FILE_SUFFIX) and entry.is_file() for entry in entries)
+    except OSError:  # no such folder, or one that cannot be listed
+        return False
+
+
 def _present_steps(spec_dir: str) -> set[str]:
-    """Steps with a file in *spec_dir*: a root ``NN_*.json``, or (for 16a to 16c) a milestone plan."""
+    """Steps with a file in *spec_dir*: a root ``NN_*.json``, a milestone plan (16a to 16c), or a JSON file of ``extensions/`` (13)."""
     present = {match.group(1) for name in os.listdir(spec_dir) if (match := STEP_JSON_RE.match(name))}
+    if _has_a_json_file(os.path.join(spec_dir, EXTENSIONS_DIR_NAME)):  # with no manifest too: its JSON files are step 13's
+        present.add(EXTENSION_STEP)
     plans = os.path.join(spec_dir, PLAN_DIR_NAME)
     if os.path.isdir(plans) and any(PLAN_FILE_RE.match(name) for name in os.listdir(plans)):
         present.update(PLAN_FILE_STEPS)

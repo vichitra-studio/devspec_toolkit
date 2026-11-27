@@ -180,8 +180,8 @@ class GraphCheckContext:
 
     @cached_property
     def slots(self) -> SchemaSlots:
-        """The schema slots of the nodes' files (``SchemaSlots``), read from the toolkit at ``repo_root``; each file's schema is loaded once per context."""
-        return SchemaSlots(self.repo_root)
+        """The schema slots of the nodes' files (``SchemaSlots``), read from the toolkit at ``repo_root`` and the extension schemas of ``spec_root``; each file's schema is loaded once per context."""
+        return SchemaSlots(self.repo_root, self.spec_root)
 
     @cached_property
     def manifest(self) -> Mapping[str, Any]:

@@ -342,6 +342,10 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
       (``extras/trace.lock.json``) and the records under ``extras/verification/``
       rely on this exclusion; a test pins it.
     - ``migration_backups/`` — excluded at all levels (toolkit convention).
+    - ``*.schema.json`` — excluded at all levels: a JSON Schema is not a spec
+      artifact.  The schema of a host extension (``extensions/ext_NN_<topic>.schema.json``,
+      see ``core/host_schemas.py``) lies beside its data file and is checked by
+      the step-13 validator, not by per-file validation.
 
     All callers that need to discover spec artifacts recursively must route
     through this helper so the exclusion is enforced in exactly one place.
@@ -357,7 +361,7 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
         else:
             dirnames[:] = [d for d in dirnames if d != "migration_backups"]
         for fn in files:
-            if fn.endswith(".json"):
+            if fn.endswith(".json") and not fn.endswith(".schema.json"):
                 # Skip entry_key_registry.json — this file may still appear in
                 # the host spec directory during migration (W3-T5 will remove
                 # it). The canonical copy now lives toolkit-side at

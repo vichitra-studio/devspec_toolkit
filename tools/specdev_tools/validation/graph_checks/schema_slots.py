@@ -61,8 +61,8 @@ def alternatives_of(schema: dict[str, Any], resolve: Any, _depth: int = 0) -> li
 class SchemaSlots:
     """The effective schema of a node or leaf, read from the ``$schema`` of its file; the schema of each file is loaded once."""
 
-    def __init__(self, repo_root: str) -> None:
-        self._resolver = SchemaResolverCtx(repo_root)
+    def __init__(self, repo_root: str, spec_root: str | None = None) -> None:
+        self._resolver = SchemaResolverCtx(repo_root, spec_root)
         self._files: dict[str, tuple[Any, Any]] = {}
 
     def _loaded(self, graph: Graph, node: Node) -> tuple[Any, Any]:

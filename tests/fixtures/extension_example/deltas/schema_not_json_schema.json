@@ -1,0 +1,15 @@
+{
+  "description": "The schema says \"type\": \"arrray\": it is not a JSON Schema, so it is not loaded.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/extensions/ext_01_database.schema.json",
+      "path": [
+        "properties",
+        "tables",
+        "type"
+      ],
+      "value": "arrray"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "The data file names a $schema that no extension schema of the folder has.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/extensions/ext_01_database.json",
+      "path": [
+        "$schema"
+      ],
+      "value": "vc:ext-09-nowhere"
+    }
+  ]
+}

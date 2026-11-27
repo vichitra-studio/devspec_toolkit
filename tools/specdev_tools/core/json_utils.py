@@ -30,6 +30,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
 from specdev_tools.core import entry_key_registry as _ekreg
+from specdev_tools.core.host_schemas import find_host_schemas, schema_place_of, schema_uri_problem, spec_root_of
 from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
 from specdev_tools.core.schema_validate import (
     NoSchemaError,
@@ -165,11 +166,16 @@ def run_jq(args: List[str], input_data: Optional[str] = None, file_path: Optiona
 
 # --- Schema Resolution ---
 
-def build_id_index(schema_dir: str) -> Dict[str, str]:
+def build_id_index(schema_dir: str, spec_root: Optional[str] = None) -> Dict[str, str]:
     """Scan schema dir once, build {$id: file_path} mapping from all *.schema.json files.
 
     Also scans a sibling canon/ directory if it exists, so that canon schema
     $id values (vc:canon:kind, vc:canon:aliases) are indexed for $ref resolution.
+
+    With *spec_root* (the spec folder of the file being resolved), the accepted
+    extension schemas of that folder (``<spec_root>/extensions/*.schema.json``,
+    see ``core/host_schemas.py``) are indexed too; none of them takes a toolkit
+    ``$id``.  ``None``, or a folder with no such schema, gives the toolkit's index alone.
     """
     index = {}
     # Primary: schema/**/*.schema.json
@@ -194,6 +200,7 @@ def build_id_index(schema_dir: str) -> Dict[str, str]:
             except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 continue
 
+    index.update(find_host_schemas(spec_root, index).paths)
     return index
 
 
@@ -263,11 +270,14 @@ def resolve_schema_path(
     file_path: str,
     repo_root: Optional[str] = None,
     id_index: Optional[Dict[str, str]] = None,
+    spec_root: Optional[str] = None,
 ) -> Optional[str]:
     """Resolve the local schema file path from the target JSON's $schema field.
 
     Uses $id-index resolution. If id_index is pre-built, reuses it (avoids
-    double scan when called from json_schema_discovery).
+    double scan when called from json_schema_discovery).  An index built here
+    takes the extension schemas of *spec_root*; without it, those of the spec
+    folder an extension file lies in (``host_schemas.spec_root_of``).
     """
     # 1. Read $schema URI from the target file
     try:
@@ -281,7 +291,7 @@ def resolve_schema_path(
     if id_index is None:
         schema_dir = find_schema_dir(repo_root)
         if schema_dir:
-            id_index = build_id_index(schema_dir)
+            id_index = build_id_index(schema_dir, spec_root or spec_root_of(file_path))
 
     if id_index:
         resolved = id_index.get(schema_url)
@@ -430,12 +440,20 @@ def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
 
 
 def _call_validate_or_raise(
-    eff_root: str, doc: dict, file_path: str, command: str,
+    eff_root: str, doc: dict, file_path: str, command: str, spec_root: Optional[str] = None, place: Optional[str] = None,
 ) -> List[SchemaViolation]:
     """Run schema_violations, mapping every schema-validation failure
-    to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
+    to a fail-CLOSED JsonUtilsError (never crash, never silently return []).
+
+    *spec_root* is the spec folder whose extension schemas are known beside the toolkit's (``schema_violations``).
+    The data file of an extension is judged by the schema its file name gives and by no other, and that schema judges
+    no other file (``schema_uri_problem``).  *place* is where the file lies when *file_path* is not a path from the
+    current folder (``check_edit``); *file_path* stays the name the messages use."""
+    mismatch = schema_uri_problem(place or file_path, doc, spec_root)
+    if mismatch:
+        raise JsonUtilsError(f"Could not validate this write to {file_path}: {mismatch}; refusing to write.")
     try:
-        return schema_violations(eff_root, doc)
+        return schema_violations(eff_root, doc, spec_root)
     except NoSchemaError:
         raise JsonUtilsError(
             f"{file_path} declares no $schema; {command} validates writes against "
@@ -444,6 +462,13 @@ def _call_validate_or_raise(
         )
     except (SchemaNotFoundError, SchemaDecodeError, SchemaBootstrapError) as exc:
         uri = getattr(exc, "uri", None) or getattr(exc, "original", exc)
+        place = schema_place_of(uri) if isinstance(uri, str) else None
+        if place:
+            raise JsonUtilsError(
+                f"Could not locate schema for {file_path} ($schema URI: {uri}); "
+                f"refusing to write. An extension schema is read from {place} in the spec folder: "
+                "write that file, or correct it if `specdev spec-check` reports it."
+            )
         raise JsonUtilsError(
             f"Could not locate schema for {file_path} ($schema URI: {uri}); "
             "refusing to write. Check --repo-root points to the toolkit root and "
@@ -470,6 +495,8 @@ def _ws1_differential_check(
     eff_root: str,
     *,
     command: str,
+    spec_root: Optional[str] = None,
+    place: Optional[str] = None,
 ) -> None:
     """Run the WS1 differential validation algorithm.
 
@@ -491,7 +518,15 @@ def _ws1_differential_check(
         The post-edit document (JSON string).
     eff_root:
         Already-resolved toolkit root (from ``resolve_effective_toolkit_root``).
+    spec_root:
+        The spec folder whose extension schemas are known beside the toolkit's.
+        Without it, the spec folder an extension file lies in (*file_path* in an
+        ``extensions`` folder); for any other file, the toolkit's schemas alone.
+    place:
+        Where the file lies, from a caller that knows the spec folder and
+        whose *file_path* is relative to it (``check_edit``).  Default: *file_path*.
     """
+    spec_root = spec_root or spec_root_of(file_path)
     try:
         original = json.loads(content)
         new = json.loads(new_content)
@@ -525,14 +560,14 @@ def _ws1_differential_check(
         )
 
     # Step 3: Validate post-edit doc — wrapped per catch strategy (fail closed).
-    errors_after = _call_validate_or_raise(eff_root, new, file_path, command)
+    errors_after = _call_validate_or_raise(eff_root, new, file_path, command, spec_root, place)
 
     # Fast path: no errors after edit → write is safe.
     if not errors_after:
         return
 
     # Step 4: Compute errors_before to distinguish pre-existing from newly introduced.
-    errors_before = _call_validate_or_raise(eff_root, original, file_path, command)
+    errors_before = _call_validate_or_raise(eff_root, original, file_path, command, spec_root, place)
     errors_before = _reindexed_after_removal(errors_before, _removed_array_item(original, new))
 
     added = _added_violations(errors_before, errors_after)
@@ -610,14 +645,21 @@ def _added_violations(
 
 def check_edit(
     file_path: str, content: str, new_content: str, repo_root: Optional[str], *, command: str = "json patch",
+    spec_root: Optional[str] = None,
 ) -> None:
     """Refuse (``JsonUtilsError``) *new_content* when it adds a schema violation to *content*, the text of *file_path*.
 
     The same differential check ``json patch`` and ``json insert`` run before they write (the refusal names
     *command*, ``json patch`` by default), for a caller that holds the edited text in memory.  Violations that *content* already had are ignored.
+    *spec_root* is the spec folder of the file, and with it a relative *file_path* is relative to that folder, not to
+    the current one (an id-keyed write names its file so): the schema of an extension file is found there, and
+    ``extensions/<name>`` is a file of its extensions folder from whatever folder the command runs.  See
+    ``_ws1_differential_check`` for the default.
     """
+    place = os.path.join(spec_root, file_path) if spec_root is not None else None  # an absolute path stays what it is
     _ws1_differential_check(
-        file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command=command,
+        file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command=command, spec_root=spec_root,
+        place=place,
     )
 
 
@@ -1106,20 +1148,48 @@ _CONSTRAINT_KEYWORDS = (
 )
 
 
-def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optional[str] = None) -> Optional[str]:
+def _declared_schema(file_path: str) -> Optional[dict]:
+    """``{"$schema": <value>}`` as the file declares it (``{}`` when it declares none); ``None`` for a file that cannot be
+    read as a JSON object."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            document = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    return {"$schema": document["$schema"]} if "$schema" in document else {}
+
+
+def json_schema_discovery(
+    file_path: str, path_selector: str, repo_root: Optional[str] = None, spec_root: Optional[str] = None,
+) -> Optional[str]:
     """Discover allowable fields from the schema, resolving $ref URNs and allOf inline.
 
-    Returns JSON string of discovered schema info.
+    Returns JSON string of discovered schema info.  The schema of an extension file is found in the ``extensions``
+    folder of *spec_root*; without *spec_root*, in the folder the file itself lies in (``host_schemas.spec_root_of``).
     """
     _check_file(file_path)
+    declared = _declared_schema(file_path)
+    mismatch = schema_uri_problem(file_path, declared, spec_root)
+    if mismatch:
+        raise JsonUtilsError(f"Could not resolve schema for {file_path}: {mismatch}.")
 
     # Build index once — shared between resolve_schema_path and ref resolution
     schema_dir = find_schema_dir(repo_root)
-    id_index = build_id_index(schema_dir) if schema_dir else {}
+    id_index = build_id_index(schema_dir, spec_root or spec_root_of(file_path)) if schema_dir else {}
     ref_cache: Dict[str, dict] = {}
 
     schema_path = resolve_schema_path(file_path, repo_root=repo_root, id_index=id_index)
     if not schema_path:
+        uri = declared.get("$schema") if isinstance(declared, dict) else None
+        place = schema_place_of(uri) if isinstance(uri, str) else None
+        if place:
+            raise JsonUtilsError(
+                f"Could not resolve schema for {file_path} ($schema URI: {uri}). "
+                f"An extension schema is read from {place} in the spec folder: "
+                "write that file, or correct it if `specdev spec-check` reports it."
+            )
         raise JsonUtilsError(
             f"Could not resolve schema for {file_path}. "
             "Make sure it has a $schema field and the schema directory is accessible."
