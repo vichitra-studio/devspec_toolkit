@@ -879,7 +879,7 @@ rows:
   disposition: none
   note: 'addition: nothing to migrate'
 - id: SC-05-21
-  path: apis[].errors[].http_status
+  path: apis[].errors[].protocol_status
   change: add
   disposition: none
   note: 'addition: nothing to migrate'

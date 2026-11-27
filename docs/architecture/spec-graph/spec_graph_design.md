@@ -442,10 +442,10 @@ bare ids. `assumes` is open to any obligation or context node at steps 00–11 (
 | 03 | term | No node links to it: used by label. It may list a seed (the row above) (**As built**) | Ruled |
 | 04 | FR | `derives_from` → capability; `depends_on` → FR | Ruled |
 | 05 | API | `derives_from` → FR; `provided_by` → component; `relies_on` → third party; `depends_on` → API | Ruled |
-| 05 | API error | `derives_from` → 04 criterion. Its `http_status` is a field of the node, the one place the number is written | Ruled |
+| 05 | API error | `derives_from` → 04 criterion. Its `protocol_status` (the status number the protocol of its API carries with it: the HTTP status, a gRPC status code, a close code, a reason code) is a field of the node, the one place the number is written | Ruled |
 | 06 | invariant | `constrains` → FR, API, API error, component, connection | Ruled |
 | 07 | NFR | `constrains` → FR, API, component, connection; `relies_on` → third party; (*illustrative*) `derives_from` → metric | Ruled |
-| 08 | fixture | `verifies` → criterion, API, invariant, NFR; `expects` → the API error it expects as its outcome (at most one; not a proof); a removal fixture carries `removes` → a deleted id, which justifies it | Ruled |
+| 08 | fixture | `verifies` → criterion, API, invariant, NFR; `expects` → the API errors it expects as its outcome (a list like every link, one as a rule; not a proof); a removal fixture carries `removes` → a deleted id, which justifies it | Ruled |
 | 09 | design milestone | `schedules` → FR or criterion, API, invariant, NFR, component, environment, charter risk | Definition |
 | 10 | rule | `derives_from` → 00 constraint, risk or scope item, 02a gate or environment, or an approver-only stakeholder. Enforcer: a 12 job's `realises`, a `cli_command`, or type `review` | Ruled (stakeholder: Definition) |
 | 11 | threat | `derives_from` → 00 risk; `threatens` → API, component, connection, third party; `mitigated_by` → obligations, fixtures | Ruled |
@@ -479,7 +479,7 @@ One closed vocabulary; a field name never changes meaning between steps (**Ruled
 | `relies_on` | Behaviour depends on a third party | No |
 | `connects_to` | A connection's target; counts as use of the target | No |
 | `verifies`, `verified_by` | Proves it; the case that proves this | No |
-| `expects` | The API error a fixture expects as its outcome. Not a proof of the error and not a use of it | No |
+| `expects` | An API error a fixture expects as its outcome. Not a proof of the error and not a use of it | No |
 | `threatens` | What a threat or edge case targets | No |
 | `schedules` | A design increment places it | No |
 | `justified_by` | An extension exists because of it | No |
@@ -615,7 +615,7 @@ node nothing uses is a sign of a wrong design.
 | Exempt | Records; plan nodes (09 and 14 milestones, tasks, task criteria, 16a plan items), whose realised-at-close rule replaces it; nodes out of play (`not_applicable`, `scope: later`, `scope: out`, and verifiers whose bindings are all retired) | Ruled |
 | Owner | The furthest step that can use the kind. Until that step has run, the error shows as pending, so an early step is never blocked by a consumer that does not exist yet | Ruled |
 | Which obligations need a verifier | The kinds a fixture's `verifies` may name: criterion, API, invariant, NFR. An API error, a threat, an edge case and a rule are proven another way (through the criterion the error derives from, through mitigations, by the rule's enforcer). The missing-verifier error is owned by step 08 (**As built**) | Definition |
-| One outcome, one statement | The status of an error response is written once, as the `http_status` of the API error. A fixture that expects an error status (its `expected` is an object with an integer `status` of 400 or more) names that error in `expects`, and its `expected.status` equals the error's `http_status`. When the fixture verifies an invariant, the invariant's `constrains` names the same error. So an invariant, an API error and a fixture that state one outcome are joined by links, and an edit of the error makes both links suspect. A removal fixture is exempt: a deleted endpoint has no API error. No text is compared. The three findings are owned by step 08 | Ruled |
+| One outcome, one statement | The status of an error response is written once, as the `protocol_status` of the API error, whatever the protocol. A fixture names in `expects` each API error it expects, and when its `expected` gives an integer `status`, that number equals the `protocol_status` of every error named. When the fixture verifies an invariant, the invariant's `constrains` names at least one of those errors. A fixture that expects an error status and names no error is found where the tools can recognise an error status without knowing the protocol: an integer `status` in the HTTP error range (400 to 599); for the status number of another protocol, naming the error is an authoring rule. So an invariant, an API error and a fixture that state one outcome are joined by links, and an edit of the error makes both links suspect. A removal fixture is exempt: a deleted endpoint has no API error. No text is compared. The three findings are owned by step 08 | Ruled |
 | At merge versus backlog | No-dangling asks only that something downstream uses the node, not that it is built. An in-scope node nothing uses must, before merge, be linked, scheduled, or marked `scope: later` or `out`. A node that is used but not yet built is ordinary backlog | Definition |
 | Partial examples | An example that shows one feature need not satisfy no-dangling for every node; it must say which nodes the parts it leaves out would use. The shipped worked example says it in its README and in the error catalogue: 16 nodes nothing uses, 5 without a verifier, 1 cross-cutting gap, 1 FR no task criterion reaches (**As built**) | Definition |
 
@@ -1541,7 +1541,7 @@ nodes through `x-node`; their data does not change. An FR that needs another FR 
   "protocol": "http", "path": "/v1/password-resets/{token}", "method": "POST", "owner": "api",
   "errors": [
     { "error_id": "err-password-reset-confirm-token-expired", "code": "token-expired", "severity": "error",
-      "http_status": 410, "message": "The reset token has expired or was already used.", "scope": "in",
+      "protocol_status": 410, "message": "The reset token has expired or was already used.", "scope": "in",
       "derives_from": ["ac-password-reset-3"] }
   ],
   "scope": "in",
@@ -1616,7 +1616,7 @@ proof must run.
 **New:** as today, with `targets` replaced by
 `"verifies": ["ac-password-reset-3", "api-password-reset-confirm"]`, and with the error it expects named:
 `"expects": ["err-password-reset-confirm-token-expired"]`. A criterion can now be verified directly, and the expected
-status (410) is checked against the error's `http_status`.
+status (410) is checked against the error's `protocol_status`.
 A second fixture, `fix-password-reset-reused-token`, verifies `inv-reset-token-single-use` and expects the same error,
 which that invariant constrains. A fixture names no test
 and no command: that would point down into code. The test binding is a verification record (section 12.20).

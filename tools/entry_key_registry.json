@@ -1106,7 +1106,7 @@
                 "code",
                 "message",
                 "severity",
-                "http_status",
+                "protocol_status",
                 "scope",
                 "scope_reason"
               ],

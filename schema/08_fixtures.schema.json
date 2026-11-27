@@ -52,14 +52,13 @@
             }
           },
           "expects": {
-            "description": "Id of the API error (step 05) this fixture expects as its outcome. At most one. Not a proof: an API error is proven through the criterion it derives from, so `expects` does not make anything verified. Give the error's `http_status` as `expected.status` when you name it. Example: [\"err-auth-token-expired\"] with expected {\"status\": 410, \"body\": {\"error\": \"token-expired\"}}. Anti-pattern: naming an error here and a different status in `expected`; listing an error in `verifies`.",
+            "description": "Ids of the API errors (step 05) this fixture expects as its outcome: usually one, more when one response carries several errors. Not a proof: an API error is proven through the criterion it derives from, so `expects` does not make anything verified. When `expected` gives a `status`, it is the `protocol_status` of every error named here. Example: [\"err-auth-token-expired\"] with expected {\"status\": 410, \"body\": {\"error\": \"token-expired\"}}. Anti-pattern: naming an error here and a different status in `expected`; listing an error in `verifies`.",
             "type": "array",
             "items": {
               "$ref": "vc:core:atoms#kebabId"
             },
             "uniqueItems": true,
             "minItems": 1,
-            "maxItems": 1,
             "x-link": {
               "kinds": ["api-error"],
               "required": false
@@ -79,7 +78,7 @@
             }
           },
           "mode": {
-            "description": "Testing mode that determines how this fixture is executed. Decision rules: 'unit' — test a single function or validation rule in complete isolation with all dependencies mocked, no network calls; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but the HTTP handler is live (use when the fixture verifies an API); 'e2e' — test a full user journey across integrated components where the service layer is real (use when the fixture verifies a criterion that spans multiple components); 'manual' — a person follows written steps; manual_reason is then required; 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. For a user-login criterion: unit mode tests the JWT signing logic in isolation (all HTTP mocked); contract mode tests the POST /auth/login endpoint with auth service mocked; e2e mode tests the full login flow including DB and session store; redteam mode tests alg:none JWT attack and SQL injection in the email field. Anti-pattern: using 'unit' for a fixture that verifies an API — those should be 'contract' or 'e2e'.",
+            "description": "Testing mode that determines how this fixture is executed. Decision rules: 'unit' — test a single function or validation rule in complete isolation with all dependencies mocked, no network calls; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but the handler of the API is live (use when the fixture verifies an API); 'e2e' — test a full user journey across integrated components where the service layer is real (use when the fixture verifies a criterion that spans multiple components); 'manual' — a person follows written steps; manual_reason is then required; 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. For a user-login criterion: unit mode tests the JWT signing logic in isolation (all HTTP mocked); contract mode tests the POST /auth/login endpoint with auth service mocked; e2e mode tests the full login flow including DB and session store; redteam mode tests alg:none JWT attack and SQL injection in the email field. Anti-pattern: using 'unit' for a fixture that verifies an API — those should be 'contract' or 'e2e'.",
             "$ref": "vc:core:atoms#testingMode"
           },
           "input": {
@@ -87,7 +86,7 @@
             "$ref": "vc:core:collections#anyJson"
           },
           "expected": {
-            "description": "The expected system behavior after applying the input. Each outcome should be: (1) specific — reference exact field names, status codes, or system states; (2) verifiable — an engineer should be able to write an assertion from this; (3) complete — cover all observable effects of the operation. Example: 'Response status 201, response body contains user_id and auth_token, database record created with correct email hash'. When the outcome is an API error named in `expects`, `expected.status` equals the `http_status` of that error.",
+            "description": "The expected system behavior after applying the input. Each outcome should be: (1) specific — reference exact field names, status codes, or system states; (2) verifiable — an engineer should be able to write an assertion from this; (3) complete — cover all observable effects of the operation. Example: 'Response status 201, response body contains user_id and auth_token, database record created with correct email hash'. When the outcome is an API error named in `expects`, `expected.status` (when given) equals the `protocol_status` of each error named.",
             "$ref": "vc:core:collections#anyJson"
           },
           "tags": {

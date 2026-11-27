@@ -16,8 +16,9 @@ def _descend(schema: Any, resolve: Any, steps: list[str | int], *, raw: bool = F
     """The effective schema at *steps* below *schema*, or ``None``; with *raw*, the schema as written there (``$ref``, ``anyOf`` and ``oneOf`` still in it).
 
     Each step is read with the conditional branches merged in; when that finds nothing further down, it is read
-    again without them.  The merge lets a branch replace a property (a ``then`` that restates ``connections`` with no
-    ``items``), and the restated one must not hide the declaration that has the members.
+    again without them.  A conditional branch only adds a property (it never replaces a declaration), so the second
+    read matters for a name that only such a branch declares: without the branch the name is tried against
+    ``patternProperties`` and ``additionalProperties``.
     """
     if not steps:
         return schema if raw else effective_schema(schema, resolve, include_conditionals=True)

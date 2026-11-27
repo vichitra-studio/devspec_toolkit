@@ -24,8 +24,8 @@ The errors, by code (run `specdev spec-check spec --repo-root <toolkit> --spec-r
 | E566 | 1 | `milestone-numbers` | `fr-password-reset-request` is in scope and no task criterion reaches it. |
 
 The API error `err-password-reset-confirm-token-expired` is used: the invariant `inv-reset-token-single-use` names it in
-`constrains`. It carries its `http_status` (410), and both fixtures name it in `expects` (a fixture whose `expected.status`
-is 400 or more must, E754).
+`constrains`. It carries its `protocol_status` (410), and both fixtures name it in `expects` (a fixture whose `expected.status`
+is from 400 to 599 must, E754).
 
 The warning is W555 (the seed has no out-of-scope bullets).
 

@@ -63,7 +63,7 @@
 - `connections`: Required when 2 or more components exist (minItems: 1). Each entry requires:
   - `connection_id`: kebab-case identifier of the connection.
   - `derives_from`: Array of component ids (minItems: 1) naming the source component.
-  - `connects_to`: Array of component or third-party ids (minItems: 1) naming the destination. (`specdev json schema spec/02_system_sketch.json .connections[0]` cannot answer for this step and prints `Could not navigate to path`: a fault of the toolkit older than this release; read the toolkit's `schema/02_system_sketch.schema.json` instead.)
+  - `connects_to`: Array of component or third-party ids (minItems: 1) naming the destination.
   - `protocol`: Must be one of `http | grpc | event | rpc | db | file`.
   - `trust_boundary`: Must be one of `internal | partner | public`.
   - When `trust_boundary` is `partner` or `public`: `auth` and `rate_limit` are also required.

@@ -159,7 +159,7 @@ Before emitting, verify:
 - Guidance, not checked (no tool measures the length).
 
 ### Invariant-Fixture Cross-Check
-- An invariant from Step 06 is proven by a fixture of Step 08 whose `verifies` names it (`E743` reports an invariant with none). The criterion that refines the invariant lists that fixture in `verified_by`. When that fixture has `expects`, the error it names is one the invariant constrains (`E756`). A missing fixture is a gap question for Step 08, not a reason to leave the invariant unrefined.
+- An invariant from Step 06 is proven by a fixture of Step 08 whose `verifies` names it (`E743` reports an invariant with none). The criterion that refines the invariant lists that fixture in `verified_by`. When that fixture has `expects`, at least one error it names is one the invariant constrains (`E756`). A missing fixture is a gap question for Step 08, not a reason to leave the invariant unrefined.
 
 ### Governance and CI Gate Binding
 - If Step 10 defines commit or PR rules that require spec ids, they apply to commits and pull requests. A task `description` or criterion `text` names no node id (`E752`): the relation is the criterion's `refines`.

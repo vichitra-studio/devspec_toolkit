@@ -23,7 +23,7 @@
           "derives_from": [
             "ac-password-reset-3"
           ],
-          "http_status": 410
+          "protocol_status": 410
         }
       ],
       "scope": "in",

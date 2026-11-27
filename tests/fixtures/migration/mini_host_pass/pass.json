@@ -72,11 +72,11 @@
       ["json", "patch", "--id", "err-tool-on-loan", ".derives_from", "[\"ac-checkout-tool-1\"]"],
       ["json", "patch", "--id", "err-loan-not-open", ".derives_from", "[\"ac-return-tool-2\"]"],
       ["json", "patch", "--id", "err-fee-not-found", ".derives_from", "[\"ac-late-fee-calc-1\"]"],
-      ["json", "patch", "--id", "err-tool-already-reserved", ".http_status", "409"],
-      ["json", "patch", "--id", "err-reservation-limit", ".http_status", "409"],
-      ["json", "patch", "--id", "err-tool-on-loan", ".http_status", "409"],
-      ["json", "patch", "--id", "err-loan-not-open", ".http_status", "404"],
-      ["json", "patch", "--id", "err-fee-not-found", ".http_status", "404"],
+      ["json", "patch", "--id", "err-tool-already-reserved", ".protocol_status", "409"],
+      ["json", "patch", "--id", "err-reservation-limit", ".protocol_status", "409"],
+      ["json", "patch", "--id", "err-tool-on-loan", ".protocol_status", "409"],
+      ["json", "patch", "--id", "err-loan-not-open", ".protocol_status", "404"],
+      ["json", "patch", "--id", "err-fee-not-found", ".protocol_status", "404"],
       ["attest", "--step", "05", "--yes"]
     ]},
     {"step": "06", "commands": [

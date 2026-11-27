@@ -1,4 +1,4 @@
-"""An edit of an API error's ``http_status`` makes suspect the links that point at the error: a fixture's ``expects`` and an invariant's ``constrains``."""
+"""An edit of an API error's ``protocol_status`` makes suspect the links that point at the error: a fixture's ``expects`` and an invariant's ``constrains``."""
 from __future__ import annotations
 
 import json
@@ -30,7 +30,7 @@ def _suspect(host: Path) -> tuple[list[str], set[tuple[str, str, str]]]:
 def _set_inputs(spec: Path) -> None:
     """The error has a status, both fixtures expect it and the invariant constrains it, whatever the example holds."""
     def error(doc: dict[str, Any]) -> None:
-        doc["apis"][0]["errors"][0]["http_status"] = 410
+        doc["apis"][0]["errors"][0]["protocol_status"] = 410
 
     def invariant(doc: dict[str, Any]) -> None:
         rule = doc["rules"][0]
@@ -56,7 +56,7 @@ def test_editing_the_status_of_an_error_makes_expects_and_constrains_suspect(tmp
             run_on_example(host, "attest", node, "--yes")
     assert _suspect(host) == ([], set())
 
-    _run(host, "json", "patch", "--id", ERROR, ".http_status", "409")
+    _run(host, "json", "patch", "--id", ERROR, ".protocol_status", "409")
 
     _nodes, links = _suspect(host)
     assert {(FIXTURES[0], "expects", ERROR), (FIXTURES[1], "expects", ERROR), (INVARIANT, "constrains", ERROR)} <= links

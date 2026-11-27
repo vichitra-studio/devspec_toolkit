@@ -24,7 +24,7 @@ For each upstream artifact ingested, extract the following:
 - **02a_delivery_baseline.json**: Environment definitions and deployment topology to determine which invariants apply at which deployment stage and to validate that enforcement mechanisms are feasible within the infrastructure
 - **03_glossary.json**: Entity definitions and domain term IDs to ensure invariant descriptions use canonical terminology
 - **04_fr_list.json**: Acceptance criteria with negative cases, error conditions, preconditions, and postconditions to encode each falsifiable constraint as a machine-checkable rule with correct severity
-- **05_interface_contracts.json**: API IDs, error response definitions (`error_id`, `code`, `http_status`), and security settings to ensure every enumerated error has a corresponding invariant that names it in `constrains` and that security boundaries are enforced by rules scoped to the correct APIs
+- **05_interface_contracts.json**: API IDs, error response definitions (`error_id`, `code`, `protocol_status`), and security settings to ensure every enumerated error has a corresponding invariant that names it in `constrains` and that security boundaries are enforced by rules scoped to the correct APIs
 
 ## Operating Flow: Discover → Formalize → Verify → Link → Emit
 - **Discover**: Scan FRs, APIs, and glossary for state machines, uniqueness rules, referential integrity needs, and business rules. Use the Invariant Discovery Checklist.

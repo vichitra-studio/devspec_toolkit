@@ -154,7 +154,7 @@ Verification evidence is not artifact text. A reviewer records it in the `eviden
 
 ## 14. Fixture Traceability
 
-- Fixture binding is authored in Step 08 via `fixtures[].verifies`, which names acceptance criteria, APIs, invariants or NFRs (not FRs). A fixture carries `verifies` or `removes`. A fixture's `expects` names the API error it expects as its outcome; it is not a proof, so an API error is still proven through the acceptance criterion it derives from. Step 04 acceptance criteria carry no fixture reference; the inverse direction is the single source of truth.
+- Fixture binding is authored in Step 08 via `fixtures[].verifies`, which names acceptance criteria, APIs, invariants or NFRs (not FRs). A fixture carries `verifies` or `removes`. A fixture's `expects` names the API errors it expects as its outcome (one as a rule); it is not a proof, so an API error is still proven through the acceptance criterion it derives from. Step 04 acceptance criteria carry no fixture reference; the inverse direction is the single source of truth.
 - Step 14 (`task.acceptance_criteria[].verified_by`) binds a roadmap acceptance criterion to the fixtures, jobs or rules that verify it. Step 16 plan items carry no fixture reference. When this step's schema includes `verified_by`, a fixture value MUST equal a `fixture_id` from `spec/08_fixtures.json` exactly.
 - Before omitting `verified_by` in Step 14, check `spec/08_fixtures.json` for a matching fixture by what it verifies. Missing fixtures are coverage gaps, not permission to omit.
 

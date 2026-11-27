@@ -3072,20 +3072,25 @@ changes:
 
   - type: add_field
     description: >
-      An API error (step 05) has an optional http_status: the HTTP status of the
-      response that carries it, an integer from 100 to 599. It is the one place
-      the number is written; a message no longer states it. http_status is part of
-      the contract view of an API error, so changing it makes suspect the
-      links that point at the error (E763). A spec that has not given its
-      errors an http_status is valid as before.
+      An API error (step 05) has an optional protocol_status: the status number
+      the protocol of its API carries with it (the HTTP status for an http
+      API, where the schema holds it to 100 to 599; the gRPC status code, the
+      WebSocket close code or the MQTT reason code for the other protocols,
+      an integer of 0 or more). It is the one place the number is written; a message no
+      longer states it. protocol_status is part of the contract view of an
+      API error, so changing it makes suspect the links that point at the
+      error (E763). A spec that has not given its errors a protocol_status is
+      valid as before.
     breaking: false
     migration:
       action: none
 
   - type: add_field
     description: >
-      A fixture (step 08) has an optional expects: the id of the API error it
-      expects as its outcome, at most one. It is the twentieth link verb
+      A fixture (step 08) has an optional expects: the ids of the API errors
+      it expects as its outcome (one as a rule; a list like every other link,
+      so a response that carries several errors names each). It is the
+      twentieth link verb
       (linkVerb of vc:core:graph, with the verbs table of the design
       document). It is not a proof (an API error is proven through the
       criterion it derives from; verifies still does not accept an error) and
@@ -3111,16 +3116,51 @@ changes:
     description: >
       Three findings of the verifier-rules check of spec-check, owned by step
       08, for a fixture that expects an error status. E754: expected.status is
-      400 or more and the fixture has no expects (a fixture that holds
-      removes is skipped). E755: the fixture expects an API error and its
-      expected.status differs from the http_status of the error, or the error has
-      none. E756: the fixture expects an API error and verifies an invariant
-      that does not constrain that error; one finding for each such
+      in the HTTP error range (400 to 599) and the fixture has no expects (a
+      fixture that holds removes is skipped; the status number of another
+      protocol is not recognised as an error, so for it naming the error is
+      an authoring rule). E755: the fixture expects an API error and its
+      expected.status differs from the protocol_status of the error, or the
+      error has none; one finding for each named error, whatever the
+      protocol. E756: the fixture expects API errors and verifies an
+      invariant that constrains none of them; one finding for each such
       invariant. Each message ends with the fix and the attest step. None is
       promotable and none is a coverage gap. A host spec that states an error
       status in a fixture gets E754 until the fixture names the error in
-      expects and the error has that http_status; this is a judgement of the author,
-      not a change a script can make, so the migration has nothing to write.
+      expects and the error has that protocol_status; this is a judgement of
+      the author, not a change a script can make, so the migration has
+      nothing to write.
+    breaking: false
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev json schema prints the declaration of a property that a
+      condition of the schema restates (a then, else, oneOf or anyOf branch);
+      it printed the condition's fragment in its place, with no type,
+      description or items. Nine paths of the step schemas change, among them
+      .connections of step 02 (.connections[0] now navigates), .extensions of
+      step 13, .milestones[].risks of step 14 and .validators of step 15. A
+      bound that only the condition states (a minItems 1, a const true) is no
+      longer printed; spec-check and the write guard (E767) hold it as
+      before. One write changes with it: specdev json insert --id
+      <milestone-id> .risks on a milestone with no risks now writes, where it
+      was refused with E767. The scope advice of E740 reads the same
+      declaration.
+    breaking: false
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      fixtures-lint: the expected.status of a contract fixture is the status
+      number of the API's protocol. It is an HTTP status (100 to 599) as
+      before, unless the fixture names APIs (in verifies, or through an API
+      error in expects) and none of them is an http API: then it is an
+      integer of 0 or more (a gRPC status code, a WebSocket close code, an
+      MQTT reason code), where 1.1.1 reported E520. A spec whose APIs are all
+      http sees no change.
     breaking: false
     migration:
       action: none

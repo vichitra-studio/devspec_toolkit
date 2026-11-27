@@ -1,14 +1,17 @@
 """The fixture outcome rules: a fixture that expects an error status names the error (E754), agrees with it (E755) and with the invariants it verifies (E756).
 
 A fixture in play that has a document item reads ``expected.status`` only when ``expected`` is an object and the value is an integer (a boolean is not).
+The rules read no protocol: the number of an error is its ``protocol_status``, whatever the protocol of its API.
 
-**Not named (E754).**  The status is 400 or more and the fixture has no ``expects`` link.  A fixture that holds ``removes`` is skipped: it
-proves that a deleted node answers 404, and no API error exists for it.
+**Not named (E754).**  The status is in the HTTP error range (400 to 599) and the fixture has no ``expects`` link.  A status number of another
+protocol is not recognised as an error, so this rule is silent for it.  A fixture that holds ``removes`` is skipped: it proves that a deleted
+node answers 404, and no API error exists for it.
 
-**Differs (E755).**  The fixture names an API error in ``expects`` and gives a status, and the error has no ``http_status`` or another one.
+**Differs (E755).**  The fixture names API errors in ``expects`` and gives a status; one finding for each named error that has no
+``protocol_status`` or another one.
 
-**Not constrained (E756).**  The fixture names an API error in ``expects`` and verifies an invariant in play that does not list the error in ``constrains``;
-one finding for each such invariant.
+**Not constrained (E756).**  The fixture names API errors in ``expects`` and verifies an invariant in play that lists none of them in
+``constrains``; one finding for each such invariant.
 
 A link target that no node has, or that is of another kind, is a finding of E700 and E701 and is skipped here.  The owner of each code is the one the
 ownership table gives (step 08).  ``check_fixture_outcomes`` is called by ``check_verifier_rules``.
@@ -27,10 +30,10 @@ from .codes import FIXTURE_ERROR_NOT_CONSTRAINED, FIXTURE_ERROR_NOT_NAMED, FIXTU
 from .context import GraphCheckContext
 
 INVARIANT = "invariant"
-HTTP_STATUS = "http_status"
-"""The field of an API error that holds its HTTP status; the fixture's number is ``expected.status``."""
-ERROR_STATUS_FLOOR = 400
-"""The lowest status that is an error outcome."""
+PROTOCOL_STATUS = "protocol_status"
+"""The field of an API error that holds the status number of its protocol; the fixture's number is ``expected.status``."""
+HTTP_ERROR_STATUSES = range(400, 600)
+"""The statuses that E754 recognises as an error outcome without a named error: the HTTP error range."""
 
 
 def _integer(container: Mapping[str, Any] | None, key: str) -> int | None:
@@ -56,47 +59,50 @@ def _fixtures(ctx: GraphCheckContext) -> list[tuple[Node, int | None]]:
     return found
 
 
-def _error_node(ctx: GraphCheckContext, fixture: Node) -> Node | None:
-    """The API error the fixture names in ``expects``, or ``None`` when it names none or the target is no API error."""
-    for target_id in link_targets(ctx.graph, fixture, EXPECTS):
-        target = ctx.graph.by_id.get(target_id)
-        if target is not None and target.kind == API_ERROR:
-            return target
-    return None
+def _error_nodes(ctx: GraphCheckContext, fixture: Node) -> list[Node]:
+    """The API errors the fixture names in ``expects``, each once, in the order it lists them (a target that is no API error is left out)."""
+    targets = (ctx.graph.by_id.get(target_id) for target_id in link_targets(ctx.graph, fixture, EXPECTS))
+    return list({target.id: target for target in targets if target is not None and target.kind == API_ERROR}.values())
 
 
 def check_fixture_outcomes(ctx: GraphCheckContext) -> list[SpecError]:
     """E754, E755 and E756 for the fixtures in play, in step then id order, the three codes of one fixture together."""
     findings: list[SpecError] = []
     for fixture, status in _fixtures(ctx):
-        error = _error_node(ctx, fixture)
-        if status is not None and status >= ERROR_STATUS_FLOOR and not link_targets(ctx.graph, fixture, EXPECTS) and not link_targets(ctx.graph, fixture, REMOVES):
+        errors = _error_nodes(ctx, fixture)
+        if status in HTTP_ERROR_STATUSES and not link_targets(ctx.graph, fixture, EXPECTS) and not link_targets(ctx.graph, fixture, REMOVES):
             findings.append(ctx.finding(
                 FIXTURE_ERROR_NOT_NAMED, fixture,
                 f"fixture {fixture.id} expects status {status} but names no API error: add expects naming the API error "
                 f"(step 05) it expects, then run specdev attest {fixture.id} --yes",
             ))
-        if error is None:
+        if not errors:
             continue
-        if status is not None:
-            error_status = _integer(item_of(ctx.graph, error), HTTP_STATUS)
+        for error in errors if status is not None else ():
+            error_status = _integer(item_of(ctx.graph, error), PROTOCOL_STATUS)
             if error_status != status:
-                states = f"has http_status {error_status}" if error_status is not None else "has no http_status"
+                states = f"has protocol_status {error_status}" if error_status is not None else "has no protocol_status"
                 findings.append(ctx.finding(
                     FIXTURE_STATUS_DIFFERS_FROM_ERROR, fixture,
                     f"fixture {fixture.id} expects status {status} but the API error {error.id} {states}: make them equal: "
-                    f"set http_status of {error.id} or fix expected.status of {fixture.id}, then run specdev attest {fixture.id} --yes",
+                    f"set protocol_status of {error.id} or fix expected.status of {fixture.id}, then run specdev attest {fixture.id} --yes",
                     target=link_target(EXPECTS, error.id),
                 ))
+        expected_ids = [error.id for error in errors]
+        listed = ", ".join(expected_ids)
         for invariant_id in link_targets(ctx.graph, fixture, VERIFIES):
             invariant = ctx.graph.by_id.get(invariant_id)
             if invariant is None or invariant.kind != INVARIANT or not ctx.in_play(invariant):
                 continue
-            if error.id not in link_targets(ctx.graph, invariant, CONSTRAINS):
+            if not set(expected_ids) & set(link_targets(ctx.graph, invariant, CONSTRAINS)):
+                if len(expected_ids) == 1:
+                    gap, named = f"the API error {listed}, which {invariant.id} does not constrain", listed
+                else:
+                    gap, named = f"the API errors {listed}, none of which {invariant.id} constrains", f"one of {listed}"
                 findings.append(ctx.finding(
                     FIXTURE_ERROR_NOT_CONSTRAINED, fixture,
-                    f"fixture {fixture.id} verifies invariant {invariant.id} but expects the API error {error.id}, which {invariant.id} "
-                    f"does not constrain: add {error.id} to constrains of {invariant.id} (then run specdev attest {invariant.id} --yes), "
+                    f"fixture {fixture.id} verifies invariant {invariant.id} but expects {gap}: "
+                    f"add {named} to constrains of {invariant.id} (then run specdev attest {invariant.id} --yes), "
                     f"or expect an error it constrains (then run specdev attest {fixture.id} --yes)",
                     target=link_target(VERIFIES, invariant.id),
                 ))
