@@ -55,7 +55,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 07 | `spec/07_nfrs.json` | Gate with `spec-check --step 07`; then `specdev stale` for the links it makes suspect |
 | 08 | `spec/08_fixtures.json` | Run `fixtures-lint` |
 | 09–12 | `spec/09*_*.json` | Validate-only unless trace references change |
-| 13 | `spec/13_extension_manifest.json` | Review proposed extension schemas |
+| 13 | `spec/13_extension_manifest.json`, `spec/extensions/ext_NN_<topic>.schema.json`, `spec/extensions/ext_NN_<topic>.json` | Gate with `spec-check --step 13`; then `specdev stale` for the links an edited item makes suspect |
 | 14 | `spec/14_roadmap.json` | Run `specdev step ready 14` first (it lists the blockers owned by the steps below 14, to fix first; the gaps step 14 owns, E566, E742, E744, E745 and the E740 of nodes a task criterion uses, are not blockers: the task criteria of step 14 clear them); gate with `spec-check --step 14`; then initiate the JIT implementation loop |
 | 15 | `spec/15_scaffold.json` | Implement scaffold manually |
 | 16a | `spec/impl_context/ms_<batch>_plan.json` | Trinity Plan: Tasks, Security, Delivery, Drift (`step create 16a <batch>`) |

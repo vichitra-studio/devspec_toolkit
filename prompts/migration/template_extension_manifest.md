@@ -11,7 +11,16 @@
 
 ### Items of step 13
 
-No script or proposer writes an item of its own for step 13; the items below and the step's check are the pass.
+No script or proposer writes an item of its own for step 13; the items below and the step's check are the pass. A manifest whose `extension_decision.status` is `none-required` needs nothing more.
+
+A manifest that declares extensions is left as it was by `apply`, and the step's check (step 7 of the procedure) reports each entry until three things are done. The steps a person follows are in `docs/developers/workflows/workflow_migrate_1_2_0.md` ("Step 13: the files and the links of an extension"):
+
+| The check prints | What it asks | Answer with |
+|---|---|---|
+| E520 `'justified_by' is a required property` | The entry lists no node that makes the extension necessary | `specdev json patch --id <extension-id> .justified_by '["<node-id>"]'` (a component, third party, capability, FR or NFR; `specdev node candidates --kind extension --field justified_by` lists them). The `prose-ids` item of the entry lists the ids its `justification` names |
+| E752 on the `justification` of the entry | The text names a node id | Once the id is in `justified_by`, reword the text to name no id: `specdev json patch --id <extension-id> .justification '"<new text>"'` |
+| E520 `Extension '<extension-id>' has no schema`, `has no file` | An entry has two files in `spec/extensions/`: its schema file and its data file | A data file of the 1.1.1 place (`spec/ext_NN_<topic>.json`) is moved to `spec/extensions/` by the operator. The schema file is written as `prompts/prompt_13_extension_manifest.md` says (The Files Of An Extension); a data file that does not exist yet is created with `specdev step create 13 <extension-id> --from <draft> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` |
+| W630 for a data file | An open item of the data file is now counted (E631 at the merge check) | Apply its answer, then `specdev json delete --id <item-id>` |
 
 ### Items any step can carry
 
@@ -23,7 +32,7 @@ No script or proposer writes an item of its own for step 13; the items below and
 | `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |
 | `gate-text` | agent | A gate that was free text got a minted id | Name it: `specdev node rename <minted-id> <gate-id>` |
 | `prose-ids` | agent | Text names ids (the evidence lists each); a field of the node may take them as links. Written by `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, not by `apply` | Link the id (`specdev json insert --id <node-id> .<field> '"<target-id>"'`) or reword the text: `specdev json patch --id <node-id> .<text-field> '"<new text>"'` |
-| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed in a node of this step: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'` (in step 13 or a trinity step no node can list a seed: move the route to the step that distils it); or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
+| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed in a node of this step: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'` (in a trinity step no node can list a seed, and in step 13 only a node of an extension whose schema declares `derives_from` to a seed can: otherwise move the route to the step that distils it); or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
 | `unresolved-link` | operator | A link the resolver refused (E700 to E702) got no lock entry | Fix or drop the link with `specdev json patch --id <node-id> .<field> '["<target-id>"]'`; `specdev attest <node-id> --yes` then writes its entry |
 
 ### Procedure
@@ -45,7 +54,7 @@ No script or proposer writes an item of its own for step 13; the items below and
 The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
 
 - `extension_decision` (object, required): requires `rationale`, `status`
-- `extensions` (array, required): each item requires `area_of_concern`, `extension_id`, `governance_label_ref`, `justification`, `required_schema_sections`, `schema_design_guidelines`, `title`
+- `extensions` (array, required): each item requires `area_of_concern`, `extension_id`, `governance_label_ref`, `justification`, `justified_by`, `required_schema_sections`, `schema_design_guidelines`, `title`
 
 ## Output Contract
 

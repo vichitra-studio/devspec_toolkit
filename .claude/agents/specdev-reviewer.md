@@ -44,8 +44,9 @@ Read is allowed for:
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline)
 - `devspec_toolkit/.claude/skills/` (skill files)
 - `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`)
+- `spec/extensions/ext_NN_<topic>.schema.json` (the schema file of an extension, when step 13 is in the scope)
 
-Do NOT Read any file under `spec/` directly. Use `specdev json read` with a filter.
+Do NOT Read any other file under `spec/` directly. Use `specdev json read` with a filter.
 Unfiltered `specdev json read <file>` (no filter) is banned — always pass a jq filter.
 Before composing any `json read` filter on a path not yet inspected, run `json structure`
 or `json keys` first. Guessing field names is the dominant failure class.
@@ -112,6 +113,16 @@ of "Flag discipline" (`--repo-root ./devspec_toolkit --spec-root ./spec --git-ro
 | `spec-review` | Existing `spec/NN_*.json` artifacts for the assigned steps; upstream-backlog and `stale` output (if `with_backlog`) |
 | `waterfall-step` | The just-authored `spec/NN_*.json` against its schema and upstream artifacts |
 | `trinity-plan batch` | `spec/impl_context/ms_<batch_id>_plan.json` — plan structure, milestone bindings, fixture refs, canon refs |
+
+Step 13 in the assigned steps: run
+`specdev json read spec/13_extension_manifest.json '.extensions | length' --repo-root <toolkit>`.
+When it prints `0`, the manifest is the whole artifact of the step. When it prints a number above 0,
+the two files of each entry are part of the scope, with `<stem>` the `extension_id` of the entry
+with its hyphens replaced by underscores: the schema file `spec/extensions/<stem>.schema.json`
+(read it with Read) and the data file `spec/extensions/<stem>.json` (read it with
+`specdev json read` and a filter, never with Read). Review them against the sections
+"The Schema File" and "The Data File" of `devspec_toolkit/prompts/prompt_13_extension_manifest.md`;
+the step gate of step 13 reports what the tool refuses in them.
 
 For `cross_step_relational` scope: review cross-step coupling, drift between steps, suspect
 links pending replay that the per-step reviewers would miss by reading only one step.

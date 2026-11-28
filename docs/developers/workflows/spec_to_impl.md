@@ -15,8 +15,8 @@ Step 13a (the completeness assessment) was removed in 1.2.0. Before step 14, run
 
 | Step | Purpose | Key Activities |
 |------|---------|----------------|
-| 13 — Extensions | Define domain-specific schemas | Identify missing domains (AI, DB) and generate `spec/13_extension_manifest.json`. |
-| 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
+| 13 — Extensions | Define domain-specific schemas | Identify missing domains (AI, DB) and generate `spec/13_extension_manifest.json`; for each extension it declares, write its schema file and its data file in `spec/extensions/` ([extension_schemas.md](../extension_schemas.md)). |
+| 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan; a task criterion refines each obligation of an extension. |
 | 15 — Scaffold | Generate compile-clean skeleton | Implement manually or via framework CLI. |
 | 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Plan items that realise task criteria, with their actions, docs impact and drift checks, in `spec/impl_context/ms_<batch>_plan.json` (`specdev step create 16a <batch> --from <draft>`). |
 | 16b — Build (Trinity) | Implement & Config | Write code, configs and docs; record each carried-out action with `specdev plan record` and prove a verifier action with `specdev verify run`. |

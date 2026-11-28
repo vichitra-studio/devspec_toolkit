@@ -118,7 +118,11 @@ The agent:
 4. Writes the whole artifact as a draft file outside `spec/` (`.specdev/drafts/step_<NN>.json`), then creates the step file with
    `specdev step create <NN> --from .specdev/drafts/step_<NN>.json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
    (ids of sub-items may be left out; the command refuses a step that already has a file, E767).
-   The agent never Writes into `spec/`.
+   The agent never Writes into `spec/`, except the schema file of an extension (item 4a).
+4a. Step 13 only, when `specdev json read spec/13_extension_manifest.json '.extensions | length' --repo-root ./devspec_toolkit`
+   prints a number above 0: for each entry of the manifest the agent writes the schema file
+   `spec/extensions/ext_NN_<topic>.schema.json` and creates the data file with
+   `specdev step create 13 <extension-id> --from .specdev/drafts/<extension-id>.json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`.
 5. Runs the scoped gate:
    ```bash
    specdev spec-check spec --step <NN> \
@@ -287,6 +291,7 @@ Then report the final verdict:
 Author gate: <clean | errors>
 Review verdict: CONVERGED at round <N> | HALT at round 5 | HALT (blocker unresolved)
 Artifact: spec/<NN>_*.json
+Extension files (step 13, when the manifest declares extensions): spec/extensions/ext_NN_<topic>.schema.json and spec/extensions/ext_NN_<topic>.json of each entry
 Blocking (own, new upstream): <node ids, or none>
 Pending (not blocking): upstream debt <node ids>; later steps <step: node ids>; waiting <node ids, with the open item ids>
 Findings path (on HALT at round 5): .specdev/findings/findings_<NN>_5_<unix_timestamp>.json

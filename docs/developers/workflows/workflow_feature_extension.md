@@ -95,7 +95,8 @@ Before starting, ensure your current specs are clean and valid.
     *   *Reference*: `prompts/prompt_11_redteam.md`.
 4.  **Step 12: CI Gates**: Do we need a new pipeline check?
     *   *Reference*: `prompts/prompt_12_ci_gates.md`.
-5.  **Step 13: Extensions**: Is this a Plugin/Extension?
+5.  **Step 13: Extensions**: Does the feature bring a domain the core steps do not describe (a database schema, a model, a queue), or add to one an extension already describes?
+    *   *Action*: A new domain is a new entry of the manifest with its two files in `spec/extensions/`. An addition to an existing extension is an edit of its data file by node id, and of its schema file when a new kind or field is needed ([extension_schemas.md](../extension_schemas.md), "The life of an extension").
     *   *Reference*: `prompts/prompt_13_extension_manifest.md`.
 
 ---

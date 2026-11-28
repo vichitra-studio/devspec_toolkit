@@ -1,7 +1,7 @@
 # Schema Annotations (`vc:core:graph`)
 
 `schema/core/graph.schema.json` (`$id` `vc:core:graph`) defines the annotation language step schemas use to declare
-graph nodes and links. It only defines shapes. The seed manifest (`schema/seed_manifest.schema.json`, the top-of-graph `seed` kind) and the step schemas 00, 01, 02, 02a, 03, 04 and 05 carry annotations, as do the step schemas 06 to 12, 14 and 15, `schema/16_anchor.schema.json` and `schema/16_impl_context.schema.json`. The schema of step 13 declares the `extension` kind (role `record`, no links) and gets the shared `ambiguity-item` node through the core `ambiguityList`. Every definition has an
+graph nodes and links. It only defines shapes. The seed manifest (`schema/seed_manifest.schema.json`, the top-of-graph `seed` kind) and the step schemas 00, 01, 02, 02a, 03, 04 and 05 carry annotations, as do the step schemas 06 to 12, 14 and 15, `schema/16_anchor.schema.json` and `schema/16_impl_context.schema.json`. The schema of step 13 declares the `extension` kind (role `plan`, with the required link `justified_by`) and gets the shared `ambiguity-item` node through the core `ambiguityList`. A host declares kinds of its own with the same annotations in the extension schemas of its spec folder (see "An extension schema"). Every definition has an
 `$anchor` equal to its name, so reference it as `vc:core:graph#<name>`.
 
 ## `x-node` (`xNode`)
@@ -31,6 +31,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 | `built` | Optional boolean, default false. |
 | `same_step_kinds` | Optional array, a subset of `kinds` that may be held in the same step. |
 | `additional_kinds` | Optional array, a subset of `kinds` that the field accepts in addition to the others. When the link is required, a value that holds only targets of these kinds does not satisfy it (E701). A target that cannot be found is looked for in the steps of the other kinds (the two special forms of E700). Used for a seed listed beside a node's upstream link. |
+| `roles` | Optional array of roles. The field accepts, in addition to `kinds`, every kind of these roles that a host declares in its extension schemas (step 13). A kind of the toolkit is never added by role: the toolkit lists its own kinds in `kinds`. Used by `refines` of a task criterion (`["obligation-system"]`), which is how a criterion refines an obligation of an extension. |
 
 ## Link verbs (`linkVerb`)
 
@@ -59,6 +60,43 @@ Attach the reason rule in the item's `allOf`; it makes `scope_reason` required w
 "allOf": [{"$ref": "vc:core:graph#scopeReasonRule"}]
 ```
 
+## An extension schema
+
+A host declares kinds and links in the schema file of an extension, `spec/extensions/ext_NN_<topic>.schema.json`
+(the guide: [extension_schemas.md](extension_schemas.md); the model:
+`tests/fixtures/extension_example/spec/extensions/ext_01_database.schema.json`). The annotations are the ones above,
+within these bounds:
+
+| An extension schema | Rule |
+|---|---|
+| `x-node` keys | `kind`, `role`, `id`, `contract`. `step`, `files` and `top_of_graph` are refused: the step is 13 and the nodes are the items of the extension's data file |
+| `role` | `context` or `obligation-system`; no other role |
+| `kind` | A name that no toolkit kind and no other extension schema declares (ANNOT-02) |
+| `id` | The id property is in `required` of the item |
+| `contract` | Properties of the item; never the id property and never a link field |
+| Nesting | A kind may be nested in another kind, not in itself |
+| `x-link` keys | `kinds`, `required`, `built`, `same_step_kinds`, `additional_kinds`, on a field named with a link verb |
+| Link targets | Kinds of earlier steps, and kinds of step 13 that the link lists in `same_step_kinds`. `seed` in the `kinds` of a `derives_from`, for a seed the manifest routes to step 13 |
+| Proof of an obligation | The obligation kind declares `verified_by` to `fixture` and `job`; a task criterion that refines an item lists a verifier the item names (E745) |
+| `$ref` | The core schemas (`vc:core:*`) and another extension schema of the folder. The `x-node` of a toolkit step schema may not be reached by `$ref`; the core `ambiguityList` may |
+| Item fields | `lifecycle` on every item; `scope`, `scope_reason` and the `scopeReasonRule` on an obligation item (ANNOT-08); `aliases` (an array of `vc:core:atoms#kebabId`) on an item that `specdev node rename` is to rename |
+
+The lint below runs on an extension schema too. An extension schema that breaks a rule is reported by the step gate of step 13
+in one E520 that lists every line, each with the schema file and the JSON pointer; no kind of any extension is
+loaded until all are corrected. The lines, copied from runs on copies of the example:
+
+- `/properties/tables: an extension kind may not take the role 'verifier'; the roles of an extension kind are context and obligation-system`
+- `/properties/tables: an extension kind may not set 'step': its step is 13 and its nodes are in the data file of the extension`
+- `/properties/datastores: the id property 'datastore_id' of the extension kind 'datastore' is not in `required` of its item; an item with no 'datastore_id' would be no node and no check would say so: add it to `required``
+- `/properties/tables: the contract of the extension kind 'table' names its id property 'table_id'; the id is not part of the text of a node`
+- `/properties/tables: the contract of the extension kind 'table' names 'scope', which is no property of its item; an edit of a node is seen through its contract fields`
+- `.fixtures: reaches by $ref the x-node of the toolkit kind 'fixture' (schema/08_fixtures.schema.json /properties/fixtures); the nodes of kind fixture live in the file of step 08, and an extension file holds the kinds an extension schema declares: declare a kind of the extension for these items, or name the nodes of the toolkit by id in a link field`
+- `ANNOT-02 kind 'rule' is declared at more than one site: schema/10_governance.schema.json /allOf/1/properties/rules, extensions/ext_01_database.schema.json /properties/datastores`
+- `ANNOT-07 extensions/ext_01_database.schema.json /properties/tables/items/properties/verified_by: x-link kind 'nosuch' is not a declared kind`
+- `ANNOT-08 extensions/ext_01_database.schema.json /properties/datastores: item of 'datastore' must declare lifecycle as $ref vc:core:graph#lifecycle`
+
+Nothing of an extension schema enters the registry files of the toolkit: `registry-generate` does not read it.
+
 ## What reads the annotations
 
 `registry-generate` scans every schema in `tools/schema_registry.json`, lints the annotations, then writes the outputs.
@@ -75,7 +113,7 @@ All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annota
 
 ## Lint codes (`ANNOT-NN`)
 
-`generate_registry` raises `AnnotationError` (a `ValueError`) when the lint finds issues. The text of each issue starts with the code and names the schema file and JSON pointer. These are toolkit-author diagnostics, not `E`/`W` codes, and have no `specdev guide` entry.
+`generate_registry` raises `AnnotationError` (a `ValueError`) when the lint finds issues. The text of each issue starts with the code and names the schema file and JSON pointer. These are toolkit-author diagnostics, not `E`/`W` codes, and have no `specdev guide` entry. For an extension schema the same texts are lines of the E520 of step 13 (see "An extension schema").
 
 | Code | Raised when |
 |---|---|

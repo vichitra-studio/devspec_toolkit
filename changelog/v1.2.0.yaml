@@ -56,9 +56,9 @@ changes:
       registry-generate no longer guesses a kind from an id field: every
       registry entry is declared by an x-node. The one entry that came from the
       guess, .extensions of step 13 (kind extension), is now declared in
-      schema/13_extension_manifest.schema.json (role record, no links): the
-      registry row gains role and source x-node; its id, kind and path are
-      unchanged.
+      schema/13_extension_manifest.schema.json (role plan, with the link
+      justified_by): the registry row gains role, links and source x-node; its
+      id, kind and path are unchanged.
     migration:
       action: none
 
@@ -78,8 +78,8 @@ changes:
       See docs/developers/schema-annotations.md. The seed manifest
       (schema/seed_manifest.schema.json) and the step schemas 00, 01, 02, 02a,
       03, 04 and 05 are annotated; the schemas of steps 06 to 12, 14, 15 and 16
-      are annotated too; the schema of step 13 carries no annotation of its own
-      (it gets the shared ambiguity-item node through the core ambiguityList).
+      are annotated too; the schema of step 13 declares the extension kind and
+      gets the shared ambiguity-item node through the core ambiguityList.
     migration:
       action: none
 
@@ -1070,7 +1070,8 @@ changes:
       links to it with their count and the command that lists them, then
       specdev attest --prune);
       E748 says to distil the seed in that step, to move the route when no
-      node of the step can link a seed (step 13 or a trinity step), to remove the route,
+      node of the step can link a seed (a trinity step, or step 13 when no
+      extension kind lists a seed), to remove the route,
       or, when it is the seed's only route, to remove the seed with it and the
       links to it that nodes still hold; E749
       ends or remove the link and run specdev attest --prune (a required
@@ -2355,8 +2356,10 @@ changes:
 
   - type: change_schema
     description: >
-      A seed can be routed to any step from 00 to 15 except 13, and a
-      node of that step lists it in derives_from. Every kind with a
+      A seed can be routed to any step from 00 to 15, and a
+      node of that step lists it in derives_from; in step 13 that node is of
+      a kind of an extension whose schema lists seed in the kinds of its
+      derives_from. Every kind with a
       derives_from accepts a seed (capability,
       component, connection, CI gate, secret, FR, API, API error, NFR, rule,
       threat), and a term, invariant, fixture, design milestone, edge case, CI job,
@@ -2367,14 +2370,14 @@ changes:
       still derive from a seed alone. The link annotation has a new optional
       key, additional_kinds (a subset of kinds; lint ANNOT-07;
       docs/developers/schema-annotations.md). The route checks are E747, E748 and
-      E749; the E748 message of a step that cannot list a seed (13, a
-      trinity key) says to move the route to the step that distils the seed. specdev node candidates offers a
+      E749; the E748 message of a step that cannot list a seed (a trinity key,
+      or 13 when no extension kind lists a seed) says to move the route to the
+      step that distils the seed. specdev node candidates offers a
       seed only when the manifest routes it to the holder's step.
       seed_templates/seed_manifest.json keeps its 1.1.1 routes (00, 01, 02,
       02a): a new host's first capability lists seed-overview beside its
       charter node, or the route is removed (E748). The Breaking items, which
-      list what each kind gains, do not repeat this field. An extension of step
-      13 holds no links, so a route to step 13 is E748. Shown by specdev json insert --id fr-password-reset .derives_from
+      list what each kind gains, do not repeat this field. Shown by specdev json insert --id fr-password-reset .derives_from
       '"seed-accounts"' on the worked example, then spec-check (E749 until the
       manifest routes the seed to step 04).
     migration:
@@ -2495,6 +2498,30 @@ changes:
       checks the same-PR rule of the sample.
     migration:
       action: none
+
+  - type: change_schema
+    description: >
+      Step 13: an extension is an entry of the manifest and two files in
+      spec/extensions/, and each entry requires justified_by. The files are
+      ext_NN_<topic>.schema.json (the host's JSON Schema, draft 2020-12, $id
+      vc:ext-NN-<topic>) and ext_NN_<topic>.json (its data, $schema the same
+      URI). An entry with no schema file or no data file is E520, and so is a
+      JSON file of that folder that no entry declares. A data file left at
+      the 1.1.1 place (spec/ext_NN_<topic>.json) is E520 schema_uri_mismatch
+      with the place to move it to. justified_by lists at least one
+      component, third party, capability, FR or NFR that makes the extension
+      necessary: specdev align apply --auto leaves the entry as it was,
+      specdev spec-check --step 13 reports it ('justified_by' is a required
+      property), specdev align propose --kind prose-ids proposes the ids the
+      justification names, and specdev json patch --id <extension-id>
+      .justified_by '["<node-id>"]' writes the field with its lock entries. An
+      open item in the ambiguities list of a data file is counted as an open
+      item of step 13 (W630 at the step gate, E631 at the merge gate). A host
+      whose manifest says extension_decision.status none-required sees no
+      change. The steps: docs/developers/workflows/workflow_migrate_1_2_0.md,
+      "Step 13: the files and the links of an extension".
+    migration:
+      action: ai_assisted
 
   - type: add_constraint
     description: >
@@ -2810,6 +2837,49 @@ changes:
       (minItems, maxItems, minLength, maxLength, pattern, enum, const,
       required, items_constraints); the reviewer quotes the constraint in the
       evidence of a bug or hallucination finding (DEVSPEC-211).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      A host extension schema is found and its data file validates
+      (DEVSPEC-245). The schema of an extension is read from
+      spec/extensions/ext_NN_<topic>.schema.json by a scan of the folder:
+      nothing is registered by hand and nothing of a host enters
+      tools/schema_registry.json. It may $ref the core schemas (vc:core:*)
+      and another extension schema of the folder. Step 13 owns the JSON files
+      directly in spec/extensions/ and reports, as E520 or E320: an entry
+      with no schema file or no data file, a file no entry declares, files
+      with no manifest, a schema that is no JSON Schema, has a wrong or a
+      toolkit $id or names another dialect, a data file whose $schema is not
+      the URI of its file name, and a required_schema_sections name the
+      schema does not declare. specdev step create 13 <extension-id> --from
+      <draft> creates the data file of a declared extension.
+      canonical-integrity, canonical-autofix and spec-quality-lint read the
+      spec folder named with --spec-root; a command run on spec/extensions
+      itself needs the flag. The guide: docs/developers/extension_schemas.md.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      The items of an extension data file are nodes of the spec graph
+      (DEVSPEC-245). An extension schema declares kinds with x-node (role
+      context or obligation-system) and links with x-link, to nodes of
+      earlier steps and, through same_step_kinds, to another kind of step 13;
+      a schema the graph cannot use is one E520 of step 13 that lists every
+      line. The manifest entry is a node of kind extension, role plan, with
+      the required link justified_by. An obligation of an extension names
+      what proves it in its own verified_by (a fixture or a CI job); a task
+      criterion refines it (the new roles key of x-link, on refines of a task
+      criterion) and lists one of those verifiers (E745 otherwise), and
+      specdev verify bind --proves accepts it. The items are written by node
+      id (specdev json patch|insert|delete --id, specdev node rename), and
+      node show, trace, stale, attest and status read them like any node. The
+      context packs 16a, 16b and 16c list an obligation of an extension under
+      obligations and gain the section extension context for the context
+      nodes it links to, on a host whose extensions declare kinds. Example:
+      tests/fixtures/extension_example.
     migration:
       action: none
 

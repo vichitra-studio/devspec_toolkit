@@ -337,7 +337,7 @@ Add potential security threats for the project. Every threat requires `threatens
 
 These steps bridge Phase I Discovery into Phase II Implementation. They must be completed before running the Trinity Loop (Steps 16a–16c).
 
-### Step 5.1: Extension Manifest — `spec/13_extension_manifest.json`
+### Step 5.1: Extensions — `spec/13_extension_manifest.json` and `spec/extensions/`
 
 *Prompt: `prompts/prompt_13_extension_manifest.md`*
 
@@ -346,13 +346,13 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 >
 > **Context to supply**:
 > - `spec/04_fr_list.json`, `spec/02_system_sketch.json`, `spec/01_capabilities.json`
-> - Any plugin or extension points identified during codebase excavation
+> - The domains the codebase excavation found that the core steps do not describe (a database schema, a model, a queue)
 >
-> The AI identifies all extension points in the system in a draft; `specdev step create 13 --from <draft>` creates `spec/13_extension_manifest.json`.
+> The AI decides which of them need an extension and writes the manifest in a draft; `specdev step create 13 --from <draft>` creates `spec/13_extension_manifest.json`. For each extension the manifest declares, the AI writes the schema file `spec/extensions/ext_NN_<topic>.schema.json`, and `specdev step create 13 <extension-id> --from <draft>` creates the data file `spec/extensions/ext_NN_<topic>.json` (see [extension_schemas.md](../extension_schemas.md)). A manifest that says `none-required` has no other file.
 
 **Validation ritual:**
 ```bash
-./tools/run_specdev.sh validate spec/13_extension_manifest.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --step 13 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### Step 5.2: Completeness Check (no artifact)

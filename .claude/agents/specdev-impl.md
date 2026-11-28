@@ -30,6 +30,10 @@ Bash surface is restricted to these subcommand families only:
 | Command | Mode | Purpose |
 |---|---|---|
 | `specdev step create <NN> --from <draft>` | author | Write the whole artifact of step NN from a draft file; refuses a step that already has a file |
+| `specdev step create 13 <extension-id> --from <draft> --repo-root <toolkit> --spec-root <spec> --git-root <root>` | author, author-extend | Step 13 only: create the data file `spec/extensions/ext_NN_<topic>.json` of an extension the manifest declares; E767 when the entry or its schema file is missing, or the data file exists |
+| `specdev json insert spec/extensions/ext_NN_<topic>.json '<section-path>' '<item>' --repo-root <toolkit>` | author-extend, fix | Step 13 only: a NEW item at the top of an extension data file (no id form adds one) |
+| `specdev json patch spec/13_extension_manifest.json --batch <ops-file> --repo-root <toolkit>` | author-extend | Step 13 only: the first entry of a manifest whose status is `none-required` (status, rationale and entry in one write) |
+| `specdev attest <node-id> --yes --repo-root <toolkit> --spec-root <spec> --git-root <root>` | author-extend, fix | Step 13 only: write the lock entries of a node written by one of the two path forms above; run it when the step gate prints E761 for that node |
 | `specdev json patch --id <node-id> '<field-path>' '<value>'` | all | Replace a field of the node with that id |
 | `specdev json insert --id <node-id> '<array-field>' '<value>'` | all | Append to an array field of the node with that id |
 | `specdev json insert --step <NN> '<collection-path>' '<item>'` | fix/author-extend | Add a new node to a collection of step NN, e.g. `.functional_requirements` |
@@ -61,16 +65,22 @@ Read is allowed for:
 - `.specdev/findings/findings_*.json` (merged findings files from reviewer)
 - `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`, or a `seed_path` supplied directly to author-extend mode)
 
-Do NOT Read any `spec/NN_*.json` file directly.
+- `spec/extensions/ext_NN_<topic>.schema.json` (the schema file of an extension, step 13)
+
+Do NOT Read any `spec/NN_*.json` file or any data file `spec/extensions/ext_NN_<topic>.json` directly.
 Use `specdev json read` with a filter for any spec content read.
 Before composing any `json read` filter, run `json structure` or `json keys` first.
 
-Edit is allowed narrowly: only for non-spec files (e.g., fixing a typo in a seed document
-or a skill file). Do NOT use Edit on any `spec/*.json` file — use `specdev json patch/insert/delete`.
+Edit is allowed narrowly: for non-spec files (e.g., fixing a typo in a seed document
+or a skill file) and for the schema file of an extension, `spec/extensions/ext_NN_<topic>.schema.json`
+(step 13). Do NOT use Edit on any other file under `spec/` — use `specdev json patch/insert/delete`.
 
-Write is allowed ONLY for the draft file of author mode, which lives outside `spec/`
-(`.specdev/drafts/step_<NN>.json`). The step file itself is created by `specdev step create`,
-never by Write. Never use Write on anything under `spec/` — use `specdev json patch/insert/delete`
+Write is allowed ONLY for the draft files, which live outside `spec/`
+(`.specdev/drafts/step_<NN>.json`; for step 13 also `.specdev/drafts/<extension-id>.json` and the
+ops file `.specdev/drafts/step_13_ops.json`), and for the schema file of an extension,
+`spec/extensions/ext_NN_<topic>.schema.json` (step 13: the host's own JSON Schema; no command
+writes it). The step file and the data file of an extension are created by `specdev step create`,
+never by Write. Never use Write on anything else under `spec/` — use `specdev json patch/insert/delete`
 with `--id` or `--step` in author-extend and fix modes; the exceptions are the file form on `.canonical_proposals` of `spec/03_glossary.json` (section "Two-tier canon write rules") and the open-item forms of a milestone plan (section "Answers that another step or a seed owns").
 
 Edits by node id write the trace lock themselves and show the link targets they touch. Never
@@ -178,13 +188,33 @@ line of the invocation prompt. This agent reads it and branches.
    and implementation claims must be traceable to seed content or an explicit upstream source.
    Relations are written as link fields, not as ids in prose (the id-in-prose check is an
    error owned by the node's step).
+6a. Step 13 only. Count the entries of the manifest written in step 6:
+    ```bash
+    specdev json read spec/13_extension_manifest.json '.extensions | length' --repo-root ./devspec_toolkit
+    ```
+    When it prints `0`, go to step 7: a manifest with no entry has no other file. When it prints a
+    number above 0, do this for each entry, in the order of the manifest, with `<stem>` the
+    `extension_id` of the entry with its hyphens replaced by underscores:
+    1. Write the schema file `spec/extensions/<stem>.schema.json` by the rules of
+       "The Schema File" in `devspec_toolkit/prompts/prompt_13_extension_manifest.md`.
+    2. Write the data draft `.specdev/drafts/<extension-id>.json` and create the data file:
+       ```bash
+       specdev step create 13 <extension-id> --from .specdev/drafts/<extension-id>.json \
+         --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+       ```
+       When it prints `E767`, nothing was written: the message names the schema file to write or
+       correct, or the line of the draft that breaks the schema, or the link that does not resolve.
+       Correct that file and run the command again.
 7. Run the step gate:
    ```bash
    specdev spec-check spec --step <NN> \
      --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ```
 8. If the gate blocks on errors owned by step NN, fix them with
-   `specdev json patch/insert/delete --id <node-id>` and re-run the gate. Do not return
+   `specdev json patch/insert/delete --id <node-id>` and re-run the gate. Step 13: a finding
+   whose text names `extensions/ext_NN_<topic>.schema.json` is corrected in that schema file
+   with Edit (the E520 that begins `the extension schemas of the spec folder` lists one line
+   per place, each with its JSON pointer), then the gate is run again. Do not return
    until the gate is clean for step NN (it does not block on upstream debt or on findings
    that a later step owns; those are reported as pending).
 9. Return structured summary (see Return contract below).
@@ -289,6 +319,24 @@ artifact, preserving all existing content.
    specdev json insert --step <NN> '<insert_pointer>' '<new-content-json>' \
      --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ```
+   Step 13: what `intent` adds decides the command.
+   - A new extension: `specdev json insert --step 13 '.extensions' '<entry>'`, then steps 6a.1 and
+     6a.2 of author mode for that entry. When the insert prints
+     `path .extensions: has more items than the schema allows`, the manifest says `none-required`:
+     write `.specdev/drafts/step_13_ops.json` (a `patch` of `.extension_decision.status` to
+     `"extensions-required"`, a `patch` of `.extension_decision.rationale`, an `insert` of the
+     entry into `.extensions`, an `insert` of its governance label into `.canonical_refs_used`),
+     run `specdev json patch spec/13_extension_manifest.json --batch .specdev/drafts/step_13_ops.json --repo-root ./devspec_toolkit`,
+     then `specdev attest <extension-id> --yes --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`.
+   - A new item at the top of a data file (`insert_pointer` names a section of
+     `spec/extensions/ext_NN_<topic>.json`):
+     `specdev json insert spec/extensions/ext_NN_<topic>.json '<section-path>' '<item>' --repo-root ./devspec_toolkit`,
+     then `specdev attest <new-id> --yes --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`.
+   - A new item nested in an item, or a new value of a field of an item: `specdev json insert --id`
+     or `specdev json patch --id`, as for any node.
+   - A field or a kind the schema file does not declare (the write prints
+     `Additional properties are not allowed`): Edit the schema file first, run the step gate, then write the item.
+
    Relations are written as link fields, not as ids in prose (the id-in-prose check is an
    error owned by the node's step).
 10. Run the step gate (POST-INSERT GATE):

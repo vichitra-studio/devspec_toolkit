@@ -26,7 +26,7 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 | 12 — CI Gates | Wire automated enforcement | `spec/12_ci_gates.json` |
 
 ## Transition: Extensions
-1.  **Step 13 (Extension Generator)**: Identify if you need specialized extensions (e.g., `ext_01_database.json`) for complex domains found in System Sketch.
+1.  **Step 13 (Extension Generator)**: Identify if you need specialized extensions for complex domains found in System Sketch. Each extension the manifest declares has two files in `spec/extensions/` (for `ext-01-database`: `ext_01_database.schema.json` and `ext_01_database.json`), and the step ends with `specdev spec-check spec --step 13` (see [extension_schemas.md](../extension_schemas.md)).
 2.  **Step 14 (Roadmap)**: Run `specdev step ready 14`. Before step 14 is written it checks the steps it will read (07, 08 and 12 among them): it exits 0 and prints `step 14: ready` when each has a file and no pending replay or coverage gap; otherwise it lists the blockers, and those are the findings to fix first (on a copy of the worked example with steps 14 to 16 removed: 11 blockers, 1 at step 07, 5 at step 08 and 5 at step 12, the same that `specdev stale` lists under those steps). The gaps that step 14 itself owns (E740 of the nodes a task criterion uses, E742 of the fixtures, and E566 of the FRs no criterion reaches, which `spec-check` reports) are not blockers: the task criteria of step 14 clear them. Step 13a (the completeness assessment) was removed in 1.2.0: `specdev coverage` and the role findings of `specdev spec-check` (E740 to E745) answer the same question.
 
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.

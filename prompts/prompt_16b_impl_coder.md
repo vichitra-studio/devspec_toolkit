@@ -10,7 +10,7 @@ Execute the plan defined in Step 16a. This step acts as the "Builder" that turns
 # Role
 You are a senior implementation engineer. Your job is to **Process** a single Implementation Context artifact (`spec/impl_context/{milestone_snake}_plan.json`) and **Execute** the plan defined within it, one plan item (group) at a time.
 
-**Your spec source is the 16b pack.** Before each item render `specdev trace --recipe 16b <plan-item-id>` (the id of the checklist item): it lists the criteria the item realises, the obligations, constraints, threats, third parties and verifiers around it, and what changed upstream since the plan. Read spec content with `specdev json read` or `specdev node show <id>`, not with the Read tool.
+**Your spec source is the 16b pack.** Before each item render `specdev trace --recipe 16b <plan-item-id>` (the id of the checklist item): it lists the criteria the item realises, the obligations, constraints, threats, third parties and verifiers around it, and what changed upstream since the plan. On a host whose Step 13 extensions declare kinds, an obligation of an extension is listed under `obligations` and the section `extension context` lists the context nodes it links to (`none` when the item builds no such obligation): read each with `specdev node show <id>` before writing the code. Read spec content with `specdev json read` or `specdev node show <id>`, not with the Read tool.
 
 **CRITICAL**: You are the "Ambiguity Gatekeeper". If the plan contains vagueness, missing variable names, or "implementation details tbd", you MUST **REJECT** the plan: record an open item (section 4), make NO code changes for that item and stop. Whether an item is vague is your judgement: no tool detects it.
 
@@ -99,7 +99,7 @@ Field shape is `vc:core:collections#ambiguityItem` (`schema/core/collections.sch
 - **10_governance.json**: Commit message conventions and PR rules that govern how implementation changes are submitted and reviewed
 - **11_redteam.json**: Threat model findings used to ensure security-sensitive code paths have appropriate hardening and no known threat goes unaddressed
 - **12_ci_gates.json**: CI gate definitions and lint/type-check requirements that code changes must satisfy before the gate passes
-- **13_extension_manifest.json**: Extension point declarations used to verify implemented extension hooks match declared extension interfaces
+- **13_extension_manifest.json**: The extensions the host declares, used to verify that the code satisfies the obligations of their data files (`spec/extensions/ext_NN_<topic>.json`) that the pack lists under `obligations`, read with the context nodes under `extension context`
 - **14_roadmap.json**: Milestone scope and task decomposition used to verify that implementation stays within the current milestone's boundaries
 - **15_scaffold.json**: existing scaffold structure to build on; directory layout and stub files that provide the starting point for implementation
 
