@@ -20,8 +20,7 @@ from dataclasses import dataclass
 
 from specdev_tools.core.errors import refusal
 from specdev_tools.core.host_declarations import HostDeclarations
-from specdev_tools.graph.build import build_graph
-from specdev_tools.graph.gitview import archive_ref, resolve_ref, spec_path_in_repo
+from specdev_tools.graph.gitview import archive_ref, graph_of_tree, resolve_ref, spec_path_in_repo
 from specdev_tools.graph.model import Graph
 from specdev_tools.lifecycle.executed import lock_if_present
 from specdev_tools.proof.built_evidence import bind_proof_context, bind_proof_seams
@@ -78,7 +77,8 @@ def tag_state(git_root: str, spec_root: str, repo_root: str, ref: str) -> Iterat
     """The ``TagState`` of the commit *ref* names, for the host at *git_root* whose spec folder is *spec_root*.
 
     Raises:
-        GitViewError: E708 when *ref* does not resolve or the spec folder is absent at it (a release cut before the spec existed).
+        GitViewError: E708 when *ref* does not resolve, the spec folder is absent at it (a release cut before the spec existed),
+            or the extension schemas of the tree at the commit are refused (the text names the commit).
         FindingError: E760 when the lock at the commit cannot be read; E520 when the toolkit's ownership table cannot be read.
     """
     commit = resolve_ref(ref, git_root)
@@ -86,7 +86,7 @@ def tag_state(git_root: str, spec_root: str, repo_root: str, ref: str) -> Iterat
     bind_proof_seams()
     with archive_ref(commit, git_root, [relative]) as archive:
         spec_dir = os.path.join(archive, relative)
-        graph = build_graph(spec_dir, repo_root)
+        graph = graph_of_tree(commit, spec_dir, repo_root)
         lock = lock_if_present(spec_dir)
         proof = ProofContext(git_root, spec_dir, records_folder(spec_root), commit=commit, spec_in_host=os.path.abspath(spec_root))
         checks = GraphCheckContext.from_graph(graph, lock, repo_root, git_root=git_root, spec_root=spec_dir)

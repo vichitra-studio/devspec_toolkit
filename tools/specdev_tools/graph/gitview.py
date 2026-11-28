@@ -22,7 +22,7 @@ from specdev_tools.core.changelog_parser import compare_versions
 from specdev_tools.core.constants import DEFAULT_BRANCH_CANDIDATES, STAMP_FILE
 from specdev_tools.core.errors import FindingError, make_error
 from specdev_tools.generation.schema_differ import get_user_version
-from specdev_tools.graph.kinds import SEED_KIND
+from specdev_tools.graph.kinds import SEED_KIND, HostKindsRefused
 from specdev_tools.graph.model import Graph, Node, collapse_whitespace
 
 GIT_TIMEOUT_SECONDS = 30
@@ -373,22 +373,46 @@ def _stamped_before_node_model(stamp: str | None) -> bool:
         return False
 
 
-def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) -> Snapshot:
-    """The ``Snapshot`` of the spec folder *spec_path* (relative to *git_root*) at *ref*, built with the toolkit at *repo_root*.
+def refused_tree(ref: str, refused: HostKindsRefused) -> GitViewError:
+    """The E708 of a tree whose own extension schemas the graph refuses: said of *ref*, never of the working tree."""
+    lines = "; ".join(refused.issues)
+    return _fail("E708", f"the tree at ref '{ref}' cannot be read: the graph refuses the extension schemas that tree holds, as they are at that ref ({lines})")
+
+
+def graph_of_tree(ref: str, spec_dir: str, repo_root: str) -> Graph:
+    """The graph of *spec_dir*, the spec folder of the tree of *ref* as git unpacked it, built with the toolkit at *repo_root*.
+
+    The extension schemas of a tree belong to that tree.  When the graph refuses them, the tree is one that cannot be
+    read, like one git cannot hand out: the E708 names the ref, and each reader of old trees does what it does for
+    such a tree (the old text of that commit is not found, a dependency report is unavailable).
 
     Raises:
-        GitViewError: E708 when the ref or the spec folder at the ref cannot be read; E709 when the spec at the ref is
-            stamped with a toolkit version below 1.2.0 (whatever its tree looks like), or when its tree has no graph
-            node (seeds do not count), whatever the stamp of the spec is.
+        GitViewError: E708 that names *ref* when the extension schemas of that tree are refused.
         KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
     """
     from specdev_tools.graph.build import build_graph  # not at the top: the git merge driver imports this module and builds no graph
 
+    try:
+        return build_graph(spec_dir, repo_root)
+    except HostKindsRefused as refused:
+        raise refused_tree(ref, refused) from refused
+
+
+def load_snapshot_at(ref: str, git_root: str, spec_path: str, repo_root: str) -> Snapshot:
+    """The ``Snapshot`` of the spec folder *spec_path* (relative to *git_root*) at *ref*, built with the toolkit at *repo_root*.
+
+    Raises:
+        GitViewError: E708 when the ref or the spec folder at the ref cannot be read, or when the extension schemas of
+            the tree at the ref are refused; E709 when the spec at the ref is
+            stamped with a toolkit version below 1.2.0 (whatever its tree looks like), or when its tree has no graph
+            node (seeds do not count), whatever the stamp of the spec is.
+        KindRegistryError: the registry of the toolkit is missing or unreadable (E520).
+    """
     stamp = toolkit_stamp_at(ref, git_root, os.path.join(git_root, spec_path))
     if _stamped_before_node_model(stamp):
         raise _fail("E709", _predates_message(ref, stamp, by_stamp=True))
     with archive_ref(ref, git_root, [spec_path]) as archived:
-        graph = build_graph(os.path.join(archived, spec_path), repo_root)
+        graph = graph_of_tree(ref, os.path.join(archived, spec_path), repo_root)
         if all(node.kind == SEED_KIND for node in graph.nodes):
             raise _fail("E709", _predates_message(ref, stamp, by_stamp=False))
         return Snapshot(graph, read_seed_texts_at(ref, git_root, graph))

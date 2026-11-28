@@ -6,6 +6,10 @@ what an item is about.  This module is that single answer; it reads files only (
 Locations are the arrays of kind ``ambiguity-item`` in ``tools/entry_key_registry.json``: ``.ambiguities`` of the step
 files 00 to 15 (with 02a), ``.plan.ambiguities`` of the anchor ``16_impl_context.json`` and, in each
 ``impl_context/ms_*_plan.json``, ``.plan.ambiguities`` (step 16a) and ``.execution.emergent_ambiguities`` (step 16b).
+The data files of the extensions folder (the JSON files directly in ``extensions/`` that are no schema file) are files
+of step 13: the items of their ``.ambiguities`` are read like the manifest's, after it.  Such a file is the host's and
+its own schema judges its shape (the step's validation reports it), so here it is read for what it holds: a file that is
+not readable JSON, an ``ambiguities`` that is no list and an entry that is no object yield nothing and raise nothing.
 
 Two item shapes are read (the legacy one stays: a spec that is not migrated yet, and an item the migration leaves in
 its 1.1.1 shape for a person to rewrite, still carry it):
@@ -22,8 +26,9 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal, NamedTuple
 
+from .host_schemas import find_host_schemas
 from .loaders import load_json_artifact
-from .step_paths import PLAN_DIR_NAME, PLAN_FILE_GLOB, STEP_JSON_RE
+from .step_paths import EXTENSION_STEP, EXTENSIONS_DIR_NAME, PLAN_DIR_NAME, PLAN_FILE_GLOB, STEP_JSON_RE
 
 Shape = Literal["unified", "legacy"]
 
@@ -179,13 +184,37 @@ def _items_in(path: str, doc: dict[str, Any], location: AmbiguityLocation) -> It
         yield AmbiguityItem(path, location.step, location.array_path, entry, shape_of(entry))
 
 
-def _root_files(spec_dir: str) -> Iterator[tuple[str, AmbiguityLocation]]:
-    """Each root step file (00 to 15, 16) with the location of its items, in file-name order."""
+def _extension_files(spec_dir: str) -> list[str]:
+    """The data files of the extensions folder (``find_host_schemas``): the JSON files directly in it that are no schema file, in name order."""
+    return [os.path.join(spec_dir, EXTENSIONS_DIR_NAME, name) for name in find_host_schemas(spec_dir).data_files]
+
+
+def _extension_items(path: str, location: AmbiguityLocation) -> list[AmbiguityItem]:
+    """The items of one data file of the extensions folder: the objects of its list, none when the file or the list cannot be read as one (never raises)."""
+    try:
+        array = _array_at(_load(path), location.array_path)
+    except AmbiguityReadError:
+        return []
+    entries = array if isinstance(array, list) else []
+    return [AmbiguityItem(path, location.step, location.array_path, entry, shape_of(entry)) for entry in entries if isinstance(entry, dict)]
+
+
+def _root_files(spec_dir: str) -> Iterator[tuple[str, AmbiguityLocation, bool]]:
+    """Each step file with the location of its items and whether it is a file of the host's own shape.
+
+    The root files (00 to 15, 16) come in file-name order; the data files of the extensions folder come at the place of
+    step 13, after its root file.
+    """
     by_step = {loc.step: loc for loc in LOCATIONS if not loc.in_plan_file}
+    of_extensions = [(path, by_step[EXTENSION_STEP], True) for path in _extension_files(spec_dir)]
     for name in sorted(os.listdir(spec_dir)):
         step = _step_of_file(name)
         if step in by_step:
-            yield os.path.join(spec_dir, name), by_step[step]
+            if step > EXTENSION_STEP:  # the first root file of a later step: the files of the folder come before it
+                yield from of_extensions
+                of_extensions = []
+            yield os.path.join(spec_dir, name), by_step[step], False
+    yield from of_extensions
 
 
 def _plan_files(spec_dir: str) -> list[str]:
@@ -197,18 +226,19 @@ def _plan_files(spec_dir: str) -> list[str]:
 
 
 def iter_ambiguity_items(spec_dir: str) -> Iterator[AmbiguityItem]:
-    """Yield every ambiguity item of *spec_dir*, open or not, in file order: step files, the anchor, milestone plans.
+    """Yield every ambiguity item of *spec_dir*, open or not, in file order: step files (the data files of the extensions folder with step 13), the anchor, milestone plans.
 
     Items of a milestone plan come as ``plan.ambiguities`` (step ``16a``) then ``execution.emergent_ambiguities``
     (step ``16b``).  A missing folder, file or array yields nothing.
 
     Raises:
-        AmbiguityReadError: a file is not readable JSON, an array is not a list or holds a non-object entry.
+        AmbiguityReadError: a file is not readable JSON, an array is not a list or holds a non-object entry (not for a
+            data file of the extensions folder: its shape is its own schema's to judge).
     """
     if not os.path.isdir(spec_dir):
         return
-    for path, location in _root_files(spec_dir):
-        yield from _items_in(path, _load(path), location)
+    for path, location, own_shape in _root_files(spec_dir):
+        yield from _extension_items(path, location) if own_shape else _items_in(path, _load(path), location)
     plan_locations = [loc for loc in LOCATIONS if loc.in_plan_file]
     for path in _plan_files(spec_dir):
         doc = _load(path)

@@ -219,6 +219,22 @@
                 "datastore"
               ]
             }
+          },
+          "verified_by": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "description": "Ids of the fixtures (step 08) or CI jobs (step 12) that prove this table: the cases that show it holds what it must. A table in scope names at least one.",
+            "x-link": {
+              "kinds": [
+                "fixture",
+                "job"
+              ],
+              "required": false
+            }
           }
         }
       }

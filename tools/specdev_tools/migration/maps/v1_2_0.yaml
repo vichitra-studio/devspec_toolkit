@@ -1957,3 +1957,13 @@ rows:
   script: p3_remove
   closed_plans: keep
   note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-13-04
+  path: extensions[].justified_by
+  change: add
+  disposition: none
+  note: 'addition, required: a 1.1.1 entry names no upstream node and no script invents one; the step-13 check reports the entry (E520) until a person names the nodes, and `align propose --kind prose-ids` lists the ids its text names'
+- id: SC-13-05
+  path: extensions[].lifecycle
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'

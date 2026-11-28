@@ -14,7 +14,7 @@ from specdev_tools.core.errors import refusal
 from specdev_tools.graph.contract import item_of
 from specdev_tools.graph.ids import mint_slug
 from specdev_tools.graph.model import NOT_APPLICABLE, Graph, Node
-from specdev_tools.graph.names import BINDING_KIND, FIXTURE, JOB, MANUAL_MODE, REALISES, RULE, VERIFIES
+from specdev_tools.graph.names import BINDING_KIND, FIXTURE, JOB, MANUAL_MODE, OBLIGATION_ROLES, REALISES, RULE, VERIFIED_BY, VERIFIES
 from specdev_tools.graph.queries import unknown_node_error
 from specdev_tools.graph.stages import UnknownStageForEnvironment, binding_required_stage, bindings_of, required_stage
 from specdev_tools.verify.guard import GuardError, compile_guard
@@ -74,10 +74,20 @@ def _verifier_of(graph: Graph, verifier_id: str) -> Node:
 
 
 def targets_of(verifier: Node, graph: Graph) -> tuple[str, ...]:
-    """The ids the verifier can prove, in link order: a fixture's ``verifies``; a job's ``realises`` and the NFRs it ``verifies``; a rule has none."""
+    """The ids the verifier can prove, in link order: a fixture's ``verifies``; a job's ``realises`` and the NFRs it ``verifies``; a rule has none.
+
+    Then each obligation that names the verifier in its own ``verified_by`` (an obligation of an extension: no toolkit
+    obligation has the field, and a task criterion is no obligation), in graph order.
+    """
     fields = _TARGET_FIELDS[verifier.kind]
-    found = dict.fromkeys(graph.canonical_id(link.target) for link in verifier.links if link.field in fields)
-    return tuple(found)
+    own = [graph.canonical_id(link.target) for link in verifier.links if link.field in fields]
+    naming = [link.source for link in graph.incoming.get(verifier.id, ()) if link.field == VERIFIED_BY and _is_obligation(graph, link.source)]
+    return tuple(dict.fromkeys((*own, *naming)))
+
+
+def _is_obligation(graph: Graph, node_id: str) -> bool:
+    node = graph.by_id.get(node_id)
+    return node is not None and node.role in OBLIGATION_ROLES
 
 
 def proved_ids(binding: Binding, graph: Graph) -> tuple[str, ...]:

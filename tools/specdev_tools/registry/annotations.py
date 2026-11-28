@@ -23,6 +23,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from specdev_tools.core.host_schemas import schema_place_of
 from specdev_tools.core.registry import SchemaRegistry, get_shared_registry
 
 GRAPH_URI = "vc:core:graph"
@@ -102,9 +103,13 @@ class SchemaRefs:
         self.store = registry.store
 
     def file_of(self, uri: str) -> str:
-        """Repo-relative file of schema *uri*, or *uri* itself when unmapped."""
+        """Repo-relative file of schema *uri*, or *uri* itself when unmapped.
+
+        The extension schema of a host is named by its place in the spec folder
+        (``extensions/ext_01_database.schema.json``), not by the absolute path the registry holds for it.
+        """
         rel = self.reg.map.get(uri)
-        return rel if rel else uri
+        return (schema_place_of(uri) or rel) if rel else uri
 
     def resolve(self, ref: str, uri: str = "") -> tuple[Any, str, str] | None:
         """Resolve *ref* seen in schema *uri*: ``(target, target_uri, target_pointer)`` or ``None``.
@@ -228,15 +233,20 @@ class AnnotationWalker:
                 self.walk(sub, uri, f"{child}/{i}", holder, None)
 
 
-def collect_annotations(repo_root: str) -> AnnotationDecls:
-    """Collect node and link declarations from every registered schema of *repo_root*."""
+def collect_annotations(repo_root: str, spec_root: str | None = None) -> AnnotationDecls:
+    """Collect node and link declarations from every registered schema of *repo_root*.
+
+    With *spec_root* (a spec folder) the accepted extension schemas of that folder are read too
+    (``core/host_schemas.py``): ``graph.host_kinds`` passes it; the generator never does, so nothing of a host
+    reaches a generated file.
+    """
     root = os.path.abspath(repo_root)
     if not (
         os.path.exists(os.path.join(root, "tools", "schema_registry.json"))
         or os.path.exists(os.path.join(root, "schema_registry.json"))
     ):
         return AnnotationDecls()
-    reg = get_shared_registry(root)
+    reg = get_shared_registry(root, spec_root)
     if GRAPH_URI not in reg.store:
         return AnnotationDecls(registry=reg)
     walker = AnnotationWalker(SchemaRefs(reg))

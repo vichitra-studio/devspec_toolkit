@@ -127,6 +127,13 @@
           "uniqueItems": true,
           "items": {"$ref": "vc:core:graph#kindName"},
           "description": "Subset of kinds that the field accepts in addition to the others: when the link is required, a value that holds only targets of these kinds does not satisfy it (E701), and a target that cannot be found is looked for in the steps of the other kinds."
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "vc:core:graph#nodeRole"},
+          "description": "Roles whose kinds a host declares in its extension schemas (step 13) and the field accepts in addition to kinds. A kind of the toolkit is never added by role: the toolkit lists its own kinds in kinds."
         }
       },
       "required": ["kinds", "required"],

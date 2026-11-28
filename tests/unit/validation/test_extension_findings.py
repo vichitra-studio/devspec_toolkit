@@ -19,7 +19,9 @@ from specdev_tools.canonical.integrity import validate_canonical_integrity, vali
 from specdev_tools.core.errors import SpecError, make_error
 from specdev_tools.core.registry import get_shared_registry
 from specdev_tools.core.step_order import load_step_order
+from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.model import Graph
+from specdev_tools.trace.lockfile import Lock, read_lock, write_lock
 from specdev_tools.validation.touched_steps import steps_for_paths, steps_without_artifact
 from specdev_tools.validation import spec_check
 from specdev_tools.validation.check_registry import CheckContext
@@ -27,7 +29,7 @@ from specdev_tools.validation.spec_quality_lint import lint_spec_quality
 from specdev_tools.validation.validate import validate_dir, validate_file
 from specdev_tools.validation.validators.step_13 import folder_without_manifest_errors, validate_step_13
 
-from ..trace._lock_support import EXAMPLE_HOST
+from ..trace._lock_support import EXAMPLE_HOST, lock_for
 
 ROOT = Path(__file__).resolve().parents[3]
 EXTENSION_FILES = ROOT / "tests" / "fixtures" / "extension_example" / "spec" / "extensions"
@@ -42,6 +44,8 @@ CANON = str(EXAMPLE_HOST / "spec" / "canon")
 """The project canon of the worked example: the example data file carries one of its terms."""
 TERM = "cn:project:term:reset-token"
 STEP_13 = "step:13"
+EXTENSION_NODES = ("ds-identity", "tbl-reset-token", "tbl-member-credential")
+"""The nodes of the example's data file (DEVSPEC-245, piece B)."""
 LABEL = {"id": "cn:core:governance_label:mandatory", "kind": "governance_label", "version": "^1.0.0"}
 
 
@@ -434,7 +438,11 @@ def test_the_deep_checks_of_step_13_do_not_run_on_a_data_file(spec: Path) -> Non
 
 
 def _host_spec(tmp_path: Path) -> Path:
-    """A copy of the worked example's spec folder with the extension's files and the manifest entry of the fixture's delta."""
+    """A copy of the worked example's spec folder with the extension's files and the manifest entry of the fixture's delta, their links accepted.
+
+    The items of the data file and the manifest entry are nodes (DEVSPEC-245, piece B): their links need a lock entry like any
+    other (E761).  The entries of the example's own lock are kept as they are.
+    """
     folder = tmp_path / "host" / "spec"
     shutil.copytree(EXAMPLE_HOST / "spec", folder)
     shutil.copytree(EXTENSION_FILES, folder / "extensions")
@@ -450,6 +458,10 @@ def _host_spec(tmp_path: Path) -> Path:
                 document[key].append(op["value"])
 
     _edit(folder / "13_extension_manifest.json", declare)
+    graph = build_graph(str(folder), str(ROOT))
+    added = lock_for(graph, folder.parent, only_holders=[node.id for node in graph.nodes if node.file in (DATA_PLACE, "13_extension_manifest.json")])
+    assert {entry.source for entry in added.entries} == {*EXTENSION_NODES, "ext-01-database"}
+    write_lock(str(folder), Lock((*read_lock(str(folder)).entries, *added.entries)))
     return folder
 
 
@@ -469,14 +481,21 @@ def test_a_folder_with_the_extension_has_the_findings_of_the_folder_without_it(t
     assert _folder_findings(_host_spec(tmp_path)) == _folder_findings(plain)
 
 
-def test_a_folder_whose_extension_lost_its_schema_has_three_more_findings(tmp_path: Path) -> None:
-    """One of the manifest (the entry has no schema) and the two of the data file (schema validation, canonical integrity)."""
+def test_a_folder_whose_extension_lost_its_schema_has_three_more_findings_and_the_lock_entries_of_its_nodes(tmp_path: Path) -> None:
+    """One of the manifest (the entry has no schema) and the two of the data file (schema validation, canonical integrity).
+
+    Piece B: with no schema the items of the data file are no nodes, so each accepted link of theirs is a lock entry with no link (E762).
+    """
     host = _host_spec(tmp_path)
     before = _folder_findings(host)
+    held = [entry for entry in read_lock(str(host)).entries if entry.source in EXTENSION_NODES]
+    assert {entry.source for entry in held} == set(EXTENSION_NODES)
     (host / "extensions" / SCHEMA_NAME).unlink()
     added = [make for make in _folder_findings(host) if make not in before]
-    assert [code for code, _text in added] == ["E520", "E520", "E520"]
-    texts = [text for _code, text in added]
+    assert [code for code, _text in added] == ["E520", "E520", "E520", *["E762"] * len(held)]
+    for entry in held:
+        assert [text for code, text in added if code == "E762" and f"{entry.source}, field {entry.field}, target '{entry.target}'" in text] != []
+    texts = [text for code, text in added if code == "E520"]
     (no_schema,) = [text for text in texts if "Extension 'ext-01-database' has no schema" in text]
     not_found = [text for text in texts if f"schema_not_found uri={URI}" in text]
     assert len(not_found) == 2 and no_schema not in not_found

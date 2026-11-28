@@ -104,7 +104,10 @@
                                 "edge-case"
                               ],
                               "required": false,
-                              "built": true
+                              "built": true,
+                              "roles": [
+                                "obligation-system"
+                              ]
                             }
                           },
                           "removes": {

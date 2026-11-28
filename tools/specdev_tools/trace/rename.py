@@ -24,6 +24,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.host_schemas import data_file_of, schema_file_of, uri_of
 from specdev_tools.core.json_utils import JsonUtilsError, check_edit, json_write_atomic, patch_text
 from specdev_tools.core.schema_validate import jq_key
 from specdev_tools.graph import names
@@ -144,7 +145,7 @@ class FileEditor:
         found: list[FileEdit] = []
         for rel in sorted(self._text):
             try:
-                check_edit(rel, self._original[rel], self._text[rel], repo_root)
+                check_edit(rel, self._original[rel], self._text[rel], repo_root, spec_root=self._spec_root)
             except JsonUtilsError as error:
                 raise refuse(str(error)) from None
             found.append(FileEdit(rel, self._original[rel], self._text[rel]))
@@ -171,6 +172,12 @@ def _node_to_rename(graph: Graph, old_id: str) -> Node:
         raise refuse(f"{node.id!r} is {article(node.kind)} {node.kind}, which is a record written by the toolkit, and a record is not renamed")
     if decl is None or decl.map_keyed or decl.id_field is None:
         raise refuse(f"{node.id!r} is {article(node.kind)} {node.kind}, whose id is the key of a map; it is not renamed by id")
+    if node.kind == names.EXTENSION:
+        raise refuse(
+            f"{node.id!r} is {article(node.kind)} {node.kind}, and its id names its data file ({data_file_of(node.id)}), its schema file "
+            f"({schema_file_of(node.id)}) and the `$id` of that schema ({uri_of(node.id)}); it is not renamed by id. To rename it by hand: "
+            "move the two files to the names of the new id, edit the `$id` of the schema and the `$schema` of the data file, then the id of the entry"
+        )
     return node
 
 

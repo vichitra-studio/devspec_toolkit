@@ -49,6 +49,9 @@
       ],
       "part_of": [
         "ds-identity"
+      ],
+      "verified_by": [
+        "fix-password-reset-reused-token"
       ]
     },
     {

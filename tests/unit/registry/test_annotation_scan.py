@@ -153,13 +153,13 @@ def test_real_registry_lists_seed_external_kind():
 
 
 def test_scan_of_real_toolkit_finds_seed_and_step_13_declares_only_extension_and_ambiguity_kinds():
-    """Step 13 declares no kind that a step of the graph holds links for: its ``extension`` record (unique ids, computed-field rejection) and the shared ambiguity list."""
+    """Step 13 declares two kinds: its ``extension`` entry, whose one link names the upstream nodes that justify it (DEVSPEC-245), and the shared ambiguity list."""
     scan = scan_annotations(str(_ROOT))
     assert [e["kind"] for e in scan.external_kinds] == ["seed"]
     host = scan.host("schema/13_extension_manifest.schema.json")
     assert host is not None
     assert {occ.entry["kind"] for occ in host.occurrences} == {"ambiguity-item", "extension"}
-    assert not any("links" in occ.entry for occ in host.occurrences if occ.entry["kind"] == "extension")
+    assert [[link["field"] for link in occ.entry["links"]] for occ in host.occurrences if occ.entry["kind"] == "extension"] == [["justified_by"]]
 
 
 # ----------------------------------------- unannotated files unchanged (acc. 2)

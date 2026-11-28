@@ -26,10 +26,12 @@ from specdev_tools.graph.gitview import (
     archive_ref,
     folder_exists_at,
     path_exists_at,
+    refused_tree,
     resolve_ref,
     run_git,
     spec_path_in_repo,
 )
+from specdev_tools.graph.kinds import HostKindsRefused
 
 BaseMode = Literal["merge-base", "head", "unavailable"]
 BaselineMode = Literal["ok", "unavailable"]
@@ -261,7 +263,9 @@ def merge_base_provider(
 
     ``unavailable``, with the reason in ``resolution.note``, when the baseline cannot be resolved or materialised (no
     git, no merge-base, a spec folder absent at the commit or outside the git root) or when the checks fail on the baseline tree (any
-    ``Exception``: a baseline that older tooling cannot read is no reason to stop the gate).  ``seed_paths`` names the seed documents of the
+    ``Exception``: a baseline that older tooling cannot read is no reason to stop the gate).  A baseline tree whose own extension
+    schemas the graph refuses is one of these: the note names the base commit and the ref, since no file of the working tree is at
+    fault.  ``seed_paths`` names the seed documents of the
     current tree; ``compute_errors`` runs the checks on the materialised tree; *base_ref* (``--base-ref``) names the
     branch to compare with, as ``resolve_target_branch`` reads it.
     """
@@ -280,6 +284,9 @@ def merge_base_provider(
                 return BaselineResult("unavailable", resolution=replace(resolution, note=reason))
             with materialise_baseline(git_root, resolution.commit, spec_dir, seed_paths(spec_dir)) as tree:
                 errors = host_paths_in(compute_errors(tree.root, tree.spec_dir), _tree_replacements(tree, spec_dir, git_root))
+        except HostKindsRefused as refused:
+            reason = f"{refused_tree(resolution.commit[:12], refused).error.message}; it is the base of the comparison with '{resolution.ref}': every error of an earlier step counts as new"
+            return BaselineResult("unavailable", resolution=replace(resolution, note=reason))
         except Exception as error:  # noqa: BLE001 - the baseline tree is old data: whatever breaks on it makes it unavailable
             text = " ".join(str(error).split())
             text = text if len(text) <= _REASON_CHARS else text[:_REASON_CHARS].rstrip() + "..."

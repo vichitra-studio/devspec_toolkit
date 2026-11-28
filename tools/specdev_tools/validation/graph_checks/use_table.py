@@ -16,8 +16,8 @@ from specdev_tools.graph.model import SpecShape
 
 from specdev_tools.graph.names import EXPECTS, REALISES, REMOVES, VERIFIED_BY, VERIFIER_ROLE, VERIFIES
 
-EXCLUDED_VERBS = frozenset({"about", "replaces", EXPECTS, REMOVES, VERIFIES, VERIFIED_BY})
-"""Verbs that are never a use: a record's ``about``, the id-history links, the verifier verbs (a fixture that verifies a node does not use it) and ``expects`` (a fixture that expects an error does not use it)."""
+EXCLUDED_VERBS = frozenset({"about", "replaces", "justified_by", EXPECTS, REMOVES, VERIFIES, VERIFIED_BY})
+"""Verbs that are never a use: a record's ``about``, the id-history links, ``justified_by`` (an extension entry of step 13 names the nodes that make it necessary; it does not deliver them), the verifier verbs (a fixture that verifies a node does not use it) and ``expects`` (a fixture that expects an error does not use it)."""
 NON_HOLDER_ROLES = frozenset({RECORD_ROLE, VERIFIER_ROLE})
 VERIFIER_USE_VERB = REALISES
 """The one verb through which a verifier is a use: a job that ``realises`` a rule uses it (DOC: a job is used through what it realises)."""

@@ -132,13 +132,13 @@ def test_every_step_schema_has_an_x_node() -> None:
 
 
 def test_extension_entry_is_declared_by_x_node(registry: dict[str, Any]) -> None:
-    """The ``extension`` kind keeps the path, id field and kind it had when the id-field heuristic found it; step 13 now declares it (a record, no links)."""
+    """The ``extension`` kind keeps the path, id field and kind it had when the id-field heuristic found it; step 13 declares it as a plan kind with one link, ``justified_by`` (DEVSPEC-245)."""
     pre_m1 = json.loads((_FIXTURES / "entry_key_registry_pre_m1.json").read_text())["registry"]
     extension = lambda reg: [a for a in reg["13_extension_manifest.json"]["arrays"] if a["array_path"] == ".extensions"]  # noqa: E731
     (new,) = extension(registry)
     (old,) = extension(pre_m1)
     assert {k: new[k] for k in old} == old
-    assert (new["source"], new["role"], "links" in new) == ("x-node", "record", False)
+    assert (new["source"], new["role"], [link["field"] for link in new["links"]]) == ("x-node", "plan", ["justified_by"])
 
 
 def test_anchor_row_registered_under_step_16(registry: dict[str, Any]) -> None:

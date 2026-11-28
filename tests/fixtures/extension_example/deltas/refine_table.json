@@ -1,0 +1,26 @@
+{
+  "description": "A task criterion of the roadmap refines the table tbl-reset-token of the extension and names the fixture that proves it. With the extension declared and this delta the example reports what the plain example reports: without it nothing refines the table (E740).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/14_roadmap.json",
+      "path": [
+        "milestones",
+        0,
+        "tasks",
+        0,
+        "acceptance_criteria"
+      ],
+      "value": {
+        "criterion_id": "tc-reset-token-table",
+        "text": "The table reset_token holds one row for each reset a member asked for, and a row whose used_at is set is refused a second redemption.",
+        "refines": [
+          "tbl-reset-token"
+        ],
+        "verified_by": [
+          "fix-password-reset-reused-token"
+        ]
+      }
+    }
+  ]
+}

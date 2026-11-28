@@ -21,7 +21,10 @@
       "governance_label_ref": {
         "id": "cn:core:governance_label:mandatory",
         "kind": "governance_label"
-      }
+      },
+      "justified_by": [
+        "fr-order-history"
+      ]
     }
   ],
   "canonical_refs_used": [

@@ -301,8 +301,8 @@ flowchart BT
   S15 -.->|"path must be a tracked file"| CODE
 ```
 *Figure 2. The layers, with one representative link per step pair, in storage direction (the holder points at the
-target). The full set is the per-step link table (section 4.3). 03 terms are used by label. 13 extensions get links
-when they become first-class. 16b execution records and the 16c review record are blocks inside the plan file.*
+target). The full set is the per-step link table (section 4.3). 03 terms are used by label. A 13 extension entry holds
+`justified_by`, and the kinds its own schema declares hold the links that schema declares (**As built**). 16b execution records and the 16c review record are blocks inside the plan file.*
 
 Two walks follow from the storage direction: **lineage** follows links upward; **impact and coverage** follow them in
 reverse, through a reverse index the tool builds when needed.
@@ -451,7 +451,8 @@ bare ids. `assumes` is open to any obligation or context node at steps 00–11 (
 | 11 | threat | `derives_from` → 00 risk; `threatens` → API, component, connection, third party; `mitigated_by` → obligations, fixtures | Ruled |
 | 11 | edge case | `threatens` → API, component or FR; `mitigated_by` → obligations, fixtures | Ruled |
 | 12 | CI job | `realises` → 02a environments, gates and secrets it provisions or runs, step-10 rules it enforces; `verifies` → the NFR its run proves; `depends_on` → job | Ruled / Definition (environments, secrets) |
-| 13 | extension | `justified_by` → its upstream nodes (when first-class) | Ruled |
+| 13 | extension (the manifest entry) | `justified_by` → the component, third party, capability, FR or NFR that makes it necessary; required, at least one (**As built**) | Ruled |
+| 13 | kinds an extension's own schema declares | The links that schema declares (`x-link`, a verb of the closed set) → nodes of earlier steps; another kind of step 13 only when the link names it in `same_step_kinds`. An obligation kind names what proves it: `verified_by` → a fixture or a CI job (**As built**) | Ruled |
 | 14 | task criterion | `refines` → any obligation kind with ids; `verified_by` → its verifier (a fixture, a CI job, or a step-10 rule the criterion refines (**As built**)); `removes` → a deleted id (removal tasks) | Ruled |
 | 14 | task | `depends_on` → task | Definition |
 | 14 | milestone | none stored: its 09 milestones are computed | Ruled |
@@ -599,9 +600,10 @@ Each kind declares one role in its schema; one rule per role applies to every re
 | context | Be used (no-dangling) | At merge | Ruled |
 | record | Exempt from no-dangling; its `about` must resolve | Always | Ruled |
 
-Seeds are the top of the graph, not a role; their checks are the route checks (section 6). Extension kinds declare a
-role when they become first-class. Until then the step-13 manifest entry (kind `extension`) is declared with the role
-`record` and no links, so that every registry row has a declared kind: a placeholder, not its role (**As built**).
+Seeds are the top of the graph, not a role; their checks are the route checks (section 6). A kind that an
+extension's own schema declares (`x-node` in `spec/extensions/ext_NN_<topic>.schema.json`) takes the role
+`obligation-system` or `context` and no other; its nodes are the items of the extension's data file, at step 13. The
+step-13 manifest entry (kind `extension`) is a `plan` node whose `justified_by` is required (**As built**).
 Error objects carry their owner and the node id (**Definition**).
 
 ### 5.2 Use and no-dangling
@@ -632,11 +634,11 @@ node nothing uses is a sign of a wrong design.
 | 02 third party | `relies_on`, `part_of`, or a connection's `connects_to` | Ruled |
 | 02a environment, gate, secret | The 12 job that `realises` it (also its built path) | Definition |
 | 03 term | Use by label | Ruled |
-| 08 fixture | A task criterion's `verified_by`, or a verification or evidence record that names it | Definition |
+| 08 fixture | A `verified_by` that names it (a task criterion's, or an extension obligation's (**As built**)), or a verification or evidence record that names it | Definition |
 | 11 threat, edge case | A task criterion that `refines` it | Definition |
 | 00 risk | A threat that `derives_from` it, a step-10 rule, a 09 milestone that `schedules` it | Ruled / Definition |
 | 00 constraint | Third-party nodes, components, 02a nodes and step-10 rules that `derives_from` it | Ruled |
-| 12 CI job | Through the gate or rule it `realises` (the reverse of the link), a task criterion's `verified_by`, or a verification or evidence record that names it | Definition |
+| 12 CI job | Through the gate or rule it `realises` (the reverse of the link), a `verified_by` that names it (a task criterion's, or an extension obligation's (**As built**)), or a verification or evidence record that names it | Definition |
 | 15 scaffold row | Code: its path is a tracked file, git submodules included. Checked at close and release, and at merge only for rows whose API is built. Owned by step 15 | Ruled |
 | Every other kind | A stored or computed link from below; record links do not count | Definition |
 
@@ -726,7 +728,8 @@ signals. The charter's `in_scope` and `out_of_scope` lists merge into one list o
 | 11 | threat, edge case | obligation (system) | Definition |
 | 12 | CI job | verifier | Definition |
 | 12 | job step | content (ids dropped) | Definition |
-| 13 | extension kinds | declared when first-class; until then the manifest entry is `record`, a placeholder (**As built**) | Ruled |
+| 13 | extension (the manifest entry) | plan (**As built**) | Ruled |
+| 13 | kinds an extension's own schema declares | obligation (system) or context, as the schema declares; no other role (**As built**) | Ruled |
 | 14 | roadmap milestone, task, task criterion | plan | Definition |
 | 15 | scaffold row | context | Ruled |
 | 16 | anchor row | record | Definition |
@@ -743,7 +746,7 @@ signals. The charter's `in_scope` and `out_of_scope` lists merge into one list o
 | Source of truth (D10) | A product decision is written into the seed it concerns. Seeds stay the source of truth. The decisions seed must not exist (no check enforces it; the migration lists one for the operator (**As built**)) | Ruled |
 | Distillation (revised D11) | Each aspect of a seed is distilled once, at the step where it belongs, and that node links the seed with `derives_from`. One seed may feed several steps, each taking different parts. Later steps read the distilled node, never the raw seed | Ruled |
 | Routing | The manifest's `step_requirements` decides which seeds a step reads and may link to. Seeds are never routed to the trinity steps | Ruled |
-| Route checks | Apply to `derives_from` links only. A `derives_from` link to a seed not routed to the node's step is an error (a seed with no route at all gets only the listed-seed error below). Every (seed, step) route must be used by at least one node of that step; a node with `scope: later` or `out` does not count. A node of any step from 00 to 15 can hold the link, except an extension (13), which holds no links; a route to step 13 or a trinity step can never be used and is reported (**As built**) (replaces W140, today's token-overlap warning between an artifact and its routed seeds). Every listed seed must be routed somewhere. A seed nothing should read is simply not listed (W551, today's warning for a seed file on disk that the manifest does not list, is dropped) | Ruled |
+| Route checks | Apply to `derives_from` links only. A `derives_from` link to a seed not routed to the node's step is an error (a seed with no route at all gets only the listed-seed error below). Every (seed, step) route must be used by at least one node of that step; a node with `scope: later` or `out` does not count. A node of any step from 00 to 15 can hold the link; a kind of an extension (13) holds it only when its schema declares `derives_from` to a seed. A route to a step none of whose kinds can hold the link (a trinity step, or step 13 with no such kind) can never be used and is reported (**As built**) (replaces W140, today's token-overlap warning between an artifact and its routed seeds). Every listed seed must be routed somewhere. A seed nothing should read is simply not listed (W551, today's warning for a seed file on disk that the manifest does not list, is dropped) | Ruled |
 | Record links | An ambiguity's `about` may name any listed seed, routed or not | Definition |
 | Seed-link minimality | A node stores a seed link only for content it took straight from the seed, not through an upstream node | Definition |
 | Seed edits | Every node that links the seed, and everything below it, becomes suspect. Whitespace-only edits change nothing (section 13.8) | Ruled |
@@ -948,6 +951,7 @@ Each obligation is proven through the verifier the spec declares for it (**Ruled
 | 02a environments, gates, secrets | The 12 job that provisions or runs them |
 | 10 rules | Their enforcer: a 12 job, a toolkit command, or a `review` attested at release with `verify attest` |
 | 00 items, 01 capabilities | Everything derived from them |
+| 13 obligations of an extension | The fixtures and 12 jobs the node names in its own `verified_by` (**As built**) |
 | 14 task criterion | Its own verifier (fixture, CI job or enforcer), which must verify the obligation it refines |
 
 | Rule | What it means | Status |
@@ -1022,7 +1026,7 @@ flowchart LR
 
 | Rule | What it means | Status |
 |---|---|---|
-| Step 13 | The extension generator stays; extension kinds become first-class later. Fixed in 1.2.0: in 1.1.1 a declared extension failed E590 without a governance label in step 10 and E210 with one; now the label resolves through canon and is not listed in step 10 (**As built**) | Ruled |
+| Step 13 | The extension generator stays. An extension is two files in `spec/extensions/`: `ext_NN_<topic>.schema.json` (a JSON Schema, `$id` `vc:ext-NN-<topic>`) and `ext_NN_<topic>.json` (its data), declared by an entry of the manifest. The tool finds the schema by a scan of the folder and validates the data file with it; the items of the data file are graph nodes of the kinds and links the schema declares, written by node id and shown in the context packs (**As built**, DEVSPEC-245). Fixed in 1.2.0: in 1.1.1 a declared extension failed E590 without a governance label in step 10 and E210 with one; now the label resolves through canon and is not listed in step 10 (**As built**) | Ruled |
 | Step 13a | Retired as a step and a file. Its three coverage numbers not involving step 14 are printed by `specdev coverage` (information, no threshold), and the gaps themselves are the role errors E740 to E745 of `spec-check` (**As built**); its two milestone numbers become checks in step 14's validator | Ruled |
 | prompt_14's root-trace rules | Retired; the role rules and no-dangling (section 5), owned by step 14, replace them | Ruled |
 | Step order | Generated from the link declarations; `tools/step_order.json` also keeps declared edges for the context reads that no stored link derives (**As built**) | Ruled |
@@ -1748,7 +1752,9 @@ steps are content, so their ids are dropped. Today's `requires` becomes `depends
 
 ### 12.16 Step 13: extensions
 
-Unchanged in the example (`extension_decision.status: none-required`).
+Unchanged in the example (`extension_decision.status: none-required`). A second example lays one extension over it
+(`tests/fixtures/extension_example`: a database, with a datastore as context and a table as an obligation that a task
+criterion refines and a fixture proves) (**As built**).
 
 ### 12.17 Step 14: roadmap milestone, task and task criteria
 
@@ -2574,7 +2580,7 @@ map onto the design areas as follows:
 | Trinity, status, close | 151, 230, 242, 264, 270, 276 |
 | Proof and evidence | 145, 277, 278 |
 | Read and write tooling | 178, 258, 260, 265 |
-| Third parties and extensions | 198, 244, 263, 289; 245 (kinds declared by an extension) is later, not in this release (**As built**) |
+| Third parties and extensions | 198, 244, 245, 263, 289 (245, kinds declared by an extension: **As built**) |
 | Migration | 248, 249 |
 | Definition home | 108 (this design is its definition) |
 

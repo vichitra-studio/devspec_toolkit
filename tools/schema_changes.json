@@ -326,6 +326,8 @@
   {"id": "SC-03-07", "step": "03", "path": "**.derives_from", "change": "add", "replaced_by": null, "owner": "S-R1", "design": [], "tickets": []},
   {"id": "SC-16_impl_context-38", "step": "16_impl_context", "path": "plan.context.existing_structures[].line_range", "change": "remove", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-252"]},
   {"id": "SC-05-21", "step": "05", "path": "apis[].errors[].protocol_status", "change": "add", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-281"]},
-  {"id": "SC-08-14", "step": "08", "path": "fixtures[].expects", "change": "add", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-281"]}
+  {"id": "SC-08-14", "step": "08", "path": "fixtures[].expects", "change": "add", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-281"]},
+  {"id": "SC-13-04", "step": "13", "path": "extensions[].justified_by", "change": "add", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-245"]},
+  {"id": "SC-13-05", "step": "13", "path": "extensions[].lifecycle", "change": "add", "replaced_by": null, "owner": "H", "design": [], "tickets": ["DEVSPEC-245"]}
  ]
 }

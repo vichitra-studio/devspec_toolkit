@@ -16,7 +16,9 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from ..core.registry import SchemaRegistry
+from ..core.host_schemas import schema_place_of
+from ..core.registry import get_shared_registry
+from ..core.step_paths import is_extension_file
 from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
@@ -542,13 +544,19 @@ def _check_scope_completeness(
     artifact_path: str,
     step_id: str,
     repo_root: str,
+    spec_dir: str | None = None,
 ) -> list[ReviewPair]:
-    """Check 5: are expected output fields (from schema) present in the artifact?"""
+    """Check 5: are expected output fields (from schema) present in the artifact?
+
+    With *spec_dir* the extension schemas of that spec folder are known, and a data file of its extensions folder is
+    compared with its own schema (the schema of its step, 13, is the manifest's).
+    """
     pairs: list[ReviewPair] = []
 
     try:
-        registry = SchemaRegistry(repo_root)
-        schema_uri = _u_find_step_schema_uri(step_id, registry)
+        registry = get_shared_registry(repo_root, spec_dir)
+        own_schema = spec_dir is not None and is_extension_file(artifact_path, spec_dir)
+        schema_uri = None if own_schema else _u_find_step_schema_uri(step_id, registry)
         if not schema_uri:
             # Fallback: try the artifact's own $schema field
             schema_uri = artifact.get("$schema")
@@ -582,7 +590,7 @@ def _check_scope_completeness(
                 description=f"Required field '{key}' (from step schema) missing from artifact",
                 source=SourceRef(
                     id=schema_uri,
-                    file=f"schema/{step_id}_*.schema.json",
+                    file=schema_place_of(schema_uri) or f"schema/{step_id}_*.schema.json",
                     path=f".properties.{key}",
                     text=f"Required schema field: {key}",
                 ),
@@ -667,7 +675,7 @@ def review_artifact(
         _check_seed_distillation(artifact, artifact_path, step_id, spec_dir, git_root=git_root)
     )
     semantic_pairs.extend(
-        _check_scope_completeness(artifact, artifact_path, step_id, repo_root)
+        _check_scope_completeness(artifact, artifact_path, step_id, repo_root, spec_dir)
     )
 
     # --- Verdict ---

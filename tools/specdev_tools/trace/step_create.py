@@ -3,7 +3,8 @@
 The draft is the whole artifact as JSON; ids of sub-items may be left out and are minted.  The file name is the step's
 key in ``tools/entry_key_registry.json`` (``04_fr_list.json``).  Step 16 is the anchor file, created when missing;
 step 16a is one plan file per batch (``16a <batch>``: the registry's glob with the batch in place of ``*``); steps 16b
-and 16c have no file of their own.  The draft is checked against the schema of the step, the candidate
+and 16c have no file of their own.  Step 13 is the manifest; ``13 <extension-id>`` is the data file of an extension the
+manifest declares, ``extensions/<stem>.json``, checked against the schema of that extension.  The draft is checked against the schema of the step, the candidate
 graph (the spec with the draft in it) must resolve every link, and the file and the lock entries of all its links are
 written under the write lock of the spec folder by ``id_writes.write_new_file``, the writer the id-keyed writes use.
 Edits to an artifact that exists go through ``specdev json patch|insert|delete --id``.
@@ -18,12 +19,15 @@ from typing import Any
 
 from specdev_tools.core.entry_key_registry import match_glob_key
 from specdev_tools.core.errors import make_error
+from specdev_tools.core.host_schemas import data_file_of, schema_file_of, uri_of
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.core.plan_files import MILESTONE_KEY, find_plan
 from specdev_tools.core.registry import get_shared_registry
 from specdev_tools.core.schema_validate import SchemaValidationError, jq_path_of, schema_violations, violation_text
-from specdev_tools.core.step_paths import PLAN_FILE_KEY
+from specdev_tools.core.step_paths import EXTENSION_STEP, PLAN_FILE_KEY, is_extension_file
+from specdev_tools.graph import host_kinds
 from specdev_tools.graph.kinds import EXTRAS_STEP, FileDecl, load_kind_registry
+from specdev_tools.graph.names import EXTENSION
 from specdev_tools.graph.model import Graph
 from specdev_tools.trace.id_writes import WriteRefusedError, WriteResult, with_ids, write_new_file
 from specdev_tools.trace.writing import writing_graph
@@ -34,12 +38,13 @@ from specdev_tools.validation.linter_utils import graph_known_ids
 #: ``STEP_EXTRA_HOSTS`` in ``registry/generate.py``).
 SCHEMA_OF_FILE = {"16_impl_context.json": "schema/16_anchor.schema.json", PLAN_FILE_KEY: "schema/16_impl_context.schema.json"}
 BATCH_NAME = re.compile(r"[A-Za-z0-9_-]+")
+"""The kind of an entry of the manifest of step 13."""
 MAX_SHOWN_VIOLATIONS = 10
 
 
 @dataclass(frozen=True)
 class StepCreateRequest:
-    """One ``step create``: the step *step* (``"04"``) from the draft file at *draft*; *batch* names the plan of ``16a``."""
+    """One ``step create``: the step *step* (``"04"``) from the draft file at *draft*; *batch* names the plan of ``16a``, or the extension whose data file step ``13`` creates."""
 
     step: str
     draft: str
@@ -119,11 +124,15 @@ def _step_schema_uri(repo_root: str, decl: FileDecl) -> str | None:
 
 def check_draft(repo_root: str, decl: FileDecl, document: dict[str, Any]) -> None:
     """E767 unless *document* declares the schema of the step and has no violation of it (a new file has nothing to compare with)."""
-    uri = _step_schema_uri(repo_root, decl)
+    _check_against(repo_root, _step_schema_uri(repo_root, decl), f"step {decl.step}", document, None)
+
+
+def _check_against(repo_root: str, uri: str | None, owner: str, document: dict[str, Any], spec_root: str | None) -> None:
+    """E767 unless *document* declares the schema *uri* (the schema of *owner*) and has no violation of it; *spec_root* is where an extension schema is found."""
     if uri is not None and document.get("$schema") != uri:
-        raise _refuse(f"the draft declares $schema {document.get('$schema')!r}; the schema of step {decl.step} is {uri!r}")
+        raise _refuse(f"the draft declares $schema {document.get('$schema')!r}; the schema of {owner} is {uri!r}")
     try:
-        violations = schema_violations(resolve_effective_toolkit_root(repo_root), document)
+        violations = schema_violations(resolve_effective_toolkit_root(repo_root), document, spec_root)
     except SchemaValidationError as error:
         raise _refuse(f"cannot validate the draft: {error}") from None
     if violations:
@@ -147,14 +156,52 @@ def _refuse_second_plan(spec_root: str, request: StepCreateRequest, draft: dict[
         )
 
 
+def step_files(graph: Graph, spec_root: str, step: str) -> tuple[str, ...]:
+    """The files of *step* present in the spec, the data files of the extensions folder left out: the manifest is the file of step 13."""
+    return tuple(name for name in graph.shape.files_by_step.get(step, ()) if not is_extension_file(os.path.join(spec_root, name), spec_root))
+
+
+def _create_extension_file(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: StepCreateRequest, *, write: bool) -> WriteResult:
+    """``step create 13 <extension-id>``: the data file of an extension the manifest declares, checked against the schema of that extension."""
+    extension_id = request.batch or ""
+    entries = [node.id for node in graph.by_kind.get(EXTENSION, ())]
+    if extension_id not in entries:
+        manifest = step_file(graph, repo_root, request.step).pattern
+        if not step_files(graph, spec_root, request.step):  # no file to insert an entry into
+            raise _refuse(
+                f"step {request.step} has no file in this spec ({manifest}), so no extension {extension_id!r} is declared; create the manifest with its entry "
+                f"first: `specdev step create {request.step} --from <manifest draft>`"
+            )
+        raise _refuse(
+            f"the manifest of step {request.step} declares no extension {extension_id!r} (its entries: {', '.join(entries) or 'none'}; "
+            f"the file: {manifest}); declare it first with `specdev json insert --step {request.step} .extensions '<entry>'`"
+        )
+    rel, schema_rel, uri = data_file_of(extension_id), schema_file_of(extension_id), uri_of(extension_id)
+    if os.path.exists(os.path.join(spec_root, rel)):
+        raise _refuse(f"the data file {rel} of extension {extension_id} already exists; edit it with `specdev json patch|insert|delete --id`")
+    if uri not in get_shared_registry(resolve_effective_toolkit_root(repo_root), spec_root).map:
+        missing = not os.path.exists(os.path.join(spec_root, schema_rel))
+        why = "is missing: write it first" if missing else "is not accepted: `specdev spec-check` says why"
+        raise _refuse(f"extension {extension_id} has no schema to check the draft against: {schema_rel} {why}")
+    draft = read_draft(request.draft)
+    decl = next((file for file in host_kinds.load_kind_registry(repo_root, spec_root).files if file.pattern == rel), None)
+    document, minted = mint_ids(graph, decl, draft) if decl is not None else (draft, ())
+    _check_against(repo_root, uri, f"extension {extension_id}", document, spec_root)
+    node_id = str(document.get("id") or rel.removesuffix(".json"))
+    return write_new_file(graph, spec_root, repo_root, git_root, rel, document, node_id, minted, write=write)
+
+
 def _create_on(graph: Graph, spec_root: str, repo_root: str, git_root: str, request: StepCreateRequest, *, write: bool) -> WriteResult:
+    if request.step == EXTENSION_STEP and request.batch is not None:
+        return _create_extension_file(graph, spec_root, repo_root, git_root, request, write=write)
     decl = step_file(graph, repo_root, request.step)
     rel = target_file(decl, request)
+    present = step_files(graph, spec_root, request.step)
     if decl.is_glob:
         if os.path.exists(os.path.join(spec_root, rel)):
             raise _refuse(f"the plan file {rel} already exists; edit it with `specdev json patch|insert|delete --id`, or name another batch")
-    elif graph.shape.files_by_step.get(request.step):
-        raise _refuse(f"step {request.step} already has a spec file ({', '.join(graph.shape.files_by_step[request.step])}); edit it with `specdev json patch|insert|delete --id`")
+    elif present:
+        raise _refuse(f"step {request.step} already has a spec file ({', '.join(present)}); edit it with `specdev json patch|insert|delete --id`")
     draft = read_draft(request.draft)
     if decl.is_glob:
         _refuse_second_plan(spec_root, request, draft)

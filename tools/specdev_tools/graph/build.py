@@ -19,6 +19,7 @@ from specdev_tools.core.scope_helpers import as_str, str_in, str_items
 from specdev_tools.core.step_order import load_step_order
 from specdev_tools.core.step_paths import PLAN_FILE_KEY
 from specdev_tools.graph import names
+from specdev_tools.graph.host_kinds import load_kind_registry
 from specdev_tools.graph.kinds import (
     EXTRAS_STEP,
     SEED_KIND,
@@ -28,7 +29,6 @@ from specdev_tools.graph.kinds import (
     KindRegistry,
     KindRegistryError,
     has_lifecycle,
-    load_kind_registry,
 )
 from specdev_tools.graph.model import (
     DEFAULT_LIFECYCLE,
@@ -243,6 +243,9 @@ def build_graph(
 ) -> Graph:
     """Build the graph of the spec folder *spec_root* from the registry of the toolkit at *repo_root*.
 
+    The kinds are the toolkit's and those the extension schemas of *spec_root* declare (``graph.host_kinds``): the
+    items of ``extensions/<stem>.json`` are nodes of step 13.
+
     Args:
         spec_root: the spec folder; node files are relative to it.
         repo_root: the toolkit root (``tools/entry_key_registry.json`` and ``tools/step_order.json``).
@@ -256,9 +259,10 @@ def build_graph(
         ``load_errors`` (``validate_file`` reports the file itself); an item with no usable id is not a node.
 
     Raises:
-        KindRegistryError: the registry or the step order of the toolkit is missing or unreadable (E520).
+        KindRegistryError: the registry or the step order of the toolkit is missing or unreadable, or an extension
+            schema of *spec_root* declares a kind or a link the graph cannot use (E520).
     """
-    registry = load_kind_registry(repo_root)
+    registry = load_kind_registry(repo_root, spec_root)
     ranks = _step_ranks(repo_root)
     root = Path(spec_root)
     wanted_files, wanted_steps = _posix_set(files), None if steps is None else set(steps)

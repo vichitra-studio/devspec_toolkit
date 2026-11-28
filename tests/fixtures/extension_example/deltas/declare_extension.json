@@ -23,6 +23,10 @@
         "title": "Database Extension",
         "area_of_concern": "Data",
         "justification": "The password reset requirement needs a stored, single-use token and the identity service owns that storage; no core step describes a table.",
+        "justified_by": [
+          "fr-password-reset",
+          "identity-service"
+        ],
         "required_schema_sections": [
           "datastores",
           "tables",

@@ -192,21 +192,32 @@ def scan_annotations(repo_root: str, decls: AnnotationDecls | None = None) -> An
     refs = SchemaRefs(reg)
     return AnnotationScan(
         decls,
-        _walk_host=lambda uri: _HostWalk(refs, SchemaReader(refs)).run(uri),
+        _walk_host=lambda uri: HostWalk(refs, SchemaReader(refs)).run(uri),
         _declaring_uris=frozenset(n.uri for n in decls.nodes),
         _rel_to_uri={rel.replace(os.sep, "/"): uri for uri, rel in reg.map.items()},
     )
 
 
-class _HostWalk:
-    """Walk one host schema and return its top-level ``ScanNode`` list."""
+class HostWalk:
+    """Walk one host schema and return its top-level ``ScanNode`` list.
+
+    The generator walks the step schemas of the toolkit with it; ``graph.host_kinds`` walks the extension schemas of a
+    spec folder with it, so the entries of an extension are the ones the generator would write for the same schema.
+
+    A schema may refer to itself (a host's tree of groups).  A schema node that is reached again while it is being
+    walked for the same kind is not entered a second time, so a cycle that carries no ``x-node`` adds nothing.  An
+    ``x-node`` reached again from inside its own items is a kind nested in itself, which a tree of entries cannot hold:
+    it is not entered either and its value is kept in ``nested_in_itself`` for the caller to refuse.
+    """
 
     def __init__(self, refs: SchemaRefs, reader: SchemaReader):
         self.refs = refs
         self.sch = reader
         self.top: list[ScanNode] = []
+        self.nested_in_itself: list[dict] = []
         self._seen: set[tuple[int, int, str]] = set()
-        self._active: set[tuple[int, int, str]] = set()
+        self._active: set[tuple[int, int]] = set()
+        self._recording: list[int] = []
 
     def run(self, uri: str) -> list[ScanNode]:
         doc = self.refs.store.get(uri)
@@ -224,7 +235,7 @@ class _HostWalk:
     ) -> None:
         if not isinstance(node, dict):
             return
-        guard = (id(node), id(scope), rel)
+        guard = (id(node), id(scope))  # not the path: it grows on each turn of a cycle
         if guard in self._active:
             return
         self._active.add(guard)
@@ -282,6 +293,10 @@ class _HostWalk:
     def _record(
         self, node: dict, uri: str, rel: str, scope: ScanNode | None, xn: dict
     ) -> None:
+        if id(xn) in self._recording:
+            if not any(known is xn for known in self.nested_in_itself):
+                self.nested_in_itself.append(xn)
+            return
         seen = (id(xn), id(scope), rel)
         if seen in self._seen:
             return
@@ -291,7 +306,11 @@ class _HostWalk:
         key = "additionalProperties" if xn.get("map_keyed") else "items"
         item, iuri = self.sch.get(node, uri, key)
         if isinstance(item, dict):
-            self._visit(item, iuri, "", sn, None)
+            self._recording.append(id(xn))
+            try:
+                self._visit(item, iuri, "", sn, None)
+            finally:
+                self._recording.pop()
 
     @staticmethod
     def _add_link(scope: ScanNode, fname: str, lk: Any) -> None:
@@ -304,4 +323,5 @@ class _HostWalk:
             "built": bool(lk.get("built", False)),
             "same_step_kinds": list(lk.get("same_step_kinds") or []),
             **({"additional_kinds": list(lk["additional_kinds"])} if lk.get("additional_kinds") else {}),
+            **({"roles": list(lk["roles"])} if lk.get("roles") else {}),
         })

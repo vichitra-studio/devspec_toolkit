@@ -29,10 +29,10 @@
     "extensions": {
       "type": "array",
       "minItems": 0,
-      "description": "Ordered list of domain-specific extension specs to generate as part of this step. Each entry defines one extension artifact (its ID, schema requirements, and governance anchors). When extension_decision.status is 'none-required', this array must be empty.",
+      "description": "Ordered list of domain-specific extension specs to generate as part of this step. Each entry defines one extension artifact (its ID, the upstream nodes that justify it, schema requirements, and governance anchors) and is a node of the spec graph. When extension_decision.status is 'none-required', this array must be empty.",
       "x-node": {
         "kind": "extension",
-        "role": "record",
+        "role": "plan",
         "contract": [
           "title",
           "area_of_concern",
@@ -109,6 +109,21 @@
               { "properties": { "kind": { "const": "governance_label" } } }
             ],
             "description": "Canonical reference to the governance label applied to this extension. Kind is structurally pinned to 'governance_label'. Example: {\"id\": \"cn:core:governance_label:mandatory\", \"kind\": \"governance_label\"}. Required field — checked by canonical-integrity against canon/manifest.json (E110). Do not list the label in step 10's canonical_refs_used. Links the extension to its governance review tier (mandatory, recommended, optional)."
+          },
+          "justified_by": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "vc:core:atoms#kebabId" },
+            "description": "Ids of the upstream nodes that make this extension necessary: components or third parties (step 02), capabilities (step 01), functional requirements (step 04) or NFRs (step 07). At least one. The justification says why in words; this field names the nodes, so an edit of one of them marks the link suspect (E763) until the entry is read again and accepted with specdev attest. Naming a node here is not a use of it: an FR that only an extension entry names is still unused (E740). Example: [\"fr-password-reset\", \"identity-service\"].",
+            "x-link": {
+              "kinds": ["component", "third-party", "capability", "fr", "nfr"],
+              "required": true
+            }
+          },
+          "lifecycle": {
+            "description": "Lifecycle state of this extension: active (default), deprecated or not_applicable.",
+            "$ref": "vc:core:graph#lifecycle"
           }
         },
         "required": [
@@ -118,9 +133,10 @@
           "justification",
           "required_schema_sections",
           "schema_design_guidelines",
-          "governance_label_ref"
+          "governance_label_ref",
+          "justified_by"
         ],
-        "description": "A single extension spec definition. Bundles the extension's identity (extension_id, title), domain scope (area_of_concern), rationale (justification), structural requirements (required_schema_sections, schema_design_guidelines), and canonical registry anchors (tag_ref, policy_ref, id_pattern_ref, governance_label_ref). Output filename is derived: extension_id with hyphens replaced by underscores + '.json'."
+        "description": "A single extension spec definition. Bundles the extension's identity (extension_id, title), domain scope (area_of_concern), rationale (justification, and justified_by: the ids of the upstream nodes behind it), structural requirements (required_schema_sections, schema_design_guidelines), and canonical registry anchors (tag_ref, policy_ref, id_pattern_ref, governance_label_ref). Output filename is derived: extension_id with hyphens replaced by underscores + '.json'."
       }
     }
   },

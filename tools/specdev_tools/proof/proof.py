@@ -5,7 +5,8 @@ of a set of nodes into the findings a gate prints.  The routing follows the desi
 proven by the fixtures (and jobs) that verify them; environments, gates and secrets by the jobs that realise them; a rule by
 its enforcer (a job, a listed command or a person's attestation); a threat or an edge case when all its mitigations are; a
 functional requirement when all its criteria are; a charter item or capability when everything derived from it is; a task
-criterion by its own ``verified_by`` verifier.  Every verifier must be satisfied: the spec declared them all.
+criterion by its own ``verified_by`` verifier; an obligation that names verifiers in its own ``verified_by`` (one of an
+extension) by those too.  Every verifier must be satisfied: the spec declared them all.
 
 A verifier is satisfied at a gate when each of its bindings whose stage is at or below the gate's cap has valid, passing
 evidence (``validity``).  A manual fixture and a rule enforced by ``review`` have no binding by design: a valid
@@ -20,6 +21,7 @@ from specdev_tools.core.cli_commands import known_cli_commands
 from specdev_tools.core.errors import FindingError, SpecError, make_error, refusal
 from specdev_tools.core.json_utils import resolve_effective_toolkit_root
 from specdev_tools.graph.contract import item_of
+from specdev_tools.graph.host_kinds import NAMED_IN_LINK, verifier_naming
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.graph.names import (
     API_ERROR, DERIVES_FROM, FIXTURE, FR, JOB, MANUAL_MODE, MITIGATED_BY, OBLIGATION_ROLES, REALISES, REFINES, REVIEW_ENFORCER, RULE, TASK_CRITERION,
@@ -218,8 +220,10 @@ class _Prover:
     # --- obligations -----------------------------------------------------------------------------------------------
 
     def _verifiers_of(self, node: Node) -> list[Node]:
-        sources = (self.graph.by_id.get(link.source) for link in self.graph.incoming.get(node.id, ()) if link.field in (VERIFIES, REALISES))
-        found = {source.id: source for source in sources if source is not None and source.role == VERIFIER_ROLE}
+        """The in-play verifiers of *node*: those that name it in ``verifies`` or ``realises``, then those it names in its own ``verified_by``."""
+        naming = [self.graph.by_id.get(link.source) for link in self.graph.incoming.get(node.id, ()) if link.field in (VERIFIES, REALISES)]
+        named = [self.graph.by_id.get(name) for name in link_targets(self.graph, node, VERIFIED_BY)]
+        found = {source.id: source for source in (*naming, *named) if source is not None and source.role == VERIFIER_ROLE}
         return [verifier for verifier in found.values() if exemption(verifier) is None]
 
     def _in_play_verifiers(self, node: Node) -> tuple[list[Node], bool]:
@@ -367,10 +371,23 @@ def _advice(shortfall: Shortfall) -> str:
     return f"{_CAUSE[shortfall.reason]}; {first} {command}"
 
 
-def _finding(node: Node, shortfall: Shortfall, owners: OwnerContext) -> SpecError:
+def _way_to_a_verifier(graph: Graph, lacking: Node | None) -> str:
+    """What gives the node *lacking* a verifier: a fixture or a job that verifies it, or, for an obligation of an extension, its own ``verified_by``."""
+    naming = verifier_naming(graph, lacking) if lacking is not None else None
+    if naming is None:
+        return "add a fixture or a job that verifies it"
+    if naming == NAMED_IN_LINK:
+        return f"name a fixture or a job in verified_by of {lacking.id}"
+    return (
+        f"the kind {lacking.kind} declares no verified_by link; declare one to a fixture or a job in the schema of its extension, "
+        f"then name the verifier in verified_by of {lacking.id}"
+    )
+
+
+def _finding(graph: Graph, node: Node, shortfall: Shortfall, owners: OwnerContext) -> SpecError:
     if shortfall.reason == REASON_NO_VERIFIER:
         lacking = f"{node.kind} {node.id}" + ("" if shortfall.verifier == node.id else f": {shortfall.verifier}")
-        code, message = OBLIGATION_NOT_PROVEN, f"{lacking} has no verifier to prove it: add a fixture or a job that verifies it"
+        code, message = OBLIGATION_NOT_PROVEN, f"{lacking} has no verifier to prove it: {_way_to_a_verifier(graph, graph.find(shortfall.verifier))}"
     elif shortfall.reason == REASON_UNBOUND:
         code, message = OBLIGATION_NOT_PROVEN, f"{node.kind} {node.id}: its verifier {shortfall.verifier} has no binding; {_advice(shortfall)}"
     else:
@@ -404,7 +421,7 @@ def proof_errors(
         if node is None:
             continue
         try:
-            findings.extend(_finding(node, shortfall, owners) for shortfall in prover.prove(node.id).shortfalls)
+            findings.extend(_finding(graph, node, shortfall, owners) for shortfall in prover.prove(node.id).shortfalls)
         except FindingError as exc:
             if exc.error.code != STAGE_UNKNOWN:
                 raise

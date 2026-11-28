@@ -1,14 +1,16 @@
 """The refinement check (E745): the verifier of a task criterion must verify the obligation the criterion refines.
 
 A verifier ``V`` of a criterion covers an obligation ``O`` when ``V`` names ``O``, a container of ``O`` or a node
-``O`` contains in ``verifies`` (or in the ``extra_verifiers`` seam), when ``V`` is a job that ``realises`` ``O``, or
-when ``V`` is the rule ``O`` itself (an enforcer covers the rule it enforces).  A node that lists ``mitigated_by`` (a
-threat, an edge case) is proven through its mitigations: ``V`` also covers it when ``V`` is one of them or covers one.
+``O`` contains in ``verifies`` (or in the ``extra_verifiers`` seam), when ``V`` is a job that ``realises`` ``O``, when
+``O`` lists ``V`` in its own ``verified_by`` (an obligation of an extension names what proves it), or when ``V`` is the
+rule ``O`` itself (an enforcer covers the rule it enforces).  A node that lists ``mitigated_by`` (a threat, an edge
+case) is proven through its mitigations: ``V`` also covers it when ``V`` is one of them or covers one.
 Criteria of closed milestones are history and are skipped.
 """
 from __future__ import annotations
 
 from specdev_tools.core.errors import SpecError, link_target
+from specdev_tools.graph.host_kinds import NAMED_IN_LINK, verifier_naming
 from specdev_tools.graph.model import Graph, Node
 from specdev_tools.trace.history import contained
 
@@ -40,13 +42,15 @@ def _covers_directly(ctx: GraphCheckContext, verifier: Node, obligation: Node) -
         return verifier.id == obligation.id
     if verifier.kind == JOB and obligation.id in link_targets(ctx.graph, verifier, REALISES):
         return True
+    if verifier.id in link_targets(ctx.graph, obligation, VERIFIED_BY):
+        return True
     named = _named_by(ctx, verifier)
     related = contained(ctx.graph, obligation.id) | _ancestors(ctx.graph, obligation)
     return bool(named & related)
 
 
 def covers(ctx: GraphCheckContext, verifier: Node, obligation: Node) -> bool:
-    """Whether *verifier* covers *obligation*: it is the rule *obligation* itself, it is a job that realises it, or what it verifies is the obligation, a container of it or something it contains; for an obligation with ``mitigated_by``, it is one of the mitigations or covers one (a threat is covered when ANY ONE of them is)."""
+    """Whether *verifier* covers *obligation*: it is the rule *obligation* itself, it is a job that realises it, *obligation* lists it in its own ``verified_by``, or what it verifies is the obligation, a container of it or something it contains; for an obligation with ``mitigated_by``, it is one of the mitigations or covers one (a threat is covered when ANY ONE of them is)."""
     if _covers_directly(ctx, verifier, obligation):
         return True
     return any(verifier.id == mitigation.id or _covers_directly(ctx, verifier, mitigation) for mitigation in mitigations(ctx.graph, obligation))
@@ -79,13 +83,29 @@ def check_refinement(ctx: GraphCheckContext, mode: Mode) -> list[SpecError]:
         if criterion.kind != TASK_CRITERION or criterion.id in historical:
             continue
         for target, obligation in _refined_unverified(ctx, criterion):
-            message = (
-                f"task criterion {criterion.id} refines {obligation.id} but none of its verifiers ({_listed(ctx.graph, criterion)}) "
-                f"verifies {obligation.id}, a node that contains it or a node it contains (for a threat or an edge case: one of its mitigations or a verifier of one); add a verifier that does"
-            )
-            findings.append(ctx.finding(VERIFIER_DOES_NOT_VERIFY_REFINED, criterion, message, target=link_target(REFINES, target)))
+            findings.append(ctx.finding(VERIFIER_DOES_NOT_VERIFY_REFINED, criterion, _message(ctx.graph, criterion, obligation), target=link_target(REFINES, target)))
     return findings
 
 
-def _listed(graph: Graph, criterion: Node) -> str:
-    return ", ".join(link_targets(graph, criterion, VERIFIED_BY)) or "none listed"
+def _message(graph: Graph, criterion: Node, obligation: Node) -> str:
+    """The text of E745, with the way out that works for *obligation*: a verifier that verifies it, or, for an obligation of an extension, its own ``verified_by``."""
+    start = f"task criterion {criterion.id} refines {obligation.id} but "
+    naming = verifier_naming(graph, obligation)
+    if naming is None:
+        return (
+            f"{start}none of its verifiers ({_listed(graph, criterion)}) "
+            f"verifies {obligation.id}, a node that contains it or a node it contains (for a threat or an edge case: one of its mitigations or a verifier of one); add a verifier that does"
+        )
+    if naming == NAMED_IN_LINK:
+        return (
+            f"{start}none of its verifiers ({_listed(graph, criterion)}) is named in verified_by of {obligation.id}; list in verified_by of {criterion.id} "
+            f"a verifier that {obligation.id} names ({_listed(graph, obligation)}), or add a verifier of {criterion.id} to verified_by of {obligation.id}"
+        )
+    return (
+        f"{start}no verifier can prove a {obligation.kind}: the kind declares no verified_by link; declare a verified_by link to a fixture or a job "
+        f"on the kind {obligation.kind} in the schema of its extension, then name a verifier of {criterion.id} in verified_by of {obligation.id}"
+    )
+
+
+def _listed(graph: Graph, holder: Node) -> str:
+    return ", ".join(link_targets(graph, holder, VERIFIED_BY)) or "none listed"

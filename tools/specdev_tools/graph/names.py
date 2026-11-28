@@ -47,6 +47,7 @@ ROADMAP_STEP = "14"
 """The step of the roadmap: its milestones, tasks and task criteria."""
 NFR = "nfr"
 ENVIRONMENT = "environment"
+EXTENSION = "extension"  # the entry of the manifest of step 13 that declares an extension; its id names the two files of the extension
 BINDING_KIND = "verification-record"
 PLAN_ITEM = "plan-item"
 EXECUTION_RECORD = "execution-record"

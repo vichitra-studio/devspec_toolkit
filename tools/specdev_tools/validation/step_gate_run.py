@@ -20,6 +20,7 @@ from ..core.git_base import BaselineChecks, BaselineProvider, BaselineResult, Se
 from ..core.loaders import read_json_object
 from ..graph.build import build_graph, step_order_ranks
 from ..graph.gitview import host_root_of
+from ..graph.host_kinds import require_host_kinds
 from ..graph.kinds import SEED_KIND
 from ..graph.model import Graph
 from ..graph.queries import require_known_step_in
@@ -104,11 +105,14 @@ def _baseline_checks(repo_root: str, *, with_project_canon: bool) -> BaselineChe
     """The check runner of the baseline provider: all checks on a materialised tree, quiet, with that tree as git root and spec root.
 
     The baseline run takes the project canon of its own tree (``<spec>/canon``) exactly when the current run has one
-    (*with_project_canon*), so both runs read the same kind of canon.
+    (*with_project_canon*), so both runs read the same kind of canon.  A baseline tree whose extension schemas the graph
+    refuses raises that refusal and no check runs on it: with no graph, the findings of the graph would all be missing
+    from the baseline and each would count as new without a word (the provider says which commit, ``core.git_base``).
     """
 
     def compute(baseline_root: Path, baseline_spec_dir: Path) -> list[SpecError]:
         spec = str(baseline_spec_dir)
+        require_host_kinds(repo_root, spec)
         canon = os.path.join(spec, "canon")
         checks = run_checks(
             repo_root, spec, git_root=str(baseline_root), spec_root=spec,

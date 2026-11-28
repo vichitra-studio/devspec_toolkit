@@ -37,6 +37,7 @@ from specdev_tools.core.json_utils import (
     json_write_atomic,
     patch_text,
 )
+from specdev_tools.core.step_paths import is_extension_file
 from specdev_tools.graph.build import build_graph
 from specdev_tools.graph.check import check_alias_space
 from specdev_tools.graph.contract import value_at
@@ -281,17 +282,22 @@ def _read_file(spec_root: str, rel: str) -> str:
         raise _refuse(f"cannot read {rel}: {error.strerror or error}") from None
 
 
-def _edited(rel: str, content: str, new_text: str, repo_root: str, node_id: str, jq_path: str, minted: Sequence[str] = (), verb: str = "patch") -> _Edit:
-    """The edit of *rel*, after the schema check of ``json patch`` (refused as E767 when the edit adds a violation)."""
+def _edited(
+    spec_root: str, rel: str, content: str, new_text: str, repo_root: str, node_id: str, jq_path: str, minted: Sequence[str] = (), verb: str = "patch",
+) -> _Edit:
+    """The edit of *rel* (a path in *spec_root*), after the schema check of ``json patch`` (refused as E767 when the edit adds a violation).
+
+    The spec folder is handed on: the schema of an extension file is found in its ``extensions`` folder.
+    """
     try:
-        check_edit(rel, content, new_text, repo_root, command=f"json {verb}")
+        check_edit(rel, content, new_text, repo_root, command=f"json {verb}", spec_root=spec_root)
         document = json.loads(new_text)
     except (JsonUtilsError, ValueError) as error:
         raise _refuse(str(error), node_id=node_id) from None
     return _Edit(rel, new_text, document, node_id, jq_path, tuple(minted))
 
 
-def _plan_delete(node: Node, content: str, repo_root: str) -> _Edit:
+def _plan_delete(spec_root: str, node: Node, content: str, repo_root: str) -> _Edit:
     """The edit that removes *node* (and so its nested nodes) from its file."""
     if not node.jq_path:
         raise _refuse(f"{node.id!r} is the whole file {node.file}; delete the file instead", node_id=node.id)
@@ -299,13 +305,13 @@ def _plan_delete(node: Node, content: str, repo_root: str) -> _Edit:
         new_text = delete_text(content, node.jq_path)
     except JsonUtilsError as error:
         raise _refuse(str(error), node_id=node.id) from None
-    return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, verb="delete")
+    return _edited(spec_root, node.file, content, new_text, repo_root, node.id, node.jq_path, verb="delete")
 
 
 def _declared_array(spec_root: str, node: Node, field: str, repo_root: str) -> bool:
     """Whether the schema of the file of *node* declares *field* of the node as an array."""
     try:
-        found = json.loads(json_schema_discovery(os.path.join(spec_root, node.file), node.jq_path + field, repo_root) or "{}")
+        found = json.loads(json_schema_discovery(os.path.join(spec_root, node.file), node.jq_path + field, repo_root, spec_root) or "{}")
     except (JsonUtilsError, ValueError):
         return False
     return isinstance(found, dict) and "error" not in found and found.get("type") == "array"
@@ -359,7 +365,7 @@ def _plan_field_write(graph: Graph, spec_root: str, node: Node, content: str, re
             new_text = insert_text(content, path, request.value or "" if request.raw else json.dumps(item), not request.raw, create=create)
     except JsonUtilsError as error:
         raise _refuse(str(error), node_id=node.id) from None
-    return _edited(node.file, content, new_text, repo_root, node.id, node.jq_path, minted, verb=request.action)
+    return _edited(spec_root, node.file, content, new_text, repo_root, node.id, node.jq_path, minted, verb=request.action)
 
 
 def _plan_node_edit(graph: Graph, spec_root: str, repo_root: str, request: WriteRequest) -> _Edit:
@@ -367,7 +373,7 @@ def _plan_node_edit(graph: Graph, spec_root: str, repo_root: str, request: Write
     node = _node_to_write(graph, request.node_id or "")
     content = _read_file(spec_root, node.file)
     if request.action == "delete":
-        return _plan_delete(node, content, repo_root)
+        return _plan_delete(spec_root, node, content, repo_root)
     return _plan_field_write(graph, spec_root, node, content, repo_root, request)
 
 
@@ -377,10 +383,13 @@ def _minted_for_field(graph: Graph, decl: KindDecl | None, field: str, payload: 
     return with_ids(payload, child, set(graph_known_ids(graph)), minted) if child is not None else payload
 
 
-def _step_file(graph: Graph, step: str) -> str:
-    """The one spec file of *step*; E706 for a step that does not exist, E767 when it has no file or several."""
+def _step_file(graph: Graph, spec_root: str, step: str) -> str:
+    """The one spec file of *step*; E706 for a step that does not exist, E767 when it has no file or several.
+
+    A data file of the extensions folder is not the file of its step (13): the manifest is, and an extension file is written by ``--id``.
+    """
     require_known_step(graph, step)
-    files = graph.shape.files_by_step.get(step, ())
+    files = tuple(name for name in graph.shape.files_by_step.get(step, ()) if not is_extension_file(os.path.join(spec_root, name), spec_root))
     if len(files) != 1:
         what = "has no file in this spec" if not files else f"has several files ({', '.join(files)}); write by --id into one of them"
         raise _refuse(f"step {step} {what}")
@@ -404,7 +413,7 @@ def _collection_decl(repo_root: str, step: str, path: str) -> KindDecl:
 def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: WriteRequest) -> _Edit:
     """The edit of ``insert --step``: the new node appended to the collection of the step's file, its ids minted."""
     step, path = request.step or "", request.path or ""
-    rel = _step_file(graph, step)
+    rel = _step_file(graph, spec_root, step)
     if not _COLLECTION_PATH.match(path):
         raise _refuse(f"the collection path {path!r} must be a plain jq path such as .functional_requirements")
     decl = _collection_decl(repo_root, step, path)
@@ -423,7 +432,7 @@ def _plan_step_insert(graph: Graph, spec_root: str, repo_root: str, request: Wri
         new_text = insert_text(content, path, json.dumps(item), True, create=True)
     except JsonUtilsError as error:
         raise _refuse(str(error)) from None
-    return _edited(rel, content, new_text, repo_root, str(item[decl.id_field]), path, minted, verb="insert")
+    return _edited(spec_root, rel, content, new_text, repo_root, str(item[decl.id_field]), path, minted, verb="insert")
 
 
 # --- judging the candidate graph ------------------------------------------------------------------------------------

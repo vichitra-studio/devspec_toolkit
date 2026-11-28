@@ -162,9 +162,10 @@
       ]
     }
   },
+  "host_kinds": {"roles": ["16a", "16b", "16c"], "obligations": "obligations", "context": "extension context"},
   "exempt": [
     {"kind": "seed", "authority": "top of the graph, not a role (design doc L600)"},
-    {"kind": "extension", "authority": "a record kind that no pack names (declared with role `record` in schema/13_extension_manifest.schema.json)"},
+    {"kind": "extension", "authority": "the entry of the manifest that declares an extension: a plan kind that no pack names (declared with role `plan` in schema/13_extension_manifest.schema.json); the kinds an extension's own schema declares are placed by `host_kinds`"},
     {"kind": "execution-record", "authority": "written by 'specdev plan record' and read by the executed rule; no pack names it (M8, WI-M8-02)"},
     {"kind": "signoff-record", "authority": "written by 'specdev milestone sign-off' and read by the close gate; no pack names it (M8, WI-M8-02)"},
     {"kind": "at-deploy-record", "authority": "written by 'specdev plan record --at-deploy' and read by the proof rule; no pack names it (M8, WI-M8-02)"}

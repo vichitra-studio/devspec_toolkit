@@ -1997,13 +1997,16 @@ def main():
                 print(json.dumps(result, indent=2))
             elif context_cmd == "review":
                 from .context.reviewer import review_artifact
+                from .core.host_schemas import spec_root_for
                 import dataclasses
                 artifact_path = os.path.abspath(args.artifact_path)
                 git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+                # No --spec-dir: the path alone is read.  A file of an `extensions` folder has its spec folder above that folder; any other file lies in its spec folder.
+                spec_dir = os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else spec_root_for(artifact_path) or os.path.dirname(artifact_path)
                 result = review_artifact(
                     artifact_path,
                     args.step,
-                    os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else os.path.dirname(artifact_path),
+                    spec_dir,
                     repo_root,
                     entry_id=getattr(args, "entry", None),
                     git_root=git_root,

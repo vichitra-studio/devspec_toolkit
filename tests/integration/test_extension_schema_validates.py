@@ -7,6 +7,13 @@ and each negative case must add the findings of its row of the table and nothing
 
 The negative cases run in three layouts (the three root flags, no ``--spec-root``, the spec folder at ``sub/spec``), and
 the gate cases run with the extension committed, so that a baseline tree holds an extension too.
+
+Piece B made the items of the data file nodes of the graph, which changes three things here.  The example's table is an
+obligation, so its host carries the task criterion that refines it (``refine_table``).  A case that leaves the data file
+without its kinds (no data file, no schema, a refused schema) loses those nodes: the criterion's ``refines`` then names
+no node (E700, step 14) and the lock entries of their links have no link (E762).  And the text of E740 counts the ways
+a kind may be used, so an unused FR reads "and N more" with one more way for each link of the extension that takes an FR
+(``_but_for_the_ways``); by code, node and owner the findings are the plain example's.
 """
 from __future__ import annotations
 
@@ -41,7 +48,8 @@ MANIFEST = "13_extension_manifest.json"
 TERM = "cn:project:term:reset-token"
 """The canonical ref the example's table ``tbl-reset-token`` carries (a term of the worked example's project canon)."""
 DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
-RESTORED = (f"spec/{MANIFEST}", "spec/extras/trace.lock.json")
+RESTORED = (f"spec/{MANIFEST}", "spec/14_roadmap.json", "spec/extras/trace.lock.json")
+"""What goes with the folder when an extension is taken out: its manifest entry, the criterion that refined its table and the lock that accepted their links."""
 
 SECOND_URI = "vc:ext-02-cache"
 SECOND_SCHEMA_PLACE = "extensions/ext_02_cache.schema.json"
@@ -80,6 +88,38 @@ SECOND_DATA: dict[str, Any] = {
 }
 
 Key = tuple[str, str | None, str | None]
+REFINING_CRITERION = "tc-reset-token-table"
+"""The task criterion of the delta ``refine_table``: it refines the example's table ``tbl-reset-token``."""
+ROADMAP = "14_roadmap.json"
+WAYS = re.compile(r"(is not used by any node; a node of this kind is used by [^:]*? and )(\d+)( more)")
+
+
+def _links_of_the_data_file(*, to_kind_named_in: str | None = None) -> int:
+    """How many ids the nodes of the example's data file hold in their link fields, read from the two fixture files.
+
+    With *to_kind_named_in*, the number of link fields of the schema that accept that kind instead (the ways the
+    extension adds to use a node of it).
+    """
+    schema = json.loads((EXTENSION / FOLDER / SCHEMA_NAME).read_text(encoding="utf-8"))
+    data = json.loads((EXTENSION / FOLDER / DATA_NAME).read_text(encoding="utf-8"))
+    held = accepting = 0
+    for collection, declared in schema["properties"].items():
+        if "x-node" not in declared:
+            continue
+        links = {name: field["x-link"] for name, field in declared["items"]["properties"].items() if "x-link" in field}
+        accepting += sum(1 for link in links.values() if to_kind_named_in in link["kinds"])
+        for item in data[collection]:
+            held += sum(len(item[name]) if isinstance(item[name], list) else 1 for name in links if name in item)
+    return held if to_kind_named_in is None else accepting
+
+
+def _but_for_the_ways(text: str) -> str:
+    """*text* with the count of the further ways a kind is used left out (E740 lists five and counts the rest)."""
+    return WAYS.sub(r"\1N\3", text)
+
+
+def _further_ways(text: str) -> list[int]:
+    return [int(found[1]) for found in WAYS.findall(text)]
 
 
 def _prefix(host: Path) -> str:
@@ -91,10 +131,14 @@ def _spec(host: Path) -> Path:
     return host / _prefix(host)
 
 
-def _add_extension(host: Path, *deltas: str, declared: bool = True) -> None:
-    """Put the extension's two files into *host*, declare it (unless not *declared*), apply *deltas* and accept every link."""
+def _add_extension(host: Path, *deltas: str, declared: bool = True, refined: bool = True) -> None:
+    """Put the extension's two files into *host*, declare it (unless not *declared*), refine its table (unless not *refined*), apply *deltas* and accept every link.
+
+    Piece B: the items of the data file are nodes.  The table is an obligation, so a task criterion refines it
+    (``refine_table``); without one it is unused (E740).
+    """
     shutil.copytree(EXTENSION / FOLDER, _spec(host) / "extensions")
-    for name in (("declare_extension",) if declared else ()) + deltas:
+    for name in (("declare_extension",) if declared else ()) + (("refine_table",) if refined else ()) + deltas:
         apply_delta(host, name, _prefix(host), folder=DELTAS)
     attest(host, _prefix(host))
 
@@ -140,6 +184,12 @@ def _output(capsys: pytest.CaptureFixture[str], host: Path, *flags: str, spec_ro
     """``spec-check <flags>`` on *host*: the exit code and stdout with the host's folder written ``<host>``."""
     code, out, _err = run_split(capsys, "spec-check", str(_spec(host)), *_flags(host, spec_root=spec_root), *flags)
     return code, out.replace(str(host), "<host>")
+
+
+def _said(capsys: pytest.CaptureFixture[str], host: Path, *flags: str) -> tuple[int, str, str]:
+    """``spec-check <flags>`` on *host*: the exit code, stdout and stderr (where the text a person reads goes), the host's folder written ``<host>``."""
+    code, out, err = run_split(capsys, "spec-check", str(_spec(host)), *_flags(host), *flags)
+    return code, out.replace(str(host), "<host>"), err.replace(str(host), "<host>")
 
 
 def _report(capsys: pytest.CaptureFixture[str], host: Path, *flags: str, spec_root: bool = True) -> dict[str, Any]:
@@ -215,24 +265,35 @@ def test_the_example_with_the_extension_reports_what_the_plain_example_reports(
     assert (report["status"], report["error_count"], report["warning_count"]) == (
         plain_report["status"], plain_report["error_count"], plain_report["warning_count"],
     )
-    assert [name for name in report["checks"] if report["checks"][name] != plain_report["checks"][name]] == []
+    unlike = [name for name in report["checks"] if report["checks"][name] != plain_report["checks"][name]]
+    assert unlike in ([], ["no-dangling"])  # the check of E740: only the count of the ways in its text may differ
+    assert [name for name in unlike if _but_for_the_ways(json.dumps(report["checks"][name])) != _but_for_the_ways(json.dumps(plain_report["checks"][name]))] == []
     assert "extensions" not in json.dumps(report)  # neither file is named by any finding or note
-    assert _output(capsys, host) == _output(capsys, plain)  # and the text a person reads is the same, to the byte
+    (code, out, text), (plain_code, plain_out, plain_text) = _said(capsys, host), _said(capsys, plain)
+    assert (code, out) == (plain_code, plain_out) and "E740" in plain_text
+    assert _but_for_the_ways(text) == _but_for_the_ways(plain_text)  # the text a person reads is the same but for that count
+    more = _links_of_the_data_file(to_kind_named_in="fr")  # each link of the extension that takes an FR is one more way to use an FR
+    changed = [(line, plain_line) for line, plain_line in zip(text.splitlines(), plain_text.splitlines()) if line != plain_line]
+    unused_frs = [finding for finding in plain_report["errors"] if finding["code"] == "E740" and (finding.get("node_id") or "").startswith("fr-")]
+    assert more >= 1 and len(changed) == len([finding for finding in unused_frs if _further_ways(finding["message"])]) >= 1, changed
+    for line, plain_line in changed:
+        assert "fr fr-" in line and _further_ways(line) == [count + more for count in _further_ways(plain_line)], (line, plain_line)
 
 
 def test_the_extension_does_not_block_step_13(capsys: pytest.CaptureFixture[str], tmp_path: Path, plain: Path) -> None:
     host = _extension_host(tmp_path / "host")
     plain_code, plain_text = _output(capsys, plain, "--step", "13")
     code, text = _output(capsys, host, "--step", "13")
+    assert "step gate:" in plain_text  # the gate writes its text to stdout
     plain_gate, gate = _report(capsys, plain, "--step", "13")["step_gate"], _report(capsys, host, "--step", "13")["step_gate"]
     assert gate["blocking"] == [] and [finding for finding in gate["own_warnings"] if "xtension" in finding["message"]] == []
     assert (code, gate["result"]) == (plain_code, plain_gate["result"])
     for part in ("blocking", "waiting", "own_warnings", "new_upstream_warnings", "upstream_debt", "gate_owned"):
         assert sorted(map(_key, gate[part]), key=str) == sorted(map(_key, plain_gate[part]), key=str), part
-    assert gate["pending"] == plain_gate["pending"]
-    assert [line for line in text.splitlines() if not line.startswith("step gate:")] == [
-        line for line in plain_text.splitlines() if not line.startswith("step gate:")
-    ]  # the header line names the base commit, which is each copy's own
+    assert json.loads(_but_for_the_ways(json.dumps(gate["pending"]))) == json.loads(_but_for_the_ways(json.dumps(plain_gate["pending"])))
+    assert [_but_for_the_ways(line) for line in text.splitlines() if not line.startswith("step gate:")] == [
+        _but_for_the_ways(line) for line in plain_text.splitlines() if not line.startswith("step gate:")
+    ]  # the header line names the base commit, which is each copy's own; the count of the ways of an unused FR is the extension's
 
 
 # --- each row of the findings table is the one difference -----------------------------------------------------------
@@ -301,6 +362,12 @@ CASES: dict[str, tuple[tuple[str, ...], Any, bool, list[tuple[str, list[str]]]]]
     ),
 }
 
+KINDS_NOT_LOADED = frozenset({
+    "the entry has no schema file", "the entry has no data file", "the schema is not a JSON Schema", "the schema has an $id that is not its file name's",
+    "the schema has the $id of a toolkit schema", "the schema names a draft that is not 2020-12",
+})
+"""The cases that leave the data file without its kinds, so its items are no nodes: what refines them dangles, and the lock entries of their links (if the links were accepted before) are orphans."""
+
 LAYOUTS: dict[str, tuple[bool, bool]] = {
     # name: (the spec folder is sub/spec, --spec-root is passed)
     "the three root flags": (False, True),
@@ -333,6 +400,13 @@ def test_a_negative_case_adds_the_findings_of_its_row_and_nothing_else(
     added = _added(_findings(capsys, host, spec_root=spec_root), _plain_findings(capsys, tmp_path, layout))
     if not spec_root:  # Z4: the same host with the flag says the same, to the file and the text (``_added`` sees neither)
         assert _whole(added) == _whole(_added(_findings(capsys, host), _plain_findings(capsys, tmp_path, "the three root flags")))
+    followed = [finding for finding in added if finding.get("owner") != STEP_13]
+    added = [finding for finding in added if finding.get("owner") == STEP_13]
+    # the lock holds the links of the nodes only when they were accepted before the kinds went: an edit comes after `attest`, a delta before
+    orphans = _links_of_the_data_file() if edit is not None else 0
+    nodes_gone = [("E700", REFINING_CRITERION, "step:14"), *[("E762", None, "merge-check")] * orphans]
+    assert sorted(map(_key, followed), key=str) == (sorted(nodes_gone, key=str) if case in KINDS_NOT_LOADED else []), followed
+    assert all("tbl-" in finding["message"] or "ds-" in finding["message"] for finding in followed), _texts(followed)
     assert {(finding["code"], finding.get("owner")) for finding in added} == {(code, STEP_13) for code, _words in expected}, added
     assert len(added) == len(expected), _texts(added)
     unmatched = [text.replace(str(host), "<host>") for text in _texts(added)]
@@ -539,7 +613,7 @@ def test_an_extension_removed_in_the_head_leaves_the_plain_example(
     ), gate["blocking"]
     assert _of_step_13(gate["upstream_debt"]) == []
 
-    for place in RESTORED:  # the manifest entry and the lock that accepted it go with the folder
+    for place in RESTORED:  # the manifest entry, the criterion that refined the table and the lock that accepted them go with the folder
         shutil.copy(EXAMPLE_HOST / place, host / place)
     attest(host)
     assert get_shared_registry(str(ROOT), str(host / "spec")) is get_shared_registry(str(ROOT))
@@ -570,8 +644,12 @@ def test_an_extension_added_on_a_branch_passes_the_merge_gate_as_a_branch_withou
     apply_delta(host, "data_breaks_schema", folder=DELTAS)
     commit_all(host, "the broken data file")
     added = _added(merge(host)["errors"], control_report["errors"])
-    assert [(finding["code"], finding.get("owner")) for finding in added] == [("E520", STEP_13)], added
-    assert "tables/0/columns" in added[0]["message"]
+    # piece B: the table is a node and its columns are part of what it says, so the link that refines it is suspect too
+    assert sorted(map(_key, added), key=str) == [("E520", None, STEP_13), ("E763", REFINING_CRITERION, "merge-check")], added
+    assert "tables/0/columns" in next(finding["message"] for finding in added if finding["code"] == "E520")
+    attest(host)
+    commit_all(host, "the link is read again and accepted")
+    assert [(finding["code"], finding.get("owner")) for finding in _added(merge(host)["errors"], control_report["errors"])] == [("E520", STEP_13)]
 
 
 # --- X1: the canonical commands on an extension file ----------------------------------------------------------------
@@ -749,13 +827,16 @@ def test_with_the_folder_removed_the_output_is_byte_equal_to_the_plain_examples(
     plain_runs = {flags: run(*flags) for flags in ((), ("--json",), ("--step", "13"), ("--step", "13", "--json"))}
 
     shutil.copytree(EXTENSION / FOLDER, host / FOLDER)
-    apply_delta(host, "declare_extension", folder=DELTAS)
+    for delta in ("declare_extension", "refine_table"):
+        apply_delta(host, delta, folder=DELTAS)
     attest(host)
     assert get_shared_registry(str(ROOT), str(host / "spec")) is not toolkit_registry
-    assert run() == plain_runs[()] and run("--step", "13") == plain_runs[("--step", "13")]
+    for flags in ((), ("--step", "13")):  # the same but for the count of the ways an unused FR may be used (piece B)
+        (code, out, err), (plain_code, plain_out, plain_err) = run(*flags), plain_runs[flags]
+        assert (code, out, _but_for_the_ways(err)) == (plain_code, plain_out, _but_for_the_ways(plain_err)), flags
 
     shutil.rmtree(host / FOLDER)
-    for place in RESTORED:  # the manifest entry and the lock that accepted it go with the folder
+    for place in RESTORED:  # the manifest entry, the criterion that refined the table and the lock that accepted them go with the folder
         shutil.copy(EXAMPLE_HOST / place, host / place)
     attest(host)
     assert get_shared_registry(str(ROOT), str(host / "spec")) is toolkit_registry
@@ -961,7 +1042,7 @@ NAMED = "extensions"
 def _named_host(destination: Path, name: str, *deltas: str, extension: bool = False) -> Path:
     """The worked example as a git repository whose spec folder is called *name* (its one commit), with a ``00_index.json`` above it.
 
-    With *extension* the extension is overlaid and declared and *deltas* are applied, uncommitted; every link is accepted.
+    With *extension* the extension is overlaid, declared and its table refined, and *deltas* are applied, uncommitted; every link is accepted.
     """
     shutil.copytree(EXAMPLE_HOST, destination)
     shutil.move(str(destination / "spec"), str(destination / name))
@@ -970,7 +1051,7 @@ def _named_host(destination: Path, name: str, *deltas: str, extension: bool = Fa
     commit_all(destination, "worked example")
     if extension:
         shutil.copytree(EXTENSION / FOLDER, destination / name / "extensions")
-        for delta in ("declare_extension", *deltas):
+        for delta in ("declare_extension", "refine_table", *deltas):
             apply_delta(destination, delta, name, folder=DELTAS)
     attest(destination, name)
     return destination
@@ -998,7 +1079,9 @@ def test_a_spec_folder_called_extensions_holds_an_extension_as_any_spec_folder_d
     _code, plain_report = _named_report(capsys, plain, NAMED, spec_root=spec_root)
     _code, report = _named_report(capsys, host, NAMED, spec_root=spec_root)
     assert _texts(_added(report["errors"], plain_report["errors"])) == []
-    assert _renamed(report["errors"], str(host), "<host>") == _renamed(plain_report["errors"], str(plain), "<host>")
+    assert [_but_for_the_ways(text) for text in _renamed(report["errors"], str(host), "<host>")] == [
+        _but_for_the_ways(text) for text in _renamed(plain_report["errors"], str(plain), "<host>")
+    ]
     plain_code, plain_gate = _named_report(capsys, plain, NAMED, "--step", "13", spec_root=spec_root)
     code, gate = _named_report(capsys, host, NAMED, "--step", "13", spec_root=spec_root)
     assert (code, gate["step_gate"]["result"], gate["step_gate"]["blocking"]) == (plain_code, plain_gate["step_gate"]["result"], [])
@@ -1085,11 +1168,6 @@ def test_spec_quality_lint_on_a_spec_folder_called_extensions_finds_the_empty_cr
     assert code == 1 and len(lines) == 1 and lines[0].startswith("E520") and "04_fr_list.json" in lines[0], out + err
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Z2(b) names `json patch --id` on the right data file.  Until piece B an item of an extension file is no node, so no "
-    "id names one; what the id-keyed write calls is tested instead (test_host_schemas: check_edit with the spec folder). "
-    "Which id did the line mean?"
-))
 def test_in_a_spec_folder_called_extensions_an_item_of_the_data_file_is_written_by_its_id(
     capsys: pytest.CaptureFixture[str], tmp_path: Path,
 ) -> None:

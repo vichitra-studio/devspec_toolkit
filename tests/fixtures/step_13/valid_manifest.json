@@ -22,7 +22,11 @@
       "governance_label_ref": {
         "id": "cn:core:governance_label:mandatory",
         "kind": "governance_label"
-      }
+      },
+      "justified_by": [
+        "fr-order-history",
+        "order-service"
+      ]
     },
     {
       "extension_id": "ext-02-session-management",
@@ -40,7 +44,11 @@
       "governance_label_ref": {
         "id": "cn:core:governance_label:mandatory",
         "kind": "governance_label"
-      }
+      },
+      "justified_by": [
+        "fr-user-login",
+        "nfr-session-expiry"
+      ]
     }
   ],
   "canonical_refs_used": [

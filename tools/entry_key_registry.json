@@ -1890,7 +1890,22 @@
           ],
           "id_field": "extension_id",
           "kind": "extension",
-          "role": "record",
+          "links": [
+            {
+              "built": false,
+              "field": "justified_by",
+              "kinds": [
+                "component",
+                "third-party",
+                "capability",
+                "fr",
+                "nfr"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "plan",
           "source": "x-node"
         }
       ],
@@ -2011,6 +2026,9 @@
                         "edge-case"
                       ],
                       "required": false,
+                      "roles": [
+                        "obligation-system"
+                      ],
                       "same_step_kinds": []
                     },
                     {

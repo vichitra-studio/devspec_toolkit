@@ -151,10 +151,14 @@ def add_trace_parsers(sub: Any) -> None:
     create = step_sub.add_parser(
         "create", help="Write the artifact of a step from a draft",
         description="Write the artifact of step NN from the draft file given with --from. Step 16 creates the anchor file when it is missing; "
-        "step 16a creates the plan file of one batch (give the batch: step create 16a <batch>); a batch is given for no other step.",
+        "step 16a creates the plan file of one batch (give the batch: step create 16a <batch>); step 13 creates the manifest, and with the id of an "
+        "extension the manifest declares (step create 13 <extension-id>) the data file of that extension, extensions/<stem>.json; a second word is given for no other step.",
     )
     create.add_argument("step", metavar="NN", help="The step to create, for example 04, 02a, 16 or 16a")
-    create.add_argument("batch", nargs="?", metavar="BATCH", help="Step 16a only: the batch name of the plan file, impl_context/ms_<BATCH>_plan.json")
+    create.add_argument(
+        "batch", nargs="?", metavar="BATCH",
+        help="Step 16a: the batch name of the plan file, impl_context/ms_<BATCH>_plan.json. Step 13: the id of a declared extension, to create its data file",
+    )
     create.add_argument("--from", required=True, dest="draft", metavar="DRAFT", help="JSON file holding the whole artifact; ids of sub-items may be left out")
     create.add_argument("--dry-run", action="store_true", dest="dry_run", help="Print the same report and write nothing")
     add_root_flags(create)
