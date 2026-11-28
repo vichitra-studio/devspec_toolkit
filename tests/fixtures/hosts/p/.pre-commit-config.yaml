@@ -1,0 +1,29 @@
+# ----------------------------------------------------------------------------
+# Invented fixture: a small backend service whose config has a long header.
+#
+# Hooks run in the order listed. Keep the secret scan first: it is the cheapest
+# and the one that must never be skipped. Two-space lists are the house style.
+# ----------------------------------------------------------------------------
+default_stages: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+    # scan staged files for credentials
+    - id: secret-scan
+      name: Secret scan
+      entry: scripts/scan_secrets.sh
+      language: system
+
+    # the service's own lint
+    - id: service-lint
+      name: Lint the service code
+      entry: make lint
+      language: system
+      pass_filenames: false
+      types: [python]
+
+  - repo: https://example.invalid/hooks/yaml-tools
+    rev: v2.3.1
+    hooks:
+    - id: check-yaml

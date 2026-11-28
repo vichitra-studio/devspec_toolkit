@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specdev_tools.validation.validators.step_16 import _find_seed_manifest
+from specdev_tools.validation.validators.step_16 import _find_seed_manifest, validate_step_16
 from specdev_tools.validation.validators.step_16a import validate_step_16a
 
 
@@ -24,7 +24,6 @@ def _make_minimal_16a() -> dict:
         "owner": "api",
         "created_at": "2024-01-01T00:00:00Z",
         "plan": {
-            "status": "active",
             "summary": {
                 "functional_summary": "Test implementation",
                 "scope_in": ["auth-api"],
@@ -59,75 +58,40 @@ def _review_with_remediation(
     return {"verdict": "needs_work", "findings": findings}
 
 
-class TestStep16aMissingSpecRefId(unittest.TestCase):
-    """E590 fires when a non-deferred, non-wont_do checklist item is missing
-    spec_ref.id; deferred and wont_do items are exempt (DEVSPEC-122 follow-up:
-    extended the pre-existing deferred exemption to wont_do for consistency)."""
+def test_no_e590_on_spec_ref_id():
+    """A 1.2.0 plan item binds to the spec through ``realises``; 16a no longer reads ``spec_ref`` (no E590)."""
+    data = _make_minimal_16a()
+    data["plan"]["spec_alignment"]["checklist"] = [
+        {"id": "CHK_ONE", "realises": ["tc-one"], "description": "Do something", "type": "behavior", "layer": "api"},
+        {"id": "CHK_TWO", "spec_ref": {"type": "fr"}, "description": "Do more", "type": "behavior", "layer": "api"},
+    ]
+    errors = validate_step_16a(data, ".", spec_path=None)
+    assert not any(e.code == "E590" for e in errors), errors
 
-    def test_active_item_missing_spec_ref_id_fires_e590(self):
-        data = _make_minimal_16a()
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {"id": "chk-1", "description": "Do something", "type": "behavior", "layer": "api"},
-        ]
-        errors = validate_step_16a(data, ".", spec_path=None)
-        self.assertTrue(
-            any(e.code == "E590" and "chk-1" in e.message for e in errors),
-            f"Expected E590 for active item missing spec_ref.id. Got: {errors}"
-        )
 
-    def test_deferred_item_missing_spec_ref_id_does_not_fire_e590(self):
-        data = _make_minimal_16a()
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "chk-1", "description": "Do something", "type": "behavior", "layer": "api",
-                "checklist_status": "deferred", "deferred_reason": "Not yet linked to a spec artifact.",
-            },
-        ]
-        errors = validate_step_16a(data, ".", spec_path=None)
-        self.assertFalse(
-            any(e.code == "E590" and "chk-1" in e.message for e in errors),
-            f"Did not expect E590 for deferred item. Got: {errors}"
-        )
-
-    def test_wont_do_item_missing_spec_ref_id_does_not_fire_e590(self):
-        data = _make_minimal_16a()
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "chk-1", "description": "Do something", "type": "behavior", "layer": "api",
-                "checklist_status": "wont_do", "wont_do_reason": "Cancelled before a spec artifact was chosen.",
-            },
-        ]
-        errors = validate_step_16a(data, ".", spec_path=None)
-        self.assertFalse(
-            any(e.code == "E590" and "chk-1" in e.message for e in errors),
-            f"Did not expect E590 for wont_do item. Got: {errors}"
-        )
+def test_plan_status_not_required():
+    """A plan carries no ``status`` since 1.2.0 (the anchor holds a milestone's deferral)."""
+    data = _make_minimal_16a()
+    assert "status" not in data["plan"]
+    errors = validate_step_16a(data, ".", spec_path=None)
+    assert not any("status" in e.message for e in errors), errors
 
 
 class TestStep16aPlanObjectRequired(unittest.TestCase):
-    """E520 fires when 'plan' is missing/not-a-dict, and when plan.status is falsy.
+    """E520 fires when 'plan' is not a dict; a missing 'plan' key and a missing plan status are the schema's concern.
 
     ``validate_step_16a`` calls the base ``validate_step_16`` before its own
-    ``isinstance(plan, dict)`` guard (step_16a.py lines 16-21). The base
-    validator now guards its own ``plan.get(...)`` dereference with an
-    ``isinstance(plan, dict)`` check (step_16.py line 261), coercing a
-    non-dict ``plan`` to ``{}`` before use instead of raising AttributeError.
-    That means a non-dict "plan" value safely reaches step_16a's own guard,
-    which fires E520 ("Step 16a requires a 'plan' object"). A missing "plan"
-    key still defaults to ``{}`` (a valid dict) via ``data.get("plan", {})``
-    and so falls through to the plan.status-required branch instead.
+    ``isinstance(plan, dict)`` guard. The base validator coerces a non-dict
+    ``plan`` to ``{}`` instead of raising, so a non-dict "plan" value safely
+    reaches step_16a's own guard, which fires E520 ("Step 16a requires a 'plan' object").
     """
 
-    def test_missing_plan_fires_e520_plan_object_required(self):
-        """A missing 'plan' key defaults to {} (a valid dict) and so falls through
-        to the plan.status-required branch — E520 still fires, just via that path."""
+    def test_missing_plan_reads_as_empty_and_does_not_raise(self):
+        """A missing 'plan' key reads as an empty plan: the schema reports it, this validator does not."""
         data = _make_minimal_16a()
         del data["plan"]
         errors = validate_step_16a(data, ".", spec_path=None)
-        self.assertTrue(
-            any(e.code == "E520" for e in errors),
-            f"Expected E520 for missing plan. Got: {errors}"
-        )
+        self.assertFalse(any(e.code == "E520" and "'plan' object" in e.message for e in errors), errors)
 
     def test_plan_not_a_dict_fires_e520_plan_object_required(self):
         """A non-dict 'plan' fires E520 ("Step 16a requires a 'plan' object").
@@ -142,14 +106,12 @@ class TestStep16aPlanObjectRequired(unittest.TestCase):
             f"Expected E520 for non-dict plan. Got: {errors}"
         )
 
-    def test_plan_status_falsy_fires_e520_plan_object_required(self):
+    def test_wrong_typed_values_do_not_raise(self):
         data = _make_minimal_16a()
-        data["plan"]["status"] = ""
-        errors = validate_step_16a(data, ".", spec_path=None)
-        self.assertTrue(
-            any(e.code == "E520" and "status" in e.message for e in errors),
-            f"Expected E520 for falsy plan.status. Got: {errors}"
-        )
+        data["plan"]["spec_alignment"] = {"checklist": ["not-an-item", {"id": 7, "realises": "tc-one"}]}
+        data["plan"]["summary"] = ["not", "a", "dict"]
+        data["review"] = {"findings": ["x", {"remediation_task": {"checklist_ids": "not-a-list"}}]}
+        self.assertIsInstance(validate_step_16a(data, ".", spec_path=None), list)
 
 
 class TestStep16aFeedbackLoop(unittest.TestCase):
@@ -218,6 +180,11 @@ class TestStep16aFeedbackLoop(unittest.TestCase):
         codes_with_path = {e.code for e in errors_with_path}
         self.assertIn("W584", codes_no_path)
         self.assertIn("W584", codes_with_path)
+
+
+def test_no_w570_for_the_seed_manifest_without_spec_path_and_spec_root(tmp_path):
+    assert [e.code for e in validate_step_16({}, ".")] == []
+    assert [e.code for e in validate_step_16({}, ".", spec_root=str(tmp_path))] == ["W570"]
 
 
 class TestFindSeedManifest(unittest.TestCase):

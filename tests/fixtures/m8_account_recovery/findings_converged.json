@@ -1,0 +1,7 @@
+{
+  "$schema": "vc:infra:findings",
+  "round": 2,
+  "scope": "ms-account-recovery-plan",
+  "generated_at": 1700000100,
+  "findings": []
+}

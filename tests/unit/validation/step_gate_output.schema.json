@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "step_gate_output.schema.json",
+  "title": "spec-check --step / --paths --json output",
+  "description": "The payload of `specdev spec-check ... --step N --json` (and `--paths`): the usual findings payload plus the `step_gate` object. For several steps each bucket of `step_gate` is the union over the steps.",
+  "type": "object",
+  "required": ["command", "step_gate", "status", "error_count", "warning_count", "errors"],
+  "additionalProperties": false,
+  "properties": {
+    "command": {"const": "spec-check"},
+    "status": {"enum": ["PASS", "WARN", "FAIL"]},
+    "error_count": {"type": "integer", "minimum": 0},
+    "warning_count": {"type": "integer", "minimum": 0},
+    "errors": {"$ref": "#/$defs/findings"},
+    "step_gate": {
+      "type": "object",
+      "required": [
+        "steps", "baseline", "blocking", "waiting", "own_warnings", "new_upstream_warnings",
+        "upstream_debt", "pending", "gate_owned", "result"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "steps": {"type": "array", "items": {"type": "string", "pattern": "^[0-9]{2}[a-z]?$"}},
+        "baseline": {
+          "type": "object",
+          "required": ["ref", "commit", "mode"],
+          "additionalProperties": false,
+          "properties": {
+            "ref": {"type": ["string", "null"]},
+            "commit": {"type": ["string", "null"]},
+            "mode": {"enum": ["merge-base", "head", "unavailable"]}
+          }
+        },
+        "blocking": {"$ref": "#/$defs/findings"},
+        "waiting": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["error", "waiting_on"],
+            "additionalProperties": false,
+            "properties": {
+              "error": {"$ref": "#/$defs/finding"},
+              "waiting_on": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+            }
+          }
+        },
+        "own_warnings": {"$ref": "#/$defs/findings"},
+        "new_upstream_warnings": {"$ref": "#/$defs/findings"},
+        "upstream_debt": {"$ref": "#/$defs/findings"},
+        "pending": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[0-9]{2}[a-z]?$"},
+          "additionalProperties": {"$ref": "#/$defs/findings"}
+        },
+        "gate_owned": {"$ref": "#/$defs/findings"},
+        "result": {"enum": ["clear", "blocked"]}
+      }
+    }
+  },
+  "$defs": {
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "finding": {
+      "type": "object",
+      "required": ["code", "message", "severity"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[EW][0-9]{3}$"},
+        "message": {"type": "string"},
+        "severity": {"enum": ["error", "warning"]},
+        "owner": {"type": "string"},
+        "node_id": {"type": "string"},
+        "file": {"type": "string"},
+        "jq_path": {"type": "string"}
+      }
+    }
+  }
+}

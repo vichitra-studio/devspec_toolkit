@@ -11,10 +11,12 @@ in control of cleanup (typically via ``tempfile.TemporaryDirectory()``).
 
 Schema invariants enforced by the factories:
   - Anchor uses ``$schema: vc:16-anchor`` and ``artifact_role: "anchor"``.
-  - Milestone-plan files use ``$schema: vc:16-impl-context``.
-  - ``milestone_index[].status`` uses the shared ``atoms#milestoneStatus`` enum
+  - Milestone-plan files use ``$schema: vc:16-impl-context`` and name their milestone in the file-level
+    ``milestone`` key.
+  - ``milestone_index[]`` rows are anchor rows (``anchor_id``, ``about``, ``status``, ``checklist_id_prefix``,
+    ``summary``); ``status`` uses the shared ``atoms#milestoneStatus`` enum
     (``pending`` | ``in_progress`` | ``done`` | ``deferred``) — never the old
-    ``active`` / ``planned`` strings.
+    ``active`` / ``planned`` strings.  A ``deferred`` row carries ``deferral_reason`` and a ``done`` row ``close``.
 """
 from __future__ import annotations
 
@@ -65,31 +67,87 @@ def make_milestone_entry(
     milestone_id: str,
     *,
     status: str = "in_progress",
-    fr_refs: Optional[list[str]] = None,
     checklist_id_prefix: Optional[str] = None,
     summary: Optional[str] = None,
-    context_path: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Build one ``plan.milestone_index[]`` entry that satisfies the anchor schema.
+    """Build one ``plan.milestone_index[]`` anchor row that satisfies the anchor schema.
 
     ``checklist_id_prefix`` defaults to a derivative of ``milestone_id`` capped
     at 20 chars and SCREAMING_SNAKE-cased so collision tests can override it
-    explicitly while no-collision tests get a unique value automatically.
+    explicitly while no-collision tests get a unique value automatically.  A
+    ``deferred`` row gets a ``deferral_reason`` and a ``done`` row a ``close``,
+    which the schema requires for those statuses.
     """
     derived_prefix = (
         milestone_id.upper().replace("-", "_")[:20]
         if checklist_id_prefix is None
         else checklist_id_prefix
     )
-    return {
-        "milestone_id": milestone_id,
-        "context_path": context_path
-        or f"spec/impl_context/{milestone_id.replace('-', '_')}_plan.json",
+    row: dict[str, Any] = {
+        "anchor_id": f"anchor-{milestone_id}",
+        "about": [milestone_id],
         "status": status,
-        "fr_refs": fr_refs or ["fr-login"],
         "checklist_id_prefix": derived_prefix,
         "summary": summary or f"{milestone_id} summary line for tests.",
     }
+    if status == "deferred":
+        row["deferral_reason"] = "Waits for an upstream decision."
+    if status == "done":
+        row["close"] = {"signed_off_by": "test-reviewer"}
+    return row
+
+
+def make_legacy_milestone_entry(
+    milestone_id: str,
+    *,
+    status: str = "in_progress",
+    fr_refs: Optional[list[str]] = None,
+    checklist_id_prefix: str = "LEGACY",
+) -> dict[str, Any]:
+    """Build one pre-1.2.0 ``milestone_index[]`` entry (``milestone_id``, ``context_path``, ``fr_refs``).
+
+    It no longer satisfies the anchor schema; it exists to show the schema rejects the removed row fields.
+    """
+    return {
+        "milestone_id": milestone_id,
+        "context_path": f"spec/impl_context/{milestone_id.replace('-', '_')}_plan.json",
+        "status": status,
+        "fr_refs": fr_refs or ["fr-login"],
+        "checklist_id_prefix": checklist_id_prefix,
+        "summary": f"{milestone_id} summary line for tests.",
+    }
+
+
+def make_roadmap(tmp_dir: Path, tasks: dict[str, list[str]], *, milestone_id: str = "ms-roadmap") -> Path:
+    """Write ``tmp_dir/14_roadmap.json`` with one roadmap milestone holding *tasks* (task id -> its criterion ids).
+
+    The anchor validator reads it, through the spec graph, to find the task that holds a criterion a plan item
+    ``realises``.  It is not a fully schema-valid roadmap: the criteria carry no ``refines`` or ``verified_by``.
+    """
+    roadmap = {
+        "$schema": "vc:14-roadmap",
+        "id": "roadmap-test",
+        "owner": "product",
+        "created_at": "2024-01-01T00:00:00Z",
+        "milestones": [
+            {
+                "milestone_id": milestone_id,
+                "name": "Test milestone",
+                "tasks": [
+                    {
+                        "task_id": task_id,
+                        "description": f"Task {task_id}.",
+                        "acceptance_criteria": [{"criterion_id": cid, "text": f"Criterion {cid}."} for cid in criteria],
+                    }
+                    for task_id, criteria in tasks.items()
+                ],
+            }
+        ],
+        "canonical_refs_used": [],
+    }
+    path = tmp_dir / "14_roadmap.json"
+    path.write_text(json.dumps(roadmap), encoding="utf-8")
+    return path
 
 
 def make_milestone_plan(
@@ -99,15 +157,19 @@ def make_milestone_plan(
     scope_in: Optional[list[str]] = None,
     scope_out: Optional[list[str]] = None,
     checklist: Optional[list[dict[str, Any]]] = None,
+    milestone: Optional[str] = None,
 ) -> Path:
     """Write a milestone-plan artifact for anchor drift-check tests.
+
+    ``milestone`` sets the file-level ``milestone`` key; without it the file is a pre-1.2.0 plan.
 
     Produces the minimal shape the anchor validator reads during E308 scope
     drift and E309 checklist drift checks: ``$schema``, ``plan.summary``
     (scope_in/scope_out), and ``plan.spec_alignment.checklist``.  This is
-    **not** a fully schema-valid ``vc:16-impl-context`` artifact — optional
-    fields like ``milestone_ref`` and ``implementation`` are omitted because
-    the anchor validator never schema-validates the milestone files it loads.
+    **not** a fully schema-valid ``vc:16-impl-context`` artifact — the plan
+    items a caller passes in (see ``make_checklist_item``) may omit
+    ``implementation`` because the anchor validator never
+    schema-validates the milestone files it loads.
     """
     ms: dict[str, Any] = {
         "$schema": "vc:16-impl-context",
@@ -115,7 +177,6 @@ def make_milestone_plan(
         "owner": "api",
         "created_at": "2024-01-01T00:00:00Z",
         "plan": {
-            "status": "active",
             "summary": {
                 "functional_summary": f"Test milestone authored by {filename}.",
                 "scope_in": scope_in or ["auth"],
@@ -137,6 +198,8 @@ def make_milestone_plan(
         "canonical_proposals": [],
         "canonical_conflicts": [],
     }
+    if milestone is not None:
+        ms["milestone"] = milestone
     path = impl_context_dir / filename
     path.write_text(json.dumps(ms), encoding="utf-8")
     return path
@@ -166,29 +229,19 @@ def make_object_test_command(
 
 def make_checklist_item(
     item_id: str,
-    spec_ref_id: str,
+    realises: list[str],
     *,
     item_type: str = "behavior",
 ) -> dict[str, Any]:
-    """Build one ``plan.spec_alignment.checklist[]`` item for a milestone plan.
+    """Build one ``plan.spec_alignment.checklist[]`` plan item that ``realises`` the criteria *realises*.
 
-    Produces a structurally sufficient item for the anchor validator's
-    cross-file drift checks (E309, W610).  The anchor validator reads
-    ``id`` and ``spec_ref.id`` — it does not schema-validate the milestone
-    plan itself.  Optional fields (``nfr_refs``, ``implementation``) are
-    omitted rather than populated with schema-invalid defaults.
+    Structurally sufficient for the anchor validator's cross-file checks (E308 ownership, E309 mapping, W610):
+    it reads ``id`` and ``realises`` and does not schema-validate the milestone plan, so ``implementation`` is omitted.
     """
     return {
         "id": item_id,
-        "spec_ref": {
-            "type": "fr",
-            "id": spec_ref_id,
-            "line_range": "L1-L10",
-            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678",
-        },
+        "realises": realises,
         "description": f"Checklist item {item_id}.",
         "type": item_type,
         "layer": "api",
-        "linked_test_expectation": "pytest test_auth",
-        "fixture_ref": "fixture-auth",
     }

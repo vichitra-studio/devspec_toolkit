@@ -1,0 +1,112 @@
+{
+  "coverage": {
+    "fr_total": 5,
+    "fr_total_fixture": 5,
+    "fr_with_api": 5,
+    "fr_with_fixture": 4,
+    "fr_with_nfr": 3,
+    "fr_with_threat": 5,
+    "scaffolds_found": 0
+  },
+  "invariant_threat_coverage": {
+    "inv-no-double-checkout": [
+      "threat-card-sharing"
+    ]
+  },
+  "matrix": [
+    {
+      "apis": [
+        "api-catalog-search"
+      ],
+      "fixtures": [
+        "fix-search-returns-matches"
+      ],
+      "fr_id": "fr-catalog-search",
+      "nfrs": [
+        "nfr-search-latency"
+      ],
+      "threats": [
+        "threat-catalog-scraping"
+      ]
+    },
+    {
+      "apis": [
+        "api-reserve-cancel",
+        "api-reserve-create"
+      ],
+      "fixtures": [
+        "fix-reserve-twice"
+      ],
+      "fr_id": "fr-reserve-tool",
+      "nfrs": [],
+      "threats": [
+        "threat-card-sharing"
+      ]
+    },
+    {
+      "apis": [
+        "api-checkout-create"
+      ],
+      "fixtures": [
+        "fix-checkout-conflict"
+      ],
+      "fr_id": "fr-checkout-tool",
+      "nfrs": [
+        "nfr-checkout-latency"
+      ],
+      "threats": [
+        "threat-card-sharing"
+      ]
+    },
+    {
+      "apis": [
+        "api-return-create"
+      ],
+      "fixtures": [
+        "fix-return-closes-loan"
+      ],
+      "fr_id": "fr-return-tool",
+      "nfrs": [],
+      "threats": [
+        "threat-fee-tampering"
+      ]
+    },
+    {
+      "apis": [
+        "api-fee-get"
+      ],
+      "fixtures": [],
+      "fr_id": "fr-late-fee-calc",
+      "nfrs": [
+        "nfr-fee-accuracy"
+      ],
+      "threats": [
+        "threat-fee-tampering"
+      ]
+    },
+    {
+      "apis": [],
+      "fixtures": [],
+      "fr_id": "fr-waitlist-notify",
+      "nfrs": [],
+      "threats": []
+    }
+  ],
+  "milestone_coverage": {
+    "fr-catalog-search": [
+      "ms-catalog-basics"
+    ],
+    "fr-checkout-tool": [
+      "ms-reservations"
+    ],
+    "fr-late-fee-calc": [
+      "ms-late-fees"
+    ],
+    "fr-reserve-tool": [
+      "ms-reservations"
+    ],
+    "fr-return-tool": [
+      "ms-reservations"
+    ]
+  }
+}

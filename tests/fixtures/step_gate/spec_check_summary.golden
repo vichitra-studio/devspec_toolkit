@@ -1,0 +1,33 @@
+spec-check: 30 checks run, 24 errors, 1 warnings
+
+  [PASS] schema-validation              0 errors  0 warnings
+  [FAIL] toolkit-version                1 errors  0 warnings
+  [PASS] spec-quality-lint              0 errors  0 warnings
+  [PASS] canonical-lint                 0 errors  0 warnings
+  [PASS] canonical-integrity            0 errors  0 warnings
+  [PASS] hallucination-lint             0 errors  0 warnings
+  [WARN] seed-lint                      0 errors  1 warnings
+  [PASS] fixtures-lint                  0 errors  0 warnings
+  [PASS] dependency-order-lint          0 errors  0 warnings
+  [PASS] graph                          0 errors  0 warnings
+  [PASS] computed-fields                0 errors  0 warnings
+  [PASS] records                        0 errors  0 warnings
+  [PASS] registry-check                 0 errors  0 warnings
+  [PASS] hardcoded-seed-check           0 errors  0 warnings
+  [PASS] glossary-drift-check           0 errors  0 warnings
+  [PASS] trace-lock                     0 errors  0 warnings
+  [PASS] third-party-pins               0 errors  0 warnings
+  [FAIL] no-dangling                    16 errors  0 warnings
+  [PASS] term-use                       0 errors  0 warnings
+  [FAIL] verifier-rules                 5 errors  0 warnings
+  [FAIL] cross-cutting                  1 errors  0 warnings
+  [PASS] refinement                     0 errors  0 warnings
+  [PASS] scaffold-paths                 0 errors  0 warnings
+  [PASS] seed-routes                    0 errors  0 warnings
+  [PASS] prose-ids                      0 errors  0 warnings
+  [FAIL] milestone-numbers              1 errors  0 warnings
+  [PASS] removal-rules                  0 errors  0 warnings
+  [PASS] open-items                     0 errors  0 warnings
+  [PASS] frozen-plans                   0 errors  0 warnings
+  [PASS] plan-records                   0 errors  0 warnings
+

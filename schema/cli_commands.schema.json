@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:cli-commands",
+  "title": "CLI Commands",
+  "description": "Schema for the generated cli_commands.json produced by 'specdev registry-generate': the command paths the toolkit CLI offers. Not canon. Carries paths only, no flags.",
+  "type": "object",
+  "required": ["$schema", "_format_version", "_note", "commands"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "vc:cli-commands",
+      "description": "Schema URI identifying this document as a CLI command list. Must be 'vc:cli-commands'."
+    },
+    "_format_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semver string for the file format."
+    },
+    "_note": {
+      "type": "string",
+      "description": "Human-readable note about the file's origin. Consumers should not parse this string."
+    },
+    "commands": {
+      "type": "array",
+      "description": "Every command path, sorted: a top-level command ('spec-check') or a command followed by a sub-command or action ('json patch', 'align apply').",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*( [a-z0-9][a-z0-9-]*)*$",
+            "description": "Space-separated command path as typed after 'specdev'."
+          }
+        }
+      }
+    }
+  }
+}

@@ -148,6 +148,21 @@ class TestErrorToDict:
         d = error_to_dict(err)
         assert "value" not in d
 
+    def test_render_text_unchanged(self) -> None:
+        owned = SpecError(code="E700", message="no node", path="a.json", owner="step:04", node_id="fr-x")
+        assert owned.render() == "E700 a.json no node"
+        assert SpecError(code="E700", message="no node", owner="step:04").render() == "E700 no node"
+
+    def test_error_to_dict_adds_keys_only_when_set(self) -> None:
+        assert "owner" not in error_to_dict(SpecError(code="E700", message="m"))
+        assert "node_id" not in error_to_dict(SpecError(code="E700", message="m"))
+        d = error_to_dict(SpecError(code="E700", message="m", owner="step:04", node_id="fr-x"))
+        assert d["owner"] == "step:04"
+        assert d["node_id"] == "fr-x"
+        only_owner = error_to_dict(SpecError(code="E520", message="m", owner="step:04"))
+        assert only_owner["owner"] == "step:04"
+        assert "node_id" not in only_owner
+
     def test_empty_string_subcode_is_included(self) -> None:
         err = SpecError(code="E530", message="test", subcode="")
         d = error_to_dict(err)
@@ -254,7 +269,7 @@ class TestMakeRemediation:
         )
         assert _make_remediation(err) is None
 
-    def test_e530_linked_test_file_not_found_shape(self) -> None:
+    def test_linked_test_file_not_found_subcode_no_longer_special_cased(self) -> None:
         err = SpecError(
             code="E530",
             message="LINKED_TEST_FILE_NOT_FOUND 09_impl_plan.json:linked_test_expectation path=tests/unit/missing.py",
@@ -263,26 +278,12 @@ class TestMakeRemediation:
             jq_path=".linked_test_expectation",
             value="tests/unit/missing.py",
         )
-        r = _make_remediation(err)
-        assert r is not None
-        assert r["guide_code"] == "E530-LINKED_TEST_FILE_NOT_FOUND"
-        assert r["parameters"]["fix_kind"] == "CREATE_OR_FIX_TEST_PATH"
-        candidates = r["parameters"]["candidates"]
-        assert len(candidates) >= 1
-        assert candidates[0]["kind"] == "correct_path"
-        cmd = candidates[0]["command"]
-        assert cmd.startswith("specdev json patch")
-        assert ".linked_test_expectation" in cmd
-        # err.file must appear in the command, not a literal <spec-file> placeholder
-        assert "09_impl_plan.json" in cmd
-        assert "<spec-file>" not in cmd
-        assert "tests/unit/missing.py" in r["owner_story"]
+        assert _make_remediation(err) is None
 
     def test_remediation_candidates_commands_start_with_specdev(self) -> None:
         errs = [
             SpecError(code="E110", message="test", subcode="UNKNOWN_CANONICAL_ID", value="cn:project:foo"),
             SpecError(code="E530", message="test", subcode="INVENTED_ENUM_OR_ID", jq_path=".jobs[0].steps[0].command", value="frobulate"),
-            SpecError(code="E530", message="test", subcode="LINKED_TEST_FILE_NOT_FOUND", file="spec/09.json", jq_path=".linked_test_expectation", value="tests/missing.py"),
         ]
         for err in errs:
             r = _make_remediation(err)

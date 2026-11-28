@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:core:ambiguity-fixture",
+  "title": "Shared ambiguity item (fixture)",
+  "$defs": {
+    "ambiguityList": {
+      "type": "array",
+      "x-node": {
+        "kind": "ambiguity-item",
+        "id": "ambiguity_id",
+        "role": "record",
+        "contract": [
+          "text"
+        ]
+      },
+      "items": {
+        "type": "object",
+        "required": [
+          "ambiguity_id"
+        ],
+        "properties": {
+          "ambiguity_id": {
+            "$ref": "vc:core:atoms#kebabId"
+          },
+          "text": {
+            "type": "string"
+          },
+          "about": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:graph#nodeId"
+            },
+            "x-link": {
+              "kinds": "*",
+              "required": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

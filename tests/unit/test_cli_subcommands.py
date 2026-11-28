@@ -7,15 +7,23 @@ produce expected output, and respect the --repo-root flag.
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from unittest.mock import patch
 
+import pytest
+
 from specdev_tools import cli
+from specdev_tools.core.toolkit_root import detect_toolkit_root
+from specdev_tools.trace import gaps
+from specdev_tools.trace.lockfile import Lock, LockEntry, serialise_lock
+from specdev_tools.validation import graph_checks
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -110,7 +118,7 @@ class TestEnvCheck(_CliMixin, unittest.TestCase):
         """When SPECDEV_PROMOTE_CODES is set, env-check reports SELECTIVE promotion."""
         # Make sure SPECDEV_WARNINGS_AS_ERRORS is off so selective path is taken
         clean_env = {k: v for k, v in os.environ.items() if k != "SPECDEV_WARNINGS_AS_ERRORS"}
-        clean_env["SPECDEV_PROMOTE_CODES"] = "W550,W560"
+        clean_env["SPECDEV_PROMOTE_CODES"] = "W571,W593"
         with patch.dict(os.environ, clean_env, clear=True):
             code, out, _ = self._run_cli(["env-check", "--repo-root", str(REPO_ROOT)])
         self.assertEqual(code, 0)
@@ -205,32 +213,6 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             self.assertIn("DAG_DEAD_END_PRODUCER", err)
             self.assertIn("'01'", err)
 
-    def test_dag_lint_detects_circular_dependency(self):
-        """dag-lint reports E599 when a consumer appears before its producer in steps ordering.
-
-        Under derive_allowed_upstream, cycles are structurally impossible.
-        Consumer ordering violations (consumer before producer in steps) are
-        detected as E599 DAG_CONSUMER_INCONSISTENCY.
-        """
-        import json
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tools_dir = os.path.join(tmpdir, "tools")
-            os.makedirs(tools_dir)
-            step_order = {
-                "steps": ["00", "01", "02"],
-                "downstream_consumers": {
-                    # 02 claims 01 is its consumer, but 01 appears before 02 -> E599
-                    "00": ["01", "02"], "01": ["02"], "02": ["01"],
-                },
-            }
-            with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
-                json.dump(step_order, f)
-            code, _, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
-            self.assertEqual(code, 1)
-            self.assertIn("E599", err)
-            self.assertIn("DAG_CONSUMER_INCONSISTENCY", err)
-
     def test_dag_lint_detects_consumer_inconsistency(self):
         """dag-lint reports E599 when a declared consumer comes before the producer in steps."""
         import json
@@ -279,6 +261,540 @@ class TestExtractionIntentCheck(_CliMixin, unittest.TestCase):
             # Empty directory — no step_order.json → should exit 0 (graceful skip)
             code, _, _ = self._run_cli(["extraction-intent-check", "--repo-root", tmpdir])
             self.assertEqual(code, 0)
+
+
+EXAMPLE_SPEC = REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+_EXAMPLE_ID = "ac-password-reset-3"
+_ROOT_FLAGS = ["--repo-root", str(REPO_ROOT), "--spec-root", str(EXAMPLE_SPEC)]
+
+
+class TestGraphCommands(_CliMixin, unittest.TestCase):
+    """The graph commands ``node``, ``trace`` and ``diff`` (WI-M4-11)."""
+
+    def _example_copy(self) -> Path:
+        import shutil
+        import tempfile
+
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        return Path(shutil.copytree(EXAMPLE_SPEC, tmp / "spec"))
+
+    def test_node_trace_diff_accept_three_root_flags(self):
+        """The three-flag default of CLAUDE.md never gives "unrecognized arguments" on a graph command."""
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        parsed = cli.build_parser()
+        for argv in (["trace", "an-id", *flags], ["diff", "v1", "v2", *flags]):
+            with self.subTest(command=argv[0]):
+                args = parsed.parse_args(argv)
+                self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        code, out, err = self._run_cli(["node", _EXAMPLE_ID, *_ROOT_FLAGS, "--git-root", str(REPO_ROOT)])
+        self.assertEqual(code, 0, err)
+        self.assertIn(_EXAMPLE_ID, out)
+        code, _, err = self._run_cli(["trace", _EXAMPLE_ID, *_ROOT_FLAGS, "--git-root", str(REPO_ROOT)])
+        self.assertEqual(code, 0, err)
+
+    def test_node_status_subcommand_dispatch(self):
+        spec = self._example_copy()
+        flags = ["--repo-root", str(REPO_ROOT), "--spec-root", str(spec)]
+        code, out, err = self._run_cli(["node", "status", _EXAMPLE_ID, "deprecated", *flags])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), f"{_EXAMPLE_ID}: active -> deprecated (04_fr_list.json)")
+        self.assertIn('"lifecycle": "deprecated"', (spec / "04_fr_list.json").read_text(encoding="utf-8"))
+        code, out, err = self._run_cli(["node", "status", _EXAMPLE_ID, "active", *flags])
+        self.assertEqual(code, 0, err)
+        self.assertNotIn('"lifecycle"', (spec / "04_fr_list.json").read_text(encoding="utf-8"))
+        code, _, err = self._run_cli(["node", "status", "ac-no-such-node", "active", *flags])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E705"), err)
+
+    def test_node_explicit_repo_root_after_id(self):
+        """``node <id> --repo-root X --json`` works without the auto-detect of the default ``.``."""
+        code, out, err = self._run_cli(["node", _EXAMPLE_ID, *_ROOT_FLAGS, "--json"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual([node["id"] for node in json.loads(out)["nodes"]], [_EXAMPLE_ID])
+
+    def test_node_show_disambiguates(self):
+        """An id that is also a subcommand name is read through ``node show``; the bare form is the subcommand."""
+        for word in ("status", "candidates"):
+            with self.subTest(word=word):
+                code, _, err = self._run_cli(["node", "show", word, *_ROOT_FLAGS])
+                self.assertEqual(code, 1)
+                self.assertTrue(err.startswith("E706") and f"'{word}'" in err, err)
+                code, _, _ = self._run_cli(["node", word, *_ROOT_FLAGS])
+                self.assertEqual(code, 2)
+
+    def test_json_flag_shapes(self):
+        spec = self._example_copy()
+        flags = ["--repo-root", str(REPO_ROOT), "--spec-root", str(spec), "--json"]
+        shapes = {
+            ("node", _EXAMPLE_ID): {"nodes", "errors"},
+            ("node", "candidates", "--kind", "api", "--field", "derives_from"): {"kind", "field", "total", "candidates"},
+            ("node", "status", _EXAMPLE_ID, "deprecated"): {"node_id", "old", "new", "file", "jq_path"},
+            ("trace", _EXAMPLE_ID): {"entry", "up", "down"},
+            ("trace", "PWRESET_CONFIRM_EXPIRED_01", "--recipe", "16b"): {"role", "start", "sections", "counts", "ambiguity_report", "dependency_report"},
+        }
+        for argv, keys in shapes.items():
+            with self.subTest(argv=argv):
+                code, out, err = self._run_cli([*argv, *flags])
+                self.assertEqual(code, 0, err)
+                self.assertEqual(set(json.loads(out)), keys)
+
+    def test_json_flag_prints_a_finding_as_the_standard_envelope(self):
+        code, out, _ = self._run_cli(["trace", "no-such-id", *_ROOT_FLAGS, "--json"])
+        self.assertEqual(code, 1)
+        document = json.loads(out)
+        self.assertEqual((document["command"], document["status"], document["errors"][0]["code"]), ("trace", "FAIL", "E706"))
+
+    def test_trace_recipe_flags_are_checked(self):
+        for argv in (["--recipe", "16b", "--up"], ["--expand"], ["--since", "v1"]):
+            with self.subTest(argv=argv):
+                code, _, err = self._run_cli(["trace", _EXAMPLE_ID, *argv, *_ROOT_FLAGS])
+                self.assertEqual(code, 2)
+                self.assertIn("specdev trace: error:", err)
+
+    def test_candidates_needs_exactly_one_of_kind_and_for(self):
+        for argv in (["--field", "derives_from"], ["--kind", "api", "--for", _EXAMPLE_ID, "--field", "derives_from"]):
+            with self.subTest(argv=argv):
+                code, _, _ = self._run_cli(["node", "candidates", *argv, *_ROOT_FLAGS])
+                self.assertEqual(code, 2)
+
+    def test_detect_toolkit_root_finds_the_submodule_only_for_the_default(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "devspec_toolkit" / "tools" / "specdev_tools" / "__init__.py"
+            marker.parent.mkdir(parents=True)
+            marker.touch()
+            self.assertEqual(detect_toolkit_root(".", cwd=tmp), str(Path(tmp) / "devspec_toolkit"))
+            self.assertEqual(detect_toolkit_root("elsewhere", cwd=tmp), "elsewhere")
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(detect_toolkit_root(".", cwd=tmp), ".")
+
+
+class TestTraceCommands(_CliMixin, unittest.TestCase):
+    """The trace commands (``stale``), registered by ``trace.commands.add_trace_parsers`` (WI-M5-05)."""
+
+    def test_stale_accepts_the_three_root_flags_and_its_own(self):
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        args = cli.build_parser().parse_args(["stale", "--step", "06", "--diff", "--json", *flags])
+        self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        self.assertEqual((args.step, args.diff, args.json_output), ("06", True, True))
+        defaults = cli.build_parser().parse_args(["stale"])
+        self.assertEqual((defaults.step, defaults.diff, defaults.json_output), (None, False, False))
+
+    def test_stale_dispatches_to_its_handler(self):
+        # The example reports role gaps under the real graph checks (E740, E743); this test shows the clean state, so no gap provider is registered (the CLI installs it on every parser it builds, so the install is turned off too).
+        with patch.object(gaps, "_providers", []), patch.object(graph_checks, "install_gap_provider", lambda: None):
+            code, out, err = self._run_cli(["stale", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "stale: no pending replay")
+
+    def test_stale_json_flag_shape(self):
+        code, out, err = self._run_cli(["stale", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent), "--json"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(set(json.loads(out)), {"steps", "totals"})
+
+    def test_stale_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["stale", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+    def test_attest_accepts_the_three_root_flags_and_its_own(self):
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        args = cli.build_parser().parse_args(["attest", "a-node", "--field", "f", "--target", "t", "--yes", "--dry-run", "--json", *flags])
+        self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        self.assertEqual((args.node_id, args.field, args.target, args.yes, args.dry_run, args.json_output), ("a-node", "f", "t", True, True, True))
+        self.assertEqual((args.step, args.prune), (None, False))
+        by_step = cli.build_parser().parse_args(["attest", "--step", "06"])
+        self.assertEqual((by_step.node_id, by_step.step, by_step.yes, by_step.dry_run), (None, "06", False, False))
+        self.assertTrue(cli.build_parser().parse_args(["attest", "--prune"]).prune)
+
+    def test_attest_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["attest", _EXAMPLE_ID, *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "attest: nothing to attest")
+
+    def test_attest_needs_a_node_a_step_or_prune(self):
+        code, _, err = self._run_cli(["attest", *_ROOT_FLAGS])
+        self.assertEqual(code, 2)
+        self.assertIn("one of the arguments", err)
+
+    def test_attest_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["attest", "--prune", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
+class TestCoverageCommand(_CliMixin, unittest.TestCase):
+    """``specdev coverage``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-14)."""
+
+    def test_coverage_accepts_the_three_root_flags_and_its_own(self):
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        args = cli.build_parser().parse_args(["coverage", "--by", "fr", "--json", *flags])
+        self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        self.assertEqual((args.by, args.json_output), ("fr", True))
+        defaults = cli.build_parser().parse_args(["coverage"])
+        self.assertEqual((defaults.by, defaults.json_output), (None, False))
+
+    def test_coverage_by_takes_only_fr(self):
+        code, _, err = self._run_cli(["coverage", "--by", "capability"])
+        self.assertEqual(code, 2)
+        self.assertIn("invalid choice", err)
+
+    def test_coverage_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["coverage", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent), "--json"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["command"], "coverage")
+
+    def test_coverage_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["coverage", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
+class TestLockCommand(_CliMixin, unittest.TestCase):
+    """``specdev lock merge`` and ``lock install-driver``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-07)."""
+
+    def _lock_text(self, *digits: str) -> str:
+        entries = [LockEntry(f"fr-{d}", "api_refs", f"api-{d}", f"sha256:{d * 64}", f"sha256:{d * 64}") for d in digits]
+        return serialise_lock(Lock(tuple(entries)))
+
+    def test_merge_takes_the_four_positionals(self):
+        args = cli.build_parser().parse_args(["lock", "merge", "o", "a", "b", "spec/extras/trace.lock.json"])
+        self.assertEqual((args.base, args.ours, args.theirs, args.pathname), ("o", "a", "b", "spec/extras/trace.lock.json"))
+
+    def test_install_driver_takes_the_root_flags_and_a_required_driver_command(self):
+        args = cli.build_parser().parse_args(["lock", "install-driver", "--driver-command", "x lock merge", "--git-root", "h", "--spec-root", "s", "--repo-root", "t", "--json"])
+        self.assertEqual((args.driver_command, args.git_root, args.spec_root, args.json_output), ("x lock merge", "h", "s", True))
+        code, _, err = self._run_cli(["lock", "install-driver"])
+        self.assertEqual(code, 2, err)
+
+    def test_lock_without_a_subcommand_is_a_usage_error(self):
+        code, _, _ = self._run_cli(["lock"])
+        self.assertEqual(code, 2)
+
+    def test_merge_dispatches_and_writes_the_result_over_ours(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = {name: Path(tmp) / name for name in ("base", "ours", "theirs")}
+            for name, text in (("base", self._lock_text("1")), ("ours", self._lock_text("1", "2")), ("theirs", self._lock_text("1", "3"))):
+                files[name].write_text(text, encoding="utf-8")
+            code, out, err = self._run_cli(["lock", "merge", str(files["base"]), str(files["ours"]), str(files["theirs"]), "p"])
+            self.assertEqual((code, out, err), (0, "", ""))
+            self.assertEqual(files["ours"].read_text(encoding="utf-8"), self._lock_text("1", "2", "3"))
+
+    def test_merge_of_a_malformed_version_exits_1_with_e760_and_leaves_ours(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ours, theirs = (Path(tmp) / name for name in ("base", "ours", "theirs"))
+            for path, text in ((base, self._lock_text("1")), (ours, self._lock_text("2")), (theirs, "<<<<<<< x\n")):
+                path.write_text(text, encoding="utf-8")
+            code, out, err = self._run_cli(["lock", "merge", str(base), str(ours), str(theirs), "p"])
+            self.assertEqual(code, 1)
+            self.assertTrue(err.startswith("E760"), err)
+            self.assertEqual(ours.read_text(encoding="utf-8"), self._lock_text("2"))
+
+
+class TestStepCommand(_CliMixin, unittest.TestCase):
+    """``specdev step create`` and ``step ready``, registered by ``trace.commands.add_trace_parsers`` (WI-M5-10, WI-M5-11)."""
+
+    def test_create_takes_the_step_from_and_dry_run_and_the_root_flags(self):
+        args = cli.build_parser().parse_args(["step", "create", "04", "--from", "d.json", "--dry-run", "--json", "--git-root", "h", "--spec-root", "s", "--repo-root", "t"])
+        self.assertEqual((args.step, args.draft, args.dry_run, args.json_output, args.git_root), ("04", "d.json", True, True, "h"))
+        self.assertFalse(cli.build_parser().parse_args(["step", "create", "04", "--from", "d.json"]).dry_run)
+
+    def test_create_needs_the_step_and_from(self):
+        for argv in (["step", "create", "--from", "d.json"], ["step", "create", "04"]):
+            code, _, err = self._run_cli(argv)
+            self.assertEqual(code, 2, err)
+
+    def test_ready_takes_the_step_and_the_root_flags(self):
+        args = cli.build_parser().parse_args(["step", "ready", "06", "--json", "--git-root", "h", "--spec-root", "s", "--repo-root", "t"])
+        self.assertEqual((args.step, args.json_output, args.git_root, args.spec_root), ("06", True, "h", "s"))
+
+    def test_ready_dispatches_to_its_handler(self):
+        code, out, err = self._run_cli(["step", "ready", "00", *_ROOT_FLAGS, "--git-root", str(EXAMPLE_SPEC.parent)])
+        self.assertEqual((code, out.strip(), err), (0, "step 00: ready", ""))
+
+    def test_step_without_a_subcommand_is_a_usage_error(self):
+        code, _, _ = self._run_cli(["step"])
+        self.assertEqual(code, 2)
+
+    def test_ready_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["step", "ready", "06", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
+class TestLifecycleCommands(_CliMixin, unittest.TestCase):
+    """``plan record``, ``review record``, ``milestone`` and ``status``: the parsers, and the usage errors that need no spec folder."""
+
+    def test_plan_record_takes_the_address_the_outcome_and_the_at_deploy_flags(self):
+        args = cli.build_parser().parse_args(["plan", "record", "ITEM/a01", "--outcome", "done", "--note", "n"])
+        self.assertEqual((args.address, args.outcome, args.note, args.at_deploy, args.prune), ("ITEM/a01", "done", "n", False, None))
+        args = cli.build_parser().parse_args(["plan", "record", "--at-deploy", "ITEM/a01", "--env", "staging", "--tag", "v1"])
+        self.assertEqual((args.address, args.at_deploy, args.env, args.tag), ("ITEM/a01", True, "staging", "v1"))
+        self.assertEqual(cli.build_parser().parse_args(["plan", "record", "--prune", "ms-a"]).prune, "ms-a")
+
+    def test_review_record_takes_the_verdict_and_the_optional_inputs(self):
+        args = cli.build_parser().parse_args(["review", "record", "ms-a", "--verdict", "needs_work", "--findings-file", "f.json", "--ratings-json", "{}"])
+        self.assertEqual((args.milestone, args.verdict, args.findings_file, args.ratings_json), ("ms-a", "needs_work", "f.json", "{}"))
+
+    def test_plan_record_misuse_is_a_usage_error(self):
+        for argv, text in (
+            (["plan", "record", *_ROOT_FLAGS], "give <plan item id>/<action id>"),
+            (["plan", "record", "ITEM", "--outcome", "done", *_ROOT_FLAGS], "is not <plan item id>/<action id>"),
+            (["plan", "record", "ITEM/a01", *_ROOT_FLAGS], "--outcome is required"),
+            (["plan", "record", "ITEM/a01", "--at-deploy", *_ROOT_FLAGS], "needs --env"),
+            (["plan", "record", "ITEM/a01", "--outcome", "done", "--env", "prod", *_ROOT_FLAGS], "go with --at-deploy"),
+            (["plan", "record", "--prune", "ms-a", "ITEM/a01", *_ROOT_FLAGS], "--prune takes a milestone id and nothing else"),
+            (["plan", "record", "ITEM/a01", "--outcome", "done", "--note", "x" * 201, *_ROOT_FLAGS], "at most 200"),
+        ):
+            code, _, err = self._run_cli(argv)
+            self.assertEqual(code, 2, err)
+            self.assertIn(text, err)
+
+    def test_milestone_commands_take_the_milestone_id_and_their_flags(self):
+        parse = cli.build_parser().parse_args
+        self.assertEqual(parse(["milestone", "start", "ms-a"]).milestone, "ms-a")
+        args = parse(["milestone", "defer", "ms-a", "--reason", "waiting"])
+        self.assertEqual((args.milestone, args.reason), ("ms-a", "waiting"))
+        self.assertIsNone(parse(["milestone", "defer", "ms-a"]).reason)
+        self.assertEqual(parse(["milestone", "sign-off", "ms-a"]).milestone, "ms-a")
+        args = parse(["milestone", "close", "ms-a", "--check"])
+        self.assertEqual((args.milestone, args.check), ("ms-a", True))
+        self.assertFalse(parse(["milestone", "close", "ms-a"]).check)
+
+    def test_status_takes_an_optional_milestone(self):
+        parse = cli.build_parser().parse_args
+        self.assertIsNone(parse(["status"]).milestone)
+        self.assertEqual(parse(["status", "--milestone", "ms-a", "--json"]).milestone, "ms-a")
+
+    def test_milestone_commands_on_a_missing_spec_folder_are_e520(self):
+        for argv in (["milestone", "start", "ms-a"], ["milestone", "close", "ms-a"], ["status"]):
+            code, _, err = self._run_cli([*argv, "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+            self.assertEqual(code, 1)
+            self.assertTrue(err.startswith("E520"), err)
+
+    def test_the_groups_need_their_subcommand(self):
+        for group in ("plan", "review", "milestone"):
+            code, _, _ = self._run_cli([group])
+            self.assertEqual(code, 2)
+
+    def test_review_record_on_a_missing_spec_folder_is_e520(self):
+        code, _, err = self._run_cli(["review", "record", "ms-a", "--verdict", "verified", "--repo-root", str(REPO_ROOT), "--spec-root", str(REPO_ROOT / "no-such-spec")])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E520"), err)
+
+
+class TestLifecycleCommandsHelp(_CliMixin, unittest.TestCase):
+    """WI-M8-16: ``--help`` of each command of the milestone's life prints its usage, exit 0; and the ``ai-help`` guide tells the true way to write a step."""
+
+    COMMANDS = (
+        ["step", "create"], ["plan", "record"], ["review", "record"], ["verify", "attest"],
+        ["milestone", "start"], ["milestone", "defer"], ["milestone", "sign-off"], ["milestone", "close"], ["status"],
+    )
+
+    def test_help_of_each_command_prints_its_usage(self):
+        for path in self.COMMANDS:
+            with self.subTest(command=" ".join(path)):
+                code, out, err = self._run_cli([*path, "--help"])
+                self.assertEqual(code, 0, err)
+                self.assertIn(f"usage: specdev-tools {' '.join(path)}", out)
+                self.assertIn("--repo-root", out)
+
+    def test_the_help_of_the_milestone_commands_names_their_refusals_and_exit_codes(self):
+        expected = {
+            ("milestone", "start"): ("E800", "Exit 0 started, 1 refused"),
+            ("milestone", "defer"): ("E802", "Exit 0 deferred, 1 refused"),
+            ("milestone", "sign-off"): ("E801", "Exit 0 recorded, 1 refused"),
+            ("milestone", "close"): ("E814", "Exit 0 closed or passes, 1 refused"),
+            ("plan", "record"): ("E822", "Exit 0 written, 1 refused, 2 usage"),
+            ("verify", "attest"): ("E824", "Exit 0 written, 1 refused, 2 usage"),
+        }
+        for path, (code_name, exits) in expected.items():
+            with self.subTest(command=" ".join(path)):
+                _, out, _ = self._run_cli([*path, "--help"])
+                flat = " ".join(out.split())
+                self.assertIn(code_name, flat)
+                self.assertIn(exits, flat)
+
+    def test_close_has_check_and_no_dry_run(self):
+        _, out, _ = self._run_cli(["milestone", "close", "--help"])
+        self.assertIn("--check", out)
+        self.assertNotIn("--dry-run", out)
+
+    def test_ai_help_no_longer_says_to_write_a_file_under_spec_directly(self):
+        for argv in (["ai-help"], ["ai-help", "--step", "04"], ["ai-help", "--json"], ["ai-help", "--step", "04", "--json"]):
+            with self.subTest(argv=argv):
+                code, out, err = self._run_cli([*argv, "--repo-root", str(REPO_ROOT)])
+                self.assertEqual(code, 0, err)
+                text = out.replace("\\n", "\n")
+                self.assertNotIn("directly to spec/", text)
+                self.assertIn("specdev step create", text)
+                self.assertIn("specdev json patch|insert|delete --id", text)
+
+
+class TestHelpTexts(_CliMixin, unittest.TestCase):
+    """Help text of ``align`` and ``json`` says what the commands do."""
+
+    def test_align_help_says_rollback_does_not_validate(self):
+        code, out, err = self._run_cli(["align", "--help"])
+        self.assertEqual(code, 0, err)
+        self.assertIn("not validated", " ".join(out.split()))
+
+    def test_json_help_lists_every_json_subcommand(self):
+        from specdev_tools.core.json_utils import build_json_parser
+
+        names = next(a for a in build_json_parser()._actions if a.dest == "command").choices
+        code, out, err = self._run_cli(["json", "--help"])
+        self.assertEqual(code, 0, err)
+        listed = {line.split()[0] for line in out.splitlines() if line.startswith("  ") and line.strip()}
+        self.assertLessEqual(set(names), listed)
+
+
+class TestCanonAcceptReport(_CliMixin, unittest.TestCase):
+    """``canon-accept`` tells a changed entry from an unchanged one and offers ``--update``."""
+
+    def _setup(self, tmp: Path, definition: str) -> list[str]:
+        canon = tmp / "canon"
+        canon.mkdir()
+        entry = {"id": "cn:project:entity:my-term", "kind": "entity", "preferred_label": "My Term", "definition": "Stored."}
+        manifest = {"$schema": "vc:core:canon", "registry_version": "1.0.0", "entries": [entry], "aliases": []}
+        (canon / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        proposal = {"temp_id": "my-term", "kind": "entity", "proposed_label": "My Term",
+                    "definition": definition, "source_field": "terms[0].definition"}
+        spec = tmp / "03_glossary.json"
+        spec.write_text(json.dumps({"canonical_proposals": [proposal]}), encoding="utf-8")
+        return ["canon-accept", "--from", str(spec), "--repo-root", str(tmp)]
+
+    def test_canon_accept_help_lists_update(self):
+        code, out, err = self._run_cli(["canon-accept", "--help"])
+        self.assertEqual(code, 0, err)
+        self.assertIn("--update", out)
+
+    def test_a_changed_entry_is_a_warn_with_exit_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self._run_cli(self._setup(Path(tmp), "Changed."))
+        self.assertEqual(code, 0, err)
+        self.assertIn("! changed (not updated, use --update): cn:project:entity:my-term (definition)", out)
+        self.assertIn("WARN (", out)
+
+    def test_update_prints_updated_and_ok(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self._run_cli([*self._setup(Path(tmp), "Changed."), "--update"])
+        self.assertEqual(code, 0, err)
+        self.assertIn("~ updated: cn:project:entity:my-term", out)
+        self.assertIn("OK (0 added, 1 updated, 0 unchanged, 0 malformed)", out)
+
+    def test_an_unchanged_entry_is_reported_as_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self._run_cli(self._setup(Path(tmp), "Stored."))
+        self.assertEqual(code, 0, err)
+        self.assertIn("~ unchanged: cn:project:entity:my-term", out)
+        self.assertIn("OK (0 added, 0 updated, 1 unchanged, 0 malformed)", out)
+
+
+class TestSpecCheckMerge(_CliMixin, unittest.TestCase):
+    """``spec-check --merge``: the flag, ``--base-ref`` beside it, and what it does not combine with (WI-M9-01)."""
+
+    def _spy_run(self, argv: list[str]) -> tuple[int, str, dict[str, object]]:
+        """Run ``spec-check`` with *argv* on a spy for ``run_spec_check``; the exit code, stderr and the keywords the spy got."""
+        seen: dict[str, object] = {}
+
+        def spy(*_args: object, **kwargs: object) -> list[object]:
+            seen.update(kwargs)
+            return []
+
+        with patch("specdev_tools.validation.spec_check.run_spec_check", spy):
+            code, _, err = self._run_cli(["spec-check", "spec", "--repo-root", str(REPO_ROOT), *argv])
+        return code, err, seen
+
+    def test_merge_flag_parsed_and_passed_through(self):
+        parsed = cli.build_parser().parse_args(["spec-check", "spec"])
+        self.assertFalse(parsed.merge)
+        code, err, seen = self._spy_run(["--merge"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual((seen["merge"], seen["base_ref"]), (True, None))
+        _, _, plain = self._spy_run([])
+        self.assertEqual((plain["merge"], plain["base_ref"]), (False, None))
+
+    def test_base_ref_with_merge_is_accepted(self):
+        code, err, seen = self._spy_run(["--merge", "--base-ref", "origin/main"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual((seen["merge"], seen["base_ref"]), (True, "origin/main"))
+
+    def test_merge_with_step_or_paths_is_a_usage_error(self):
+        for flags in (["--step", "04"], ["--paths", "spec/04_fr_list.json"], ["--detail", "all"]):
+            with self.subTest(flags=flags):
+                code, err, seen = self._spy_run(["--merge", *flags])
+                self.assertEqual(code, 2)
+                self.assertIn("--merge cannot be combined with --step, --paths or --detail", err)
+                self.assertEqual(seen, {})
+
+    def test_base_ref_alone_is_still_a_usage_error_and_names_merge(self):
+        code, err, _ = self._spy_run(["--base-ref", "main"])
+        self.assertEqual(code, 2)
+        self.assertIn("apply only with --step or --paths (--base-ref also with --merge)", err)
+
+
+# --- specdev release (WI-M9-06) ---------------------------------------------------------------------------------------------
+
+
+def _parse(*argv: str):
+    return cli.build_parser().parse_args(list(argv))
+
+
+def test_parse_release_tag_flag():
+    args = _parse("release", "--tag", "v1.0.0", "--message", "first")
+    assert (args.cmd, args.release_cmd, args.cut_tag, args.cut_message) == ("release", None, "v1.0.0", "first")
+    assert callable(args.handler) and (args.spec_root, args.git_root, args.json_output) == ("./spec", None, False)
+    assert _parse("release").cut_tag is None
+
+
+def test_parse_release_check_stage_prod_tag():
+    args = _parse("release", "check", "--stage", "prod", "--tag", "v1.0.0")
+    assert (args.release_cmd, args.stage, args.check_tag, args.cut_tag) == ("check", "prod", "v1.0.0", None)
+    assert args.handler.__name__ == "run_release_check"
+
+
+def test_parse_release_rollback_positional_and_reason():
+    args = _parse("release", "rollback", "v1.0.0", "--reason", "never reached production")
+    assert (args.release_cmd, args.tag, args.reason) == ("rollback", "v1.0.0", "never reached production")
+    assert args.handler.__name__ == "run_release_rollback"
+    for argv in (["release", "rollback", "--reason", "x"], ["release", "rollback", "v1.0.0"]):
+        with pytest.raises(SystemExit) as stop:
+            _parse(*argv)
+        assert stop.value.code == 2
+
+
+@pytest.mark.parametrize(("argv", "needle"), [
+    (["release", "check", "--tag", "v1.0.0"], "--stage"),
+    (["release", "check", "--stage", "staging", "--tag", "v1.0.0"], "invalid choice: 'staging'"),
+    (["release", "check", "--stage", "prod"], "--tag"),
+])
+def test_parse_release_check_requires_stage_prod(argv: list[str], needle: str, capsys: pytest.CaptureFixture[str]):
+    with pytest.raises(SystemExit) as stop:
+        _parse(*argv)
+    assert stop.value.code == 2 and needle in capsys.readouterr().err
+
+
+def test_parse_path_flag_before_and_after_subcommand():
+    before = _parse("release", "--git-root", "X", "check", "--stage", "prod", "--tag", "t")
+    after = _parse("release", "check", "--stage", "prod", "--tag", "t", "--git-root", "X")
+    assert before.git_root == after.git_root == "X" and (before.check_tag, after.check_tag) == ("t", "t")
+    both = _parse("release", "--spec-root", "A", "rollback", "v1.0.0", "--reason", "r", "--spec-root", "B", "--json")
+    assert both.spec_root == "B" and both.json_output is True
+    kept = _parse("release", "--spec-root", "A", "--json", "rollback", "v1.0.0", "--reason", "r")
+    assert kept.spec_root == "A" and kept.json_output is True, "a value given before the subcommand survives"
+    assert _parse("release", "check", "--stage", "prod", "--tag", "t").spec_root == "./spec", "the defaults are the release parser's"
+
+
+def test_parse_release_prep():
+    args = _parse("release", "prep")
+    assert (args.cmd, args.release_cmd, args.cut_tag) == ("release", "prep", None)
+    after = _parse("release", "prep", "--git-root", "X", "--json")
+    before = _parse("release", "--git-root", "X", "prep")
+    assert (after.git_root, after.json_output, before.git_root) == ("X", True, "X")
+    assert _parse("release", "prep").spec_root == "./spec", "the defaults are the release parser's"
 
 
 if __name__ == "__main__":

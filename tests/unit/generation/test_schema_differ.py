@@ -4,7 +4,9 @@ Created by FIX-047 (Batch 5).
 """
 from __future__ import annotations
 
+import dataclasses
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -81,10 +83,13 @@ class TestCalculateVersionDelta:
         assert "PATCH" in result
 
     def test_downgrade_returns_none(self):
-        # True downgrade: target minor strictly below source. All deltas <= 0,
-        # so calculate_version_delta falls to the else branch and returns None.
+        # True downgrade: target minor strictly below source, all deltas <= 0.
         result = calculate_version_delta("1.1.0", "1.0.0")
         assert result is None
+
+    def test_downgrade_with_a_larger_lower_number_returns_none(self):
+        assert calculate_version_delta("1.2.0", "1.1.5") is None
+        assert calculate_version_delta("2.0.0", "1.5.0") is None
 
     def test_downgrade_major_returns_none(self):
         # Downgrade along the major axis (and others) — distinct input path from
@@ -173,9 +178,9 @@ class TestInventoryUserSteps:
         assert inventory_user_steps(tmp_path / "nope") == {}
 
     def test_substep_files(self, tmp_path):
-        (tmp_path / "13a_completeness.json").write_text("{}")
+        (tmp_path / "02a_baseline.json").write_text("{}")
         result = inventory_user_steps(tmp_path)
-        assert "13a_completeness" in result
+        assert "02a_baseline" in result
 
 
 # ---------------------------------------------------------------------------
@@ -249,6 +254,19 @@ class TestDiffStepFields:
         diffs = diff_step_fields(user, schema)
         assert any(d.diff_type == DiffType.MISSING_REQUIRED and d.path == "name" for d in diffs)
 
+    def test_required_field_inside_allof_is_reported(self, tmp_path):
+        user = tmp_path / "spec.json"
+        schema = tmp_path / "spec.schema.json"
+        user.write_text(json.dumps({"id": "test"}))
+        schema.write_text(json.dumps({
+            "allOf": [{
+                "required": ["id", "name"],
+                "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+            }],
+        }))
+        diffs = diff_step_fields(user, schema)
+        assert [d.path for d in diffs if d.diff_type == DiffType.MISSING_REQUIRED] == ["name"]
+
     def test_schema_ref_outdated(self, tmp_path):
         user = tmp_path / "spec.json"
         schema = tmp_path / "spec.schema.json"
@@ -295,6 +313,58 @@ class TestDiffStepFields:
         assert diffs[0].diff_type == DiffType.TYPE_MISMATCH
 
 
+_SCHEMA_DIR = Path(__file__).resolve().parents[3] / "schema"
+
+_LEGACY_CHARTER = {
+    "$schema": "vc:00-charter",
+    "id": "charter",
+    "title": "Charter",
+    "problem_statement": "A legacy charter written against the 1.1.1 shape.",
+    "in_scope": ["billing"],
+    "out_of_scope": ["payroll"],
+}
+
+
+class TestDiffStepFieldsM2Schemas:
+    """The differ reads the top level of a schema (``required`` and ``properties`` merged
+    across ``allOf``, and ``additionalProperties``). The M2 step 00-05 schemas keep their
+    item-level rules inside ``allOf`` and ``unevaluatedProperties``, so item-level and
+    graph-shape changes are invisible to ``align``."""
+
+    def test_diff_step_fields_m2_02a_top_level_only(self, tmp_path):
+        user = tmp_path / "02a_delivery_baseline.json"
+        user.write_text(json.dumps({
+            "$schema": "vc:02a-delivery-baseline",
+            "id": "delivery-baseline",
+            "owner": "ops",
+            "created_at": "2026-01-01T00:00:00Z",
+            "canonical_refs_used": [],
+            "environments": {
+                "dev": {"url": "http://localhost"},
+                "ci": {"runner": "gha"},
+                "staging": {"url": "https://staging.example.com"},
+                "prod": {"url": "https://example.com"},
+            },
+            "ci_gates": ["validate-all"],
+        }))
+        diffs = diff_step_fields(user, _SCHEMA_DIR / "02a_delivery_baseline.schema.json")
+        assert diffs == []
+
+    def test_diff_step_fields_m2_00_in_scope_not_reported_by_top_level_differ(self, tmp_path):
+        """Pins a known limit of the differ (the migration of steps 00-05 does not rely on it)."""
+        user = tmp_path / "00_charter.json"
+        user.write_text(json.dumps(_LEGACY_CHARTER))
+        diffs = diff_step_fields(user, _SCHEMA_DIR / "00_charter.schema.json")
+        assert not [d for d in diffs if d.diff_type == DiffType.EXTRA_FIELD]
+
+    def test_diff_step_fields_m2_00_reports_scope_items_required_by_an_allof_branch(self, tmp_path):
+        user = tmp_path / "00_charter.json"
+        user.write_text(json.dumps(_LEGACY_CHARTER))
+        diffs = diff_step_fields(user, _SCHEMA_DIR / "00_charter.schema.json")
+        missing = {d.path for d in diffs if d.diff_type == DiffType.MISSING_REQUIRED}
+        assert {"scope_items", "owner"} <= missing
+
+
 # ---------------------------------------------------------------------------
 # detect_paradigm_shifts
 # ---------------------------------------------------------------------------
@@ -323,6 +393,9 @@ class TestDetectParadigmShifts:
         shifts = detect_paradigm_shifts(spec_dir, tmp_path)
         detected = [s for s in shifts if s.detected]
         assert detected == []
+
+    def test_a_shift_names_no_prompt_template(self):
+        assert [f.name for f in dataclasses.fields(ParadigmShift)] == ["description", "source_file", "target_file", "detected"]
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +460,7 @@ def _write_good_step16_layout(spec_dir: Path) -> None:
         "id": "anchor-v1",
         "owner": "api",
         "created_at": "2026-02-08T00:00:00Z",
+        "canonical_refs_used": [],
         "artifact_role": "anchor",
         "plan": {},
     }), encoding="utf-8")

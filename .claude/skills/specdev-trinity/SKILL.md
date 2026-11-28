@@ -1,33 +1,27 @@
 ---
 name: specdev-trinity
 description: >
-  Orchestrate trinity phases (16a plan, 16b code-write, 16c code-review) for a milestone batch
-  via --phase plan|impl|review; orchestrates, does NOT author plan artifacts. Plan phase reviews
-  ms_<batch_id>_plan.json then gates on user approval. Impl phase serially executes each group
-  via specdev-trinity-impl + per-group review loop. Review phase runs milestone-wide reviewer +
-  milestone_fix loop. Filesystem-derived state; no schema extensions.
+  Orchestrate the trinity loop of one milestone (16a plan, 16b code-write, 16c code-review) via
+  --phase plan|impl|review. Plan phase creates ms_<batch_id>_plan.json when it is missing
+  (specdev step create 16a), reviews it, gates on user approval and starts the milestone. Impl
+  phase executes each plan item serially via specdev-trinity-impl with a per-item review loop.
+  Review phase runs the milestone-wide reviewer + milestone_fix loop, records the review
+  (specdev review record), asks the person for sign-off and closes the milestone. A person
+  decides sign-off, defer and manual verification; the skill never answers those prompts and
+  writes no spec file by hand.
   Trigger on: "trinity plan", "trinity impl", "trinity review", "/specdev-trinity",
   any /specdev-trinity invocation, "16a", "16b", "16c", "batch <id> plan|impl|review".
 ---
 
 # /specdev-trinity — Trinity Phase Orchestrator
 
-Runs the three phases of the Trinity loop: 16a plan review, 16b code-write implementation,
-16c code-review. Select the phase with `--phase`. Default is `plan`.
-
-**Source spec:** K_agentification.md §11.3, §11.3.1, §11.3.2, §11.5, §11.7, §11.8.
-
-> **Note:** The former `/specdev-trinity-plan` skill has been removed; its plan-phase
-> functionality is now invoked via `/specdev-trinity --phase plan` (this skill). Host repos
-> that vendor the toolkit as a submodule must re-run `init_project.py` after bumping versions
-> to refresh the now-stale `specdev-trinity-plan` skill symlink.
-
----
-
-## Prerequisites
-
-`--phase plan` requires `spec/impl_context/ms_<batch_id>_plan.json` to exist; author it first
-with `/specdev-step 16a`.
+Runs the three phases of the trinity loop for one milestone: 16a plan, 16b code-write, 16c
+code-review. Select the phase with `--phase`; the default is `plan`. The step contracts are
+`prompts/prompt_16a_impl_planner.md`, `prompt_16b_impl_coder.md` and `prompt_16c_impl_reviewer.md`
+(read `docs/prompts/shared_expectations.md` before them). The packs are the spec source of the
+three roles: the session renders the 16a packs when it authors the plan
+(`specdev trace --recipe 16a <task-id>`); `specdev-trinity-impl` and `specdev-trinity-reviewer`
+render their own (`specdev trace --recipe 16b <plan-item-id>`, `specdev trace --recipe 16c <milestone-id>`).
 
 ---
 
@@ -37,33 +31,102 @@ with `/specdev-step 16a`.
 /specdev-trinity <batch_id> --phase plan|impl|review [--auto-advance] [--soft-warn-rounds N]
 ```
 
-- `<batch_id>`: milestone batch identifier (maps to `spec/impl_context/ms_<batch_id>_plan.json`).
-- `--phase`: default `plan`. Selects sub-protocol (see sections below).
-- `--auto-advance`: `--phase impl` only; disables the pause-between-groups (E10). Default off
-  (pause is the default per K2 §11.3.1).
-- `--soft-warn-rounds N`: integer (default 5). Soft-warn threshold for both impl and review
-  loops. Each loop iteration checks `round >= --soft-warn-rounds` and pauses for human gating
-  (E9). Compared with `>=` so soft-warn fires at N and every subsequent round, preventing
-  unbounded looping.
+- `<batch_id>`: the plan file stem (`spec/impl_context/ms_<batch_id>_plan.json`): letters, digits, `_`, `-`.
+- `--phase`: default `plan`. Selects the sub-protocol (see sections below).
+- `--auto-advance`: `--phase impl` only; disables the pause between groups. Default off.
+- `--soft-warn-rounds N`: integer (default 5). Soft-warn threshold for the impl and review
+  loops: each iteration checks `round >= --soft-warn-rounds` and pauses for human gating, at N
+  and every round after it.
+
+---
+
+## The milestone id
+
+Every lifecycle command takes the roadmap milestone id (`ms-...`), never the batch id. Once the
+plan file exists, dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`
+(it runs `specdev milestone-state --batch-id <batch_id>` and returns its JSON) and read the
+`milestone` key ONCE: that value is `<ms-id>` wherever this skill says so. The output's
+`milestone_id` echoes the batch id and is not a milestone id (a batch id given to a milestone
+command is E803).
+
+If `milestone` is `null`, the plan has no `milestone` key (it was written before 1.2.0): stop. Tell
+the operator what the toolkit prints for it, "E803 no plan names milestone <ms-id>: add it with
+`specdev json patch <plan file> '.milestone' '"<milestone-id>"'` (the plan has no `milestone` key)", and that
+on a host not yet migrated to 1.2.0 the migration writes the key (`specdev align apply spec --auto`, a person
+confirms it); the operator runs one of the two or not; do nothing else with that plan.
+
+## Who decides what
+
+The skill runs the loop, `specdev milestone start`, `specdev verify run`, `specdev review record`
+and `specdev milestone close`. A **person** decides:
+
+- **sign-off** (`specdev milestone sign-off <ms-id>`) and **defer**
+  (`specdev milestone defer <ms-id> --reason "<at most 300 characters>"`);
+- whether a **manual-verification action** was carried out (it is then recorded with
+  `specdev plan record <ITEM>/<action-id> --outcome done --note "operator confirmed"`), and whether a
+  **manual fixture** or a **rule enforced by review** was attested (`specdev verify attest <node-id>...`;
+  not `specdev attest`, which re-accepts links);
+- **release**, the cut (`specdev release --tag <name>`): not a step of a milestone's loop; the person
+  runs it and the skill never does.
+
+Before each of them except the release: show `specdev status --milestone <ms-id>` first, ask the person
+in the conversation, and run the command only on an explicit yes. When the host has installed ask rules, Claude Code also
+asks before the command runs; that prompt is the person's and the skill never answers it. The skill
+never runs one of these commands on its own judgement.
+
+## The life of a milestone, in order
+
+1. `specdev milestone-state --batch-id <batch_id>` (the id), then, when the plan is missing,
+   `specdev step ready 16a` and `specdev step create 16a <batch_id> --from <draft>`.
+2. Plan review and approval, then `specdev milestone start <ms-id>`.
+3. Per plan item: `specdev-trinity-impl` (`specdev plan record`, `specdev verify run`) and a review loop.
+4. The milestone-wide review loop.
+5. `specdev verify run --milestone <ms-id> --stage ci`, `specdev verify attest` (a person decides),
+   `specdev review record <ms-id> --verdict verified --findings-file <file>`, `specdev status --milestone <ms-id>`.
+6. `specdev milestone sign-off <ms-id>` (a person decides), `specdev milestone close <ms-id> --check`,
+   `specdev milestone close <ms-id>`.
 
 ---
 
 ## --phase plan (default)
 
-Runs the review-fix loop against a milestone batch plan artifact, then gates on human
-approval. Plan-phase (16a) only.
+Creates the plan when it is missing, runs the review-fix loop against it, then gates on human
+approval and starts the milestone. Plan-phase (16a) only.
 
-**Source spec:** K_agentification.md §5.2, §5.5, §9.
+### Step 1 — Locate or create the plan
 
-### Step 1 — Locate the plan artifact
-
-Verify that `spec/impl_context/ms_<batch_id>_plan.json` exists:
 ```bash
 specdev json structure spec/impl_context/ms_<batch_id>_plan.json
 ```
 
-If the file does not exist, stop: `spec/impl_context/ms_<batch_id>_plan.json` not found —
-run `/specdev-step 16a <batch_id>` to author it first, then re-invoke this phase.
+If the file exists, read `<ms-id>` (section "The milestone id") and go to Step 2. If it does not:
+
+1. Run `specdev step ready 16a --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`.
+   Exit 1 (E773) means a step upstream of the plan has no file, has suspect links or has coverage
+   gaps (the output names which: for example `step 14 (11 blockers); fix the coverage gaps of step 14
+   first`): show the output and stop; the step it names is authored or replayed first
+   (`/specdev-step <NN>`, `/specdev-review <NN>`).
+2. Render the 16a pack of each task of the milestone (`specdev trace <ms-id> --down --kinds task --json`
+   lists the tasks of the roadmap milestone the operator named; `specdev trace --recipe 16a <task-id>`
+   renders one) and follow `prompts/prompt_16a_impl_planner.md`: write the plan as a draft outside
+   `spec/` (`.specdev/drafts/plan_<batch_id>.json`) and create the file with
+   `specdev step create 16a <batch_id> --from .specdev/drafts/plan_<batch_id>.json` (`--dry-run`
+   prints the report and writes nothing). Never write a file under `spec/` yourself. A milestone
+   has one plan file: a second `step create 16a` for it is E767.
+3. When `spec/16_impl_context.json` has no row for the milestone, add it as
+   `prompts/prompt_16_impl_context.md` says (`specdev step create 16` for a missing anchor file;
+   `specdev json insert --step 16 .plan.milestone_index '<row>'` for one more row).
+4. `specdev spec-check spec --step 16a` must report `RESULT: CLEAR`. Then read `<ms-id>` and go on.
+
+**Re-plan.** A 16a re-plan edits the existing plan by id (`prompt_16a` Output Rules). Afterwards run
+`specdev attest <item-id> --yes` for each new item and each item whose `realises` changed (E761 names a
+missing lock entry), and `specdev plan record --prune <ms-id>` only when `specdev spec-check` reports a
+record (E700 on a `rec-NNNN`) whose item is gone. `--prune` also removes a record whose action is gone
+from an item that still exists; nothing reports that one (no E700), so prune after deleting an action
+that had a record. An upstream edit after approval makes links on
+the plan's chain suspect: `specdev status --milestone <ms-id>` and `specdev milestone start` (E800) list
+them and the close gate blocks on them (E763); the step authors replay what `specdev stale` lists, and
+then the plan's links are attested again.
 
 ### Step 2 — Review-fix loop
 
@@ -85,24 +148,27 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
    reviewers from fan-out). Pass the plan artifact path and scope per reviewer:
    ```json
    {
-     "steps": ["ms-<batch_id>-plan"],
+     "steps": ["16a"],
      "scope_kind": "plan_artifact",
      "reviewer_id": "<reviewer_id from fan_out[]>",
      "round": <current_round>,
      "scope": "ms-<batch_id>-plan",
-     "flags": { "with_replay": false, "with_backlog": false },
+     "flags": { "with_backlog": false },
      "artifact_path": "spec/impl_context/ms_<batch_id>_plan.json"
    }
    ```
+   `steps` is `["16a"]`, the step of a plan file: the reviewer runs its step gate as
+   `specdev spec-check spec --step 16a`. `scope` names the plan and is used in the findings file name.
 
    Each reviewer writes to:
-   `.specdev/findings/findings_ms-<batch_id>-plan_<round>_r<reviewer_id>.json`
+   `.specdev/findings/findings_ms-<batch_id>-plan_<round>_<reviewer_id>.json`
 
-   (Ensure directory exists once: `mkdir -p .specdev/findings`.)
+   Once: `mkdir -p .specdev/findings`. Before the reviewers of a round are dispatched, remove what an earlier run left for this plan and round, so that the merge in 2b sees only the files of this run: `rm -f .specdev/findings/findings_ms-<batch_id>-plan_<round>_r*.json .specdev/findings/findings_ms-<batch_id>-plan_<round>.json`
 
-   **2b. Merge with the jq one-liner** (K_agentification.md §5.4, paths per §11.7):
+   **2b. Merge with the jq one-liner** (the merged file keeps `"$schema": "vc:infra:findings"`; without it
+   `specdev validate` gives E520 and `review record` refuses the file):
    ```bash
-   jq -s '{round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
+   jq -s '{"$schema": "vc:infra:findings", round: .[0].round, scope: .[0].scope, generated_at: (now | floor), findings: (map(.findings) | add | unique_by({kind, location, signature}))}' \
      .specdev/findings/findings_ms-<batch_id>-plan_<round>_r*.json > .specdev/findings/findings_ms-<batch_id>-plan_<round>.json
    ```
 
@@ -114,10 +180,10 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    After Agent returns (blocker handling — canonical contract: `specdev-impl.md` § "Blocker emission protocol"):
    1. Parse return JSON.
-   2. If `status != "blocker"`: check `gate_status` and `errors_remaining`; carry forward.
+   2. If `status != "blocker"`: check `gate_status`; `errors_remaining` are not dispatched again (the next round's reviewers raise what is still true). A finding in neither `findings_closed` nor `findings_open` counts as open. Check one write per closed finding as `/specdev-review` does (its step 2 of "After Agent returns"), then print `Round <N>: <C> findings closed by <E> edits, <O> open.`
    3. If `status == "blocker"`:
       a. Validate shape: `questions[]` non-empty; each has `{id, question, header, options[2..4]}`.
-         If malformed → HALT and surface to user (do NOT re-dispatch on a malformed payload).
+         If malformed → set verdict = "HALT (blocker unresolved): malformed blocker payload" and surface to user (do NOT re-dispatch on a malformed payload).
          Malformed includes: `questions[]` empty, any entry missing required fields, edits
          written AND `status: "blocker"` simultaneously (timing-constraint violation).
       b. Persist: `mkdir -p .specdev/blockers/` then write
@@ -125,7 +191,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
       c. Chunk questions ≤4. Call `AskUserQuestion` once per chunk, sequentially.
          Collect answers keyed by `question.id`.
          If the user dismisses or does not answer an AskUserQuestion call (empty answer set
-         returned), HALT immediately. Surface: "Blocker unresolved: user did not answer
+         returned), HALT immediately. Surface: "HALT (blocker unresolved): user did not answer
          clarification questions. Re-invoke /specdev-trinity <batch_id> --phase plan to retry."
          Write a HALT artifact noting `aborted_by_user` to
          `.specdev/blockers/blocker_ms-<batch_id>-plan_aborted_<unix_ts>.json`.
@@ -133,15 +199,19 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
       d. Build re-dispatch prompt: original fix dispatch input verbatim
          + `## User answers (from blocker bridge)` section listing each
            `{id, question, selected_label, selected_description, user_notes_if_any}`
-         + `## Context from prior dispatch` section (agent's `context` field).
+         + `## Context from prior dispatch` section (agent's `context` field)
+         + for an answer whose question has an `owner` other than `this-step` (a step id or
+           `seed`): the instruction NOT to apply it to the plan and to record it as an open item in
+           `.plan.ambiguities` of `spec/impl_context/ms_<batch_id>_plan.json` (`description`,
+           `about` = the question's `about` ids, `decision` = the chosen label), with the plan-file
+           forms of `specdev-impl.md` § "Answers that another step or a seed owns".
       e. Increment `blocker_round` counter (per-dispatch-site, scoped to a single subagent
          dispatch chain; starts at 0 on first dispatch; cap = 2 re-dispatches (counter values
          0, 1, 2); does not persist across skill invocations; resets to 0 at the start of each
          new outer review-fix round (R1/R2/.../R5)).
-      f. If `blocker_round > 2`: HALT, surface to user (persistent blocking — no auto-retry).
+      f. If `blocker_round > 2`: set verdict = "HALT (blocker unresolved): blocker_round exceeded 2", surface to user (persistent blocking — no auto-retry).
       g. Fresh Agent dispatch with augmented prompt. Continue from step 1.
-      Note: lossy re-dispatch — accepted cost; user answers are the ONLY persistence across
-      the bridge. SendMessage-based clean resumption is deferred.
+      Note: re-dispatch is lossy; user answers are the ONLY persistence across the bridge.
       Note: the Step 3 human gate (proceed/replay/abort) fires AFTER the entire review-fix
       loop exits, regardless of whether blockers occurred mid-loop. The blocker AskUserQuestion
       and the human gate AskUserQuestion are independent mechanisms.
@@ -157,7 +227,7 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    Print:
    ```
-   HALT: max_rounds=5 reached with unresolved findings.
+   HALT at round 5: max_rounds=5 reached with unresolved findings.
    Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json
    Finding count: <N> (<P0_count> P0, <P1_count> P1, <P2_count> P2)
    Human action required: proceed-with-gaps | replay | hand-edit then re-invoke /specdev-trinity <batch_id> --phase plan
@@ -165,17 +235,17 @@ Run the review-fix loop on the plan artifact using the same protocol as `/specde
 
    Do not silently accept partial convergence. HALT is a first-class verdict.
 
-   Set verdict = "HALT (N unresolved findings)". Proceed to Step 3 regardless (HALT is a valid verdict to gate on).
+   Set verdict = "HALT at round 5". Proceed to Step 3 regardless (HALT is a valid verdict to gate on).
 
-### Step 3 — Human gate (K_agentification.md §5.5)
+### Step 3 — Human gate
 
 After the loop returns a verdict (CONVERGED or HALT), present an `AskUserQuestion` with
 three options:
 
 ```
 Plan phase review complete.
-Verdict: <CONVERGED at round N | HALT at round 5 with N findings remaining>
-[On HALT: Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json]
+Verdict: <CONVERGED at round N | HALT at round 5 (N findings remain) | HALT (blocker unresolved): <reason>>
+[On HALT at round 5: Findings path: .specdev/findings/findings_ms-<batch_id>-plan_5_<unix_timestamp>.json. A HALT (blocker unresolved) has no findings file; the blocker is under .specdev/blockers/]
 
 How would you like to proceed?
 A) Proceed — accept the plan and continue to downstream phases.
@@ -183,11 +253,15 @@ B) Replay — re-run the review-fix loop from round 1 (fresh state, no prior fin
 C) Abort — stop here; plan requires substantial rework before proceeding.
 ```
 
-**On Proceed:** Return the verdict. Downstream 16b/16c are handled by
-`/specdev-trinity --phase impl` and `/specdev-trinity --phase review`. This skill's job is complete.
+**On Proceed:** run `specdev milestone start <ms-id> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
+(pending or deferred becomes `in_progress`; a milestone already in progress is left as it is, exit 0). If it
+refuses with E800 (no anchor row for the milestone, the milestone is done, or suspect links on its chain),
+show the message and the owner-tagged lines under it and stop: the replay it names clears it, then start
+again. On success return the verdict. Downstream 16b/16c are handled by `/specdev-trinity --phase impl` and
+`/specdev-trinity --phase review`.
 
 **On Replay:** Re-run the loop from Step 2 (round 1, fresh state). Prior findings files
-are NOT consulted — the reviewer sees the artifact's current state (K_agentification.md §5.6).
+are NOT consulted — the reviewer sees the artifact's current state.
 
 **On Abort:** Return. The user will rework the plan artifact manually before re-invoking.
 
@@ -195,21 +269,22 @@ are NOT consulted — the reviewer sees the artifact's current state (K_agentifi
 
 ## --phase impl
 
-**Semantics deviation from K1 (deliberate):** K1 §3 sets `max_rounds=5` as a hard cap with
-HALT as a first-class verdict. K2 `--phase impl` replaces this with **no hard cap,
-soft-warn-at-N (default 5)** with explicit user gating to continue. Spec-phase agents
-(`/specdev-review`, `/specdev-step`) continue to enforce K1's hard cap; only the code-phase
-trinity uses soft-warn semantics. Rationale: `ms_phase2_newsletter_send` showed real code-phase
-groups legitimately needing >5 rounds (K2 §11.3.1).
-
-**Source spec:** K_agentification.md §11.3.1.
+The spec-phase loops (`/specdev-review`, `/specdev-step`) have a hard cap of five rounds. The code-phase
+loops have **no hard cap: soft-warn at N (default 5)** with explicit user gating to continue, because
+real code-phase groups can legitimately need more rounds.
 
 ### Pre-flight
 
-1. Dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`.
-2. Parse `groups[]` and `derived_phase_position` from the output.
-3. Identify unresolved groups: groups in state `{pending}` (and `executing` if observed).
-   Groups in `{code_converged, blocked, verified, deferred, wont_do}` are skipped.
+1. Dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`. Read
+   `<ms-id>` (`milestone`), `groups[]` and `derived_phase_position` from the output.
+2. Run `specdev status --milestone <ms-id>`: its first line must be `milestone <ms-id>: in_progress`.
+   Otherwise print `REFUSED: milestone <ms-id> is <status>; approve the plan with /specdev-trinity <batch_id>
+   --phase plan (that starts the milestone)` and exit; when `status` itself refuses with E800 (the anchor row
+   is missing; exit 1) show that message and stop, it names the row to add; for `done` print instead `REFUSED: milestone
+   <ms-id> is done: it is closed and is not started again` (`milestone start` of a done milestone is E800).
+3. Identify unresolved groups: groups in state `pending`. Groups in `{code_converged, blocked, deferred,
+   wont_do}` are skipped; list each `blocked` group with its `blocking_amb_ids` (open items of the plan about a
+   node of the item's chain) for the operator.
 4. Compute `milestone_start_ref` once before the first group dispatch:
    ```bash
    milestone_start_ref=$(git rev-parse HEAD)
@@ -221,7 +296,7 @@ groups legitimately needing >5 rounds (K2 §11.3.1).
 ### Per-group serial loop (in plan order)
 
 For each unresolved group (serial — not parallel; inter-group file-overlap dependencies make
-serial ordering safe per K2 §11.3.1):
+serial ordering is safe):
 
 **1. Execute**
 
@@ -234,7 +309,21 @@ Dispatch `specdev-trinity-impl` with:
   "batch_id": "<batch_id>"
 }
 ```
-This applies the group's `implementation.actions[]` to host source code.
+The agent applies the group's `implementation.actions[]` to host source code and records each carried-out
+action with `specdev plan record` (an action that names a verifier is proven by `specdev verify run`,
+not recorded). It writes no spec file. Its return carries `recorded`, `awaiting_confirmation`,
+`skipped_at_deploy`, `gate_status`, `errors_remaining` and `ambiguities_raised`:
+
+- `awaiting_confirmation` lists manual-verification actions the agent could not record. Ask the person whether
+  each was carried out (show `specdev status --milestone <ms-id>` first); on an explicit yes run
+  `specdev plan record <group_id>/<action-id> --outcome done --note "operator confirmed"`; on no leave it
+  unrecorded and say the item stays not executed.
+- `skipped_at_deploy` lists actions marked `at_deploy`: nothing to do here (they hold nothing up; a deploy job
+  records them with `plan record --at-deploy`).
+- `errors_remaining` holding a refusal (E820 closed milestone, E821 unknown item or action): show it and stop.
+- `ambiguities_raised` are open items `{id, description, about}` the agent already wrote into the plan. List them
+  at the pause. They block the item until the operator answers them upstream and deletes each with
+  `specdev json delete --id <amb-id>`; never edit them away otherwise.
 
 **2. Inner review-fix loop (no hard cap; soft-warn at `--soft-warn-rounds`, default 5)**
 
@@ -245,7 +334,7 @@ repeat:
 
   Dispatch specdev-trinity-reviewer with:
   {
-    "milestone_id": "ms_<batch_id>",
+    "milestone_id": "<ms-id>",
     "batch_id": "<batch_id>",
     "group_id": "<group_id>",
     "scope_kind": "code_phase_group",
@@ -294,12 +383,11 @@ repeat:
 
 **3. After group converges or HALTs**
 
-- Do NOT flip `implementation.status` — it stays `pending` throughout impl + review phases per
-  E11 / §11.5. Operator flips to `verified` after deploy + live verification.
-- Do NOT write to `plan.trinity_execution` — not a schema field this session per session decision.
-- Convergence marker is the empty-findings file itself (written by `specdev-trinity-reviewer`).
+- The convergence marker is the empty-findings file itself (written by `specdev-trinity-reviewer`);
+  `specdev milestone-state` shows the group as `code_converged`. Nothing is written to the plan or the
+  anchor row here.
 
-**4. Pause for user inspection** (default; `--auto-advance` disables per E10).
+**4. Pause for user inspection** (default; `--auto-advance` disables it).
 
 ### After all groups processed
 
@@ -316,25 +404,33 @@ design (AskUserQuestion is reserved for HALT gating).
 
 ## --phase review
 
-Milestone-wide convergence sweep. Re-runnable: always fresh round 1
-(K §5.6 fresh-resume invariant carries forward). New empty-findings file written each
-successful run; prior files stay as audit trail.
-
-**Source spec:** K_agentification.md §11.3.2.
+Milestone-wide convergence sweep, then the close sequence. Re-runnable: always fresh round 1. A new
+empty-findings file is written each successful run; prior files stay as audit trail.
 
 ### Pre-flight
 
-1. Dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`.
-2. Check `derived_phase_position`.
-3. Refuse if `derived_phase_position` is not in `{impl_complete, review_pending, review_complete}`.
-   (Refuse if any active (non-deferred, non-wont_do) group is in `pending` state — impl must complete first.)
+1. Dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`; read `<ms-id>`
+   (`milestone`) and `derived_phase_position`.
+2. Run `specdev status --milestone <ms-id>`: its first line must be `milestone <ms-id>: in_progress`.
+3. Refuse if `derived_phase_position` is not in `{impl_complete, review_pending, review_complete}` or the status
+   is not `in_progress`. (An active group in `pending` state means impl must complete first; `closed` means the
+   milestone is already closed; `operator_pending` means the review converged and an open item of the plan
+   still blocks a group.)
 
-   Print refusal:
+   Print refusal (every position but `operator_pending`):
    ```
-   REFUSED: --phase review requires impl_complete or later phase position.
+   REFUSED: --phase review requires the phase position impl_complete, review_pending or review_complete.
    Current state: <derived_phase_position>
    Pending groups: <list of group_ids with state=pending>
    Action: Run /specdev-trinity <batch_id> --phase impl to completion first.
+   ```
+   Print refusal (`operator_pending`):
+   ```
+   REFUSED: an open item of the plan blocks a group; the review cannot close the milestone.
+   Current state: operator_pending
+   Blocked groups: <group_id: blocking_amb_ids, for each group whose blocking_amb_ids is not empty>
+   Action: answer each open item in the step that owns its node, delete the item
+   (specdev json delete --id <amb-id>), then run /specdev-trinity <batch_id> --phase review again.
    ```
    Exit.
 4. Compute `milestone_start_ref` once before the first review round:
@@ -354,24 +450,25 @@ repeat:
 
   Dispatch specdev-trinity-reviewer with:
   {
-    "milestone_id": "ms_<batch_id>",
+    "milestone_id": "<ms-id>",
     "batch_id": "<batch_id>",
     "scope_kind": "code_phase_milestone",
-    "scope": "<batch_id>",
+    "scope": "<ms-id>",
     "round": <round>,
     "reviewer_id": "r1",
     "plan_path": "spec/impl_context/ms_<batch_id>_plan.json",
     "milestone_start_ref": "<milestone_start_ref>"
   }
-  → writes .specdev/findings/findings_<batch_id>_review_<round>_r1.json
+  → writes .specdev/findings/findings_<ms-id>_<round>_r1.json  (its `scope` is the milestone id)
 
-  (Single reviewer per round per code_phase_milestone; per-reviewer file IS the merged file:)
-  cp .specdev/findings/findings_<batch_id>_review_<round>_r1.json \
+  (Single reviewer per round per code_phase_milestone; the per-reviewer file IS the merged file. Copy it to
+   the name `specdev milestone-state` reads for the milestone-wide review:)
+  cp .specdev/findings/findings_<ms-id>_<round>_r1.json \
      .specdev/findings/findings_<batch_id>_review_<round>.json
 
   If findings == [] → CONVERGED; exit loop
     Convergence marker = .specdev/findings/findings_<batch_id>_review_<round>.json
-    (the empty-findings file itself is the convergence signal)
+    (the empty-findings file of the newest round is the convergence signal; `milestone-state` shows `review_complete`)
 
   If round >= --soft-warn-rounds:
     Write HALT artifact:
@@ -395,6 +492,7 @@ repeat:
   {
     "mode": "milestone_fix",
     "findings_path": ".specdev/findings/findings_<batch_id>_review_<round>.json",
+    "milestone_id": "<ms-id>",
     "batch_id": "<batch_id>",
     "plan_path": "spec/impl_context/ms_<batch_id>_plan.json"
   }
@@ -404,149 +502,98 @@ repeat:
 
 ### After convergence
 
-**On CONVERGED:** perform evidence synthesis and write the `review` block automatically
-(no gate before the verdict write). Then present the operator gate for anchor/roadmap sync.
+The converged file is `.specdev/findings/findings_<batch_id>_review_<round>.json` of the last round: it carries
+`"$schema": "vc:infra:findings"`, `scope` the milestone id and an empty `findings` list. The tree must not
+change between (1) and (6): a code edit after (1) sends the loop back to (1), because the evidence of
+`verify run` is tied to the code tree (a changed tree is E811 `STALE_TREE`). The code tree counts every
+untracked file that git does not ignore (the spec folder and the seed documents are left out), so after (1)
+nothing is written into the repository outside the spec folder before `specdev milestone close` (a findings file written under `.specdev/` after `verify run` moved the tree on
+a host that does not ignore `.specdev/`: `status` then listed both bindings `STALE_TREE`); write the
+findings file first, as the loop above does.
 
-#### Step C1 — Read checklist evidence
+0. The milestone's code must be committed (the close gate reads tracked files: E746). The skill never
+   commits: if `git status` shows the milestone's files uncommitted, ask the operator to commit them now.
+1. `specdev verify run --milestone <ms-id> --stage ci` runs the dev and ci bindings of the milestone and
+   writes their evidence on the final tree. A `FAIL` line (exit 1) is not a findings file: send it back to the
+   milestone-wide review loop (the reviewer's `specdev verify run --milestone <ms-id> --stage ci --no-record`
+   spot-check turns it into a finding, and `milestone_fix` takes that), then start again from (1).
+2. `specdev status --milestone <ms-id>`. Each line under "manual share" that reads
+   "not attested; `specdev verify attest <node>`" is a manual fixture or a rule enforced by review: ask
+   the person whether it was carried out and, for each yes, run `specdev verify attest <node-id>...`.
+3. `specdev review record <ms-id> --verdict verified --findings-file .specdev/findings/findings_<batch_id>_review_<round>.json`.
+4. `specdev status --milestone <ms-id>` again: its close-gate dry run lists what is still owed; only
+   E814 (no sign-off) should remain.
+5. Ask the person for the sign-off (the status of (4) is what they decide on). On an explicit yes run
+   `specdev milestone sign-off <ms-id>`. If the code changed after a sign-off, show the status again (it
+   prints each sign-off with its tree next to the code tree now) and ask whether it still stands.
+6. `specdev milestone close <ms-id> --check` prints `the close gate passes; nothing written` or the
+   errors that are still owed; then `specdev milestone close <ms-id>`. Afterwards `milestone-state` shows
+   `derived_phase_position: closed` and `plan record` on this milestone is E820 (the plan is frozen).
 
-```bash
-specdev json read spec/impl_context/ms_<batch_id>_plan.json '.plan.spec_alignment.checklist[]'
-```
+| Outcome | Commands | Left on disk |
+|---|---|---|
+| converged | (1) to (6) | `review` block `verified`, evidence and attestation records, sign-off record, anchor row `done` with its close record, frozen plan |
+| not converged (the operator halts at the soft-warn gate) | `specdev review record <ms-id> --verdict needs_work --findings-file <the timestamped halt copy>`; no sign-off, no close | `review` block `needs_work` (the next `review record` replaces it), the findings files under `.specdev/findings/`, anchor row `in_progress` |
+| close refused | print the errors by owner and stop; see the next section | the sign-off record stays; the anchor row stays `in_progress` |
+| re-plan (16a again) | the "Re-plan" rule of the plan phase, then 16b and 16c again | the old `review` block until the next `review record` replaces it |
 
-Data source is `actions[].evidence` in the plan artifact — NOT the convergence findings file
-(which carries no schema data, only the empty-findings signal).
+`--phase review` is re-runnable: always fresh round 1.
 
-#### Step C2 — Derive `review` fields
+## When a command refuses
 
-**`fixture_status`** — `implemented_interfaces: []`, `test_results: []`, plus:
-- `ci_status: "green"` — derived from ANCHORED evidence signals in `actions[].evidence.content`
-  across all FR-linked checklist items. NOT a loose substring match.
+Show the message as printed (and the owner-tagged lines under it), say what it means and run what clears it; a
+refusal is never answered by writing a spec file.
 
-  **Anchored-match rule (AC7 invariant):**
-  1. Failure signals (any present in any FR-linked action ⇒ `ci_status: "red"`; HALT):
-     `FAIL`, `FAILED`, `ERROR`, non-zero-exit indicator.
-  2. Anchored success signal (required per FR-linked item; absence ⇒ HALT):
-     - `^(pytest|tests?|ci|suite)\b.*\bPASS(ED)?\b` — test-runner context + PASS/PASSED
-     - OR `\b[1-9]\d*\s+pass(ed)?\b` — explicit "N passed" counter (N ≥ 1; "0 passed" is not a success)
-     - OR `\bexit\s+0\b` — explicit exit-code token
-  3. Decoy evidence that must NOT satisfy the check: `"BYPASSED"` (no anchored signal),
-     `"PASSED 0 of 3 suites"` (0 tests actually passed), `"compile PASS / tests FAIL"`
-     (failure signal present). These are the exact AC7 regression cases.
-
-  HALT with a clear error naming the evidence gap if any FR-linked item lacks an anchored
-  success signal, shows a failure signal, or is ambiguous — do NOT fabricate green.
-
-  **Status-deviation note (RB-WI8-A2):** In the agentified trinity flow,
-  `implementation.status` remains `pending` (§11.5 — operator flips to `verified` after
-  deploy + live verification). Therefore prompt_16c §4b criterion 2
-  (`status == "verified"`) CANNOT be met literally for agentified runs. `satisfied: true`
-  and `ci_status: "green"` are derived from ANCHORED evidence signals in
-  `actions[].evidence.content`, NOT from `implementation.status`. A future reader must NOT
-  "fix" this back to a literal status check — `status: "pending"` is correct and deliberate
-  in the agentified flow.
-
-**`semantic_review.fr_coverage`** — one entry per distinct FR referenced in the checklist.
-  Two-branch filter (apply in order; HALT only if neither yields ≥1 entry):
-  - **PRIMARY:** `spec_ref.type == "fr"` → `fr_id = spec_ref.id`.
-    Real plans use `type="fr"` with kebab IDs (confirmed against fixtures); this is the
-    normal path.
-  - **DEFENSIVE:** `spec_ref.type == "doc" AND spec_ref.id == "vc:04-fr-list"` →
-    contribute an entry ONLY when a resolvable kebab fr_id is derivable from the item's
-    context (e.g., `description`, `milestone_ref`). If none is derivable, SKIP the item —
-    do NOT fabricate an fr_id. Schema requires `^[a-z0-9]+(?:-[a-z0-9]+)*$`; a
-    non-kebab or fabricated id is invalid and will fail spec-check.
-
-  Per entry: `fr_id`, `satisfied: true` iff an anchored success signal is present (same
-  rule as ci_status above), `evidence_summary` ≥20 chars from `actions[].evidence.content`,
-  `checklist_ids` from matched items.
-
-**`semantic_review.hallucinated_features`**: `[]` — empty asserts no untraced behavior.
-
-**`review.ratings`**: default all five scores to 3; adjust upward on strong PASS evidence.
-
-**`review.findings`**: `[]` (convergence = empty).
-
-**`review.verdict`**: `"verified"` (per D-VERDICT; do NOT use `code_review_complete` or
-  any invented value).
-
-Write the complete `review` object atomically:
-```bash
-specdev json patch spec/impl_context/ms_<batch_id>_plan.json '.review' '<review-json>'
-```
-Confirm with spec-check after write:
-```bash
-specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-
-**On HALT (review non-convergence or evidence failure):** write non-empty `review.findings`
-(the HALT round's findings, or the named evidence gap) before exit:
-```bash
-specdev json patch spec/impl_context/ms_<batch_id>_plan.json '.review.findings' '<findings-json>'
-```
-Do NOT write `review.verdict`. Do NOT update anchor or roadmap files. Exit with HALT verdict.
-
-#### Step C3 — Operator gate (anchor/roadmap sync)
-
-After the `review.verdict` write, present AskUserQuestion:
-```
-Review converged. Update anchor and roadmap to done? (Y/N)
-```
-- On **Y**: patch three files:
-  - `spec/16_impl_context.json` → `plan.milestone_index[<this milestone>].status = "done"`
-  - `spec/14_roadmap.json` → corresponding milestone `status = "done"`
-  - `spec/09_impl_plan.json` → corresponding milestone `status = "done"`
-- On **N**: leave as-is.
-
-This gate is deliberate and distinct from the "no AskUserQuestion at phase boundary" note in
---phase impl (which applies only to the impl→review phase transition). This AskUserQuestion
-appears within --phase review post-convergence and is a required operator checkpoint.
-
-- Do NOT write to `plan.trinity_review` — not a schema field this session.
-- Convergence marker is the empty-findings file at
-  `.specdev/findings/findings_<batch_id>_review_<round>.json`.
-- `implementation.status` stays `pending` (operator phase pending — §11.5). Operator flips
-  to `verified` after deploy + live verification.
-- EXIT — return CONVERGED or HALT verdict.
-
-### Re-runnability
-
-`--phase review` is re-runnable: always fresh round 1 (K §5.6 fresh-resume invariant).
-New empty-findings file written each successful run; prior files stay as audit trail.
+| Code | It means | What clears it |
+|---|---|---|
+| E800 (`milestone start`) | no anchor row for the id, the milestone is done, or suspect links on its chain | add the row with the `specdev json insert --step 16 .plan.milestone_index '<row>'` the message prints (a real prefix and summary in place of its placeholders; plan phase, Step 1; the milestone must be in the roadmap); a done milestone stays done; for suspect links the step authors replay what `specdev stale` lists, then start again |
+| E803 | a batch id was given, or no plan names the milestone | use the `milestone` value of `milestone-state`; a plan with no `milestone` key stops the skill |
+| E810 | a task criterion has no plan item that realises it | a 16a re-plan adds the item, then 16b and 16c again |
+| E811 | a criterion is unproven (`NO_EVIDENCE`, `STALE_TREE`, `STALE_HASH`, or the verifier has no binding) | `specdev verify run <binding> --stage dev` as printed, or step (1); a missing binding is `specdev verify bind <verifier-id> --command CMD --guard REGEX`, an author's decision: ask |
+| E812 | a plan item is not executed | `--phase impl` for the item (`specdev plan record`) |
+| E813 | no review is recorded, or its verdict is not `verified` | the review loop, then `specdev review record <ms-id> --verdict verified ...` |
+| E814 | no sign-off record | ask the person for the sign-off |
+| E746 | a scaffold row names a file that is not tracked | ask the operator to commit the file |
+| E632 | an open item is still in the plan | the operator answers it upstream and deletes it: `specdev json delete --id <amb-id>` |
+| E763 | a suspect link on the milestone's chain | the step authors replay what `specdev stale` lists, then `specdev attest <node-id> --yes`; then again from (1) (the attest changes hashes) |
+| E820 | the plan is frozen (the milestone is closed) | nothing; no record can be written |
+| E821 | the address names no item or action | the message lists the item's actions: use one of those ids; an item with no action at all is a planner's gap: the message names the `specdev json insert --id <item> .implementation.actions '<action>'` that adds one (a 16a re-plan), then record it |
+| E822 | the action names a verifier | its proof is `specdev verify run <binding>`, not a record |
+| E823 | the findings file is invalid | `specdev validate <file> --repo-root ./devspec_toolkit`, fix the file (`"$schema": "vc:infra:findings"`), record again |
+| E767 | a second plan file for the milestone | edit the plan by id (`specdev json patch\|insert\|delete --id`) |
 
 ---
 
 ## Flag discipline
 
-Three-flag protocol for all validation/governance commands:
+Three-flag protocol for every command this skill runs except the two below:
 ```
 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
+That covers `milestone` (`start`, `defer`, `sign-off`, `close`), `plan record`, `review record`, `status`,
+`verify` (`run`, `bind`, `attest`), `step`, `trace`, `attest`, `stale`, `spec-check` and `milestone-state`.
 
-`specdev json` read/shape/edit subcommands: pass `--repo-root` only.
-Exception: `specdev json resolve-pointers` accepts `--git-root`.
-`canon-accept`: pass `--git-root`, NOT `--spec-root`.
+`specdev json` read/shape/edit subcommands and `specdev validate`: pass `--repo-root` only.
 
-Never read `spec/*.json` directly. Use `specdev json read` with a filter.
+Never read `spec/*.json` directly. Use `specdev json read` with a filter or a pack.
 
 ---
 
 ## What this skill does NOT do
 
-- Does not author the plan artifact from scratch. The plan must already exist at
-  `spec/impl_context/ms_<batch_id>_plan.json` before invoking any phase.
-- Does not commit changes. User authorizes commits separately.
-- Does not accept `--with-replay` or `--with-backlog` flags for `--phase plan` (plan artifacts
-  are not subject to forward-replay in the same sense as spec steps).
+- Does not write a file under `spec/` by hand: a new plan is `specdev step create 16a`, records are
+  `specdev plan record`, the `review` block is `specdev review record`, a milestone's status is
+  `specdev milestone start|defer|close`.
+- Does not decide sign-off, defer, a manual action or a manual attestation, and never answers the prompt of
+  one (section "Who decides what").
+- Does not commit changes. The operator authorizes commits separately.
+- Does not run `step ready` for the code phase (16b, 16c): the gate that opens it is `milestone start` and
+  the gate that ends it is the close gate.
 - Does not silently accept partial convergence. HALT is a first-class verdict that gates on
   human decision.
 - Does not auto-advance between phases. After `--phase impl` exits, the user manually invokes
   `/specdev-trinity <batch_id> --phase review`.
-- Does not write to `plan.trinity_execution` or `plan.trinity_review` — these are proposed
-  schema extensions (K2 §13 Day 1) that have NOT landed in this session. Convergence state is
-  encoded entirely by the filesystem under `.specdev/findings/`.
-- Does not flip `implementation.status` to `verified`. That is operator-driven (§11.5).
 - Does not run impl group reviewers in parallel within a round. Code-phase groups are serial
-  (E1: inter-group file-overlap dependencies; K2 §11.3.1).
-- Does not skip AskUserQuestion on a blocker payload (--phase plan only; --phase impl and
-  --phase review are outside alpha scope). Blocker questions must be presented to the user via
-  the harness before re-dispatching.
+  (inter-group file-overlap dependencies).
+- Does not skip AskUserQuestion on a blocker payload (`--phase plan` only). Blocker questions must be
+  presented to the user via the harness before re-dispatching.

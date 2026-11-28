@@ -1,741 +1,475 @@
 """Unit tests for tools/specdev_tools/context/milestone_state.py.
 
 Covers:
-- Per-group state derivation: pending, code_converged, blocked, verified, deferred
+- Per-group state derivation: pending, code_converged, blocked, deferred, wont_do
+- ``deferred`` / ``wont_do`` read from the ``disposition`` of the tasks a plan item realises, ``blocked`` from an open
+  item about a node on the item's chain, ``closed`` from the anchor row (the spec graph is the worked example)
 - Derived phase position transitions: pending, impl_in_progress, impl_complete,
   review_pending, review_complete, operator_pending, closed
-- Mandatory keystone: implementation.status=="verified" => group state "verified"
-  => (all non-deferred verified) => milestone "closed"
-- well_formed: severity-present + description-present true/false cases
-- Filesystem robustness: non-dict findings file skipped
+- Findings-file logic: per-reviewer, round-output and halt-archive shapes; a non-dict file is skipped
+- The module reads neither ``checklist_status`` nor ``implementation.status``
 
-All filesystem probes use pytest ``tmp_path`` fixtures with synthetic
-``.specdev/findings/`` directories — no host filesystem access.
+Findings probes use pytest ``tmp_path`` folders with a synthetic ``.specdev/findings/``; the spec side is a copy of
+the worked example under ``tmp_path``.
 """
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 
+import pytest
+
+from specdev_tools.context import milestone_state
 from specdev_tools.context.milestone_state import (
+    ItemView,
+    SpecView,
     compute_milestone_state,
     derive_group_state,
     derive_phase_position,
+    load_spec_view,
 )
+from unit.graph._synth import run_cli
+from unit.lifecycle._support import ANCHOR, edit_row, example_spec, load, toolkit_root
+
+ITEM = "PWRESET_CONFIRM_EXPIRED_01"
+PLAN = "impl_context/ms_account_recovery_plan.json"
+ROADMAP = "14_roadmap.json"
+EXPIRED_CRITERION = "tc-confirm-expired-token"
+REUSED_CRITERION = "tc-confirm-reused-token"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _write_findings(findings_dir: Path, filename: str, findings: list) -> Path:
-    """Write a synthetic findings file and return its path."""
-    path = findings_dir / filename
-    data = {
-        "round": 1,
-        "scope": "test-scope",
-        "generated_at": 1700000000,
-        "findings": findings,
-    }
-    path.write_text(json.dumps(data), encoding="utf-8")
+def _findings_dir(tmp_path: Path) -> Path:
+    path = tmp_path / ".specdev" / "findings"
+    path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def _make_group(
-    group_id: str,
-    impl_status: str = "in_progress",
-    checklist_status: str = "active",
-    fixture_ref: str | None = None,
-) -> dict:
-    """Build a minimal checklist group dict."""
-    g: dict = {
-        "id": group_id,
-        "checklist_status": checklist_status,
-        "implementation": {"status": impl_status},
-    }
-    if fixture_ref is not None:
-        g["fixture_ref"] = fixture_ref
-    return g
+def _write_findings(findings_dir: Path, filename: str, findings: list) -> Path:
+    """Write a synthetic findings file and return its path."""
+    path = findings_dir / filename
+    path.write_text(
+        json.dumps({"round": 1, "scope": "test-scope", "generated_at": 1700000000, "findings": findings}), encoding="utf-8"
+    )
+    return path
 
 
-def _make_plan(checklist: list[dict], ambs: list[dict] | None = None) -> dict:
-    """Build a minimal plan dict."""
+def _group(group_id: str = "G1") -> dict:
+    return {"id": group_id, "realises": ["tc-x"]}
+
+
+def _converge(findings_dir: Path, group_id: str) -> None:
+    _write_findings(findings_dir, f"findings_{group_id}_1.json", [])
+
+
+def _state_of(group: dict, findings_dir: Path, ambiguities: list[dict] | None = None, view: ItemView = ItemView()) -> dict:
+    return derive_group_state(group, str(findings_dir), ambiguities or [], view)
+
+
+def _group_state(group_id: str, state: str, blocking: list[str] | None = None) -> dict:
     return {
-        "id": "ms-test-plan",
-        "plan": {"spec_alignment": {"checklist": checklist}},
-        "execution": {"emergent_ambiguities": ambs or []},
+        "group_id": group_id,
+        "state": state,
+        "implementation_converged_at": None,
+        "reviewer_rounds": 0,
+        "findings_resolved_path": None,
+        "blocking_amb_ids": blocking or [],
     }
 
 
+def _plan(spec: Path) -> dict:
+    return load(spec, PLAN)
+
+
+def _edit_plan(spec: Path, edit) -> None:
+    document = load(spec, PLAN)
+    edit(document)
+    (spec / PLAN).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def _set_disposition(spec: Path, value: object) -> None:
+    document = load(spec, ROADMAP)
+    document["milestones"][0]["tasks"][0]["disposition"] = {"value": value, "reason": "Set aside for the test."}
+    (spec / ROADMAP).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def _state_from_spec(spec: Path, tmp_path: Path) -> dict:
+    """The one group of the example plan, derived through ``compute_milestone_state`` with the view of *spec*."""
+    plan = _plan(spec)
+    view = load_spec_view(plan, str(spec), toolkit_root())
+    return compute_milestone_state(plan, str(_findings_dir(tmp_path)), "account_recovery", view)
+
+
 # ---------------------------------------------------------------------------
-# Per-group state: pending
+# Per-group state from findings
 # ---------------------------------------------------------------------------
 
-class TestGroupStatePending:
+class TestGroupStateFromFindings:
     def test_no_findings_dir(self, tmp_path: Path) -> None:
-        """Group with no findings file → pending."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        group = _make_group("GRP_A")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "pending"
-        assert result["implementation_converged_at"] is None
-        assert result["reviewer_rounds"] == 0
-        assert result["findings_resolved_path"] is None
-        assert result["blocking_amb_ids"] == []
+        state = derive_group_state(_group(), str(tmp_path / "missing"), [])
+        assert state["state"] == "pending"
+        assert state["findings_resolved_path"] is None
 
     def test_only_reviewer_files_not_empty(self, tmp_path: Path) -> None:
-        """Reviewer files exist with findings → still pending (no convergence)."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_B_1_r1.json", [{"kind": "bug"}])
-        group = _make_group("GRP_B")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "pending"
-        assert result["reviewer_rounds"] == 1
+        findings_dir = _findings_dir(tmp_path)
+        _write_findings(findings_dir, "findings_G1_1_r1.json", [{"kind": "gap"}])
+        state = _state_of(_group(), findings_dir)
+        assert (state["state"], state["reviewer_rounds"]) == ("pending", 1)
 
-    def test_round_output_with_findings(self, tmp_path: Path) -> None:
-        """Round output file has non-empty findings → pending."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_C_1.json", [{"kind": "bug"}])
-        group = _make_group("GRP_C")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "pending"
+    def test_round_output_with_findings_is_pending(self, tmp_path: Path) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        _write_findings(findings_dir, "findings_G1_1.json", [{"kind": "gap"}])
+        assert _state_of(_group(), findings_dir)["state"] == "pending"
 
+    def test_empty_round_output_is_code_converged(self, tmp_path: Path) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        path = _write_findings(findings_dir, "findings_G1_1.json", [])
+        state = _state_of(_group(), findings_dir)
+        assert state["state"] == "code_converged"
+        assert state["findings_resolved_path"] == str(path)
+        assert state["implementation_converged_at"] is not None
 
-# ---------------------------------------------------------------------------
-# Per-group state: code_converged
-# ---------------------------------------------------------------------------
+    @pytest.mark.parametrize("name", ["findings_G1_2_r1.json", "findings_G1_2_rr3.json"])
+    def test_empty_reviewer_file_is_code_converged(self, tmp_path: Path, name: str) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        _write_findings(findings_dir, name, [])
+        state = _state_of(_group(), findings_dir)
+        assert (state["state"], state["reviewer_rounds"]) == ("code_converged", 1)
 
-class TestGroupStateCodeConverged:
-    def test_empty_round_output(self, tmp_path: Path) -> None:
-        """Empty round-output file → code_converged."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_D_1.json", [])
-        group = _make_group("GRP_D")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "code_converged"
-        assert result["implementation_converged_at"] is not None
-        assert result["findings_resolved_path"] is not None
-        assert result["findings_resolved_path"].endswith("findings_GRP_D_1.json")
-
-    def test_empty_reviewer_file(self, tmp_path: Path) -> None:
-        """Empty per-reviewer file also signals convergence → code_converged."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_E_2_r1.json", [])
-        group = _make_group("GRP_E")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "code_converged"
-        assert result["reviewer_rounds"] == 1
-
-    def test_rr_variant_reviewer_file(self, tmp_path: Path) -> None:
-        """Double-r reviewer suffix ``_rr1`` is counted as a reviewer file."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_F_1_rr1.json", [])
-        group = _make_group("GRP_F")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["reviewer_rounds"] == 1
-        assert result["state"] == "code_converged"
+    def test_findings_file_logic_is_unchanged(self, tmp_path: Path) -> None:
+        """Halt archives and fixer files never converge a group; a non-dict file is skipped; only the group's own files count."""
+        findings_dir = _findings_dir(tmp_path)
+        _write_findings(findings_dir, "findings_G1_5_1700000000.json", [])
+        _write_findings(findings_dir, "findings_G1_1_r1_fixer-discovered.json", [])
+        _write_findings(findings_dir, "findings_G2_1.json", [])
+        (findings_dir / "findings_G1_2.json").write_text("[]", encoding="utf-8")
+        assert _state_of(_group(), findings_dir)["state"] == "pending"
+        _write_findings(findings_dir, "findings_G1_3.json", [])
+        assert _state_of(_group(), findings_dir)["state"] == "code_converged"
 
 
 # ---------------------------------------------------------------------------
-# Per-group state: blocked
+# Per-group state from the item view (no graph needed)
 # ---------------------------------------------------------------------------
 
-class TestGroupStateBlocked:
-    def test_blocked_amb_referencing_group(self, tmp_path: Path) -> None:
-        """Converged group with a blocked+unresolved amb that refs group_id → blocked."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_G_1.json", [])
-        group = _make_group("GRP_G")
-        ambs = [
-            {
-                "id": "amb-test-001",
-                "status": "blocked",
-                "severity": "high",
-                "description": "Something in GRP_G is unresolved",
-                "impact": ["GRP_G"],
-                "resolved": False,
-            }
-        ]
-        result = derive_group_state(group, str(findings_dir), ambs)
-        assert result["state"] == "blocked"
-        assert "amb-test-001" in result["blocking_amb_ids"]
-        health = result["blocking_amb_health"]
-        assert len(health) == 1
-        assert health[0]["well_formed"] is True
+class TestGroupStateFromView:
+    def test_set_aside_outranks_converged_findings(self, tmp_path: Path) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        _converge(findings_dir, "G1")
+        for set_aside in ("deferred", "wont_do"):
+            assert _state_of(_group(), findings_dir, view=ItemView(set_aside=set_aside))["state"] == set_aside
 
-    def test_resolved_amb_does_not_block(self, tmp_path: Path) -> None:
-        """A resolved blocked amb does not trigger blocked state."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_H_1.json", [])
-        group = _make_group("GRP_H")
-        ambs = [
-            {
-                "id": "amb-resolved",
-                "status": "blocked",
-                "severity": "medium",
-                "description": "GRP_H issue resolved",
-                "impact": ["GRP_H"],
-                "resolved": True,
-            }
-        ]
-        result = derive_group_state(group, str(findings_dir), ambs)
-        assert result["state"] == "code_converged"
-        assert result["blocking_amb_ids"] == []
+    def test_open_item_on_the_chain_blocks_a_converged_group(self, tmp_path: Path) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        _converge(findings_dir, "G1")
+        ambiguities = [{"id": "amb-one", "description": "d", "about": ["node-a", "node-b"]}]
+        state = _state_of(_group(), findings_dir, ambiguities, ItemView(chain=frozenset({"node-b"})))
+        assert (state["state"], state["blocking_amb_ids"]) == ("blocked", ["amb-one"])
 
-    def test_missing_resolved_field_treated_as_unresolved(self, tmp_path: Path) -> None:
-        """Amb without 'resolved' key defaults to unresolved → can trigger blocked."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_I_1.json", [])
-        group = _make_group("GRP_I")
-        ambs = [
-            {
-                "id": "amb-no-resolved",
-                "status": "blocked",
-                "severity": "low",
-                "description": "GRP_I ambiguity without resolved field",
-                "impact": ["GRP_I"],
-                # no "resolved" key
-            }
-        ]
-        result = derive_group_state(group, str(findings_dir), ambs)
-        assert result["state"] == "blocked"
+    def test_open_item_on_the_chain_does_not_block_an_unconverged_group(self, tmp_path: Path) -> None:
+        state = _state_of(_group(), _findings_dir(tmp_path), [{"id": "amb-one", "about": ["node-a"]}], ItemView(chain=frozenset({"node-a"})))
+        assert (state["state"], state["blocking_amb_ids"]) == ("pending", ["amb-one"])
 
-    def test_amb_not_referencing_group_is_ignored(self, tmp_path: Path) -> None:
-        """Blocked amb that doesn't reference this group_id → no effect."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_GRP_J_1.json", [])
-        group = _make_group("GRP_J")
-        ambs = [
-            {
-                "id": "amb-other",
-                "status": "blocked",
-                "severity": "high",
-                "description": "An issue in SOME_OTHER_GROUP",
-                "impact": ["SOME_OTHER_GROUP"],
-                "resolved": False,
-            }
-        ]
-        result = derive_group_state(group, str(findings_dir), ambs)
-        assert result["state"] == "code_converged"
-        assert result["blocking_amb_ids"] == []
+    def test_items_that_are_not_objects_or_have_no_id_are_skipped(self, tmp_path: Path) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        _converge(findings_dir, "G1")
+        state = _state_of(_group(), findings_dir, ["x", {"about": ["node-a"]}, {"id": 3, "about": ["node-a"]}], ItemView(chain=frozenset({"node-a"})))
+        assert (state["state"], state["blocking_amb_ids"]) == ("code_converged", [])
 
 
 # ---------------------------------------------------------------------------
-# Per-group state: verified  (MANDATORY KEYSTONE)
+# State read through the spec graph (the worked example)
 # ---------------------------------------------------------------------------
 
-class TestGroupStateVerified:
-    def test_status_string_verified_no_findings(self, tmp_path: Path) -> None:
-        """KEYSTONE: implementation.status=='verified' => state 'verified', even with no findings file.
+class TestSpecView:
+    def test_group_is_deferred_when_every_realised_criterion_is_deferred(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        _set_disposition(spec, "deferred")
+        assert _state_from_spec(spec, tmp_path)["groups"][0]["state"] == "deferred"
 
-        This pins the string-only semantics introduced by DEVSPEC-38.
-        status_ref is NOT read — the status string alone is authoritative.
-        """
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        # No findings files at all
-        group = _make_group("GRP_VERIFIED", impl_status="verified")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "verified"
-        # Filesystem fields are null (no convergence file)
-        assert result["implementation_converged_at"] is None
-        assert result["findings_resolved_path"] is None
+    def test_group_is_wont_do_when_every_realised_criterion_is_wont_do(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        _set_disposition(spec, "wont_do")
+        assert _state_from_spec(spec, tmp_path)["groups"][0]["state"] == "wont_do"
 
-    def test_status_string_verified_beats_pending(self, tmp_path: Path) -> None:
-        """verified state takes precedence over pending (no convergence file present)."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        group = _make_group("GRP_V2", impl_status="verified")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "verified"
+    @pytest.mark.parametrize("value", [["deferred"], {"deferred": True}], ids=["list", "object"])
+    def test_non_string_disposition_value_is_no_disposition(self, tmp_path: Path, value: object) -> None:
+        spec = example_spec(tmp_path)
+        _set_disposition(spec, value)
+        view = load_spec_view(_plan(spec), str(spec), toolkit_root())
+        assert view.items and all(item.set_aside is None for item in view.items.values())
 
-    def test_fixtures_exercised(self, tmp_path: Path) -> None:
-        """fixture_ref is captured in fixtures_exercised."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        group = _make_group("GRP_V3", impl_status="verified", fixture_ref="fix-my-contract")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["fixtures_exercised"] == ["fix-my-contract"]
+    def test_group_with_one_task_still_planned_is_not_set_aside(self, tmp_path: Path) -> None:
+        """An item realising criteria of two tasks, only one of them deferred, stays active."""
+        spec = example_spec(tmp_path)
+        roadmap = load(spec, ROADMAP)
+        task = roadmap["milestones"][0]["tasks"][0]
+        second = {"task_id": "task-second", "description": "d", "acceptance_criteria": [{"criterion_id": "tc-second", "text": "t"}]}
+        task["disposition"] = {"value": "deferred", "reason": "later"}
+        roadmap["milestones"][0]["tasks"].append(second)
+        (spec / ROADMAP).write_text(json.dumps(roadmap), encoding="utf-8")
+        _edit_plan(spec, lambda plan: plan["plan"]["spec_alignment"]["checklist"][0]["realises"].append("tc-second"))
+        assert _state_from_spec(spec, tmp_path)["groups"][0]["state"] == "pending"
 
+    def test_deferred_and_wont_do_tasks_together_read_as_deferred(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        roadmap = load(spec, ROADMAP)
+        tasks = roadmap["milestones"][0]["tasks"]
+        tasks[0]["disposition"] = {"value": "wont_do", "reason": "never"}
+        tasks.append({
+            "task_id": "task-second", "description": "d", "disposition": {"value": "deferred", "reason": "later"},
+            "acceptance_criteria": [{"criterion_id": "tc-second", "text": "t"}],
+        })
+        (spec / ROADMAP).write_text(json.dumps(roadmap), encoding="utf-8")
+        _edit_plan(spec, lambda plan: plan["plan"]["spec_alignment"]["checklist"][0]["realises"].append("tc-second"))
+        assert _state_from_spec(spec, tmp_path)["groups"][0]["state"] == "deferred"
 
-# ---------------------------------------------------------------------------
-# Per-group state: deferred
-# ---------------------------------------------------------------------------
+    def test_group_is_blocked_by_an_open_item_about_a_node_on_its_chain(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        _edit_plan(spec, lambda plan: plan["plan"].update(
+            ambiguities=[{"id": "amb-clock", "description": "Which clock decides expiry?", "about": [EXPIRED_CRITERION]}]
+        ))
+        _converge(_findings_dir(tmp_path), ITEM)
+        result = _state_from_spec(spec, tmp_path)
+        group = result["groups"][0]
+        assert (group["state"], group["blocking_amb_ids"]) == ("blocked", ["amb-clock"])
+        assert result["blockers"] == [{"kind": "ambiguity", "id": "amb-clock", "issue": f"open ambiguity about a node of group {ITEM}"}]
+        assert result["derived_phase_position"] == "impl_complete"
 
-class TestGroupStateDeferred:
-    def test_deferred_status(self, tmp_path: Path) -> None:
-        """checklist_status=='deferred' => state 'deferred' regardless of impl status."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        group = _make_group("GRP_DEF", impl_status="verified", checklist_status="deferred")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "deferred"
+    def test_open_item_in_the_execution_block_counts_too(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        _edit_plan(spec, lambda plan: plan.update(
+            execution={"emergent_ambiguities": [{"id": "amb-emergent", "description": "d", "about": ["fix-password-reset-expired-token"]}]}
+        ))
+        _converge(_findings_dir(tmp_path), ITEM)
+        assert _state_from_spec(spec, tmp_path)["groups"][0]["blocking_amb_ids"] == ["amb-emergent"]
 
+    def test_group_is_blocked_by_an_open_item_about_the_plan_item_itself(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        _edit_plan(spec, lambda plan: plan["plan"].update(ambiguities=[{"id": "amb-self", "description": "d", "about": [ITEM]}]))
+        assert _state_from_spec(spec, tmp_path)["groups"][0]["blocking_amb_ids"] == ["amb-self"]
 
-# ---------------------------------------------------------------------------
-# Per-group state: wont_do (DEVSPEC-122 follow-up)
-# ---------------------------------------------------------------------------
+    def test_open_item_about_an_unrelated_node_blocks_no_group(self, tmp_path: Path) -> None:
+        """An item about the other criterion of the roadmap, which the plan item does not realise, blocks nothing."""
+        spec = example_spec(tmp_path)
+        _edit_plan(spec, lambda plan: plan["plan"].update(
+            ambiguities=[{"id": "amb-other", "description": "d", "about": [REUSED_CRITERION]}]
+        ))
+        _converge(_findings_dir(tmp_path), ITEM)
+        result = _state_from_spec(spec, tmp_path)
+        assert (result["groups"][0]["state"], result["groups"][0]["blocking_amb_ids"], result["blockers"]) == ("code_converged", [], [])
 
-class TestGroupStateWontDo:
-    def test_wont_do_status(self, tmp_path: Path) -> None:
-        """checklist_status=='wont_do' => state 'wont_do' regardless of impl status."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        group = _make_group("GRP_WONT", impl_status="pending", checklist_status="wont_do")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "wont_do"
+    def test_open_item_blocks_only_the_group_whose_chain_it_is_on(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
 
-    def test_wont_do_status_outranks_verified_impl(self, tmp_path: Path) -> None:
-        """wont_do takes precedence even when implementation.status=='verified'."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        group = _make_group("GRP_WONT_V", impl_status="verified", checklist_status="wont_do")
-        result = derive_group_state(group, str(findings_dir), [])
-        assert result["state"] == "wont_do"
+        def second_item(plan: dict) -> None:
+            checklist = plan["plan"]["spec_alignment"]["checklist"]
+            checklist.append({**checklist[0], "id": "PWRESET_CONFIRM_REUSED_01", "realises": [REUSED_CRITERION]})
+            plan["plan"]["ambiguities"] = [{"id": "amb-clock", "description": "d", "about": [EXPIRED_CRITERION]}]
 
+        _edit_plan(spec, second_item)
+        result = _state_from_spec(spec, tmp_path)
+        assert {g["group_id"]: g["blocking_amb_ids"] for g in result["groups"]} == {ITEM: ["amb-clock"], "PWRESET_CONFIRM_REUSED_01": []}
 
-# ---------------------------------------------------------------------------
-# well_formed predicate
-# ---------------------------------------------------------------------------
+    def test_closed_is_read_from_the_anchor_row(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        assert _state_from_spec(spec, tmp_path)["derived_phase_position"] == "pending"
+        edit_row(spec, lambda row: row.update(status="done", close={"signed_off_by": "someone@example.invalid"}))
+        assert _state_from_spec(spec, tmp_path)["derived_phase_position"] == "closed"
 
-class TestWellFormed:
-    def _find_health(self, ambs: list[dict], findings_dir: Path) -> list[dict]:
-        """Helper: derive health for GRP_WF group with converged state."""
-        _write_findings(findings_dir, "findings_GRP_WF_1.json", [])
-        group = _make_group("GRP_WF")
-        result = derive_group_state(group, str(findings_dir), ambs)
-        return result["blocking_amb_health"]
+    def test_closed_is_not_read_from_converged_groups(self, tmp_path: Path) -> None:
+        """Every group converged and reviewed is not closed while the anchor row is not done."""
+        spec = example_spec(tmp_path)
+        findings_dir = _findings_dir(tmp_path)
+        _converge(findings_dir, ITEM)
+        _write_findings(findings_dir, "findings_account_recovery_review_1.json", [])
+        assert _state_from_spec(spec, tmp_path)["derived_phase_position"] == "review_complete"
 
-    def test_well_formed_true(self, tmp_path: Path) -> None:
-        """Amb with severity + description present → well_formed True."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        ambs = [{
-            "id": "amb-wf-ok",
-            "status": "blocked",
-            "severity": "high",
-            "description": "GRP_WF is blocked",
-            "impact": ["GRP_WF"],
-            "resolved": False,
-        }]
-        health = self._find_health(ambs, findings_dir)
-        assert len(health) == 1
-        assert health[0]["well_formed"] is True
+    def test_row_with_an_unknown_status_reads_as_not_closed(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        edit_row(spec, lambda row: row.update(status="finished"))
+        assert _state_from_spec(spec, tmp_path)["derived_phase_position"] == "pending"
 
-    def test_well_formed_false_missing_severity(self, tmp_path: Path) -> None:
-        """Missing severity → well_formed False."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        ambs = [{
-            "id": "amb-wf-bad",
-            "status": "blocked",
-            # no "severity"
-            "description": "GRP_WF is blocked",
-            "impact": ["GRP_WF"],
-            "resolved": False,
-        }]
-        health = self._find_health(ambs, findings_dir)
-        assert len(health) == 1
-        assert health[0]["well_formed"] is False
+    def test_no_graph_reports_no_blocked_group_and_does_not_crash(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        _edit_plan(spec, lambda plan: plan["plan"].update(ambiguities=[{"id": "amb-clock", "description": "d", "about": [EXPIRED_CRITERION]}]))
+        _set_disposition(spec, "deferred")
+        _converge(_findings_dir(tmp_path), ITEM)
+        view = load_spec_view(_plan(spec), str(spec), str(tmp_path / "no-toolkit"))
+        assert view.items == {}
+        result = compute_milestone_state(_plan(spec), str(_findings_dir(tmp_path)), "account_recovery", view)
+        assert (result["groups"][0]["state"], result["groups"][0]["blocking_amb_ids"]) == ("code_converged", [])
 
-    def test_well_formed_false_missing_description(self, tmp_path: Path) -> None:
-        """Missing description → well_formed False."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        ambs = [{
-            "id": "amb-wf-bad2",
-            "status": "blocked",
-            "severity": "medium",
-            # no "description"
-            "impact": ["GRP_WF"],
-            "resolved": False,
-        }]
-        health = self._find_health(ambs, findings_dir)
-        assert len(health) == 1
-        assert health[0]["well_formed"] is False
+    def test_plan_without_a_milestone_key_has_no_closed_view(self, tmp_path: Path) -> None:
+        spec = example_spec(tmp_path)
+        plan = _plan(spec)
+        del plan["milestone"]
+        assert load_spec_view(plan, str(spec), toolkit_root()).closed is False
+        assert compute_milestone_state(plan, str(_findings_dir(tmp_path)), "account_recovery")["milestone"] is None
 
 
 # ---------------------------------------------------------------------------
-# Filesystem robustness
-# ---------------------------------------------------------------------------
-
-class TestFilesystemRobustness:
-    def test_non_dict_findings_file_skipped(self, tmp_path: Path) -> None:
-        """A findings file whose top-level JSON is a list is skipped gracefully."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        # Write a file with a JSON list (not dict) at top level
-        bad = findings_dir / "findings_GRP_ROB_1.json"
-        bad.write_text(json.dumps([{"kind": "bug"}]), encoding="utf-8")
-        group = _make_group("GRP_ROB")
-        result = derive_group_state(group, str(findings_dir), [])
-        # Should not crash; file skipped → pending
-        assert result["state"] == "pending"
-
-
-# ---------------------------------------------------------------------------
-# Phase position transitions
+# Phase position
 # ---------------------------------------------------------------------------
 
 class TestDerivePhasePosition:
-    """Tests for derive_phase_position covering all 7 positions."""
+    @pytest.fixture
+    def findings_dir(self, tmp_path: Path) -> Path:
+        return _findings_dir(tmp_path)
 
-    def _make_group_state(
-        self,
-        group_id: str,
-        state: str,
-        blocking_amb_health: list[dict] | None = None,
-    ) -> dict:
-        return {
-            "group_id": group_id,
-            "state": state,
-            "implementation_converged_at": None,
-            "reviewer_rounds": 0,
-            "findings_resolved_path": None,
-            "blocking_amb_ids": [],
-            "blocking_amb_health": blocking_amb_health or [],
-            "fixtures_exercised": [],
-        }
+    def _position(self, findings_dir: Path, *states: str, closed: bool = False) -> str:
+        groups = [_group_state(f"G{i}", state) for i, state in enumerate(states)]
+        return derive_phase_position(groups, str(findings_dir), "batch1", closed)
 
-    def test_pending_all_groups_pending(self, tmp_path: Path) -> None:
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("A", "pending"),
-            self._make_group_state("B", "pending"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+    @pytest.mark.parametrize(
+        "states",
+        [("pending", "pending"), ("deferred", "deferred"), ("wont_do",), ("deferred", "wont_do")],
+    )
+    def test_pending_when_every_active_group_is_pending_or_none_is_active(self, findings_dir: Path, states: tuple[str, ...]) -> None:
+        assert self._position(findings_dir, *states) == "pending"
 
-    def test_pending_all_deferred(self, tmp_path: Path) -> None:
-        """All-deferred milestone → pending (nothing to track)."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [self._make_group_state("D", "deferred")]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+    def test_impl_in_progress_mixed(self, findings_dir: Path) -> None:
+        assert self._position(findings_dir, "code_converged", "pending") == "impl_in_progress"
 
-    def test_pending_all_wont_do(self, tmp_path: Path) -> None:
-        """All-wont_do milestone → pending (nothing to track), same as all-deferred."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [self._make_group_state("W", "wont_do")]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+    def test_set_aside_group_is_excluded_from_the_roll_up(self, findings_dir: Path) -> None:
+        assert self._position(findings_dir, "code_converged", "wont_do") == "impl_complete"
 
-    def test_pending_mixed_deferred_and_wont_do(self, tmp_path: Path) -> None:
-        """All groups either deferred or wont_do → pending (nothing active to track)."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("D", "deferred"),
-            self._make_group_state("W", "wont_do"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+    def test_impl_complete_all_advanced_no_review_file(self, findings_dir: Path) -> None:
+        assert self._position(findings_dir, "code_converged", "blocked") == "impl_complete"
 
-    def test_closed_excludes_wont_do_group_regression(self, tmp_path: Path) -> None:
-        """REGRESSION GUARD: a wont_do group must not block 'closed' the way an
-        unhandled non-excluded status would -- without the wont_do exclusion, this
-        milestone would incorrectly report impl_in_progress/pending forever since
-        the wont_do group would never reach 'verified'."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("V", "verified"),
-            self._make_group_state("W", "wont_do"),  # excluded from roll-up
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "closed"
+    def test_review_pending_has_review_file_not_empty(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_1.json", [{"kind": "gap"}])
+        assert self._position(findings_dir, "code_converged") == "review_pending"
 
-    def test_impl_in_progress_mixed(self, tmp_path: Path) -> None:
-        """≥1 code_converged AND ≥1 pending → impl_in_progress."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("A", "code_converged"),
-            self._make_group_state("B", "pending"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "impl_in_progress"
+    def test_review_complete_empty_review_file(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_1.json", [])
+        assert self._position(findings_dir, "code_converged") == "review_complete"
 
-    def test_impl_in_progress_verified_and_pending(self, tmp_path: Path) -> None:
-        """verified + pending → impl_in_progress (verified counts as progress)."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("A", "verified"),
-            self._make_group_state("B", "pending"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch1") == "impl_in_progress"
+    def test_the_newest_round_decides_not_any_empty_round(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_1.json", [])
+        _write_findings(findings_dir, "findings_batch1_review_2.json", [{"kind": "bug", "severity": "P0"}])
+        assert self._position(findings_dir, "code_converged") == "review_pending"
+        _write_findings(findings_dir, "findings_batch1_review_3.json", [])
+        assert self._position(findings_dir, "code_converged") == "review_complete"
 
-    def test_impl_complete_all_advanced_no_review_file(self, tmp_path: Path) -> None:
-        """All non-deferred advanced, no review file → impl_complete."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("A", "code_converged"),
-            self._make_group_state("B", "blocked"),
-            self._make_group_state("C", "verified"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch2") == "impl_complete"
+    def test_rounds_are_ordered_as_numbers_and_a_halt_archive_belongs_to_its_round(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_9.json", [{"kind": "bug"}])
+        _write_findings(findings_dir, "findings_batch1_review_10.json", [])
+        assert self._position(findings_dir, "code_converged") == "review_complete"
+        _write_findings(findings_dir, "findings_batch1_review_11_1700000000.json", [{"kind": "bug"}])
+        assert self._position(findings_dir, "code_converged") == "review_pending"
 
-    def test_review_pending_has_review_file_not_empty(self, tmp_path: Path) -> None:
-        """All advanced + milestone-review file exists but has findings → review_pending."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        # Create a non-empty review file
-        _write_findings(findings_dir, "findings_batch3_review_1_r1.json", [{"kind": "bug"}])
-        groups = [
-            self._make_group_state("A", "code_converged"),
-            self._make_group_state("B", "verified"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch3") == "review_pending"
+    def test_the_round_number_decides_not_the_file_time(self, findings_dir: Path) -> None:
+        older = _write_findings(findings_dir, "findings_batch1_review_10.json", [])
+        newer = _write_findings(findings_dir, "findings_batch1_review_9.json", [{"kind": "bug"}])
+        os.utime(older, (1_700_000_000, 1_700_000_000))
+        os.utime(newer, (1_800_000_000, 1_800_000_000))
+        assert self._position(findings_dir, "code_converged") == "review_complete"
 
-    def test_review_complete_empty_review_file_no_blockers(self, tmp_path: Path) -> None:
-        """All advanced + empty milestone-review file + no blocked groups → review_complete."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_batch4_review_1.json", [])
-        groups = [
-            self._make_group_state("A", "code_converged"),
-            self._make_group_state("B", "verified"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch4") == "review_complete"
+    def test_operator_pending_blocked_group(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_1.json", [])
+        assert self._position(findings_dir, "code_converged", "blocked") == "operator_pending"
 
-    def test_operator_pending_blocked_group(self, tmp_path: Path) -> None:
-        """review_complete conditions + a blocked group → operator_pending."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_batch5_review_1.json", [])
-        groups = [
-            self._make_group_state("A", "blocked"),
-            self._make_group_state("B", "code_converged"),
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch5") == "operator_pending"
+    def test_operator_pending_open_item_on_a_group(self, findings_dir: Path) -> None:
+        _write_findings(findings_dir, "findings_batch1_review_1.json", [])
+        groups = [_group_state("G0", "code_converged", blocking=["amb-one"])]
+        assert derive_phase_position(groups, str(findings_dir), "batch1") == "operator_pending"
 
-    def test_operator_pending_unresolved_blocking_amb(self, tmp_path: Path) -> None:
-        """review_complete + unresolved blocking amb health → operator_pending."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_batch6_review_1.json", [])
-        # code_converged group with an unresolved blocking amb in health
-        g = self._make_group_state(
-            "A",
-            "code_converged",
-            blocking_amb_health=[
-                {"id": "amb-x", "status": "blocked", "resolved": False, "well_formed": True}
-            ],
-        )
-        groups = [g, self._make_group_state("B", "verified")]
-        assert derive_phase_position(groups, str(findings_dir), "batch6") == "operator_pending"
-
-    def test_closed_all_verified(self, tmp_path: Path) -> None:
-        """KEYSTONE: all non-deferred groups verified → closed.
-
-        This pins the string-only 'verified' semantics. status_ref is NOT consulted.
-        """
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        groups = [
-            self._make_group_state("A", "verified"),
-            self._make_group_state("B", "verified"),
-            self._make_group_state("DEF", "deferred"),  # excluded from roll-up
-        ]
-        assert derive_phase_position(groups, str(findings_dir), "batch7") == "closed"
+    @pytest.mark.parametrize("states", [("pending",), ("deferred",), ("code_converged", "blocked")])
+    def test_closed_is_decided_by_the_flag_alone(self, findings_dir: Path, states: tuple[str, ...]) -> None:
+        assert self._position(findings_dir, *states, closed=True) == "closed"
+        assert self._position(findings_dir, *states) != "closed"
 
 
 # ---------------------------------------------------------------------------
-# compute_milestone_state integration
+# Output contract
 # ---------------------------------------------------------------------------
 
 class TestComputeMilestoneState:
-    """Integration tests for compute_milestone_state."""
-
-    def test_all_pending_returns_pending_position(self, tmp_path: Path) -> None:
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        plan = _make_plan([
-            _make_group("G1"),
-            _make_group("G2"),
-        ])
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        # milestone_id is always batch_id per output contract (specdev-scope.md:238)
-        assert result["milestone_id"] == "batchX"
-        assert result["derived_phase_position"] == "pending"
-        assert len(result["groups"]) == 2
-        assert result["blockers"] == []
-
-    def test_verified_and_pending_gives_impl_in_progress(self, tmp_path: Path) -> None:
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        plan = _make_plan([
-            _make_group("G1", impl_status="verified"),
-            _make_group("G2", impl_status="in_progress"),
-        ])
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        assert result["derived_phase_position"] == "impl_in_progress"
-
-    def test_all_verified_gives_closed(self, tmp_path: Path) -> None:
-        """MANDATORY POSITIVE CASE: all groups verified => milestone closed.
-
-        Tests the full pipeline:
-          implementation.status == 'verified'
-          => derive_group_state() returns state='verified'
-          => derive_phase_position() returns 'closed'
-
-        No status_ref consulted anywhere in this path.
-        """
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        plan = _make_plan([
-            _make_group("G1", impl_status="verified"),
-            _make_group("G2", impl_status="verified"),
-        ])
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        # Per-group state must be verified
-        for g in result["groups"]:
-            assert g["state"] == "verified", f"group {g['group_id']} expected verified"
-        # Milestone position must be closed
-        assert result["derived_phase_position"] == "closed"
-
-    def test_deferred_excluded_from_rollup(self, tmp_path: Path) -> None:
-        """Deferred groups do not participate in the roll-up."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        plan = _make_plan([
-            _make_group("G1", impl_status="verified"),
-            _make_group("G2", checklist_status="deferred"),
-        ])
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        assert result["groups"][1]["state"] == "deferred"
-        assert result["derived_phase_position"] == "closed"
-
-    def test_wont_do_excluded_from_rollup(self, tmp_path: Path) -> None:
-        """REGRESSION GUARD (DEVSPEC-122 follow-up): wont_do groups do not
-        participate in the roll-up, same as deferred. Without this, a wont_do
-        checklist item (which the schema does not require an 'implementation'
-        object for) would derive state 'pending' and the milestone would never
-        reach 'closed' even after all real work is verified."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        plan = _make_plan([
-            _make_group("G1", impl_status="verified"),
-            _make_group("G2", checklist_status="wont_do"),
-        ])
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        assert result["groups"][1]["state"] == "wont_do"
-        assert result["derived_phase_position"] == "closed"
-
-    def test_blockers_populated(self, tmp_path: Path) -> None:
-        """Blocking ambs appear in both blocking_amb_ids and top-level blockers[]."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        _write_findings(findings_dir, "findings_G1_1.json", [])
-        ambs = [{
-            "id": "amb-block-1",
-            "status": "blocked",
-            "severity": "high",
-            "description": "G1 is blocked",
-            "impact": ["G1"],
-            "resolved": False,
-        }]
-        plan = _make_plan([_make_group("G1")], ambs=ambs)
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        g = result["groups"][0]
-        assert "amb-block-1" in g["blocking_amb_ids"]
-        assert any(b["id"] == "amb-block-1" for b in result["blockers"])
-
     def test_output_contract_shape(self, tmp_path: Path) -> None:
-        """Output object has all required top-level and per-group keys."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        plan = _make_plan([_make_group("G1")])
-        result = compute_milestone_state(plan, str(findings_dir), "batchX")
-        # Top-level keys
-        assert set(result.keys()) == {"milestone_id", "groups", "derived_phase_position", "blockers"}
-        # Per-group keys
-        required_group_keys = {
-            "group_id", "state", "implementation_converged_at",
-            "reviewer_rounds", "findings_resolved_path",
-            "blocking_amb_ids", "blocking_amb_health", "fixtures_exercised",
-        }
-        for g in result["groups"]:
-            assert required_group_keys.issubset(g.keys())
-
-    def test_milestone_id_is_batch_id(self, tmp_path: Path) -> None:
-        """milestone_id in output is always batch_id per specdev-scope.md:238.
-
-        The plan may have a different 'id' field, but the output contract
-        specifies "milestone_id": "<batch_id>" — the plan id is ignored.
-        """
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        # Plan has an id that differs from batch_id — it must not leak into output
-        plan = _make_plan([_make_group("G1")])  # _make_plan sets id="ms-test-plan"
-        result = compute_milestone_state(plan, str(findings_dir), "my_batch_42")
-        assert result["milestone_id"] == "my_batch_42"
-
-    def test_milestone_id_is_batch_id_when_plan_has_no_id(self, tmp_path: Path) -> None:
-        """milestone_id == batch_id even when the plan dict has no 'id' key."""
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        # Build a plan without the 'id' field
-        plan = {
-            "plan": {"spec_alignment": {"checklist": [_make_group("G1")]}},
-            "execution": {"emergent_ambiguities": []},
-        }
-        result = compute_milestone_state(plan, str(findings_dir), "no_id_batch")
-        assert result["milestone_id"] == "no_id_batch"
-
-    def test_verified_group_with_blocking_amb_is_verified_and_surfaces_blocker(
-        self, tmp_path: Path
-    ) -> None:
-        """F1: verified outranks blocked; amb is advisory, not a gate.
-
-        A group with implementation.status=='verified' AND a matching unresolved
-        blocking ambiguity must:
-          - resolve to group state 'verified' (verified beats blocked, pins precedence)
-          - still populate blocking_amb_ids (amb is surfaced for visibility)
-
-        At the milestone level (all non-deferred groups verified):
-          - derived_phase_position == 'closed' (closed is still reached)
-          - blockers[] is non-empty (documents the advisory advisory behavior)
-
-        Downstream consumers MUST gate on derived_phase_position, not blockers[].
-        """
-        findings_dir = tmp_path / ".specdev" / "findings"
-        findings_dir.mkdir(parents=True)
-        ambs = [
-            {
-                "id": "amb-advisory-001",
-                "status": "blocked",
-                "severity": "high",
-                "description": "G_VER group has an outstanding concern",
-                "impact": ["G_VER"],
-                "resolved": False,
-            }
+        plan = {"milestone": "ms-x", "plan": {"spec_alignment": {"checklist": [_group("G1")]}}}
+        result = compute_milestone_state(plan, str(_findings_dir(tmp_path)), "batch1")
+        assert list(result) == ["milestone_id", "milestone", "groups", "derived_phase_position", "blockers"]
+        assert list(result["groups"][0]) == [
+            "group_id", "state", "implementation_converged_at", "reviewer_rounds", "findings_resolved_path", "blocking_amb_ids",
         ]
-        # Group is verified but the amb references it and is unresolved
-        plan = _make_plan([_make_group("G_VER", impl_status="verified")], ambs=ambs)
-        result = compute_milestone_state(plan, str(findings_dir), "batchF1")
 
-        # Per-group: state is verified (verified outranks blocked)
-        g = result["groups"][0]
-        assert g["state"] == "verified", "verified must outrank blocked"
-        # Amb is still surfaced in blocking_amb_ids (advisory, not suppressed)
-        assert "amb-advisory-001" in g["blocking_amb_ids"], (
-            "blocking_amb_ids must be non-empty even for verified group"
-        )
+    def test_milestone_id_echoes_the_batch_id_and_milestone_is_the_plan_key(self, tmp_path: Path) -> None:
+        plan = {"id": "plan-x", "milestone": "ms-x", "plan": {"spec_alignment": {"checklist": []}}}
+        result = compute_milestone_state(plan, str(_findings_dir(tmp_path)), "batch1")
+        assert (result["milestone_id"], result["milestone"]) == ("batch1", "ms-x")
 
-        # Milestone: closed (all non-deferred verified), blockers[] non-empty (advisory)
-        assert result["derived_phase_position"] == "closed", (
-            "derived_phase_position must be closed when all groups verified"
-        )
-        assert len(result["blockers"]) > 0, (
-            "blockers[] CAN be non-empty even when closed — amb is advisory, not a gate"
-        )
+    def test_wrong_typed_levels_read_as_absent(self, tmp_path: Path) -> None:
+        for plan in ({}, {"plan": []}, {"plan": {"spec_alignment": {"checklist": "x"}}, "execution": 3}, {"milestone": 4}):
+            result = compute_milestone_state(plan, str(_findings_dir(tmp_path)), "batch1")
+            assert (result["groups"], result["milestone"], result["derived_phase_position"]) == ([], None, "pending")
+
+    def test_a_group_without_a_string_id_is_not_a_group(self, tmp_path: Path) -> None:
+        plan = {"plan": {"spec_alignment": {"checklist": [{"realises": ["tc-x"]}, {"id": 4}, "x", _group("G1")]}}}
+        result = compute_milestone_state(plan, str(_findings_dir(tmp_path)), "batch1")
+        assert [g["group_id"] for g in result["groups"]] == ["G1"]
+
+    def test_a_blocker_is_listed_once(self, tmp_path: Path) -> None:
+        findings_dir = _findings_dir(tmp_path)
+        for gid in ("G1", "G2"):
+            _converge(findings_dir, gid)
+        plan = {
+            "plan": {"spec_alignment": {"checklist": [_group("G1"), _group("G2")]}, "ambiguities": [{"id": "amb-one", "about": ["node-a"]}]},
+        }
+        view = SpecView(items={gid: ItemView(chain=frozenset({"node-a"})) for gid in ("G1", "G2")})
+        result = compute_milestone_state(plan, str(findings_dir), "batch1", view)
+        assert [b["id"] for b in result["blockers"]] == ["amb-one"]
+        assert [g["state"] for g in result["groups"]] == ["blocked", "blocked"]
+
+
+def test_module_reads_neither_checklist_status_nor_implementation_status() -> None:
+    source = Path(milestone_state.__file__).read_text(encoding="utf-8")
+    code = "\n".join(line for line in source.splitlines() if not line.lstrip().startswith("#"))
+    assert not re.search(r"checklist_status|[\"']implementation[\"']\s*\)|\.get\(\s*[\"']status[\"']|impl_status", code)
+
+
+def test_anchor_file_name_is_the_one_the_view_reads(tmp_path: Path) -> None:
+    """The engine reads the closedness of the milestone from the anchor file of the spec folder, nowhere else."""
+    spec = example_spec(tmp_path)
+    (spec / ANCHOR).unlink()
+    assert load_spec_view(_plan(spec), str(spec), toolkit_root()).closed is False
+
+
+# ---------------------------------------------------------------------------
+# Through the real command
+# ---------------------------------------------------------------------------
+
+def _run_command(spec: Path, host: Path) -> dict:
+    code, out = run_cli("milestone-state", "--batch-id", "account_recovery", "--repo-root", toolkit_root(), "--spec-root", str(spec), "--git-root", str(host))
+    assert code == 0, out
+    return json.loads(out)
+
+
+def test_command_reads_closed_blocked_and_deferred_from_the_spec(tmp_path: Path) -> None:
+    """`specdev milestone-state` on a copy of the worked example: the anchor row gives `closed`, the roadmap `deferred`, an open item `blocked`."""
+    spec = example_spec(tmp_path / "host")
+    _converge(_findings_dir(tmp_path / "host"), ITEM)
+    state = _run_command(spec, tmp_path / "host")
+    assert (state["milestone"], state["groups"][0]["state"], state["derived_phase_position"]) == ("ms-account-recovery", "code_converged", "impl_complete")
+    _edit_plan(spec, lambda plan: plan["plan"].update(ambiguities=[{"id": "amb-clock", "description": "d", "about": [EXPIRED_CRITERION]}]))
+    assert _run_command(spec, tmp_path / "host")["groups"][0]["state"] == "blocked"
+    edit_row(spec, lambda row: row.update(status="done", close={"signed_off_by": "someone@example.invalid"}))
+    assert _run_command(spec, tmp_path / "host")["derived_phase_position"] == "closed"
+    _set_disposition(spec, "deferred")
+    assert _run_command(spec, tmp_path / "host")["groups"][0]["state"] == "deferred"
+
+
+def test_command_reads_the_newest_milestone_review_round(tmp_path: Path) -> None:
+    """An empty round 1 and a round 2 that holds a P0 finding: the review is pending, not complete."""
+    spec = example_spec(tmp_path / "host")
+    findings_dir = _findings_dir(tmp_path / "host")
+    _converge(findings_dir, ITEM)
+    _write_findings(findings_dir, "findings_account_recovery_review_1.json", [])
+    assert _run_command(spec, tmp_path / "host")["derived_phase_position"] == "review_complete"
+    _write_findings(findings_dir, "findings_account_recovery_review_2.json", [{"kind": "bug", "severity": "P0"}])
+    assert _run_command(spec, tmp_path / "host")["derived_phase_position"] == "review_pending"

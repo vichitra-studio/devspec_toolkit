@@ -1,0 +1,160 @@
+{
+    "$schema": "vc:01-capabilities",
+    "id": "capabilities-catalog",
+    "owner": "product",
+    "created_at": "2026-03-02T09:00:00Z",
+    "capabilities": [
+        {
+            "capability_id": "cap-browse-catalog",
+            "verb": "browse",
+            "description": "Members look through the tool catalog and see which tools are on the shelf.",
+            "scope": "in",
+            "owner": "product",
+            "capability_ref": {
+                "id": "cn:project:capability:browse-catalog",
+                "kind": "capability",
+                "version": "1.0.0"
+            },
+            "goal_id": "m-checkout-time",
+            "success_metric_refs": [
+                "m-checkout-time"
+            ],
+            "inputs": [
+                "search_text"
+            ],
+            "outputs": [
+                "tool_list"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-catalog-search"
+                }
+            ]
+        },
+        {
+            "capability_id": "cap-reserve-tool",
+            "verb": "reserve",
+            "description": "Members hold a tool for one pickup day.",
+            "scope": "in",
+            "owner": "product",
+            "capability_ref": {
+                "id": "cn:project:capability:reserve-tool",
+                "kind": "capability",
+                "version": "1.0.0"
+            },
+            "goal_id": "m-checkout-time",
+            "success_metric_refs": [
+                "m-checkout-time"
+            ],
+            "inputs": [
+                "tool_id",
+                "pickup_day"
+            ],
+            "outputs": [
+                "reservation"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-reserve-tool"
+                }
+            ]
+        },
+        {
+            "capability_id": "cap-checkout-return",
+            "verb": "lend",
+            "description": "Volunteers lend a tool to a member and take it back.",
+            "scope": "in",
+            "owner": "ops",
+            "capability_ref": {
+                "id": "cn:project:capability:checkout-return",
+                "kind": "capability",
+                "version": "1.0.0"
+            },
+            "goal_id": "m-overdue-share",
+            "success_metric_refs": [
+                "m-overdue-share",
+                "m-checkout-time"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-checkout-tool"
+                },
+                {
+                    "type": "fr",
+                    "id": "fr-return-tool"
+                }
+            ]
+        },
+        {
+            "capability_id": "cap-late-fees",
+            "verb": "charge",
+            "description": "The desk records a fee for every full day a tool is late.",
+            "scope": "in",
+            "owner": "business",
+            "capability_ref": {
+                "id": "cn:project:capability:late-fees",
+                "kind": "capability",
+                "version": "1.0.0"
+            },
+            "goal_id": "m-overdue-share",
+            "success_metric_refs": [
+                "m-overdue-share"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-late-fee-calc"
+                }
+            ]
+        },
+        {
+            "capability_id": "cap-repair-queue",
+            "verb": "repair",
+            "description": "Broken tools wait in a queue for the Saturday repair table.",
+            "scope": "future",
+            "owner": "ops",
+            "capability_ref": {
+                "id": "cn:project:capability:repair-queue",
+                "kind": "capability",
+                "version": "1.0.0"
+            },
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-checkout-return",
+                    "note": "Repairs start from a returned, broken tool"
+                }
+            ]
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:capability:browse-catalog",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:checkout-return",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:late-fees",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:repair-queue",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:reserve-tool",
+            "kind": "capability",
+            "version": "1.0.0"
+        }
+    ]
+}

@@ -1,0 +1,139 @@
+{
+    "$schema": "vc:00-charter",
+    "id": "lantern-lending-charter",
+    "title": "Lantern Lending — Charter",
+    "owner": "product",
+    "created_at": "2026-03-02T09:00:00Z",
+    "problem_statement": "Volunteers at the neighbourhood tool library track every loan in a paper ledger, so members cannot see what is on the shelf and late returns go unnoticed for weeks.",
+    "in_scope": [
+        "Browse the tool catalog and see what is on the shelf",
+        "Reserve a tool for a pickup day",
+        "Check tools out and back in at the desk"
+    ],
+    "out_of_scope": [
+        "Online payment of late fees",
+        "Tool donation intake",
+        "Scheduling of repair table volunteers"
+    ],
+    "assumptions": [
+        "The library keeps one desk computer with a barcode scanner",
+        "Members have a phone number we can text"
+    ],
+    "risks": [
+        "Volunteer availability at the Café Lantern pickup desk is uneven",
+        "The hosting plan may not allow a second environment"
+    ],
+    "stakeholders": [
+        {
+            "role_ref": {
+                "id": "cn:project:role:volunteer-librarian",
+                "kind": "role",
+                "version": "1.0.0"
+            },
+            "role": "Volunteer Librarian",
+            "needs": [
+                "Check a tool out in under a minute",
+                "See at a glance who holds an overdue tool"
+            ]
+        },
+        {
+            "role_ref": {
+                "id": "cn:project:role:neighbourhood-member",
+                "kind": "role",
+                "version": "1.0.0"
+            },
+            "role": "Neighbourhood Member",
+            "needs": [
+                "Know before walking over whether a tool is on the shelf"
+            ]
+        }
+    ],
+    "user_segments": [
+        {
+            "segment_id": "member-borrowers",
+            "description": "Residents who borrow tools two or three times a year",
+            "jobs_to_be_done": [
+                "Find a ladder for Saturday",
+                "Return a drill without a fuss"
+            ],
+            "pains": [
+                "Walking over to find the shelf empty"
+            ],
+            "gains": [
+                "A confirmed pickup slot"
+            ]
+        },
+        {
+            "segment_id": "desk-volunteers",
+            "description": "Volunteers who staff the pickup desk",
+            "jobs_to_be_done": [
+                "Lend and take back tools"
+            ],
+            "pains": [
+                "Paper ledger lookups"
+            ],
+            "gains": [
+                "One screen for every open loan"
+            ]
+        }
+    ],
+    "success_metrics": [
+        {
+            "metric_id": "m-checkout-time",
+            "name": "Desk checkout time",
+            "target": 60,
+            "unit": "seconds",
+            "unit_ref": {
+                "id": "cn:core:unit:ms",
+                "kind": "unit",
+                "version": "1.0.0"
+            },
+            "measurement_method": "Median of desk app timestamps, first scan to confirmation"
+        },
+        {
+            "metric_id": "m-overdue-share",
+            "name": "Share of loans returned late",
+            "target": 10,
+            "unit": "percent",
+            "unit_ref": {
+                "id": "cn:core:unit:percent",
+                "kind": "unit",
+                "version": "1.0.0"
+            },
+            "measurement_method": "Late returns divided by all returns, per month"
+        }
+    ],
+    "links": [
+        {
+            "rel": "source",
+            "href": "https://example.org/lantern/brief"
+        }
+    ],
+    "seed_refs_ingested": [
+        {
+            "seed_id": "seed-lending-overview"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:unit:ms",
+            "kind": "unit",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:unit:percent",
+            "kind": "unit",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:role:neighbourhood-member",
+            "kind": "role",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:role:volunteer-librarian",
+            "kind": "role",
+            "version": "1.0.0"
+        }
+    ]
+}

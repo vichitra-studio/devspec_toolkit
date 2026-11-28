@@ -1,0 +1,147 @@
+{
+  "$schema": "vc:00-charter",
+  "id": "charter-password-reset",
+  "title": "Password reset charter",
+  "owner": "product",
+  "created_at": "2026-11-15T00:00:00Z",
+  "problem_statement": "Members who forget their password must wait for support to get back into their account, which costs members time and support staff effort.",
+  "scope_items": [
+    {
+      "scope_id": "scope-password-reset",
+      "scope": "in",
+      "text": "A registered member can reset a forgotten password through an emailed single-use link.",
+      "derives_from": [
+        "seed-accounts",
+        "need-fewer-reset-tickets"
+      ]
+    },
+    {
+      "scope_id": "scope-sms-reset",
+      "scope": "out",
+      "scope_reason": "Not offered in this product version.",
+      "text": "Password reset by SMS.",
+      "derives_from": [
+        "seed-accounts"
+      ]
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "asm-member-controls-email",
+      "text": "A member's email account is under the member's control.",
+      "derives_from": [
+        "seed-accounts"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "risk_id": "risk-reset-link-takeover",
+      "scope": "in",
+      "text": "Reset links could be replayed or guessed to take over accounts.",
+      "derives_from": [
+        "seed-accounts",
+        "asm-member-controls-email"
+      ]
+    }
+  ],
+  "stakeholders": [
+    {
+      "stakeholder_id": "sh-support-lead",
+      "role": "Support lead",
+      "needs": [
+        {
+          "need_id": "need-fewer-reset-tickets",
+          "text": "Fewer password-reset tickets",
+          "derives_from": [
+            "seed-accounts"
+          ]
+        }
+      ],
+      "role_ref": {
+        "id": "cn:project:role:support-lead",
+        "kind": "role",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "user_segments": [
+    {
+      "segment_id": "seg-registered-member",
+      "description": "People with an account and a verified email address.",
+      "jobs_to_be_done": [
+        "Get back into my account quickly"
+      ],
+      "pains": [
+        "Waiting a day for support"
+      ],
+      "gains": [
+        "Self-service recovery"
+      ],
+      "derives_from": [
+        "seed-accounts"
+      ]
+    }
+  ],
+  "success_metrics": [
+    {
+      "metric_id": "metric-recovery-time",
+      "name": "Time To Recover",
+      "target": "<= 5 min",
+      "unit": "min",
+      "measurement_method": "Median time from reset request to successful login, from the auth service log.",
+      "unit_ref": {
+        "id": "cn:project:unit:min",
+        "kind": "unit",
+        "version": "1.0.0"
+      },
+      "derives_from": [
+        "seed-accounts",
+        "need-fewer-reset-tickets"
+      ]
+    },
+    {
+      "metric_id": "metric-reset-completion-rate",
+      "name": "Reset Completion Rate",
+      "target": 90,
+      "unit": "percent",
+      "measurement_method": "Share of reset requests that end in a successful login within 30 minutes, from the auth service log.",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit",
+        "version": "1.0.0"
+      },
+      "derives_from": [
+        "seed-accounts",
+        "need-fewer-reset-tickets"
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "constraint_id": "con-staged-delivery",
+      "scope": "in",
+      "text": "Every change goes through dev, CI and staging before production.",
+      "derives_from": [
+        "seed-accounts"
+      ]
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:project:unit:min",
+      "kind": "unit",
+      "version": "^1.0.0"
+    },
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit",
+      "version": "^1.0.0"
+    },
+    {
+      "id": "cn:project:role:support-lead",
+      "kind": "role",
+      "version": "^1.0.0"
+    }
+  ]
+}

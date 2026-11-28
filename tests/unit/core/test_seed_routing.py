@@ -5,7 +5,9 @@ contract (plan §3.14).
 """
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 
 from specdev_tools.core.seed_routing import resolve_seed_paths, resolve_seeds_for_step
 
@@ -63,16 +65,16 @@ class TestPlainStep:
         assert step_ids == ["s-a"]
         assert "s-umbrella" not in step_ids
 
-    def test_13a_no_umbrella(self):
-        """Umbrella semantics must NOT apply to "13a"."""
+    def test_04_no_umbrella(self):
+        """Umbrella semantics must NOT apply to "04"."""
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={
-                "13a": ["s-impl"],
+                "04": ["s-impl"],
                 "16": ["s-umbrella"],
             },
         )
-        _, step_ids = resolve_seeds_for_step("13a", manifest)
+        _, step_ids = resolve_seeds_for_step("04", manifest)
         assert step_ids == ["s-impl"]
         assert "s-umbrella" not in step_ids
 
@@ -113,8 +115,7 @@ class TestStep16Aggregate:
         assert "s-16c" in step_ids
 
     def test_bare_16_key_explicitly_included(self):
-        """Bare "16" key must appear — this is the deliberate behavior
-        change vs seed_lint._collect_required_seeds which skipped it."""
+        """Bare "16" key must appear: it is consulted with 16a, 16b and 16c."""
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={
@@ -256,6 +257,21 @@ class TestOrdering:
         # remainder in encounter order: s-z, s-y, s-x
         remainder = step_ids[1:]
         assert remainder == ["s-z", "s-y", "s-x"]
+
+    def test_a_seed_left_out_of_global_seed_order_is_read_after_the_listed_ones(self):
+        manifest = _make_manifest(
+            global_seed_order=["s-a", "s-b"],
+            step_requirements={"04": ["s-left-out", "s-b", "s-a"]},
+        )
+        _, step_ids = resolve_seeds_for_step("04", manifest)
+        assert step_ids == ["s-a", "s-b", "s-left-out"]
+
+    def test_the_global_seed_order_description_says_a_seed_may_be_left_out(self):
+        schema_path = Path(__file__).resolve().parents[3] / "schema" / "seed_manifest.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        description = schema["properties"]["global_seed_order"]["description"]
+        assert "may be left out" in description
+        assert "at minimum" not in description
 
 
 # ---------------------------------------------------------------------------
@@ -409,13 +425,13 @@ class TestUmbrellaIsolation:
         _, step_ids = resolve_seeds_for_step("00", manifest)
         assert "s-umbrella" not in step_ids
 
-    def test_16_bare_does_not_leak_into_13a(self):
+    def test_16_bare_does_not_leak_into_02a_with_an_extension_seed(self):
         manifest = _make_manifest(
             global_seed_order=[],
             step_requirements={
-                "13a": ["s-ext"],
+                "02a": ["s-ext"],
                 "16": ["s-umbrella"],
             },
         )
-        _, step_ids = resolve_seeds_for_step("13a", manifest)
+        _, step_ids = resolve_seeds_for_step("02a", manifest)
         assert "s-umbrella" not in step_ids

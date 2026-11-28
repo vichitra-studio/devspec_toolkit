@@ -8,12 +8,12 @@ toolkit-generated artifacts must satisfy toolkit-defined invariants.
 
 A step is "accounted for" if it appears in any of:
   1. ``registry`` — as a basename whose step field matches, OR
-  2. ``steps_without_entry_arrays`` — explicit opt-out (no id-bearing arrays), OR
-  3. ``steps_with_deferred_registration`` — deferred (e.g. per-milestone files).
+  2. ``steps_without_entry_arrays`` — explicit opt-out (no node kind of its own: no schema, or
+     records that are blocks inside another step's file).
 
 Reads directly from ``devspec_toolkit/tools/entry_key_registry.json``.
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_step_registry_coverage.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/
@@ -48,14 +48,13 @@ def _load_registry_doc() -> dict:
 def _opted_out_steps(doc: dict) -> set[str]:
     """Return steps in steps_without_entry_arrays (supports dict and list formats)."""
     opted: set[str] = set()
-    for key in ("steps_without_entry_arrays", "steps_with_deferred_registration"):
-        entry = doc.get(key, [])
-        if isinstance(entry, dict):
-            opted.update(entry.keys())
-        elif isinstance(entry, list):
-            for item in entry:
-                if isinstance(item, dict) and "step" in item:
-                    opted.add(item["step"])
+    entry = doc.get("steps_without_entry_arrays", [])
+    if isinstance(entry, dict):
+        opted.update(entry.keys())
+    elif isinstance(entry, list):
+        for item in entry:
+            if isinstance(item, dict) and "step" in item:
+                opted.add(item["step"])
     return opted
 
 
@@ -65,7 +64,7 @@ def _registered_steps(doc: dict) -> set[str]:
     for _bn, entry in doc.get("registry", {}).items():
         if not entry.get("_special", False):
             step = entry.get("step")
-            if step:
+            if step and step != "extras":  # record hosts (extras/verification/*) belong to no pipeline step
                 registered.add(step)
     return registered
 
@@ -101,13 +100,12 @@ class TestStepRegistryCoverage:
 
     @pytest.mark.parametrize("step", _load_steps(), ids=lambda s: f"step_{s}")
     def test_step_is_accounted_for(self, step: str, accounted_steps: set[str]) -> None:
-        """Step must be registered, in steps_without_entry_arrays, or in steps_with_deferred_registration."""
+        """Step must be registered or in steps_without_entry_arrays."""
         assert step in accounted_steps, (
             f"Step '{step}' is not accounted for in entry_key_registry.json. "
             "It must appear in one of: "
-            "(1) registry (as a basename starting with '{step}_'), "
-            "(2) steps_without_entry_arrays, or "
-            "(3) steps_with_deferred_registration. "
+            f"(1) registry (as a basename starting with '{step}_') or "
+            "(2) steps_without_entry_arrays. "
             "Re-run: specdev registry-generate --repo-root <toolkit-path>"
         )
 

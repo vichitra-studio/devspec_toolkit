@@ -65,8 +65,8 @@
       "$anchor": "stepId",
       "type": "string",
       "pattern": "^[0-9]{2}[a-c]?$",
-      "description": "Canonical pipeline step identifier. Two digits, optionally followed by a single suffix letter from a/b/c (sub-step letters are restricted because the pipeline only declares 02a/13a/16a/16b/16c). Examples: '00', '02a', '16c'. Anti-pattern: free-form letter suffixes ('04d', '16z') — these would never resolve to a real step in step_order.json. Used everywhere a step needs to be referenced (downstream_consumers, required_spec_inputs, specRefIngested.step_id) so the validation surface stays in lockstep across spec/, tools/, and host repos.",
-      "examples": ["00", "01", "02a", "13a", "16", "16a", "16b", "16c"]
+      "description": "Canonical pipeline step identifier. Two digits, optionally followed by a single suffix letter from a/b/c (sub-step letters are restricted because the pipeline only declares 02a/16a/16b/16c). Examples: '00', '02a', '16c'. Anti-pattern: free-form letter suffixes ('04d', '16z') — these would never resolve to a real step in step_order.json. Used everywhere a step needs to be referenced (downstream_consumers, required_spec_inputs) so the validation surface stays in lockstep across spec/, tools/, and host repos.",
+      "examples": ["00", "01", "02a", "16", "16a", "16b", "16c"]
     },
     "milestoneStatus": {
       "$anchor": "milestoneStatus",
@@ -78,7 +78,7 @@
         "deferred"
       ],
       "default": "pending",
-      "description": "Progress status for milestones. Decision rules: 'pending' — not yet started (default); 'in_progress' — actively being worked, assigned developer exists; 'done' — all deliverables completed and verified against acceptance criteria; 'deferred' — explicitly postponed to a future milestone. Anti-pattern: using 'deferred' as a synonym for 'not yet started' — only defer items that were previously planned and consciously deprioritised. Note: task-level status is a separate, wider enum (see 14_roadmap's tasks[].status, which adds 'wont_do') and is not backed by this atom."
+      "description": "Progress status for milestones. Decision rules: 'pending' — not yet started (default); 'in_progress' — actively being worked, assigned developer exists; 'done' — the milestone is closed and its close record says who signed it off; 'deferred' — explicitly postponed to a future milestone. Anti-pattern: using 'deferred' as a synonym for 'not yet started' — only defer items that were previously planned and consciously deprioritised. Note: this atom backs the status on the Step 16 anchor row; the roadmap stores no milestone or task status."
     },
     "severityLevel": {
       "$anchor": "severityLevel",
@@ -90,17 +90,6 @@
         "critical"
       ],
       "description": "Severity or risk level across threat assessments, milestone risk ratings, and review findings. Decision rules: 'critical' — system cannot operate or data is permanently corrupted (e.g., auth bypass, data loss); 'high' — significant customer-visible impact or security vulnerability exploitable without authentication; 'medium' — degraded functionality with a workaround available, or authenticated exploit only; 'low' — cosmetic or UX issues, or theoretical attack paths with significant attacker prerequisites."
-    },
-    "ambiguityStatus": {
-      "$anchor": "ambiguityStatus",
-      "type": "string",
-      "enum": [
-        "resolved",
-        "tracking",
-        "deferred",
-        "blocked"
-      ],
-      "description": "Resolution status for an ambiguity across planning, execution, and anchor contexts. Decision rules: 'resolved' — decision recorded and no further action needed; 'tracking' — under observation, revisit each cycle; 'deferred' — consciously postponed to a later milestone; 'blocked' — cannot proceed without external input. Shared by planning ambiguities (16 anchor, 16a plan), emergent ambiguities (16b execution), and any future ambiguity-bearing artifact — change this enum in one place, not per schema."
     },
     "httpMethod": {
       "$anchor": "httpMethod",
@@ -114,20 +103,6 @@
       ],
       "description": "Standard HTTP methods for REST API interface contracts. Decision rules: GET — read without side effects, safe and idempotent; POST — create a new resource or trigger a non-idempotent action; PUT — full replacement of an existing resource, idempotent; PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource. Anti-pattern: using POST for idempotent updates (use PUT/PATCH) or using GET for actions with side effects."
     },
-    "httpMethodFull": {
-      "$anchor": "httpMethodFull",
-      "type": "string",
-      "enum": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "PATCH",
-        "OPTIONS",
-        "HEAD"
-      ],
-      "description": "Extended HTTP method set including OPTIONS and HEAD, used for scaffold interface mappings. Includes all five standard REST methods plus: OPTIONS — returns allowed methods for a resource (used in CORS preflight); HEAD — returns headers only, no response body (used for existence checks). Use OPTIONS and HEAD only when the scaffold explicitly maps them to a route handler."
-    },
     "componentType": {
       "$anchor": "componentType",
       "type": "string",
@@ -138,10 +113,9 @@
         "cache",
         "job",
         "ui",
-        "lib",
-        "external"
+        "lib"
       ],
-      "description": "Architectural component type classification in system sketches. Decision rules: 'service' — stateless business logic process (REST API, gRPC service); 'db' — persistent store with durable writes (PostgreSQL, DynamoDB, MongoDB); 'queue' — async message broker with a channel/topic model (Kafka, SQS, RabbitMQ); 'cache' — ephemeral in-memory store (Redis, Memcached); 'job' — triggered or scheduled batch process (cron job, AWS Lambda); 'ui' — browser or mobile frontend application; 'lib' — importable library with no own runtime or deployment; 'external' — third-party service outside the project boundary (Stripe, Auth0, Twilio). Anti-pattern: calling a message broker a 'db' — use 'queue' for any async publish/subscribe component."
+      "description": "Architectural component type classification in system sketches. Decision rules: 'service' — stateless business logic process (REST API, gRPC service); 'db' — persistent store with durable writes (PostgreSQL, DynamoDB, MongoDB); 'queue' — async message broker with a channel/topic model (Kafka, SQS, RabbitMQ); 'cache' — ephemeral in-memory store (Redis, Memcached); 'job' — triggered or scheduled batch process (cron job, AWS Lambda); 'ui' — browser or mobile frontend application; 'lib' — importable library with no own runtime or deployment. A third-party service outside the project boundary (Stripe, Auth0, Twilio) is not a component: it is a third-party node. Anti-pattern: calling a message broker a 'db' — use 'queue' for any async publish/subscribe component."
     },
     "connectionProtocol": {
       "$anchor": "connectionProtocol",
@@ -227,9 +201,10 @@
         "unit",
         "contract",
         "e2e",
+        "manual",
         "redteam"
       ],
-      "description": "Testing mode for fixture definitions. Decision rules: 'unit' — test a single function or rule in isolation, no network calls, all dependencies mocked; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but HTTP layer is live; 'e2e' — test a full user journey across integrated components (database, queue, external calls may be stubbed but service layer is real); 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. Anti-pattern: using 'unit' for tests that make real HTTP calls — those are 'contract' or 'e2e'."
+      "description": "Testing mode for fixture definitions. Decision rules: 'unit' — test a single function or rule in isolation, no network calls, all dependencies mocked; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but HTTP layer is live; 'e2e' — test a full user journey across integrated components (database, queue, external calls may be stubbed but service layer is real); 'manual' — verified by a person following written steps, not by an automated run; 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. Anti-pattern: using 'unit' for tests that make real HTTP calls — those are 'contract' or 'e2e'."
     },
     "threatCategory": {
       "$anchor": "threatCategory",

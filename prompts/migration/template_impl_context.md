@@ -1,101 +1,87 @@
-# Migration: Implementation Context (Step 16, post-split)
+<!-- Migration template: step {{STEP_ID}}, {{SOURCE_VERSION}} to {{TARGET_VERSION}} -->
+# Migration: Implementation Context (Anchor) (Step 16)
 
-## Schema URIs
+## Schema URI
 
-The pre-split `spec/16_impl_context.json` (single artifact using
-`vc:16-impl-context`) has been split into **two** distinct artifact types. A
-host repo upgrading from an earlier version must produce BOTH:
+`vc:16-anchor` for the anchor (`spec/16_impl_context.json`); `vc:16-impl-context` for the milestone plans under `spec/impl_context/`.
 
-1. **Trinity Anchor** — `spec/16_impl_context.json` — `vc:16-anchor`
-2. **Milestone Plans** — `spec/impl_context/<milestone>_plan.json` — `vc:16-impl-context`
+## Judgement pass
 
-## Required Changes
+`specdev align apply spec --auto` has run and been committed. What it could not decide is a worklist item. This pass settles the items of step 16, clears the step's baseline entries and ends with the step's check. Do it after the steps above 16 have passed. `blocking` on an item is a display hint; nothing gates on it.
 
-**Step-base fields (required in every artifact — both anchor and milestone plans)**
+### Items of step 16
 
-- `id`: Unique kebab-case identifier for this artifact instance (`$ref: vc:core:atoms#kebabId`).
-- `owner`: One of `api | ui | system | ops | data | product | business | engineering`.
-- `created_at`: ISO 8601 timestamp (`$ref: vc:core:atoms#timestamp`).
-- `canonical_refs_used`: Array of canonical reference objects.
-- `$schema`: `vc:16-anchor` for the anchor; `vc:16-impl-context` for milestone plans.
+| Kind | Who | What it asks | Answer with |
+|---|---|---|---|
+| `ambiguity-about` | operator | An open item of the anchor does not name exactly one node of an earlier step | Answer it in the spec, then delete the item: `specdev json delete --id <item-id>`. An `about` repairs the item's shape (E520) and nothing more: `spec-check --merge`, which `align validate` runs, reports E631 for every open item outside a frozen plan until the question is answered and the item deleted. If the question is still open, delete the item here and raise it again after the migration. (Shape only: `specdev json patch --id <item-id> .about '["<node-id>"]'`, then `specdev json delete <file> '<item path>.<field>'` for each old field such as severity, status, impact; `specdev node show <item-id>` prints file and path) |
+| `anchor-open-item` | operator | An open item of the anchor is not exempt from the open-item rule | Answer it in the spec, then delete the item: `specdev json delete --id <item-id>`. An open item cannot survive `align validate` (E631) wherever it stands, so raising it again in another artifact does not finish the migration; if the question is still open, delete the item here and raise it again after the migration: `specdev json insert --step <NN> .ambiguities '{"id":"<id>","description":"<text>","about":["<earlier-node-id>"]}'` |
+| `collided-id-citation` | agent | Text cites an id that two nodes defined; decide which one it meant | When it meant the renamed one: `specdev json patch <file> '<jq path of the text>' '"<text with the new id>"'`. When the text is in a closed plan (the item says so), leave it as it is and resolve the item |
+| `duplicate-promoted-item` | operator | One open item is in the anchor and in a plan | The run renamed the plan's copy to `<id>-2` (the next number not in use, if that is taken; its output has the line `duplicate id renamed: <id> -> <new id>`), so each copy has its own id. Both are open items: answer the question in the spec, then delete each by its id, `specdev json delete --id <id>` and `specdev json delete --id <id>-2`. The merge check (E631) wants both gone before `align validate`; a question that is still open is deleted and raised again after the migration |
+| `plan-item-disposition` | operator | An item of an open plan was `deferred` or `wont_do`, or the whole open plan was `deferred` (the item is then about the milestone and quotes the old reason); the disposition fields were removed | For an item: the task is dropped (`specdev node status <task-id> deprecated`), deferred (a disposition on the task, see step 14), or the item is dropped when 16a re-plans. For a whole plan: `specdev milestone defer <milestone-id> --reason "..."` keeps the deferral, or the milestone goes on |
+| `plan-without-row` | operator | No anchor row names the plan file, so its milestone is unknown | `specdev json patch <plan-file> .milestone '"<milestone-id>"'` |
+| `plan-milestone-mismatch` | operator | A plan's `milestone` differs from the anchor row that names it | Keep whichever is right: `specdev json patch <plan-file> .milestone '"<milestone-id>"'`, or the row |
+| `legacy-close-skipped` | operator | A milestone the sources call done has no anchor row or no plan naming it, so the legacy close was not written | Add the row or the plan's `milestone` key, then run `specdev align apply spec --auto --repo-root ./devspec_toolkit --git-root .` again: the close is written then |
 
-### Trinity Anchor (`vc:16-anchor`) — `spec/16_impl_context.json`
+### Items any step can carry
 
-Required fields beyond step-base:
+| Kind | Who | What it asks | Answer with |
+|---|---|---|---|
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry. When the entry points to a node of a later step, the link belongs to that node's own field (`derives_from` of an FR, for example): check it there with `specdev node show <target-id>`, then resolve the item |
+| `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
+| `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
+| `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |
+| `gate-text` | agent | A gate that was free text got a minted id | Name it: `specdev node rename <minted-id> <gate-id>` |
+| `prose-ids` | agent | Text names ids (the evidence lists each); a field of the node may take them as links. Written by `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, not by `apply` | Link the id (`specdev json insert --id <node-id> .<field> '"<target-id>"'`) or reword the text: `specdev json patch --id <node-id> .<text-field> '"<new text>"'` |
+| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed in a node of this step: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'` (in a trinity step no node can list a seed, and in step 13 only a node of an extension whose schema declares `derives_from` to a seed can: otherwise move the route to the step that distils it); or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
+| `unresolved-link` | operator | A link the resolver refused (E700 to E702) got no lock entry | Fix or drop the link with `specdev json patch --id <node-id> .<field> '["<target-id>"]'`; `specdev attest <node-id> --yes` then writes its entry |
 
-- `artifact_role`: **Must be the literal string `"anchor"`** (JSON Schema `const`).
-- `plan.summary`: Object with `functional_summary`, `scope_in`, `scope_out`, `target_file_patterns`.
-- `plan.ambiguities`: Array of unresolved decisions carried across Trinity cycles. Each item requires `id`, `description`, `severity` (`low | medium | high | critical` — the anchor uses `severityLevel`, not the milestone-plan `blocking | non_blocking`). Empty array is valid.
-- `plan.drift.checks`: Array of cross-cycle drift-check strings.
-- `plan.milestone_index`: Array registering each active/pending/done/deferred milestone. Each entry requires `milestone_id`, `context_path` (pointing at the 16a plan file under `spec/impl_context/`), `status`, `fr_refs`, `checklist_id_prefix`, `summary`.
+### Procedure
 
-The anchor schema **forbids** `execution`, `review`, top-level `milestone_ref`, and `plan.spec_alignment.checklist` via `unevaluatedProperties: false`. All per-milestone detail lives in the corresponding milestone plan file.
+1. Once per migration, before the first step pass, run the proposers; they add the items `apply` does not write (`refines`, `prose-ids`, `legacy-binding`, `legacy-fixture`), write only the worklist, and a rerun adds none: `specdev align propose spec --kind refines --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind bindings --repo-root ./devspec_toolkit --git-root .`.
+2. List the open items of the step: `specdev align triage spec --step 16 --repo-root ./devspec_toolkit --git-root .` (add `--audience agent` for the ones an agent settles; an operator item is decided by a person).
+3. Read each item's evidence and proposal, and the node it names: `specdev node show <node-id>`. A proposal says what the script would do; it has not been applied.
+4. Make the edit with the id-keyed commands of the table. Nothing is written into a file under `spec/` by hand; read through `specdev json read <file> '<jq path>'`, not the file.
+5. Close the item: `specdev align triage spec --resolve <item-id> --note "<what was decided>" --repo-root ./devspec_toolkit --git-root .`.
+6. Clear the step's baseline entries one node at a time. The check lists one E882 per entry: review the node's links, then `specdev attest <node-id>` previews what would be written and `specdev attest <node-id> --yes` writes it. A node of a closed milestone keeps its marker (E765).
+7. Check the step: `specdev spec-check spec --step 16 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` ends `RESULT: CLEAR` when the step has no error of its own and no new error of an earlier step. Debt of an earlier step that still has E882 entries is listed and does not block. `specdev guide <code>` explains an error code.
 
-### Milestone Plans (`vc:16-impl-context`) — `spec/impl_context/<milestone>_plan.json`
+### Context
 
-One file per milestone (shared across 16a plan / 16b execution / 16c review). Required beyond step-base:
+- A plan of a closed milestone keeps its history: nothing is to be done in it. A milestone that 1.1.1 called done was closed by the migration (its `close` names `legacy-migration`).
 
-- `plan.status`: `active | deferred`.
-- `plan.summary`: Same structure as the anchor but scoped to this milestone.
-- `plan.spec_alignment.checklist`: Array of checklist items. Each item id **MUST be prefixed with the `checklist_id_prefix` declared for this milestone in the anchor's `milestone_index[]`** (e.g. prefix `AUTH` → `AUTH_LOGIN_01`). Two milestones sharing a prefix trigger E309 ANCHOR_CHECKLIST_DRIFT.
-- Non-deferred checklist items also require `implementation` (with `status` and `actions`) and `fixture_ref` for behavioural types. `nfr_refs` is required for behavioural types **only when the owning FR has at least one NFR tracing to it in `07_nfrs.json`** — FRs with no NFRs may omit it without an error.
-- `plan.review_requirements.test_commands`: Array with `minItems: 1` when `status == "active"`.
+## Shape in 1.2.0 (anchor)
 
-Optional sections (populated as the Trinity Loop progresses):
+The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
 
-- `execution`: Files touched, execution results, critical evidence (written by 16b).
-- `review`: Findings, ratings, verdict, next actions (written by 16c).
-- `plan.ambiguities`: Planning-phase ambiguities, `severity` uses `blocking | non_blocking` (distinct from the anchor's `severityLevel` enum).
+- `artifact_role` (value, required)
+- `plan` (object, required): requires `ambiguities`, `drift`, `milestone_index`, `summary`
 
-## Migration Steps
+## Shape in 1.2.0 (milestone plan)
 
-Applying the split to an existing host repo:
+The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
 
-1. **Preserve the legacy artifact**: copy `spec/16_impl_context.json` to `spec/impl_context/<milestone_id>_plan.json` (for whichever milestone the original content belonged to). Leave `$schema` as `vc:16-impl-context`. Drop `artifact_role` if present.
-2. **Rewrite `spec/16_impl_context.json` against the anchor contract**: see `prompts/prompt_16_impl_context.md` and `schema/16_anchor.schema.json`. The new file carries only `artifact_role: "anchor"`, `plan.summary`, `plan.ambiguities`, `plan.drift.checks`, and `plan.milestone_index`.
-3. **Use the shared milestone status enum**: `milestone_index[].status` is one of `pending | in_progress | done | deferred` (from `vc:core:atoms#milestoneStatus`). Earlier drafts used `active | planned` — those values are now schema-rejected.
-4. **Derive `checklist_id_prefix` per milestone**: allocate a unique SCREAMING_SNAKE prefix (e.g. `AUTH`, `PAYMENT`). Ensure it does not collide with other milestones' prefixes. Update each 16a plan's checklist ids to use this prefix.
-5. **Validate**:
+- `extensions` (object, optional): fields `execution_context`
+- `plan` (object, required): requires `review_requirements`
+- `execution` (object, optional): fields `config_validation`, `emergent_ambiguities`, `files_touched`, `records`
+- `review` (object, optional): fields `delivery_status`, `findings`, `next_actions`, `ratings`, `recorded_at`, `security_status`, `semantic_review`, `verdict`
+- `policy_ref` (object, optional): requires `id`, `kind`
+- `risk_category_ref` (object, optional): requires `id`, `kind`
+- `milestone` (string, required)
 
-   ```bash
-   ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-   ```
+## Output Contract
 
-   `spec-check` surfaces any new E308 (scope/FR-ownership conflict), E309 (checklist ID drift), W587 (stale drift checks), W588 (unreadable milestone), and W589 (mis-schemaed milestone) signals introduced by the split.
+The migrated artifact MUST include:
 
-   **Curing W589 on legacy files moved into `impl_context/`**: the anchor validator scans every `*.json` under `spec/impl_context/` and treats files whose `$schema` is not exactly `"vc:16-impl-context"` as mis-schemaed. If step 1 above moved a legacy artifact in but the `$schema` is missing, blank, or set to anything else (a stray draft, a backup, a doc index), either set `"$schema": "vc:16-impl-context"` on the file or remove it from `impl_context/`. Anchor `$schema: vc:16-anchor` files are NOT placed under `impl_context/` — the anchor lives at `spec/16_impl_context.json`.
-
-## Optional Fields (milestone plan only)
-
-- `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `plan.solution.architecture_sketch`: Free-form description of the solution approach.
-- `plan.context.existing_structures` / `plan.context.coding_examples`: Grounding references into the current codebase.
-- `plan.review_requirements.guidelines`, `plan.review_requirements.nfr_measurement_methods`, `plan.review_requirements.timeout_constants`.
-- `plan.security`, `plan.docs`, `plan.delivery`: each either `{status: not_applicable, reason}` or `{status: planned, …}`.
-- `plan.coverage_status`: Integer counts of `total`, `verified`, `deferred`, `pending` checklist items.
-- `extensions.review_state` / `extensions.execution_context`.
-
-## Context
-
-Before the split, `spec/16_impl_context.json` tried to serve two purposes: a scope/ownership declaration spanning all milestones AND the per-milestone implementation contract for the active Trinity cycle. Validating both through one schema meant the anchor paid the milestone-plan validation cost (forced per-task behavior+validation pairs, hollow stub items, ~130 item bloat on a real host repo). The split gives each artifact its own contract, its own validator, and its own authoring prompt.
-
-New error/warning codes introduced by the split:
-
-- **E308** ANCHOR_SCOPE_DRIFT — scope contradiction (bidirectional) or FR/API ownership conflict between in-flight milestones.
-- **E309** ANCHOR_CHECKLIST_DRIFT — cross-milestone checklist ID collision or duplicate `checklist_id_prefix`.
-- **W585** ANCHOR_DRIFT_SKIP — drift check skipped (usually routing-related).
-- **W586** ANCHOR_VALIDATOR_WRONG_ARTIFACT — anchor validator invoked on a non-anchor artifact.
-- **W587** ANCHOR_DRIFT_CHECKS_STALE — `milestone_index` non-empty but `drift.checks` empty.
-- **W588** ANCHOR_MILESTONE_UNREADABLE — a milestone plan file could not be parsed.
-- **W589** ANCHOR_MILESTONE_MISSCHEMAED — file under `impl_context/` declares the wrong `$schema`.
+- `$schema`: `vc:16-anchor` (anchor) or `vc:16-impl-context`.
+- `canonical_refs_used`: array of canonical reference objects (`[]` when there are none).
 
 ## Full Generation Reference
 
-To generate these artifacts from scratch (rather than migrate an existing one), use the canonical step prompts:
+To generate this artifact from scratch (rather than migrate an existing one), use the canonical step prompt:
 
-- **Anchor**: `prompts/prompt_16_impl_context.md`
-- **Milestone plan (16a)**: `prompts/prompt_16a_impl_planner.md`
-- **Milestone execution (16b)**: `prompts/prompt_16b_impl_coder.md`
-- **Milestone review (16c)**: `prompts/prompt_16c_impl_reviewer.md`
+- `prompts/prompt_16_impl_context.md`
+- `prompts/prompt_16a_impl_planner.md`
+- `prompts/prompt_16b_impl_coder.md`
+- `prompts/prompt_16c_impl_reviewer.md`
 
-Each generation prompt contains the complete Output Contract, Self-Audit Gate, and schema authority reference needed to produce a valid artifact.
+The generation prompt contains the complete Output Contract, Self-Audit Gate, and schema authority reference needed to produce a valid artifact.

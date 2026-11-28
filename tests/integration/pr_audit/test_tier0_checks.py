@@ -12,8 +12,11 @@ Coverage:
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Load tier0_checks as a module from its script path
@@ -96,32 +99,47 @@ def test_t09_only_changelog_files_exempt_from_trigger():
     assert result == [], f"Expected [], got {result}"
 
 
-def test_t09_commands_subpackage_triggers_finding(tmp_path):
-    """T0-09: a file under tools/specdev_tools/commands/ triggers the changelog requirement.
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tools/specdev_tools/trace/commands.py",
+        "tools/specdev_tools/trace/id_write_commands.py",
+        "tools/specdev_tools/lifecycle/commands.py",
+    ],
+)
+def test_t09_a_command_module_triggers_finding(tmp_path, path):
+    """T0-09: a command module of a package (commands.py, <name>_commands.py) triggers the changelog requirement.
 
-    When a commands/ subpackage file changes without a changelog entry the
-    prefix-match branch (CLI_PREFIX) must fire, producing at least one finding.
     REPO_ROOT is temporarily redirected to tmp_path (which has no changelog
     files) so has_entry stays False and a finding is emitted.
     """
-    changed_files = ["tools/specdev_tools/commands/foo.py"]
     original_repo_root = _tier0.REPO_ROOT
     _tier0.REPO_ROOT = tmp_path
     try:
-        result = _tier0.check_t09_changelog_entry_present({}, changed_files)
+        result = _tier0.check_t09_changelog_entry_present({}, [path])
     finally:
         _tier0.REPO_ROOT = original_repo_root
-    assert len(result) >= 1, f"Expected >=1 finding for commands/ file, got {result}"
+    assert len(result) >= 1, f"Expected >=1 finding for {path}, got {result}"
     assert result[0].get("catalog_tag") == "D11", (
         f"Expected catalog_tag='D11', got {result[0].get('catalog_tag')!r}"
     )
 
 
+def test_t09_a_module_that_is_not_a_command_module_triggers_nothing(tmp_path):
+    """T0-09: a module that registers no subcommand is not a CLI change."""
+    original_repo_root = _tier0.REPO_ROOT
+    _tier0.REPO_ROOT = tmp_path
+    try:
+        result = _tier0.check_t09_changelog_entry_present({}, ["tools/specdev_tools/trace/id_writes.py"])
+    finally:
+        _tier0.REPO_ROOT = original_repo_root
+    assert result == []
+
+
 def test_t09_cli_py_still_triggers_finding(tmp_path):
     """T0-09: tools/specdev_tools/cli.py still triggers the changelog requirement (regression).
 
-    The set-membership branch (CLI_PATHS) must continue to fire after the
-    broadening change so that the original trigger path is not broken.
+    The set-membership branch (CLI_PATHS) fires for the entry point itself.
     REPO_ROOT is temporarily redirected to tmp_path (which has no changelog
     files) so has_entry stays False and a finding is emitted.
     """
@@ -136,6 +154,77 @@ def test_t09_cli_py_still_triggers_finding(tmp_path):
     assert result[0].get("catalog_tag") == "D11", (
         f"Expected catalog_tag='D11', got {result[0].get('catalog_tag')!r}"
     )
+
+
+def _t09_findings(repo_root, changed_files):
+    """Run T0-09 with REPO_ROOT redirected to *repo_root* and return its findings."""
+    original_repo_root = _tier0.REPO_ROOT
+    _tier0.REPO_ROOT = repo_root
+    try:
+        return _tier0.check_t09_changelog_entry_present({}, changed_files)
+    finally:
+        _tier0.REPO_ROOT = original_repo_root
+
+
+_T09_TRIGGER = "tools/specdev_tools/cli.py"
+
+
+def _write_changelog_file(repo_root, name, text):
+    """Write changelog/<name> under *repo_root* (or CHANGELOG.md at its top for name 'CHANGELOG.md')."""
+    path = repo_root / name if name == "CHANGELOG.md" else repo_root / "changelog" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def test_t09_a_markdown_only_entry_does_not_satisfy(tmp_path):
+    """T0-09: the Markdown is rendered from the YAML, so a Markdown entry alone is no entry."""
+    _write_changelog_file(tmp_path, "unreleased.md", "A change that is described in text only.\n")
+    _write_changelog_file(tmp_path, "CHANGELOG.md", "## [Unreleased]\n\n- A change in text only.\n")
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+    assert result[0].get("catalog_tag") == "D11"
+
+
+def test_t09_the_unreleased_yaml_skeleton_does_not_satisfy(tmp_path):
+    """T0-09: the committed skeleton (`changes: []`) records nothing."""
+    _write_changelog_file(tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges: []\n')
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+
+
+def test_t09_an_unreleased_yaml_with_a_change_satisfies(tmp_path):
+    """T0-09: a `changes` item in changelog/unreleased.yaml is the entry."""
+    _write_changelog_file(
+        tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges:\n  - type: fix\n    description: x\n'
+    )
+    assert _t09_findings(tmp_path, [_T09_TRIGGER]) == []
+
+
+def test_t09_a_python_without_pyyaml_says_so(tmp_path, monkeypatch):
+    """T0-09: without PyYAML the finding names the missing module, not a missing entry."""
+    _write_changelog_file(
+        tmp_path, "unreleased.yaml", 'version: "unreleased"\nbreaking: false\nchanges:\n  - type: fix\n    description: x\n'
+    )
+    monkeypatch.setitem(sys.modules, "yaml", None)  # `import yaml` raises ImportError
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+    assert "PyYAML is not installed" in result[0]["message"]
+    assert "PyYAML is not installed" in " ".join(result[0]["evidence"])
+    assert "no changelog YAML entry found" not in result[0]["message"]
+
+
+def test_t09_an_unreadable_yaml_says_so(tmp_path):
+    """T0-09: a YAML file that does not parse is reported as unreadable, not as missing."""
+    _write_changelog_file(tmp_path, "unreleased.yaml", "changes: [unclosed\n")
+    result = _t09_findings(tmp_path, [_T09_TRIGGER])
+    assert len(result) == 1, f"Expected one finding, got {result}"
+    assert "unreadable" in result[0]["message"]
+    assert "no changelog YAML entry found" not in result[0]["message"]
+
+
+def test_t09_a_version_yaml_in_the_diff_satisfies(tmp_path):
+    """T0-09: a changelog/v<X.Y.Z>.yaml that the diff changes is the entry."""
+    assert _t09_findings(tmp_path, [_T09_TRIGGER, "changelog/v1.2.0.yaml"]) == []
 
 
 # ---------------------------------------------------------------------------
@@ -177,3 +266,67 @@ def test_t10_specdev_unavailable_emits_p2_finding():
     assert f.get("catalog_tag") == "D9", (
         f"Expected catalog_tag='D9', got {f.get('catalog_tag')!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# T0-10: every generator output is compared
+# ---------------------------------------------------------------------------
+
+
+def test_t10_redirects_every_output_flag_of_registry_generate():
+    """GENERATED_OUTPUTS names every ``--*out`` flag of ``registry-generate``, so a new output cannot go undiffed."""
+    from specdev_tools.cli import build_parser
+
+    subparsers = next(a for a in build_parser()._actions if getattr(a, "choices", None) and "registry-generate" in a.choices)
+    out_flags = {
+        flag
+        for action in subparsers.choices["registry-generate"]._actions
+        for flag in action.option_strings
+        if flag == "--out" or flag.endswith("-out")
+    }
+    assert {flag for flag, _rel in _tier0.GENERATED_OUTPUTS} == out_flags
+    for _flag, rel in _tier0.GENERATED_OUTPUTS:
+        assert (_tier0.REPO_ROOT / rel).is_file(), rel
+
+
+def test_t10_clean_tree_has_no_generator_drift():
+    """On the committed tree the five generated files equal a fresh generator run."""
+    findings = _tier0.check_t10_generated_artifacts_clean()
+    if any(f["message"].startswith("T0-10 skipped") for f in findings):
+        pytest.skip("the check found no specdev to run")
+    assert findings == []
+
+
+def test_t10_clean_tree_test_skips_when_specdev_is_not_found():
+    """Without ``specdev`` the clean-tree test skips; it neither fails nor passes."""
+    not_found = MagicMock(returncode=1, stdout="", stderr="specdev: command not found")
+    with patch("subprocess.run", return_value=not_found), pytest.raises(pytest.skip.Exception):
+        test_t10_clean_tree_has_no_generator_drift()
+
+
+
+@pytest.mark.parametrize(
+    "test_text",
+    [
+        "import specdev_tools.trace.lockfile as lockfile\n",
+        "from specdev_tools.trace.lockfile import read_lock\n",
+        "from specdev_tools.trace import lockfile\n",
+        "from specdev_tools.trace import (\n    attest,\n    lockfile,\n)\n",
+    ],
+)
+def test_t11_accepts_a_module_that_a_test_imports(test_text):
+    """A new module needs no ``test_<module>*.py`` when a test file imports it."""
+    assert _tier0._imported_by_a_test("tools/specdev_tools/trace/lockfile.py", [test_text])
+
+
+@pytest.mark.parametrize(
+    "test_text",
+    [
+        "from specdev_tools.trace import attest\n",
+        "from specdev_tools.graph import lockfile\n",
+        "lockfile = 'a word in a test, not an import'\n",
+    ],
+)
+def test_t11_does_not_accept_a_module_that_no_test_imports(test_text):
+    """Another module of the package, the same name in another package and a bare word are not an import."""
+    assert not _tier0._imported_by_a_test("tools/specdev_tools/trace/lockfile.py", [test_text])

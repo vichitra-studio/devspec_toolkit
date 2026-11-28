@@ -12,19 +12,10 @@
         "Process payment intents"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        },
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        },
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "derives_from": [
+        "capability-user-auth",
+        "capability-user-profile",
+        "capability-payment-processing"
       ]
     },
     {
@@ -36,39 +27,28 @@
         "Synchronize profile updates"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
+      "derives_from": [
+        "capability-user-profile"
       ]
     }
   ],
   "connections": [
     {
-      "from": "core-service",
-      "to": "aux-service",
+      "connection_id": "core-service-to-aux-service",
+      "derives_from": [
+        "core-service"
+      ],
+      "connects_to": [
+        "aux-service"
+      ],
       "protocol": "http",
       "trust_boundary": "internal",
-      "schema_ref": "file://schemas/aux.json",
       "rate_limit": {
         "rps": 200,
         "burst": 50,
         "scope": "client"
-      },
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
-      ]
+      }
     }
   ],
-  "tech_stack": {
-    "languages": [{ "name": "Python", "version": "3.12" }],
-    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
-    "infrastructure": [{ "name": "SQLite", "version": "3" }],
-    "tools": [{ "name": "pytest", "version": "8.0" }]
-  },
   "canonical_refs_used": []
 }

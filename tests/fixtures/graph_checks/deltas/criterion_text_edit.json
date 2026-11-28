@@ -1,0 +1,17 @@
+{
+  "description": "The text of ac-password-reset-3 changes: the criterion that task criterion tc-confirm-expired-token refines is no longer the one it refined.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/04_fr_list.json",
+      "path": [
+        "functional_requirements",
+        0,
+        "acceptance_criteria",
+        2,
+        "text"
+      ],
+      "value": "Given a reset token that has expired or was already used, when a new password is submitted with it, then the request is rejected, the stored password is unchanged and the member is told to ask for a new link."
+    }
+  ]
+}

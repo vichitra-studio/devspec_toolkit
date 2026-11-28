@@ -1,77 +1,67 @@
 """
 Integration tests for Step 11 (Red-Team / Failure Modes) validation.
 
-Validates that step 11 fixtures conform to schema and that reference
-validation logic works correctly using self-contained mock data.
+Validates that step 11 fixtures conform to the schema in the graph shape: a threat names what it
+``threatens`` and what it is ``mitigated_by``; an edge case does the same, and both links are required there.
 """
 
 import json
+import tempfile
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "step_11"
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+FIXTURES_DIR = _REPO_ROOT / "tests" / "fixtures" / "step_11"
 
-# ---------------------------------------------------------------------------
-# Mock ID index (replaces live spec/ reads)
-# ---------------------------------------------------------------------------
-
-MOCK_ID_INDEX = {
-    "api": {"api-ask", "api-search", "api-trace-retrieval"},
-    "component": {"comp-retrieval-engine", "comp-auth-service"},
-    "fr": {"fr-read-document", "fr-search-docs"},
-    "nfr": {"nfr-availability-api", "nfr-latency-p99"},
-    "inv": {"invariant-payload-validation", "inv-input-validation"},
-    "fixture": {"fix-happy-path-search"},
-    "doc": set(),
-    "capability": {"cap-search"},
+# The worked examples of the spec-graph design (threat and edge case "New" forms).
+_DOC_EXAMPLE_THREAT: dict[str, Any] = {
+    "threat_id": "threat-reset-token-replay",
+    "category": "authn",
+    "severity": "high",
+    "description": "An attacker who obtains a used or expired reset link replays it to set the account password.",
+    "derives_from": ["risk-reset-link-takeover"],
+    "threatens": ["api-password-reset-confirm"],
+    "mitigated_by": ["inv-reset-token-single-use", "fix-password-reset-expired-token"],
+    "risk_category_ref": {"id": "cn:project:risk_category:authn", "kind": "risk_category"},
+}
+_DOC_EXAMPLE_EDGE_CASE: dict[str, Any] = {
+    "id": "ec-token-at-expiry-second",
+    "scope": "in",
+    "description": "A token redeemed in the second it expires.",
+    "trigger": "Clock reaches issued_at + 30 min.",
+    "threatens": ["api-password-reset-confirm"],
+    "mitigated_by": ["ac-password-reset-3", "fix-password-reset-expired-token"],
 }
 
 
-# ---------------------------------------------------------------------------
-# Helper: reference validation (extracted from old script)
-# ---------------------------------------------------------------------------
+def _schema_errors(spec: dict[str, Any]) -> list[str]:
+    """Rendered E520 errors for a step 11 document."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "11_redteam.json"
+        path.write_text(json.dumps(spec))
+        errors = specdev_validate_file(str(_REPO_ROOT), str(path))
+    return [e.render() for e in errors if e.code == "E520"]
 
 
-def _validate_references(fixture_data, id_index):
-    """Return list of error strings for invalid references."""
-    errors = []
-    for threat in fixture_data.get("threats", []):
-        threat_id = threat.get("threat_id", "<unknown>")
-
-        # Target IDs
-        for target in threat.get("target_ids", []):
-            t_type = target.get("type")
-            t_id = target.get("id")
-            if t_type not in ("api", "component"):
-                errors.append(
-                    f"Threat {threat_id}: invalid target type '{t_type}'"
-                )
-                continue
-            known = id_index.get(t_type, set())
-            if known and t_id not in known:
-                errors.append(
-                    f"Threat {threat_id}: target '{t_id}' ({t_type}) not found"
-                )
-
-        # Mitigation IDs
-        for mit in threat.get("mitigations", []):
-            m_type = mit.get("type")
-            m_id = mit.get("id")
-            if m_type in ("inv", "nfr", "fr", "api", "capability", "fixture"):
-                known = id_index.get(m_type, set())
-                if known and m_id not in known:
-                    errors.append(
-                        f"Threat {threat_id}: mitigation '{m_id}' ({m_type}) not found"
-                    )
-
-    return errors
+def _doc_example_errors(mutate: Callable[[dict, dict], None]) -> list[str]:
+    """Schema errors for the design-doc threat and edge case after ``mutate(threat, edge_case)`` edits copies."""
+    spec = json.loads((FIXTURES_DIR / "valid_full.json").read_text())
+    threat = json.loads(json.dumps(_DOC_EXAMPLE_THREAT))
+    edge_case = json.loads(json.dumps(_DOC_EXAMPLE_EDGE_CASE))
+    mutate(threat, edge_case)
+    spec["threats"] = [threat]
+    spec["edge_cases"] = [edge_case]
+    return _schema_errors(spec)
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+def _assert_fails_naming(mutate: Callable[[dict, dict], None], needle: str) -> None:
+    rendered = _doc_example_errors(mutate)
+    assert any(needle in msg for msg in rendered), rendered
 
 
 class TestStep11Fixtures:
@@ -90,61 +80,53 @@ class TestStep11Fixtures:
         for field in ("$schema", "id", "owner", "threats", "edge_cases"):
             assert field in data, f"Missing required field: {field}"
 
-    def test_valid_full_references_resolve(self):
-        """All target and mitigation IDs in valid_full.json resolve against mock index."""
-        data = json.loads((FIXTURES_DIR / "valid_full.json").read_text())
-        errors = _validate_references(data, MOCK_ID_INDEX)
-        assert errors == [], f"Reference errors: {errors}"
+    def test_valid_full_has_no_schema_errors(self):
+        assert _schema_errors(json.loads((FIXTURES_DIR / "valid_full.json").read_text())) == []
 
-    def test_invalid_missing_target_lacks_target_ids(self):
-        """invalid_missing_target.json has a threat without target_ids."""
-        data = json.loads(
-            (FIXTURES_DIR / "invalid_missing_target.json").read_text()
-        )
-        threat = data["threats"][0]
-        assert "target_ids" not in threat, (
-            "Expected missing target_ids in invalid fixture"
-        )
+    def test_invalid_missing_target_lacks_threatens(self):
+        """invalid_missing_target.json has a threat without threatens, and the schema says so."""
+        data = json.loads((FIXTURES_DIR / "invalid_missing_target.json").read_text())
+        assert "threatens" not in data["threats"][0]
+        assert any("threatens" in msg for msg in _schema_errors(data))
 
     def test_invalid_category_has_bad_category(self):
-        """invalid_category.json uses a non-enum category value."""
-        data = json.loads(
-            (FIXTURES_DIR / "invalid_category.json").read_text()
+        """invalid_category.json uses a non-enum category value, and the schema says so."""
+        data = json.loads((FIXTURES_DIR / "invalid_category.json").read_text())
+        assert data["threats"][0]["category"] == "invalid-category"
+        assert any("'invalid-category' is not one of" in msg for msg in _schema_errors(data))
+
+    def test_doc_example_validates(self):
+        assert _doc_example_errors(lambda threat, edge_case: None) == []
+
+    def test_edge_case_with_empty_mitigated_by_fails(self):
+        _assert_fails_naming(lambda threat, edge_case: edge_case.update(mitigated_by=[]), "mitigated_by")
+
+    def test_edge_case_without_mitigated_by_or_threatens_fails(self):
+        _assert_fails_naming(lambda threat, edge_case: edge_case.pop("mitigated_by"), "mitigated_by")
+        _assert_fails_naming(lambda threat, edge_case: edge_case.pop("threatens"), "threatens")
+
+    def test_threat_without_mitigated_by_validates(self):
+        assert _doc_example_errors(lambda threat, edge_case: threat.pop("mitigated_by")) == []
+
+    def test_threat_without_threatens_fails(self):
+        _assert_fails_naming(lambda threat, edge_case: threat.pop("threatens"), "threatens")
+
+    def test_old_target_ids_and_mitigations_fail(self):
+        _assert_fails_naming(
+            lambda threat, edge_case: threat.update(target_ids=[{"type": "api", "id": "api-ask"}]), "target_ids"
         )
-        threat = data["threats"][0]
-        assert threat["category"] == "invalid-category"
+        _assert_fails_naming(
+            lambda threat, edge_case: threat.update(mitigations=[{"type": "inv", "id": "inv-x"}]), "mitigations"
+        )
 
-    def test_unresolvable_mitigation_detected(self):
-        """Reference validator catches a mitigation ID that does not exist."""
-        fake_fixture = {
-            "threats": [
-                {
-                    "threat_id": "threat-test",
-                    "target_ids": [{"type": "api", "id": "api-ask"}],
-                    "mitigations": [
-                        {"type": "fr", "id": "fr-does-not-exist"}
-                    ],
-                }
-            ]
-        }
-        errors = _validate_references(fake_fixture, MOCK_ID_INDEX)
-        assert len(errors) == 1
-        assert "fr-does-not-exist" in errors[0]
+    def test_old_artifact_level_trace_fails(self):
+        spec = json.loads((FIXTURES_DIR / "valid_full.json").read_text())
+        spec["trace"] = [{"type": "doc", "id": "spec-11-redteam"}]
+        assert any("trace" in msg for msg in _schema_errors(spec))
 
-    def test_invalid_target_type_detected(self):
-        """Reference validator rejects a target type outside api/component."""
-        fake_fixture = {
-            "threats": [
-                {
-                    "threat_id": "threat-test",
-                    "target_ids": [{"type": "widget", "id": "w-1"}],
-                    "mitigations": [],
-                }
-            ]
-        }
-        errors = _validate_references(fake_fixture, MOCK_ID_INDEX)
-        assert len(errors) == 1
-        assert "invalid target type" in errors[0]
+    def test_scope_later_without_scope_reason_fails(self):
+        _assert_fails_naming(lambda threat, edge_case: threat.update(scope="later"), "scope_reason")
+        _assert_fails_naming(lambda threat, edge_case: edge_case.update(scope="out"), "scope_reason")
 
 
 if __name__ == "__main__":

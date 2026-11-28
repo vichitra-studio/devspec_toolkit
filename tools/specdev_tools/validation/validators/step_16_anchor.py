@@ -4,11 +4,11 @@ Validates the anchor artifact (spec/16_impl_context.json) — the scope declarat
 that spans all milestones.  The anchor's unique job is cross-milestone drift detection:
 
   E308 (ANCHOR_SCOPE_DRIFT): fires when a milestone's scope_in contradicts the
-      anchor's scope_out (or vice versa), or when the same FR/API is active in
-      two milestones simultaneously.
+      anchor's scope_out (or vice versa), or when two milestones that are not ``done``
+      both own one roadmap task (a plan owns the tasks of the criteria its items ``realises``).
 
-  E309 (ANCHOR_CHECKLIST_DRIFT): fires when the same checklist ID maps to different
-      spec_ref.id values across any two milestone context files.
+  E309 (ANCHOR_CHECKLIST_DRIFT): fires when one plan-item id carries different ``realises``
+      sets in two plans, or when two ``milestone_index`` rows share one ``checklist_id_prefix``.
 
 The anchor validator does NOT call validate_step_16() — the anchor has its own
 contract (vc:16-anchor schema), and the checks here are cross-artifact comparisons
@@ -20,53 +20,54 @@ multiple files from the filesystem.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Optional
 
-from ...core.errors import make_error, SpecError
+from ...core.errors import FindingError, make_error, SpecError
+from ...core.loaders import read_json_object
+from ...core.scope_helpers import as_dict, as_list, str_items
+from ...core.step_paths import PLAN_DIR_NAME
+from ...graph.build import build_graph
+from ...graph.kinds import KindRegistryError
+from ...graph.names import ROW_DONE
+from ...graph.queries import task_of
+from ...lifecycle.anchor_store import read_statuses
+from ...core.plan_files import MILESTONE_KEY, find_plan, plan_files
 from .step_16 import _is_anchor
 
+_PLAN_SCHEMA = "vc:16-impl-context"
 
-def _resolve_context_path(ctx_path: str, anchor_path: Path) -> Path:
-    """Resolve a milestone_index context_path to an absolute path.
 
-    Strips an optional leading segment matching the anchor's parent directory
-    name (typically ``spec/``) or a literal ``spec/`` prefix, then joins
-    relative to the anchor's parent.
-    """
-    resolved = ctx_path
-    anchor_parent_name = anchor_path.parent.name
-    if resolved.startswith(anchor_parent_name + "/"):
-        resolved = resolved[len(anchor_parent_name) + 1:]
-    elif resolved.startswith("spec/"):
-        resolved = resolved[len("spec/"):]
-    return anchor_path.parent / resolved
+def _row_milestone(row: dict[str, Any]) -> str:
+    """The milestone a ``milestone_index`` row is about: its ``about`` item, else the row id, else the old ``milestone_id``."""
+    about = as_list(row.get("about"))
+    for candidate in (about[0] if about else None, row.get("anchor_id"), row.get("milestone_id")):
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    return ""
 
 
 def validate_step_16_anchor(
     data: dict[str, Any],
-    toolkit_root: str,  # noqa: ARG001 — kept for DEEP_VALIDATORS API symmetry
+    toolkit_root: str,
     spec_path: Optional[str] = None,
 ) -> list[SpecError]:
     """Deep validation for the Step 16 Trinity Anchor artifact.
 
     Args:
         data:         Parsed JSON content of the anchor artifact.
-        toolkit_root: Toolkit root directory (unused directly, kept for API symmetry).
+        toolkit_root: Toolkit root directory (the spec graph of the E308 ownership arm is built from its registry).
         spec_path:    Absolute path to the artifact file.  Required for drift checks;
-                      without it only in-memory checks run (E308 ownership, E309 prefix).
+                      without it only in-memory checks run (E309 prefix).
 
     Returns:
-        List of SpecError objects.  Empty list when valid.
+        List of SpecError objects.  Empty list when valid.  Never raises on a wrong-typed value.
     """
-    errors: list[SpecError] = []
-
     # Guard: if this is somehow called on a non-anchor artifact, return early.
     # Schema validation already enforces artifact_role == "anchor", so reaching
     # this path with a non-anchor usually means a routing bug — surface a warning.
     if not _is_anchor(spec_path, data):
-        errors.append(
+        return [
             make_error(
                 "W586",
                 "ANCHOR_VALIDATOR_WRONG_ARTIFACT: validate_step_16_anchor called on "
@@ -75,396 +76,344 @@ def validate_step_16_anchor(
                 "Both signals failed — this indicates a routing bug in validate.py "
                 "dispatch or a mis-authored artifact that should not have reached here.",
             )
-        )
-        return errors
+        ]
 
-    # ── W608: legacy schema at the anchor path ────────────────────────────────
-    # The Trinity Anchor split (0.6.0) moved per-milestone checklist content
-    # out of ``spec/16_impl_context.json`` and into ``spec/impl_context/*.json``.
-    # The anchor artifact itself now validates against ``vc:16-anchor``.
-    #
-    # Host repos that pre-date the split still declare ``$schema:
-    # vc:16-impl-context`` on their anchor file. That schema is still registered
-    # (for milestone-plan artifacts inside ``impl_context/``), so schema
-    # validation passes. The routing layer dispatches to this validator based on
-    # the anchor *path* regardless of the declared schema — which means the
-    # legacy anchor silently bypasses E308/E309/W587 (all of which key off
-    # ``milestone_index``, a field the legacy shape does not carry).
-    #
-    # Without an explicit signal, host repos have no forcing function to
-    # migrate. W608 surfaces the mismatch at ``spec-check`` time, pointing at
-    # the migration steps documented in ``prompt_16_impl_context.md`` and the
-    # breaking-change changelog entry. The check is intentionally *after* the
-    # W586 routing guard (a non-anchor artifact should surface the routing bug
-    # first, not a schema-migration hint) and *before* the drift checks (which
-    # are no-ops on legacy shapes anyway — emitting W608 first makes the
-    # dominant cause of an otherwise-clean legacy anchor obvious).
-    declared_schema = data.get("$schema") if isinstance(data, dict) else None
-    if declared_schema == "vc:16-impl-context":
-        errors.append(
-            make_error(
-                "W608",
-                "ANCHOR_LEGACY_SCHEMA: artifact at the anchor path declares "
-                "$schema='vc:16-impl-context' (the pre-split milestone-plan "
-                "schema). The Trinity Anchor is now a distinct contract "
-                "(vc:16-anchor). Migrate: (1) move per-milestone checklist "
-                "content to spec/impl_context/<milestone>_plan.json; "
-                "(2) rewrite this file against vc:16-anchor with plan.summary, "
-                "plan.ambiguities, plan.drift, plan.milestone_index; "
-                "(3) set artifact_role='anchor'. "
-                "See prompts/prompt_16_impl_context.md for the target schema.",
-            )
-        )
+    errors = _legacy_schema_errors(data)
+    plan = as_dict(data.get("plan"))
+    rows = [row for row in as_list(plan.get("milestone_index")) if isinstance(row, dict)]
+    errors.extend(_drift_staleness_errors(plan, rows))
+    errors.extend(_row_errors(rows))
 
-    # ── In-memory checks (no filesystem access required) ─────────────────────
-    # Extract plan data and run checks that operate purely on the anchor's own
-    # milestone_index — E308 ownership conflicts, E309 prefix collisions, W587
-    # staleness.  These run even when spec_path is None.
-    anchor_plan = data.get("plan", {}) if isinstance(data.get("plan"), dict) else {}
-    anchor_summary = anchor_plan.get("summary", {}) if isinstance(anchor_plan.get("summary"), dict) else {}
-    anchor_scope_in: list[str] = anchor_summary.get("scope_in", []) or []
-    anchor_scope_out: list[str] = anchor_summary.get("scope_out", []) or []
-
-    # ── W587: drift-checks staleness ───────────────────────────────────────────
-    # An anchor that registers one or more milestones but records zero drift checks
-    # is paying its maintenance cost without doing its job.  Fires regardless of
-    # whether impl_context/ exists — the signal is "you have milestones to watch
-    # but no evidence you have watched them".
-    milestone_index: list[dict[str, Any]] = anchor_plan.get("milestone_index", []) or []
-    drift_block = anchor_plan.get("drift", {}) if isinstance(anchor_plan.get("drift"), dict) else {}
-    drift_checks = drift_block.get("checks", []) if isinstance(drift_block.get("checks"), list) else []
-    if milestone_index and not drift_checks:
-        errors.append(
-            make_error(
-                "W587",
-                f"ANCHOR_DRIFT_CHECKS_STALE: milestone_index has "
-                f"{len(milestone_index)} entries but plan.drift.checks is empty — "
-                f"record at least one drift check per Trinity cycle.",
-            )
-        )
-
-    # ── Milestone_index sweep: in-memory checks (E308 ownership / E309 prefix) ──
-    # These checks operate purely on the anchor's milestone_index data — no
-    # filesystem access required.  Done milestones are exempt from FR/API
-    # ownership conflict (delivered IDs may be referenced again in follow-on
-    # work) but still participate in the prefix-collision check (a done
-    # milestone's namespace is still allocated).
-    id_to_milestone: dict[str, str] = {}        # FR/API ID → first-seen milestone_id (E308)
-    prefix_to_milestone: dict[str, str] = {}    # checklist_id_prefix → first-seen milestone_id (E309)
-    for entry in milestone_index:
-        if not isinstance(entry, dict):
-            continue
-        ms_id = entry.get("milestone_id", "")
-        status = entry.get("status", "")
-
-        # ── E308: FR/API ownership conflict (skip done milestones) ───────────
-        if status != "done":
-            for ref_id in entry.get("fr_refs", []) or []:
-                if not isinstance(ref_id, str):
-                    continue
-                if ref_id in id_to_milestone:
-                    prev_ms = id_to_milestone[ref_id]
-                    kind = "API" if ref_id.startswith("api-") else "FR"
-                    errors.append(
-                        make_error(
-                            "E308",
-                            f"ANCHOR_SCOPE_DRIFT [ownership]: {kind} ownership conflict — '{ref_id}' is "
-                            f"claimed by both non-done milestone '{prev_ms}' and '{ms_id}'.  "
-                            f"Only one non-done milestone may own a given {kind} at a time.",
-                        )
-                    )
-                else:
-                    id_to_milestone[ref_id] = ms_id
-
-        # ── E309: checklist_id_prefix collision (applies to all milestones) ──
-        prefix = entry.get("checklist_id_prefix")
-        if isinstance(prefix, str) and prefix:
-            if prefix in prefix_to_milestone:
-                prev_ms = prefix_to_milestone[prefix]
-                errors.append(
-                    make_error(
-                        "E309",
-                        f"ANCHOR_CHECKLIST_DRIFT [prefix]: checklist_id_prefix '{prefix}' is shared by "
-                        f"milestone_index entries '{prev_ms}' and '{ms_id}' — two milestones "
-                        f"cannot allocate checklist IDs from the same namespace.",
-                    )
-                )
-            else:
-                prefix_to_milestone[prefix] = ms_id
-
-    # ── Filesystem-dependent checks ───────────────────────────────────────────
     # Everything below requires spec_path for path resolution and file I/O.
     if spec_path is None:
         errors.append(
             make_error(
                 "W585",
                 "ANCHOR_DRIFT_SKIP: spec_path is None — filesystem drift checks "
-                "skipped (W607/E308-scope/E309-mapping/W610).  "
+                "skipped (E308/E309-mapping/W610).  "
                 "Pass spec_path to validate_step_16_anchor to enable them.",
             )
         )
         return errors
 
     anchor_path = Path(spec_path)
-
-    # ── W609: misfiled anchor ──────────────────────────────────────────────────
-    if anchor_path.parent.name == "impl_context":
-        errors.append(
-            make_error(
-                "W609",
-                f"ANCHOR_MISFILED: '{anchor_path.name}' has artifact_role='anchor' "
-                f"but lives inside '{anchor_path.parent}'.  The Trinity Anchor must "
-                f"sit at spec/16_impl_context.json (one level up); files inside "
-                f"spec/impl_context/ are per-milestone plans (vc:16-impl-context).  "
-                f"Move this file to '{anchor_path.parent.parent}/16_impl_context.json' "
-                f"so cross-milestone drift checks can resolve the impl_context/ "
-                f"sibling directory correctly.",
-            )
-        )
+    if anchor_path.parent.name == PLAN_DIR_NAME:
+        errors.append(_misfiled_error(anchor_path))
         return errors
+    errors.extend(_cross_file_errors(anchor_path, plan, rows, toolkit_root))
+    return errors
 
-    # ── W607: declared context_path must exist on disk ────────────────────────
-    impl_context_dir = anchor_path.parent / "impl_context"
-    for entry in milestone_index:
-        if not isinstance(entry, dict):
+
+def _legacy_schema_errors(data: dict[str, Any]) -> list[SpecError]:
+    """W608 when the anchor file still declares the pre-split milestone-plan schema.
+
+    The Trinity Anchor split (0.6.0) moved per-milestone checklist content out of ``spec/16_impl_context.json``
+    into ``spec/impl_context/*.json``.  Host repos that pre-date the split declare ``$schema: vc:16-impl-context``
+    on their anchor file; that schema is still registered (for plan files), so schema validation passes while
+    the anchor-only checks have nothing to read.  The warning is the forcing function to migrate.
+    """
+    if data.get("$schema") != _PLAN_SCHEMA:
+        return []
+    return [
+        make_error(
+            "W608",
+            "ANCHOR_LEGACY_SCHEMA: artifact at the anchor path declares "
+            "$schema='vc:16-impl-context' (the pre-split milestone-plan "
+            "schema). The Trinity Anchor is now a distinct contract "
+            "(vc:16-anchor). Migrate: (1) move per-milestone checklist "
+            "content to spec/impl_context/<milestone>_plan.json; "
+            "(2) rewrite this file against vc:16-anchor with plan.summary, "
+            "plan.ambiguities, plan.drift, plan.milestone_index; "
+            "(3) set artifact_role='anchor'. "
+            "See prompts/prompt_16_impl_context.md for the target schema.",
+        )
+    ]
+
+
+def _drift_staleness_errors(plan: dict[str, Any], rows: list[dict[str, Any]]) -> list[SpecError]:
+    """W587 when milestones are registered but ``plan.drift.checks`` records no drift check."""
+    checks = as_list(as_dict(plan.get("drift")).get("checks"))
+    if not rows or checks:
+        return []
+    return [
+        make_error(
+            "W587",
+            f"ANCHOR_DRIFT_CHECKS_STALE: milestone_index has "
+            f"{len(rows)} entries but plan.drift.checks is empty — "
+            f"record at least one drift check per Trinity cycle.",
+        )
+    ]
+
+
+def _row_errors(rows: list[dict[str, Any]]) -> list[SpecError]:
+    """E309 [prefix]: two ``milestone_index`` rows must not share one ``checklist_id_prefix``.
+
+    A done milestone's namespace is still allocated, so done rows take part.
+    """
+    errors: list[SpecError] = []
+    prefix_owner: dict[str, str] = {}  # checklist_id_prefix -> first milestone that uses it
+    for row in rows:
+        milestone = _row_milestone(row)
+        prefix = row.get("checklist_id_prefix")
+        if not isinstance(prefix, str) or not prefix:
             continue
-        ms_id = entry.get("milestone_id", "")
-        ctx_path = entry.get("context_path")
-        if isinstance(ctx_path, str) and ctx_path:
-            declared_path = _resolve_context_path(ctx_path, anchor_path)
-            if not declared_path.exists():
+        if prefix in prefix_owner:
+            errors.append(
+                make_error(
+                    "E309",
+                    f"ANCHOR_CHECKLIST_DRIFT [prefix]: checklist_id_prefix '{prefix}' is shared by "
+                    f"milestone_index entries '{prefix_owner[prefix]}' and '{milestone}' — two milestones "
+                    f"cannot allocate checklist IDs from the same namespace.",
+                )
+            )
+        else:
+            prefix_owner[prefix] = milestone
+    return errors
+
+
+def _realised(plan: dict[str, Any]) -> list[str]:
+    """Every criterion id the items of *plan* ``realises``, in item order."""
+    return [cid for item in _checklist(plan) if isinstance(item, dict) for cid in str_items(item.get("realises"))]
+
+
+def _ownership_errors(
+    spec_root: Path, toolkit_root: str, contexts: dict[str, dict[str, Any]]
+) -> list[SpecError]:
+    """E308 [ownership]: one roadmap task must not be owned by two milestones that are not ``done``.
+
+    A plan owns the tasks of the criteria its items ``realises``; the criterion-to-task step is read from the spec
+    graph and the status of a milestone from its anchor row (``anchor_store.read_statuses``).  A milestone with no
+    anchor row, a row with an unreadable status, or a spec folder the graph cannot be built from takes no part
+    (schema validation and W611 report those).
+    """
+    try:
+        statuses = read_statuses(spec_root)
+    except FindingError:
+        return []
+    open_plans = [
+        (ms_data[MILESTONE_KEY], _realised(ms_data)) for _file, ms_data in sorted(contexts.items())
+        if statuses.get(ms_data[MILESTONE_KEY]) is not None and statuses[ms_data[MILESTONE_KEY]].status != ROW_DONE
+    ]
+    if sum(1 for _milestone, criteria in open_plans if criteria) < 2:
+        return []
+    try:
+        graph = build_graph(str(spec_root), toolkit_root)
+    except KindRegistryError:
+        return []
+    errors: list[SpecError] = []
+    owner_of: dict[str, str] = {}  # task id -> first non-done milestone whose plan realises one of its criteria
+    for milestone, criteria in open_plans:
+        for task in dict.fromkeys(node.id for cid in criteria if (node := task_of(graph, cid)) is not None):
+            if owner_of.setdefault(task, milestone) != milestone:
                 errors.append(
                     make_error(
-                        "W607",
-                        f"ANCHOR_CONTEXT_PATH_MISSING: milestone_index entry "
-                        f"'{ms_id}' declares context_path '{ctx_path}' but the "
-                        f"file does not exist at '{declared_path}'. Drift detection "
-                        f"will silently skip this milestone until the plan is authored.",
+                        "E308",
+                        f"ANCHOR_SCOPE_DRIFT [ownership]: task ownership conflict — '{task}' is realised by plan "
+                        f"items of both non-done milestone '{owner_of[task]}' and '{milestone}'.  "
+                        f"Only one non-done milestone may own a given task at a time.",
                     )
                 )
+    return errors
 
-    # ── W612: phantom milestone_id (not in 14_roadmap.json) ─────────────────
-    roadmap_path = anchor_path.parent / "14_roadmap.json"
-    if roadmap_path.exists():
-        try:
-            roadmap_data = json.loads(roadmap_path.read_text())
-            roadmap_milestones = {
-                m.get("milestone_id", "")
-                for m in roadmap_data.get("milestones", [])
-                if isinstance(m, dict)
-            }
-            for entry in milestone_index:
-                if not isinstance(entry, dict):
-                    continue
-                ms_id = entry.get("milestone_id", "")
-                if ms_id and ms_id not in roadmap_milestones:
-                    errors.append(
-                        make_error(
-                            "W612",
-                            f"ANCHOR_PHANTOM_MILESTONE: milestone_index entry "
-                            f"'{ms_id}' does not match any milestone_id in "
-                            f"14_roadmap.json. Verify the ID is not a typo — "
-                            f"phantom milestones bypass ownership, prefix, and "
-                            f"scope drift detection.",
-                        )
-                    )
-        except (json.JSONDecodeError, OSError):
-            pass  # Roadmap unreadable — other validators surface this.
 
-    # ── Cross-file checks (E308 scope drift, E309 checklist drift) ────────────
+def _misfiled_error(anchor_path: Path) -> SpecError:
+    """W609: the anchor sits inside ``impl_context/``, where per-milestone plans live."""
+    return make_error(
+        "W609",
+        f"ANCHOR_MISFILED: '{anchor_path.name}' has artifact_role='anchor' "
+        f"but lives inside '{anchor_path.parent}'.  The Trinity Anchor must "
+        f"sit at spec/16_impl_context.json (one level up); files inside "
+        f"spec/impl_context/ are per-milestone plans (vc:16-impl-context).  "
+        f"Move this file to '{anchor_path.parent.parent}/16_impl_context.json' "
+        f"so cross-milestone drift checks can resolve the impl_context/ "
+        f"sibling directory correctly.",
+    )
+
+
+def _cross_file_errors(
+    anchor_path: Path, plan: dict[str, Any], rows: list[dict[str, Any]], toolkit_root: str
+) -> list[SpecError]:
+    """Checks that read the plan files: W588/W589/W608/W611 (scan), E308 scope and ownership, E309 mapping and W610 prefix."""
+    spec_root = anchor_path.parent
+    impl_context_dir = spec_root / PLAN_DIR_NAME
     if not impl_context_dir.exists():
-        # No milestone contexts yet — valid state for a fresh anchor.
-        return errors
+        return []  # No milestone plans yet — a valid state for a fresh anchor.
+    row_milestones = {_row_milestone(row) for row in rows}
+    contexts, errors = _scan_plan_files(spec_root, row_milestones)
+    summary = as_dict(plan.get("summary"))
+    errors.extend(_scope_drift_errors(as_list(summary.get("scope_in")), as_list(summary.get("scope_out")), contexts))
+    errors.extend(_ownership_errors(spec_root, toolkit_root, contexts))
+    errors.extend(_mapping_drift_errors(contexts))
+    errors.extend(_prefix_errors(spec_root, rows, contexts))
+    return errors
 
-    # Only milestone-plan artifacts declaring $schema == "vc:16-impl-context" count
-    # for drift detection.  Stray files in impl_context/ (temp drafts, backups,
-    # non-JSON-object roots) are silently skipped — they have their own validators
-    # or should not be there.  Filtering by $schema prevents a misfiled document
-    # from polluting the E308/E309 registries.
-    #
-    # A file that *should* be a milestone plan but cannot be read or parsed is a
-    # different case: silently dropping it would hide the file from E308/E309
-    # entirely, so emit W588 and continue.  In ``validate_dir`` that same file
-    # will also be picked up by its own dispatcher (with a richer error); in
-    # ``validate_file`` on the anchor alone, W588 is the only diagnostic the
-    # author sees.
-    milestone_contexts: dict[str, dict[str, Any]] = {}
-    files_seen = 0
-    for ms_file in sorted(impl_context_dir.glob("*.json")):
-        files_seen += 1
-        try:
-            ms_data = json.loads(ms_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+
+def _scan_plan_files(
+    spec_root: Path, row_milestones: set[str]
+) -> tuple[dict[str, dict[str, Any]], list[SpecError]]:
+    """Classify every ``impl_context/ms_*_plan.json`` file; return the plans that take part in drift checks and the notices.
+
+    ``find_plan`` decides which file is the plan of a milestone.  The directory is listed as well because
+    ``find_plan`` skips, by design, a file it cannot read or that names no milestone, and those are what W588 and
+    W608 report.  A file takes part when it parses to an object declaring ``vc:16-impl-context`` and is the plan
+    ``find_plan`` returns for a milestone some anchor row is about.  Anything else is skipped with a notice and never
+    raises: W588 unreadable, W589 wrong ``$schema``, W608 no ``milestone`` key (a pre-1.2.0 plan), W611 a ``milestone``
+    that no anchor row is about, or no usable plan at all.
+    """
+    contexts: dict[str, dict[str, Any]] = {}
+    errors: list[SpecError] = []
+    orphans: list[str] = []
+    files = plan_files(spec_root)
+    for ms_file in files:
+        ms_data = read_json_object(ms_file)
+        if ms_data is None:
             errors.append(
                 make_error(
                     "W588",
                     f"ANCHOR_MILESTONE_UNREADABLE: '{ms_file.name}' in impl_context/ "
-                    f"could not be read or parsed ({type(exc).__name__}: {exc}); "
+                    f"could not be read or parsed as a UTF-8 JSON object; "
                     f"drift detection skipped this file.",
                 )
             )
             continue
-        if not isinstance(ms_data, dict):
-            continue
-        # Rename to ms_declared_schema to avoid shadowing the outer-scope
-        # ``declared_schema`` variable used by the W608 check earlier in this
-        # function (line ~86).  The two variables have unrelated semantics —
-        # the outer is the ANCHOR's $schema (legacy detection); this one is
-        # each MILESTONE PLAN's $schema (mis-schemaed detection).
-        ms_declared_schema = ms_data.get("$schema")
-        if ms_declared_schema != "vc:16-impl-context":
-            # File parses as JSON but isn't declared as a milestone plan.
-            # Silent-skipping it would hide authoring mistakes (missing or
-            # wrong `$schema`) and drop the file from every drift check.
-            # Surface the mismatch so the author can either fix the $schema
-            # or move the file out of impl_context/.
-            errors.append(
-                make_error(
-                    "W589",
-                    f"ANCHOR_MILESTONE_MISSCHEMAED: '{ms_file.name}' in "
-                    f"impl_context/ has $schema={ms_declared_schema!r} — expected "
-                    f"'vc:16-impl-context'. Drift checks skipped this file.",
-                )
-            )
-            continue
-        milestone_contexts[str(ms_file)] = ms_data
+        notice = _plan_notice(ms_file, ms_data)
+        if notice is not None:
+            errors.append(notice)
+        elif ms_data[MILESTONE_KEY] not in row_milestones:
+            orphans.append(ms_file.name)
+        elif find_plan(spec_root, ms_data[MILESTONE_KEY]) == ms_file:
+            contexts[str(ms_file)] = ms_data
+    if orphans or (files and not contexts):
+        errors.append(_suppressed_error(len(files), len(contexts), orphans))
+    return contexts, errors
 
-    if not milestone_contexts:
-        # ── W611: drift detection suppressed ────────────────────────────��────
-        # If impl_context/ contained JSON files but none survived filtering
-        # (all hit W588/W589), cross-milestone E308/E309 checks are completely
-        # suppressed.  Without this warning the anchor looks clean while
-        # contributing nothing to drift detection.  When files_seen==0 the
-        # directory is genuinely empty — a valid state for a fresh anchor.
-        if files_seen > 0:
-            errors.append(
-                make_error(
-                    "W611",
-                    f"ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains "
-                    f"{files_seen} JSON file(s) but none declare "
-                    f"$schema='vc:16-impl-context' — E308/E309 cross-milestone "
-                    f"drift detection is completely suppressed.  Fix the W588/W589 "
-                    f"warnings above to restore drift checks.",
-                )
-            )
-        return errors
 
-    # ── E308: ANCHOR_SCOPE_DRIFT (bidirectional scope check) ──────────────────
-    # milestone scope_in must not overlap anchor scope_out, and vice versa.
-    # Normalisation: lowercase + strip for case-insensitive comparison.  The
-    # schema's ``uniqueItems: true`` is case-sensitive (``"Auth"`` and ``"auth"``
-    # are distinct items), but for drift detection purposes they describe the
-    # same scope category.  This means an anchor with both ``"Auth"`` and
-    # ``"auth"`` in scope_in passes schema validation but collapses to one
-    # entry here — intentional, since the drift check cares about semantic
-    # overlap, not string identity.
-    anchor_scope_in_set = {s.strip().lower() for s in anchor_scope_in if isinstance(s, str)}
-    anchor_scope_out_set = {s.strip().lower() for s in anchor_scope_out if isinstance(s, str)}
-
-    for ms_file, ms_data in milestone_contexts.items():
-        ms_plan = ms_data.get("plan", {}) if isinstance(ms_data.get("plan"), dict) else {}
-        ms_summary = ms_plan.get("summary", {}) if isinstance(ms_plan.get("summary"), dict) else {}
-        ms_scope_in: list[str] = ms_summary.get("scope_in", []) or []
-        ms_scope_out: list[str] = ms_summary.get("scope_out", []) or []
-        ms_name = Path(ms_file).name
-
-        for item in ms_scope_in:
-            if isinstance(item, str) and item.strip().lower() in anchor_scope_out_set:
-                errors.append(
-                    make_error(
-                        "E308",
-                        f"ANCHOR_SCOPE_DRIFT [scope]: milestone '{ms_name}' has scope_in item "
-                        f"'{item}' that appears in anchor scope_out — scope contradiction",
-                    )
-                )
-
-        for item in ms_scope_out:
-            if isinstance(item, str) and item.strip().lower() in anchor_scope_in_set:
-                errors.append(
-                    make_error(
-                        "E308",
-                        f"ANCHOR_SCOPE_DRIFT [scope]: milestone '{ms_name}' has scope_out item "
-                        f"'{item}' that appears in anchor scope_in — scope contradiction",
-                    )
-                )
-
-    # ── E309: ANCHOR_CHECKLIST_DRIFT ──────────────────────────────────────────
-    # Cross-milestone checklist ID registry: the same checklist item ID must not
-    # map to different spec_ref.id values across any two milestone context files.
-    id_registry: dict[str, tuple[str, str]] = {}  # id → (spec_ref_id, source_file)
-    for ms_file, ms_data in milestone_contexts.items():
-        ms_plan = ms_data.get("plan", {}) if isinstance(ms_data.get("plan"), dict) else {}
-        checklist: list[dict[str, Any]] = (
-            ms_plan.get("spec_alignment", {}).get("checklist", [])
-            if isinstance(ms_plan.get("spec_alignment"), dict)
-            else []
+def _plan_notice(ms_file: Path, ms_data: dict[str, Any]) -> Optional[SpecError]:
+    """W589 for a file that is not a milestone plan, W608 for a plan with no ``milestone`` key; else ``None``."""
+    declared = ms_data.get("$schema")
+    if declared != _PLAN_SCHEMA:
+        # A file that parses but is not declared as a milestone plan: silently skipping it would hide a missing
+        # or wrong `$schema` and drop the file from every drift check.
+        return make_error(
+            "W589",
+            f"ANCHOR_MILESTONE_MISSCHEMAED: '{ms_file.name}' in "
+            f"impl_context/ has $schema={declared!r} — expected "
+            f"'{_PLAN_SCHEMA}'. Drift checks skipped this file.",
         )
+    if not isinstance(ms_data.get(MILESTONE_KEY), str):
+        return make_error(
+            "W608",
+            f"ANCHOR_LEGACY_SCHEMA: plan file '{ms_file.name}' in impl_context/ has no file-level "
+            f"'{MILESTONE_KEY}' key (the pre-1.2.0 plan shape). Drift detection skipped this file until "
+            f"it names its milestone.",
+        )
+    return None
+
+
+def _suppressed_error(files_seen: int, usable: int, orphans: list[str]) -> SpecError:
+    """W611: some plan files, or all of them, take no part in E308/E309 drift detection."""
+    reason = ""
+    if orphans:
+        reason = f" Plan file(s) {', '.join(repr(n) for n in orphans)} name a milestone that no anchor row is about."
+    return make_error(
+        "W611",
+        f"ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains {files_seen} ms_*_plan.json file(s); "
+        f"{usable} take part in E308/E309 drift detection.{reason}  Fix the W588/W589/W608 warnings "
+        f"above, or add the anchor row, to restore drift checks.",
+    )
+
+
+def _scope_drift_errors(
+    anchor_scope_in: list[Any], anchor_scope_out: list[Any], contexts: dict[str, dict[str, Any]]
+) -> list[SpecError]:
+    """E308 [scope]: a plan's ``scope_in`` must not overlap the anchor's ``scope_out``, and the reverse.
+
+    Items compare lowercased and stripped: the schema's ``uniqueItems`` is case-sensitive, but ``"Auth"`` and
+    ``"auth"`` name the same scope category for drift detection.
+    """
+    errors: list[SpecError] = []
+    in_set = {s.strip().lower() for s in anchor_scope_in if isinstance(s, str)}
+    out_set = {s.strip().lower() for s in anchor_scope_out if isinstance(s, str)}
+    for ms_file, ms_data in contexts.items():
+        ms_summary = as_dict(as_dict(ms_data.get("plan")).get("summary"))
         ms_name = Path(ms_file).name
-        for item in checklist:
-            if not isinstance(item, dict):
-                continue
-            item_id = item.get("id")
-            spec_ref = item.get("spec_ref")
-            spec_ref_id = spec_ref.get("id") if isinstance(spec_ref, dict) else None
-            if not item_id or not spec_ref_id:
-                continue
-            if item_id in id_registry:
-                prev_ref, prev_file = id_registry[item_id]
-                if prev_ref != spec_ref_id:
+        for field, anchor_set, anchor_field in (("scope_in", out_set, "scope_out"), ("scope_out", in_set, "scope_in")):
+            for item in as_list(ms_summary.get(field)):
+                if isinstance(item, str) and item.strip().lower() in anchor_set:
                     errors.append(
                         make_error(
-                            "E309",
-                            f"ANCHOR_CHECKLIST_DRIFT [mapping]: checklist id '{item_id}' maps to "
-                            f"'{spec_ref_id}' in '{ms_name}' but '{prev_ref}' in "
-                            f"'{Path(prev_file).name}' — same ID, different spec_ref",
+                            "E308",
+                            f"ANCHOR_SCOPE_DRIFT [scope]: milestone '{ms_name}' has {field} item "
+                            f"'{item}' that appears in anchor {anchor_field} — scope contradiction",
                         )
                     )
-            else:
-                id_registry[item_id] = (spec_ref_id, ms_file)
+    return errors
 
-    # ── W610: ANCHOR_PREFIX_VIOLATION ───────────────────────────────────────
-    # The anchor declares a checklist_id_prefix per milestone (e.g. "AUTH").
-    # 16a planners are told to name checklist IDs starting with that prefix.
-    # Schema cannot enforce this cross-artifact contract — verify it here by
-    # matching each loaded milestone plan to its anchor index entry via
-    # context_path and checking every checklist ID against the prefix.
-    # Build reverse map: ms filename → declared prefix (from the milestone_index sweep).
-    ms_path_to_prefix: dict[str, str] = {}
-    for entry in milestone_index:
-        if not isinstance(entry, dict):
-            continue
-        ctx_path = entry.get("context_path")
-        prefix = entry.get("checklist_id_prefix")
-        if isinstance(ctx_path, str) and isinstance(prefix, str) and prefix:
-            abs_path = str(_resolve_context_path(ctx_path, anchor_path))
-            ms_path_to_prefix[abs_path] = prefix
 
-    for ms_file, ms_data in milestone_contexts.items():
-        expected_prefix = ms_path_to_prefix.get(ms_file)
-        if not expected_prefix:
-            continue
-        ms_plan = ms_data.get("plan", {}) if isinstance(ms_data.get("plan"), dict) else {}
-        checklist = (
-            ms_plan.get("spec_alignment", {}).get("checklist", [])
-            if isinstance(ms_plan.get("spec_alignment"), dict)
-            else []
-        )
+def _checklist(ms_data: dict[str, Any]) -> list[Any]:
+    """The ``plan.spec_alignment.checklist`` list of a plan file."""
+    return as_list(as_dict(as_dict(ms_data.get("plan")).get("spec_alignment")).get("checklist"))
+
+
+def _mapping_drift_errors(contexts: dict[str, dict[str, Any]]) -> list[SpecError]:
+    """E309 [mapping]: one plan-item id must not carry different ``realises`` sets in two plan files."""
+    errors: list[SpecError] = []
+    registry: dict[str, tuple[frozenset[str], str]] = {}  # plan-item id -> (realises set, plan file)
+    for ms_file, ms_data in contexts.items():
         ms_name = Path(ms_file).name
-        prefix_with_sep = expected_prefix + "_"
-        for item in checklist:
-            if not isinstance(item, dict):
+        for item in _checklist(ms_data):
+            item_id = item.get("id") if isinstance(item, dict) else None
+            realised = frozenset(str_items(item.get("realises"))) if isinstance(item, dict) else frozenset()
+            if not isinstance(item_id, str) or not item_id or not realised:
                 continue
-            item_id = item.get("id")
-            if isinstance(item_id, str) and not item_id.startswith(prefix_with_sep):
+            if item_id not in registry:
+                registry[item_id] = (realised, ms_file)
+            elif registry[item_id][0] != realised:
+                prev_realised, prev_file = registry[item_id]
+                errors.append(
+                    make_error(
+                        "E309",
+                        f"ANCHOR_CHECKLIST_DRIFT [mapping]: plan item '{item_id}' realises "
+                        f"{_listed(realised)} in '{ms_name}' but {_listed(prev_realised)} in "
+                        f"'{Path(prev_file).name}' — same id, different realises",
+                    )
+                )
+    return errors
+
+
+def _listed(ids: frozenset[str]) -> str:
+    """The ids of *ids* in sorted order, quoted, as one phrase for a message."""
+    return ", ".join(f"'{cid}'" for cid in sorted(ids))
+
+
+def _prefix_errors(
+    spec_root: Path, rows: list[dict[str, Any]], contexts: dict[str, dict[str, Any]]
+) -> list[SpecError]:
+    """W610: every checklist id of a plan must start with the ``checklist_id_prefix`` of its anchor row.
+
+    The plan of a row is found through ``core.plan_files.find_plan``.  16a planners are told to name checklist ids with the
+    prefix; the schema cannot enforce this cross-artifact contract, so it is verified here.
+    """
+    errors: list[SpecError] = []
+    for row in rows:
+        prefix = row.get("checklist_id_prefix")
+        plan_path = find_plan(spec_root, _row_milestone(row))
+        if plan_path is None or not isinstance(prefix, str) or not prefix:
+            continue
+        ms_data = contexts.get(str(plan_path))
+        if ms_data is None:
+            continue
+        for item in _checklist(ms_data):
+            item_id = item.get("id") if isinstance(item, dict) else None
+            if isinstance(item_id, str) and not item_id.startswith(prefix + "_"):
                 errors.append(
                     make_error(
                         "W610",
                         f"ANCHOR_PREFIX_VIOLATION: checklist id '{item_id}' in "
-                        f"'{ms_name}' does not start with the declared "
-                        f"checklist_id_prefix '{expected_prefix}_' from "
+                        f"'{plan_path.name}' does not start with the declared "
+                        f"checklist_id_prefix '{prefix}_' from "
                         f"milestone_index.  Namespace violations undermine "
                         f"E309 collision prevention.",
                     )
                 )
-
     return errors

@@ -1,0 +1,271 @@
+{
+    "$schema": "vc:16-impl-context",
+    "id": "plan-ms-reservations",
+    "owner": "api",
+    "created_at": "2026-05-01T10:00:00Z",
+    "plan": {
+        "status": "active",
+        "summary": {
+            "functional_summary": "Reservations and the desk flow for the reservations milestone.",
+            "scope_in": [
+                "reserve-endpoint",
+                "desk-flow"
+            ],
+            "scope_out": [
+                "waitlist"
+            ],
+            "target_file_patterns": [
+                "src/reservations.ts",
+                "src/desk_flow.ts",
+                "tests/reservations.test.ts"
+            ]
+        },
+        "spec_alignment": {
+            "requirements_summary": [
+                {
+                    "theme": "Reservations",
+                    "summary": "A member can hold a tool for a pickup day."
+                }
+            ],
+            "checklist": [
+                {
+                    "id": "RESERVE_ENDPOINT_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-reserve-endpoint",
+                        "line_range": "L1-L20",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Build POST /reservations, covering `ac-reserve-tool-1` and `inv-reservation-window`.",
+                    "type": "behavior",
+                    "layer": "api",
+                    "linked_test_expectation": "npm test -- reservations",
+                    "nfr_refs": [
+                        "nfr-checkout-latency"
+                    ],
+                    "fixture_ref": "fix-reserve-happy",
+                    "milestone_ref": "ms-reservations",
+                    "implementation": {
+                        "status": "pending",
+                        "actions": [
+                            {
+                                "type": "file_create",
+                                "target": "src/reservations.ts",
+                                "description": "Create the reservations route"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "RESERVE_ENDPOINT_01_VAL",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-reserve-endpoint",
+                        "line_range": "L1-L20",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Validate that the reserve endpoint stores the hold.",
+                    "type": "validation",
+                    "layer": "tests",
+                    "linked_test_expectation": "npm test -- reservations",
+                    "nfr_refs": [
+                        "nfr-checkout-latency"
+                    ],
+                    "fixture_ref": "fix-reserve-twice",
+                    "milestone_ref": "ms-reservations",
+                    "implementation": {
+                        "status": "pending",
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Reserve a ladder twice and compare answers"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "RESERVE_DESK_FLOW_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-checkout-return-flow",
+                        "line_range": "L31-L40",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Build the checkout and return flow at the desk.",
+                    "type": "behavior",
+                    "layer": "service",
+                    "linked_test_expectation": "bash scripts/check_desk_flow.sh",
+                    "nfr_refs": [
+                        "nfr-checkout-latency"
+                    ],
+                    "fixture_ref": "fix-checkout-conflict",
+                    "milestone_ref": "ms-reservations",
+                    "implementation": {
+                        "status": "pending",
+                        "actions": [
+                            {
+                                "type": "file_create",
+                                "target": "src/desk_flow.ts",
+                                "description": "Create the desk flow"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "RESERVE_SMS_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-reserve-sms",
+                        "line_range": "L21-L30",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Hand reminders to the SMS gateway.",
+                    "type": "behavior",
+                    "layer": "integration",
+                    "linked_test_expectation": "a reminder text arrives on a test phone the evening before",
+                    "nfr_refs": [
+                        "nfr-checkout-latency"
+                    ],
+                    "fixture_ref": "fix-reserve-happy",
+                    "milestone_ref": "ms-reservations",
+                    "checklist_status": "deferred",
+                    "deferred_reason": "The vendor contract is not signed; the sandbox cannot send to real phones.",
+                    "implementation": {
+                        "status": "deferred",
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Text a test phone"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "id": "RESERVE_WAITLIST_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-reserve-endpoint",
+                        "line_range": "L1-L20",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Add a waitlist.",
+                    "type": "behavior",
+                    "layer": "service",
+                    "linked_test_expectation": "npx jest waitlist",
+                    "nfr_refs": [
+                        "nfr-checkout-latency"
+                    ],
+                    "fixture_ref": "fix-reserve-happy",
+                    "milestone_ref": "ms-reservations",
+                    "checklist_status": "wont_do",
+                    "wont_do_reason": "Waitlists are out of scope for this release; the desk phones members.",
+                    "implementation": {
+                        "status": "deferred",
+                        "actions": [
+                            {
+                                "type": "manual_verification",
+                                "description": "Join a waitlist"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "ambiguities": [
+            {
+                "id": "amb-pickup-cutoff",
+                "description": "The pickup cutoff time was unclear.",
+                "source": "spec",
+                "severity": "blocking",
+                "impact": [
+                    "fr-reserve-tool"
+                ],
+                "status": "resolved",
+                "decision": "The desk closes at 18:00 and holds end then.",
+                "resolved": true
+            },
+            {
+                "id": "amb-fee-rounding",
+                "description": "It is not stated whether a part day owes a fee.",
+                "source": "spec",
+                "severity": "non_blocking",
+                "impact": [
+                    "fr-late-fee-calc",
+                    "ac-late-fee-calc-1"
+                ],
+                "proposed_assumption": "Only full days owe a fee.",
+                "mitigation": "Ask the desk lead before the late fees milestone starts.",
+                "status": "tracking"
+            },
+            {
+                "id": "amb-sms-retry",
+                "description": "How often a failed text is retried is not stated.",
+                "source": "plan",
+                "severity": "non_blocking",
+                "impact": [
+                    "task-reserve-sms"
+                ],
+                "mitigation": "Retry three times and then log the failure.",
+                "status": "tracking"
+            },
+            {
+                "id": "amb-sms-quota",
+                "description": "The monthly text quota is unknown.",
+                "source": "spec",
+                "severity": "non_blocking",
+                "impact": [
+                    "RESERVE_SMS_01"
+                ],
+                "mitigation": "Count texts in the first month and decide then.",
+                "status": "deferred"
+            }
+        ],
+        "docs_impact": {
+            "status": "required",
+            "rationale": "Reservations are user-visible.",
+            "docs_touched": [
+                "README.md"
+            ]
+        },
+        "review_requirements": {
+            "test_commands": [
+                "npm test"
+            ]
+        }
+    },
+    "execution": {
+        "execution_results": [],
+        "emergent_ambiguities": [
+            {
+                "id": "amb-late-pickup",
+                "description": "A member arrives after closing; the hold is lost.",
+                "severity": "low",
+                "impact": [
+                    "fr-reserve-tool"
+                ],
+                "status": "resolved",
+                "decision": "The hold ends at closing.",
+                "resolved": "Closing time decided at planning."
+            },
+            {
+                "id": "amb-sms-retry",
+                "description": "A failed text was retried twice in the sandbox.",
+                "severity": "medium",
+                "impact": [
+                    "src/reservations.ts"
+                ],
+                "status": "tracking"
+            },
+            {
+                "id": "amb-pickup-hours",
+                "description": "Saturday pickup hours differ from weekday hours.",
+                "severity": "low",
+                "impact": [
+                    "fr-reserve-tool"
+                ],
+                "status": "deferred"
+            }
+        ]
+    },
+    "canonical_refs_used": []
+}

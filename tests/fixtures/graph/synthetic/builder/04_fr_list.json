@@ -1,0 +1,21 @@
+{
+  "functional_requirements": [
+    {
+      "fr_id": "fr-login",
+      "statement": "A user   can sign in\nwith a password.",
+      "scope": "in",
+      "derives_from": ["cap-login"],
+      "acceptance_criteria": [
+        {"criterion_id": "ac-login-1", "text": "Valid credentials open a session."},
+        {"criterion_id": "ac-login-2", "text": "Invalid credentials are refused."}
+      ]
+    },
+    {"fr_id": "fr-logout", "statement": "A user can sign out.", "lifecycle": "deprecated", "depends_on": ["fr-login"]}
+  ],
+  "ambiguities": [
+    {"ambiguity_id": "amb-lockout", "about": ["fr-login", "seed-accounts"]}
+  ],
+  "fr_coverage": [
+    {"fr_id": "fr-login", "covered": true}
+  ]
+}

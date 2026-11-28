@@ -1,0 +1,77 @@
+{
+    "$schema": "vc:16-impl-context",
+    "id": "plan-ms-account-recovery",
+    "owner": "api",
+    "created_at": "2026-05-01T10:00:00Z",
+    "plan": {
+        "status": "active",
+        "summary": {
+            "functional_summary": "Reset a forgotten password through an emailed single-use link.",
+            "scope_in": [
+                "reset-confirm-endpoint"
+            ],
+            "scope_out": [
+                "sms-reset"
+            ],
+            "target_file_patterns": [
+                "src/routes/password-resets/*.ts",
+                "tests/contract/*.ts"
+            ]
+        },
+        "spec_alignment": {
+            "requirements_summary": [
+                {
+                    "theme": "Account recovery",
+                    "summary": "A member redeems an emailed token to set a new password."
+                }
+            ],
+            "checklist": [
+                {
+                    "id": "PWRESET_CONFIRM_EXPIRED_01",
+                    "spec_ref": {
+                        "type": "task",
+                        "id": "task-implement-password-reset-confirm",
+                        "line_range": "L1-L40",
+                        "commit_hash": "4f1c2d9"
+                    },
+                    "description": "The confirm handler returns 410 token-expired for a token older than 30 minutes.",
+                    "type": "behavior",
+                    "layer": "api",
+                    "checklist_status": "active",
+                    "fixture_ref": "fix-password-reset-expired-token",
+                    "milestone_ref": "ms-account-recovery",
+                    "nfr_refs": [],
+                    "linked_test_expectation": "tests/contract/password-reset-confirm.test.ts",
+                    "implementation": {
+                        "status": "pending",
+                        "actions": [
+                            {
+                                "type": "file_edit",
+                                "target": "src/routes/password-resets/confirm.ts",
+                                "description": "Reject expired tokens before the password update."
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "ambiguities": [],
+        "docs_impact": {
+            "status": "required",
+            "rationale": "The reset flow is user-visible.",
+            "docs_touched": [
+                "README.md"
+            ]
+        },
+        "review_requirements": {
+            "test_commands": [
+                "npm test"
+            ]
+        }
+    },
+    "execution": {
+        "execution_results": [],
+        "emergent_ambiguities": []
+    },
+    "canonical_refs_used": []
+}

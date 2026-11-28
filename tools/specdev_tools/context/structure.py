@@ -12,6 +12,7 @@ import os
 from typing import Any
 
 from ..core.registry import SchemaRegistry
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seeds_for_step
 from .canon_extractor import extract_canon
 from ._utils import (
@@ -47,7 +48,7 @@ def _find_spec_file(step_id: str, spec_dir: str) -> str | None:
     """Find the spec JSON file for *step_id* inside *spec_dir*.
 
     Convention: files are named ``{step_id}_{name}.json``.
-    Step IDs with letters (e.g. "02a", "13a", "16b") map to files like
+    Step IDs with letters (e.g. "02a", "16a", "16b") map to files like
     ``02a_delivery_baseline.json``.  We match any file whose stem starts
     with ``{step_id}_``.
     """
@@ -117,7 +118,7 @@ def _seeds_required(step_id: str, spec_dir: str) -> list[str]:
     ``seed_routing.resolve_seeds_for_step`` for full routing rules).
     """
     spec_dir_abs = os.path.abspath(spec_dir)
-    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    manifest_path = os.path.join(spec_dir_abs, SEED_MANIFEST_FILE)
     if not os.path.exists(manifest_path):
         return []
 

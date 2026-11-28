@@ -1,0 +1,573 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:infra:migration-capture",
+  "title": "infra_migration_capture",
+  "description": "What the 1.1.1 to 1.2.0 migration copied before it removed anything, kept in spec/extras/migration/capture.json: the values a later judgement step cannot get from the migrated tree, grouped by the work that reads them, and the commit everything else is read from. Written once by the first migration script (migration/scripts/v1_2_0/p1_capture.py); the only later write is the renames section, appended by the script that renames an id. Every value copied from a 1.1.1 file sits under a key that starts with legacy_; the other keys are the capture's own. Committed and tool-owned; not a step artifact and not read by the graph.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source",
+    "milestone_status",
+    "task_status",
+    "task_exit_conditions",
+    "task_assumptions",
+    "third_party",
+    "governance",
+    "plan_security",
+    "plan_items",
+    "milestone_ordering",
+    "milestone_links",
+    "ambiguities",
+    "environment_host_keys"
+  ],
+  "properties": {
+    "source": {
+      "description": "Where the old content can be read again, and what the files were before the run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "spec_dir",
+        "show_form",
+        "file_hashes"
+      ],
+      "properties": {
+        "commit": {
+          "description": "HEAD of the host when the capture was made (git rev-parse HEAD).",
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,64}$"
+        },
+        "spec_dir": {
+          "description": "The spec folder, relative to the git work tree, with slashes.",
+          "type": "string",
+          "minLength": 1
+        },
+        "show_form": {
+          "description": "The command that prints an old file: git show <commit>:<spec_dir>/<file>.",
+          "type": "string"
+        },
+        "file_hashes": {
+          "description": "The sha256 of every file of the spec folder before the run (the files under extras/migration/ excepted), by path relative to the spec folder.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "milestone_status": {
+      "description": "Status per source, for the legacy close and its conflicts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "roadmap",
+        "impl_plan",
+        "anchor",
+        "plans"
+      ],
+      "properties": {
+        "roadmap": {
+          "description": "Step 14 milestones[]: status and status reason.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/milestoneRow"
+          }
+        },
+        "impl_plan": {
+          "description": "Step 09 milestones[]: status.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/milestoneRow"
+          }
+        },
+        "anchor": {
+          "description": "The anchor's plan.milestone_index[]: status.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/milestoneRow"
+          }
+        },
+        "plans": {
+          "description": "One row per plan file: the review verdict (null when the plan has none) and plan.status.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "review_verdict",
+              "legacy_plan_status"
+            ],
+            "properties": {
+              "file": {
+                "$ref": "#/$defs/path",
+                "description": "The file, relative to the spec folder."
+              },
+              "review_verdict": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The verdict of the plan's review (verified or another), null when the plan has no review."
+              },
+              "legacy_plan_status": {
+                "description": "The plan.status the plan carried."
+              },
+              "legacy_plan_deferred_reason": {
+                "type": "string",
+                "description": "The plan.deferred_reason the plan carried, present only when it was a string."
+              }
+            }
+          }
+        }
+      }
+    },
+    "task_status": {
+      "description": "Every task of step 14: status, status reason and the fr_refs and invariant_refs the 1.1.1 task carried.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/taskRow"
+      }
+    },
+    "task_exit_conditions": {
+      "description": "The tasks of step 14 with a non-empty exit_conditions list.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/taskRow"
+      }
+    },
+    "task_assumptions": {
+      "description": "The tasks of step 14 with a non-empty assumptions list.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/taskRow"
+      }
+    },
+    "third_party": {
+      "description": "The tech stacks of steps 02, 09 and 14 and the external components of step 02.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tech_stacks",
+        "external_components"
+      ],
+      "properties": {
+        "tech_stacks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "step",
+              "legacy_tech_stack"
+            ],
+            "properties": {
+              "step": {
+                "enum": [
+                  "02",
+                  "09",
+                  "14"
+                ],
+                "description": "The step of the file the value was copied from."
+              },
+              "legacy_tech_stack": {
+                "description": "The tech_stack object as the file carried it."
+              }
+            }
+          },
+          "description": "One row per step whose file carried a tech_stack."
+        },
+        "external_components": {
+          "description": "Components of step 02 with type external, whole except their trace.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "component",
+              "legacy_component"
+            ],
+            "properties": {
+              "component": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The component_id of the component (null when it had none)."
+              },
+              "legacy_component": {
+                "type": "object",
+                "description": "The component object as the file carried it, without its trace."
+              }
+            }
+          }
+        }
+      }
+    },
+    "governance": {
+      "description": "The keys of step 10 that are removed or become rules; each present key under its legacy_ name.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "legacy_pr_rules": {
+          "description": "The pr_rules list."
+        },
+        "legacy_review_policy": {
+          "description": "The review_policy object."
+        },
+        "legacy_reviewers": {
+          "description": "The reviewers list."
+        },
+        "legacy_spec_first_policy": {
+          "description": "The spec_first_policy value."
+        },
+        "legacy_policy_ref": {
+          "description": "The policy_ref object."
+        },
+        "legacy_command_ref": {
+          "description": "The old command_ref key."
+        }
+      }
+    },
+    "plan_security": {
+      "description": "Per plan: the security.spec_mutations and security.new_fixtures entries (a plan that has none is not listed).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "$ref": "#/$defs/path",
+            "description": "The file, relative to the spec folder."
+          },
+          "legacy_spec_mutations": {
+            "description": "The plan.security.spec_mutations entries."
+          },
+          "legacy_new_fixtures": {
+            "description": "The plan.security.new_fixtures entries."
+          }
+        }
+      }
+    },
+    "plan_items": {
+      "description": "Per plan item id: the fields a later step removes (a plan item that has none is not listed).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "item"
+        ],
+        "properties": {
+          "file": {
+            "$ref": "#/$defs/path",
+            "description": "The file, relative to the spec folder."
+          },
+          "item": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id of the plan item (a plan.spec_alignment.checklist[] entry)."
+          },
+          "legacy_linked_test_expectation": {
+            "description": "The linked_test_expectation of the item (a string or a list)."
+          },
+          "legacy_fixture_ref": {
+            "description": "The fixture_ref of the item."
+          },
+          "legacy_checklist_status": {
+            "description": "The checklist_status of the item."
+          },
+          "legacy_deferred_reason": {
+            "description": "The deferred_reason of the item."
+          },
+          "legacy_wont_do_reason": {
+            "description": "The wont_do_reason of the item."
+          }
+        }
+      }
+    },
+    "milestone_ordering": {
+      "description": "Milestone ordering that no 1.2.0 field stores: the step-09 depends_on lists, every typed dependency of steps 09 and 14, the dependency_ref objects.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pairs",
+        "typed_dependencies",
+        "dependency_refs"
+      ],
+      "properties": {
+        "pairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "milestone",
+              "legacy_depends_on"
+            ],
+            "properties": {
+              "milestone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The milestone id as the file spelled it."
+              },
+              "legacy_depends_on": {
+                "description": "The depends_on list of the milestone."
+              }
+            }
+          },
+          "description": "One row per step-09 milestone that carried a depends_on list."
+        },
+        "typed_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "step",
+              "legacy_dependency"
+            ],
+            "properties": {
+              "step": {
+                "enum": [
+                  "09",
+                  "14"
+                ],
+                "description": "The step of the file the value was copied from."
+              },
+              "legacy_dependency": {
+                "description": "The dependency entry as the file carried it."
+              }
+            }
+          },
+          "description": "Every entry of the top-level dependencies of steps 09 and 14, with its type."
+        },
+        "dependency_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "step",
+              "legacy_dependency_ref"
+            ],
+            "properties": {
+              "step": {
+                "enum": [
+                  "09",
+                  "14"
+                ],
+                "description": "The step of the file the value was copied from."
+              },
+              "legacy_dependency_ref": {
+                "description": "The dependency_ref object."
+              }
+            }
+          },
+          "description": "The dependency_ref object of steps 09 and 14."
+        }
+      }
+    },
+    "milestone_links": {
+      "description": "Per milestone of step 09, step 14 and the anchor: the source milestones, deliverables, fr_refs, capability_refs and context_path the 1.1.1 file carried.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "milestone"
+        ],
+        "properties": {
+          "step": {
+            "enum": [
+              "09",
+              "14",
+              "16"
+            ],
+            "description": "The step of the file the value was copied from."
+          },
+          "milestone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The milestone id as the file spelled it."
+          },
+          "legacy_source_milestones": {
+            "description": "The source_milestones of the milestone."
+          },
+          "legacy_deliverables": {
+            "description": "The deliverables of the milestone."
+          },
+          "legacy_fr_refs": {
+            "description": "The fr_refs of the milestone, anchor row or task."
+          },
+          "legacy_capability_refs": {
+            "description": "The capability_refs of the milestone."
+          },
+          "legacy_context_path": {
+            "description": "The context_path of the anchor row."
+          }
+        }
+      }
+    },
+    "ambiguities": {
+      "description": "The ambiguity items of the anchor and of the plans that are not resolved, whole (impact included); resolved items are not copied.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "step",
+          "legacy_item"
+        ],
+        "properties": {
+          "file": {
+            "$ref": "#/$defs/path",
+            "description": "The file, relative to the spec folder."
+          },
+          "step": {
+            "enum": [
+              "16",
+              "16a",
+              "16b"
+            ],
+            "description": "The step of the file the value was copied from."
+          },
+          "legacy_item": {
+            "type": "object",
+            "description": "The ambiguity item whole, as the file carried it."
+          }
+        }
+      }
+    },
+    "environment_host_keys": {
+      "description": "The environments of step 02a, each whole; the host keys that no node field takes are among them.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "environment",
+          "legacy_environment"
+        ],
+        "properties": {
+          "environment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The environment name (dev, ci, staging, prod)."
+          },
+          "legacy_environment": {
+            "type": "object",
+            "description": "The environment object whole, as the file carried it."
+          }
+        }
+      }
+    },
+    "renames": {
+      "description": "The definitions phase 2 gave a new id (a collision), written by the script that renamed them in the same run. The sections above key old 1.1.1 records by the id they had when the capture was made: a reader maps an old id to its new one through this list. Optional: absent until a rename happens.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "old",
+          "new",
+          "kind",
+          "file"
+        ],
+        "properties": {
+          "old": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id the definition had."
+          },
+          "new": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id it has now."
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The kind of the renamed node (criterion, design-milestone, ...)."
+          },
+          "file": {
+            "$ref": "#/$defs/path",
+            "description": "The file that holds the renamed definition."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "description": "A path relative to the spec folder, with slashes.",
+      "type": "string",
+      "minLength": 1
+    },
+    "milestoneRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "milestone"
+      ],
+      "properties": {
+        "milestone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The milestone id as the file spelled it."
+        },
+        "legacy_status": {
+          "description": "The status the milestone or task carried."
+        },
+        "legacy_milestone_status_reason": {
+          "description": "The milestone_status_reason of the milestone."
+        }
+      }
+    },
+    "taskRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "milestone",
+        "task"
+      ],
+      "properties": {
+        "milestone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The milestone id as the file spelled it."
+        },
+        "task": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The task_id of the task."
+        },
+        "legacy_status": {
+          "description": "The status the milestone or task carried."
+        },
+        "legacy_status_reason": {
+          "description": "The status_reason of the task."
+        },
+        "legacy_fr_refs": {
+          "description": "The fr_refs of the milestone, anchor row or task."
+        },
+        "legacy_invariant_refs": {
+          "description": "The invariant_refs of the task."
+        },
+        "legacy_exit_conditions": {
+          "description": "The exit_conditions of the task."
+        },
+        "legacy_assumptions": {
+          "description": "The assumptions of the task."
+        }
+      }
+    }
+  }
+}

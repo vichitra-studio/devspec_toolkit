@@ -1,5 +1,8 @@
 """Registry generator for entry_key_registry.json and extraction_paths.json.
 
+``run`` (the ``registry-generate`` command) also writes step_order.json, cli_commands.json and the
+schema-change checklist, each built by its own module.
+
 Implements W3-T1: programmatically derives the entry-key registry and
 extraction-paths from toolkit schemas (schema/*.schema.json), replacing the
 previously hand-curated spec/entry_key_registry.json.
@@ -10,74 +13,62 @@ newline).  ``registry`` keys follow step_order.json::steps[] ordering;
 preserved by json.load).
 
 Design constraints:
-  - $ref resolution: items that use "$ref": "vc:core:collections#traceRef" etc.
-    are resolved via core/collections.schema.json $defs.
   - Sentinel arrays (canonical_refs_used, canonical_proposals) are listed only
     at the top-level _sentinels key, NOT per-file.
-  - kind derivation:
-      * id_field ends in _id → strip suffix, snake→kebab
-        (e.g. fr_id → fr, threat_id → threat)
-      * id_field == id → singularise array name snake→kebab
-        (e.g. deliverables → deliverable, edge_cases → edge-case)
   - Basename overrides: schema name ≠ spec basename in two cases:
       * step 13: schema is 13_extension_manifest.schema.json
                  spec basename is 13_extension_manifest.json
       * step 16: two schemas exist (16_impl_context + 16_anchor);
-                 only 16_impl_context.schema.json is used;
-                 16_anchor.schema.json is an internal anchor schema, skipped.
-  - Deferred-registration steps (16a, 16b, 16c): no schemas exist; entries live
-    in per-milestone impl_context files. Routed to steps_with_deferred_registration
-    regardless of missing-schema fallback rule (deferred-list wins).
-  - Cross-reference arrays (e.g. 05_interface_contracts.out_of_scope, which has
-    fr_id but is a cross-reference list, not primary entries) are excluded via
-    the CROSS_REF_EXCLUSIONS hardcoded map.
-  - job.steps in 12_ci_gates are workflow-internal and excluded via the same map.
-  - capabilities.goal_id is a secondary ID alongside capability_id; the first
-    *_id field found takes precedence (schema declaration order).
+                 16_impl_context.schema.json is the step host and
+                 16_anchor.schema.json (``STEP_EXTRA_HOSTS``) is a second host
+                 whose annotation entries register under the same spec file.
+  - Steps 16b and 16c have no schema and no node kind of their own: their records are blocks
+    inside the plan file, registered under step 16a.  They are listed in
+    ``steps_without_entry_arrays``.  Step 16a has no schema either, but its ``plan-item`` kind is
+    registered through the ``files`` glob of an ``x-node`` of step 16, so it is not listed there.
+
+Every kind is declared by an ``x-node`` object (see registry/annotation_scan.py).  A schema file
+that declares ``x-node`` at a definition site inside itself is a host: its kinds, paths and id
+fields are the declared ones.  A shared ``schema/core`` node reached only by ``$ref`` is added to
+the host's entries once per occurrence.  No kind or id field is guessed from a schema's shape.
 """
 from __future__ import annotations
 
 import glob
 import json
 import os
+from pathlib import Path
 from typing import Any
 
-from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
+from specdev_tools.core.entry_key_registry import join_nested_path
+from specdev_tools.core.step_paths import PLAN_FILE_KEY
+from specdev_tools.registry.annotation_scan import AnnotationScan, HostScan, scan_annotations
+from specdev_tools.registry.annotations import (
+    AnnotationDecls,
+    AnnotationError,
+    collect_annotations,
+    lint_annotations,
+)
+from specdev_tools.registry.schema_checklist import generate_checklist
+from specdev_tools.registry.step_order_gen import (
+    StepOrderError,
+    annotated_steps,
+    build_step_order_document,
+    declared_edge_pairs,
+    derive_from_decls,
+    load_hand_kept,
+    load_steps,
+)
 
 
 # ---------------------------------------------------------------------------
 # Constants / overrides
 # ---------------------------------------------------------------------------
 
-#: Arrays that match the id-field heuristic but are cross-reference lists,
-#: not primary entry registries.  Key: (schema_basename, array_name).
-CROSS_REF_EXCLUSIONS: frozenset[tuple[str, str]] = frozenset([
-    ("05_interface_contracts.schema.json", "out_of_scope"),  # fr_id refs, not primary
-    ("12_ci_gates.schema.json", "steps"),                   # job.steps are workflow-internal
-])
-
-#: $ref URIs whose items are cross-step foreign-key references, NOT primary
-#: entry keys.  Arrays whose items.$ref appears in this set are skipped during
-#: scanning — they would otherwise pollute the corpus-ID collection with foreign
-#: IDs and produce false nearest_id matches and spurious E110 collisions.
-#:
-#: traceRef (vc:core:collections#traceRef) is the canonical example: every
-#: "trace" array in specs holds {type, id} pairs where id is a FOREIGN KEY
-#: into another step's artifact, not a primary entry key for this step.
-#:
-#: Note: dependencyItem also has a {type, id} shape but is a primary entry
-#: (dependencies are owned by the roadmap).  That ref resolves via
-#: dependencyObjectList → dependencyItem, NOT directly via a traceRef $ref, so
-#: it is unaffected by this set.
-TRACE_REF_REFS: frozenset[str] = frozenset([
-    "vc:core:collections#traceRef",
-])
-
 #: Sentinels: array names that appear across multiple spec files and are always
 #: corpus-excluded.  Only emitted at top-level _sentinels, not per-file.
-#: Also includes cross-reference arrays excluded via CROSS_REF_EXCLUSIONS that
-#: need suppression in the W614 registry-check scanner (e.g. out_of_scope is
-#: a cross-ref list of fr_ids in step 05 — primary entries live in step 04).
+#: Also includes cross-reference arrays that need suppression in the W614
+#: registry-check scanner (``out_of_scope`` lists of ids held by another step).
 SENTINEL_ARRAYS: tuple[str, ...] = ("canonical_proposals", "canonical_refs_used", "out_of_scope")
 
 #: Map step_id → spec_file_basename when schema filename ≠ spec basename.
@@ -87,330 +78,40 @@ STEP_BASENAME_OVERRIDES: dict[str, str] = {
 
 #: Schema files to skip entirely (not the canonical spec file for any step).
 SCHEMA_SKIP: frozenset[str] = frozenset([
-    "16_anchor.schema.json",          # internal anchor schema, not a spec file
+    "16_anchor.schema.json",          # a second host of step 16 (STEP_EXTRA_HOSTS), not its step schema
     "seed_manifest.schema.json",      # seed manifest, not a step spec
     "seed_requirements.schema.json",  # seed requirements, not a step spec
     "step_order.schema.json",         # step_order, not a step spec
 ])
 
-#: Steps whose entries live in per-milestone files, not spec/NN_*.json.
-DEFERRED_STEPS: frozenset[str] = frozenset(["16a", "16b", "16c"])
+#: Schema files that are a second host of a step: their annotation entries register under the
+#: step's own spec file.  Key: step id.
+STEP_EXTRA_HOSTS: dict[str, tuple[str, ...]] = {
+    "16": ("16_anchor.schema.json",),
+}
 
-#: Rationale string used for deferred steps.
-DEFERRED_RATIONALE = "per-milestone files; deferred per Out-of-scope"
+#: Host schemas that describe per-milestone files, not the step's own spec file: every entry of
+#: such a host without its own ``files`` registers under this glob, for this step.  Key: schema
+#: path relative to the toolkit root.  (``16_impl_context.schema.json`` is the plan-file schema;
+#: the anchor file ``16_impl_context.json`` is ``16_anchor.schema.json``.)
+PLAN_FILE_HOSTS: dict[str, tuple[str, str]] = {
+    "schema/16_impl_context.schema.json": ("16a", PLAN_FILE_KEY),
+}
+
+#: Steps with no schema and no node kind of their own: their records are blocks inside the plan file.
+STEPS_INSIDE_PLAN_FILE: frozenset[str] = frozenset(["16b", "16c"])
+
+#: Rationale of a step in ``STEPS_INSIDE_PLAN_FILE``.
+INSIDE_PLAN_FILE_RATIONALE = "no node kind of its own: its records are blocks inside the plan file, registered under step 16a"
 
 #: Format version for the generated registry.
-FORMAT_VERSION = "1.0.0"
+FORMAT_VERSION = "1.1.0"
 
 #: Note embedded in _note field of generated registry.
 REGISTRY_NOTE = (
     "Generated by specdev registry-generate from devspec_toolkit/schema/*.schema.json. "
     "Do not hand-edit."
 )
-
-
-# ---------------------------------------------------------------------------
-# Schema loading and $ref resolution
-# ---------------------------------------------------------------------------
-
-def _load_json(path: str) -> Any:
-    """Load JSON from path, raising FileNotFoundError or json.JSONDecodeError."""
-    with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
-
-
-def _build_ref_resolver(repo_root: str) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Build ref-resolver maps from core/collections.schema.json $defs.
-
-    Returns:
-        (items_resolver, array_resolver) — both are dicts keyed by $ref string:
-        - items_resolver: $ref → properties dict (for items.$ref resolution)
-        - array_resolver: $ref → full $defs entry (for property-level $ref that
-          resolves to an array, e.g. dependencyObjectList)
-
-    Only resolves fragments from core/collections.schema.json $defs, which is
-    the only file that defines items-level $refs in the toolkit schemas.  The
-    resolver is intentionally narrow: it handles the specific $ref patterns seen
-    in practice rather than a general JSON Schema resolver.
-    """
-    collections_path = os.path.join(repo_root, "schema", "core", "collections.schema.json")
-    if not os.path.isfile(collections_path):
-        return {}, {}
-    collections = _load_json(collections_path)
-    defs = collections.get("$defs", {})
-
-    items_resolver: dict[str, dict[str, Any]] = {}
-    array_resolver: dict[str, dict[str, Any]] = {}
-
-    for name, defn in defs.items():
-        if not isinstance(defn, dict):
-            continue
-        ref_key = f"vc:core:collections#{name}"
-        # items resolver: maps ref → item properties dict
-        props = defn.get("properties", {})
-        if props:
-            items_resolver[ref_key] = props
-        # array resolver: maps ref → full defn (for top-level property $refs)
-        if defn.get("type") == "array":
-            array_resolver[ref_key] = defn
-
-    return items_resolver, array_resolver
-
-
-def _get_all_properties(schema: dict[str, Any]) -> dict[str, Any]:
-    """Return merged top-level properties from a schema, collapsing allOf blocks.
-
-    Preserves insertion order (Python 3.7+), which is the schema-declaration
-    order.  Later allOf entries override earlier ones if keys collide (rare).
-
-    Thin adapter over ``schema_nav.effective_schema`` (conditionals OFF, no-op
-    resolver).  Generate intentionally does NOT resolve the ``vc:core:step-base``
-    ``$ref`` — only inline step-specific top-level properties are wanted.  The
-    no-op resolver returns None (non-dict) for any ``$ref`` node, causing
-    effective_schema to treat that branch as empty — same as before.
-
-    Projects ``["properties"]`` only; ``["required"]`` is discarded (generate
-    never reads required; the helper always sets ``required=[]``).
-    """
-    # No-op resolver: returns None (non-dict) for any $ref node so that
-    # effective_schema skips bare-$ref branches without resolving them.
-    # MUST return non-dict (None) — not the node itself — per the helper contract.
-    def _noop_resolver(_node: dict) -> None:
-        return None
-
-    e = _schema_nav_effective_schema(schema, _noop_resolver, include_conditionals=False)
-    return e["properties"]
-
-
-# ---------------------------------------------------------------------------
-# kind derivation
-# ---------------------------------------------------------------------------
-
-def _snake_to_kebab(s: str) -> str:
-    """Convert snake_case to kebab-case."""
-    return s.replace("_", "-")
-
-
-def _singularize(name: str) -> str:
-    """Naively singularize an English plural.
-
-    Rules (applied in order):
-      1. ends in 'ies' (not 'ss') → replace with 'y'
-         e.g. dependencies → dependency
-      2. ends in 'ss' → leave unchanged (e.g. 'class' stays 'class')
-      3. ends in 's' → strip trailing 's'
-         e.g. deliverables → deliverable, threats → threat
-
-    Examples:
-      deliverables → deliverable
-      threats → threat
-      edge_cases → edge_case
-      dependencies → dependency
-      milestones → milestone
-    """
-    if name.endswith("ies"):
-        return name[: -len("ies")] + "y"
-    if name.endswith("ss"):
-        return name
-    if name.endswith("s"):
-        return name[:-1]
-    return name
-
-
-def _derive_kind(id_field: str, array_name: str) -> str:
-    """Derive the 'kind' string for a registry entry.
-
-    Rule A:
-      - id_field ends in _id → strip suffix, snake→kebab
-        e.g. fr_id → fr, threat_id → threat, milestone_id → milestone
-      - id_field == 'id' → singularize array_name, snake→kebab
-        e.g. deliverables → deliverable, edge_cases → edge-case, trace → trace
-    """
-    if id_field.endswith("_id"):
-        base = id_field[: -len("_id")]
-        return _snake_to_kebab(base)
-    # id_field == 'id'
-    singular = _singularize(array_name)
-    return _snake_to_kebab(singular)
-
-
-# ---------------------------------------------------------------------------
-# Array scanning
-# ---------------------------------------------------------------------------
-
-def _find_id_field(item_props: dict[str, Any]) -> str | None:
-    """Find the primary id field in an items.properties dict.
-
-    Priority:
-      1. First property name ending in _id (schema declaration order).
-      2. Bare 'id' if present.
-      3. None → array is not entry-bearing.
-    """
-    for key in item_props:
-        if key.endswith("_id"):
-            return key
-    if "id" in item_props:
-        return "id"
-    return None
-
-
-def _scan_nested_arrays(
-    item_props: dict[str, Any],
-    items_resolver: dict[str, dict[str, Any]],
-    parent_schema_basename: str,
-) -> list[dict[str, Any]]:
-    """Scan item_props for nested arrays of objects with id fields.
-
-    Recurses to arbitrary depth: each discovered nested entry is itself scanned
-    for deeper entry-bearing arrays, whose entries are attached under a further
-    ``nested`` key.  This mirrors the recursive ``arrayEntry.nested`` shape in
-    ``schema/entry_key_registry.schema.json``.  Example: step 14's
-    ``milestones[].tasks[].acceptance_criteria`` is 3-deep — the ``criterion``
-    entry is nested under the ``task`` entry, which is nested under ``milestone``.
-
-    Returns a list of arrayEntry dicts (without 'corpus_excluded').
-    """
-    nested: list[dict[str, Any]] = []
-    for prop_name, prop_def in item_props.items():
-        if not isinstance(prop_def, dict):
-            continue
-        if prop_def.get("type") != "array":
-            continue
-        # Exclusion check for nested arrays
-        if (parent_schema_basename, prop_name) in CROSS_REF_EXCLUSIONS:
-            continue
-        nested_items = prop_def.get("items", {})
-        if not isinstance(nested_items, dict):
-            continue
-        # Skip traceRef arrays: these are cross-step foreign-key references,
-        # not primary entries for this spec file.
-        if nested_items.get("$ref") in TRACE_REF_REFS:
-            continue
-        # Resolve $ref
-        nested_item_props = _resolve_item_props(nested_items, items_resolver)
-        if not nested_item_props:
-            continue
-        id_field = _find_id_field(nested_item_props)
-        if id_field is None:
-            continue
-        kind = _derive_kind(id_field, prop_name)
-        entry: dict[str, Any] = {
-            "array_path": f".{prop_name}",
-            "id_field": id_field,
-            "kind": kind,
-        }
-        # Recurse: attach any deeper entry-bearing arrays under this entry.
-        deeper = _scan_nested_arrays(
-            nested_item_props, items_resolver, parent_schema_basename
-        )
-        if deeper:
-            entry["nested"] = deeper
-        nested.append(entry)
-    return nested
-
-
-def _resolve_item_props(
-    items: dict[str, Any],
-    items_resolver: dict[str, dict[str, Any]],
-) -> dict[str, Any]:
-    """Resolve items dict to its effective properties dict.
-
-    Handles inline (items.type=object) and $ref (items.$ref=vc:core:...) cases.
-    """
-    if "$ref" in items:
-        ref_key = items["$ref"]
-        return items_resolver.get(ref_key, {})
-    if items.get("type") == "object":
-        return items.get("properties", {})
-    return {}
-
-
-def _scan_schema_for_arrays(
-    schema: dict[str, Any],
-    schema_basename: str,
-    items_resolver: dict[str, dict[str, Any]],
-    array_resolver: dict[str, dict[str, Any]],
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """Scan a schema for entry-bearing top-level arrays.
-
-    Handles two forms of array declaration:
-    1. Inline: property has type=array with items
-    2. Top-level $ref: property is "$ref": "vc:core:collections#X" where X
-       resolves to an array type in core/collections.schema.json $defs
-       (e.g. dependencyObjectList for 14_roadmap.dependencies)
-
-    Returns:
-        (arrays, sentinels_found)
-        arrays: list of arrayEntry dicts suitable for inclusion in the registry
-        sentinels_found: array names that match SENTINEL_ARRAYS (not included in
-                         arrays — only collected for the top-level _sentinels list)
-    """
-    props = _get_all_properties(schema)
-    arrays: list[dict[str, Any]] = []
-    sentinels_found: list[str] = []
-
-    for prop_name, prop_def in props.items():
-        if not isinstance(prop_def, dict):
-            continue
-
-        # Sentinel check (sentinels are always inline arrays added at write-time)
-        if prop_name in SENTINEL_ARRAYS:
-            sentinels_found.append(prop_name)
-            continue
-
-        # Exclusion check
-        if (schema_basename, prop_name) in CROSS_REF_EXCLUSIONS:
-            continue
-
-        # Resolve array definition — two cases:
-        # Case 1: property itself is a $ref to a collection that is an array
-        #         e.g. "dependencies": {"$ref": "vc:core:collections#dependencyObjectList"}
-        # Case 2: property has type=array with inline items
-        if "$ref" in prop_def and "type" not in prop_def:
-            # Top-level property $ref
-            ref_key = prop_def["$ref"]
-            array_defn = array_resolver.get(ref_key)
-            if array_defn is None:
-                continue
-            items = array_defn.get("items", {})
-            if not isinstance(items, dict):
-                continue
-        elif prop_def.get("type") == "array":
-            items = prop_def.get("items", {})
-            if not isinstance(items, dict):
-                continue
-        else:
-            continue
-
-        # Skip traceRef arrays: these are cross-step foreign-key references,
-        # not primary entries for this spec file.  Check BEFORE resolving props
-        # because _resolve_item_props strips the $ref away.
-        if items.get("$ref") in TRACE_REF_REFS:
-            continue
-
-        item_props = _resolve_item_props(items, items_resolver)
-        if not item_props:
-            continue
-
-        id_field = _find_id_field(item_props)
-        if id_field is None:
-            continue
-
-        kind = _derive_kind(id_field, prop_name)
-        entry: dict[str, Any] = {
-            "array_path": f".{prop_name}",
-            "id_field": id_field,
-            "kind": kind,
-        }
-
-        # Nested arrays
-        nested = _scan_nested_arrays(item_props, items_resolver, schema_basename)
-        if nested:
-            entry["nested"] = nested
-
-        arrays.append(entry)
-
-    return arrays, sentinels_found
 
 
 # ---------------------------------------------------------------------------
@@ -471,6 +172,14 @@ def _spec_basename_for_step(step: str, schema_path: str) -> str:
 # extraction_paths.json generation
 # ---------------------------------------------------------------------------
 
+def _full_array_paths(entry: dict[str, Any], full_path: str) -> list[str]:
+    """Return *full_path* followed, depth first, by the full path of each nested entry of *entry*."""
+    paths = [full_path]
+    for nested in entry.get("nested", []):
+        paths += _full_array_paths(nested, join_nested_path(full_path, nested["array_path"]))
+    return paths
+
+
 def _build_extraction_paths(
     registry: dict[str, dict[str, Any]],
     step_order: list[str],
@@ -478,7 +187,10 @@ def _build_extraction_paths(
     """Build the extraction_paths.json structure from the registry.
 
     Format matches the existing extraction_paths.json: step-keyed dict
-    (excluding _meta) with inner basename → list[array_path].
+    (excluding _meta) with inner basename → list of array paths: each
+    top-level ``array_path``, then (depth first) the full path of every nested
+    or map-keyed entry (``join_nested_path``), e.g.
+    ``.milestones[].tasks[].acceptance_criteria``.
 
     The _meta key is preserved in spirit but we emit only the structure that
     downstream consumers (registry_check._load_extraction_basenames) expect:
@@ -523,8 +235,7 @@ def _build_extraction_paths(
         step_block: dict[str, list[str]] = {}
         for basename in sorted(basenames):
             arrays = registry[basename]["arrays"]
-            paths = [a["array_path"] for a in arrays]
-            step_block[basename] = paths
+            step_block[basename] = [path for a in arrays for path in _full_array_paths(a, a["array_path"])]
         result[step] = step_block
 
     return result
@@ -533,6 +244,81 @@ def _build_extraction_paths(
 # ---------------------------------------------------------------------------
 # Main generator
 # ---------------------------------------------------------------------------
+
+#: Registry ``step`` of every entry declared by a record host (a non-step schema).
+RECORD_HOST_STEP = "extras"
+
+
+def _register_glob_entry(
+    registry: dict[str, dict[str, Any]], key: str, step: str, entry: dict[str, Any]
+) -> None:
+    """Append *entry* to the registry slot of glob *key*, creating the slot under *step*."""
+    registry.setdefault(key, {"step": step, "arrays": []})["arrays"].append(entry)
+
+
+def _in_slot(registry: dict[str, dict[str, Any]], key: str, entry: dict[str, Any]) -> bool:
+    """True when the slot of *key* already holds an entry with the same array path and kind."""
+    arrays = registry.get(key, {}).get("arrays", [])
+    return any(a["array_path"] == entry["array_path"] and a["kind"] == entry["kind"] for a in arrays)
+
+
+def _register_host_entries(
+    registry: dict[str, dict[str, Any]],
+    host: HostScan,
+    step: str,
+    arrays: list[dict[str, Any]],
+    default_files: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    """Register one step host's annotation entries; return ``(arrays, claimed glob keys)``.
+
+    An occurrence with ``files`` (or, lacking its own, *default_files*) goes under each glob key
+    (step *step* unless it names its own).
+    Any other occurrence is added to the returned *arrays*; when an entry of *arrays* (from an
+    earlier host of the step) has its path, the declared entry replaces it in place, so a kind
+    declared once carries one name in every host.  The *arrays* argument itself is not modified.
+    """
+    out = list(arrays)
+    claimed: set[str] = set()
+    for occ in host.occurrences:
+        files = occ.files or default_files
+        if files:
+            for glob_key in files:
+                _register_glob_entry(registry, glob_key, occ.step or step, occ.entry)
+                claimed.add(glob_key)
+            continue
+        slot = next((i for i, a in enumerate(out) if a["array_path"] == occ.entry["array_path"]), None)
+        if slot is None:
+            out.append(occ.entry)
+        else:
+            out[slot] = occ.entry
+    return out, claimed
+
+
+def _register_step_hosts(
+    registry: dict[str, dict[str, Any]],
+    scan: AnnotationScan,
+    step: str,
+    schema_files: list[str],
+    arrays: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], set[str]]:
+    """Register the annotation entries of every host schema file of *step*, in *schema_files* order.
+
+    Each file is a schema path relative to the toolkit root; a file that is no host adds nothing.
+    A file in ``PLAN_FILE_HOSTS`` registers all its entries under its plan-file glob.
+    Returns the step's ``(arrays, claimed glob keys)`` as ``_register_host_entries`` does.
+    """
+    claimed: set[str] = set()
+    for rel in schema_files:
+        host = scan.host(rel)
+        if host is not None:
+            if rel in PLAN_FILE_HOSTS:
+                plan_step, glob_key = PLAN_FILE_HOSTS[rel]
+                arrays, keys = _register_host_entries(registry, host, plan_step, arrays, [glob_key])
+            else:
+                arrays, keys = _register_host_entries(registry, host, step, arrays)
+            claimed |= keys
+    return arrays, claimed
+
 
 def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Generate the entry_key_registry and extraction_paths dicts from schemas.
@@ -544,34 +330,55 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         (registry_doc, extraction_paths_doc) — two dicts ready to serialize.
 
     Raises:
-        FileNotFoundError: if step_order.json or core/collections.schema.json
-                           are missing.
         json.JSONDecodeError: if any schema file is malformed.
+        AnnotationError: if the x-node / x-link annotation lint finds issues.
+        StepOrderError: if ``steps`` of tools/step_order.json cannot be read or leaves out a step
+                        that declares an ``x-node`` kind (the registry would silently lose it).
+    """
+    return generate_registry_from_decls(repo_root, collect_annotations(repo_root))
+
+
+def generate_registry_from_decls(
+    repo_root: str, decls: AnnotationDecls, steps: list[str] | None = None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """``generate_registry`` over annotation declarations the caller already collected.
+
+    Args:
+        repo_root: Absolute path to the toolkit root.
+        decls: ``collect_annotations(repo_root)``; the lint runs here.
+        steps: ``steps`` of tools/step_order.json when the caller already read the file (default: read here).
+
+    Returns and raises as ``generate_registry``.
     """
     schema_dir = os.path.join(repo_root, "schema")
     tools_dir = os.path.join(repo_root, "tools")
 
-    # Load step order
-    step_order_path = os.path.join(tools_dir, "step_order.json")
-    step_order_data = _load_json(step_order_path)
-    steps: list[str] = step_order_data["steps"]
+    # Annotation lint (x-node / x-link): a no-op when the toolkit has no
+    # vc:core:graph entry or no schema carries an annotation.
+    annotation_issues = lint_annotations(decls)
+    if annotation_issues:
+        raise AnnotationError(annotation_issues)
+    scan = scan_annotations(repo_root, decls)
 
-    # Build $ref resolvers
-    items_resolver, array_resolver = _build_ref_resolver(repo_root)
+    # Load step order
+    if steps is None:
+        steps = load_steps(os.path.join(tools_dir, "step_order.json"))
+    unlisted = sorted(annotated_steps(decls) - set(steps))
+    if unlisted:  # the loop below would leave these steps out of the registry without a message
+        raise StepOrderError(f"tools/step_order.json: steps: annotated step(s) {', '.join(unlisted)} are not listed")
 
     # Accumulators
     registry: dict[str, dict[str, Any]] = {}  # basename → entry
-    sentinels_set: set[str] = set()
     steps_without: list[dict[str, str]] = []
-    steps_deferred: list[dict[str, str]] = []
 
     for step in steps:
-        # Deferred-list wins over missing-schema fallback
-        if step in DEFERRED_STEPS:
-            steps_deferred.append({"step": step, "rationale": DEFERRED_RATIONALE})
+        if step in STEPS_INSIDE_PLAN_FILE:
+            steps_without.append({"step": step, "rationale": INSIDE_PLAN_FILE_RATIONALE})
             continue
 
         schema_path = _schema_file_for_step(step, schema_dir)
+        if schema_path is None and any(e["step"] == step for e in registry.values()):
+            continue  # no schema of its own: an annotation of an earlier step registered it
         if schema_path is None:
             steps_without.append({
                 "step": step,
@@ -579,15 +386,14 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
             })
             continue
 
-        schema = _load_json(schema_path)
-        schema_basename = os.path.basename(schema_path)
         spec_basename = _spec_basename_for_step(step, schema_path)
 
-        arrays, sentinels_found = _scan_schema_for_arrays(
-            schema, schema_basename, items_resolver, array_resolver
-        )
-        sentinels_set.update(sentinels_found)
+        step_hosts = [os.path.relpath(schema_path, repo_root)]
+        step_hosts += [os.path.join("schema", name) for name in STEP_EXTRA_HOSTS.get(step, ())]
+        arrays, extra_keys = _register_step_hosts(registry, scan, step, step_hosts, [])
 
+        if not arrays and extra_keys:
+            continue  # the step's entries all live under glob keys
         if not arrays:
             steps_without.append({
                 "step": step,
@@ -603,13 +409,20 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
             "arrays": arrays,
         }
 
+    # Record hosts: registered non-step schemas whose own x-node sets ``files``.  Their entries
+    # belong to no step: they register under ``RECORD_HOST_STEP``.
+    for occ in scan.record_hosts():
+        for glob_key in occ.files or []:
+            if _in_slot(registry, glob_key, occ.entry):
+                registry[glob_key]["step"] = RECORD_HOST_STEP  # a step schema reached it via $ref first
+            else:
+                _register_glob_entry(registry, glob_key, RECORD_HOST_STEP, occ.entry)
+
     # Sentinels are a hardcoded constant list: these array names appear across
     # multiple spec files at write-time (appended by canonical-lint tooling) and
     # are never declared in any schema's properties.  We do NOT discover them
     # via schema walk — they are always emitted from the SENTINEL_ARRAYS constant.
-    # sentinels_set tracks any that *were* found in schemas (should be empty in
-    # practice) and is merged in for completeness.
-    all_sentinels = sorted(set(SENTINEL_ARRAYS) | sentinels_set)
+    all_sentinels = sorted(SENTINEL_ARRAYS)
 
     # Build output document
     registry_doc: dict[str, Any] = {
@@ -619,8 +432,10 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         "registry": registry,
         "_sentinels": all_sentinels,
         "steps_without_entry_arrays": steps_without,
-        "steps_with_deferred_registration": steps_deferred,
     }
+    external_kinds = scan.external_kinds
+    if external_kinds:
+        registry_doc["external_kinds"] = external_kinds
 
     # Build extraction_paths
     extraction_paths_doc = _build_extraction_paths(registry, steps)
@@ -637,10 +452,26 @@ def _serialize(doc: Any) -> str:
     return json.dumps(doc, sort_keys=True, indent=2) + "\n"
 
 
+def _write_text(path: str, text: str) -> None:
+    """Write *text* to *path* (creating its directory) and report it."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    print(f"registry-generate: wrote {path}")
+
+
+def _write_doc(path: str, doc: Any) -> None:
+    """Write *doc* serialized to *path* (creating its directory) and report it."""
+    _write_text(path, _serialize(doc))
+
+
 def run(
     repo_root: str,
     out_path: str,
     extraction_paths_out: str,
+    step_order_out: str | None = None,
+    cli_commands_out: str | None = None,
+    checklist_out: str | None = None,
 ) -> None:
     """Generate registry and extraction_paths files and write them to disk.
 
@@ -648,19 +479,51 @@ def run(
         repo_root: Absolute or relative path to the toolkit root.
         out_path: Destination path for entry_key_registry.json.
         extraction_paths_out: Destination path for extraction_paths.json.
+        step_order_out: Optional destination for the step order derived from the annotations
+            and the hand-carried keys of ``tools/step_order.json`` (``None`` writes nothing; the
+            command line defaults it to ``tools/step_order.json`` when ``out_path`` is defaulted).
+        cli_commands_out: Optional destination for cli_commands.json (``None`` writes nothing).
+        checklist_out: Optional destination for the schema-change checklist rendered from
+            ``tools/schema_changes.json`` (``None`` writes nothing).
+
+    Raises:
+        AnnotationError: if the annotation lint fails or no annotated step gives a step order.
+        ChecklistError: if ``tools/schema_changes.json`` is not well formed.
+        StepOrderError: if ``steps`` of ``tools/step_order.json`` cannot be used or leaves out an annotated
+            step; with *step_order_out*, also if another hand-kept key cannot be used.
     """
     repo_root = os.path.abspath(repo_root)
-    registry_doc, extraction_paths_doc = generate_registry(repo_root)
+    decls = collect_annotations(repo_root)
+    # Read the hand-kept keys once; the registry generation takes ``steps`` from the same read.
+    hand_path = os.path.join(repo_root, "tools", "step_order.json")
+    step_order = (os.path.abspath(step_order_out), load_hand_kept(hand_path)) if step_order_out else None
+    registry_doc, extraction_paths_doc = generate_registry_from_decls(
+        repo_root, decls, step_order[1]["steps"] if step_order else None
+    )
+    outputs: list[tuple[str, Any]] = [
+        (out_path, registry_doc),
+        (extraction_paths_out, extraction_paths_doc),
+    ]
 
-    # Write registry
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as fh:
-        fh.write(_serialize(registry_doc))
+    # Derive everything first (the checklist too), so a failure writes no output file.
+    if step_order:
+        step_order_path, hand = step_order
+        if not annotated_steps(decls):
+            raise AnnotationError(
+                ["registry-generate --step-order-out: no annotated step to derive an order from"]
+            )
+        derived = derive_from_decls(decls, declared_edge_pairs(hand))
+        outputs.append((step_order_path, build_step_order_document(derived, hand)))
+    if cli_commands_out:
+        # Lazy: generate_cli_commands builds the full CLI parser (specdev_tools.cli), which loads
+        # this module lazily in turn; a local import keeps loading generate from loading cli.
+        from specdev_tools.registry.cli_commands import generate_cli_commands
 
-    # Write extraction_paths
-    os.makedirs(os.path.dirname(os.path.abspath(extraction_paths_out)), exist_ok=True)
-    with open(extraction_paths_out, "w", encoding="utf-8") as fh:
-        fh.write(_serialize(extraction_paths_doc))
+        outputs.append((os.path.abspath(cli_commands_out), generate_cli_commands()))
 
-    print(f"registry-generate: wrote {out_path}")
-    print(f"registry-generate: wrote {extraction_paths_out}")
+    checklist = (os.path.abspath(checklist_out), generate_checklist(Path(repo_root))) if checklist_out else None
+
+    for path, doc in outputs:
+        _write_doc(path, doc)
+    if checklist:
+        _write_text(*checklist)

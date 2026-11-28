@@ -1,0 +1,25 @@
+code: E881
+subcode: MIGRATION_SCRIPT_INVARIANT
+title: "A migration script broke a rule of the runner"
+trigger: |
+  `specdev align apply --auto` ran a script on a scratch copy and the script
+  failed a rule the runner holds every script to, so nothing was written:
+    "E881 script <id> (phase <n>, <name>): <problem>; nothing was written"
+  The rules: a script does not raise; it changes only the steps it declares;
+  the set of definition ids is the same before and after, except for ids it
+  renamed or deleted and recorded; a second detect finds nothing to do; a plan
+  file does not change after the phase that closes milestones; a closed plan
+  still matches its close hash.
+resolution: |
+  1. Read the script id and the problem in the message. The host is exactly as
+     it was: `git status` shows no change.
+  2. This is a fault in the toolkit or a shape of host data the script does not
+     know, not a fault in your spec. Report the script id, the problem and, if
+     you can share it, the smallest part of the spec that triggers it.
+  3. Do not edit the spec to make the script pass. Run again with the fixed
+     toolkit:
+       specdev align apply spec --auto \
+         --repo-root ./devspec_toolkit --git-root .
+see_also:
+  - E880
+  - E884

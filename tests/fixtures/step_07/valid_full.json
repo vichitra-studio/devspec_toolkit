@@ -25,11 +25,8 @@
       "measurement_method": "PromQL: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m])) by (le))",
       "stage": "prod",
       "owner": "api",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-login"
-        }
+      "constrains": [
+        "fr-user-login"
       ]
     },
     {
@@ -53,11 +50,8 @@
       "measurement_method": "PromQL: rate(http_requests_total{job=\"api-server\"}[5m])",
       "stage": "prod",
       "owner": "api",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-login"
-        }
+      "constrains": [
+        "fr-user-login"
       ]
     },
     {
@@ -81,11 +75,8 @@
       "measurement_method": "PromQL: (1 - sum(rate(http_request_duration_seconds_bucket{job=\"api-server\", status!~\"2..\"}[5m])) / sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m]))) * 100",
       "stage": "prod",
       "owner": "system",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-login"
-        }
+      "constrains": [
+        "fr-user-login"
       ]
     },
     {
@@ -109,11 +100,8 @@
       "measurement_method": "Cloud billing dashboard with cost allocation tags",
       "stage": "prod",
       "owner": "business",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "cost-analysis-report"
-        }
+      "constrains": [
+        "fr-user-login"
       ]
     },
     {
@@ -137,11 +125,8 @@
       "measurement_method": "Configuration review of storage systems",
       "stage": "prod",
       "owner": "system",
-      "trace": [
-        {
-          "type": "inv",
-          "id": "inv-data-encryption"
-        }
+      "constrains": [
+        "fr-user-login"
       ]
     }
   ],

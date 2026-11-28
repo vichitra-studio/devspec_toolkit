@@ -1,0 +1,20 @@
+{
+  "description": "The manifest requires a section the schema does not declare.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/13_extension_manifest.json",
+      "path": [
+        "extensions",
+        0,
+        "required_schema_sections"
+      ],
+      "value": [
+        "datastores",
+        "tables",
+        "validation_rules",
+        "migrations"
+      ]
+    }
+  ]
+}

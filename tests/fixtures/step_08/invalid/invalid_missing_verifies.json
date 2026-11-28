@@ -1,0 +1,25 @@
+{
+  "$schema": "vc:08-fixtures",
+  "id": "fixtures-invalid",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fixture-fail-missing-verifies",
+      "description": "This fixture names neither verifies nor removes and should fail validation",
+      "mode": "unit",
+      "input": {},
+      "expected": {},
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag"
+    }
+  ]
+}

@@ -14,8 +14,9 @@ from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-
 if TYPE_CHECKING:
     from referencing import Registry
 
+from ..context._utils import merged_required_and_properties
 from ..core.errors import SpecError, make_error
-from ..core.registry import SchemaRegistry
+from ..core.registry import get_shared_registry
 
 FENCED_JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 EMBEDDED_SCHEMA_RE = re.compile(r"#+\s*Embedded Schema\s*```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
@@ -23,11 +24,6 @@ OUTPUT_CONTRACT_HEADING_RE = re.compile(r"(?im)^#\s*Output Contract\b.*$")
 SUBHEADING_RE = re.compile(r"(?im)^##\s+")
 SCHEMA_URI_RE = re.compile(r"(?im)^\s*-\s*Schema URI:\s*(\S+)\s*$")
 SCHEMA_FILE_RE = re.compile(r"(?im)^\s*-\s*Schema File:\s*(\S+)\s*$")
-DRIFT_SENSITIVE_FIELDS = (
-    "dependencies",
-    "trace",
-    "canonical_refs_used",
-)
 
 # Schema-filename → step-key override.  ``schema_contracts`` is keyed by the
 # numeric prefix of the schema filename (``Path(schema_file).name.split("_", 1)[0]``).
@@ -94,11 +90,25 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
         if step == "seed":
             continue
         try:
-            schema_required, schema_props, schema = _load_contract(schema_file)
+            schema_required, schema_props, schema = _load_contract(schema_file, root)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
             errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_schema {schema_file} {exc}"))
             continue
         schema_contracts[step] = (schema_file, schema, schema_required, schema_props)
+        for prompt_path in _step_16_reference_prompts(prompt_dir, step):
+            schema_ref, schema_ref_line = _extract_schema_reference(prompt_path)
+            errors.extend(
+                _schema_reference_errors(
+                    prompt_path=prompt_path,
+                    line_no=schema_ref_line,
+                    schema_file=schema_file,
+                    schema=schema,
+                    schema_ref=schema_ref,
+                    registry_map=registry_map,
+                    registry_map_error=registry_map_error,
+                    repo_root=root,
+                )
+            )
         prompt_candidates = _prompt_candidates(prompt_dir, step)
         if not prompt_candidates:
             continue
@@ -137,14 +147,6 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
             if extra:
                 errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} extra required {extra}"))
             errors.extend(
-                _drift_sensitive_property_errors(
-                    prompt_path,
-                    line_no,
-                    schema_props,
-                    prompt_props,
-                )
-            )
-            errors.extend(
                 _required_canonical_ref_errors(
                     prompt_path,
                     line_no,
@@ -157,18 +159,38 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
     return errors
 
 
-def _load_contract(schema_path: str) -> tuple[list[str], dict[str, Any], dict[str, Any]]:
+def _load_contract(schema_path: str, repo_root: Path) -> tuple[list[str], dict[str, Any], dict[str, Any]]:
+    """Return ``(required, properties, raw_schema)`` of the schema file.
+
+    ``required`` and ``properties`` are merged across the schema's ``allOf`` branches
+    (``merged_required_and_properties``); the third element is the schema as written,
+    which the output-contract validation uses.  Raises ``OSError`` or ``ValueError``
+    when the file cannot be read or parsed.
+    """
     with open(schema_path, "r", encoding="utf-8") as f:
         schema = json.load(f)
-    required = schema.get("required", []) or []
-    props = schema.get("properties", {})
-    if not isinstance(props, dict):
-        props = {}
-    return required, props, schema
+    merged = merged_required_and_properties(schema, repo_root)
+    return merged["required"], merged["properties"], schema
 
 
 def _prompt_candidates(prompt_dir: Path, step: str) -> list[str]:
     return sorted(glob.glob(str(prompt_dir / f"prompt_{step}_*.md")))
+
+
+def _step_16_reference_prompts(prompt_dir: Path, step: str) -> list[str]:
+    """The step-16 prompts whose Schema URI and Schema File are checked against the schema of *step*.
+
+    ``prompt_{step}_*.md`` does not find them: ``prompt_16_impl_context.md`` has the key ``16anchor``
+    (``_PROMPT_STEP_OVERRIDE``), and ``prompt_16a_*``, ``prompt_16b_*`` and ``prompt_16c_*`` have the key ``16``
+    (``_SUBSTEP_TO_BASE_SCHEMA``).
+    """
+    found: list[str] = []
+    for prompt_path in sorted(glob.glob(str(prompt_dir / "prompt_*.md"))):
+        name = Path(prompt_path).name
+        key = _PROMPT_STEP_OVERRIDE.get(name) or _SUBSTEP_TO_BASE_SCHEMA.get(_step_from_prompt_name(name) or "")
+        if key == step:
+            found.append(prompt_path)
+    return found
 
 
 def _extract_prompt_contract(prompt_path: str) -> tuple[list[str] | None, dict[str, object], dict[str, Any], int]:
@@ -219,7 +241,7 @@ def _extract_schema_reference(prompt_path: str) -> tuple[dict[str, str] | None, 
 
 def _schema_registry_map(repo_root: Path) -> tuple[dict[str, str] | None, str | None]:
     try:
-        schema_registry = SchemaRegistry(str(repo_root))
+        schema_registry = get_shared_registry(str(repo_root))
     except (OSError, ValueError, json.JSONDecodeError, TypeError) as exc:
         return None, str(exc)
     return schema_registry.map, None
@@ -291,37 +313,6 @@ def _schema_reference_errors(
             ))
 
     return errors
-
-
-def _drift_sensitive_property_errors(
-    prompt_path: str,
-    line_no: int,
-    schema_props: dict[str, object],
-    prompt_props: dict[str, object],
-) -> list[SpecError]:
-    fields = DRIFT_SENSITIVE_FIELDS
-    errors: list[SpecError] = []
-    for field in fields:
-        schema_prop = schema_props.get(field)
-        prompt_prop = prompt_props.get(field)
-        if schema_prop is None:
-            continue
-        if prompt_prop is None:
-            errors.append(make_error(
-                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing property field='{field}'"
-            ))
-            continue
-        if not (isinstance(schema_prop, dict) and isinstance(prompt_prop, dict)):
-            continue
-        if _canonical_json(schema_prop) != _canonical_json(prompt_prop):
-            errors.append(make_error(
-                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} property_drift field='{field}'"
-            ))
-    return errors
-
-
-def _canonical_json(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _required_canonical_ref_errors(
@@ -468,7 +459,7 @@ _PROMPT_STEP_OVERRIDE: dict[str, str] = {
 # they legitimately appear in multiple artifacts with different semantics.
 _SUBSTEP_EXPECTED_KEYS = {
     "16a": {"spec_alignment", "checklist"},
-    "16b": {"execution", "implementation", "evidence"},
+    "16b": {"execution", "implementation"},
     "16c": {"review", "verdict", "semantic_review"},
 }
 
@@ -533,7 +524,7 @@ def _validate_output_schema_uri(payload: dict[str, Any], schema: dict[str, Any])
 
 def _schema_registry(repo_root: Path) -> tuple[Registry | None, str | None]:
     try:
-        schema_registry = SchemaRegistry(str(repo_root))
+        schema_registry = get_shared_registry(str(repo_root))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return None, str(exc)
     return schema_registry.to_referencing_registry(), None

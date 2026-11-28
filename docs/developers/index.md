@@ -5,17 +5,20 @@ Use this index to locate the developer-facing material while working through the
 ## Onboarding
 - [`getting_started.md`](getting_started.md) — single-path setup guide and workflow primer.
 - [`reference.md`](reference.md) — command cheatsheet, naming rules, and troubleshooting steps.
+- [`host_setup.md`](host_setup.md) — what `init` and `specdev update` install into a host, the workflow templates a person copies, and a release from `release prep` to a rollback.
+- [`host_declarations.md`](host_declarations.md) — the optional host file `spec/common/host_declarations.json`: its items and which command reads each.
 
 ## Workflow Guides
 - [`workflows/discovery.md`](workflows/discovery.md) — steps 00–12 overview.
-- [`workflows/spec_to_impl.md`](workflows/spec_to_impl.md) — steps 13–17 overview.
+- [`workflows/spec_to_impl.md`](workflows/spec_to_impl.md) — steps 13–16c overview.
+- [`workflows/workflow_migrate_1_2_0.md`](workflows/workflow_migrate_1_2_0.md) — migrating a 1.1.1 host to 1.2.0: the mechanical stage, the judgement pass, `align validate`, sizing.
 - [`workflows/workflow_migration.md`](workflows/workflow_migration.md) — guide for migrating projects after toolkit updates.
 - [`workflows/workflow_align.md`](workflows/workflow_align.md) — guide for using the specdev align CLI.
 - [`workflows/workflow_bootstrap_legacy.md`](workflows/workflow_bootstrap_legacy.md) — bootstrapping legacy projects.
 - [`workflows/workflow_feature_extension.md`](workflows/workflow_feature_extension.md) — adding new features to existing specs.
 
 ## Tooling & Diagnostics
-- [`tooling/coverage_matrix.md`](tooling/coverage_matrix.md) — traceability mechanics and enforcement.
+- The coverage matrix page was removed in 1.2.0: use `specdev coverage` and `specdev trace` ([`reference.md`](reference.md)).
 - [`tooling/gap_hunter_checklist.md`](tooling/gap_hunter_checklist.md) — repeatable gap-hunting process.
 
 ### Tools

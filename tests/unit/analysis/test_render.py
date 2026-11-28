@@ -1,219 +1,97 @@
-"""Render unit tests — plain and JSON."""
+"""Render unit tests: plain and JSON (schema_version 2)."""
 from __future__ import annotations
 
 import json
 
 from specdev_tools.analysis.upstream_backlog import (
-    _record_sort_key,
+    UNPLACED,
+    Placement,
+    Record,
+    expand,
+    group_key,
     render_json,
     render_plain,
+    summarise,
 )
+from specdev_tools.core.ambiguity_items import AmbiguityItem, shape_of
+from specdev_tools.graph.model import Graph, SpecShape
+
+_GRAPH = Graph.from_nodes([], shape=SpecShape(step_ranks={"seed": -1, "04": 4, "05": 5}))
+_POINTER = {"file": "spec/04_fr_list.json", "id": "fr-a"}
 
 
-def _rec(**kw):
-    base = {
-        "milestone_id": "ms-x",
-        "ambiguity_id": "amb-y",
-        "severity": "medium",
-        "status": "tracking",
-        "status_unset": False,
-        "description": "",
-        "impact": [],
-        "bucket": "unclassified",
-        "matched_rule": 4,
-        "matched_impact_entry": None,
-    }
-    base.update(kw)
-    return base
+def _record(group: str = "04", step: str = "16b", placement: Placement | None = None, **raw) -> Record:
+    raw.setdefault("id", "amb-y")
+    item = AmbiguityItem("/s/impl_context/ms_x_plan.json", step, ".x", raw, shape_of(raw))
+    return Record(item, "impl_context/ms_x_plan.json", placement or Placement((group,), ("04",), (_POINTER,)), group)
 
 
-def _sample_records():
-    return sorted([
-        _rec(ambiguity_id="a-step09", bucket="step_09", severity="high",
-             impact=["spec/09_impl_plan.json:task-foo"], matched_rule=1,
-             matched_impact_entry="spec/09_impl_plan.json:task-foo"),
-        _rec(ambiguity_id="a-plan", bucket="plan_level", severity="medium",
-             impact=["plan.summary"], matched_rule=3,
-             matched_impact_entry="plan.summary"),
-        _rec(ambiguity_id="a-tool", bucket="toolkit", severity="low",
-             impact=["E307 foo"], matched_rule=2,
-             matched_impact_entry="E307 foo"),
-        _rec(ambiguity_id="a-un", bucket="unclassified", severity="low",
-             impact=["SCREAMING_TOKEN"]),
-    ], key=_record_sort_key)
+def _plain(records: list[Record]) -> str:
+    return render_plain(records, summarise(records), _GRAPH)
 
 
-def test_plain_bucket_order():
-    out = render_plain(
-        _sample_records(), status_filter="open",
-        total_records=4, open_count=4, resolved_count=0,
-        milestones_scanned=1, unclassified_w613_count=1,
-    )
-    idx_step = out.index("Step 09")
-    idx_plan = out.index("Plan-level")
-    idx_tool = out.index("Toolkit")
-    idx_un = out.index("Unclassified")
-    assert idx_step < idx_plan < idx_tool < idx_un
-
-
-def test_plain_unset_status_rendered():
-    r = _rec(status="tracking", status_unset=True, bucket="plan_level",
-             impact=["plan.x"])
-    out = render_plain([r], status_filter="open", total_records=1,
-                       open_count=1, resolved_count=0, milestones_scanned=1,
-                       unclassified_w613_count=0)
-    assert "(unset status → tracking)" in out
-
-
-def test_plain_w613_header_when_unclassified():
-    r = _rec(ambiguity_id="a-un", bucket="unclassified")
-    out = render_plain([r], status_filter="open", total_records=1,
-                       open_count=1, resolved_count=0, milestones_scanned=1,
-                       unclassified_w613_count=1)
-    assert "[1 x W613 — see stderr]" in out
-
-
-def test_plain_origin_tag_plan_renders_16a():
-    r = _rec(bucket="plan_level", impact=["plan.x"], origin="plan")
-    out = render_plain([r], status_filter="open", total_records=1,
-                       open_count=1, resolved_count=0, milestones_scanned=1,
-                       unclassified_w613_count=0)
-    assert "[16a]" in out
-
-
-def test_plain_origin_tag_execution_renders_16b_plus():
-    r = _rec(bucket="plan_level", impact=["plan.x"], origin="execution")
-    out = render_plain([r], status_filter="open", total_records=1,
-                       open_count=1, resolved_count=0, milestones_scanned=1,
-                       unclassified_w613_count=0)
-    assert "[16b+]" in out
-
-
-def test_plain_totals_line():
-    out = render_plain([], status_filter="open", total_records=0,
-                       open_count=0, resolved_count=0, milestones_scanned=0,
-                       unclassified_w613_count=0)
-    assert out.startswith("Totals:")
-
-
-def test_json_schema_version_and_shape():
-    records = _sample_records()
-    out = render_json(
-        records, total_records=len(records), open_count=len(records),
-        resolved_count=0, milestones_scanned=1, unclassified_count=1,
-        warnings=[{"code": "W613", "target": "ms-x:a-un"}],
-    )
-    data = json.loads(out)
-    assert data["schema_version"] == "1"
-    assert set(data) == {"schema_version", "summary", "records", "warnings"}
-    assert data["summary"]["unclassified_count"] == 1
-    assert data["warnings"][0]["code"] == "W613"
-
-
-def test_json_sort_order_buckets():
-    records = _sample_records()
-    out = json.loads(render_json(
-        records, total_records=4, open_count=4, resolved_count=0,
-        milestones_scanned=1, unclassified_count=1, warnings=[],
-    ))
-    buckets = [r["bucket"] for r in out["records"]]
-    assert buckets == ["step_09", "plan_level", "toolkit", "unclassified"]
-
-
-def test_letter_suffix_sort_order():
-    recs = [
-        _rec(ambiguity_id="a13a", bucket="step_13a", severity="low"),
-        _rec(ambiguity_id="a14", bucket="step_14", severity="low"),
-        _rec(ambiguity_id="a13", bucket="step_13", severity="low"),
+def test_totals_line_counts_with_answer_and_needing_answer():
+    records = [
+        _record(id="a", about=["fr-a"], decision="Use thirty minutes."),
+        _record(id="b", about=["fr-a"]),
+        _record(id="c", about=["fr-a"]),
     ]
-    sorted_recs = sorted(recs, key=_record_sort_key)
-    assert [r["bucket"] for r in sorted_recs] == [
-        "step_13", "step_13a", "step_14"
-    ]
+    assert _plain(records).splitlines()[-1] == "Totals: 3 items / 1 with answer / 2 needing answer."
 
 
-def test_plain_description_multiline_truncates_to_first_line():
-    r = _rec(bucket="plan_level", impact=["plan.x"],
-             description="first line\nsecond line\nthird")
-    out = render_plain([r], status_filter="open", total_records=1,
-                       open_count=1, resolved_count=0, milestones_scanned=1,
-                       unclassified_w613_count=0)
-    assert "first line" in out
-    assert "second line" not in out
-    assert "third" not in out
+def test_empty_report_is_the_totals_line_only():
+    assert _plain([]) == "Totals: 0 items / 0 with answer / 0 needing answer."
+
+
+def test_item_in_two_groups_counts_once_and_is_marked_also_in():
+    placement = Placement(("04", "05"), ("04", "05"), ())
+    records = expand(_record(placement=placement, about=["fr-a", "api-b"]))
+    out = _plain(records)
+    assert out.count("amb-y") == 2
+    assert "(also in 04)" in out
+    assert out.splitlines()[-1].startswith("Totals: 1 item /")
+
+
+def test_groups_render_in_group_order_and_unplaced_last():
+    records = [_record(UNPLACED, about=["x"], id="u"), _record("05", id="f", about=["y"]), _record("04", id="e", about=["z"])]
+    records.sort(key=lambda r: group_key(r.group, _GRAPH))
+    out = _plain(records)
+    assert out.index("04 - ") < out.index("05 - ") < out.index(f"{UNPLACED} - ")
+
+
+def test_plain_line_shows_artifact_item_description_about_and_answer_state():
+    out = _plain([_record(about=["fr-a", "api-b"], description="first line\nsecond line")])
+    assert "impl_context/ms_x_plan.json / amb-y - needs operator answer" in out
+    assert "first line" in out and "second line" not in out
+    assert "about: fr-a | api-b" in out
+
+
+def test_plain_flags_a_legacy_item():
+    assert "legacy" in _plain([_record(severity="low", status="tracking", impact=["spec/04_x.json"])])
+
+
+def test_json_v2_record_keys_and_legacy_impact_key():
+    unified = _record(id="u", about=["fr-a"], decision="yes")
+    legacy = _record(id="l", severity="high", status="tracking", impact=["spec/04_fr_list.json:fr-a", {"file": "f", "id": "i"}])
+    data = json.loads(render_json([unified, legacy], summarise([unified, legacy])))
+    assert data["schema_version"] == "2"
+    base = {"group", "also_in", "artifact", "step", "item_id", "about", "about_steps", "decision", "shape", "description", "impact"}
+    u, l = data["records"]
+    assert set(u) == base
+    assert set(l) == base | {"severity", "status", "bucket", "matched_rule"}
+    assert u["impact"] == [_POINTER]
+    assert l["impact"] == ["spec/04_fr_list.json:fr-a", {"file": "f", "id": "i"}]
+    assert (l["bucket"], l["shape"], u["shape"]) == ("step_04", "legacy", "unified")
+
+
+def test_json_summary_counts_and_hidden_by_status():
+    records = [_record(id="a", about=["x"], decision="d"), _record(UNPLACED, id="b", about=["y"])]
+    summary = summarise(records, hidden_by_status=3, warnings=[{"code": "W613", "target": "t"}])
+    data = json.loads(render_json(records, summary))
+    assert data["summary"] == {"items": 2, "with_answer": 1, "needing_answer": 1, "unplaced_count": 1, "hidden_by_status_count": 3}
+    assert data["warnings"] == [{"code": "W613", "target": "t"}]
 
 
 def test_json_preserves_full_multiline_description():
-    r = _rec(bucket="plan_level", description="line1\nline2")
-    out = json.loads(render_json(
-        [r], total_records=1, open_count=1, resolved_count=0,
-        milestones_scanned=1, unclassified_count=0, warnings=[],
-    ))
-    assert out["records"][0]["description"] == "line1\nline2"
-
-
-def test_plain_wrap_continuation_prefixed_with_pipe():
-    from specdev_tools.analysis.upstream_backlog import _wrap_impact
-    # Entries crafted to force a wrap at ~80 chars with indent=11.
-    impact = ["a" * 30, "b" * 30, "c" * 30]
-    lines = _wrap_impact(impact, indent=11, width=80)
-    assert len(lines) >= 2
-    assert lines[0].lstrip().startswith("impact: ")
-    # First entry on first line; second entry on same line; third wraps.
-    for cont in lines[1:]:
-        assert cont.lstrip().startswith("| "), f"expected '| ' prefix: {cont!r}"
-
-
-def test_plain_wrap_single_entry_no_continuation():
-    from specdev_tools.analysis.upstream_backlog import _wrap_impact
-    lines = _wrap_impact(["short"], indent=11)
-    assert lines == ["           impact: short"]
-
-
-def test_plain_wrap_filters_non_string_entries():
-    from specdev_tools.analysis.upstream_backlog import _wrap_impact
-    assert _wrap_impact([{"x": 1}, 42, None], indent=11) == []
-
-
-def test_json_preserves_non_string_impact_entries():
-    r = _rec(bucket="unclassified", impact=["plain", 42, {"x": 1}])
-    out = json.loads(render_json(
-        [r], total_records=1, open_count=1, resolved_count=0,
-        milestones_scanned=1, unclassified_count=1, warnings=[],
-    ))
-    assert out["records"][0]["impact"] == ["plain", 42, {"x": 1}]
-
-
-def test_json_hidden_by_status_count_defaults_to_zero():
-    out = json.loads(render_json(
-        [], total_records=0, open_count=0, resolved_count=0,
-        milestones_scanned=0, unclassified_count=0, warnings=[],
-    ))
-    assert out["summary"]["hidden_by_status_count"] == 0
-
-
-def test_json_hidden_by_status_count_passthrough():
-    out = json.loads(render_json(
-        [], total_records=0, open_count=0, resolved_count=0,
-        milestones_scanned=0, unclassified_count=0, warnings=[],
-        hidden_by_status_count=71,
-    ))
-    assert out["summary"]["hidden_by_status_count"] == 71
-
-
-def test_json_record_origin_defaults_to_execution_without_origin_key():
-    r = _rec(bucket="unclassified")
-    out = json.loads(render_json(
-        [r], total_records=1, open_count=1, resolved_count=0,
-        milestones_scanned=1, unclassified_count=1, warnings=[],
-    ))
-    assert out["records"][0]["origin"] == "execution"
-
-
-def test_json_record_origin_plan_passthrough():
-    r = _rec(bucket="unclassified", origin="plan", severity="blocking")
-    out = json.loads(render_json(
-        [r], total_records=1, open_count=1, resolved_count=0,
-        milestones_scanned=1, unclassified_count=1, warnings=[],
-    ))
-    assert out["records"][0]["origin"] == "plan"
+    data = json.loads(render_json([_record(description="line1\nline2", about=["x"])], summarise([])))
+    assert data["records"][0]["description"] == "line1\nline2"

@@ -1,0 +1,102 @@
+{
+  "role": "16b",
+  "start": "PWRESET_CONFIRM_EXPIRED_01",
+  "sections": {
+    "core criteria": {
+      "members": [
+        "tc-confirm-expired-token"
+      ],
+      "containers": [
+        "ms-account-recovery",
+        "task-implement-password-reset-confirm"
+      ]
+    },
+    "obligations": {
+      "members": [
+        "ac-password-reset-3"
+      ],
+      "containers": [
+        "fr-password-reset"
+      ]
+    },
+    "APIs and errors": {
+      "members": [
+        "api-password-reset-confirm",
+        "err-password-reset-confirm-token-expired"
+      ],
+      "containers": []
+    },
+    "lineage": {
+      "members": [
+        "cap-account-recovery",
+        "fr-password-reset",
+        "scope-password-reset"
+      ],
+      "containers": []
+    },
+    "assumptions": {
+      "members": [
+        "asm-member-controls-email"
+      ],
+      "containers": []
+    },
+    "constraints": {
+      "members": [
+        "inv-reset-token-single-use",
+        "nfr-latency-reset-email"
+      ],
+      "containers": []
+    },
+    "threats": {
+      "members": [
+        "ec-token-at-expiry-second",
+        "threat-reset-token-replay"
+      ],
+      "containers": []
+    },
+    "delivery": {
+      "members": [
+        "ci",
+        "conn-identity-to-mailrelay",
+        "contract-tests",
+        "job-contract-tests",
+        "scaffold-password-reset-confirm",
+        "secret-mailrelay-api-key",
+        "secret-reset-token-signing-key"
+      ],
+      "containers": []
+    },
+    "dependencies": {
+      "members": [],
+      "containers": []
+    },
+    "third parties": {
+      "members": [
+        "tp-argon2",
+        "tp-mailrelay"
+      ],
+      "containers": []
+    },
+    "verifiers": {
+      "members": [
+        "fix-password-reset-expired-token",
+        "ver-password-reset-expired-token"
+      ],
+      "containers": []
+    },
+    "universal": {
+      "members": [
+        "15_scaffold.json",
+        "rule-contract-tests-on-every-pr",
+        "rule-security-review-of-token-handling",
+        "rule-spec-check-on-every-pr",
+        "term-reset-token"
+      ],
+      "containers": []
+    }
+  },
+  "pins": {
+    "tp-argon2": "0.41.1",
+    "tp-mailrelay": "api-v3"
+  }
+}

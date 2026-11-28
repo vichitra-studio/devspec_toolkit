@@ -120,15 +120,20 @@ slices:
 - name: agent_contracts
   description: >
     Agent prompt-contracts under .claude/agents that drive the pr-audit and
-    specdev sub-agents. They restate schema-derived enums and protocol steps,
-    so they drift against schema/infra and protocol.md if left unaudited.
+    specdev sub-agents, and the skills under .claude/skills that dispatch them.
+    They restate schema-derived enums, commands and protocol steps, so they
+    drift against schema/infra, the CLI and protocol.md if left unaudited.
+    A skill file is read here for its commands, its dispatch inputs and the
+    output it expects from an agent; host_integration also lists it, for the
+    mechanical checks only.
   globs:
     - ".claude/agents/**/*.md"
+    - ".claude/skills/**"
   expansion_rules:
     - target: "schema/infra/findings.schema.json"
     - target: "schema/infra/pr_audit_fix_plan.schema.json"
   applies:
-    drift_types: [D1, D3, D6, D14]
+    drift_types: [D1, D2, D3, D6, D14]
     invariants:  [I2, I13]
   semantic_work: true
   model_tier: sonnet
@@ -161,7 +166,7 @@ slices:
 - name: validators
   description: >
     Check logic that enforces contracts. Includes per-step validators,
-    cross-artifact checks, canonical integrity, registry generation,
+    graph checks, canonical integrity, registry generation,
     and lint modules.
   globs:
     - "tools/specdev_tools/validation/**/*.py"
@@ -171,7 +176,16 @@ slices:
     - "tools/specdev_tools/analysis/**/*.py"
     - "tools/specdev_tools/generation/**/*.py"
     - "tools/specdev_tools/core/**/*.py"          # shared core utilities (loaders, parsers, constants)
-    - "tools/specdev_tools/*.py"                  # top-level lint/validate modules (validate.py, fixtures_lint.py, matrix.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
+    - "tools/specdev_tools/graph/**/*.py"         # 1.2.0: the spec graph (nodes, links, resolver, queries)
+    - "tools/specdev_tools/trace/**/*.py"         # 1.2.0: trace lock, stale, attest, context recipes
+    - "tools/specdev_tools/lifecycle/**/*.py"     # 1.2.0: milestone start/close, plan and review records, status
+    - "tools/specdev_tools/release/**/*.py"       # 1.2.0: release prep and release gate
+    - "tools/specdev_tools/verify/**/*.py"        # 1.2.0: verification runs and records
+    - "tools/specdev_tools/proof/**/*.py"         # 1.2.0: proof of a criterion
+    - "tools/specdev_tools/thirdparty/**/*.py"    # 1.2.0: third-party checks
+    - "tools/error_ownership.json"                # hand-maintained: the owner of each finding code
+    - "tools/graph_recipes.json"                  # hand-maintained: context recipes read by trace
+    - "tools/specdev_tools/*.py"                # top-level lint/validate modules (validate.py, fixtures_lint.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
   expansion_rules:
     - target: "schema/{step}_*.json"
       capture: "tools/specdev_tools/validation/step_*.py"
@@ -197,8 +211,9 @@ slices:
     - "tools/specdev_tools/guides/**/*.yaml"
     - "tools/specdev_tools/context/**/*.py"
     # Manually-maintained toolkit config files that live under tools/ but are NOT
-    # generator outputs (registry-generate writes only entry_key_registry.json and
-    # extraction_paths.json). Routed here for semantic drift review rather than the
+    # generator outputs (registry-generate writes entry_key_registry.json,
+    # extraction_paths.json, step_order.json, cli_commands.json and
+    # docs/developers/schema-change-checklist.md). Routed here for semantic drift review rather than the
     # deterministic generated_artifacts slice:
     #   - command_prefixes.json — command-prefix allowlist (E530 / hallucination_lint)
     #   - step_docs.json — step→reference-doc map (consumed by `specdev ai-help`)
@@ -247,10 +262,15 @@ slices:
 - name: generated_artifacts
   description: >
     Files declared as generator-owned. Must stay byte-exact with the
-    output of their generator. Hand-edits forbidden.
+    output of their generator. Hand-edits forbidden. Two further outputs of
+    registry-generate are routed elsewhere for review of their content:
+    tools/step_order.json (pipeline_topology) and
+    docs/developers/schema-change-checklist.md (docs). The T0-10 check diffs
+    all five against a fresh generator run.
   globs:
     - "tools/entry_key_registry.json"
     - "tools/extraction_paths.json"
+    - "tools/cli_commands.json"
   expansion_rules:
     - target: "schema/**/*.json"          # generators read schemas
     - target: "tools/specdev_tools/registry/**"
@@ -269,6 +289,8 @@ slices:
     Governs how breaking changes are introduced and applied.
   globs:
     - "tools/specdev_tools/migration/**/*.py"
+    - "tools/specdev_tools/migration/maps/**/*.yaml"   # the disposition map of each schema change
+    - "tools/schema_changes.json"                      # hand-maintained input of the schema-change checklist
     - "prompts/migration/**/*.md"        # verified: prompts/migration/ exists
     - "migration_prompts/**/*.md"        # back-compat: legacy location for migration templates
     - "changelog/**/*.md"
@@ -290,11 +312,10 @@ slices:
 # ---------------------------------------------------------------
 - name: governance_ci
   description: >
-    Governance check, forward-replay, env-flag promotion, CI gates.
+    Governance check, env-flag promotion, CI gates.
     Owns the contract that policies declared elsewhere are actually enforceable.
   globs:
     - "tools/specdev_tools/validation/governance*.py"
-    - "tools/specdev_tools/validation/forward_replay*.py"
     - "tools/specdev_tools/core/config.py"
     - ".github/workflows/**/*.yml"
   expansion_rules:
@@ -358,16 +379,17 @@ slices:
 - name: host_integration
   description: >
     The toolkit's host-integration surface: init script, wrapper template,
-    and template files that init_project.py writes into host repos.
+    and template files that `specdev update` (tools/specdev_tools/host_install.py,
+    also run by init_project.py) writes into host repos.
     Audits toolkit-side artifacts only — not files generated into host repos.
   globs:
     - "scripts/init_project.py"
     - "scripts/**/*.py"
     - "scripts/templates/**"
-    - "scripts/templates/run_specdev.sh"  # template source; init_project writes this into host
+    - "scripts/templates/run_specdev.sh"  # template source; host_install renders it into the host (`update`)
     - "templates/**"                       # toolkit-root templates shipped to host
     - "seed_templates/**"                  # phase-0 seed templates for host bootstrap
-    - ".claude/skills/**"                  # toolkit-distributed skills (host-installed)
+    - ".claude/skills/**"                  # toolkit-distributed skills (host-installed); read for meaning in agent_contracts
   expansion_rules:
     - target: "docs/developers/getting_started.md"
     # docs/developers/installation*.md — removed; file does not exist

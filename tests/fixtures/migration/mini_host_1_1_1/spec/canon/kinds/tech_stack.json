@@ -1,0 +1,22 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "tech_stack",
+    "entries": [
+        {
+            "id": "cn:project:tech_stack:typescript-express",
+            "kind": "tech_stack",
+            "preferred_label": "TypeScript and Express",
+            "definition": "The language and HTTP framework of the lending service.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

@@ -77,8 +77,6 @@ def lint_canon_schema_alignment(
     # Category B exclusions: enums that are intentional subsets of a canon kind
     # or domain-specific enums whose overlap with a canon kind is coincidental.
     _EXCLUDED_DISCOVERY_ENUMS = {
-        # step 11 mitigations.type is an artifact-type enum, not a trace_type
-        ("11_redteam.schema.json", "allOf/1/properties/threats/items/properties/mitigations/items/properties/type/enum"),
         ("16_impl_context.schema.json", "$defs/specRef/properties/type/enum"),
         # build_status is a standalone build-lifecycle enum (no canon status kind exists)
         ("15_scaffold.schema.json", "properties/build_status/enum"),

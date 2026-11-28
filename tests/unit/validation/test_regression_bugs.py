@@ -12,19 +12,11 @@ from specdev_tools.core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, 
 
 
 # ---------------------------------------------------------------------------
-# Bug 1: E141, E142, E320 must be in ERROR_CODES registry
+# Bug 1: E320 must be in ERROR_CODES registry
 # ---------------------------------------------------------------------------
 
 class TestErrorCodeRegistry:
     """Verify that specific error codes exist in the registry."""
-
-    def test_e141_exists(self):
-        assert "E141" in ERROR_CODES
-        assert ERROR_CODES["E141"] == "TASK_DEPENDENCY_CYCLE"
-
-    def test_e142_exists(self):
-        assert "E142" in ERROR_CODES
-        assert ERROR_CODES["E142"] == "TECH_STACK_MISMATCH"
 
     def test_e320_exists(self):
         assert "E320" in ERROR_CODES
@@ -71,26 +63,6 @@ class TestHallucinationLintNfrIds:
 
 
 # ---------------------------------------------------------------------------
-# Bug 3: W550 is SEMANTIC_COVERAGE_SKIP, W551 is UNDECLARED_SEED
-# ---------------------------------------------------------------------------
-
-class TestWarningCodeSemantics:
-    """Verify W550 and W551 have correct semantic labels."""
-
-    def test_w550_is_semantic_coverage_skip(self):
-        assert ERROR_CODES["W550"] == "SEMANTIC_COVERAGE_SKIP"
-
-    def test_w551_is_undeclared_seed(self):
-        assert ERROR_CODES["W551"] == "UNDECLARED_SEED"
-
-    def test_w550_promotes_to_e550(self):
-        assert PROMOTABLE_PAIRS["W550"] == "E550"
-
-    def test_e550_is_forward_replay_missing(self):
-        assert ERROR_CODES["E550"] == "FORWARD_REPLAY_MISSING"
-
-
-# ---------------------------------------------------------------------------
 # Bug 4: validate_file applies W->E promotion
 # ---------------------------------------------------------------------------
 
@@ -104,13 +76,13 @@ class TestValidateFilePromotion:
         monkeypatch.setenv("SPECDEV_WARNINGS_AS_ERRORS", "1")
         reset_config()
         try:
-            # W550 is a stable promotable pair (W550 -> E550). W590 is NOT used
+            # W572 is a stable promotable pair (W572 -> E572). W590 is NOT used
             # here: it was deliberately removed from PROMOTABLE_PAIRS because
             # CROSS_STEP_UPSTREAM_MISSING has no semantically-correct E-counterpart.
-            failures = [make_error("W550", "SEMANTIC_COVERAGE_SKIP some message")]
+            failures = [make_error("W572", "ASSUMPTION_COUNT_HIGH some message")]
             result = _apply_we_promotion(failures)
-            assert any(e.code == "E550" for e in result)
-            assert not any(e.code == "W550" for e in result)
+            assert any(e.code == "E572" for e in result)
+            assert not any(e.code == "W572" for e in result)
         finally:
             monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
             reset_config()
@@ -248,9 +220,9 @@ class TestValidateFilePromotion:
         E-code counterparts already present should be dropped (deduped).
 
         Scenario: SPECDEV_PROMOTE_CODES=W571 (only W571 promoted).
-        Input has both W560 and E560 with the same message/path.
-        W560 is NOT in the promote list, but its E-code counterpart E560
-        is already present — W560 should be dropped as redundant.
+        Input has both W572 and E572 with the same message/path.
+        W572 is NOT in the promote list, but its E-code counterpart E572
+        is already present — W572 should be dropped as redundant.
         """
         from specdev_tools.core.config import reset_config
         from specdev_tools.validation.validate import _apply_we_promotion
@@ -259,19 +231,19 @@ class TestValidateFilePromotion:
         monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
         reset_config()
         try:
-            msg = "some traceability gap message"
+            msg = "some assumption count message"
             failures = [
-                make_error("W560", msg),
-                make_error("E560", msg),
+                make_error("W572", msg),
+                make_error("E572", msg),
                 make_error("W571", "vague quantifier message"),
             ]
             result = _apply_we_promotion(failures)
-            # W560 should be dropped because E560 with same message exists
-            assert not any(e.code == "W560" for e in result), (
-                "W560 should be dropped when matching E560 is present"
+            # W572 should be dropped because E572 with same message exists
+            assert not any(e.code == "W572" for e in result), (
+                "W572 should be dropped when matching E572 is present"
             )
-            # E560 should survive
-            assert any(e.code == "E560" for e in result)
+            # E572 should survive
+            assert any(e.code == "E572" for e in result)
             # W571 should be promoted to E571
             assert any(e.code == "E571" for e in result)
             assert not any(e.code == "W571" for e in result)

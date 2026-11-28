@@ -1,0 +1,12 @@
+name: ci
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: |
+          npx jest tests/fee.spec.ts
+          pytest tests/test_return.py -q
+      - run: ./devspec_env/bin/specdev spec-check spec

@@ -1,70 +1,57 @@
+<!-- Migration template: step {{STEP_ID}}, {{SOURCE_VERSION}} to {{TARGET_VERSION}} -->
 # Migration: Non-Functional Requirements (Step 07)
 
 ## Schema URI
 
 `vc:07-nfrs`
 
-## Required Changes
+## Judgement pass
 
-**Step-base fields (required in every artifact):**
+`specdev align apply spec --auto` has run and been committed. What it could not decide is a worklist item. This pass settles the items of step 07, clears the step's baseline entries and ends with the step's check. Do it after the steps above 07 have passed. `blocking` on an item is a display hint; nothing gates on it.
 
-- `id`: String — unique kebab-case identifier for this artifact instance (e.g., `nfrs-v1`). Convention: `{step-noun}-v{N}`.
-- `owner`: String enum — must be one of `api | ui | system | ops | data | product | business | engineering`.
-- `created_at`: String — ISO 8601 UTC timestamp (e.g., `2025-10-16T22:06:04.202593Z`).
-- `canonical_refs_used`: Array of canonical reference objects — required even when empty (`[]`).
+### Items of step 07
 
-**Step-specific fields:**
+No script or proposer writes an item of its own for step 07; the items below and the step's check are the pass.
 
-- `$schema`: Must reference the URI above for the target toolkit version.
-- `nfrs`: Array of NFR objects (minItems: 1). Each entry requires:
-  - `nfr_id`: String matching pattern `^nfr-[a-z0-9]+-[a-z0-9-]+$` (e.g., `nfr-latency-api-response`).
-  - `category`: Must be one of `latency | throughput | availability | durability | cost | security | privacy | maintainability | usability | portability | energy`.
-  - `metric`: String — specific measurable dimension (e.g., `P95 response time for POST /auth/login`).
-  - `target`: Number or string containing at least one digit (e.g., `< 200ms`).
-  - `unit`: String using canonical abbreviations (`ms`, `percent`, `req/s`, `count`, `MB`, `GB`).
-  - `metric_ref`: Canonical reference object (kind: `metric`) — required.
-  - `unit_ref`: Canonical reference object (kind: `term`) — required; must be consistent with `unit`.
-  - `environment_ref`: Canonical reference object (kind: `environment`) — required.
-  - `measurement_method`: String describing the tool and metric collected.
-  - `stage`: Must be one of `dev | ci | staging | prod`.
-  - `owner`: Canonical owner enum (`api | ui | system | ops | data | product | business | engineering`).
-  - `trace`: Array of trace reference objects (minItems: 1) — at least one must use `type: derives_from`.
+### Items any step can carry
+
+| Kind | Who | What it asks | Answer with |
+|---|---|---|---|
+| `trace-link` | agent | A 1.1.1 `trace` entry names a node that no link field of this node takes | Pick the field that fits (`specdev node candidates --for <node-id> --field <field>` lists targets), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop the entry. When the entry points to a node of a later step, the link belongs to that node's own field (`derives_from` of an FR, for example): check it there with `specdev node show <target-id>`, then resolve the item |
+| `legacy-ref` | agent | An old reference names no node, or a node of another kind than its field takes | Find the node it meant (`specdev node show <id>`), then `specdev json insert --id <node-id> .<field> '"<target-id>"'`; or drop it |
+| `scope-reason` | agent | A scope item with `later` or `out` has no `scope_reason` (the old list gave none) | `specdev json patch --id <node-id> .scope_reason '"<why, from the seed or the charter>"'` |
+| `out-of-scope-entry` | agent | An old `out_of_scope` entry named no node | On the node it meant, the reason first (`out` needs one): `specdev json patch --id <node-id> .scope_reason '"<why>"'`, then `specdev json patch --id <node-id> .scope '"out"'` |
+| `gate-text` | agent | A gate that was free text got a minted id | Name it: `specdev node rename <minted-id> <gate-id>` |
+| `prose-ids` | agent | Text names ids (the evidence lists each); a field of the node may take them as links. Written by `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, not by `apply` | Link the id (`specdev json insert --id <node-id> .<field> '"<target-id>"'`) or reword the text: `specdev json patch --id <node-id> .<text-field> '"<new text>"'` |
+| `seed-route-cleanup` | operator | The seed manifest routes a seed to this step (or to none) and no node of the step lists it in `derives_from` (E747, E748) | Distil the seed in a node of this step: `specdev json insert --id <node-id> .derives_from '"<seed-id>"'` (in a trinity step no node can list a seed, and in step 13 only a node of an extension whose schema declares `derives_from` to a seed can: otherwise move the route to the step that distils it); or remove the route: `specdev json delete spec/common/seed_manifest.json '<jq path of the route>'` |
+| `unresolved-link` | operator | A link the resolver refused (E700 to E702) got no lock entry | Fix or drop the link with `specdev json patch --id <node-id> .<field> '["<target-id>"]'`; `specdev attest <node-id> --yes` then writes its entry |
+
+### Procedure
+
+1. Once per migration, before the first step pass, run the proposers; they add the items `apply` does not write (`refines`, `prose-ids`, `legacy-binding`, `legacy-fixture`), write only the worklist, and a rerun adds none: `specdev align propose spec --kind refines --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind prose-ids --repo-root ./devspec_toolkit --git-root .`, `specdev align propose spec --kind bindings --repo-root ./devspec_toolkit --git-root .`.
+2. List the open items of the step: `specdev align triage spec --step 07 --repo-root ./devspec_toolkit --git-root .` (add `--audience agent` for the ones an agent settles; an operator item is decided by a person).
+3. Read each item's evidence and proposal, and the node it names: `specdev node show <node-id>`. A proposal says what the script would do; it has not been applied.
+4. Make the edit with the id-keyed commands of the table. Nothing is written into a file under `spec/` by hand; read through `specdev json read <file> '<jq path>'`, not the file.
+5. Close the item: `specdev align triage spec --resolve <item-id> --note "<what was decided>" --repo-root ./devspec_toolkit --git-root .`.
+6. Clear the step's baseline entries one node at a time. The check lists one E882 per entry: review the node's links, then `specdev attest <node-id>` previews what would be written and `specdev attest <node-id> --yes` writes it. A node of a closed milestone keeps its marker (E765).
+7. Check the step: `specdev spec-check spec --step 07 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` ends `RESULT: CLEAR` when the step has no error of its own and no new error of an earlier step. Debt of an earlier step that still has E882 entries is listed and does not block. `specdev guide <code>` explains an error code.
+
+### Context
+
+- An NFR in play needs a fixture or a step-12 job whose `verifies` names it (E743); the item for that is a step-12 `nfr-verifier`.
+
+## Shape in 1.2.0
+
+The schema is the authority (`specdev json schema <spec-file> .<field>` resolves the schema of a field); this lists its unconditional requirements as of 1.2.0. Required at the top level of every artifact: `id`, `owner`, `created_at`, `canonical_refs_used`. Links between nodes are the link fields of a node kind: `specdev node candidates --kind <kind> --field <field>` lists what a field accepts.
+
+- `nfrs` (array, required): each item requires `category`, `environment_ref`, `measurement_method`, `metric`, `metric_ref`, `nfr_id`, `owner`, `stage`, `target`, `unit`, `unit_ref`
 
 ## Output Contract
 
 The migrated artifact MUST include:
 
-- `$schema`: Set to the canonical URI above.
-- `canonical_refs_used`: Array of canonical reference objects.
-
-## Optional Fields
-
-- `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `nfrs[].name`: String (minLength: 2) — human-readable label for dashboards.
-- `nfrs[].baseline`: Current measured value before optimization (number or string).
-- `nfrs[].measurement_frequency`: One of `real-time | hourly | daily | weekly | monthly | per-release | on-demand`.
-- `nfrs[].stage_ref`: Canonical reference (kind: `stage`) binding the `stage` value to the registry.
-
-## Validation
-
-After migration, run:
-
-```bash
-./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-```
-
-## Context
-
-NFRs define quality attributes and are referenced in the trace matrix alongside
-FRs and fixtures. The field name `id` must be renamed to `nfr_id` and must
-match the pattern `^nfr-[a-z0-9]+-[a-z0-9-]+$`. The fields `metric_ref`,
-`unit_ref`, and `environment_ref` are now required on every entry — add them
-using canonical IDs from `canon/manifest.json`. The `category` enum contains
-11 specific values; map legacy `performance` to `latency` or `throughput`,
-`reliability` to `availability` or `durability`. Verify all `nfr_id` values
-referenced in fixtures (Step 08) still exist. Regenerate the trace matrix
-after migration.
-
+- `$schema`: `vc:07-nfrs`.
+- `canonical_refs_used`: array of canonical reference objects (`[]` when there are none).
 
 ## Full Generation Reference
 

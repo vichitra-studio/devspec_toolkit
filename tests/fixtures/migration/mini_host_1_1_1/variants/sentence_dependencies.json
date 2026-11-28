@@ -1,0 +1,13 @@
+{
+    "description": "Step-09 `dependencies` entries written as SENTENCES, not as typed objects (both real 1.1.1 hosts wrote them so; the mini host's own entry is an object).",
+    "edits": [
+        {
+            "file": "spec/09_impl_plan.json",
+            "path": ["dependencies"],
+            "value": [
+                "The SMS gateway must be contracted before reminders can be sent.",
+                "The volunteer roster is kept by the desk lead and must be exported before the first import."
+            ]
+        }
+    ]
+}

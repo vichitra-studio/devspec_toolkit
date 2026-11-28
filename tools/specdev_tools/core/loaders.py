@@ -119,7 +119,7 @@ def _scan_spec_dir(
     if not os.path.isdir(spec_dir):
         return None
 
-    for fn in os.listdir(spec_dir):
+    for fn in sorted(os.listdir(spec_dir)):
         if fn.startswith(f"{step_prefix}_") and fn.endswith(".json"):
             path = os.path.join(spec_dir, fn)
             try:
@@ -155,6 +155,69 @@ def _extract_ids(data: Any, array_key: str, id_field: str) -> set[str]:
 # load_sibling_artifact — step_14-style "look next to artifact, fallback to spec/"
 # ---------------------------------------------------------------------------
 
+def _sibling_candidates(
+    artifact_path: str | Path | None,
+    prefix: str,
+    spec_root: str | Path | None,
+    fallback_root: str | Path | None,
+) -> list[Path]:
+    """Candidate files ``<prefix>_*.json`` in search order, each directory sorted by name.
+
+    Search order: the directory of *artifact_path*, then *spec_root*, then
+    ``<fallback_root>/spec``. A directory that does not exist contributes nothing.
+    """
+    directories: list[Path] = []
+    if artifact_path:
+        directories.append(Path(artifact_path).resolve().parent)
+    if spec_root:
+        directories.append(Path(spec_root).resolve())
+    if fallback_root:
+        directories.append(Path(fallback_root).resolve() / "spec")
+    return [
+        directory / fn
+        for directory in directories
+        for fn in sorted(_match_prefix(directory, prefix))
+        if (directory / fn).is_file()
+    ]
+
+
+def read_json_object(path: str | Path) -> dict | None:
+    """The JSON object in the file at *path*; ``None`` when the file is missing, unreadable, not UTF-8, not JSON
+    or has a top level that is not an object.  Never raises."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError, RecursionError):  # ValueError: JSONDecodeError, UnicodeDecodeError; RecursionError: nesting too deep to parse
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _first_json_object(candidates: list[Path]) -> dict | None:
+    """Return the first candidate that reads and parses as a JSON object, else ``None``."""
+    for path in candidates:
+        data = read_json_object(path)
+        if data is not None:
+            return data
+    return None
+
+
+def load_sibling_json(
+    artifact_path: str | Path | None,
+    prefix: str,
+    *,
+    spec_root: str | Path | None = None,
+    fallback_root: str | Path | None = None,
+) -> dict | None:
+    """Find and read the sibling artifact ``<prefix>_*.json``.
+
+    Searches the directory of *artifact_path*, then *spec_root*, then
+    ``<fallback_root>/spec``; within a directory files are tried in name order.
+    Returns the first candidate that parses as a JSON object, or ``None`` when
+    there is none. Never raises for a missing or unreadable file.
+    """
+    return _first_json_object(_sibling_candidates(artifact_path, prefix, spec_root, fallback_root))
+
+
 def load_sibling_artifact(
     artifact_path: str | Path,
     sibling_prefix: str,
@@ -167,44 +230,30 @@ def load_sibling_artifact(
 
     If the sibling is not found beside *artifact_path* and *fallback_root* is
     given, checks ``<fallback_root>/spec/<sibling_prefix>_*.json`` as well.
+    Candidates are listed once and the first one that parses as a JSON object
+    wins (the rule of :func:`load_sibling_json`), so a malformed candidate
+    followed by a valid one yields the valid one's IDs.
 
     Returns
     -------
     None
-        No candidate file was found in either the sibling directory or the
+        There is no candidate file in the sibling directory or the
         ``fallback_root`` spec dir.  Callers should treat this as "upstream
         absent, skip cross-ref check".
     set[str]
         A (possibly empty) set of extracted IDs.  An **empty set is not
-        None**: it signals "upstream present but contained no IDs", and
+        None**: it signals "upstream present but yielded no IDs", and
         callers should still run cross-ref validation (so stray references
         get flagged) while skipping coverage checks over an empty set.
-        Malformed JSON or read errors also yield an empty set — the file
-        was found but could not be mined, which is distinct from absent.
+        The empty set is also returned when candidates exist and none of them
+        parses as a JSON object (malformed, unreadable or not an object):
+        the file was found but could not be mined, which is distinct from absent.
     """
-    candidates: list[Path] = []
-    if artifact_path:
-        artifact_dir = Path(artifact_path).resolve().parent
-        for fn in _match_prefix(artifact_dir, sibling_prefix):
-            candidates.append(artifact_dir / fn)
-    if fallback_root:
-        spec_dir = Path(fallback_root).resolve() / "spec"
-        for fn in _match_prefix(spec_dir, sibling_prefix):
-            candidates.append(spec_dir / fn)
-
-    found_any = False
-    for path in candidates:
-        if not path.exists():
-            continue
-        found_any = True
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            return set()
-        return _extract_ids(data, array_key, id_field)
-
-    return set() if found_any else None
+    candidates = _sibling_candidates(artifact_path, sibling_prefix, None, fallback_root)
+    if not candidates:
+        return None
+    data = _first_json_object(candidates)
+    return _extract_ids(data, array_key, id_field) if data is not None else set()
 
 
 def _match_prefix(directory: Path, prefix: str) -> list[str]:
@@ -288,9 +337,15 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
     - ``<spec_dir>/samples/`` — excluded at the **first level only**; a
       hypothetical ``spec/03_glossary/samples/`` would still be scanned.
     - ``<spec_dir>/extras/`` — excluded at the **first level only**; holds
-      generated toolkit artifacts (e.g. ``trace_matrix.json``) that are not
-      spec artifacts and have no ``$schema``.
+      generated toolkit artifacts that are not spec artifacts and have no
+      ``$schema``.  The trace lock
+      (``extras/trace.lock.json``) and the records under ``extras/verification/``
+      rely on this exclusion; a test pins it.
     - ``migration_backups/`` — excluded at all levels (toolkit convention).
+    - ``*.schema.json`` — excluded at all levels: a JSON Schema is not a spec
+      artifact.  The schema of a host extension (``extensions/ext_NN_<topic>.schema.json``,
+      see ``core/host_schemas.py``) lies beside its data file and is checked by
+      the step-13 validator, not by per-file validation.
 
     All callers that need to discover spec artifacts recursively must route
     through this helper so the exclusion is enforced in exactly one place.
@@ -306,7 +361,7 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
         else:
             dirnames[:] = [d for d in dirnames if d != "migration_backups"]
         for fn in files:
-            if fn.endswith(".json"):
+            if fn.endswith(".json") and not fn.endswith(".schema.json"):
                 # Skip entry_key_registry.json — this file may still appear in
                 # the host spec directory during migration (W3-T5 will remove
                 # it). The canonical copy now lives toolkit-side at

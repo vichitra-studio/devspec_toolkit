@@ -1,0 +1,113 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "step-impl-missing-realises",
+  "owner": "api",
+  "created_at": "2024-01-15T10:00:00Z",
+  "extensions": {
+    "execution_context": {
+      "command_overrides": {
+        "test": "pytest -v"
+      }
+    }
+  },
+  "milestone": "ms-fixture",
+  "plan": {
+    "summary": {
+      "functional_summary": "Full implementation of the user profile feature.",
+      "scope_in": [
+        "profile-api",
+        "database-migration"
+      ],
+      "scope_out": [
+        "frontend-ui"
+      ],
+      "target_file_patterns": [
+        "src/api/profile.py",
+        "migrations/001_users.sql"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Data Persistence",
+          "summary": "Persist user data securely"
+        }
+      ],
+      "checklist": [
+        {
+          "id": "REQ_DB_SCHEMA",
+          "description": "Create user table migration",
+          "type": "metadata",
+          "layer": "db",
+          "implementation": {
+            "actions": [
+              {
+                "id": "a01",
+                "type": "manual_verification",
+                "description": "Verify Create user table migration"
+              }
+            ]
+          }
+        },
+        {
+          "id": "REQ_API_ENDPOINT",
+          "realises": [
+            "tc-api-get-profile"
+          ],
+          "description": "Implement GET /profile endpoint",
+          "type": "behavior",
+          "layer": "api",
+          "implementation": {
+            "files_touched": [
+              "src/api/profile.py"
+            ],
+            "actions": [
+              {
+                "id": "a01",
+                "type": "file_edit",
+                "target": "src/api/profile.py",
+                "description": "Add route handler"
+              },
+              {
+                "id": "a02",
+                "type": "manual_verification",
+                "description": "Curl the endpoint"
+              }
+            ]
+          }
+        },
+        {
+          "id": "REQ_API_VALIDATION",
+          "realises": [
+            "tc-api-get-profile"
+          ],
+          "description": "Validate GET /profile endpoint returns correct data",
+          "type": "validation",
+          "layer": "tests",
+          "implementation": {
+            "actions": [
+              {
+                "id": "a01",
+                "type": "manual_verification",
+                "description": "Verify profile endpoint returns correct data"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "test_commands": [
+        "pytest tests/"
+      ]
+    }
+  },
+  "canonical_refs_used": []
+}

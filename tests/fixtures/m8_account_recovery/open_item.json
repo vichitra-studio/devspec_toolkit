@@ -1,0 +1,5 @@
+{
+  "id": "amb-token-store",
+  "description": "Where does the confirm handler read the issue time of a token from?",
+  "about": ["tc-confirm-expired-token"]
+}

@@ -1,0 +1,41 @@
+{
+    "$schema": "vc:07-nfrs",
+    "id": "nfrs-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "nfrs": [
+        {
+            "nfr_id": "nfr-latency-reset-email",
+            "category": "latency",
+            "metric": "reset email delivery time p95",
+            "target": "<= 60 s",
+            "unit": "s",
+            "stage": "staging",
+            "owner": "ops",
+            "measurement_method": "Synthetic reset request every 15 minutes in staging; time to receipt in a test inbox.",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-password-reset"
+                },
+                {
+                    "type": "charter-goal",
+                    "id": "metric-recovery-time"
+                }
+            ],
+            "metric_ref": {
+                "id": "cn:project:metric:email-delivery-time",
+                "kind": "metric"
+            },
+            "unit_ref": {
+                "id": "cn:core:unit:s",
+                "kind": "unit"
+            },
+            "environment_ref": {
+                "id": "cn:core:environment:staging",
+                "kind": "environment"
+            }
+        }
+    ]
+}

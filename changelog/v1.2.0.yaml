@@ -1,0 +1,3236 @@
+version: "1.2.0"
+breaking: true
+source_of_truth: changelog/v1.2.0.yaml
+render_target: changelog/v1.2.0.md
+
+changes:
+  - type: fix
+    description: >
+      prompt_schema_sync, align status|diff|plan (schema_differ) and align
+      prompts (prompt_generator) read only the root-level required of a step
+      schema, which is empty for 13 of the 19 step schemas (their fields sit
+      in allOf branches). They now read the allOf-merged set (step 04 - 5
+      required fields where the root had 0). align status on a spec that lacks
+      a required field now reports it as MISSING_REQUIRED; specdev prompt-sync
+      stays clean on the repository (0 findings before and after).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev context structure, canon extraction and the entry-key generator
+      now include a property that only a oneOf, anyOf, then or else branch of a
+      step schema declares; the allOf definition wins when both declare one.
+      No step schema has such a property at its top level today, so the
+      generated registry is unchanged by this (checked on the repository).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev seed-lint reports an empty seed file (E520, "is empty"); it
+      checked only that the file exists.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 12 says that its three conditional MUST rules (governance-check
+      job, invariants-check job, coverage_thresholds) are authoring and review
+      rules that no tool checks.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      extraction_paths.json also lists the nested and map-keyed paths of each
+      file (.stakeholders[].needs, .milestones[].tasks,
+      .milestones[].tasks[].acceptance_criteria,
+      .functional_requirements[].acceptance_criteria, .apis[].errors) beside
+      the top-level ones.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      registry-generate no longer guesses a kind from an id field: every
+      registry entry is declared by an x-node. The one entry that came from the
+      guess, .extensions of step 13 (kind extension), is now declared in
+      schema/13_extension_manifest.schema.json (role plan, with the link
+      justified_by): the registry row gains role, links and source x-node; its
+      id, kind and path are unchanged.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      Steps 16b and 16c are listed in steps_without_entry_arrays of
+      entry_key_registry.json (their records are blocks inside the plan file,
+      registered under step 16a); the key steps_with_deferred_registration is
+      gone from the file and from schema/entry_key_registry.schema.json.
+    migration:
+      action: none
+
+  - type: add_definition
+    description: >
+      schema/core/graph.schema.json (vc:core:graph): the x-node / x-link
+      annotation language for declaring graph nodes and links in step schemas.
+      See docs/developers/schema-annotations.md. The seed manifest
+      (schema/seed_manifest.schema.json) and the step schemas 00, 01, 02, 02a,
+      03, 04 and 05 are annotated; the schemas of steps 06 to 12, 14, 15 and 16
+      are annotated too; the schema of step 13 declares the extension kind and
+      gets the shared ambiguity-item node through the core ambiguityList.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      Added the annotation reader and lint (registry/annotations.py, ANNOT-NN
+      toolkit-author codes) and the step-order derivation
+      (registry/step_order_gen.py, ANNOT-20 / ANNOT-21). registry-generate
+      folds annotated nodes into entry_key_registry.json; a toolkit with no
+      annotations produces unchanged entries, with _format_version 1.1.0.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      Added tools/cli_commands.json (generated, byte-exact with the CLI parser;
+      schema/cli_commands.schema.json) and the registry-generate flags
+      --cli-commands-out and --step-order-out.  Toolkit-internal; no host action.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      schema/entry_key_registry.schema.json accepts annotation-derived entries
+      (source, role, contract, coarse, links; map-keyed entries without
+      id_field; glob keys such as impl_context/ms_*_plan.json) and the
+      step "extras" for record-host entries. Host
+      entry_key_registry.json files are unaffected.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      schema_nav.effective_schema keeps keywords that sit beside a $ref
+      (description, default, items bounds) instead of dropping them. Only
+      description-level and sibling keys change in merged schemas; validation
+      results are unchanged.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Step 13 governance_label_ref is no longer checked by E590 / W590
+      against step 10; the label resolves through canon (E110 when unknown) and
+      E210 stays for labels also present in step 10. Removes a clash between
+      E590 and E210 on the same label. Hosts with no declared extensions
+      (none-required) see no change. Description-only change in
+      schema/13_extension_manifest.schema.json.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      spec-check and the canonical checks share one schema registry and cache
+      validators (core/registry.py: get_shared_registry, get_cached_validator,
+      clear_shared_caches), removing repeated schema loads. Speed only.
+    migration:
+      action: none
+
+  - type: paradigm_shift
+    description: >
+      Breaking for host specs: steps 00 to 05 move to the spec-graph shape.
+      Step 00 (charter): in_scope / out_of_scope merge into scope_items (each
+      with scope in | later | out, scope_reason for later / out, scope_id), and
+      the 1.1.1 floor of three entries in each of the two lists becomes one
+      entry in scope_items;
+      assumptions, risks and stakeholder needs become objects with ids (they
+      were strings); stakeholders gain stakeholder_id; new constraints list; links removed; derives_from added to scope items,
+      assumptions, risks, needs, segments, metrics and constraints. Step 01:
+      capabilities lose goal_id, success_metric_refs and trace and gain
+      derives_from and scope_reason; the scope value future becomes later.
+      Step 02: components and connections lose trace;
+      connections lose from, to, schema_ref and interface_ref and gain
+      connection_id, derives_from (source) and connects_to; new third_parties
+      list (tech_stack is removed); component type external and the tag
+      external-dependency are removed (model the service as a third_parties
+      entry). Step 02a: artifact-level trace removed;
+      ci_gates and secrets become objects (gate_id, secret_id); each
+      environment gains scope, derives_from and a config object that holds the
+      host keys. Step 03: terms gain aliases, lifecycle and replaces. Step 04:
+      FRs lose trace and gain derives_from (capabilities) and depends_on (FRs);
+      acceptance criteria gain scope. Step 05: APIs lose trace and example_refs
+      and gain derives_from (FRs), provided_by, relies_on and depends_on; each
+      error gains required error_id, scope and derives_from. scope (in | later |
+      out) becomes required on every functional requirement, API, API error,
+      acceptance criterion, charter risk, environment, CI gate and secret
+      (none of them had it in 1.1.1; capabilities already required it).
+      scope_reason is required wherever scope is later or out, capabilities
+      included (1.1.1 had no such rule).
+      derives_from with at least one id becomes required on every node of
+      steps 00 to 05 except stakeholders, glossary terms and acceptance
+      criteria. A stakeholder needs at least one need.  Every
+      node accepts aliases, lifecycle and replaces; every node except an
+      assumption and a glossary term also accepts assumes. Existing host specs do
+      not validate until migrated; specdev align apply SPEC_DIR --auto migrates
+      them (the migration scripts of this release are listed below), and the
+      specdev align status / diff / plan
+      commands report nothing for a 1.1.1 spec of steps 00 to 05 against the
+      new schemas, top-level renames such as in_scope to scope_items included,
+      because the differ reads only a schema's own top-level required,
+      properties and additionalProperties, and these step schemas keep their
+      properties under allOf.
+    migration:
+      action: ai_assisted
+
+  - type: remove_validator
+    description: >
+      Link-existence checks are removed from the step validators of 01
+      (capability to component), 02
+      (connection endpoints) and 05 (API to requirement, with its W590 for a
+      missing step 04 file). They are replaced by the graph check of
+      spec-check (E700 to E703); a single-file specdev validate of those files
+      does not report a link to an id no node has. The step 04 check that a requirement
+      carries a non-empty trace and the step 02 check for a missing tech_stack
+      go with those fields. The step 02 capability-coverage check (E590)
+      stays; it now reads component derives_from and exempts capabilities
+      whose scope is later or out. Other content checks stay, for example the
+      duplicate method and route check of step 05 (E520).
+      Three validator modules are deleted: validation/validators/step_01.py
+      (the capability-to-component check), validation/validators/step_02a.py
+      (an E520 for a duplicate ci_gates entry; a gate is a node with a
+      gate_id, and a duplicate id is E704) and
+      validation/validators/step_16b.py (E520 checks of
+      execution.execution_results, a removed plan field; a plan file is
+      checked by the 16a and 16c validators).
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      E311 (MISSING_ENUM_PROVENANCE) is narrowed: it fires only for an API that
+      declares a parameters[].enum, names a third party in relies_on and has
+      no enum_provenance; error lists and
+      error_codes no longer trigger it. schema/05_interface_contracts.schema.json
+      adds the optional parameters[].enum (array of strings, minItems 1, unique).
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      registry-check no longer reports E622 for a registered root collection
+      (plain name or first hop of a wide path) that is absent from a spec file,
+      matching nested arrays (key not present); a present null, a collection
+      of the wrong shape, a file whose top level is not an object and a
+      missing id_field are still E622. Required presence stays with schema validation.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      A check that reads fields of the 1.1.1 shape (trace, goal_id,
+      success_metric_refs) runs only when the files it reads carry those fields.
+      A 1.1.1 spec whose step-05 APIs carry no trace at all is invalid under the
+      1.1.1 schema. The step-11 W583 check reads API derives_from: a 1.1.1
+      step-05 API linked only to parked requirements through trace is no longer
+      exempt from W583. The closure checks (E535, E560, W564, W568), the matrix
+      coverage warning (W592, E592), completeness-check and specdev matrix,
+      which this entry described for a spec in the new shape, are removed in
+      this release (see the entries on the retired closure and completeness
+      checks and on the retired matrix).
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      W555 text no longer cites a charter minItems:3 bound (the threshold is a
+      seed-quality heuristic). scripts/generate_fixtures_02a.py removed (stale,
+      nothing called it); toolkit-internal.
+      W555 counts the out-of-scope or non-goal bullets of the seeds routed to
+      step 00 and names no retired field.
+    migration:
+      action: none
+
+  - type: paradigm_shift
+    description: >
+      Steps 06 to 16 move to the spec-graph shape, with the core schemas they
+      share; existing host specs do not validate until migrated. specdev align
+      apply SPEC_DIR --auto migrates a 1.1.1 spec to this shape (the migration
+      scripts of this release are listed below), but specdev align status / diff
+      / plan read only a
+      schema's own top-level required, properties and additionalProperties, while
+      the step schemas keep most or all of their properties under allOf, so they
+      miss the changes below, top-level ones included (align diff reports a 1.1.1
+      file of step 07, 08, 11 or 14 as OK). The module migration/planner.py,
+      which ordered such differences into a plan of template steps, is deleted;
+      align apply --auto runs the migration scripts of
+      migration/scripts/v1_2_0/. specdev update does not rely on that
+      comparison alone: it does not re-stamp spec/specdev_version on a spec that
+      needs a migration, and prints the commands to run instead.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Core and every step schema: spec_refs_ingested and seed_refs_ingested are
+      removed from steps 00 to 16 (16_anchor and 16_impl_context included) and
+      from core/step_base, with the definitions specRefIngested* and seedRef*.
+      Steps 00 to 15 gain an optional top-level ambiguities list of open items:
+      each item has id, description and about (ids it concerns), and optional
+      missing_kind, decision and proposed_assumption; it has no other field.
+      plan.ambiguities in 16_anchor and 16_impl_context, and
+      execution.emergent_ambiguities in 16_impl_context, use the same open item:
+      severity, status, impact and resolved are removed (and source and
+      mitigation from plan.ambiguities of 16_impl_context), and about is
+      required. The core definitions crossCycleAmbiguityItem and ambiguityStatus
+      are removed. testingMode and step 08 fixtures[].mode gain the value
+      manual. The core definitions dependencyList, techStack, techStackItem,
+      techStackList, dependencyItem, dependencyObjectList, link, httpMethodFull,
+      traceRef and traceId are removed with their last use.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Steps 02, 04 and 05 (finishing the step 00 to 05 change above): tech_stack
+      is removed from step 02 (use third_parties[]); the priority value wont-have
+      is removed from step 04 functional requirements (use scope: later or scope:
+      out); the top-level out_of_scope list is removed from step 05 (mark the
+      requirement scope: out with a scope_reason).
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Steps 06 and 07: rules[].trace (step 06) and nfrs[].trace (step 07) are
+      replaced by constrains, an optional list of ids of functional requirements,
+      APIs, components or connections. Step 06 rules[].scope, an object
+      {components, apis} in 1.1.1, becomes the string in | later | out (default
+      in; later and out need scope_reason). Step 07 gains optional relies_on
+      (third parties), derives_from (metrics) and scope / scope_reason. Both steps
+      gain optional assumes, lifecycle, aliases and replaces on every node. The
+      node kind of step 06 is invariant.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 08: fixtures[].targets is replaced by verifies (ids of acceptance
+      criteria, APIs, invariants or NFRs; not FRs), and the top-level out_of_scope
+      list is removed. A fixture needs verifies or removes. New optional
+      manual_reason (a string of at least 10 characters), required when mode is
+      manual. Fixtures gain lifecycle, aliases and replaces.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 09: the top-level tech_stack, tech_stack_ref, trace, dependencies and
+      dependency_ref are removed, and milestones is the step's own required
+      top-level field (the step-base fields id, owner, created_at and
+      canonical_refs_used stay required). Each milestone loses status, deliverables and depends_on and requires
+      schedules (at least one id of a functional requirement, acceptance
+      criterion, API, invariant, NFR, component, environment or risk); it gains
+      lifecycle, aliases and replaces. The node kind is design-milestone.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 10: pr_rules, spec_first_policy, review_policy, reviewers, trace and
+      links are removed. rules (at least one) is required beside
+      commit_message_rules. Each rule (node kind rule) needs rule_id, text and
+      derives_from (at least one id of a constraint, risk, scope item, gate,
+      environment or stakeholder), and may carry enforcer (only review),
+      cli_command, assumes, scope, scope_reason, lifecycle, aliases and replaces;
+      a rule with enforcer must not carry cli_command. versioning, policy_ref and
+      command_ref stay.
+      A rule's cli_command must be a command of tools/cli_commands.json; any
+      other value is E530 at step 10, owned by step 10.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 11: the artifact-level trace is removed. A threat's target_ids becomes
+      threatens (required, at least one id of an API, component, connection or
+      third party) and mitigations becomes mitigated_by (optional ids of
+      functional requirements, criteria, APIs, API errors, invariants, NFRs,
+      rules, gates, secrets, environments, constraints or fixtures); a threat
+      gains optional derives_from (risks). An edge case now requires threatens
+      (APIs, components or FRs) and mitigated_by (at least one id). Threats and
+      edge cases gain scope, scope_reason, assumes, lifecycle, aliases and
+      replaces. The node kinds are threat and edge-case.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 12: trace is removed. jobs[].requires is renamed jobs[].depends_on (ids
+      of jobs of the same file), and jobs[].steps[].id is removed (a step needs
+      name and command). Jobs gain optional realises (environments, gates, secrets
+      or rules), verifies (NFRs), lifecycle, aliases and replaces. The node kind
+      is job.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 14: the top-level tech_stack, tech_stack_ref, dependencies,
+      dependency_ref and trace are removed. A milestone loses status,
+      milestone_status_reason, source_milestones, fr_refs, capability_refs and
+      deliverables, and requires milestone_id, name, target_date, user_story and
+      tasks (node kind roadmap-milestone). A task loses status, status_reason,
+      assumptions, exit_conditions, fr_refs and invariant_refs; its depends_on
+      items are kebab-case task ids; it gains disposition (value: deferred or
+      wont_do, and reason, both required) to set a task aside (node kind task). An
+      acceptance criterion's fixture_ref is renamed verified_by (ids of fixtures,
+      jobs or rules), and the criterion needs refines (at least one id of an
+      upstream node) or removes (at least one id) (node kind task-criterion).
+      Milestones, tasks and criteria gain lifecycle, aliases and replaces.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 15: trace and links are removed. Each interface_map[] row loses
+      interface_ref and method and requires row_id (a kebab-case id), realises (at least one API id) and path; an API may be realised by
+      several rows. Rows gain lifecycle, aliases and replaces. The node kind is
+      scaffold-row. project_skeleton, validators, command_ref and build_status
+      stay.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 16 anchor (16_anchor): each plan.milestone_index[] row loses
+      milestone_id, context_path and fr_refs. A row requires anchor_id, about (the
+      id of one roadmap milestone), checklist_id_prefix and summary; status stays
+      and is optional, and an absent status reads as pending. deferral_reason is
+      required when status is deferred; close (signed_off_by, and source when
+      signed_off_by is legacy-migration) is required when status is done. The node
+      kind is anchor-row.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 16 plan (16_impl_context): the file requires a file-level milestone
+      (the roadmap milestone id the plan is about), and the anchor validator finds
+      the plan of an anchor row through it (milestone-state still finds a plan by
+      its file name). A plan is a file impl_context/ms_<batch>_plan.json: another
+      JSON file in that folder is no plan. plan.status, plan.deferred_reason and plan.coverage_status are removed.
+      A plan item (plan.spec_alignment.checklist[], node kind plan-item) loses
+      spec_ref, milestone_ref, nfr_refs, fixture_ref, checklist_status,
+      deferred_reason, wont_do_reason, linked_test_expectation and
+      implementation.status; it requires id, realises (at least one task-criterion
+      id), description and implementation, and gains lifecycle, aliases and
+      replaces. Also removed:
+      plan.spec_alignment.requirements_summary[].spec_refs,
+      plan.security.new_fixtures, plan.security.spec_mutations,
+      execution.critical_evidence, execution.execution_results[].evidence_binding,
+      review.fixture_status.test_results and extensions.review_state; review.findings[].spec_ref loses line_range and commit_hash;
+      review.fixture_status.implemented_interfaces[] items are plain kebab-case
+      ids. A passed execution.execution_results[] entry no longer needs evidence_binding
+      beside evidence_ref.
+    migration:
+      action: ai_assisted
+
+  - type: remove_validator
+    description: >
+      Error codes removed from the registry, PROMOTABLE_PAIRS (25 pairs become 10:
+      W581 to E581 and W582 to E582 go here, and the pairs of W550, W560, W562 to
+      W569, W575, W576 and W592 go with the checks that other entries remove) and
+      the catalog
+      docs/developers/error-codes.md: E142, E581, E582, W574, W581, W582, W602,
+      W605, W607, W612 and W616. The fields they read are gone, and no emitter is
+      left. The E530 sub-code LINKED_TEST_FILE_NOT_FOUND is removed with its guide
+      (specdev guide E530-LINKED_TEST_FILE_NOT_FOUND now prints the base E530
+      guide) and its JSON remediation advice. hallucination-lint no longer checks
+      linked_test_expectation paths and no longer reports INVENTED_ENUM_OR_ID for
+      pr_rules. E596 stays; E305 and E307 are retired with the plan fields they
+      read (see the entry that retires E301 to E307).
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step validators, in the 1.2.0 shape: step 06, 07 and 08 no longer report
+      E520 for a missing trace or targets, E530 for a trace-target pattern, or
+      E590 / W590 for a link target; fixtures-lint no longer reports E520
+      (missing targets) or E590 (targets unknown API / FR / Invariant / NFR), a
+      1.1.1 fixture file with targets included; its input / expected checks are
+      unchanged, and the command now reads a step 08 file that carries
+      vc:08-fixtures (1.1.1 matched only a $schema ending in
+      /08_fixtures.schema.json, so it read nothing in a 1.2.0 spec). Step 09 no longer checks that a deliverable names a capability
+      (E590 / W590). Step 10 no longer reports E530 for pr_rules or for a trace
+      type or link target. Step 11 no longer reports E520, E530 or E590 for the
+      ids a threat names: W583 is satisfied by a threat threatens and W615 by a
+      threat mitigated_by, and both still skip an API or invariant whose every
+      linked FR is parked. Step 12 no longer reports E141 or E590 for
+      depends_on: the graph check of spec-check reports an unknown job (E700)
+      and a cycle (E703). Step 14 no longer reports E590 for source_milestones,
+      fr_refs or capability_refs, or E520 / E530 for dependency entries, or E141
+      for a task depends_on cycle (E703 from spec-check); its date checks stay.
+      A duplicate id, a step 15 row_id included, is reported as E704 (see the
+      graph check below), no longer as E520; the E520 check for a duplicate
+      interface_ref and the E530 check for method are gone. The deep validators
+      of steps 01 to 16 do not raise on a value of the wrong type, in the file
+      they validate or in a file they read; the schema reports it for the file
+      that holds it (a validator may also report its own finding). The step 16
+      anchor no longer emits W607 or W612; a plan file with no milestone key is
+      skipped with W608, a plan whose milestone no anchor row is about is
+      skipped with W611, and W610 pairs a plan with its row through milestone.
+      The step 16 validator no longer reports E301, E302, E305, E306 or E307 (see
+      the entry that retires them).
+      E304 now means: the plan's milestone is not a roadmap milestone, or a task
+      of it (not set aside by disposition) has no plan item whose realises names
+      one of its criteria; a task with no acceptance criterion is reported as
+      well, since no plan item can realise it.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The step validators of steps 06 to 16 do not check that the id in a link
+      field (a field the schema marks x-link, such as verifies, refines or
+      realises) exists; the graph check of spec-check does (E700 to E703). The
+      checks that
+      read 1.1.1 plan fields are retired with those fields: E301 (item shapes),
+      E305, W599, W600 and W601 keyed on implementation.status, and E307 on an
+      object spec_ref. No plan item, in the 1.1.1 or the 1.2.0 shape, is reported
+      with them.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      tools/step_order.json is generated by specdev registry-generate; do not
+      edit it by hand. It is derived from the x-link declarations of the step
+      schemas, plus the hand-carried keys version, steps, policy and the new
+      declared_edges ([producer, consumer] pairs for context reads no stored
+      link carries; steps 13, 16a, 16b and 16c keep their 1.1.1 reads there,
+      step 14 keeps its read of step 13, and [09, 14] and [14, 16] stand for
+      computed links). Against 1.1.1, 15 pairs are added (written
+      consumer<-producer: 02<-00, 02a<-00, 05<-00, 06<-00, 07<-05, 09<-06,
+      11<-00, 11<-02a, 11<-10, 12<-07, 14<-02a, 14<-05, 14<-06, 14<-07, 14<-10)
+      and 28 are removed (03<-00, 03<-01, 03<-02, 04<-03, 05<-03, 07<-02a,
+      07<-03, 08<-02, 08<-02a, 09<-01, 09<-08, 10<-02, 10<-09, 11<-01, 14<-02,
+      15<-02, 15<-02a, 15<-04, 15<-08, 15<-11, 15<-14, 16<-04, 16<-05, 16<-08,
+      16<-09, 16<-11, 16<-12, 16<-15). A removed pair is a context read no link
+      carries: prompt-context and context list fewer consumers and inputs for
+      those steps. The glossary (step 03) has no inputs and no consumers in the
+      derived order, and dag-lint exempts it from E596 beside 16c.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev registry-generate writes tools/step_order.json and the new
+      docs/developers/schema-change-checklist.md (rendered from
+      tools/schema_changes.json) when --out is absent; --step-order-out now
+      defaults to the first file, and the new --checklist-out sets the second. A
+      failed annotation lint, a missing annotated step, a malformed rows file or
+      a tools/step_order.json whose hand-kept keys cannot be used ends the
+      command with registry-generate: failed: and writes no file. The
+      generator-owned files
+      are now entry_key_registry.json, extraction_paths.json, step_order.json,
+      cli_commands.json and the checklist. In entry_key_registry.json, the kind
+      inv becomes invariant, milestone becomes design-milestone (step 09) and
+      roadmap-milestone (step 14), and the step 14 dependency entry is removed;
+      the step 11 mitigation entry is removed too; the step 14 kind criterion (a
+      task's acceptance criteria) becomes task-criterion, while step 04 keeps
+      criterion; the kinds rule, scaffold-row, anchor-row, plan-item and
+      ambiguity-item are new. Step 16a is registered under the key impl_context/ms_*_plan.json,
+      which holds the plan items and the two ambiguity lists of a plan file
+      (plan.ambiguities, execution.emergent_ambiguities), so registry-check reads
+      those lists in plan files; 16b and 16c stay deferred.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      For now the step 16 checks of 1.1.1 plan items, E308 [ownership] (reads
+      fr_refs) and E309 [mapping] (reads spec_ref), report nothing on a
+      1.2.0-shaped file; E308 [scope] and E309 [prefix] read fields that stay
+      and still fire. The closure codes, the matrix, W604, the scope resolver's
+      reads of trace, targets, fr_refs and source_milestones and the reviewer's
+      structural pass that this entry listed are removed or fixed in this
+      release (see the entries on the retired closure, matrix and shim). specdev
+      upstream-backlog and milestone-state read both ambiguity shapes: an open
+      item (about, no severity) is listed by upstream-backlog under the step of
+      its about nodes, is never hidden by --severity or --status, and never
+      blocks a group in milestone-state; an item none of whose about ids names a
+      node is listed under unplaced and fires W613.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      Step 16 plan (16_impl_context): specdev spec-check and specdev validate
+      report E520 when the target of a file_create or file_edit action matches
+      no pattern of plan.summary.target_file_patterns and is not listed in
+      plan.summary.milestone_supporting_files (Action 'a02' of plan item
+      'PWRESET_CONFIRM_01' targets 'src/auth/session.ts', which
+      plan.summary.target_file_patterns does not cover). The 1.1.1 check
+      compared two lists with the patterns: an item's
+      implementation.files_touched once the item was in progress, and
+      execution.files_touched. The 1.2.0 loop writes neither list, so the plan's
+      own actions are compared, when the plan is written; the actions of the
+      plan of a milestone closed by a migration are not compared. A file listed
+      in execution.files_touched is still compared, in every plan. Add a pattern
+      for the path, or change the action. Shown by specdev spec-check spec
+      --repo-root ./devspec_toolkit --spec-root ./spec --git-root ., which lists
+      the E520.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      While a host migrates it meets these states: the 21 migration templates
+      prompts/migration/template_*.md describe the 1.2.0 shape of each step and
+      the judgement pass of that step; specdev align prompts renders none of
+      them for a 1.1.1 to 1.2.0 migration (on a 1.1.1 host its only output is a
+      prompt for the removed step 13a file), so a person opens
+      prompts/migration/template_<name>.md of the step they work on, and the
+      last instructions of the align prompts report name the id-keyed edit
+      commands (specdev json patch|insert|delete --id) instead of pasting output
+      into a spec file. The migration writes under spec/ only: host CI and hooks
+      that call specdev matrix, forward-replay-check, completeness-check or
+      traceability-check fail with exit 2 after the toolkit is updated, specdev
+      update and W932 list those lines, and the host edits them by hand before
+      the pass. A host whose plans have no milestone key gets E803, which says
+      to add the key with specdev json patch <plan file> '.milestone'
+      '"<milestone-id>"'; on a host that is not migrated yet, specdev align
+      apply --auto writes it (p2_plan_milestone_key); a plan without the key in
+      a migrated host was written by hand. specdev update installs the Claude
+      Code ask rules into a host's clone (.claude/settings.local.json); in a
+      clone where it has not run, specdev milestone sign-off, specdev milestone
+      defer, specdev verify attest and specdev release run without a prompt
+      unless the host wrote its own rule. A host whose project canon holds
+      entries of kind completeness_dimension, or that still has
+      spec/13a_completeness_assessment.json, is migrated by specdev align apply
+      --auto (p3_remove deletes the file, p3_host_canon the canon kind; see the
+      step 13a entry). Shown by specdev milestone-state --batch-id
+      account_recovery --repo-root ./devspec_toolkit --spec-root ./spec
+      --git-root ..
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      New commands for reading the spec as a graph (graph/commands.py); each takes
+      --repo-root, --spec-root (default ./spec), --git-root (default: the folder that holds --spec-root) and --json. specdev node
+      <id> [<id> ...] [--full] (also specdev node show <id>, which
+      reads an id that is itself a subcommand name) shows a node: file and jq
+      path, content, links out and the number of links in. specdev node candidates
+      (--kind KIND | --for ID) --field FIELD [--query TEXT] [--limit N] lists the
+      nodes a link field may point at. specdev node status <id>
+      active|deprecated|not_applicable writes the node's lifecycle into its spec
+      file (active removes the key from a node that has another value) and prints
+      <id>: <old> -> <new> (<file>); a node that already has the value is not
+      written, an explicit "lifecycle": "active" in its file included, and the line
+      reads <id>: already <value>, nothing written (<file>).
+      specdev trace <id> [--up] [--down] [--depth N] [--kinds K,K] [--verbs V,V]
+      [--no-containment] lists what the node rests on and what rests on it.
+      specdev trace <id> --recipe 16a|16b|16c [--expand] [--since REF] prints the
+      context pack of a role. specdev diff <refA> <refB> compares the graph at two
+      git refs (the working tree is not read) and prints a suggested version bump.
+      A command that cannot answer prints one finding on stderr (with --json, the
+      status / errors envelope on stdout) and exits 1, for example:
+      E705 for a lifecycle change that is refused (a seed node, an unknown id, a
+      lifecycle value that is not one of the three, a write the JSON tools refuse),
+      E706 for an unknown id, kind,
+      link field or recipe role, E707 for a recipe start node of the wrong kind,
+      E708 for a ref that does not resolve or a spec folder that cannot be read at
+      it, E709 for a ref whose spec is stamped with a toolkit version below 1.2.0,
+      whatever its tree holds, or, when it has no stamp, whose tree has no graph
+      node (a tree with no stamp that has ids the registry reads is compared as
+      it is, and the result is not meaningful), E520 for a spec folder that is missing. When a spec file cannot be read, node, node candidates, node status
+      and trace print one more line on stderr that names the file and says the
+      answer may be incomplete, and an unknown id then says the node may be in one
+      of those files. The commands are listed in tools/cli_commands.json.
+      not_applicable is accepted only for a closed milestone's historical
+      step-14 nodes (the roadmap milestone, its tasks and its task criteria)
+      and for a node that already has it; any other node is refused with E705,
+      and deprecated takes a node out of use. The finding of an unused
+      glossary term (E741) and of an unrealised task criterion (E810) name what
+      clears them: use the term's label or delete the term; add a plan item,
+      give the task a disposition or delete the criterion at step 14.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev spec-check runs a new check, graph (before registry-check), over the
+      whole spec: E700 (a link names an id no node has; when a spec file that could hold the target could not be read, the message says so), E701 (a node of a kind the
+      field does not accept), E702 (a node of a later step), E703 (a cycle within
+      one step, one finding per cycle) and E704 (an id defined more than once). In
+      spec-check --json these findings carry owner (for example step:12) and
+      node_id. The graph check reports W720 (a link to a deprecated node) and E761
+      as well (see the trace lock below). validate-all does not run the check; it
+      reports the trace-lock findings listed below.
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      Removed from the step validators, and reported by the graph check of
+      spec-check instead: duplicate-id checks on node ids (E520, for example step 04
+      fr_id), the step 12 E590 for a depends_on (1.1.1: requires) entry that names
+      no job, and E141
+      (a cycle of job or task dependencies, steps 12 and 14), which is retired in favour
+      of E703. A single-file specdev validate therefore no longer reports a job or
+      task cycle or an unknown job in depends_on; spec-check does (E703, E700). A
+      task depends_on cycle that runs through the tasks of two milestones is
+      reported too (E703); 1.1.1 checked a cycle only among the tasks of one
+      milestone. An id defined in two files is new in spec-check (E704): the 1.1.1
+      commands did not report it (for example a task criterion id in
+      14_roadmap.json equal to the id of an FR criterion in 04_fr_list.json: a
+      single-file validate of each file is OK).
+      validate still reports an id defined twice inside the one file (E704).
+      The prompts for steps 12 and 03 do not
+      say that a job_id or a term_id must differ from the ids of nodes of other
+      kinds; for example a step 12 job_id equal to the 02a gate_id it implements,
+      or a glossary term_id equal to a charter metric_id, is now reported by
+      spec-check as E704 (1.1.1 reported nothing);
+      give the job its own id and link it to the gate with realises. The E704
+      message names both places.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev context scope is now an alias of specdev trace: it prints the same
+      keys as before (entry, resolved_ids, source_files) for the nodes a trace
+      of the entry reaches in both directions, with resolved_ids grouped by node
+      kind, and one deprecation line on stderr. It no longer writes
+      spec/extras/trace_matrix.json, which the 1.1.1 command wrote. specdev
+      matrix was removed in this release, so no command writes that file. Step 2
+      of prompts/prompt_16b_impl_coder.md ("Query trace_matrix.json", in two
+      places; the prompt still says context commands regenerate the file) still
+      reads it (see the interim states above); use specdev trace and specdev
+      node to find the entities linked to a node.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      hallucination-lint, spec-quality-lint and spec-check take the ids a spec
+      defines from the spec graph for every file that has graph nodes: a *_id
+      field of a collection that is not a node no longer counts as a definition,
+      so a *_ref that names only such an id is now reported (E530 by
+      hallucination-lint, E520 by spec-quality-lint; on a copy of the worked
+      example, a note_ref naming an id that appears only in a
+      coverage_notes[].fr_id was not reported by the 1.1.1 commands). Files with
+      no graph node (16b, 16c, unregistered names) keep the scan. specdev json
+      resolve-pointers reports an id defined more than once in the file with
+      "ambiguous": true and each definition under "locations" (it returned the
+      first definition alone in 1.1.1).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      The trace lock spec/extras/trace.lock.json ($schema vc:extras:trace-lock,
+      schema/extras/trace_lock.schema.json) holds one entry for each link of the
+      spec: the holder, the field, the target, and the content hash and chain
+      stamp (sha256: and 64 hex digits) the target had when the holder accepted
+      the link. A link whose target now has another chain stamp is a suspect
+      link (E763); the cause is content_changed (the target was edited) or
+      upstream_changed (a node above it was). Links held by the nodes of a
+      closed milestone (an anchor row with status done) are not suspect and
+      cannot be re-attested (E765). The worked example carries a lock of 64
+      entries. A host that has no lock file gets E761 (a link with no entry)
+      once per link from spec-check and validate-all; specdev attest <node-id>
+      --yes creates the entries of a node. spec-check runs three new checks:
+      trace-lock (E760 for a lock that cannot be read, E762 for an entry whose
+      link is gone, E763, E882 for a baseline marker that no attest has
+      cleared), computed-fields (E768 for a stored computed field such as
+      content_hash) and records (E774 for an invalid record file); the graph
+      check also reports E761, W720 (a new link to a deprecated node), E771 (an
+      alias that collides), E772 (a replaces link to a node still in the spec)
+      and E778 (a live node that links by an old id). validate-all reports E760
+      to E763, E778, E882 and W720 too. The error-code catalogue has an entry
+      for each, with a message copied from a run. The skills /specdev-step and
+      /specdev-context write links by node id (json patch|insert|delete --id,
+      json insert --step, step create --from), which write the lock entries; a
+      write with the path form of specdev json (json patch <file> <path>
+      <value>) writes no lock entry, so a spec with links reports E761 after
+      such a write.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev stale [--step NN] [--diff] lists the suspect links by owning step in
+      waterfall order, nodes upward first, with the cause and the nodes the change
+      started from (roots); --diff adds the diff of each root's contract text against
+      the text the holders accepted, recovered from git (one diff for each accepted
+      version when the holders below one root accepted different ones). It exits 0 when it lists links, and an unknown step is E706; a spec file that cannot be read is a warning on stderr and a lock that cannot be read is E760, exit 1. specdev attest <node-id>
+      [--field F] [--target T], attest --step NN and attest --prune write the current
+      hashes into the lock for the suspect links of a node, of a step (upward first)
+      or remove the entries of links that no longer exist; without --yes the first two
+      print what they would write and write nothing, --dry-run never writes, with or without --yes, and --prune writes at once; --target
+      takes an id or an alias. Refused with exit 1: E520 (--yes or --prune, each
+      with or without --dry-run, while a spec file cannot be read, so the links it holds are not in the graph, and --yes also while a seed document is not found under the host root (--git-root, or the folder that holds --spec-root), because the hash of a link to it would be that of a missing file; nothing is written; a preview, with no --yes, still prints, with a warning on stderr that the answer may be incomplete, or a note on stderr that a seed document is not found), E764 (a node the holder links to is itself suspect: attest
+      that one first), E765 (a node of a closed milestone), E706 (an unknown id or
+      step), E704 (an id defined twice). specdev coverage [--by fr] prints how many
+      FRs have an API or a fixture and how many capabilities have an FR, the criteria
+      that have a current refinement and the exempt nodes (not_applicable, scope later
+      or out); it prints information and exits 0 when it shows the counts and unlinked ids, because no rule requires those links; a spec file that cannot be read is a warning on stderr and a lock that cannot be read is E760, exit 1. The coverage gaps are the findings E740, E742 and E743 of the role checks of spec-check: stale counts them under the step that owns each, coverage lists them under Role findings, and step ready counts them as blockers.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev lock merge BASE OURS THEIRS PATH is a git merge driver for the lock:
+      it merges the three versions entry by entry and writes the result over OURS
+      (E760 for an input that is not a valid lock, E520 for a file that cannot be read);
+      when both sides changed one entry in different ways it keeps the entry the
+      common ancestor had, or, when it had none, the entry with the smaller chain
+      stamp (string order), and the link is suspect again when its target changed
+      after the kept entry. specdev lock install-driver --driver-command CMD adds the line <path of the lock relative to the git top level> merge=specdev-trace-lock (sub/spec/extras/trace.lock.json merge=specdev-trace-lock for a spec folder sub/spec) to the file git rev-parse --git-path info/attributes names and sets
+      merge.specdev-trace-lock.driver to CMD %O %A %B %P in the clone at the git root (--git-root, or the folder that holds
+      --spec-root); running it again changes nothing. specdev update (and init,
+      which runs it) installs the driver in the clone it runs in, with the
+      command <venv>/bin/specdev lock merge: run it once in each clone,
+      otherwise git merges the lock as text, and a conflict leaves conflict
+      markers in it, which specdev reports as E760 with the repair.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev json patch|insert|delete --id <node-id> and specdev json insert --step
+      NN write by node id: the field path is relative to the node, ids the new item
+      leaves out are minted, the lock entries of the links the edit adds are written
+      and those of the links it removes are dropped, and the command lists the links the edit leaves suspect (newly suspect: ...; would
+      become suspect: ... with --dry-run) and, for a delete, the links that
+      now point at a node that is gone (now broken). With --dry-run the report says
+      lock entry to write and lock entry to remove, and nothing is written. Refused
+      with exit 1: E767 (a seed, the node's own id, an edit that adds a schema violation or leaves a
+      link that does not resolve or an alias collision, an insert --id into a field the node does not have and its schema does not declare as an array, or into a field that holds a string, an object, a number or a boolean, a path
+      that is not a node collection of the step, the path of a collection that is a
+      map keyed by id), E768 (the payload stores a computed field), E706 (an unknown
+      id or step), E769 (another specdev write is running; the write lock is on the spec folder), E520 (a spec file cannot be read, so the links it holds are not in the graph, or a seed document is not found under the host root, so the hash of a link to it would be that of a missing file; also for a dry run). json insert --id creates the first item of an array field that
+      the node lacks and its schema declares. These forms take --repo-root, --spec-root, --git-root and --json (CLAUDE.md says the
+      json subcommands take --repo-root only: that holds for the path forms); json
+      delete, json keys and json structure now accept --repo-root too.
+      On a step-14 node (the roadmap milestone, a task or a task criterion) of
+      a closed milestone json patch|insert|delete --id is refused with E767, a
+      dry run included; specdev node status <id> not_applicable is the way to
+      park such a node. While spec/specdev_version says migration_status:
+      in_progress the edit is allowed and the first one of a milestone adds
+      one record to its close.migrations; a second edit of the same milestone
+      in the same migration adds none. specdev node rename of such a node is
+      refused and recorded the same way, and specdev node status takes only
+      not_applicable (and active, to take it back) on it: deprecated is E705.
+      The field .lifecycle is not written by json patch|insert --id (E767: the
+      lifecycle is set with specdev node status <id> <value>). The file form
+      json patch|insert|delete <file> <jq-path> is the same as editing the
+      file by hand and does not guard these nodes. json delete --id lists as now broken
+      only the links of live nodes that point at the deleted node, not the
+      history links replaces and removes.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev step create NN --from DRAFT [--dry-run] writes the file of step NN from
+      a draft that holds the whole artifact (ids of sub-items may be left out), checks
+      it against the step's schema, requires every link to resolve and writes the lock
+      entries of its links; E767 when the step already has its file, for step 16b and 16c (they are parts of the plan file of 16a), for a draft that cannot be read, for a draft whose $schema is not the step's
+      and for a link that does not resolve; E520 when a spec file cannot be read or a seed document is not found under the host root (also for a dry run). specdev step ready NN prints step NN: ready and exits 0 when the steps NN links
+      to have a spec file and no pending replay, and otherwise reports E773 with the blockers and exits 1, ending with what to do
+      first by the blockers of the first step: write it (no file), replay it (suspect links), fix its coverage gaps (coverage gaps
+      only), or replay it and fix its coverage gaps (both); E520, exit 1, when a spec file
+      cannot be read; the file of NN itself is not required. When NN has no spec file
+      yet, the steps checked, for presence and for pending replay, are its declared
+      inputs (the required_spec_inputs of NN in tools/step_order.json); run on copies
+      of the worked example with the files from step K on removed, step ready printed
+      ready for K = 02, 04 and 05, not ready, 1 blocker (step 07: coverage gap E740:
+      metric-reset-completion-rate) for K = 08 and 09, and not ready, 11 blockers
+      (steps 07, 08 and 12) for K = 14.
+      When any blocker is a suspect link, the last line names the earliest
+      step above the blockers that holds a suspect link, even a step that NN has
+      no link into, because a link cannot be attested while the node it points
+      to is suspect; a coverage gap of an unlinked step is not named. The
+      blockers listed are still those of the steps NN links to.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev node rename OLD NEW [--dry-run] changes a node's id in one change: the
+      old id goes into the node's aliases, the links that live nodes write to it are
+      rewritten, and the lock entries of those links and of the node's own links are
+      re-keyed with their hashes unchanged, so a rename makes no link suspect (link
+      ids are hashed under the target's first name, the first entry of its aliases).
+      Links held by closed milestones and by records keep the old id and resolve
+      through the alias. specdev node rename --label TERM_ID "NEW LABEL" changes a
+      glossary term's label and rewrites every use of the old label in the text of
+      nodes of steps 04 to 15, except in nodes of a closed milestone, which it lists
+      as not rewritten; the nodes whose text changes, and the nodes that link to them,
+      become suspect. specdev diff prints <new id>: renamed from <old id> for a rename
+      and suggests the bump patch. Before it writes, it checks the schema of the files
+      it edits and the findings of the graph; it does not run the step validators, so
+      a new id that breaks the id convention of a step is written and spec-check
+      reports it (E530). A plan item can be renamed. Refused: E770 (a seed, a record,
+      an environment, an id that a node or an alias has, the same id, a rename that
+      adds a schema violation or a finding, a label of something that is not a
+      glossary term), E706 (an unknown id), E520 (a spec file cannot be read, so the
+      links it holds are not in the graph; also for a dry run).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      Verification and evidence records: the kinds verification-record and
+      evidence-record, the schemas vc:extras:verification-record and
+      vc:extras:evidence-record, and the files
+      spec/extras/verification/ver-<id>.json and evd-<id>.json, each {"$schema":
+      ..., "records": [one record]} with the record id as the file name. The worked
+      example has ver-password-reset-expired-token.json. spec-check reports E774 for
+      an invalid record file (check records); a verifies or about id that no node
+      has is E700 from the graph check. validate-all does not read record files.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      New error codes E760 to E765, E767 to E774, E778 and E882 (E766 does not
+      exist), in the catalogue docs/developers/error-codes.md and registered in
+      tools/specdev_tools/core/errors.py. tools/cli_commands.json lists the new
+      commands.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      File-level forward replay is retired; the trace lock replaces it.
+      validate-all no longer reports a changed step whose later steps did not
+      change. specdev forward-replay-check, spec-check --include-forward-replay,
+      the environment variable SPECDEV_REPLAY_DIFF_ERROR_MODE and the
+      id-regression codes are removed (see the entry on the retired replay
+      check). W595 is no longer reported by forward replay. The environment
+      variable SPECDEV_STALENESS_THRESHOLD and the staleness_threshold setting
+      are removed and a host that sets the variable gets no effect. validate-all
+      has no file-level replay gate: a host's CI sees suspect links (E763) and
+      links with no entry (E761) only, and a suspect link can only be cleared
+      with attest or an edit.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev node status and the id writes were refused for a spec file that
+      already had a schema violation elsewhere: the differential check
+      compared the message text of the violations. It now compares the path and the
+      validator keyword of each violation: on the worked example with step 04 cut to
+      one FR (a minItems violation), specdev node status fr-password-reset
+      deprecated is written, and an edit that adds a violation is still refused.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev diff reported no change when only a seed file outside the spec folder
+      had changed: seed paths in the seed manifest are relative to the
+      repository root, and diff read them relative to the spec folder. It now reads
+      them from the repository root: on the worked example, one appended line gives
+      seed-accounts: changed and the suggested bump patch, and a whitespace-only
+      edit gives no change. A spec whose manifest wrote seed paths relative to the
+      spec folder now shows its seeds as missing.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev spec-check gates one step: --step N (repeat it for several steps;
+      a step given twice is gated once) blocks on the errors that step N owns
+      and on errors of earlier steps that are new since the baseline; --paths
+      FILE... (every word up to the next option; zero or more files; write
+      spec_dir before it) gates the steps of the files you list; --base-ref REF
+      (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, origin/main,
+      origin/master, main, master) names the base ref, and the baseline is its
+      merge-base with HEAD; --detail {summary,all} lists upstream debt, pending
+      (owned by a later step) and gate-owned findings in full. The report goes
+      to stdout and notes to stderr, and the exit code is 1 only when the result
+      is BLOCKED, with --json too. A new error is told from an old one by the
+      key (code, owner, node id, link target, file, location, subcode, path; the
+      location is the jq path with the array indexes removed, except an index
+      inside a quoted key, which is part of the key), never by its message, and
+      by count: for each key, a finding is new only when the working tree has
+      more findings with it than the baseline had. A reworded message, or an
+      item inserted before an old error, is not new. One limit: an error fixed
+      and another of the same key (the same code, file and place, array indexes
+      aside) added on the same branch reads as no change at the step gate; plain
+      spec-check lists the new one, and the merge check (specdev spec-check
+      --merge) reports every error. An error fixed in one file or place does not
+      offset a new error in another. A schema error (E520) of spec-check --json
+      now carries file (relative to the spec folder) and jq_path, and validate
+      and validate-all --json give jq_path on E520 (a key that is not a name in
+      jq is written in brackets: .step_requirements["00"]); the where column of
+      the step gate text shows that file name where it showed -. With several
+      steps each bucket of the --json report is the union over the steps. When
+      no baseline can be used the report says base: unavailable, every upstream
+      error counts as new, and stderr gives the reason; a branch that adds the
+      spec folder, such as a host's first adoption branch (or a base commit that
+      holds a file named like the spec folder), gets the spec folder is not in
+      the base commit <12-char sha>: every error of an earlier step counts as
+      new. With --step or --paths, a spec folder that does not exist, a toolkit
+      with no readable tools/error_ownership.json, and a toolkit whose
+      tools/step_order.json is unreadable (E520 <path> step order is unreadable:
+      <reason>, for a missing file No such file or directory) give one E520 and
+      exit 1, an unknown step with --step gives one E706 and exit 1, and a spec
+      folder that is not inside --git-root with --paths gives one E708 and exit
+      1 (with --step the report says base: unavailable and stderr gives the note
+      the spec folder <dir> is not inside the git root <root>, so it cannot be
+      found in the repository); plain spec-check on a missing spec folder prints
+      every check with that E520 among the findings and exits 1. A spec file
+      that cannot be read (no permission, or a folder named like a step file)
+      gives one E520 from the open-items check, and the run goes on; with --step
+      or --paths stderr also has the note specdev spec-check: could not read
+      <file>; the answer may be incomplete (plain spec-check has the E520 only).
+      --step with --paths, an empty --base-ref, and --base-ref or --detail
+      without a gate are usage errors (exit 2). A path listed on --paths that
+      lies outside the host root maps to no step, and the note for it gives the
+      advice to pass --git-root only when --git-root was not given. A relative
+      path after --paths is taken from the repository top: --git-root, else the
+      top of the git working tree that holds the spec folder, else the folder
+      that holds the spec folder. A step that a listed path maps to but that has
+      no artifact in the spec folder is not gated, unlike with --step; when no
+      step is left, stderr says no step gated: no listed path maps to a step
+      that has an artifact. See docs/developers/reference.md, section "Step
+      gate".
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      New error codes W630 (OPEN_ITEM), E631 (OPEN_ITEM_AT_MERGE), E632
+      (OPEN_ITEM_IN_PLAN) and W633 (OPEN_ITEM_LEGACY_TRIAGE), in the catalogue
+      docs/developers/error-codes.md and registered in
+      tools/specdev_tools/core/errors.py. spec-check has a new check, open-items, which reports W630: one warning for each open item of the
+      1.2.0 shape and one summary for each artifact, step and array for items of
+      the 1.1.1 shape; the summary names its array (3 legacy open items in
+      <file> (ambiguities); see upstream-backlog, or (plan.ambiguities),
+      (execution.emergent_ambiguities)). W630 and W633 are not promotable.
+      specdev spec-check --merge runs the merge gate and reports E631 and W633
+      (check merge-open-items); E632 is reported by the close gate (milestone close, close
+      --check, status --milestone), and W630 is not reported for an item in the
+      plan of a closed milestone.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev spec-check runs eight new checks over the whole spec, each
+      before open-items: no-dangling (E740: a node of a requirement, delivery
+      or context kind that no node uses), term-use (E741: a glossary term
+      whose label no node of steps 04 to 15 mentions), verifier-rules (E742: a
+      fixture that no task criterion lists in verified_by, or a job that none
+      lists and that realises and verifies nothing; E743: a
+      criterion, API, invariant or NFR that no fixture verifies, where a job
+      also counts for an NFR), cross-cutting (E744: a task that an invariant
+      or NFR applies to, when no criterion of the task refines it), refinement
+      (E745: a task criterion whose verifiers do not verify what it refines),
+      scaffold-paths (E746: the file of a scaffold row of a built API is not
+      tracked by git; the check is skipped outside a git repository),
+      seed-routes (E747: a seed no route names; E748: a route no node of its
+      step uses; E749: a node links a seed that the manifest does not route to
+      its step) and prose-ids (E752: a node id written in the text of a node).
+      The new codes are E740 to E749, E752 and E754 to E756 (E750 and E751 do not exist); each has an entry in docs/developers/error-codes.md
+      and an owner in tools/error_ownership.json: step 14 for E741, E742, E744
+      and E745, step 08 for E743 and E754 to E756, step 15 for E746, step 00 for E747, the step
+      of the route for E748, the step of the node for E749 and E752, and for
+      E740 the latest step whose nodes can use the kind. None is promotable.
+      The checks run on every spec: none is skipped because the files look
+      like 1.1.1, so a spec that has not been migrated gets them too (E752
+      reports its old link fields trace and targets). A child keeps its own
+      scope: an FR set to scope: later does not park its criteria. E740 ends
+      with the ways out that exist for the kind: link it always, schedule it
+      only for a kind that a step 09 milestone's schedules is one of the ways to
+      use (a criterion, an FR, an NFR, an API, an invariant, a risk), and set
+      scope later or out with a scope_reason only for a kind whose schema has a
+      scope field. E742 ends list it in a criterion's verified_by, or remove it
+      and run specdev attest --prune (or remove it and the links to it (N nodes:
+      specdev trace <id> --down --depth 1 lists them) and run specdev attest
+      --prune when a node still links it);
+      E743 asks for a fixture at step 08 that
+      verifies the node and that a task criterion lists in verified_by (for an
+      NFR, or a job at step 12 that verifies it); E744 asks for a task
+      criterion that refines the node and lists in verified_by a verifier that
+      verifies it; E747 says to route the seed and list it in derives_from of a
+      node of that step, or to remove the seed (its seeds[] entry, its
+      global_seed_order entry when it has one, and its document, and the
+      links to it with their count and the command that lists them, then
+      specdev attest --prune);
+      E748 says to distil the seed in that step, to move the route when no
+      node of the step can link a seed (a trinity step, or step 13 when no
+      extension kind lists a seed), to remove the route,
+      or, when it is the seed's only route, to remove the seed with it and the
+      links to it that nodes still hold; E749
+      ends or remove the link and run specdev attest --prune (a required
+      derives_from that would be left empty needs another entry). A message that says to
+      remove a node says how many nodes still link it and the command that
+      lists them (specdev trace <id> --down --depth 1); the catalogue says
+      once, as a loop, what removing a node takes. A fix
+      that adds, changes or removes a link ends with specdev attest <node> --yes for each node an
+      E761 or E763 names, and specdev attest --prune after a removed link. E752
+      does not report a node's own id. E745 reads a threat or an edge case
+      through its mitigations. E752 reads nodes parked with scope: later or
+      out, and the description of a task. E747 is the only finding for a seed
+      that no route names; E749 is one finding for each link. scaffold-paths
+      is skipped when every row to check lies under a submodule that is not
+      checked out.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      Every finding in spec-check --json has an owner: the one the finding carries,
+      else the row of tools/error_ownership.json for its code, else the default owner
+      of its check (merge-check for most checks). A finding that had no owner now
+      shows its row's owner or merge-check. Plain spec-check does not print the
+      owner: read it with --json (the step gate shows it too).
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev upstream-backlog lists every open item of the spec grouped by the
+      step of the nodes the item is about, not by the text of impact[]: a seed
+      item under seed, a silent-spec item under the step of its missing kind, an
+      item about nodes of several steps in each group (counted once), and an
+      item that no group can hold under unplaced with W613. The JSON has
+      schema_version "2"; each record has group, also_in, artifact, step,
+      item_id, about, about_steps, decision, shape, description and impact, and
+      a record of the 1.1.1 shape also has severity, status, bucket and
+      matched_rule. ambiguity_id is now item_id; milestone_id, origin and
+      matched_impact_entry are removed. In summary, items, with_answer,
+      needing_answer and unplaced_count replace total_records, open_count,
+      resolved_count, milestones_scanned and unclassified_count
+      (hidden_by_status_count stays). The group unclassified is now unplaced;
+      the bucket of such a record and the name of W613
+      (UPSTREAM_BACKLOG_UNCLASSIFIED) keep unclassified, and the target of a
+      W613 warning is now the artifact and item
+      (impl_context/ms_x_plan.json:amb-old-2) where it was the milestone id and
+      item (plan-ms-x:amb-old-2). --severity and --status filter items of the
+      1.1.1 shape only. An artifact that cannot be read (bad JSON, no
+      permission, a folder named like a step file), or a spec folder that does
+      not exist, stops the run with E520 and exit 2. An item that cannot be
+      reported (no id, neither about nor a valid severity, a severity outside
+      its scale) prints one E520 line on stderr (item=(no id) for an item with
+      no id); the run goes on and the exit code is 2. A decision of spaces only
+      counts as no answer. --spec-root is still accepted and ignored.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The host pre-commit template templates/pre-commit-config.host.yaml runs
+      spec-check ... --paths as its spec-check hook, with pass_filenames: true and
+      require_serial: true, so a commit gates only the steps of the files it touches.
+      specdev update (which init runs) writes the template's hooks into the
+      host's .pre-commit-config.yaml between the lines # >>> specdev-managed and
+      # <<< specdev-managed. A host whose config has hand-written toolkit hooks
+      keeps them, with its old hook that checks the whole spec on every commit,
+      and gets W930 for each hook that differs until specdev update --adopt
+      replaces them by the marked block.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      A spec that has only some of its steps written fails spec-check on the
+      role checks until its nodes are linked, or marked scope: later or out
+      with a scope_reason where the kind has that field: the worked example, which is a partial
+      spec, reports role findings (the counts are in docs/developers/error-codes.md) and exits 1. The step gate
+      lists a finding under PENDING (owned by a later step) until the step that owns it is
+      gated, so spec-check --step 05 on the worked example now prints a
+      PENDING line, and step ready 14 on it reports E773 with the E743
+      gaps of step 08 as blockers, ending fix the coverage gaps
+      of step 08 first.
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      The replay check is removed. specdev forward-replay-check exits 2 and
+      prints "specdev: forward-replay-check was removed in 1.2.0; use specdev
+      stale for the pending replay and specdev spec-check for broken links";
+      spec-check --include-forward-replay is an argument error (unrecognized
+      arguments: --include-forward-replay, exit 2); validate-all runs no replay
+      step and prints no "skipped" line. The environment variable
+      SPECDEV_REPLAY_DIFF_ERROR_MODE is no longer read (specdev env-check lists
+      any SPECDEV_* variable that is set, but nothing reads this one);
+      SPECDEV_REPLAY_BASE_REF stays and names the base ref of the step gate and
+      of specdev diff. The keys policy.require_full_forward_replay_on_change and
+      policy.status_write_exemptions are removed from tools/step_order.json, and
+      schema/step_order.schema.json allows no other key in policy
+      (additionalProperties: false). The codes E550, W550, E555 and W598 (id
+      regression and replay diff), W560 (a relabelled closure gap), W140 (seed
+      content overlap) and W551 (a seed on disk that the manifest does not
+      declare) are removed from the registry and the catalogue (specdev guide
+      E555 prints no remediation guide for E555). What answers the same
+      question: a deleted node is a broken link at each node that links it
+      (E700, E701, owned by the step of the holder; specdev spec-check); a
+      changed upstream node is a suspect link (E763; specdev stale, then specdev
+      attest); a seed that no route names or no node of its step uses is E747,
+      E748 or E749. A host must delete the CI lines that call
+      forward-replay-check or pass --include-forward-replay (both now exit 2)
+      and unset SPECDEV_REPLAY_DIFF_ERROR_MODE.
+    migration:
+      action: none
+
+  - type: remove_step
+    description: >
+      Step 13a (the completeness assessment) is removed: its prompt
+      prompts/prompt_13a_completeness_assessment.md, its schema
+      vc:13a-completeness-assessment, its validator, the migration template
+      prompts/migration/template_completeness_assessment.md, its entry in
+      tools/step_order.json and tools/step_docs.json, and the canon kind
+      completeness_dimension (the kind file, the four entries
+      cn:core:completeness_dimension:ambiguity, :completeness, :quality and
+      :traceability of canon/manifest.json, and the autofix rule that mapped
+      category to completeness_dimension_ref). specdev prompt-context 13a prints
+      Error: Unknown step '13a'; spec-check --step 13a, step ready 13a and step
+      create 13a print E706 no step '13a'; known steps: 00, 01, 02, 02a, 03, 04,
+      05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 16a, 16b, 16c. step ready
+      14 and step ready 16a no longer wait for a 13a file. What answers the same
+      question: specdev coverage (the link counts and the ids that are not
+      linked), the role findings E740 to E745 of specdev spec-check, and specdev
+      step ready 14, which lists the blockers owned by the steps below 14 (on a copy
+      of the worked example with steps 14 to 16 removed: 11 blockers at steps 07, 08
+      and 12); the gaps that step 14 owns (E566, E742, E744, E745 and the E740 of the
+      nodes a task criterion uses) are not blockers, and the task criteria of step 14 clear them.
+      A host must delete its
+      spec/13a_completeness_assessment.json: left in place it gives E520
+      schema_not_found uri=vc:13a-completeness-assessment from spec-check and
+      validate-all (run on a copy of the worked example with such a file). A
+      project canon entry of kind completeness_dimension does nothing now (on a
+      copy of the worked example with one added, spec-check reported the same
+      findings and canonical-lint printed OK); delete it. specdev align apply --auto
+      migrates both (p3_remove deletes the file, p3_host_canon the canon kind).
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      The closure and completeness checks are removed. specdev
+      completeness-check exits 2 and prints "specdev: completeness-check was
+      removed in 1.2.0; use specdev coverage for the link counts and the ids
+      that are not linked"; specdev traceability-check exits 2 and prints
+      "specdev: traceability-check was removed in 1.2.0; use specdev spec-check
+      for the role-rule findings (E740 to E745) and broken links". The
+      spec-check checks traceability-closure and completeness-check are gone
+      from the summary, and validate-all no longer raises E535, E536 or E560.
+      The module validation/traceability_closure.py is deleted.
+      The codes E535, E536, E560, E561, E562, E563, E564, E565, E568, E569,
+      E575, E576, W561, W562, W563, W564, W565, W568, W569, W575 and W576 are
+      removed from the registry and the catalogue; together with the codes of
+      the matrix entry below, the promotable pairs go from 23 to 10. The
+      question each closure code asked is now a role rule or a link check: a
+      node that nothing uses is E740, a missing fixture or verifier is E742 or
+      E743, a link to an id no node has is E700 or E701, and an FR that no task
+      criterion reaches is E566 (see the step 14 entry). specdev context
+      freshness no longer writes W595 (CONTENT_STALENESS, SEED_UNTRACKED) to
+      stderr and no longer exits 1 under SPECDEV_WARNINGS_AS_ERRORS; its JSON
+      keeps the keys stale and untracked. A seed that changed is a suspect link
+      (specdev stale); a seed that no node links has no signal in the graph
+      (E747 to E749 are other conditions: a seed no route names, a route no node
+      uses, a link to a seed the route does not reach). W595 stays registered
+      for the messages of specdev seed-index. specdev extraction-intent-check
+      now reads a "## Extraction Intent" section too (it skipped eight prompts
+      before); an empty seed file is still not reported. A host must delete the
+      CI lines that call either command (both now exit 2).
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      The trace matrix and the trace types are removed. specdev matrix exits 2
+      and prints "specdev: matrix was removed in 1.2.0; use specdev coverage
+      --by fr for the FR view and specdev trace --up|--down <id> for lineage";
+      its --out and --json flags go with it. No command writes
+      spec/extras/trace_matrix.json now, and nothing reads it (a leftover copy
+      gives no finding in spec-check). The environment variable
+      SPECDEV_MATRIX_STRICT is no longer read, and specdev env-check no longer
+      prints the lines Coverage thresholds and Matrix strict mode.
+      coverage_thresholds is removed from tools/step_order.json and from
+      schema/step_order.schema.json (it was required). The codes E604, W604
+      (TRACE_MATRIX_STALE), E592 and W592 (COVERAGE_THRESHOLD_*) are removed:
+      SPECDEV_PROMOTE_CODES=W592 prints "specdev: SPECDEV_PROMOTE_CODES contains
+      unrecognised code 'W592'; it will be ignored." The canon kind trace_type
+      is removed (the kind file and its 11 entries cn:core:trace_type:* of
+      canon/manifest.json), with the modules core/trace_types.py,
+      validation/matrix.py and validation/cross_artifact_checks.py and the lazy
+      aliases specdev_tools.trace_types and specdev_tools.matrix;
+      hallucination-lint no longer reports E530 for an invented type in a trace
+      entry. The CI workflow that init used to generate had a "Build trace
+      matrix" and an "Upload matrix" step; init no longer writes that workflow,
+      the merge-check workflow that specdev update installs has neither, and
+      .gitignore no longer lists tools/trace_matrix.json. What answers the same question: specdev
+      coverage, specdev coverage --by fr and specdev trace. A host must delete
+      the CI lines that call specdev matrix (now exit 2; specdev update reports
+      each as W932), may delete a leftover
+      spec/extras/trace_matrix.json, and should unset SPECDEV_MATRIX_STRICT.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      specdev spec-check runs a new check, milestone-numbers (owner step 14,
+      listed after prose-ids), which replaces the 1.1.1 warnings W561, W566 and
+      W567: E566 UNCOVERED_FR_MILESTONE (an FR in scope that no task criterion
+      of step 14 reaches: the criterion refines the FR, one of its acceptance
+      criteria or a node derived from them) and E567
+      INCOMPLETE_MILESTONE_DECOMPOSITION (a step 09 milestone that a step 14
+      milestone computes, and that schedules a node no task criterion refines)
+      are errors computed from the graph, no longer warnings read from fr_refs.
+      They run under spec-check and the step gate (spec-check --step 14 blocks
+      on them), not under validate or validate-all. The empty-milestone half of
+      W567 is gone: the schema refuses a milestone with no tasks. A branch that
+      adds an in-scope FR must plan it in the same pass. On a copy of the worked
+      example, which is a partial spec, the summary has the line [FAIL]
+      milestone-numbers and the finding reads E566 fr fr-password-reset-request
+      is in scope but no task criterion reaches it: add a task criterion that
+      refines it, one of its acceptance criteria or a node derived from it, or
+      set its scope to later or out with a scope_reason.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      The legacy shim is removed. validation/_legacy_shim.py, which kept
+      1.1.1-shaped checks quiet on a 1.2.0-shaped spec, is deleted, with the
+      shim key of every row of tools/schema_changes.json, the Shim column of the
+      generated docs/developers/schema-change-checklist.md (five columns now)
+      and the header sentence about it. specdev context review reports no
+      structural coverage: upstream_coverage (covered, dropped) and
+      reverse_trace (unjustified, scope_creep) are empty for every artifact and
+      the verdict is never FAIL because of them (run on the worked example's
+      step 04 file: PASS). The step 11 parked-FR exemption reads scope: later or
+      out only; priority: wont-have no longer parks a requirement.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      Prompts, skills and agents are on the 1.2.0 graph shape. Prompts 00 to 15
+      name link fields (derives_from, provided_by, relies_on, constrains,
+      verifies, threatens, mitigated_by, schedules, realises, refines,
+      verified_by, and depends_on between jobs only) in place of trace, links,
+      targets, target_ids, {type,id} mitigations, deliverables, pr_rules,
+      reviewers, spec_first_policy, requires and tech_stack; prompts 05, 06 and
+      07 no longer require a verbatim copy of an upstream text; prompt 03 states
+      the term-use rule (E741); each prompt has a Coverage Closure item "No node
+      ids in prose" (E752); prompt 14 names E566, E567, E742, E744 and E745 and
+      uses spec-check --step 14 where it ran specdev matrix; prompt 15 describes
+      scaffold rows by row_id, realises and path.
+      docs/prompts/shared_expectations.md no longer names step 13a, matrix or
+      the deprecated alias; it lists the checks spec-check runs and describes
+      the --step gate, step create --from and the attest step. In
+      schema/05_interface_contracts.schema.json the /auth/login example uses
+      "security": "oauth2" (it was "none", against the field's own rule). The
+      skills write a new step as a draft file outside spec/,
+      .specdev/drafts/step_<NN>.json, create it with specdev step create NN
+      --from .specdev/drafts/step_<NN>.json, gate it with specdev spec-check
+      --step NN, edit by node id, and clear suspect links with specdev stale and
+      specdev attest. /specdev-review has no --with-replay: --with-backlog
+      passes specdev stale --json as well as specdev upstream-backlog --json to
+      the relational reviewer. The return field forward_replay_debt of the
+      author agents is pending_replay; their blocker questions carry owner and
+      about, and open items go to ambiguities. The specdev-reviewer and
+      specdev-scope agents lost the with_replay flag and the
+      forward-replay-check call, stop on spec-check --step <NN>, and report two
+      nodes that state one obligation as a drift finding whose message starts
+      near-duplicate:. The specdev-trinity-reviewer agent lost six
+      forward-replay-check lines. The specdev-context skill names trace,
+      coverage --by fr and stale where it named the trace matrix, and its
+      allow-list changed.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev verify bind <verifier-id> --command CMD [--command CMD ...]
+      --guard REGEX [--proves ID ...] [--stage dev|ci|staging|prod] [--id
+      ver-ID] writes the verification record spec/extras/verification/<id>.json
+      of a fixture, a job or a rule (never a spec file), and specdev verify run
+      [ver-ID ...] [--all | --milestone ms-ID] [--stage S] [--only-stage]
+      [--no-record] [--installed TP=VERSION ...] [--timeout SEC] runs the
+      commands of bindings and writes one evidence record
+      evd-<name>-<stage>.json (<name> being the binding id without its ver-
+      prefix) for each, with the code-tree id of the run and the version that
+      each declared source reads for the third parties the proved nodes rely on
+      (those reached through the providing component's connections included).
+      verify run exits 1 when a binding fails and warns W350 (a registered
+      submodule with uncommitted content; an embedded repository that is not a
+      registered submodule is not seen) and W351 (the run changed the code
+      tree). Evidence rests on the binding too: the run records the hash of the
+      binding itself beside the hashes of its verifier and of the nodes it
+      proves, so after a change of a binding (its commands, guard, stage or
+      proves) its evidence is stale (E347 STALE_HASH) until verify run is
+      repeated, while a verify bind that changes nothing leaves it valid;
+      evidence written without the hash of the binding is stale once. verify
+      bind of the same verifier and nodes replaces the record, whatever its id,
+      also when the stage differs, so the plain command is the way out of E330
+      for every stored binding. A third party that the proved nodes rely on and
+      that has a declared version source but no version recorded by the run (a
+      source declared after the run, or a reliance that appeared after it) makes
+      the evidence stale (E347 STALE_TP_VERSION) until verify run is repeated.
+      The guard of a binding is compiled before its commands run, so a guard
+      that is no regular expression is E332 and nothing ran. An id of
+      --installed that is no third-party node is E706 and a third party named
+      twice is a usage error (exit 2). Shown by
+      specdev verify bind --help, specdev verify run --help and specdev verify
+      run --all, which prints one PASS or FAIL line for each binding and then N
+      run, N passed, N failed.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev third-party pin <tp-id> <version> writes the pin of a third-party
+      node through the id-keyed write path (the links into the node become
+      suspect; E336 for a pin that is not exact: empty, latest, *, an x-wildcard
+      or a range). specdev third-party check compares the pin of each third
+      party that declares pin_sources with the version its sources read (E336,
+      E337, E338; every pin matches its declared sources and exit 0, or exit 1);
+      with --installed TP=VERSION [TP=VERSION ...] --env ENV [--tag TAG] it
+      compares what a deploy installed with the pins (E339 and exit 1, which
+      stops the deploy; E706 for an id that is no third-party node; a third
+      party named twice is a usage error) and, when all match, writes one
+      install-check evidence record for each third party
+      (evd-<name>-<env>-install.json). third-party pin of the pin a
+      node already has writes nothing and prints <id> already has the pin
+      <version>; nothing written (exit 0, no reminder), and writes the value
+      without surrounding spaces. Shown by specdev third-party check and specdev
+      third-party pin.
+      spec-check runs the pin check in every run (the check third-party-pins,
+      whose findings are step 02's own, so --step 02 blocks on them) and tests
+      the pin of every third party for exactness (E336), whether or not it
+      declares pin_sources; E337 and E338 are reported the same way.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      The optional host file spec/common/host_declarations.json ($schema
+      vc:host-declarations, schema schema/host_declarations.schema.json,
+      template templates/host_declarations.host.json, page
+      docs/developers/host_declarations.md) holds release_tag_pattern,
+      setup_command, code_tree_exclusions and pin_sources. specdev verify run
+      reads code_tree_exclusions and pin_sources, specdev third-party check
+      reads pin_sources, and specdev third-party check --installed also reads
+      code_tree_exclusions; a regex source is matched with MULTILINE, as the
+      output guard is, a key of pin_sources may be an id the third party had
+      before a rename, and a third party with no pin_sources entry gets no
+      stale-version check unless the run recorded a version for it
+      (--installed); specdev release and release rollback read
+      release_tag_pattern, specdev update reads setup_command (the "Host setup"
+      step of the merge-check workflow it installs, W935 when it is absent), and
+      specdev spec-check --merge reads pin_sources too.
+      spec-check reports a file that breaks its schema as E520. A host that does
+      not use the file has nothing to do, and neither init nor update installs
+      the template (copy it by hand).
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      New fields of the records: a verification record has an optional proves (a
+      list of node ids; plain data and not a link, and an id that names no node is
+      E774); an evidence record has the type install-check beside run and
+      attestation, and the fields recorded_hashes, git_author (required on an
+      attestation), env and tag; a lock entry has an optional target_containers,
+      which specdev attest writes for a node. Shown by specdev verify run --json
+      and by spec-check (check records).
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      specdev spec-check runs a new check, removal-rules (owner step 14, listed
+      after milestone-numbers): E341
+      REMOVAL_FIXTURE_MISMATCH (the removes of a removal criterion and of its
+      removal fixture differ, or a removal fixture removes an id that no criterion
+      listing it removes) and E342 REMOVES_TARGET_PRESENT (a criterion or a
+      fixture that is not closed removes an id the spec still has). The criteria
+      of a closed milestone are not checked. Shown by specdev spec-check.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      New error codes E330 BINDING_STAGE_MISMATCH, E331
+      BINDING_TARGET_NOT_VERIFIED, E332 BINDING_GUARD_INVALID, E333
+      BINDING_DUPLICATE_TARGET, E334 UNKNOWN_STAGE_FOR_ENVIRONMENT, E336
+      THIRD_PARTY_PIN_NOT_EXACT, E337 THIRD_PARTY_PIN_MISMATCH, E338
+      THIRD_PARTY_SOURCE_UNRESOLVED, E339 THIRD_PARTY_INSTALLED_MISMATCH, E341
+      REMOVAL_FIXTURE_MISMATCH, E342 REMOVES_TARGET_PRESENT, E343
+      REALISATION_OUTDATED, E344 REALISATION_REMOVED, E347
+      VERIFIER_NO_VALID_EVIDENCE, E348 OBLIGATION_NOT_PROVEN, and the warnings
+      W350 SUBMODULE_DIRTY_NOT_COVERED and W351 RUN_CHANGED_CODE_TREE, in the
+      catalogue docs/developers/error-codes.md and registered in
+      tools/specdev_tools/core/errors.py. E343 and E344
+      (unresolved_realisations, for the release gate) and E347 and E348
+      (proof_errors, for the close and release gates) are reported by the
+      release gate (specdev release) and, for E347 and E348, by the close gate
+      (as E811 of specdev milestone close) and the production gate (specdev
+      release check --stage prod); proof_errors reports a
+      node whose stage cannot be told (an environment that is not a stage) as
+      E334 and goes on with the other nodes. tools/cli_commands.json lists
+      verify, verify bind, verify run, third-party, third-party pin and
+      third-party check.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev attest --prune also removes the verification and evidence records
+      whose every verifies or about target is gone, repeated until none dangles
+      (the evidence of a removed binding goes with it); --dry-run lists and
+      deletes nothing; the text adds attest --prune: removed N orphan records and
+      one file per line, and --json carries pruned_records. Shown by specdev
+      attest --prune --dry-run after a fixture that has a binding was deleted.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The records check of spec-check also runs the record lint: E330 for a stored
+      binding whose stage no longer matches the nodes it proves, E334 for a
+      binding that proves an environment that is not a stage, and E774 for a
+      proves id that names no node. Shown by specdev spec-check.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      E752 (prose-ids) no longer reads a field whose schema is a choice between
+      forms (anyOf or oneOf) when every form is fixed, such as a node id in
+      kebab-case or SCREAMING_SNAKE_CASE: the proves of a verification record
+      gives no finding. Shown by specdev spec-check after specdev verify bind.
+      E752 does not read the nodes of a frozen plan (the plan of a milestone whose
+      anchor row is done): a frozen plan is never edited, so its text cannot be
+      reworded; the closed nodes of step 14 are still read.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The graph check does not resolve the verified_by and refines links of the
+      task criteria of a closed milestone: a deleted fixture or obligation gives
+      no E700 on them. The id-keyed writes still resolve what a write adds
+      (specdev json patch --id <closed criterion> .verified_by ... to an id that
+      does not exist is E767). Shown by specdev spec-check after the milestone was
+      closed and a fixture its criterion lists was deleted.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      A verifier named by a verification record (verifies) or an evidence record
+      (about) is used, so it gets no E742, and a verifier whose bindings are all
+      retired (the environment of their stage has scope: out) verifies nothing, so
+      the nodes it alone verified get E743. Shown by specdev spec-check, specdev
+      stale, specdev coverage and specdev step ready.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev trace <milestone-id> --recipe 16c lists the verification records and
+      the evidence records of a run among the verifiers of the milestone. Shown by
+      specdev trace <milestone-id> --recipe 16c after specdev verify run.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step 16 plan (16_impl_context), breaking for a host's plans: the action id
+      is required (a01, a02, ...), and the 1.1.1 plan fields that the new loop
+      replaces are removed: execution.execution_results, execution.final_status,
+      an action's evidence, review.fixture_status,
+      review.semantic_review.fr_coverage and the two verified conditions of the
+      review block. A host plan with an action that has no id, or with a removed
+      field, is reported by specdev spec-check and specdev validate as E520 ('id'
+      is a required property; Additional properties are not allowed); the plan of
+      a milestone closed by a migration (a close whose signed_off_by is
+      legacy-migration) is exempt. specdev align apply --auto adds
+      the action ids and the plan's milestone key (p2_action_ids,
+      p2_plan_milestone_key); until it has run, a 1.1.1 plan
+      is read only through specdev status and is not driven through
+      /specdev-trinity. Shown by specdev spec-check spec --repo-root
+      ./devspec_toolkit --spec-root ./spec --git-root ..
+    migration:
+      action: ai_assisted
+
+  - type: add_module
+    description: >
+      specdev milestone start|defer|sign-off|close <milestone-id> write a
+      milestone's life on its row of the anchor 16_impl_context.json: start moves
+      pending or deferred to in_progress (refused with E800 when a suspect link is
+      on the milestone's chain), defer --reason TEXT (at most 300 characters) puts
+      it aside, sign-off writes the record
+      spec/extras/signoff/so-<milestone-id>-<NNNN>.json, and close runs the close
+      gate (E810 a criterion no plan item realises, E811 a criterion not proven,
+      E812 a plan item not executed, E813 the review not verified, E632, E763,
+      E746, E814 no sign-off) and, when it finds nothing, writes status: done with
+      the close record {signed_off_by, signoff, tree, plan_hash, closed_at,
+      migrations} and freezes the plan; close --check writes nothing, takes no write lock and there is no
+      --dry-run. A milestone with no anchor row is E800, which names the specdev
+      json insert --step 16 .plan.milestone_index '<row>' that adds it. A batch
+      id is refused with E803 and the way to the milestone id. The sign-off
+      record lists the manual fixtures and how many are attested, the deferred
+      and won't-do tasks, the number of open items the person was shown and the
+      criteria whose proof is owed at staging or prod (a binding at staging or
+      prod whose proof is not proven). A person decides sign-off and defer.
+      The close gate also reports E761 for a link of the milestone's chain
+      that has no lock entry (a plan item added to the plan file by hand and
+      never attested), because once the milestone is closed attest refuses
+      that link. Shown by specdev milestone close
+      ms-account-recovery --check.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev status [--milestone <milestone-id>] [--json] prints where the work
+      stands (pending replay, open items, milestones awaiting sign-off, outdated
+      realisations, the next step that may start, the close gate as a dry run,
+      the merge-check and release-gate errors, and the production verification
+      of the previous release); with --milestone it prints the view a person signs off from (E800 and exit 1
+      for a milestone whose anchor row is missing). It reads and writes nothing.
+      Shown by specdev status.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev plan record <ITEM>/<action-id> --outcome done|failed|blocked [--note
+      TEXT] appends an execution record to execution.records of the plan (an
+      action that names a verifier is E822: its proof is specdev verify run);
+      specdev plan record --at-deploy <ITEM>/<action-id> --env staging|prod writes
+      spec/extras/verification/dep-<NNNN>.json for an action marked at_deploy;
+      specdev plan record --prune <milestone-id> removes the records of an item or
+      action that is gone; specdev review record <milestone-id> --verdict
+      verified|needs_work|blocked|deferred --findings-file F replaces the plan's
+      review block (E823 for invalid input). The plan of a closed milestone
+      refuses both (E820). The spec-check check plan-records warns W825 (a record
+      older than a change of what its item realises) and W826 (an item that
+      realises only deferred or won't-do tasks), and the new check frozen-plans
+      reports E827 for a plan edited after its milestone closed; spec-check now
+      runs 30 checks (the third-party-pins check is described with
+      specdev third-party).
+      A record is stale (W825) when the item's realises links were attested
+      again after it was written, whether or not the criterion's text changed:
+      the item is carried out and recorded again. Shown by specdev plan record
+      --help; specdev review record --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev verify attest <node-id>... records an attestation
+      (spec/extras/verification/evd-<node id>-attested.json) of a fixture with
+      mode manual or a rule enforced by review, and specdev verify attest
+      <ITEM>/<action-id> --env staging|prod records an at_deploy action a person
+      carried out; a person decides, and an id that is not attestable is E824 with
+      nothing written. It is not specdev attest, which re-accepts links. A review
+      rule is built once it is attested (it was reported as pending evidence
+      before), and the advice of E347, E348 and the E767 of a manual fixture name
+      specdev verify attest. The release gate (specdev release) reports a rule
+      enforced by review that has no valid attestation as E830. Shown by specdev verify attest
+      --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev step create 16 --from DRAFT creates the anchor file when it is
+      missing and specdev step create 16a <batch> --from DRAFT creates the plan
+      file impl_context/ms_<batch>_plan.json and the lock entries of its links
+      (the draft carries the ids of its items, actions and open items); a
+      milestone has one plan, so a draft for a milestone that already has a plan
+      file is E767, and step create 16b or 16c is E767 (they are parts of the plan
+      file). Shown by specdev step create --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      New error codes E800 MILESTONE_NOT_STARTABLE, E801
+      MILESTONE_TRANSITION_INVALID, E802 DEFER_REASON_MISSING, E803
+      PLAN_MILESTONE_UNKNOWN, E810 CLOSE_CRITERION_UNREALISED, E811
+      CLOSE_CRITERION_UNPROVEN, E812 CLOSE_ITEM_NOT_EXECUTED, E813
+      CLOSE_REVIEW_NOT_VERIFIED, E814 CLOSE_NO_SIGNOFF, E820 PLAN_FROZEN, E821
+      RECORD_TARGET_UNKNOWN, E822 RECORD_ACTION_NAMES_VERIFIER, E823
+      REVIEW_RECORD_INVALID, E824 ATTEST_TARGET_NOT_ATTESTABLE, W825
+      EXECUTION_STALE, W826 PLAN_ITEM_REALISES_EXCLUDED_TASK, E827
+      PLAN_CHANGED_AFTER_CLOSE, E830 REVIEW_RULE_UNATTESTED and W837
+      PLAN_FILE_LARGE (a plan file above 750000 bytes). Each has an entry with its
+      message and the way out in docs/developers/error-codes.md, "Milestone
+      Lifecycle". Shown by grep -n '^### E8' docs/developers/error-codes.md.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step 16 schemas, additions: an action may carry at_deploy (staging, prod);
+      execution.records[] holds the execution records specdev plan record writes;
+      the review block has recorded_at and limits on what a record takes
+      (review.findings 50, a finding's description 600, next_actions 1000, a
+      record's note 200, execution.records 1000); the anchor row's deferral_reason
+      takes at most 300 characters and its close record is {signed_off_by,
+      signoff, tree, plan_hash, closed_at, migrations}. New record schemas
+      vc:extras:signoff-record (spec/extras/signoff/so-*.json) and
+      vc:extras:at-deploy-record (spec/extras/verification/dep-*.json); specdev
+      spec-check reads both folders (E774 for an invalid file). Shown by specdev
+      validate spec/impl_context/ms_<batch>_plan.json --repo-root
+      ./devspec_toolkit.
+    migration:
+      action: ai_assisted
+
+  - type: change_config
+    description: >
+      specdev milestone-state --batch-id <batch> prints a new key milestone (the
+      plan's milestone key, null when it has none; milestone_id still echoes the
+      batch id and is not a milestone id). Group states are pending,
+      code_converged, blocked, deferred and wont_do: verified is gone, deferred
+      and wont_do follow the disposition of the tasks the item realises, blocked
+      follows open items about a node of the item's chain, and
+      derived_phase_position is closed only when the anchor row is done
+      (review_complete only when the newest review round's findings file is
+      empty). The group
+      keys blocking_amb_health and fixtures_exercised are removed. A findings
+      file's scope may be a plan item id. The anchor validator's E308 [ownership]
+      arm now compares the roadmap tasks the plans' items realise, and E309
+      [mapping] compares the realises sets of one item id in two plans. Shown by
+      specdev milestone-state --batch-id account_recovery --repo-root
+      ./devspec_toolkit --spec-root ./spec --git-root ..
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      Error codes retired into the removed set with the plan fields they read:
+      E301 MISSING_PROOF_CLOSURE, E302 UNPROVEN_VERIFIED_REVIEW, E305
+      PLANNED_UNEXECUTED, E306 SEMANTIC_REVIEW_FR_MISMATCH, E307
+      BEHAVIOR_VALIDATION_PAIRING, W599 EVIDENCE_TOO_SHORT, W600
+      VERIFIED_ACTION_NO_EVIDENCE and W601 EVIDENCE_NO_ARTIFACT_REF; the close
+      gate (E811, E812, E813) replaces the first three. spec-check --step 16b runs
+      the 16a checks (there is no 16b validator) and the validator of a 16c plan
+      only checks that review is an object. E303 stays, meaning only a commit
+      message that does not match commit_message_rules of step 10. Each retired
+      code has a stub in docs/developers/error-codes.md, "Removed Codes". Shown by
+      grep -n '(removed)' docs/developers/error-codes.md.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      The step 16 prompts (prompt_16_impl_context.md, prompt_16a_impl_planner.md,
+      prompt_16b_impl_coder.md, prompt_16c_impl_reviewer.md), the agents
+      specdev-trinity-impl and specdev-trinity-reviewer and the skill
+      /specdev-trinity describe the 1.2.0 loop: a plan is created by step create
+      16a <batch>, items realise task criteria, a carried-out action is recorded
+      with plan record, a verifier action is proven by verify run, the review is
+      recorded with review record from a vc:infra:findings file, and the milestone
+      ends with status --milestone, a person's milestone sign-off, milestone close
+      --check and milestone close. The code is committed before specdev verify run
+      --milestone <id> --stage ci (E746 reads tracked files, and a commit after
+      the run makes the evidence stale, E811). A person decides sign-off, defer
+      and manual attestation: the agent shows specdev status first and never
+      answers the host's prompt. The prompts no longer name the plan item's
+      spec_ref, milestone_ref, checklist_status, execution_results, fixture_status,
+      fr_coverage, the trace matrix or specdev matrix.
+      prompt_16b_impl_coder.md says what 16b does with a test it wrote that no
+      binding covers: it binds the test with specdev verify bind, which the
+      agent may run. The seed manifest schema,
+      docs/prompts/shared_expectations.md and docs/agents/agents.md say which
+      steps a seed can be routed to (see the entry on seed links). Shown by
+      specdev status --milestone ms-account-recovery.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      docs/developers/reference.md documents the commands above and the
+      milestone-state output as printed; docs/developers/workflows/spec_to_impl.md
+      has the order of a milestone's life and who decides each step. The specdev
+      ai-help guide no longer says to write the artifact directly to spec/: it
+      names specdev step create NN --from <draft> and specdev json
+      patch|insert|delete --id; for step 16a it names specdev step create 16a
+      <batch> --from <draft>, for 16b specdev plan record and the two open-item
+      forms, for 16c specdev review record (16b and 16c have no file of their
+      own), and its validate line is specdev spec-check spec --step <step>.
+      Shown by specdev ai-help --step 16b.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev spec-check SPEC --merge [--base-ref REF] runs the merge gate:
+      two checks appended after the registered ones (merge-open-items for E631
+      and W633, merge-bindings for E901 and E900).
+      Plain spec-check, --step and --paths do not run them, so a plain run on
+      the worked example is unchanged (30 checks run, 24 errors, 1 warnings;
+      with --merge 31 checks run, 24 errors, 1 warnings). A pin finding (E336
+      to E338) is the registered check third-party-pins's, which every run
+      makes, and is listed and counted once. merge-bindings runs,
+      without recording evidence, the dev and CI bindings of each milestone that
+      the branch closes. --merge with --step, --paths or --detail is a usage
+      error (exit 2); --base-ref is also accepted with --merge, and a full
+      commit id that the clone does not have (the null id of a forced push)
+      means the first parent of HEAD; --base-ref REF without --step, --paths or
+      --merge is still a usage error. Shown by specdev spec-check spec --merge
+      --base-ref main --repo-root ./devspec_toolkit --spec-root ./spec
+      --git-root ..
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev release --tag NAME [--message TEXT] cuts a release. It refuses a
+      tree that is not clean (E910), a host with no release_tag_pattern (E911),
+      a tag name that does not match the pattern, that git does not accept or
+      that exists (E912), and a release gate with errors; otherwise it creates
+      an annotated tag on HEAD and writes nothing else: no commit, no push, no
+      version number. The release gate runs the checks of spec-check, the
+      open-item and pin checks of the merge gate, the scaffold check in release
+      mode (E746), E913 for a milestone closed with no close record, E914 for an
+      obligation in scope that is not built at ci, E343 and E344 for a
+      realisation that nothing answers, E347 and E348 for the proof of each
+      obligation, E830 for a rule enforced by review that has no attestation,
+      E928 for a design milestone that no roadmap milestone realises and, for
+      the previous release, E920 when it was neither verified in production nor
+      waived; what is scope later or out is listed and blocks nothing (W933),
+      and a retired stage is skipped (W936). --json adds tag, commit, tagged,
+      listed and notes. Exit 0 tagged, 1 refused, 2 usage. Shown by specdev
+      release --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev release check --stage prod --tag NAME is the production-deploy
+      gate: it reads the spec as it was at the tag and the evidence from the
+      checkout, and checks that every obligation has valid evidence up to
+      staging for the tag's code tree (E347 and E348 with the owner
+      release-gate), that every delivery obligation is built at staging (E923)
+      and that every node the release gate relieved holds (E924). A name that is
+      not a tag of this clone (`HEAD`, a branch, a commit id) is E921, a retired
+      staging environment is W934. It writes nothing. Exit 0 passes, 1 blocked. Shown by specdev release check --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev release prep runs the dev and CI bindings whose evidence is
+      missing, failed or stale for the checked-out code tree (stage ci), writes
+      spec/extras/verification/evd-<binding>-ci.json and then lists what the
+      release gate still finds under left for the release gate; it stages,
+      commits, pushes and tags nothing. Exit 0 when no binding failed (what the
+      gate still finds does not change it), 1 when one failed or a run was
+      refused. Shown by specdev release prep --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev release rollback TAG --reason TEXT writes
+      spec/extras/releases/rollback-<tag>.json, which waives the production
+      verification of that tag for the next release (E920). It refuses a name
+      that is not a tag of this clone or does not match the pattern (E925), a blank reason
+      (E926) and a second record (E927), and commits nothing; a damaged record
+      is E774. Shown by specdev release rollback --help.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      New error codes E900 MERGE_BASE_UNRESOLVED, E901 MERGE_BINDING_FAILED,
+      E910 RELEASE_REPO_DIRTY, E911 RELEASE_TAG_PATTERN_UNDECLARED, E912
+      RELEASE_TAG_INVALID, E913 RELEASE_MILESTONE_UNSIGNED, E914
+      RELEASE_OBLIGATION_NOT_BUILT, E920 RELEASE_PREVIOUS_UNVERIFIED, E921
+      PROD_TAG_UNRESOLVED, E923 PROD_DELIVERY_NOT_BUILT, E924
+      PROD_RELIEVED_NODE_FAILS, E925 ROLLBACK_TAG_UNKNOWN, E926
+      ROLLBACK_REASON_EMPTY, E927 ROLLBACK_ALREADY_RECORDED, E928
+      RELEASE_UNREALISED_DESIGN_MILESTONE and the warnings W930
+      HOST_TEMPLATE_DRIFT, W931 HOST_INSTALL_REFUSED, W932 HOST_RETIRED_COMMAND,
+      W933 RELEASE_SCOPE_LISTED, W934 PROD_STAGING_SKIPPED, W935
+      HOST_SETUP_UNDECLARED, W936 RELEASE_STAGE_SKIPPED, W937
+      RELEASE_NO_PREVIOUS and W938 RELEASE_PREVIOUS_PREDATES_1_2_0. None is
+      promotable. Each has an entry with its message and the way out in
+      docs/developers/error-codes.md, "Merge and Release Gates", and is
+      registered in tools/specdev_tools/core/errors.py. Shown by grep -n '^###
+      [EW]9' docs/developers/error-codes.md.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev update SPEC_DIR installs the toolkit's files into the host before
+      it re-stamps spec/specdev_version (only when no migration is needed: a
+      spec that needs one keeps its stamp and is told what to run): seven pieces, each reported as created,
+      refreshed, current, drift, refused or would_install. They are the
+      toolkit's pre-commit hooks between # >>> specdev-managed and # <<<
+      specdev-managed in .pre-commit-config.yaml (and pre-commit install in the
+      clone), the lock merge driver (the clone's git config and
+      .git/info/attributes), .github/workflows/specdev-merge-check.yml (the
+      merge gate, and release prep on release-prep/ branches; its "Host setup"
+      step is the declared setup_command), tools/run_specdev.sh and
+      tools/ensure_venv.py rendered with the host's venv name, links of the
+      toolkit's skills and agents into .claude/, ten ask rules (milestone
+      sign-off, milestone defer, release and verify attest, in the specdev and
+      ./tools/run_specdev.sh forms) in the clone's .claude/settings.local.json,
+      and the line .specdev/ in .gitignore. New flags: --git-root (the host
+      root), --install-only (no version check, no stamp), --no-install, --adopt
+      (replace hand-written toolkit hooks by the marked block and rewrite an
+      edited wrapper; never a workflow), --force-claude (replace stale links,
+      never a real file) and the --json key host_install; a second run changes
+      nothing. What a host already has is left as it is and reported: W930 for
+      drift, W931 for a piece that could not run, W932 for a retired command
+      (validate-all, matrix, forward-replay-check, completeness-check,
+      traceability-check, trace_matrix.json) in the host's own workflows and
+      hook file, W935 for no declared setup_command; the warnings never change
+      the exit code. init writes no CI workflow, no pre-commit file and no skill
+      links itself any more: after it creates the venv it runs specdev update
+      spec --repo-root <toolkit> --install-only (init --force-claude forwards
+      the flag). Run update once in every clone, and commit what it wrote before
+      specdev verify run: the installed files belong to the code tree. Shown by
+      specdev update spec --repo-root ./devspec_toolkit --git-root .
+      --install-only --dry-run.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      templates/workflows/ holds four workflow templates:
+      specdev-merge-check.yml, which specdev update installs (spec-check --merge
+      on pull requests and pushes, and release prep on release-prep/ branches of
+      the repository), and three fragments that a person copies into the host's
+      own workflows: specdev-step.snippet.yml (the merge gate step for a host's
+      own test workflow), deploy-preamble.snippet.yml (third-party check,
+      release check --stage prod for prod, the host's deploy steps, verify run
+      --all --stage ENV --only-stage and plan record --at-deploy, in that order)
+      and evidence-pr.snippet.yml (the pull request that carries the evidence).
+      A pull request's title, base ref and head ref reach a shell only through
+      env:. The templates were not run on a live runner. Shown by ls
+      templates/workflows.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      docs/developers/host_setup.md (new, linked from the developer index) says
+      what init and update install, the venv name rule, what is per clone and
+      not committed, the four workflow templates and what a person copies, and a
+      release from release prep to a rollback; docs/developers/reference.md
+      lists the commands above and the update flags;
+      docs/developers/host_declarations.md says which command reads
+      release_tag_pattern, setup_command and pin_sources.
+      tools/cli_commands.json lists release, release check, release prep and
+      release rollback. Shown by grep -n host_setup docs/developers/index.md.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev status prints the release gate run on the checkout in its section
+      "Merge-check and release-gate errors" (release gate: N error(s), N
+      warning(s), N listed (not blocking), then its errors by owner, its
+      warnings and its notes) and, in "Production verification", the previous
+      release and its state: verified in production, rollback recorded, not
+      verified (released, awaiting production proof) with the E920 line, none
+      (previous tag predates 1.2.0) or none. It still reads and writes nothing.
+      On the commit that a release tag matching release_tag_pattern points at,
+      the section reads release at HEAD: <tag> and that release's own state
+      (--json: data.at_head); on any other commit it is the previous release.
+      Shown by specdev status.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The wrapper tools/run_specdev.sh that init wrote named devspec_env
+      whatever --venv-name said. specdev update renders the
+      wrapper with the name of the venv that runs it, so init --venv-name X now
+      gives a wrapper that uses X: on a host with a .venv, the wrapper printed
+      VENV_DIR="${ROOT}/.venv" and ran the real CLI through it. Shown by grep -n
+      VENV_DIR= tools/run_specdev.sh in a host.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      A top-level integer in a fixture's input or expected (step 08) now
+      validates: the anyJson definition of schema/core/collections.schema.json
+      listed integer beside number in its oneOf, so an integer matched two
+      branches and was refused. The integer branch is removed; the number
+      branch accepts an integer.
+    migration:
+      action: none
+
+  - type: add_script
+    description: >
+      Migration script p1_capture (mechanical). Runs first. It copies what a
+      later script removes or a person still needs (the statuses the close
+      compares, tech_stack entries, the rules of step 10, exit_conditions, open
+      ambiguity items, ...) into spec/extras/migration/capture.json, with the
+      source commit, and creates an empty spec/extras/migration/worklist.json
+      for the scripts that follow. specdev align validate deletes both files
+      when no worklist item is open. A later run captures nothing again.
+    migration:
+      action: auto
+      script: p1_capture
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_id_collisions (mechanical). An id that two nodes
+      define is renamed once, and only a real collision is renamed: a step-14
+      task criterion that reused a step-04 criterion id becomes tc-..., the
+      step-09 copy of a milestone id that step 14 also defines becomes
+      milestone-..., any other pair gives the later definition the id E704
+      suggests. A reference to the old id is rewritten only where its field
+      fixes the kind it points at; every other mention is a worklist item that
+      names both candidates.
+    migration:
+      action: auto
+      script: p2_id_collisions
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_id_mint (mechanical). Every item that had no id gets
+      one. A string in a list of nodes (a charter risk, a stakeholder need, an
+      02a gate or secret, ...) becomes an object with an id and the text, and an
+      object without an id gets its id field; step 00 in_scope / out_of_scope
+      become scope_items and step 10 pr_rules become rules. An out scope item
+      (it needs a scope_reason) and a gate string that is not a kebab name are
+      worklist items; an item that has an id is not touched. A text with no
+      ASCII letter or digit (a risk written in Japanese, say) gets a numbered id
+      from the kind's prefix (risk-1).
+    migration:
+      action: auto
+      script: p2_id_mint
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_plan_milestone_key (mechanical). Every plan file gets
+      the file-level milestone key that names its roadmap milestone (found from
+      the anchor row that names the plan file); nothing else of the plan changes
+      and no plan file is renamed. A plan that no anchor row names, or whose key
+      disagrees with its row, is a worklist item.
+    migration:
+      action: auto
+      script: p2_plan_milestone_key
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_anchor_rows (mechanical). Each anchor row
+      (plan.milestone_index[] of step 16) gets an id of its own, anchor_id
+      (anchor-<milestone id>), and a one-element about that names its roadmap
+      milestone; milestone_id, context_path and fr_refs are taken out by
+      p3_remove.
+    migration:
+      action: auto
+      script: p2_anchor_rows
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p2_action_ids (mechanical). Every action of an open plan
+      gets an id (a01, a02, ... per plan item); an id that exists is never
+      changed, and a plan that was done before 1.2.0 gets none.
+    migration:
+      action: auto
+      script: p2_action_ids
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_convert (mechanical). Legacy reference fields become
+      the declared link fields: goal_id / success_metric_refs, connection from /
+      to, typed trace / targets / target_ids / mitigations entries (a trace
+      entry with the borrowed type charter-goal too, when its id names exactly
+      one node), the typed step 09 deliverables (each one whose id names a node
+      the milestone's schedules accepts is written to schedules, in order; a
+      capability, an unknown id, a free-text string and a type that disagrees
+      with the id are not, and the milestone then gets one schedules worklist
+      item naming them), requires,
+      interface_ref, criterion fixture_ref; future and wont-have become scope
+      later / out; out_of_scope lists become scope: out; environment host keys
+      move into config; scope: in is set where the schema requires it. A node
+      that two out_of_scope entries name keeps both reasons in scope_reason,
+      joined with ; . The note of a converted trace or deliverables entry is not carried (1.2.0
+      has no place for a link's note): read it in the old file with specdev
+      align triage <spec> --legacy NN. What no single field fits is a worklist
+      item, and the old value stays in capture.json.
+    migration:
+      action: auto
+      script: p3_convert
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_remove (mechanical). Removes the fields 1.2.0 dropped
+      (the *_refs_ingested lists, tech_stack, task status and assumptions,
+      stored computed names (on node objects only; a key of that name inside a
+      fixture's payload stays), line_range of a plan's
+      context.existing_structures entries, ...) after capture.json holds the values a later
+      pass reads; a plan that was done before 1.2.0 loses from this script only
+      the stored computed names (content_hash, chain_stamp, and the
+      milestone_ref, nfr_refs and fixture_ref of a checklist item); the
+      migration changes such a plan in two more things, the milestone key
+      (p2_plan_milestone_key) and its open items, which p4_ambiguities removes
+      and lists as legacy-open-item worklist items; deletes step 13a and
+      extras/trace_matrix.json.
+    migration:
+      action: auto
+      script: p3_remove
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_copies (mechanical). Removes the artifact-level trace
+      (its notes held copies of FR statements); the typed entries of a node's
+      own trace are converted by p3_convert first.
+    migration:
+      action: auto
+      script: p3_copies
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_host_canon (mechanical). Renames the host canon kind
+      inv to invariant (kind file, entry ids, manifest and the cn: references in
+      the step files) and removes the canon kinds the toolkit retired
+      (completeness_dimension, trace_type).
+    migration:
+      action: auto
+      script: p3_host_canon
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p3_ordering (judgement). Reports which step-09 milestone
+      orderings the FR / API depends_on links already imply; each ordering that
+      is not implied is a worklist item for the step that authors the missing
+      link. It edits no spec file.
+    migration:
+      action: auto
+      script: p3_ordering
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p4_assumptions (judgement). Assumptions that hold more
+      than one claim, or that name a technology the host declared, are listed
+      for the step-00 pass; none is split or moved.
+    migration:
+      action: auto
+      script: p4_assumptions
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p4_step10_rules (mechanical). pr_rules strings are rules
+      with a cli_command (validate-all becomes spec-check, matrix becomes
+      coverage); review_policy.verdict_requirements become review rules;
+      reviewers, review_policy and spec_first_policy are removed; a rule that is
+      not a toolkit command, and every rule without an upstream reason, is a
+      worklist item.
+    migration:
+      action: auto
+      script: p4_step10_rules
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_mixed_jobs (judgement). Step-12 jobs that mix a
+      one-time action with a check are listed; none is split.
+    migration:
+      action: auto
+      script: p4_mixed_jobs
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p4_third_party (mechanical). An external component of
+      step 02 becomes a third_parties entry with the same id (no pin, no
+      derives_from); tech_stack entries, typed external dependencies and API
+      version strings become worklist proposals. A step-09 dependencies entry
+      that is a sentence, not an object, becomes one external-dependency worklist
+      item.
+    migration:
+      action: auto
+      script: p4_third_party
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_plan_dispositions (mechanical). plan.status and the
+      item dispositions are removed from open plans; a deferred or won't-do item
+      of an open plan becomes an operator worklist item plan-item-disposition
+      (not blocking). An open plan whose own plan.status was deferred gets one
+      more operator worklist item of that kind: it quotes the plan's
+      deferred_reason and names specdev milestone defer <milestone-id> --reason,
+      which holds a deferral in 1.2.0. A plan that was done before 1.2.0 keeps
+      them as history.
+    migration:
+      action: auto
+      script: p4_plan_dispositions
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_exit_conditions (mechanical). Each task's
+      exit_conditions become task criteria with tc- ids (the field itself is
+      taken out by p3_remove), each with a worklist item so the criterion is not
+      mistaken for a second list; specdev align propose --kind refines offers
+      their refines candidates.
+    migration:
+      action: auto
+      script: p4_exit_conditions
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_plan_security_items (mechanical). plan.security
+      entries become open items of an open plan, or informational worklist items
+      for a closed one.
+    migration:
+      action: auto
+      script: p4_plan_security_items
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_ambiguities (mechanical). Resolved open items are
+      deleted; those of a closed plan are listed and removed; those of the
+      anchor and open plans get the unified shape where impact names one node,
+      else a worklist item; duplicate ids are renamed, and each rename is
+      recorded in the renames section of capture.json.
+    migration:
+      action: auto
+      script: p4_ambiguities
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p4_nfr_verifiers (judgement). Each in-play NFR that
+      nothing verifies gets a worklist item; the item names a candidate job
+      only when a job's own text mentions the NFR.
+    migration:
+      action: auto
+      script: p4_nfr_verifiers
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p5_legacy_close (mechanical). A milestone that was done
+      before 1.2.0 (the roadmap says done, the anchor row says done, or the
+      plan's review verdict is verified) is closed with a legacy-migration close
+      record and its plan is frozen; the roadmap milestone status is removed;
+      milestones the sources disagree about, and ones that cannot be closed, are
+      worklist items.
+    migration:
+      action: auto
+      script: p5_legacy_close
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p5_triage (judgement). Open items of the anchor, a
+      decisions seed, seed routes to trinity steps, unused or missing seed
+      routes, pending tasks of closed milestones and a decommissioned staging
+      environment without a job are listed for the operator.
+    migration:
+      action: auto
+      script: p5_triage
+      kind: judgement
+
+  - type: add_script
+    description: >
+      Migration script p6_baseline (mechanical). The trace lock of the host is
+      written once, with one entry per link that resolves, each marked baseline:
+      the hashes are the ones the migrated spec has, nobody has accepted them
+      yet. A link that does not resolve gets no entry and one worklist item.
+      Check a link, then clear its marker (E882) with specdev attest <holder id>
+      --yes; the links of a milestone that was closed keep theirs.
+    migration:
+      action: auto
+      script: p6_baseline
+      kind: mechanical
+
+  - type: add_script
+    description: >
+      Migration script p7_host_files (judgement). Reads the host's own workflow,
+      hook and lock files and lists, as worklist items, the retired commands
+      found in them (validate-all, matrix, ... with file and line) and the host
+      declarations the host lacks (release_tag_pattern, setup_command,
+      code_tree_exclusions, a pin source for each third party, each as a pair of
+      commands that is safe to run in any order and creates the file when it
+      does not exist). It writes
+      nothing outside spec/, and no file of the host.
+    migration:
+      action: auto
+      script: p7_host_files
+      kind: judgement
+
+  - type: add_module
+    description: >
+      specdev align propose <spec_dir> --kind refines|prose-ids|bindings adds
+      worklist items to spec/extras/migration/worklist.json for the judgement
+      pass and writes nothing else: refines (the candidate refines link of each
+      task criterion, with a class: auto-eligible, needs-judgement or none),
+      prose-ids (the ids a node's text names, resolved or not) and bindings
+      (kinds legacy-binding and legacy-fixture in step 08: the specdev verify
+      bind line of each legacy fixture, proposed from the commands the 1.1.1
+      plans and CI workflows recorded). A rerun adds no item; --dry-run prints
+      only; --json. It refuses (exit 1) a folder that has no
+      spec/extras/migration/capture.json. Shown by specdev align propose spec
+      --kind refines --repo-root ./devspec_toolkit --git-root ..
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev align bind-legacy <spec_dir> prints the specdev verify bind line
+      of each legacy fixture whose command is certain, writes them when a person
+      confirms (a prompt, or --yes) through the writer of verify bind, and
+      closes the settled worklist items. --summary counts the fixtures that are
+      still without a binding or an attestation (the count must be zero before
+      the first release). Shown by specdev align bind-legacy spec --summary
+      --repo-root ./devspec_toolkit --git-root ..
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev align triage <spec_dir> lists the open worklist items by audience
+      (operator first), blocking first, then step, kind and id (--step,
+      --audience operator|agent, --json); --legacy NN prints the files of step
+      NN as they were before the migration, and --resolve ID --note TEXT closes
+      a worklist item. specdev align validate <spec_dir> is rewritten for the
+      migration: it requires the stamp to record the toolkit's version, runs
+      spec-check --merge (--base-ref REF) and changes nothing when that finds an
+      error,
+      deletes capture.json and worklist.json when no worklist item is open
+      (--keep-worklist keeps them; an open blocking item is reported as
+      information, not as a failure) and clears migration_status. It refuses a
+      spec that is stamped below the toolkit and was never migrated. The skill
+      /specdev-step reads the worklist first when
+      spec/extras/migration/worklist.json exists (align triage --step NN, the
+      agent items as input to the step, each item closed with --resolve), and
+      the skills list align triage as auto-invocable and align validate as
+      human-required. Shown by specdev align triage spec --repo-root
+      ./devspec_toolkit.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev update no longer re-stamps spec/specdev_version on a spec that
+      needs a migration (a migration script is registered for a version above
+      the host's, the changelog between the two has an entry with a script or
+      kind: mechanical, or the host's version is not one the changelog lists):
+      it prints the migration commands in the order they are run and leaves the
+      stamp as it is. While the stamp says migration_status: in_progress it
+      points to specdev align validate. A spec with no stamp is re-stamped as
+      before. Shown by specdev update spec --repo-root ./devspec_toolkit
+      --no-install --dry-run.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      A seed can be routed to any step from 00 to 15, and a
+      node of that step lists it in derives_from; in step 13 that node is of
+      a kind of an extension whose schema lists seed in the kinds of its
+      derives_from. Every kind with a
+      derives_from accepts a seed (capability,
+      component, connection, CI gate, secret, FR, API, API error, NFR, rule,
+      threat), and a term, invariant, fixture, design milestone, edge case, CI job,
+      roadmap milestone and scaffold row get an optional derives_from that
+      accepts a seed only. Where derives_from is required, the seed is listed
+      beside the upstream node and never in its place: a field that holds only
+      seeds is E701; the kinds of step 00, the third party and the environment
+      still derive from a seed alone. The link annotation has a new optional
+      key, additional_kinds (a subset of kinds; lint ANNOT-07;
+      docs/developers/schema-annotations.md). The route checks are E747, E748 and
+      E749; the E748 message of a step that cannot list a seed (a trinity key,
+      or 13 when no extension kind lists a seed) says to move the route to the
+      step that distils the seed. specdev node candidates offers a
+      seed only when the manifest routes it to the holder's step.
+      seed_templates/seed_manifest.json keeps its 1.1.1 routes (00, 01, 02,
+      02a): a new host's first capability lists seed-overview beside its
+      charter node, or the route is removed (E748). The Breaking items, which
+      list what each kind gains, do not repeat this field. Shown by specdev json insert --id fr-password-reset .derives_from
+      '"seed-accounts"' on the worked example, then spec-check (E749 until the
+      manifest routes the seed to step 04).
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      specdev json read, read-multi, keys and structure take --ref <git-ref> and
+      read the file as of that ref (a bad ref, a path absent at the ref or a
+      folder that is not a repository exits 1 with cannot read <path> at <ref>).
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      specdev json read --json keeps JSON quoting of strings. specdev json patch --batch OPS_FILE applies a JSON array of {op, path,
+      value} items (patch, insert, delete) with one validation and one atomic
+      write; a failing item names itself (batch item <i>), and a patch or delete
+      item whose selector matches nothing fails like the single command, so
+      nothing is written. --dry-run of json
+      patch|insert|delete now prints a short summary of the matches instead of the
+      whole resulting file (a change in what the command prints); --show-file
+      (only with --dry-run; alone it is a usage error, exit 2) prints the file
+      as before.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      `specdev json` runs jq with an empty environment: a filter such as
+      `$ENV.TOKEN` or `env.TOKEN` printed the value of a process variable into the
+      command output. On a scratch copy of the worked example `SECRET_TOKEN=leakme
+      specdev json read spec/00_charter.json '$ENV.SECRET_TOKEN'` printed `leakme`
+      before and prints `null` now.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      `specdev json` writes: a failed atomic write no longer leaves a `tmpXXXX`
+      file beside the spec; `build_id_index` skips a schema file whose top level
+      is not an object (it raised `TypeError`); every file read in `json_utils` is
+      UTF-8; the pointer check for forbidden temp paths follows symlinks.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      `specdev json patch|insert|delete` (by path and by id) keep the indentation
+      of the file they write (spaces or tab); they rewrote a 2-space file in 4
+      spaces. On the worked example, one `json patch --id
+      rule-spec-check-on-every-pr .text ...` changes 1 line of
+      `spec/10_governance.json` (35 insertions and 35 deletions before).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      `specdev json insert` at a path that names one item of an array
+      (`.rules[1]`, or a `select()` that yields items) merged the value into that
+      item, reported `Inserted` and lost the item's fields; it now refuses with a
+      message that says to insert into the array or patch a field. On the worked
+      example `json insert spec/10_governance.json '.rules[1]' '{...}'` exits 1
+      and the file is unchanged.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      `specdev json patch <file> <path>` and `json delete <file> <path>` fail
+      (exit 1, file unchanged) when the selector matches nothing or the index is
+      out of range; they printed `Updated` / `Deleted` and exited 0. A selector
+      that matches several values prints `warning: '<sel>' matches N values; all N
+      are changed.` on stderr first. On the worked example `json delete
+      03_glossary.json '.terms[500]'` exits 1. `json patch` with an index past
+      the end of an array fails the same way. The file form of `json delete`
+      is now checked against the schema before it writes, as `patch` and
+      `insert` are: a delete that leaves a required field out is refused (exit 1,
+      `Write refused: this edit introduces schema violation(s)`, no code; only
+      the --id forms print E767).
+      On a dry run the multi-match warning says `would be changed`.
+      `json delete <file> .` (the whole document) is refused (exit 1, file
+      unchanged, `Refusing to write: ... would replace the whole document with
+      null`); it wrote `null` over the file and exited 0.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      `specdev json schema` prints `minItems`, `maxItems`, `minLength`,
+      `maxLength`, `pattern`, `additionalProperties`, `const` and the items
+      constraints of the node.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Three content rules that sat in schema description text with no check
+      behind them (the rationale of the step 13 extension decision, the spike
+      entries of step 14, the finding text of a 16c review) are now authoring
+      guidance in the step 13, 14 and 16c prompts and no longer read as schema
+      contract. Description-only change of 13_extension_manifest, 14_roadmap
+      and 16_impl_context; no field or keyword changes.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Text that claimed more than the tools check: the shared expectations no
+      longer say additionalProperties is false everywhere; the step 14
+      migration_plan description matches its prompt (one or two sentences,
+      under 40 words, or "none") and the step 09 prompt states the 2 to 4
+      sentences of its schema; the 16a and 16c prompts scope "verbose" to the
+      description of an item and an action; the step 13 prompt says which
+      constraints only the schema enforces and that the justification is a
+      review rule; the step 08 prompt says a contract body is a SHOULD that
+      nothing checks, that E510 does not read spec/samples/ and that nothing
+      checks the same-PR rule of the sample.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step 13: an extension is an entry of the manifest and two files in
+      spec/extensions/, and each entry requires justified_by. The files are
+      ext_NN_<topic>.schema.json (the host's JSON Schema, draft 2020-12, $id
+      vc:ext-NN-<topic>) and ext_NN_<topic>.json (its data, $schema the same
+      URI). An entry with no schema file or no data file is E520, and so is a
+      JSON file of that folder that no entry declares. A data file left at
+      the 1.1.1 place (spec/ext_NN_<topic>.json) is E520 schema_uri_mismatch
+      with the place to move it to. justified_by lists at least one
+      component, third party, capability, FR or NFR that makes the extension
+      necessary: specdev align apply --auto leaves the entry as it was,
+      specdev spec-check --step 13 reports it ('justified_by' is a required
+      property), specdev align propose --kind prose-ids proposes the ids the
+      justification names, and specdev json patch --id <extension-id>
+      .justified_by '["<node-id>"]' writes the field with its lock entries. An
+      open item in the ambiguities list of a data file is counted as an open
+      item of step 13 (W630 at the step gate, E631 at the merge gate). A host
+      whose manifest says extension_decision.status none-required sees no
+      change. The steps: docs/developers/workflows/workflow_migrate_1_2_0.md,
+      "Step 13: the files and the links of an extension".
+    migration:
+      action: ai_assisted
+
+  - type: add_constraint
+    description: >
+      Step 13: required_schema_sections of an extension holds at least 3
+      names (minItems 3, the ">=3 dedicated schema sections" of the
+      prompt). A 1.1.1 extension with fewer is E520 from align validate; add
+      sections or remove the extension (specdev json delete --id
+      <extension-id>; when it is the only extension, remove it and set
+      extension_decision.status to none-required in one specdev json patch
+      <file> --batch, since either alone is refused).
+    migration:
+      action: ai_assisted
+
+  - type: add_constraint
+    description: >
+      Step 14: a milestone with risk_status high or critical needs at least
+      one entry in risks. A 1.1.1 milestone without one is E520 from align
+      validate; add a risk (specdev json patch --id <milestone-id> .risks
+      '["<risk>"]'; json insert is refused when the milestone has no risks
+      key) or lower risk_status. The target_date description now says
+      what the validator checks: non-decreasing order, equal dates allowed.
+    migration:
+      action: ai_assisted
+
+  - type: add_constraint
+    description: >
+      Step 06: severity is required on every rule (the schema description
+      said so, the required list did not; rules[].required gains severity). A 1.1.1 rule without
+      it is E520 from align validate; set it with specdev json patch --id
+      <inv-id> .severity '"error"'. Which rules are error stays an authoring
+      and review rule that no tool checks (prompt 06).
+    migration:
+      action: ai_assisted
+
+  - type: add_constraint
+    description: >
+      Step 10: commit_message_rules.pattern is required when require_spec_ids
+      is true (an if / then in the schema). A 1.1.1 file with require_spec_ids
+      true and no pattern is E520 from align validate; add the pattern with
+      specdev json patch spec/10_governance.json
+      .commit_message_rules.pattern '"<regex>"', or set require_spec_ids to
+      false.
+      A pattern that is not a valid regular expression makes governance-check
+      report `E303 commit_message_rules.pattern is not a valid regular
+      expression: <reason>` (it ended in a traceback).
+    migration:
+      action: ai_assisted
+
+  - type: add_constraint
+    description: >
+      Step 05: path and method are required when protocol is http (an if /
+      then of apis[]; the descriptions said they were optional). A 1.1.1 http
+      API without either is E520 from align validate; set them with specdev
+      json patch --id <api-id> .path '"/..."' and .method '"GET"'. An API of
+      another protocol needs neither.
+    migration:
+      action: ai_assisted
+
+  - type: change_schema
+    description: >
+      Step 03 glossary: acronym accepts an inner / or - (CI/CD, JSON-LD); the
+      term_ref description says a role, unit, environment or entity is a canon
+      entry of its own kind.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      Step 16 plan: plan.context.existing_structures[].line_range is removed
+      and source_file accepts a repo-relative path of any file type, so a
+      config, markdown, template or shell file can use the object form.
+      p3_remove takes line_range out of a migrated plan (see its entry
+      above).
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      /specdev-review takes --review-only (reviewers run once, no fix dispatch,
+      one findings file); upstream reconciliation is replaced by specdev stale
+      and specdev attest.
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      W573 (ASSUMPTION_UNBOUND_ID) and W594 (CONTENT_DERIVATION_LOW_OVERLAP) are
+      removed with E573 and E594. W573 reported an id-like word in an assumption
+      that names no node; no check reports that any more (it is a review item).
+      An id in an assumption that does name a node is E752, reported by
+      spec-check (not by validate <file>). Derivation is stated by derives_from
+      links. The nine-key token-overlap heuristic is gone; the worked example
+      gives W555 only.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      E510 and E512 no longer fire on the English word "placeholder" or on the
+      "-tbd" sentinel that the step 05 schema and prompts tell authors to write;
+      the markers TBD, TODO, FIXME and XXX still do, and AUTO-DERIVE (the marker
+      prompt 02 tells the author to resolve) is a marker too.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      W593 (VAGUE_LANGUAGE_FREE_TEXT) now scans each string of the array fields
+      risks, spikes, preconditions and postconditions (it only scanned a string
+      value); the scan field narrative, which no schema has, is dropped. The
+      worked example and this repository's spec/ give no new W593.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The E530 command-prefix check also reads the string entries of
+      plan.review_requirements.test_commands, as prompt 16a already said.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The review scope kinds have manifest_artifact for a file of spec/common/
+      that is not a step file (the seed manifest), reviewed with specdev seed-
+      lint and spec-check instead of a step gate.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompts 01, 15 and 16c say what no tool checks or no longer demand what
+      cannot hold: prompt 01 names no charter goals or step 03 glossary nouns
+      and says the capability owner and the cap- prefix are review rules; prompt
+      15 says no tool runs validators and that step ready 15 checks step 05,
+      not 04 or 09; prompt 16c and the 16c reviewer ask for the file and the function,
+      class or text of a finding, not a line number. In the 16c prompt the tag
+      of the rating-evidence rule is now ENF-144 and the tag of the remediation
+      rule is ENF-140 (they were the other way round).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev canon-accept keeps the indentation of manifest.json and of
+      kinds/<kind>.json (it wrote 2 spaces): on a 4-space canon only the lines
+      of the accepted entries change. A new kind file takes the indentation of
+      the manifest.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev canon-accept told an entry whose proposal text had changed apart
+      from an unchanged one only by writing both as "skipped (duplicate)" and
+      OK. It now lists the changed ones ("! changed (not updated, use
+      --update)", a WARN summary line, exit 0), and the new flag --update
+      rewrites definition, preferred_label and aliases in manifest.json and
+      in kinds/<kind>.json together when the canon has a file for the kind
+      (the old label becomes an alias; --update of an entry that only
+      manifest.json holds creates no kinds/ file). A proposal text that
+      differs from the stored text only by whitespace, Unicode form, curly
+      quotes or dashes counts as unchanged. The text
+      output says "unchanged" where it said "skipped (duplicate)"; the JSON key
+      skipped stays, and the JSON output gains changed, updated and
+      would_update.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev canon-accept stores lifecycle.accepted_from relative to
+      --git-root (else --repo-root), never as an absolute path. An entry
+      accepted before keeps its old value until it is rewritten.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The E210 suppression by a canonical_proposals item matches its
+      source_field in the form terms[*].term (the form the schema documents)
+      as well as terms[3].term.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev align rollback says in its help and after a restore that the
+      restored spec is not validated; specdev json --help lists the keys
+      subcommand; specdev canonical-autofix prints a line that names E607 as
+      out of its scope when it has no change, where it printed "OK (no
+      changes)".
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Schema descriptions and prompts say what no tool checks or no longer
+      teach what nothing reads: the step 02a gate and compliance names are
+      free strings (prompt and schema description); prompt 16 says no tool
+      checks the anchor's roadmap coverage or its two scope lists and that a
+      misfiled anchor is W609, a warning; prompts 03 and 02a state nothing
+      about later steps; the step_base description of $schema says it is
+      required (specdev validate reports E520 missing_schema_uri); the step_base
+      description of id no longer teaches a {step-noun}-v{N} convention.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev context canon, the glossary drift lint (E606, E607, W606) and
+      canonical-lint read the two canon tiers through one loader
+      (CanonicalRegistry, project entry wins). A project canon that holds
+      manifest.json alone (no kinds/) is now listed by context canon and
+      checked by the lint, and a project entry of the same id as a toolkit
+      entry now wins in context canon (the toolkit entry won there).
+      The toolkit's example entries (canon/examples/, which the registry loads
+      and no canon/kinds/ file holds) are listed by context canon too, and its
+      entries come in id order.
+      canonical-lint no longer carries its own copy of the manifest merge.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      E606 and E607 compare text after collapsing whitespace, composing
+      Unicode and folding curly quotes and dashes, and name the first differing position (first_difference_at=N);
+      E607 also reports a glossary term whose label is not the canon entry's
+      preferred_label (or an alias; case is ignored), and a
+      canonical_proposals item of any step (capability, metric, ...) whose
+      definition or label differs from the canon entry made from it
+      (CANON_PROPOSAL_DRIFT).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The fix-mode agent reads each fix back (specdev node show) before its
+      finding counts as closed (DEVSPEC-170), checks every part of a
+      multi-part finding, reads the other fields of an edited node for a new
+      contradiction, and returns findings_closed and findings_open with a
+      record per finding (signature, location, the node and field read back
+      with its value, edits). /specdev-review and the trinity plan loop print
+      "Round N: C findings closed by E edits, O open.", so two findings of one
+      root cause closed by one edit show as "2 findings closed by 1 edits"
+      (DEVSPEC-133). A claimed fix that did not persist is a findings_open
+      entry instead of a closed finding.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The fix-mode agent runs specdev canon-accept --update after it edits a
+      glossary term whose canon entry exists, so the entry does not stay stale
+      (E607).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      scripts/init_project.py --strict no longer ends in an uncaught
+      CalledProcessError when the host sets core.hooksPath: the commit-msg hook
+      install warns and init goes on (DEVSPEC-137).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The review loops (/specdev-review, /specdev-trinity plan review) remove
+      the findings files of a round before they dispatch its reviewers, so a
+      file of an earlier run is not merged; a reviewer writes a finding's
+      location as the node id (fr-password-reset#description), so two reviewers
+      agree on the merge key. The location description of
+      schema/infra/findings.schema.json says so (DEVSPEC-159).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      schema/infra/findings.schema.json declares $schema: the findings file the
+      review loop merges passes both specdev validate and a plain JSON Schema
+      check (it failed the second with "Additional properties are not allowed
+      ('$schema' was unexpected)"). The schema is not in the 1.1.1 baseline and
+      the change loosens it (DEVSPEC-160).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The fix agent reads the open items (specdev upstream-backlog) before it
+      asks a question or adds an open item: a question that an open item
+      already asks is not asked again, and the decision of that item is applied;
+      the reviewer is told that a decision kept only in a commit message, a
+      brief or a chat reply is no record and does not protect a finding
+      (DEVSPEC-169).
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      findings.schema.json: optional origin of a finding (introduced-on-branch,
+      pre-existing-on-main, stale-after-fix); a regression finding cannot be
+      introduced-on-branch. The field is optional, so no findings file written
+      before it changes (DEVSPEC-199).
+    breaking: false
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The fix agent and the reviewer run specdev json schema for the pointer
+      they are about to write or to judge and honour the constraints it prints
+      (minItems, maxItems, minLength, maxLength, pattern, enum, const,
+      required, items_constraints); the reviewer quotes the constraint in the
+      evidence of a bug or hallucination finding (DEVSPEC-211).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      A host extension schema is found and its data file validates
+      (DEVSPEC-245). The schema of an extension is read from
+      spec/extensions/ext_NN_<topic>.schema.json by a scan of the folder:
+      nothing is registered by hand and nothing of a host enters
+      tools/schema_registry.json. It may $ref the core schemas (vc:core:*)
+      and another extension schema of the folder. Step 13 owns the JSON files
+      directly in spec/extensions/ and reports, as E520 or E320: an entry
+      with no schema file or no data file, a file no entry declares, files
+      with no manifest, a schema that is no JSON Schema, has a wrong or a
+      toolkit $id or names another dialect, a data file whose $schema is not
+      the URI of its file name, and a required_schema_sections name the
+      schema does not declare. specdev step create 13 <extension-id> --from
+      <draft> creates the data file of a declared extension.
+      canonical-integrity, canonical-autofix and spec-quality-lint read the
+      spec folder named with --spec-root; a command run on spec/extensions
+      itself needs the flag. The guide: docs/developers/extension_schemas.md.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      The items of an extension data file are nodes of the spec graph
+      (DEVSPEC-245). An extension schema declares kinds with x-node (role
+      context or obligation-system) and links with x-link, to nodes of
+      earlier steps and, through same_step_kinds, to another kind of step 13;
+      a schema the graph cannot use is one E520 of step 13 that lists every
+      line. The manifest entry is a node of kind extension, role plan, with
+      the required link justified_by. An obligation of an extension names
+      what proves it in its own verified_by (a fixture or a CI job); a task
+      criterion refines it (the new roles key of x-link, on refines of a task
+      criterion) and lists one of those verifiers (E745 otherwise), and
+      specdev verify bind --proves accepts it. The items are written by node
+      id (specdev json patch|insert|delete --id, specdev node rename), and
+      node show, trace, stale, attest and status read them like any node. The
+      context packs 16a, 16b and 16c list an obligation of an extension under
+      obligations and gain the section extension context for the context
+      nodes it links to, on a host whose extensions declare kinds. Example:
+      tests/fixtures/extension_example.
+    migration:
+      action: none
+
+  - type: add_script
+    description: >
+      seed_templates/seed_extension.md: a template for the seed of one feature
+      added to a specced project. specdev init copies it with the other seed
+      templates into the host's seed folder, next to the overview and
+      tech-stack seeds (DEVSPEC-226).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 07 says that measurement_method is required by the schema and that
+      a concrete query, tool or dashboard URL is a SHOULD, an authoring and
+      review rule that no tool checks (DEVSPEC-233).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 16b says that no tool runs test_commands (the tools check that
+      every action is recorded, E812, and that every criterion is proven by
+      specdev verify run, E811), that whether an item is vague is the
+      implementer's judgement, and that the amb-new- prefix is a convention no
+      tool checks. The trinity implementer agent carries the Ambiguity
+      Gatekeeper rule of prompt 16b (DEVSPEC-235).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 14 states one rule on tightening: a threshold or case that no
+      upstream node states is not written in a task criterion and is raised as
+      an open item about the upstream criterion; it no longer calls a stricter
+      threshold or an added edge case a refinement (DEVSPEC-280).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      docs/developers/workflows/discovery.md and prompt 10 describe step 10 as
+      what it holds (the commit-message convention, versioning and the rules
+      with their reason and enforcer), not as change control policies
+      (DEVSPEC-282).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      docs/prompts/shared_expectations.md (section 11, item 5) and
+      docs/agents/agents.md (Phase B) say that a decision another step or a
+      seed owns is recorded as an open item of the step (E631 at the merge
+      gate), not applied in it (DEVSPEC-286).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The step order declares the pair 16a to 16c: 16a is among the
+      required_spec_inputs of 16c, and 16c among the downstream_consumers of
+      16a (prompt 16c already read the plan file of 16a).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 16a says that a checklist id outside its row's prefix is W610, a
+      warning that does not fail the gate, and that the doc-path rule
+      (docs_touched against target_file_patterns) and the atomicity rules are
+      review rules that no tool checks.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The reviewer agent has one more finding class, "disagreement:" (kind
+      drift, P1): a task criterion against each node it refines, a fixture
+      against each node it verifies, and an API error against an invariant
+      that state one outcome. An accepted canonical_proposals entry stays in
+      the file by design and is not reported as stale;
+      docs/prompts/shared_expectations.md and prompt 03 say so and name
+      specdev json read spec/canon/kinds/<kind>.json as the way to read an
+      accepted definition (DEVSPEC-280, 281, 202).
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      /specdev-step runs its review-fix loop by invoking /specdev-review
+      instead of restating the loop; a change of the loop protocol is made in
+      one skill.
+    migration:
+      action: none
+
+  - type: add_constraint
+    description: >
+      shared_expectations.md gains rule 11, Output hygiene (no citations,
+      dates, quotations, measured values or decision stories in a field;
+      provenance only where the schema defines it), and a pointer in section
+      12 to where verification evidence is recorded.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The PR audit check T0-09 (changelog-entry-present) accepted a
+      Markdown-only entry and the empty changelog/unreleased.yaml skeleton as
+      the changelog entry of a change to a schema, the CLI or a migration
+      file. It now needs a changes item in changelog/unreleased.yaml, or a
+      changelog/v<X.Y.Z>.yaml changed by the diff.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 09 says target_date is a SHOULD, as the worked example and the
+      validator allow (a milestone without a date is valid; a date that is
+      present must be ISO and the dates must not decrease, E520), and that
+      migration_plan is an authoring and review rule that no tool checks.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      fixtures-lint reads a step 08 file that carries vc:08-fixtures (1.1.1
+      matched only a $schema ending in /08_fixtures.schema.json, so it read
+      nothing in a 1.2.0 spec). A fixture with no input or expected in such a
+      file is E520, as the schema already requires them.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Step 10: a bad owner is reported by the schema as E520, no longer also
+      by the step 10 validator as E530 (the validator's copy of the owner list
+      is deleted).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev canonical-autofix validates the finished document (after the
+      inferred refs and canonical_refs_used are written) against its schema
+      and writes nothing, with E520 ... autofix_result_invalid, when the
+      result adds a violation the file did not have (counted by path and
+      keyword, so a violation the file already had does not block the write;
+      a dry run reports the refusal too). When the file or the result cannot
+      be validated at all, it writes nothing either, with E520 ...
+      autofix_result_unvalidated validation_raised.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The description of global_seed_order in schema/seed_manifest.schema.json
+      no longer says the list should include every declared seed: a seed left
+      out is read after the listed ones (description-only change).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev guide E607 prints a playbook for the three E607 cases (term
+      definition, term label, proposal of another step). The E607 resolution
+      no longer says to re-run canon-accept plainly (it leaves an entry that
+      exists alone): patch the term or the proposal, or put the new text in
+      canonical_proposals and run specdev canon-accept --from <file>
+      --namespace cn:project: --update --repo-root ./devspec_toolkit --git-root .
+      (add --dry-run first), which rewrites
+      the entry in manifest.json and in kinds/<kind>.json when the canon has
+      one.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Step 04: the descriptions of rationale, preconditions and postconditions
+      ask for behaviour: they no longer say to cite a regulation clause or
+      give a table or column as an example (description-only change).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Step 05: the prompt says that the 4xx and 5xx rule is an authoring and
+      review rule that no tool checks, that an http API also has path and
+      method, and that an API with a parameter enum that names a third party
+      in relies_on needs an enum_provenance (E311).
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Prompt 11 says that W583 and W615 are warnings (W583 covers APIs only;
+      W615 checks only a rule that carries a risk_category_ref) and that the
+      trust-boundary and edge-case-count rules are review rules that no tool
+      checks.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev extraction-intent-check reports a prompt with no Extraction
+      Intent section as E591 (it skipped it before), and an entry that names a
+      step after the prompt's own step as E598. The 21 prompts of the toolkit
+      give neither.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      docs/prompts/shared_expectations.md and the 17 step prompts say that the
+      closing checklist asks that every upstream node the step must cover is
+      used by a node of the step (spec-check reports an unused one, E740 to
+      E745), no longer that an id "has been consumed"; Coverage Closure runs
+      before the artifact is emitted; the Output Contract block of a prompt is
+      a worked example that a test validates, not a restatement; a deprecated
+      canonical entry is W110, a warning with no error form; and a Clarify
+      question reaches an orchestrator as a blocker payload.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Step 07: the validator no longer checks nfr_id against
+      ^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$ (it accepted nfr-latency, which the schema
+      rejects); the schema pattern nfr-<category>-<condition> is the one
+      check, reported as E520.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      The migration_plan strings of step 09 and step 14 hold the migration
+      sequence (dual-write, cutover) and the rollback, and no longer ask for
+      what is replaced or for the acceptance test that confirms the migration.
+      What is replaced is stated by links (replaces on the node that takes the
+      place of a deleted one, a removal task criterion's removes); what
+      confirms the migration is a task criterion of step 14 with a verifier in
+      verified_by. No tool reads a link out of these strings, so a node id
+      written in one is not a link. Schema descriptions and prompts 09 and 14 only; no
+      keyword changes (DEVSPEC-275).
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      E541 UNBOUND_CANONICAL_TERM is removed: hallucination-lint no longer
+      reports a description, rationale, justification, name or definition that
+      mentions a glossary or canon term without a *_ref beside it. In 1.2.0 a
+      term is used by its label and no node links to it; a term that no node
+      uses is E741. The code is gone from the registry and has a "removed"
+      entry in docs/developers/error-codes.md. A host sees its E541 findings
+      disappear; nothing changes in a spec (DEVSPEC-266, DEVSPEC-250).
+    breaking: false
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      An API error (step 05) has an optional protocol_status: the status number
+      the protocol of its API carries with it (the HTTP status for an http
+      API, where the schema holds it to 100 to 599; the gRPC status code, the
+      WebSocket close code or the MQTT reason code for the other protocols,
+      an integer of 0 or more). It is the one place the number is written; a message no
+      longer states it. protocol_status is part of the contract view of an
+      API error, so changing it makes suspect the links that point at the
+      error (E763). A spec that has not given its errors a protocol_status is
+      valid as before.
+    breaking: false
+    migration:
+      action: none
+
+  - type: add_field
+    description: >
+      A fixture (step 08) has an optional expects: the ids of the API errors
+      it expects as its outcome (one as a rule; a list like every other link,
+      so a response that carries several errors names each). It is the
+      twentieth link verb
+      (linkVerb of vc:core:graph, with the verbs table of the design
+      document). It is not a proof (an API error is proven through the
+      criterion it derives from; verifies still does not accept an error) and
+      not a use of the error (E740 does not count it). The links of a fixture
+      are part of its contract view, so a fixture that gains expects makes the
+      links that point at the fixture suspect (E763).
+    breaking: false
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      The constrains field of an invariant (step 06) also accepts the id of an
+      API error. An invariant that constrains an error uses it: the error is no
+      longer reported by E740 when an invariant in play constrains it (the
+      worked example reports 16 E740, not 17). No path of a schema changes,
+      so the migration has nothing to write.
+    breaking: false
+    migration:
+      action: none
+
+  - type: add_constraint
+    description: >
+      Three findings of the verifier-rules check of spec-check, owned by step
+      08, for a fixture that expects an error status. E754: expected.status is
+      in the HTTP error range (400 to 599) and the fixture has no expects (a
+      fixture that holds removes is skipped; the status number of another
+      protocol is not recognised as an error, so for it naming the error is
+      an authoring rule). E755: the fixture expects an API error and its
+      expected.status differs from the protocol_status of the error, or the
+      error has none; one finding for each named error, whatever the
+      protocol. E756: the fixture expects API errors and verifies an
+      invariant that constrains none of them; one finding for each such
+      invariant. Each message ends with the fix and the attest step. None is
+      promotable and none is a coverage gap. A host spec that states an error
+      status in a fixture gets E754 until the fixture names the error in
+      expects and the error has that protocol_status; this is a judgement of
+      the author, not a change a script can make, so the migration has
+      nothing to write.
+    breaking: false
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev json schema prints the declaration of a property that a
+      condition of the schema restates (a then, else, oneOf or anyOf branch);
+      it printed the condition's fragment in its place, with no type,
+      description or items. Nine paths of the step schemas change, among them
+      .connections of step 02 (.connections[0] now navigates), .extensions of
+      step 13, .milestones[].risks of step 14 and .validators of step 15. A
+      bound that only the condition states (a minItems 1, a const true) is no
+      longer printed; spec-check and the write guard (E767) hold it as
+      before. One write changes with it: specdev json insert --id
+      <milestone-id> .risks on a milestone with no risks now writes, where it
+      was refused with E767. The scope advice of E740 reads the same
+      declaration.
+    breaking: false
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      fixtures-lint: the expected.status of a contract fixture is the status
+      number of the API's protocol. It is an HTTP status (100 to 599) as
+      before, unless the fixture names APIs (in verifies, or through an API
+      error in expects) and none of them is an http API: then it is an
+      integer of 0 or more (a gRPC status code, a WebSocket close code, an
+      MQTT reason code), where 1.1.1 reported E520. A spec whose APIs are all
+      http sees no change.
+    breaking: false
+    migration:
+      action: none

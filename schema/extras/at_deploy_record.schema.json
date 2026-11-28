@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:extras:at-deploy-record",
+  "title": "At-deploy Record",
+  "description": "An at-deploy record states that a deploy job carried out an action of a plan item that is marked at_deploy, at one environment. One record per file, spec/extras/verification/dep-<NNNN>.json, written by 'specdev plan record --at-deploy' and never by hand. The file holds a records array of exactly one record, and the file name without .json is the record id.",
+  "type": "object",
+  "required": ["records"],
+  "additionalProperties": false,
+  "properties": {
+    "records": {
+      "description": "The one at-deploy record of this file.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "x-node": {
+        "kind": "at-deploy-record",
+        "role": "record",
+        "contract": [
+          "about", "action", "env", "outcome"
+        ],
+        "id": "deploy_id",
+        "files": ["extras/verification/dep-*.json"]
+      },
+      "items": {
+        "description": "An at-deploy record: the outcome of one at_deploy action of one plan item at one environment, against one code tree.",
+        "type": "object",
+        "required": ["deploy_id", "about", "milestone", "action", "env", "tree", "outcome", "recorded_at", "git_author"],
+        "additionalProperties": false,
+        "properties": {
+          "deploy_id": {
+            "description": "Id of this record: dep- and a number of at least four digits. Equals the file name without .json. Example: dep-0001.",
+            "type": "string",
+            "pattern": "^dep-[0-9]{4,}$"
+          },
+          "about": {
+            "description": "The one plan item the action belongs to, as a one-item array.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "vc:core:graph#nodeId"},
+            "x-link": {
+              "kinds": ["plan-item"],
+              "required": true
+            }
+          },
+          "milestone": {
+            "description": "Id of the Step 14 roadmap milestone the plan item belongs to.",
+            "$ref": "vc:core:graph#nodeId"
+          },
+          "action": {
+            "description": "Id of the action of that item this record is about. Example: a03.",
+            "type": "string",
+            "pattern": "^a[0-9]{2,}$"
+          },
+          "env": {
+            "description": "The environment the deploy job ran for: staging or prod, one of the stages the action is marked at_deploy for.",
+            "type": "string",
+            "enum": ["staging", "prod"]
+          },
+          "tag": {
+            "description": "Release tag the deploy job deployed. Optional.",
+            "type": "string",
+            "minLength": 1
+          },
+          "tree": {
+            "description": "Id of the code tree the deploy job ran against (a git tree id).",
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome": {
+            "description": "done: the action was carried out. failed: it was tried and did not work.",
+            "type": "string",
+            "enum": ["done", "failed"]
+          },
+          "recorded_at": {
+            "description": "UTC time the tool wrote the record, ISO 8601. Informational: nothing compares it.",
+            "type": "string",
+            "minLength": 1
+          },
+          "git_author": {
+            "description": "The git author of the deploy job as git reports it. A deploy job often has no git identity: the tool then writes name ci and an empty email, which this record allows.",
+            "type": "object",
+            "required": ["name", "email"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"description": "Name of the git author.", "type": "string", "minLength": 1},
+              "email": {"description": "Email of the git author; empty when the deploy job has no git identity.", "type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

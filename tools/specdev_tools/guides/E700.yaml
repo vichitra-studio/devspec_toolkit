@@ -1,0 +1,28 @@
+code: E700
+subcode: LINK_TARGET_NOT_FOUND
+title: "A link names an id that no node has"
+trigger: |
+  A link field of a node holds an id that is not the id of any node of the spec:
+    E700 fr-x (04_fr_list.json), field derives_from, target 'cap-nope': no node
+    has that id
+  After a migration the usual causes are an id that was renamed (the capture's
+  `renames` section lists each old and new id), a node that a pass step deleted,
+  or a typing mistake. A `verified_by` or `refines` link of a task criterion of
+  a closed milestone is not checked.
+resolution: |
+  1. Find the id the link should name:
+       specdev node candidates --for <holder id> --field <field>
+     lists the nodes the field accepts. For a renamed id, read `renames` in
+     spec/extras/migration/capture.json.
+  2. Rewrite the link:
+       specdev json patch --id <holder id> .<field> '["<right id>"]'
+     (the id-keyed write refuses a link that would still be broken, with E767).
+  3. If the node the link names should exist, define it instead:
+       specdev json insert --step NN .<collection> '<node json>'
+  4. Accept the link: `specdev attest <holder id> --yes` (a link written by
+     `json patch --id` already has its lock entry).
+  5. `specdev spec-check spec --step NN ...`.
+see_also:
+  - E701
+  - E702
+  - E704

@@ -10,11 +10,12 @@ HAS_REFERENCING = True
 
 # Define schema path relative to the repo root (assumed execution dir)
 SCHEMA_PATH = "schema/02a_delivery_baseline.schema.json"
-REPO_ROOT = os.getcwd()
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
 
 # Map vc: URIs to local file paths for offline resolution
 _URI_TO_PATH = {
     "vc:core:atoms": "schema/core/atoms.schema.json",
+    "vc:core:graph": "schema/core/graph.schema.json",
     "vc:core:collections": "schema/core/collections.schema.json",
     "vc:core:step-base": "schema/core/step_base.schema.json",
     "vc:core:errors": "schema/core/errors.schema.json",
@@ -102,9 +103,14 @@ def run_self_test(schema):
     # Expected results: filename -> should_pass
     expectations = {
         "valid_minimal.json": True,
+        "valid_config_lifecycle.json": True,
         "invalid_empty_env.json": False,
         "invalid_gates.json": False,
-        "invalid_gate_format.json": False
+        "invalid_gate_format.json": False,
+        "invalid_only_dev_environment.json": False,
+        "invalid_env_missing_scope.json": False,
+        "invalid_flat_host_key.json": False,
+        "invalid_string_ci_gate.json": False,
     }
     
     all_passed = True
@@ -144,3 +150,42 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+import unittest
+
+
+class Step02aIntegrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.schema = load_schema(SCHEMA_PATH)
+        validator_cls = jsonschema.validators.validator_for(cls.schema)  # type: ignore[attr-defined]
+        cls.validator = validator_cls(cls.schema, registry=_build_registry(cls.schema))
+
+    def messages(self, fixture: str) -> list[str]:
+        path = os.path.join(REPO_ROOT, "tests", "fixtures", "step_02a", fixture)
+        return [err.message for err in self.validator.iter_errors(load_json(path))]
+
+    def assert_fails_mentioning(self, fixture: str, needle: str) -> None:
+        messages = self.messages(fixture)
+        self.assertTrue(messages, f"{fixture}: expected validation errors")
+        self.assertIn(needle, " | ".join(messages))
+
+    def test_only_dev_environment_fails(self):
+        self.assert_fails_mentioning("invalid_only_dev_environment.json", "'ci' is a required property")
+
+    def test_environment_without_scope_fails(self):
+        self.assert_fails_mentioning("invalid_env_missing_scope.json", "'scope' is a required property")
+
+    def test_flat_host_key_at_environment_level_fails(self):
+        self.assert_fails_mentioning("invalid_flat_host_key.json", "'url' was unexpected")
+
+    def test_config_lifecycle_host_key_passes(self):
+        self.assertEqual(self.messages("valid_config_lifecycle.json"), [])
+
+    def test_string_ci_gate_fails(self):
+        self.assert_fails_mentioning("invalid_string_ci_gate.json", "'schema-validate' is not of type 'object'")

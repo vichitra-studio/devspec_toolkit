@@ -1,11 +1,10 @@
 """Schema differ for DevSpec Toolkit migration system.
 
 Compares user spec files against toolkit schemas to identify migration gaps.
-At ~1300 LOC this is the largest module in the toolkit; a future refactor
-could split it into core diff logic, report formatters, and apply/backup
-helpers (see AUDIT-020).
+The module is about 1100 lines; a future refactor could split it into core
+diff logic, report formatters, and apply/backup helpers.
 
-See: docs/developers/workflows/migration_system_spec.md
+See: docs/developers/design/migration_system_spec.md
 """
 from __future__ import annotations
 
@@ -14,15 +13,14 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from ..core.constants import STAMP_FILE
 from ..core.changelog_parser import (
     ChangelogEntry,
     VersionChangelog,
-    compare_versions,
     get_changes_between,
     get_toolkit_version,
-    list_versions,
     load_version,
 )
 
@@ -86,7 +84,6 @@ class ParadigmShift:
     source_file: Path
     target_file: Path
     detected: bool = False              # Whether source exists and target missing
-    prompt_template: Optional[str] = None
 
 
 @dataclass
@@ -120,7 +117,8 @@ def calculate_version_delta(
         Delta string like "1 MINOR update (breaking)" for an upgrade
         (target newer than source), or ``None`` in two cases: when the
         versions are equal, and when the source is *newer* than the target
-        (a downgrade — all major/minor/patch deltas <= 0). Callers that must
+        (a downgrade — the target's (major, minor, patch) tuple is the lower
+        one, whatever its single parts). Callers that must
         distinguish "aligned" from "downgrade" should compare the versions
         directly rather than relying on this return value alone.
     """
@@ -138,7 +136,11 @@ def calculate_version_delta(
     
     src = parse_semver(source_version)
     tgt = parse_semver(target_version)
-    
+
+    if tgt <= src:
+        # Downgrade or same
+        return None
+
     # Determine delta type and count
     major_delta = tgt[0] - src[0]
     minor_delta = tgt[1] - src[1]
@@ -150,12 +152,9 @@ def calculate_version_delta(
     elif minor_delta > 0:
         delta_type = "MINOR"
         delta_count = minor_delta
-    elif patch_delta > 0:
+    else:
         delta_type = "PATCH"
         delta_count = patch_delta
-    else:
-        # Downgrade or same
-        return None
     
     # Check for breaking flag in target version changelog
     breaking = False
@@ -279,26 +278,32 @@ def apply_step16_anchor_mapping(toolkit_schemas: Dict[str, Path]) -> Dict[str, P
     return remapped
 
 
+def read_stamp(spec_dir: str | Path) -> Optional[Dict[str, Any]]:
+    """The mapping in ``<spec_dir>/specdev_version`` (the one reader of the stamp).
+
+    Returns:
+        The mapping, or ``None`` when the file is missing, cannot be read or parsed, or is not a mapping.
+    """
+    import yaml  # lazy import: yaml is only needed when a stamp is read or written
+
+    try:
+        with open(Path(spec_dir) / STAMP_FILE, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except (OSError, ValueError, yaml.YAMLError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def get_user_version(spec_dir: Path) -> Optional[str]:
     """Get user's toolkit version from spec/specdev_version.
-    
+
     Args:
         spec_dir: Path to user's spec/ directory
-        
+
     Returns:
-        Version string or None if not found
+        The ``toolkit_version`` of the stamp, or None when there is no readable stamp or it has no such key
     """
-    version_file = spec_dir / "specdev_version"
-    if not version_file.exists():
-        return None
-    
-    try:
-        import yaml
-        with open(version_file, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        return data.get("toolkit_version") if data else None
-    except Exception:
-        return None
+    return (read_stamp(spec_dir) or {}).get("toolkit_version")
 
 
 # -----------------------------------------------------------------------------
@@ -384,12 +389,8 @@ def compare_step_inventories(
             if step_id in rename_map:
                 continue  # Already handled above
             
-            # Check if it's a project-specific extension (e.g., ext_01_database.json).
-            # Per docs/developers/extension_schemas.md, extensions use ext_NN_<topic>.json
-            # naming. This branch catches user-created specs with a numeric step prefix
-            # (e.g., 02b_custom) that have no corresponding toolkit schema.
-            # Note: Some extensions like 13a_completeness_assessment ARE in toolkit_ids
-            # and are handled in the first loop above.
+            # A user-created spec whose step prefix carries a letter (e.g., 02b_custom) and
+            # that has no corresponding toolkit schema is a project-specific extension.
             if re.match(r"^\d{2}[a-z]_", step_id):
                 diffs.append(StepDiff(
                     step_id=step_id,
@@ -458,8 +459,12 @@ def diff_step_fields(user_file: Path, schema_path: Path) -> List[FieldDiff]:
             ))
     
     # Check required fields
-    required = schema.get("required", [])
-    properties = schema.get("properties", {})
+    # Imported here: ``context`` loads the graph builder, which graph.gitview (and so the lock file's merge driver) must not load.
+    from ..context._utils import merged_required_and_properties
+
+    merged = merged_required_and_properties(schema, Path(schema_path).parent.parent)
+    required = merged["required"]
+    properties = merged["properties"]
     
     for field_name in required:
         if field_name not in user_data:
@@ -517,18 +522,16 @@ def detect_paradigm_shifts(
     
     # Check for common paradigm shifts
     paradigm_checks = [
-        # (source_file, target_file, description, prompt_template)
+        # (source_file, target_file, description)
         (
             project_root / "roadmap.md",
             spec_dir / "14_roadmap.json",
             "Prose roadmap converted to structured JSON",
-            "template_prose_to_json.md",
         ),
         (
             project_root / "docs" / "roadmap.md",
             spec_dir / "14_roadmap.json",
             "Prose roadmap converted to structured JSON",
-            "template_prose_to_json.md",
         ),
     ]
     
@@ -541,24 +544,19 @@ def detect_paradigm_shifts(
                 if source_exists and target_missing:
                     source_path = project_root / source_exists
                     target_path = project_root / target_missing
-                    prompt = None
-                    if change.migration:
-                        prompt = change.migration.prompt
                     paradigm_checks.append((
                         source_path,
                         target_path,
                         change.description or "Paradigm shift",
-                        prompt or "",
                     ))
     
-    for source, target, description, prompt in paradigm_checks:
+    for source, target, description in paradigm_checks:
         if source.exists() and not target.exists():
             shifts.append(ParadigmShift(
                 description=description,
                 source_file=source,
                 target_file=target,
                 detected=True,
-                prompt_template=prompt,
             ))
     
     return shifts
@@ -917,63 +915,8 @@ def format_plan_report(diff: MigrationDiff) -> str:
 
 
 # -----------------------------------------------------------------------------
-# Pre-Migration Validation (Phase 5)
+# Validation result (shared with the post-migration check)
 # -----------------------------------------------------------------------------
-
-@dataclass
-class ValidationResult:
-    """Result of pre-migration validation."""
-    can_proceed: bool
-    warnings: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-
-
-def validate_pre_migration(spec_dir: Path, toolkit_root: Path) -> ValidationResult:
-    """Validate environment before migration.
-    
-    Checks per spec:
-    - Git repo exists: Warn, skip Git backup
-    - Working tree clean: Warn, prompt to continue
-    - spec/ exists: Abort
-    - Toolkit version detectable: Abort
-    """
-    warnings = []
-    errors = []
-    
-    # Check spec/ exists
-    if not spec_dir.exists():
-        errors.append(f"No spec/ directory found: {spec_dir}")
-    
-    # Check toolkit version is detectable
-    toolkit_version = get_toolkit_version(toolkit_root)
-    if not toolkit_version:
-        errors.append("Cannot determine toolkit version from pyproject.toml")
-    
-    # Check Git repo and working tree
-    git_dir = spec_dir.parent / ".git"
-    if not git_dir.exists():
-        warnings.append("Not a Git repo - Git backup will be skipped")
-    else:
-        import subprocess
-        try:
-            result = subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=spec_dir.parent,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.stdout.strip():
-                warnings.append("Git working tree has uncommitted changes")
-        except Exception:
-            warnings.append("Could not check Git status")
-    
-    return ValidationResult(
-        can_proceed=len(errors) == 0,
-        warnings=warnings,
-        errors=errors,
-    )
-
 
 def log_operation(spec_dir: Path, operation: str, status: str) -> None:
     """Log operation to spec/migration_log.
@@ -1002,74 +945,6 @@ class BackupResult:
     git_branch: Optional[str]
     backup_dir: Path
     timestamp: str
-
-
-def create_backup(spec_dir: Path, target_version: str) -> BackupResult:
-    """Create hybrid backup: folder copy (always) + Git branch (if in repo).
-    
-    Args:
-        spec_dir: Path to user's spec/ directory
-        target_version: Version being migrated to
-        
-    Returns:
-        BackupResult with backup location info
-    """
-    import shutil
-    from datetime import datetime
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # Folder copy (always)
-    backup_dir = spec_dir / "migration_backups" / f"pre_v{target_version}_{timestamp}"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    
-    for item in spec_dir.iterdir():
-        if item.name == "migration_backups":
-            continue  # Don't copy backup folder itself
-        if item.is_dir():
-            shutil.copytree(item, backup_dir / item.name)
-        else:
-            shutil.copy2(item, backup_dir / item.name)
-    
-    # Git branch (if in repo) - create branch at current commit
-    git_branch = None
-    git_dir = spec_dir.parent / ".git"
-    if git_dir.exists():
-        import subprocess
-        branch_name = f"backup/pre-migration-v{target_version}"
-        try:
-            # First ensure we have a commit to branch from
-            subprocess.run(
-                ["git", "add", str(spec_dir)],
-                cwd=spec_dir.parent,
-                capture_output=True,
-                check=False,
-                timeout=10,
-            )
-            subprocess.run(
-                ["git", "commit", "-m", f"Pre-migration snapshot for v{target_version}"],
-                cwd=spec_dir.parent,
-                capture_output=True,
-                check=False,
-                timeout=10,
-            )
-            # Create branch at current HEAD
-            subprocess.run(
-                ["git", "branch", "-f", branch_name],
-                cwd=spec_dir.parent,
-                capture_output=True,
-                check=False,
-                timeout=10,
-            )
-            git_branch = branch_name
-        except Exception:
-            pass  # Git backup is optional
-    
-    return BackupResult(
-        git_branch=git_branch,
-        backup_dir=backup_dir,
-        timestamp=timestamp,
-    )
 
 
 def list_backups(spec_dir: Path) -> List[BackupResult]:
@@ -1139,231 +1014,76 @@ def restore_backup(spec_dir: Path, backup: BackupResult) -> None:
 
 
 # -----------------------------------------------------------------------------
-# Auto-Apply Fixes (Phase 5)
-# -----------------------------------------------------------------------------
-
-@dataclass
-class ApplyResult:
-    """Result of applying auto fixes."""
-    operations: List[str]
-    backup: Optional[BackupResult]
-    success: bool
-    error: Optional[str] = None
-
-
-def apply_auto_fixes(
-    diff: MigrationDiff,
-    spec_dir: Path,
-    toolkit_root: Path,
-    dry_run: bool = False,
-) -> ApplyResult:
-    """Apply mechanical/auto-fixable changes.
-    
-    Args:
-        diff: MigrationDiff with identified changes
-        spec_dir: Path to user's spec/ directory
-        toolkit_root: Path to toolkit root
-        dry_run: If True, only report what would be done
-        
-    Returns:
-        ApplyResult with operations performed
-    """
-    operations = []
-    backup = None
-    
-    # Count auto-fixes needed
-    auto_fixes = []
-    for step in diff.steps:
-        if step.status == "needs_rename":
-            auto_fixes.append(("rename", step))
-        for fd in step.field_diffs:
-            if fd.auto_fixable:
-                auto_fixes.append(("field", step, fd))
-    
-    if not auto_fixes:
-        return ApplyResult(
-            operations=["No auto-fixable changes found."],
-            backup=None,
-            success=True,
-        )
-    
-    # Create backup (unless dry run)
-    if not dry_run:
-        backup = create_backup(spec_dir, diff.target_version)
-        operations.append(f"Creating backup...")
-        operations.append(f"      Git branch: {backup.git_branch or 'N/A'}")
-        operations.append(f"      Folder: {backup.backup_dir.name}/")
-        operations.append(f"      ✅ Backup complete")
-        log_operation(spec_dir, f"Created backup: {backup.backup_dir.name}", "success")
-    else:
-        operations.append("[DRY RUN] Would create backup")
-    
-    # Apply fixes with error handling
-    for fix in auto_fixes:
-        try:
-            if fix[0] == "rename":
-                step = fix[1]
-                old_path = step.source_file
-                new_name = f"{step.step_id}.json"
-                new_path = spec_dir / new_name
-                
-                if dry_run:
-                    operations.append(f"[DRY RUN] Would rename {old_path.name} → {new_name}")
-                else:
-                    if new_path.exists():
-                        operations.append(f"⚠️ Skipped rename {old_path.name} → {new_name} (target exists)")
-                        log_operation(spec_dir, f"Skipped rename {old_path.name} (conflict)", "skipped")
-                    else:
-                        old_path.rename(new_path)
-                        operations.append(f"Renaming {old_path.name} → {new_name}...")
-                        operations.append(f"      ✅ File renamed")
-                        log_operation(spec_dir, f"Renamed {old_path.name} → {new_name}", "success")
-            
-            elif fix[0] == "field":
-                step, fd = fix[1], fix[2]
-                if fd.diff_type == DiffType.SCHEMA_REF_OUTDATED:
-                    file_path = step.source_file
-                    if dry_run:
-                        operations.append(f"[DRY RUN] Would update $schema in {file_path.name}")
-                    else:
-                        try:
-                            with open(file_path, "r", encoding="utf-8") as f:
-                                data = json.load(f)
-                            data["$schema"] = fd.expected
-                            with open(file_path, "w", encoding="utf-8") as f:
-                                json.dump(data, f, indent=2)
-                            operations.append(f"Updating $schema in {file_path.name}...")
-                            operations.append(f"      ✅ Schema reference updated")
-                            log_operation(spec_dir, f"Updated $schema in {file_path.name}", "success")
-                        except json.JSONDecodeError as e:
-                            operations.append(f"⚠️ Skipped {file_path.name}: JSON parse error at line {e.lineno}")
-                            log_operation(spec_dir, f"Failed {file_path.name}: {e}", "error")
-        except Exception as e:
-            operations.append(f"⚠️ Error: {e}")
-            log_operation(spec_dir, f"Error during fix: {e}", "error")
-    
-    # Update specdev_version with in-progress marker
-    if not dry_run:
-        version_file = spec_dir / "specdev_version"
-        try:
-            import yaml
-            version_data = {"toolkit_version": diff.target_version, "migration_status": "in_progress"}
-            if version_file.exists():
-                with open(version_file, "r", encoding="utf-8") as f:
-                    existing = yaml.safe_load(f) or {}
-                existing["migration_status"] = "in_progress"
-                existing["target_version"] = diff.target_version
-                version_data = existing
-            with open(version_file, "w", encoding="utf-8") as f:
-                yaml.dump(version_data, f, default_flow_style=False)
-            operations.append(f"Updating spec/specdev_version...")
-            operations.append(f"      ✅ In-progress marker added")
-            log_operation(spec_dir, "Updated specdev_version with in-progress marker", "success")
-        except Exception as e:
-            operations.append(f"⚠️ Could not update specdev_version: {e}")
-    else:
-        operations.append("[DRY RUN] Would update spec/specdev_version")
-    
-    # Log completion
-    if not dry_run:
-        log_operation(spec_dir, "Migration apply --auto completed", "success")
-    
-    return ApplyResult(
-        operations=operations,
-        backup=backup,
-        success=True,
-    )
-
-
-def format_apply_report(result: ApplyResult) -> str:
-    """Format apply result as human-readable text."""
-    lines = [
-        "",
-        "🔧 Applying Mechanical Fixes",
-        "━" * 28,
-        "",
-    ]
-    
-    # Count main operations (not indented detail lines)
-    main_ops = [op for op in result.operations if not op.startswith("      ")]
-    op_num = 0
-    
-    for op in result.operations:
-        if op.startswith("      "):
-            # Detail line - no numbering
-            lines.append(op)
-        else:
-            # Main operation - add numbering
-            op_num += 1
-            lines.append(f"[{op_num}/{len(main_ops)}] {op}")
-    
-    lines.append("")
-    if result.success:
-        lines.append(f"✅ Mechanical fixes complete ({len(main_ops)}/{len(main_ops)})")
-        lines.append("")
-        lines.append("Remaining work requires AI assistance.")
-        lines.append("Run `specdev align prompts` to generate migration prompts.")
-    else:
-        lines.append(f"❌ Failed: {result.error}")
-    
-    return "\n".join(lines)
-
-
-# -----------------------------------------------------------------------------
 # Version Stamp
 # -----------------------------------------------------------------------------
+
+KEEP_STATUS: Any = object()
+"""``stamp_specdev_version(migration_status=KEEP_STATUS)``: leave the ``migration_status`` key as it is."""
+
 
 def stamp_specdev_version(
     spec_dir: Path,
     toolkit_version: str,
     is_migration: bool = False,
+    *,
+    migration_status: Any = KEEP_STATUS,
+    history_notes: Optional[str] = None,
+    now: Optional[Callable[[], str]] = None,
 ) -> Optional[str]:
     """Write or update spec/specdev_version to record the current toolkit version.
+
+    The ONE writer of the stamp: ``specdev update`` (a plain re-stamp), the migration runner (the start of a migration)
+    and ``specdev align validate`` (its end) all call it.  The file is read first and every key it holds is kept,
+    whether this function knows the key or not; only the keys named below change.
 
     Args:
         spec_dir: Path to the project's spec/ directory.
         toolkit_version: The toolkit version string to record.
-        is_migration: When True, appends a history entry ("Migrated to vX.Y.Z").
-                      When False (plain version bump), no history entry is added.
+        is_migration: When True, sets ``last_migration`` and appends a history entry when the recorded version differs
+                      from *toolkit_version* (a re-run at the same version appends none).
+                      When False (plain version bump), no history entry is added and ``last_migration`` is kept.
+        migration_status: ``KEEP_STATUS`` (default) leaves the key as it is; a string sets it (the runner writes
+                      ``in_progress``); ``None`` removes the key (``align validate`` does, at the end of a migration).
+        history_notes: The ``notes`` of the history entry (default ``Migrated to v<version>``).
+        now: The clock of the stamp's dates (default: the current UTC time).
 
     Returns:
         None on success, or an error message string on failure.
     """
     import yaml  # lazy import — yaml is only needed at stamp time
 
-    version_file = spec_dir / "specdev_version"
+    clock = now or _get_timestamp
+    version_file = spec_dir / STAMP_FILE
     try:
-        version_data: Dict[str, Any] = {
-            "toolkit_version": toolkit_version,
-            "created_at": _get_timestamp(),
-            # last_migration tracks the last *schema* migration via `specdev align`.
-            # Only update it when is_migration=True; plain version bumps preserve the
-            # existing value (or leave null for new files, matching init_project.py).
-            "last_migration": _get_timestamp() if is_migration else None,
-            "migration_history": [],
-        }
-
-        if version_file.exists():
+        stamped = clock()
+        existed = version_file.exists()
+        existing: Dict[str, Any] = {}
+        if existed:
             with open(version_file, "r", encoding="utf-8") as f:
                 existing = yaml.safe_load(f) or {}
 
-            # Preserve created_at (bootstrap timestamp)
-            version_data["created_at"] = existing.get("created_at", _get_timestamp())
-            version_data["migration_history"] = existing.get("migration_history", [])
-            if not is_migration:
-                # Plain re-stamp: preserve last_migration so it still reflects the
-                # most recent actual schema migration rather than this bump.
-                version_data["last_migration"] = existing.get("last_migration", None)
-
-            if is_migration and existing.get("toolkit_version") != toolkit_version:
-                version_data["migration_history"].append(
-                    {
-                        "from": existing.get("toolkit_version", "unknown"),
-                        "to": toolkit_version,
-                        "date": _get_timestamp(),
-                        "notes": f"Migrated to v{toolkit_version}",
-                    }
-                )
+        version_data: Dict[str, Any] = dict(existing)
+        # created_at is the bootstrap timestamp: kept once written.
+        version_data["created_at"] = existing.get("created_at", stamped)
+        version_data["toolkit_version"] = toolkit_version
+        # last_migration tracks the last *schema* migration (`specdev align`): only a migration moves it; a plain
+        # bump keeps the value (null for a new file, matching init_project.py).
+        version_data["last_migration"] = stamped if is_migration else existing.get("last_migration", None)
+        history = list(existing.get("migration_history") or [])
+        if is_migration and existed and existing.get("toolkit_version") != toolkit_version:
+            history.append(
+                {
+                    "from": existing.get("toolkit_version", "unknown"),
+                    "to": toolkit_version,
+                    "date": stamped,
+                    "notes": history_notes or f"Migrated to v{toolkit_version}",
+                }
+            )
+        version_data["migration_history"] = history
+        if migration_status is None:
+            version_data.pop("migration_status", None)
+        elif migration_status is not KEEP_STATUS:
+            version_data["migration_status"] = migration_status
 
         with open(version_file, "w", encoding="utf-8") as f:
             yaml.dump(version_data, f, default_flow_style=False)
@@ -1372,68 +1092,6 @@ def stamp_specdev_version(
     except Exception as e:
         return f"Could not update specdev_version: {e}"
 
-
-# -----------------------------------------------------------------------------
-# Post-Migration Validation (Phase 9)
-# -----------------------------------------------------------------------------
-
-def validate_post_migration(
-    spec_dir: Path, 
-    toolkit_root: Path,
-    toolkit_version: str
-) -> ValidationResult:
-    """Validate migrated specs and trace integrity.
-    
-    Args:
-        spec_dir: Path to user's spec/ directory
-        toolkit_root: Path to toolkit root
-        toolkit_version: The target toolkit version
-        
-    Returns:
-        ValidationResult with status and messages
-    """
-    from ..validation.validate import validate_dir
-    warnings = []
-    errors = []
-    
-    # 1. Schema Validation
-    schema_failures = validate_dir(str(toolkit_root), str(spec_dir), git_root=str(spec_dir.parent), spec_root=str(spec_dir))
-    if schema_failures:
-        for fail in schema_failures:
-            errors.append(f"Schema Validation Failed: {fail}")
-
-    # 2. Trace Integrity
-    from ..validation.matrix import validate_trace_integrity
-    from ..core.errors import render_errors as _render_errors
-    trace_errors = validate_trace_integrity(str(toolkit_root), str(spec_dir))
-    if trace_errors:
-        errors.extend(_render_errors(trace_errors))
-    
-    # 3. Migration Notes Check
-    notes_file = spec_dir / "_migration_notes.md"
-    if notes_file.exists():
-        warnings.append(f"_migration_notes.md exists. Please review manually for unmapped data.")
-    
-    # Check checks for in-file _migration_notes objects
-    for f in spec_dir.iterdir():
-        if f.suffix == ".json":
-            try:
-                with open(f, "r", encoding="utf-8") as file:
-                    data = json.load(file)
-                if "_migration_notes" in data:
-                    warnings.append(f"{f.name} contains '_migration_notes'. Review required.")
-            except Exception:
-                pass
-
-    if errors:
-        return ValidationResult(can_proceed=False, warnings=warnings, errors=errors)
-
-    # 4. Update Version File on Success
-    stamp_err = stamp_specdev_version(spec_dir, toolkit_version, is_migration=True)
-    if stamp_err:
-        warnings.append(stamp_err)
-
-    return ValidationResult(can_proceed=True, warnings=warnings, errors=errors)
 
 def _get_timestamp():
     from datetime import datetime, timezone

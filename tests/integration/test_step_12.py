@@ -14,21 +14,21 @@ def validate_dag_integrity(jobs):
     """
     job_ids = {job['job_id'] for job in jobs}
     
-    # Check that all requires point to existing jobs
+    # Check that all depends_on entries point to existing jobs
     for job in jobs:
         job_id = job['job_id']
-        requires = job.get('requires', [])
-        for req in requires:
+        depends_on = job.get('depends_on', [])
+        for req in depends_on:
             if req not in job_ids:
-                return False, f"Job '{job_id}' requires non-existent job '{req}'"
+                return False, f"Job '{job_id}' depends on non-existent job '{req}'"
     
     # Simple cycle detection using topological sort approach
     # Build dependency graph
     graph = {job_id: set() for job_id in job_ids}
     for job in jobs:
         job_id = job['job_id']
-        requires = job.get('requires', [])
-        for req in requires:
+        depends_on = job.get('depends_on', [])
+        for req in depends_on:
             graph[req].add(job_id)
     
     # Check for cycles using DFS
@@ -65,16 +65,8 @@ def validate_step_structure(steps):
         if not isinstance(step, dict):
             return False, f"Step {i} is not a dictionary"
         
-        if 'id' not in step:
-            return False, f"Step {i} missing required 'id' field"
-        
         if 'command' not in step:
             return False, f"Step {i} missing required 'command' field"
-        
-        # Validate id format (kebab-case)
-        step_id = step['id']
-        if not isinstance(step_id, str) or not step_id.replace('-', '').isalnum():
-            return False, f"Step {i} id '{step_id}' is not valid kebab-case"
         
         # Validate command format
         command = step['command']
@@ -175,3 +167,61 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+import tempfile
+import unittest
+from typing import Any, Callable
+
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_FIXTURES = _REPO_ROOT / "tests" / "fixtures" / "step_12"
+
+# The worked example of the spec-graph design (CI job "New" form), as ordered steps without ids.
+_DOC_EXAMPLE_JOB: dict[str, Any] = {
+    "job_id": "job-contract-tests",
+    "name": "Contract Tests",
+    "steps": [{"name": "Run Contract Suite", "command": "npm run test:contract"}],
+    "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
+    "realises": ["ci", "contract-tests", "rule-contract-tests-on-every-pr"],
+}
+
+
+class Step12IntegrationTests(unittest.TestCase):
+    def _errors(self, mutate: Callable[[dict], None]) -> list[str]:
+        """Rendered E520 and E141 errors for the valid fixture with the design-doc job, after ``mutate`` edits the copy."""
+        spec = json.loads((_FIXTURES / "valid_dag.json").read_text())
+        spec["jobs"] = [json.loads(json.dumps(_DOC_EXAMPLE_JOB))]
+        mutate(spec)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "12_ci_gates.json"
+            path.write_text(json.dumps(spec))
+            errors = specdev_validate_file(str(_REPO_ROOT), str(path))
+        return [e.render() for e in errors if e.code in {"E520", "E141", "E590"}]
+
+    def _assert_fails_naming(self, mutate: Callable[[dict], None], needle: str) -> None:
+        rendered = self._errors(mutate)
+        self.assertTrue(any(needle in msg for msg in rendered), rendered)
+
+    def test_doc_example_validates(self):
+        self.assertEqual(self._errors(lambda spec: None), [])
+
+    def test_job_without_realises_validates(self):
+        self.assertEqual(self._errors(lambda spec: spec["jobs"][0].pop("realises")), [])
+
+    def test_job_with_verifies_nfr_validates(self):
+        self.assertEqual(self._errors(lambda spec: spec["jobs"][0].update(verifies=["nfr-password-reset-latency"])), [])
+
+    def test_old_requires_and_step_id_fail(self):
+        self._assert_fails_naming(lambda spec: spec["jobs"][0].update(requires=["other"]), "requires")
+        self._assert_fails_naming(lambda spec: spec["jobs"][0]["steps"][0].update(id="run-contract-suite"), "id")
+        self._assert_fails_naming(lambda spec: spec.update(trace=[{"type": "doc", "id": "10-governance-policy"}]), "trace")
+
+    def test_depends_on_not_a_list_does_not_raise(self):
+        self._assert_fails_naming(lambda spec: spec["jobs"][0].update(depends_on="job-other"), "depends_on")
+        self._assert_fails_naming(lambda spec: spec["jobs"][0].update(depends_on={"job": 1}), "depends_on")

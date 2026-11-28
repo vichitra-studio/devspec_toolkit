@@ -1,0 +1,15 @@
+{
+  "$schema": "vc:host-declarations",
+  "release_tag_pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+  "setup_command": "npm ci",
+  "code_tree_exclusions": ["devspec_toolkit", "test-results/"],
+  "pin_sources": {
+    "tp-argon2": [
+      { "type": "json-pointer", "file": "package-lock.json", "pointer": "/packages/node_modules~1argon2/version" }
+    ],
+    "tp-mailrelay": [
+      { "type": "regex", "file": "src/mail/client.ts", "pattern": "MAILRELAY_API_VERSION = \"(api-v[0-9]+)\"" },
+      { "type": "regex", "file": "src/mail/client.ts", "pattern": "X-Api-Version: (api-v[0-9]+)" }
+    ]
+  }
+}

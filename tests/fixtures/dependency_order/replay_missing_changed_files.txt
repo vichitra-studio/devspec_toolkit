@@ -1,1 +1,0 @@
-spec/01_capabilities.json

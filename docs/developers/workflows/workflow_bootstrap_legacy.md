@@ -21,13 +21,19 @@ Alternatively, `./tools/run_specdev.sh` enforces virtualenv usage automatically 
 To reverse-engineer a **100% Complete Spec Suite (Steps 00–16c)** using a **Prose-First** strategy:
 
 1. **Prepare the Seeds**: Fill out `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md` with project-specific context.
-2. **Generate the Spec**: Use canonical prompts at `prompts/prompt_NN_name.md` to emit each `spec/NN_name.json` artifact.
+2. **Generate the Spec**: Use canonical prompts at `prompts/prompt_NN_name.md` to draft each step artifact; `specdev step create NN --from <draft>` creates `spec/NN_name.json` from the draft.
 3. **Excavate the Code**: Rigorously scan the codebase to backfill the contracts.
 
 Each spec step uses the **two-phase Clarify/Emit protocol**:
 
 - **Clarify** (if Self-Audit Gate score < 0.9): the AI outputs only short bulleted gap questions. No JSON, no code fences. Stop and wait for answers.
-- **Emit**: the AI writes the artifact JSON directly to `spec/NN_name.json`. Do not return fenced JSON as the primary output.
+- **Emit**: the AI writes the artifact to disk through the CLI, never as fenced JSON in the response. A step that does not exist yet is written as a whole draft file outside `spec/` and created with `specdev step create NN --from <draft>`; a step that exists is edited with `specdev json patch|insert|delete --id <node-id>` (a new node: `specdev json insert --step NN <collection-path> '<node>'`). A file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
+
+In a bootstrap every step is new, so each step below ends the same way: the AI writes the draft, and this command creates the step file and writes the lock entry of every link in it (`--dry-run` prints the report and writes nothing):
+
+```bash
+./tools/run_specdev.sh step create NN --from <draft> --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
 
 ---
 
@@ -58,7 +64,7 @@ Before writing any new content, check which spec artifacts are missing.
 
 *Seed: `docs/seed/seed_overview.md`*
 
-Fill in `docs/seed/seed_overview.md` with the project's problem statement, target users, and success metrics. Then use the canonical prompt to emit the charter artifact.
+Fill in `docs/seed/seed_overview.md` with the project's problem statement, target users, and success metrics. Then use the canonical prompt to draft the charter artifact.
 
 **User Action:**
 > Open `prompts/prompt_00_project_charter.md` in your AI assistant.
@@ -67,7 +73,7 @@ Fill in `docs/seed/seed_overview.md` with the project's problem statement, targe
 > - Content of `docs/seed/seed_overview.md`
 > - Any existing `README.md` or product brief
 >
-> The AI will clarify gaps first (if needed), then emit `spec/00_charter.json` directly.
+> The AI will clarify gaps first (if needed), then write the charter as a draft outside `spec/`; `specdev step create 00 --from <draft>` creates `spec/00_charter.json`.
 
 **Validation ritual:**
 ```bash
@@ -88,7 +94,7 @@ Scan `package.json`, `pyproject.toml`, `Dockerfile`, `go.mod`, or any infra-as-c
 > - Content of `docs/seed/seed_overview.md`
 > - Dependency manifests (`package.json`, `pyproject.toml`, etc.)
 >
-> The AI will clarify ambiguous versions (e.g., "Is this Postgres 14 or 15?"), then emit `spec/01_capabilities.json`.
+> The AI will clarify ambiguous versions (e.g., "Is this Postgres 14 or 15?"), then draft the capabilities; `specdev step create 01 --from <draft>` creates `spec/01_capabilities.json`.
 
 **Validation ritual:**
 ```bash
@@ -113,7 +119,7 @@ Scan `package.json`, `pyproject.toml`, `Dockerfile`, `go.mod`, or any infra-as-c
 > - `spec/00_charter.json`, `spec/01_capabilities.json`
 > - Directory structure of `src/` or equivalent
 >
-> The AI maps the high-level components and emits `spec/02_system_sketch.json`.
+> The AI maps the high-level components into a draft; `specdev step create 02 --from <draft>` creates `spec/02_system_sketch.json`.
 
 **Validation ritual:**
 ```bash
@@ -133,7 +139,7 @@ Use this step if the project has measurable delivery metrics to capture before P
 > - Content of `docs/seed/seed_tech_stack.md`
 > - Any existing delivery metrics, SLAs, or baseline performance data
 >
-> The AI captures measurable delivery baselines and emits `spec/02a_delivery_baseline.json`.
+> The AI captures measurable delivery baselines in a draft; `specdev step create 02a --from <draft>` creates `spec/02a_delivery_baseline.json`.
 
 **Validation ritual:**
 ```bash
@@ -150,9 +156,9 @@ Use this step if the project has measurable delivery metrics to capture before P
 > **Context to supply**:
 > - Scan results of class names, DB tables, and shared constants from the codebase
 >
-> The AI defines the top domain terms and emits `spec/03_glossary.json`.
+> The AI defines the top domain terms in a draft; `specdev step create 03 --from <draft>` creates `spec/03_glossary.json`.
 
-After emitting, promote project-specific terms to the canon registry:
+After the step file is created, promote project-specific terms to the canon registry:
 
 ```bash
 ./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit --git-root .
@@ -176,13 +182,13 @@ After emitting, promote project-specific terms to the canon registry:
 > - Root `README.md`
 > - Any existing feature documentation
 >
-> The AI extracts every feature and user story, formalizes them into atomic FRs (ID format: `fr-kebab-case`), and emits `spec/04_fr_list.json`.
+> The AI extracts every feature and user story, and formalizes them into atomic FRs (ID format: `fr-kebab-case`) in a draft; `specdev step create 04 --from <draft>` creates `spec/04_fr_list.json`.
 
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/04_fr_list.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -202,13 +208,13 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 > - `spec/04_fr_list.json`
 > - Full scan of controllers, routers, and resolvers in the API layer
 >
-> The AI identifies every public endpoint/method, extracts input/output types, and emits `spec/05_interface_contracts.json`.
-> Every `trace` field must link to an FR from Step 2.4.
+> The AI identifies every public endpoint/method and extracts input/output types into a draft; `specdev step create 05 --from <draft>` creates `spec/05_interface_contracts.json`.
+> Every id in an API's `derives_from` must be an FR from Step 2.4, or a seed the manifest routes to step 05 listed beside an FR.
 
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/05_interface_contracts.json --repo-root ./devspec_toolkit
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 # Run after Step 08 is complete
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
@@ -223,7 +229,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 > **Context to supply**:
 > - Scan of `tests/`, `validators/`, and `config/`
 >
-> The AI extracts business rules and emits `spec/06_invariants.json`.
+> The AI extracts business rules into a draft; `specdev step create 06 --from <draft>` creates `spec/06_invariants.json`.
 
 **Validation ritual:**
 ```bash
@@ -240,7 +246,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 > **Context to supply**:
 > - Scan of system limits, SLAs, and performance constraints
 >
-> The AI extracts non-functional requirements and emits `spec/07_nfrs.json`.
+> The AI extracts non-functional requirements into a draft; `specdev step create 07 --from <draft>` creates `spec/07_nfrs.json`.
 
 **Validation ritual:**
 ```bash
@@ -257,7 +263,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 > **Context to supply**:
 > - `db/models`, `tests/conftest`, or equivalent
 >
-> The AI creates concrete JSON examples for every core entity and emits `spec/08_fixtures.json`.
+> The AI creates concrete JSON examples for every core entity in a draft; `specdev step create 08 --from <draft>` creates `spec/08_fixtures.json`.
 
 **Validation ritual:**
 ```bash
@@ -277,7 +283,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 *Prompt: `prompts/prompt_09_impl_plan.md`*
 
-Use this step to capture milestones and deliverables. Requires `tech_stack` as an object (not array) and `milestones` with a `deliverables` array.
+Use this step to capture milestones. Every milestone requires `schedules`, an array of at least one id of what it schedules (functional requirements, acceptance criteria, APIs, invariants, NFRs, components, environments or risks).
 
 **Validation ritual:**
 ```bash
@@ -297,7 +303,7 @@ Use this step to capture milestones and deliverables. Requires `tech_stack` as a
 
 *Prompt: `prompts/prompt_11_redteam.md`*
 
-Add potential security threats for the project. `target_ids` must reference API or Component IDs; `mitigations` must be structured objects.
+Add potential security threats for the project. Every threat requires `threatens`, an array of at least one id of an API, component, connection or third party; `mitigated_by` lists the ids that mitigate it.
 
 **Validation ritual:**
 ```bash
@@ -309,7 +315,7 @@ Add potential security threats for the project. `target_ids` must reference API 
 *Prompt: `prompts/prompt_12_ci_gates.md`*
 
 **User Action:**
-> Open each prompt in turn and supply the relevant upstream spec context. Each AI session will clarify gaps then emit the artifact directly.
+> Open each prompt in turn and supply the relevant upstream spec context. Each AI session will clarify gaps, then draft the artifact; `specdev step create NN --from <draft>` (`09`, `10`, `11`, `12`) creates the step file.
 
 **Validation ritual after all Phase 4 steps:**
 ```bash
@@ -318,7 +324,6 @@ Add potential security threats for the project. `target_ids` must reference API 
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
 ```
 
@@ -328,11 +333,11 @@ Add potential security threats for the project. `target_ids` must reference API 
 
 ## Phase 5: The Transition (Extension & Roadmap)
 
-*Targets: `13`, `13a`, `14`*
+*Targets: `13`, `14`*
 
 These steps bridge Phase I Discovery into Phase II Implementation. They must be completed before running the Trinity Loop (Steps 16a–16c).
 
-### Step 5.1: Extension Manifest — `spec/13_extension_manifest.json`
+### Step 5.1: Extensions — `spec/13_extension_manifest.json` and `spec/extensions/`
 
 *Prompt: `prompts/prompt_13_extension_manifest.md`*
 
@@ -341,33 +346,27 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 >
 > **Context to supply**:
 > - `spec/04_fr_list.json`, `spec/02_system_sketch.json`, `spec/01_capabilities.json`
-> - Any plugin or extension points identified during codebase excavation
+> - The domains the codebase excavation found that the core steps do not describe (a database schema, a model, a queue)
 >
-> The AI identifies all extension points in the system and emits `spec/13_extension_manifest.json`.
+> The AI decides which of them need an extension and writes the manifest in a draft; `specdev step create 13 --from <draft>` creates `spec/13_extension_manifest.json`. For each extension the manifest declares, the AI writes the schema file `spec/extensions/ext_NN_<topic>.schema.json`, and `specdev step create 13 <extension-id> --from <draft>` creates the data file `spec/extensions/ext_NN_<topic>.json` (see [extension_schemas.md](../extension_schemas.md)). A manifest that says `none-required` has no other file.
 
 **Validation ritual:**
 ```bash
-./tools/run_specdev.sh validate spec/13_extension_manifest.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --step 13 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
-### Step 5.2: Completeness Assessment — `spec/13a_completeness_assessment.json`
+### Step 5.2: Completeness Check (no artifact)
 
-*Prompt: `prompts/prompt_13a_completeness_assessment.md`*
+Step 13a (the completeness assessment, `spec/13a_completeness_assessment.json`) was removed in 1.2.0. No prompt and no file remain. Check completeness with commands before Step 14:
 
-**User Action:**
-> Open `prompts/prompt_13a_completeness_assessment.md` in your AI assistant.
->
-> **Context to supply**:
-> - All completed Phase I specs (Steps 00–13)
-> - `docs/seed/seed_overview.md`
->
-> The AI performs a pairwise completeness check across the entire spec suite and emits `spec/13a_completeness_assessment.json`. Address any gaps surfaced before proceeding to Step 14.
-
-**Validation ritual:**
 ```bash
-./tools/run_specdev.sh validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh coverage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh step ready 14 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
+
+Address the blockers `step ready 14` lists (the gaps owned by steps below 14) before proceeding to Step 14. The gaps Step 14 owns (E566, E742, E744, E745 and the E740 of the nodes a task criterion uses) are not blockers: the task criteria of Step 14 clear them.
 
 ### Step 5.3: Roadmap — `spec/14_roadmap.json`
 
@@ -377,10 +376,10 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 > Open `prompts/prompt_14_roadmap.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/09_impl_plan.json`, `spec/04_fr_list.json`, `spec/13a_completeness_assessment.json`
+> - `spec/09_impl_plan.json`, `spec/04_fr_list.json`
 > - `docs/seed/seed_overview.md`
 >
-> The AI schedules milestones and roadmap items, emitting `spec/14_roadmap.json`.
+> The AI schedules milestones and roadmap items in a draft; `specdev step create 14 --from <draft>` creates `spec/14_roadmap.json`.
 > Each roadmap item ID uses the format `step-kebab-case`.
 
 **Validation ritual:**
@@ -412,7 +411,7 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 > - `spec/02_system_sketch.json`, `spec/05_interface_contracts.json`, `spec/09_impl_plan.json`
 > - `spec/12_ci_gates.json`, `spec/14_roadmap.json`
 >
-> The AI generates the directory layout, stub files, and test scaffolding, then emits `spec/15_scaffold.json`. After generating the artifact, implement the scaffold manually or using your preferred generator/framework CLI.
+> The AI describes the directory layout, stub files, and test scaffolding in a draft; `specdev step create 15 --from <draft>` creates `spec/15_scaffold.json`. After the artifact is created, implement the scaffold manually or using your preferred generator/framework CLI.
 
 **Validation ritual:**
 ```bash
@@ -429,11 +428,11 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 > Open `prompts/prompt_16_impl_context.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/14_roadmap.json` (active milestone, tasks, fr_refs)
+> - `spec/14_roadmap.json` (active milestone, tasks, acceptance criteria)
 > - `spec/04_fr_list.json`, `spec/05_interface_contracts.json`
 > - `spec/08_fixtures.json`, `spec/09_impl_plan.json`
 >
-> The AI produces the root Trinity Anchor artifact and emits `spec/16_impl_context.json`.
+> The AI writes the root Trinity Anchor as a draft outside `spec/` (`.specdev/drafts/step_16.json`); `specdev step create 16 --from .specdev/drafts/step_16.json` creates `spec/16_impl_context.json`. The command refuses an existing anchor file: the row of one more milestone is added with `specdev json insert --step 16 .plan.milestone_index '<row>'`.
 
 **Validation ritual:**
 ```bash
@@ -442,25 +441,25 @@ These steps take the fully-bootstrapped spec suite through to working, reviewed 
 
 ### Steps 6.3–6.5: The Trinity Loop (16a / 16b / 16c)
 
-The Trinity Loop iterates over each implementation milestone. All three steps operate on milestone-scoped execution files in `spec/impl_context/`, anchored to `spec/16_impl_context.json`. Loop back to 16a if the reviewer returns an unverified verdict.
+The Trinity Loop iterates over each implementation milestone. All three steps operate on the milestone's plan file in `spec/impl_context/`, anchored to `spec/16_impl_context.json`. Loop back to 16a if the reviewer returns an unverified verdict. The order of a milestone's life (start, record, review, sign-off, close) and who decides each step is in [Spec to implementation](spec_to_impl.md#the-life-of-a-milestone).
 
-#### Step 6.3: Impl Planner — `spec/impl_context/{step_id}.json`
+#### Step 6.3: Impl Planner — `spec/impl_context/ms_<batch>_plan.json`
 
 *Prompt: `prompts/prompt_16a_impl_planner.md`*
 
-**Purpose:** Produce a **machine-checkable blueprint** for implementation using the Checklist-Driven Architecture. Every piece of work must be traceable (linked to a specific spec requirement with commit hash), atomic (one checklist item = one testable behavior), explicit (zero "common sense" references), and evidence-bound (every checklist item has a concrete `linked_test_expectation`).
+**Purpose:** Produce a **machine-checkable blueprint** for implementation using the Checklist-Driven Architecture. Every piece of work must be traceable (every checklist item names in `realises` at least one task criterion of the roadmap), atomic (one checklist item = one testable behavior) and explicit (zero "common sense" references).
 
 **User Action:**
 > Open `prompts/prompt_16a_impl_planner.md` in your AI assistant.
 >
 > **Context to supply**:
 > - `spec/16_impl_context.json` (Trinity Anchor scope)
-> - `spec/14_roadmap.json` (active milestone tasks and fr_refs)
+> - `spec/14_roadmap.json` (active milestone tasks and acceptance criteria)
 > - `spec/04_fr_list.json`, `spec/05_interface_contracts.json`
 >
-> The AI creates or updates `spec/impl_context/{step_id}.json` with the plan and checklist for the coding agent.
+> The AI writes a draft of the plan and its checklist, and the plan file is created with `specdev step create 16a <batch> --from <draft>` (an existing plan is edited with `specdev json patch|insert|delete --id <item-id>`). A person approves the plan, then `specdev milestone start <milestone-id>` starts the milestone.
 
-#### Step 6.4: Impl Coder — `spec/impl_context/{step_id}.json`
+#### Step 6.4: Impl Coder — `spec/impl_context/ms_<batch>_plan.json`
 
 *Prompt: `prompts/prompt_16b_impl_coder.md`*
 
@@ -470,12 +469,12 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > Open `prompts/prompt_16b_impl_coder.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/impl_context/{step_id}.json` (the Plan from 16a)
+> - `spec/impl_context/ms_<batch>_plan.json` (the Plan from 16a)
 > - The actual codebase files targeted by `plan.summary.target_file_patterns`
 >
-> The AI writes code files and updates the artifact's `execution` section. If ambiguities are found, it returns an artifact with `emergent_ambiguities` and no code changes — resolve them and re-run 16a.
+> The AI writes code files and records each carried-out action with `specdev plan record <ITEM>/<action-id> --outcome done` (an action that names a verifier is proven by `specdev verify run <binding>` instead). If open items are found, it writes them into `execution.emergent_ambiguities` and stops on the items they concern: each is answered upstream and deleted with `specdev json delete --id <amb-id>` (the close gate refuses a milestone with an open item, E632), and nothing re-runs 16a.
 
-#### Step 6.5: Impl Reviewer — `spec/impl_context/{step_id}.json`
+#### Step 6.5: Impl Reviewer — `spec/impl_context/ms_<batch>_plan.json`
 
 *Prompt: `prompts/prompt_16c_impl_reviewer.md`*
 
@@ -485,15 +484,15 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 > Open `prompts/prompt_16c_impl_reviewer.md` in your AI assistant.
 >
 > **Context to supply**:
-> - `spec/impl_context/{step_id}.json` (Plan + Execution)
+> - `spec/impl_context/ms_<batch>_plan.json` (Plan + Execution)
 > - The actual codebase for the implemented milestone
 >
-> The AI audits the implementation against the plan and spec. If `verdict` is `verified`, it also updates `spec/14_roadmap.json` and `spec/09_impl_plan.json` to set the milestone's status to `done`. If unverified, loop back to Step 16a with the surfaced remediation tasks.
+> The AI audits the implementation against the plan and spec and writes a findings file; the verdict is recorded (by the skill under `/specdev-trinity`; by a person in a manual run) with `specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred --findings-file <file>`. The milestone is closed only by commands: the code is committed, `specdev verify run --milestone <milestone-id> --stage ci` runs, a person signs the milestone off (`specdev milestone sign-off <milestone-id>`), and `specdev milestone close <milestone-id>` runs (run by the skill after the sign-off, or by a person) the close gate and sets the milestone's row in the anchor `spec/16_impl_context.json` (`plan.milestone_index[]`) to `status: done` with its `close` record. `spec/14_roadmap.json` and `spec/09_impl_plan.json` carry no milestone status. If unverified, loop back to Step 16a with the surfaced remediation tasks.
 
 **Validation ritual after each Trinity Loop iteration:**
 ```bash
 ./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -507,11 +506,10 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
    ```bash
    ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-   ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
    ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ```
 2. Commit with a governance-compliant message (see `spec/10_governance.json` for the required pattern).
-3. **You are now fully bootstrapped through implementation.** Steps 13, 13a, and 14 are covered in Phase 5; Steps 15–16c are covered in Phase 6.
+3. **You are now fully bootstrapped through implementation.** Steps 13 and 14 are covered in Phase 5; Steps 15–16c are covered in Phase 6.
 4. To add a new feature or begin a new implementation cycle, proceed to the **[Feature Extension Workflow](./workflow_feature_extension.md)**.

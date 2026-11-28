@@ -1,0 +1,118 @@
+# Legacy (1.1.1) reference fields, per step: which kind of node the id in the field names.
+#
+# The collision script (p2_id_collisions) rewrites a reference to a renamed definition ONLY where the holder field
+# fixes the kind of the node it points at; any other mention is a worklist item.  Field names come from the facts the
+# orchestrator measured on the two real hosts ("fields that hold a colliding id", an upper bound: every field that ever
+# held a value equal to an id that is defined twice by some object, references and definitions alike).
+#
+# Per step ("any" applies to every file):
+#   refs:            field -> kind (a string), or a mapping holder kind -> kind when the field's meaning depends on the
+#                    node that holds it; a holder kind not listed leaves the field unfixed (a worklist item).
+#   definitions:     fields that are the id of a node (a definition, never a reference).
+#   not_references:  field -> why a value equal to an id in it is no reference (a name that only looks like one).
+# Kinds are the names of the 1.2.0 kind registry.
+fields:
+  "00":
+    definitions: [metric_id, segment_id]
+  "01":
+    definitions: [capability_id]
+    refs: {success_metric_refs: metric}
+  "02":
+    definitions: [component_id]
+    refs: {from: component, to: component}
+  "03":
+    not_references: {temp_id: "the proposed id of a canon term (a proposal), not a node reference"}
+  "04":
+    definitions: [fr_id, criterion_id]
+  "05":
+    definitions: [api_id]
+    refs: {fr_id: fr}
+  "06":
+    definitions: [inv_id]
+    refs: {apis: api, components: component}
+  "07":
+    definitions: [nfr_id]
+  "08":
+    definitions: [fixture_id]
+    refs: {mitigates_threat: threat, fr_id: fr}
+    not_references:
+      stage_compose_project: "a compose project name of a stage; a coincidence of text"
+      success_reference_source: "the name of a source a fixture's success is read from; a coincidence of text"
+  "09":
+    definitions: [milestone_id]
+    refs: {depends_on: design-milestone}
+  "11":
+    definitions: [threat_id]
+  "14":
+    definitions: [milestone_id, task_id, criterion_id]
+    refs:
+      fr_refs: fr
+      capability_refs: capability
+      invariant_refs: invariant
+      fixture_ref: fixture
+      source_milestones: design-milestone
+      depends_on: {task: task, roadmap-milestone: roadmap-milestone}
+    not_references: {owner: "the owner enum of the node, not a node id"}
+  "15":
+    refs: {interface_ref: api}
+  "16":
+    refs: {milestone_id: roadmap-milestone, about: {anchor-row: roadmap-milestone}}
+  invariants:
+    not_references: {actor: "the actor of an invariant, a role name"}
+  plan:
+    refs:
+      nfr_refs: nfr
+      nfr_ref: nfr
+      milestone_ref: roadmap-milestone
+      milestone_id: roadmap-milestone
+      fr_refs: fr
+      fr_id: fr
+      implemented_interfaces: api
+      fixture_ref: fixture
+      new_fixtures: fixture
+      impact: null   # names nodes of any kind: the field fixes none, so a collided id there is a worklist item
+    not_references:
+      scope_in: "free text of the scope of the plan"
+      dashboard_id: "the id of a dashboard the plan documents, not a node"
+  trace:
+    refs:
+      fixtures: fixture
+      fr_id: fr
+      apis: api
+      threats: threat
+      nfrs: nfr
+
+# The `type` of a typed entry `{type, id}` of the 1.1.1 files, and the kind it fixes.  A type that names two kinds
+# (04 and 14 both have criteria; 09 and 14 both have milestones) fixes none.
+typed_types:
+  fr: fr
+  api: api
+  nfr: nfr
+  component: component
+  capability: capability
+  invariant: invariant
+  inv: invariant
+  fixture: fixture
+  task: task
+  threat: threat
+  metric: metric
+  criterion: null
+  milestone: null
+
+# A `type` that is not a kind at all: the entry borrowed a word, and the kind is the one the id really has.  Such an
+# entry is converted like any other when exactly one node has the id; an id that matches none or several stays a worklist item.
+borrowed_types: [charter-goal]
+
+# What to do with an id that is defined twice, by the kinds of its definitions.  `rename` is the kind whose
+# definition gets a new id; `replace_prefix` makes the new id from the old one (`first_free_id` makes it free).
+# A pair that is not listed: the later definition is renamed and the new id is the hint of E704 (`<id>-2`).
+collisions:
+  - kinds: [criterion, task-criterion]
+    rename: task-criterion
+    replace_prefix: {from: "ac-", to: "tc-"}
+  - kinds: [design-milestone, roadmap-milestone]
+    rename: design-milestone
+    replace_prefix: {from: "ms-", to: "milestone-"}
+  - kinds: [ambiguity-item, ambiguity-item]
+    rename: null   # not a collision to mint around: P4 deletes the resolved copy, WI-06 converts the rest
+    triage_when_files: anchor-and-plan   # one copy in the anchor, one in a plan: a promoted item, triaged

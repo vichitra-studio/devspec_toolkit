@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:ext-01-database",
+  "title": "ext_01_database",
+  "description": "Extension ext-01-database of the worked example: the datastore of the identity service and the tables that hold a password reset. A host writes a schema like this one beside the data file it describes (spec/extensions/); the toolkit finds it by its file name.",
+  "type": "object",
+  "properties": {
+    "datastores": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The datastores this extension describes. Each is a place where a component keeps its data.",
+      "x-node": {
+        "kind": "datastore",
+        "role": "context",
+        "contract": [
+          "name",
+          "engine",
+          "description"
+        ],
+        "id": "datastore_id"
+      },
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "One datastore: what it is called, which engine runs it and the component it belongs to.",
+        "required": [
+          "datastore_id",
+          "name",
+          "engine",
+          "description",
+          "derives_from"
+        ],
+        "properties": {
+          "datastore_id": {
+            "$ref": "vc:core:atoms#kebabId",
+            "description": "Unique kebab-case id of the datastore. Format: ds-{name}. Example: 'ds-identity'."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the datastore as the team says it."
+          },
+          "engine": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The database engine, for example 'postgresql'."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the datastore holds, in one or two sentences."
+          },
+          "lifecycle": {
+            "$ref": "vc:core:graph#lifecycle",
+            "description": "Lifecycle state of this datastore: active (default), deprecated or not_applicable."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "uniqueItems": true,
+            "description": "Former ids of this datastore. Optional."
+          },
+          "derives_from": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "description": "Ids of the components (step 02) that own this datastore.",
+            "x-link": {
+              "kinds": [
+                "component"
+              ],
+              "required": true,
+              "built": true
+            }
+          }
+        }
+      }
+    },
+    "tables": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The tables of the datastores. A table is something the system must have: it is planned, built and checked like a requirement.",
+      "x-node": {
+        "kind": "table",
+        "role": "obligation-system",
+        "contract": [
+          "name",
+          "description",
+          "columns",
+          "scope",
+          "scope_reason"
+        ],
+        "id": "table_id"
+      },
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "One table: its name, its columns, the datastore it is part of and the requirement it exists for.",
+        "required": [
+          "table_id",
+          "name",
+          "description",
+          "columns",
+          "derives_from",
+          "part_of"
+        ],
+        "allOf": [
+          {
+            "$ref": "vc:core:graph#scopeReasonRule"
+          }
+        ],
+        "properties": {
+          "table_id": {
+            "$ref": "vc:core:atoms#kebabId",
+            "description": "Unique kebab-case id of the table. Format: tbl-{name}. Example: 'tbl-reset-token'."
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "The table name in the database, snake_case."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What a row of the table is, in one or two sentences."
+          },
+          "columns": {
+            "type": "array",
+            "minItems": 1,
+            "description": "The columns of the table, in the order of the table definition.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "One column: its name, its type and whether it may be null.",
+              "required": [
+                "name",
+                "type"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "description": "The column name, snake_case."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The column type as the engine names it, for example 'uuid' or 'timestamptz'."
+                },
+                "nullable": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Whether the column may hold null. Default false."
+                }
+              }
+            }
+          },
+          "term_ref": {
+            "$ref": "vc:core:collections#canonicalRef",
+            "description": "The glossary term this table stores, as a canonical ref (kind term). Each ref a table carries is listed in canonical_refs_used."
+          },
+          "lifecycle": {
+            "$ref": "vc:core:graph#lifecycle",
+            "description": "Lifecycle state of this table: active (default), deprecated or not_applicable."
+          },
+          "scope": {
+            "$ref": "vc:core:graph#scope",
+            "default": "in",
+            "description": "Delivery scope of this table: 'in' (the default), 'later' or 'out'. 'later' and 'out' require scope_reason."
+          },
+          "scope_reason": {
+            "$ref": "vc:core:graph#scopeReason",
+            "description": "Why this table is 'later' or 'out' of scope."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "uniqueItems": true,
+            "description": "Former ids of this table. Optional."
+          },
+          "derives_from": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "description": "Ids of the functional requirements (step 04) this table exists for.",
+            "x-link": {
+              "kinds": [
+                "fr"
+              ],
+              "required": true,
+              "built": true
+            }
+          },
+          "part_of": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "description": "Id of the datastore of this extension that holds the table.",
+            "x-link": {
+              "kinds": [
+                "datastore"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "datastore"
+              ]
+            }
+          },
+          "verified_by": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "description": "Ids of the fixtures (step 08) or CI jobs (step 12) that prove this table: the cases that show it holds what it must. A table in scope names at least one.",
+            "x-link": {
+              "kinds": [
+                "fixture",
+                "job"
+              ],
+              "required": false
+            }
+          }
+        }
+      }
+    },
+    "validation_rules": {
+      "type": "array",
+      "minItems": 1,
+      "description": "What a reviewer or a test checks about the tables, in prose. A rule names tables by their database name, not by id.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "One rule: a short name and the check it asks for.",
+        "required": [
+          "name",
+          "check"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A short name of the rule."
+          },
+          "check": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What must hold, as one sentence that a test can verify."
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "datastores",
+    "tables",
+    "validation_rules"
+  ],
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
+    }
+  ],
+  "unevaluatedProperties": false
+}

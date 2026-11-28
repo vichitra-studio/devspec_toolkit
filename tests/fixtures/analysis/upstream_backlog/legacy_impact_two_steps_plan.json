@@ -1,0 +1,28 @@
+{
+  "id": "ms-legacy-order",
+  "execution": {
+    "emergent_ambiguities": [
+      {
+        "id": "amb-legacy-widened",
+        "severity": "high",
+        "status": "tracking",
+        "description": "Widened from the roadmap to the requirement.",
+        "impact": ["spec/14_roadmap.json:t-1", "spec/04_fr_list.json:fr-password-reset"]
+      },
+      {
+        "id": "amb-legacy-no-step",
+        "severity": "low",
+        "status": "tracking",
+        "description": "Names no step file.",
+        "impact": ["SCREAMING_TOKEN"]
+      },
+      {
+        "id": "amb-legacy-resolved",
+        "severity": "medium",
+        "status": "resolved",
+        "description": "Already resolved.",
+        "impact": ["spec/05_interface_contracts.json:api-password-reset-confirm"]
+      }
+    ]
+  }
+}

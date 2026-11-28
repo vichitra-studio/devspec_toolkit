@@ -1,78 +1,134 @@
-"""Tests for init_project.py pre-commit config generation and seed bootstrap."""
+"""Tests for init_project.py: the host install delegate, the strict-mode hook, seed bootstrap and the CI workflow render."""
 import json
 import os
 import sys
 from unittest import mock
 
+import pytest
+
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
-from init_project import _build_pre_commit_config, _render_ci_workflow, copy_seeds_from_manifest
+import init_project
+from init_project import copy_seeds_from_manifest
 
 
-class TestBuildPreCommitConfig:
-    def test_repo_root_flag_present(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "--repo-root ./devspec_toolkit" in content
+class TestInitIntoHost:
+    """Run `init_project.main` into a temporary host with every subprocess stubbed."""
 
-    def test_custom_toolkit_path(self):
-        content = _build_pre_commit_config("custom/path")
-        assert "--repo-root ./custom/path" in content
+    TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-    def test_contains_spec_check_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "spec-check" in content
+    def _init(self, host, monkeypatch) -> None:
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(host), "--toolkit-root", self.TOOLKIT_ROOT])
+        with (
+            mock.patch("init_project.run_cmd"),
+            mock.patch("init_project.run_install_delegate", return_value=0),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
 
-    def test_contains_canonical_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "canonical-lint" in content
+    def test_init_itself_writes_no_pre_commit_config_and_runs_no_plain_pre_commit_install(self, tmp_path, monkeypatch):
+        calls: list[list[str]] = []
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT])
+        with (
+            mock.patch("init_project.run_cmd", side_effect=lambda cmd, **kw: calls.append(list(cmd))),
+            mock.patch("init_project.run_install_delegate", return_value=0),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
+        assert not (tmp_path / ".pre-commit-config.yaml").exists()
+        assert not any(c[-1:] == ["install"] and "pre-commit" in c[0] for c in calls)
+        assert not hasattr(init_project, "_build_pre_commit_config")
 
-    def test_contains_seed_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "seed-lint" in content
+    def test_strict_adds_the_commit_msg_hook_and_appends_the_governance_hook_after_the_delegate(self, tmp_path, monkeypatch):
+        (tmp_path / "devspec_env" / "bin").mkdir(parents=True)
+        (tmp_path / "devspec_env" / "bin" / "pre-commit").write_text("#!/bin/sh\n")
+        config = tmp_path / ".pre-commit-config.yaml"
+        calls: list[tuple[str, list[str]]] = []
 
-    def test_contains_dependency_order_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "dependency-order-lint" in content
+        def delegate(cmd, cwd):  # the installer writes the file; init only appends the strict hook afterwards
+            calls.append(("delegate", list(cmd)))
+            config.write_text("repos:\n  - repo: local\n    hooks:\n      # >>> specdev-managed\n      - id: spec-check\n      # <<< specdev-managed\n")
+            return 0
 
-    def test_path_substitution_applied(self):
-        content = _build_pre_commit_config("my_toolkit")
-        assert "./devspec_toolkit" not in content
-        assert "devspec_toolkit/" not in content
-        assert "devspec_toolkit/tools" not in content
-        assert "./my_toolkit" in content
-        assert "my_toolkit/" in content
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT, "--strict"])
+        with (
+            mock.patch("init_project.run_cmd", side_effect=lambda cmd, **kw: calls.append(("run_cmd", list(cmd)))),
+            mock.patch("init_project.run_install_delegate", side_effect=delegate),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
+        order = [name for name, _ in calls]
+        commit_msg = next(i for i, (n, c) in enumerate(calls) if n == "run_cmd" and c[-2:] == ["--hook-type", "commit-msg"])
+        assert order.index("delegate") < commit_msg
+        text = config.read_text()
+        assert text.rstrip().endswith("stages: [commit-msg]")
+        assert text.index("devspec-governance") > text.index("# <<< specdev-managed")
 
-    def test_build_pre_commit_config_missing_template(self):
-        with mock.patch("init_project.os.path.exists", return_value=False):
-            content = _build_pre_commit_config("devspec_toolkit")
-        assert "spec-check" in content
-        assert "devspec_env/bin/python" in content
-        assert "--repo-root ./devspec_toolkit" in content
-        assert "--spec-root ./spec" in content
-        assert "--git-root ." in content
+    def test_init_delegates_to_venv_cli_after_venv_created(self, tmp_path, monkeypatch):
+        calls: list[tuple[str, list[str]]] = []
+        monkeypatch.setattr(
+            sys, "argv",
+            ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT, "--force-claude"],
+        )
+        with (
+            mock.patch("init_project.run_cmd", side_effect=lambda cmd, **kw: calls.append(("run_cmd", list(cmd)))),
+            mock.patch("init_project.run_install_delegate", side_effect=lambda cmd, cwd: calls.append(("delegate", [*cmd, cwd])) or 0),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+        ):
+            init_project.main()
+        names = [name for name, _ in calls]
+        setup = next(i for i, (n, c) in enumerate(calls) if n == "run_cmd" and c[0] == "bash")
+        precommit = next(i for i, (n, c) in enumerate(calls) if n == "run_cmd" and c[:3] == ["uv", "pip", "install"])
+        delegate = names.index("delegate")
+        assert setup < precommit < delegate
+        command = calls[delegate][1]
+        rel_toolkit = os.path.relpath(self.TOOLKIT_ROOT, tmp_path).replace("\\", "/")
+        assert command == [
+            str(tmp_path / "devspec_env" / "bin" / "specdev"), "update", "spec", "--repo-root", rel_toolkit,
+            "--install-only", "--force-claude", str(tmp_path),
+        ]
 
-    def test_contains_dag_lint_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "dag-lint" in content
+    def test_init_exits_nonzero_with_the_rerun_command_when_the_delegate_fails(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["init_project.py", "--target", str(tmp_path), "--toolkit-root", self.TOOLKIT_ROOT])
+        with (
+            mock.patch("init_project.run_cmd"),
+            mock.patch("init_project.run_install_delegate", return_value=1),
+            mock.patch("init_project.shutil.which", return_value="/usr/bin/uv"),
+            pytest.raises(SystemExit) as raised,
+        ):
+            init_project.main()
+        assert raised.value.code == 1
+        assert "./tools/run_specdev.sh update spec --repo-root" in capsys.readouterr().err
 
-    def test_contains_extraction_intent_check_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "extraction-intent-check" in content
+    def test_init_project_never_imports_the_package(self):
+        import ast
 
-    def test_contains_canon_schema_alignment_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "canon-schema-alignment" in content
+        tree = ast.parse(open(init_project.__file__, encoding="utf-8").read())
+        imported = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        imported |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+        assert "specdev_tools" not in imported
 
-    def test_contains_canonical_integrity_hook(self):
-        content = _build_pre_commit_config("devspec_toolkit")
-        assert "canonical-integrity" in content
 
-    def test_custom_venv_name_propagates(self):
-        content = _build_pre_commit_config("devspec_toolkit", "customenv")
-        assert "customenv/bin/python" in content
-        # no leakage of the default venv name when a custom one is requested
-        assert "devspec_env/bin/python" not in content
+class TestCommitMsgHookInstall:
+    """`--strict` installs the commit-msg hook; a refusal by pre-commit is a warning, not a crash."""
+
+    @staticmethod
+    def _fake_pre_commit(tmp_path, exit_code):
+        script = tmp_path / "pre-commit"
+        script.write_text(f"#!/bin/sh\nexit {exit_code}\n")
+        script.chmod(0o755)
+        return str(script)
+
+    def test_a_failing_commit_msg_install_is_a_warning(self, tmp_path, capsys):
+        installed = init_project.install_commit_msg_hook(self._fake_pre_commit(tmp_path, 1), str(tmp_path))
+        assert installed is False
+        assert "core.hooksPath" in capsys.readouterr().err
+
+    def test_a_working_commit_msg_install_returns_true(self, tmp_path, capsys):
+        installed = init_project.install_commit_msg_hook(self._fake_pre_commit(tmp_path, 0), str(tmp_path))
+        assert installed is True
+        assert capsys.readouterr().err == ""
 
 
 class TestManifestDerivedSeedBootstrap:
@@ -176,37 +232,16 @@ class TestManifestDerivedSeedBootstrap:
         )
 
 
-class TestCiWorkflowRender:
-    def test_default_venv_name_in_ci(self):
-        content = _render_ci_workflow(".", "devspec_env")
-        # uv-driven setup: managed Python + venv on the default name
-        assert "astral-sh/setup-uv" in content
-        assert "uv venv devspec_env --python 3.13" in content
-        assert "uv pip install --python devspec_env/bin/python" in content
-        # the old pip/venv path must be gone
-        assert "python -m venv" not in content
-        assert "/bin/pip install" not in content
+class TestExtensionSeedTemplate:
+    """seed_templates/seed_extension.md is a blank for the seed of one feature; init copies it with the others."""
 
-    def test_custom_venv_name_propagates(self):
-        content = _render_ci_workflow(".", "customenv")
-        assert "uv venv customenv --python 3.13" in content
-        assert "uv pip install --python customenv/bin/python" in content
-        assert "customenv/bin" in content
-        # no leakage of the default venv name when a custom one is requested
-        assert "devspec_env" not in content
+    TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-    def test_ci_uses_spec_check_not_validate_all(self):
-        content = _render_ci_workflow(".", "devspec_env")
-        assert "spec-check" in content
-        assert "validate-all" not in content
-        assert "--spec-root ./spec" in content
-        assert "--git-root ." in content
+    def test_extension_seed_template_is_scaffolded(self, tmp_path):
+        templates_dir = os.path.join(self.TOOLKIT_ROOT, "seed_templates")
+        manifest_path = os.path.join(templates_dir, "seed_manifest.json")
 
-    def test_toolkit_path_substitution(self):
-        content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")
-        assert "vendor/devspec_toolkit/tools" in content
-        # Every "devspec_toolkit/tools" occurrence must carry the vendor/ prefix —
-        # i.e. the path substitution left no unsubstituted bare token behind.
-        # (Discriminating: if replace-1 were dropped, bare tokens would remain and
-        # the counts would diverge.)
-        assert content.count("devspec_toolkit/tools") == content.count("vendor/devspec_toolkit/tools")
+        copy_seeds_from_manifest(str(tmp_path), templates_dir, manifest_path)
+
+        assert (tmp_path / "docs" / "seed" / "seed_extension.md").is_file()
+        assert (tmp_path / "docs" / "seed" / "seed_overview.md").is_file()

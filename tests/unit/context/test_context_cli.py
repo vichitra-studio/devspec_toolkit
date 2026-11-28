@@ -27,14 +27,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TOOLS_DIR = REPO_ROOT / "tools"
 SPEC_CORPUS = REPO_ROOT / "tests" / "fixtures" / "spec_corpus"
+GRAPH_EXAMPLE_SPEC = REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+SCOPE_ENTRY = "fr-password-reset"
 
 
 @pytest.fixture
-def spec_corpus_copy(tmp_path):
-    """Return a temporary copy of SPEC_CORPUS so writes (e.g. trace_matrix.json)
-    land in tmp_path rather than the tracked fixture directory."""
-    dest = tmp_path / "spec_corpus"
-    shutil.copytree(str(SPEC_CORPUS), str(dest))
+def graph_example_copy(tmp_path):
+    """Return a temporary copy of the worked example spec (a 1.2.0 graph with declared links)."""
+    dest = tmp_path / "spec"
+    shutil.copytree(str(GRAPH_EXAMPLE_SPEC), str(dest))
     return dest
 
 
@@ -184,6 +185,32 @@ class TestContextCanon:
         )
 
 
+def test_context_canon_includes_manifest_only_project_entry(tmp_path):
+    """A project canon that holds manifest.json alone (no kinds/) is read by `context canon`."""
+    canon = tmp_path / "spec" / "canon"
+    canon.mkdir(parents=True)
+    entry = {
+        "id": "cn:project:capability:account-recovery",
+        "kind": "capability",
+        "preferred_label": "Account recovery",
+        "definition": "Members regain access to an account.",
+        "version": "1.0.0",
+        "status": "active",
+    }
+    (canon / "manifest.json").write_text(
+        json.dumps({"registry_version": "1.0.0", "entries": [entry], "aliases": []}), encoding="utf-8",
+    )
+    proc = _run(
+        "context", "canon",
+        "--step", "04",
+        "--repo-root", str(REPO_ROOT),
+        "--spec-root", str(tmp_path / "spec"),
+    )
+    data = _parse_json(proc)
+    ids = [e["id"] for e in data["canon_kinds"]["capability"]]
+    assert "cn:project:capability:account-recovery" in ids
+
+
 # ---------------------------------------------------------------------------
 # context freshness
 # ---------------------------------------------------------------------------
@@ -290,11 +317,8 @@ class TestContextFreshness:
             "indexed_hash and current_hash must match for an unmodified seed"
         )
 
-    def test_stale_seed_detected(self, tmp_path):
-        """Modifying a seed file after indexing must cause stale=True.
-
-        Uses the standard flat layout (no --git-root).
-        """
+    def _indexed_overview_seed(self, tmp_path):
+        """A flat-layout host with one indexed seed (`seed-overview`); returns the spec dir and the seed file."""
         spec_dir = tmp_path / "spec"
         common_dir = spec_dir / "common"
         seed_file_dir = tmp_path / "docs" / "seed"
@@ -324,19 +348,22 @@ class TestContextFreshness:
         (common_dir / "seed_manifest.json").write_text(
             json.dumps(manifest, indent=2), encoding="utf-8"
         )
-
-        # Index the seed
         idx_proc = _run(
             "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
         assert idx_proc.returncode == 0, f"seed-index failed: {idx_proc.stderr}"
+        return spec_dir, seed_file
 
-        # Modify the seed file so it's stale
+    def test_stale_seed_detected(self, tmp_path):
+        """Modifying a seed file after indexing must cause stale=True.
+
+        Uses the standard flat layout (no --git-root).
+        """
+        spec_dir, seed_file = self._indexed_overview_seed(tmp_path)
         seed_file.write_text("Modified content — now stale!\n", encoding="utf-8")
 
-        # Check freshness — expect stale=True
         proc = _run(
             "context", "freshness", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
@@ -347,8 +374,21 @@ class TestContextFreshness:
             "Seed content changed after indexing; must report stale=True"
         )
 
+    def test_context_freshness_prints_no_w595_on_stderr(self, tmp_path):
+        """A stale seed is a suspect (`specdev stale`), not a W595 line: freshness prints its JSON only."""
+        spec_dir, seed_file = self._indexed_overview_seed(tmp_path)
+        seed_file.write_text("Modified content — now stale!\n", encoding="utf-8")
+
+        proc = _run(
+            "context", "freshness", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+        )
+        assert proc.returncode == 0
+        assert _parse_json(proc)["seed-overview"]["stale"] is True
+        assert "W595" not in proc.stderr and proc.stderr.strip() == ""
+
     def test_untracked_manifest_seed_detected(self, tmp_path):
-        """A manifest seed absent from the index reports untracked=True and W595.
+        """A manifest seed absent from the index reports untracked=True in the JSON (and no W595 line).
 
         Regression guard for DEVSPEC-125 Gap 2: previously check_freshness only
         iterated indexed seeds, so a manifest seed added after the last index
@@ -405,9 +445,7 @@ class TestContextFreshness:
         assert "seed-extra" in data, f"untracked seed missing from output: {data}"
         assert data["seed-extra"]["untracked"] is True
         assert data["seed-overview"]["untracked"] is False
-        assert "W595" in proc.stderr and "seed-extra" in proc.stderr, (
-            f"expected W595 SEED_UNTRACKED for seed-extra on stderr: {proc.stderr!r}"
-        )
+        assert "W595" not in proc.stderr
 
     def test_nested_layout_freshness_resolves_via_git_root(self, tmp_path):
         """Nested layout: spec_dir is NOT a direct child of the host root.
@@ -489,59 +527,61 @@ class TestContextFreshness:
 # ---------------------------------------------------------------------------
 
 class TestContextScope:
-    """Smoke tests for `specdev context scope`."""
+    """Smoke tests for `specdev context scope` (an alias over the spec graph's trace)."""
 
-    def test_entry_id_present_in_source_files(self, spec_corpus_copy):
+    def test_entry_id_present_in_source_files(self, graph_example_copy):
         """The queried entry ID must appear in source_files with its origin file."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
-        assert "FR-CORPUS-001" in data["source_files"], (
-            f"FR-CORPUS-001 not found in source_files: {data.get('source_files')}"
+        assert SCOPE_ENTRY in data["source_files"], (
+            f"{SCOPE_ENTRY} not found in source_files: {data.get('source_files')}"
         )
-        assert data["source_files"]["FR-CORPUS-001"]["file"].endswith("04_fr_list.json"), (
-            f"Unexpected source file: {data['source_files']['FR-CORPUS-001']['file']}"
+        assert data["source_files"][SCOPE_ENTRY]["file"].endswith("04_fr_list.json"), (
+            f"Unexpected source file: {data['source_files'][SCOPE_ENTRY]['file']}"
         )
 
-    def test_connected_entities_are_reachable(self, spec_corpus_copy):
-        """BFS must discover cross-file linked entities (milestone, API, NFR, etc.)."""
+    def test_connected_entities_are_reachable(self, graph_example_copy):
+        """The scope must reach linked entities of other files, grouped by kind, and none of the entry's siblings."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
-        # All IDs across all buckets (spec_corpus uses uppercase so they land in "other")
-        all_ids: set[str] = set()
         resolved = data.get("resolved_ids", {})
+        all_ids: set[str] = set()
         for bucket_ids in resolved.values():
             all_ids.update(bucket_ids)
 
-        expected_connected = {"MS-CORPUS-001", "API-CORPUS-001", "NFR-CORPUS-001"}
+        expected_connected = {"milestone-account-recovery", "api-password-reset-confirm", "nfr-latency-reset-email"}
         missing = expected_connected - all_ids
         assert not missing, (
             f"Expected cross-file entities {expected_connected} to be reachable. "
             f"Missing: {missing}. All found: {all_ids}"
         )
+        assert resolved["fr"] == [SCOPE_ENTRY], "the buckets are named by kind and the FR bucket holds the entry alone"
+        assert "fr-password-reset-request" not in all_ids, "a sibling FR is not part of the scope"
+        assert "deprecated" in proc.stderr, "context scope prints a deprecation note on stderr"
 
-    def test_entry_field_echoed(self, spec_corpus_copy):
+    def test_entry_field_echoed(self, graph_example_copy):
         """The 'entry' field must echo the --entry argument."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
-        assert data["entry"] == "FR-CORPUS-001"
+        assert data["entry"] == SCOPE_ENTRY
 
-    def test_found_entry_has_no_scope_warning(self, spec_corpus_copy):
+    def test_found_entry_has_no_scope_warning(self, graph_example_copy):
         """An entry that exists in spec files must not produce a scope_warning."""
         proc = _run(
-            "context", "scope", str(spec_corpus_copy),
-            "--entry", "FR-CORPUS-001",
+            "context", "scope", str(graph_example_copy),
+            "--entry", SCOPE_ENTRY,
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)

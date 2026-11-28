@@ -3,71 +3,24 @@
   "id": "roadmap-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "tech_stack": {
-    "languages": [
-      {
-        "name": "python",
-        "version": "3.9",
-        "rationale": "Primary language for backend services"
-      },
-      {
-        "name": "javascript",
-        "version": "ES6",
-        "rationale": "Frontend development"
-      }
-    ],
-    "frameworks": [
-      {
-        "name": "fastapi",
-        "version": "0.95.0",
-        "rationale": "High performance web framework"
-      },
-      {
-        "name": "react",
-        "version": "18.2.0",
-        "rationale": "Frontend UI library"
-      }
-    ],
-    "infrastructure": [
-      {
-        "name": "docker",
-        "version": "20.10.0",
-        "rationale": "Containerization platform"
-      },
-      {
-        "name": "kubernetes",
-        "version": "1.25.0",
-        "rationale": "Container orchestration"
-      }
-    ],
-    "tools": [
-      {
-        "name": "poetry",
-        "version": "1.4.0",
-        "rationale": "Dependency management"
-      }
-    ]
-  },
   "milestones": [
     {
       "milestone_id": "m1-core-foundation",
       "name": "Core Foundation",
       "target_date": "2025-02-01",
-      "status": "done",
       "risk_status": "low",
       "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
-      "source_milestones": [
-        "m1-core-foundation"
-      ],
       "tasks": [
         {
           "task_id": "init-fastapi-project",
           "description": "Initialize FastAPI project structure",
-          "fr_refs": ["fr-initial-setup", "fr-project-bootstrap"],
           "acceptance_criteria": [
             {
               "criterion_id": "project-structure-ready",
-              "text": "FastAPI app boots with expected folder layout in place."
+              "text": "FastAPI app boots with expected folder layout in place.",
+              "refines": [
+                "ac-project-structure-ready"
+              ]
             }
           ]
         },
@@ -77,7 +30,10 @@
           "acceptance_criteria": [
             {
               "criterion_id": "docker-compose-runs",
-              "text": "Docker compose up starts both DB and app containers successfully."
+              "text": "Docker compose up starts both DB and app containers successfully.",
+              "refines": [
+                "ac-docker-compose-runs"
+              ]
             }
           ]
         },
@@ -87,23 +43,14 @@
           "acceptance_criteria": [
             {
               "criterion_id": "health-endpoint-ok",
-              "text": "GET /health returns 200 with JSON status body."
+              "text": "GET /health returns 200 with JSON status body.",
+              "refines": [
+                "ac-health-endpoint-ok"
+              ]
             }
           ]
         }
       ],
-      "deliverables": [
-        {
-          "type": "api",
-          "id": "health-endpoint"
-        },
-        {
-          "type": "doc",
-          "id": "project-structure"
-        }
-      ],
-      "fr_refs": ["fr-health-check", "fr-project-setup"],
-      "capability_refs": ["cap-core-infrastructure"],
       "risks": [],
       "spikes": []
     },
@@ -111,12 +58,8 @@
       "milestone_id": "m2-authentication",
       "name": "Authentication System",
       "target_date": "2025-03-15",
-      "status": "in_progress",
       "risk_status": "medium",
       "user_story": "As a user, I want to securely log in so that I can access protected resources.",
-      "source_milestones": [
-        "m2-authentication"
-      ],
       "tasks": [
         {
           "task_id": "implement-jwt-generation",
@@ -124,7 +67,10 @@
           "acceptance_criteria": [
             {
               "criterion_id": "jwt-issued",
-              "text": "Login returns a signed JWT with correct claims payload."
+              "text": "Login returns a signed JWT with correct claims payload.",
+              "refines": [
+                "ac-jwt-issued"
+              ]
             }
           ]
         },
@@ -134,7 +80,10 @@
           "acceptance_criteria": [
             {
               "criterion_id": "registration-endpoint-works",
-              "text": "POST /register creates a new user and returns 201 status."
+              "text": "POST /register creates a new user and returns 201 status.",
+              "refines": [
+                "ac-registration-endpoint-works"
+              ]
             }
           ]
         },
@@ -144,36 +93,20 @@
           "acceptance_criteria": [
             {
               "criterion_id": "passwords-hashed",
-              "text": "User passwords are stored using bcrypt with salt rounds."
+              "text": "User passwords are stored using bcrypt with salt rounds.",
+              "refines": [
+                "ac-passwords-hashed"
+              ]
             }
           ]
         }
       ],
-      "deliverables": [
-        {
-          "type": "api",
-          "id": "auth-endpoints"
-        },
-        {
-          "type": "doc",
-          "id": "auth-architecture"
-        }
-      ],
-      "fr_refs": ["fr-user-login", "fr-user-registration"],
-      "capability_refs": ["cap-auth", "cap-user-management"],
       "risks": [
         "Security vulnerabilities in token implementation"
       ],
       "spikes": [
         "Investigate secure password hashing algorithms"
       ]
-    }
-  ],
-  "dependencies": [],
-  "trace": [
-    {
-      "type": "capability",
-      "id": "core-api"
     }
   ],
   "canonical_refs_used": []

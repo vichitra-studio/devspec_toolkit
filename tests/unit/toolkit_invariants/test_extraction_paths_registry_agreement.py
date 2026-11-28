@@ -15,12 +15,11 @@ Exclusions:
   - ``_meta`` and other ``_``-prefixed keys in extraction_paths (tooling metadata).
   - Sentinel basenames in the registry (``canonical_refs_used``, ``canonical_proposals``).
   - Registry entries with ``_special: true``.
-  - Steps in ``steps_without_entry_arrays`` and ``steps_with_deferred_registration``
-    are excluded from the registry side (they are registered as opted-out/deferred,
-    not in ``registry``). However, those steps must NOT appear in extraction_paths
+  - Steps in ``steps_without_entry_arrays`` are excluded from the registry side
+    (they are registered as opted-out, not in ``registry``). However, those steps must NOT appear in extraction_paths
     either (they have no entry arrays to extract).
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_extraction_paths_registry_agreement.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/
@@ -43,6 +42,8 @@ _REGISTRY_PATH = _TOOLKIT_ROOT / "tools" / "entry_key_registry.json"
 _EXTRACTION_PATHS_PATH = _TOOLKIT_ROOT / "tools" / "extraction_paths.json"
 
 _SENTINEL_KEYS = frozenset({"canonical_refs_used", "canonical_proposals"})
+_RECORD_HOST_STEP = "extras"
+"""Step of the record hosts (``extras/verification/*``): tool-written records, not extraction targets."""
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +65,7 @@ def _registry_basenames(doc: dict) -> set[str]:
     for bn, entry in doc.get("registry", {}).items():
         if bn in _SENTINEL_KEYS:
             continue
-        if entry.get("_special", False):
+        if entry.get("_special", False) or entry.get("step") == _RECORD_HOST_STEP:
             continue
         basenames.add(bn)
     return basenames
@@ -185,7 +186,7 @@ class TestExtractionPathsRegistryAgreement:
 
         mismatches: list[str] = []
         for bn, entry in registry_doc.get("registry", {}).items():
-            if bn in _SENTINEL_KEYS or entry.get("_special", False):
+            if bn in _SENTINEL_KEYS or entry.get("_special", False) or entry.get("step") == _RECORD_HOST_STEP:
                 continue
             ext_paths = ext_lookup.get(bn, [])
             for arr in entry.get("arrays", []):

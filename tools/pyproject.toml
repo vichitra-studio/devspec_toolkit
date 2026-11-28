@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "specdev_tools"
-version = "1.1.1"
+version = "1.2.0"
 description = "Internal tooling for DevSpec Toolkit"
 authors = [{name = "Vichitra Collective"}]
 license = {text = "MIT"}
@@ -44,10 +44,11 @@ specdev = "specdev_tools.cli:main"
 include = ["specdev_tools*"]
 
 [tool.setuptools.package-data]
-specdev_tools = ["guides/*.yaml"]
+specdev_tools = ["guides/*.yaml", "migration/maps/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*", "*Tests"]
 python_functions = ["test_*"]
+markers = ["host_migration: runs the migration on a copy of a real host named by SPECDEV_HOST_W / SPECDEV_HOST_P (opt-in, skipped without them)"]

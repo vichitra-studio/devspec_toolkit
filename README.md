@@ -33,13 +33,24 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 └─ tools/                    # CLI package + schema registry
    └─ specdev_tools/         # Python CLI package
       ├─ cli.py              # entry point
-      ├─ core/               # errors, registry, trace_types, changelog_parser
-      ├─ validation/         # validate, validators/, linters (fixtures, seed, docs,
-      │                      #   quality, hallucination, dependency, forward-replay,
-      │                      #   traceability, invariants, governance, matrix)
+      ├─ core/               # errors, registry, git_base, changelog_parser
+      ├─ validation/         # validate, validators/, linters (fixtures, seed,
+      │                      #   quality, hallucination, dependency, invariants, governance,
+      │                      #   graph_checks, step gate)
       ├─ generation/         # prompt_generator, prompt_schema_sync, schema_differ
       ├─ canonical/          # autofix, integrity, lint, registry
-      └─ migration/          # planner, runner
+      ├─ registry/           # registry-generate: annotations, entry-key registry, step order, checklist
+      ├─ graph/              # the spec graph: nodes, links, queries, diff, lineage
+      ├─ trace/              # trace lock, suspect links, attest, replay, writes by node id, step create
+      ├─ lifecycle/          # milestone start / sign-off / defer / close, close gate, plan and review records, status
+      ├─ verify/             # verify bind, verify run, verification records
+      ├─ proof/              # proof of obligations, evidence validity, realisation
+      ├─ release/            # release prep, release gates, tagging
+      ├─ thirdparty/         # third-party pins and their checks
+      ├─ context/            # step context, canon extraction, review scope, seed index, milestone-state
+      ├─ analysis/           # upstream-backlog
+      ├─ guides/             # the playbooks `specdev guide <code>` prints
+      └─ migration/          # runner, scripts, triage, proposers, writer
 
 ```
 

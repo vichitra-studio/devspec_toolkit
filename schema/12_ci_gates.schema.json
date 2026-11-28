@@ -10,13 +10,9 @@
     {
       "type": "object",
       "properties": {
-        "trace": {
-          "type": "array",
-          "description": "Traceability links connecting CI gate jobs to the spec artifacts they enforce. Decision rule: every CI gate must trace to at least one NFR or invariant it enforces, using type='enforces'. Example: [{\"type\": \"enforces\", \"id\": \"nfr-api-auth-p95-latency\", \"note\": \"This gate rejects PRs that degrade latency beyond the NFR target\"}]. A second example: [{\"type\": \"enforces\", \"id\": \"inv-test-coverage-threshold\", \"note\": \"Coverage gate enforces the 80% line coverage invariant\"}]. Gates without trace links are floating checks that cannot be mapped to their specification rationale. Consult the items description for approved types and format. Anti-pattern: prose strings instead of traceRef objects — always use the {type, id, note} structure.",
-          "items": {
-            "$ref": "vc:core:collections#traceRef",
-            "description": "A traceability link from this CI gates spec to another artifact. Use to connect enforcement jobs back to the NFRs, invariants, or FRs they protect. Examples: link a security-scan job back to 'nfr-security-vuln-scan', link a coverage gate to 'nfr-test-coverage'. Provides end-to-end traceability from quality requirement to pipeline enforcement."
-          }
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
         },
         "jobs": {
           "type": "array",
@@ -28,15 +24,11 @@
             "properties": {
               "job_id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this CI job. Recommended format: gate-{phase}-{check}. Example: 'gate-build-unit-tests', 'gate-deploy-security-scan'. Should be unique across all jobs in this spec (enforced by linters, not the schema)."
+                "description": "Unique kebab-case identifier for this CI job. Recommended format: gate-{phase}-{check}. Example: 'gate-build-unit-tests', 'gate-deploy-security-scan'. It should be unique across the whole spec, not only among jobs: a CI gate's `gate_id` with the same value is reported as E704 by `spec-check`."
               },
               "name": {
                 "type": "string",
                 "description": "Human-readable display name for this CI gate job, shown in CI dashboards and PR status checks. Decision rule: use Title Case, mirroring the words in job_id. Examples: job_id='unit-tests' → name='Unit Tests'; job_id='security-scan' → name='Security Scan'; job_id='e2e-smoke' → name='E2E Smoke Tests'. Anti-pattern: name='Tests' when job_id='unit-tests' (inconsistent, hides the scope); name='Run unit tests and check coverage' (too verbose for a CI dashboard label)."
-              },
-              "requires": {
-                "$ref": "vc:core:collections#kebabIdArray",
-                "description": "Other gates or jobs that must complete before this job runs. When present, must contain at least one entry (enforced by minItems from kebabIdArray). Omit the field entirely for jobs with no prerequisites. Use to model the dependency DAG of your CI pipeline. Example: 'unit-tests must pass before integration-tests run'. Each entry should reference a valid job_id defined in this spec (enforced by linters, not the schema)."
               },
               "steps": {
                 "type": "array",
@@ -46,10 +38,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "id": {
-                      "$ref": "vc:core:atoms#kebabId",
-                      "description": "Unique kebab-case identifier for this pipeline step within the parent job. Use the pattern '{verb}-{noun}' describing what the step does. Examples: 'run-unit-tests', 'install-dependencies', 'build-docker-image', 'run-security-scan', 'upload-coverage-report'. Should be unique within the parent job. Referenced by step dependency declarations and failure reporting."
-                    },
                     "name": {
                       "type": "string",
                       "description": "Human-readable display name for this pipeline step. Use Title Case, verb + noun phrase. Examples: 'Install Dependencies', 'Run Unit Tests', 'Build Docker Image', 'Run Security Scan', 'Upload Coverage Report'. Shown in CI pipeline dashboards next to pass/fail status."
@@ -67,11 +55,10 @@
                     }
                   },
                   "required": [
-                    "id",
                     "name",
                     "command"
                   ],
-                  "description": "A single atomic step within this CI job. Steps execute sequentially; if any step fails, the job fails immediately. Each step should have a unique id within the job, a human-readable name for dashboard display, and a specific reproducible command. Minimize steps that have side effects outside the job runner."
+                  "description": "A single atomic step within this CI job. Steps execute sequentially; if any step fails, the job fails immediately. Each step carries a human-readable name for dashboard display, and a specific reproducible command. Minimize steps that have side effects outside the job runner."
                 }
               },
               "environment_ref": {
@@ -132,6 +119,94 @@
                     }
                   }
                 }
+              },
+              "realises": {
+                "description": "Ids of the nodes this job is the running proof of: the environment it runs in, the gate it runs, the secret it uses or the rule it enforces. Optional; the schema accepts a job that names nothing here. A scheduled live probe is an ordinary job whose environment_ref is the environment it probes and whose realises names the gate or rule it guards. Example: [\"ci\", \"contract-tests\", \"rule-contract-tests-on-every-pr\"]. Anti-pattern: naming an NFR here (use verifies).",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "environment",
+                    "gate",
+                    "secret",
+                    "rule"
+                  ],
+                  "required": false,
+                  "built": true
+                }
+              },
+              "verifies": {
+                "description": "Ids of the NFRs this job's run proves, such as a load test that proves a latency target. Optional; the same verb and meaning as verifies on a fixture. Example: [\"nfr-password-reset-latency\"]. Anti-pattern: naming a rule or gate here (use realises).",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "nfr"
+                  ],
+                  "required": false
+                }
+              },
+              "depends_on": {
+                "description": "Ids of the other jobs in this spec that must complete before this job runs. Optional; omit for a job with no prerequisites. The jobs must not form a cycle. Example: [\"unit-tests\"].",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "job"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "job"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this job: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this job; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "derives_from": {
+                "description": "Ids of the seeds this job takes content from directly. Optional: list a seed routed to this step, and only for content taken straight from the seed and not through an upstream node.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": false,
+                  "built": true
+                }
+              },
+              "replaces": {
+                "description": "Ids of nodes that this job replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -141,6 +216,18 @@
               "environment_ref"
             ],
             "description": "A single CI job definition with steps, dependency ordering, environment targeting, and security configuration."
+          },
+          "x-node": {
+            "kind": "job",
+            "role": "verifier",
+            "contract": [
+              "name",
+              "steps",
+              "environment_ref",
+              "role_ref",
+              "security"
+            ],
+            "id": "job_id"
           }
         },
         "coverage_thresholds": {

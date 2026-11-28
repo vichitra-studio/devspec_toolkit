@@ -23,8 +23,11 @@ from urllib.parse import urldefrag, urljoin
 from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import ERROR_CODES, SpecError, make_error
+from ..core.host_schemas import schema_uri_problem, spec_root_for
 from ..core.loaders import iter_spec_artifacts
-from ..core.registry import SchemaRegistry
+from ..core.registry import SchemaRegistry, get_shared_registry
+from ..core.step_paths import EXTENSION_STEP, is_extension_file
+from ..graph.ownership import stamp_file_owner
 from ..validation.linter_utils import is_resolved_canonical_ref as _is_resolved_ref
 
 
@@ -35,7 +38,14 @@ def validate_canonical_integrity(
     enforce_unresolved_semantics: bool = True,
     require_manifest_schema_registration: bool = True,
     project_canon_dir: str | None = None,
+    spec_root: str | None = None,
 ) -> list[SpecError]:
+    """Canonical integrity of every artifact under *spec_dir*.
+
+    *spec_root* is the spec folder the caller was told (``--spec-root``); *spec_dir* itself when absent.  Its
+    extension schemas are known beside the toolkit's (``get_shared_registry``), and its place says which file is a
+    file of the extensions folder.
+    """
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
         return [make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}")]
@@ -49,7 +59,8 @@ def validate_canonical_integrity(
         return _uniq(preflight_errors)
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     errors: list[SpecError] = list(registry.load_errors)
-    schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
+    known_root = spec_root or spec_dir_abs
+    loaded = (known_root, *_try_load_schema_registry(repo_root, known_root))
     observed: dict[tuple[str, str], dict[str, list[str]]] = {}
     for path in _iter_json_files(spec_dir_abs):
         try:
@@ -60,15 +71,16 @@ def validate_canonical_integrity(
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_json {exc}"))
             continue
         rel = os.path.relpath(path, repo_root)
-        schema, schema_uri, schema_error = _load_document_schema(schema_registry, data, rel, schema_registry_error)
+        schema_registry, schema, schema_uri, schema_error = _schema_for(path, rel, data, loaded)
         if schema_error:
-            errors.append(schema_error)
+            errors.append(_owned_by_its_step(schema_error, path, known_root))
         enforce_unresolved_for_doc = enforce_unresolved_semantics and schema_error is None
         errors.extend(
             _validate_document_integrity(
                 registry,
                 data,
                 rel,
+                _autofix_folder(path, rel, known_root),
                 schema=schema,
                 schema_uri=schema_uri,
                 schema_registry=schema_registry,
@@ -98,7 +110,13 @@ def validate_canonical_integrity_file(
     enforce_unresolved_semantics: bool = True,
     require_manifest_schema_registration: bool = True,
     project_canon_dir: str | None = None,
+    spec_root: str | None = None,
 ) -> list[SpecError]:
+    """Canonical integrity of the one artifact *path*.
+
+    *spec_root* is the spec folder whose extension schemas are known beside the toolkit's; without it, the folder
+    above the ``extensions`` folder a file of an extension lies in, read from the path alone (``host_schemas.spec_root_for``).
+    """
     preflight_errors = lint_canon_dirs(
         repo_root,
         canon_dir=canon_dir,
@@ -109,22 +127,24 @@ def validate_canonical_integrity_file(
         return _uniq(preflight_errors)
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     errors: list[SpecError] = list(registry.load_errors)
-    schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
+    known_root = spec_root_for(path, spec_root)
+    loaded = (known_root, *_try_load_schema_registry(repo_root, known_root))
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         return [make_error("E520", f"UNRESOLVED_INPUT {path} invalid_json {exc}")]
 
-    schema, schema_uri, schema_error = _load_document_schema(schema_registry, data, path, schema_registry_error)
+    schema_registry, schema, schema_uri, schema_error = _schema_for(path, path, data, loaded)
     if schema_error:
-        errors.append(schema_error)
+        errors.append(_owned_by_its_step(schema_error, path, known_root))
     enforce_unresolved_for_doc = enforce_unresolved_semantics and schema_error is None
     errors.extend(
         _validate_document_integrity(
             registry,
             data,
             path,
+            _autofix_folder(path, path, known_root),
             schema=schema,
             schema_uri=schema_uri,
             schema_registry=schema_registry,
@@ -174,11 +194,13 @@ def _validate_document_integrity(
     registry: CanonicalRegistry,
     data: Any,
     rel: str,
+    autofix_folder: str,
     schema: dict[str, Any] | None = None,
     schema_uri: str | None = None,
     schema_registry: SchemaRegistry | None = None,
     enforce_unresolved_semantics: bool = True,
 ) -> list[SpecError]:
+    """The integrity findings of the document *data* of the file shown as *rel*; an E210 names ``canonical-autofix <autofix_folder>``."""
     errors: list[SpecError] = []
     for ref_path, ref in _collect_canonical_refs(data):
         ref_errors = registry.validate_ref(ref)
@@ -207,7 +229,7 @@ def _validate_document_integrity(
             make_error(
                 "E210",
                 f"CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids} "
-                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync",
+                f"— run './tools/run_specdev.sh canonical-autofix {autofix_folder} --write' to sync",
                 subcode="CROSS_ARTIFACT_DRIFT",
                 file=rel,
                 jq_path=".canonical_refs_used",
@@ -219,7 +241,7 @@ def _validate_document_integrity(
             make_error(
                 "E210",
                 f"CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids} "
-                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync",
+                f"— run './tools/run_specdev.sh canonical-autofix {autofix_folder} --write' to sync",
                 subcode="CROSS_ARTIFACT_DRIFT",
                 file=rel,
                 jq_path=".canonical_refs_used",
@@ -322,7 +344,6 @@ _FALLBACK_DIRECT_FIELDS: set[str] = {
     "risk_category",
     "governance_label",
     "id_pattern",
-    "completeness_dimension",
 }
 
 
@@ -349,7 +370,7 @@ def _validate_unresolved_candidates(
         label = _norm_semantic(value)
         if (field_path, label) in conflicts:
             continue
-        if (field_path, kind, label) in proposals:
+        if (_wild(field_path), kind, label) in proposals:
             continue
         errors.append(
             make_error(
@@ -492,6 +513,14 @@ def _kind_for_ref_key(ref_key: str) -> str | None:
     return None
 
 
+_WILDCARD_INDEX = re.compile(r"\[(?:\d+|\*)\]")
+
+
+def _wild(path: str) -> str:
+    """*path* with every array index (``[3]`` or ``[*]``) written ``[*]``."""
+    return _WILDCARD_INDEX.sub("[*]", path)
+
+
 def _proposal_index(value: Any) -> set[tuple[str, str, str]]:
     out: set[tuple[str, str, str]] = set()
     if not isinstance(value, list):
@@ -503,7 +532,7 @@ def _proposal_index(value: Any) -> set[tuple[str, str, str]]:
         kind = item.get("kind")
         label = item.get("proposed_label")
         if isinstance(field, str) and isinstance(kind, str) and isinstance(label, str):
-            out.add((field, kind, _norm_semantic(label)))
+            out.add((_wild(field), kind, _norm_semantic(label)))
     return out
 
 
@@ -526,11 +555,46 @@ def _norm_semantic(value: str) -> str:
     return " ".join(tokens)
 
 
-def _try_load_schema_registry(repo_root: str) -> tuple[SchemaRegistry | None, str | None]:
+def _autofix_folder(path: str, shown: str, known_root: str | None) -> str:
+    """The folder the ``canonical-autofix`` command of an E210 text is run on for the file *path*, written the way *shown* writes the file.
+
+    The folder of the file; for a file of the extensions folder the spec folder above it, so that the command works
+    as written (run on ``<spec>/extensions`` it would take that folder for the spec folder).
+    """
+    folder = os.path.dirname(shown)
+    if is_extension_file(path, known_root):
+        folder = os.path.dirname(folder)
+    return folder or "."
+
+
+def _owned_by_its_step(schema_error: SpecError, path: str, known_root: str | None) -> SpecError:
+    """*schema_error* owned by step 13 when *path* is a file of the extensions folder of the spec folder *known_root*
+    (``is_extension_file``; by its path alone when the caller knows no spec folder), as the schema-validation finding of
+    the same file is; unchanged for any other file.  The finding names no file, so its owner cannot be read from its path."""
+    return stamp_file_owner([schema_error], EXTENSION_STEP)[0] if is_extension_file(path, known_root) else schema_error
+
+
+def _try_load_schema_registry(repo_root: str, spec_root: str | None = None) -> tuple[SchemaRegistry | None, str | None]:
     try:
-        return SchemaRegistry(repo_root), None
+        return get_shared_registry(repo_root, spec_root), None
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, f"schema_registry_bootstrap_failed detail={exc}"
+
+
+def _schema_for(
+    path: str, rel: str, data: Any, loaded: tuple[str | None, SchemaRegistry | None, str | None],
+) -> tuple[SchemaRegistry | None, dict[str, Any] | None, str | None, SpecError | None]:
+    """The schema registry, the schema and its URI that judge the document *data* of the file *path*, or the error (*rel* names the file in it).
+
+    *loaded* is the registry of the spec folder the caller knows (the folder, the registry, the error of loading it),
+    loaded once for all files.  The data file of an extension whose ``$schema`` is not the URI its file name gives, and
+    any other file that names the URI of an extension schema, is judged by no schema (``schema_uri_problem``).
+    """
+    known_root, schema_registry, registry_error = loaded
+    mismatch = schema_uri_problem(path, data, known_root)
+    if mismatch:
+        return schema_registry, None, None, make_error("E520", f"UNRESOLVED_INPUT {rel} {mismatch}")
+    return (schema_registry, *_load_document_schema(schema_registry, data, rel, registry_error))
 
 
 def _load_document_schema(

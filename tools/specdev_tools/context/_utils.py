@@ -9,24 +9,15 @@ import json
 import os
 from typing import Any
 
-from ..core.registry import SchemaRegistry
+from ..core.json_utils import resolve_effective_toolkit_root
+from ..core.registry import SchemaRegistry, get_shared_registry
 from ..core.schema_nav import effective_schema as _schema_nav_effective_schema
+from ..core.step_order import load_step_order  # noqa: F401  (re-exported for context/structure.py)
 
 
 def load_json(path: str) -> Any:
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
-
-
-def load_step_order(repo_root: str) -> dict:
-    """Load ``tools/step_order.json`` from *repo_root*.
-
-    The DAG lives only under ``tools/``; there is no repo-root copy. If the file
-    is absent, ``load_json`` raises ``FileNotFoundError`` naming that canonical
-    ``tools/`` path — previously a dead repo-root fallback masked it.
-    """
-    path = os.path.join(os.path.abspath(repo_root), "tools", "step_order.json")
-    return load_json(path)
 
 
 def find_spec_file(step_id: str, spec_dir: str) -> str | None:
@@ -122,9 +113,12 @@ def merge_allof(schema: dict, registry: SchemaRegistry) -> dict:
     an ``allOf`` that $refs ``vc:core:step-base``) or inside an ``allOf`` branch.
     Both shapes are merged into a single property set.
 
-    Thin adapter over ``schema_nav.effective_schema`` (conditionals OFF — same
-    allOf-only, own-first behavior as before; oneOf/anyOf/if-then-else latent gap
-    is intentionally unchanged per §6 deferred scope).
+    Thin adapter over ``schema_nav.effective_schema``, called twice: with
+    conditionals OFF (the allOf-only, own-first set) and ON.  A property that
+    only a ``oneOf``/``anyOf``/``then``/``else`` branch declares is added; the
+    allOf-only definition wins when both declare a key (a conditional branch can
+    restate a property without its ``items``).  ``required`` is never taken from
+    a conditional branch.
     """
     ref_registry = registry.to_referencing_registry()
 
@@ -151,8 +145,28 @@ def merge_allof(schema: dict, registry: SchemaRegistry) -> dict:
             pass
         return None
 
-    e = _schema_nav_effective_schema(schema, _resolve_ref, include_conditionals=False)
-    return {"properties": e["properties"], "required": e["required"]}
+    base = _schema_nav_effective_schema(schema, _resolve_ref, include_conditionals=False)
+    full = _schema_nav_effective_schema(schema, _resolve_ref, include_conditionals=True)
+    return {"properties": {**full["properties"], **base["properties"]}, "required": base["required"]}
+
+
+def merged_required_and_properties(schema: dict, repo_root: str | os.PathLike | None) -> dict:
+    """``{"properties", "required"}`` of *schema* with its ``allOf`` branches merged (``merge_allof``); the required list is
+    de-duplicated, order kept.  The registry is ``get_shared_registry(resolve_effective_toolkit_root(repo_root))``: a
+    *repo_root* with no ``tools/schema_registry.json`` (or ``None``) falls back to the registry of the toolkit package, so
+    ``vc:core:step-base`` still resolves.  When even that cannot be loaded (OSError, ValueError, JSONDecodeError) the
+    schema is merged with ``effective_schema(schema, lambda node: None)``: its inline ``allOf`` branches are merged and a
+    ``$ref`` branch counts as empty.
+    """
+    try:
+        registry = get_shared_registry(
+            resolve_effective_toolkit_root(os.fspath(repo_root) if repo_root is not None else None)
+        )
+    except (OSError, ValueError):  # json.JSONDecodeError is a ValueError
+        merged = _schema_nav_effective_schema(schema, lambda node: None)
+    else:
+        merged = merge_allof(schema, registry)
+    return {"properties": merged["properties"], "required": list(dict.fromkeys(merged["required"]))}
 
 
 def compute_required_inputs(

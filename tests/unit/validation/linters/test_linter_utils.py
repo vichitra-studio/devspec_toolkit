@@ -4,16 +4,14 @@ Created by FIX-044 (Batch 5).
 """
 from __future__ import annotations
 
-from specdev_tools.core.errors import SpecError
+import os
+
 from specdev_tools.validation.linter_utils import (
     CONTENT_STOPWORDS,
-    DERIVATION_STOPWORDS,
-    check_no_duplicates,
     collect_ids_and_refs,
     extract_command_string,
     is_reference_context,
     iter_json,
-    tokenize_free_text,
 )
 
 
@@ -59,64 +57,16 @@ class TestExtractCommandString:
 class TestStopwords:
     """Verify stopword sets contain expected members and are frozensets."""
 
-    def test_derivation_is_frozenset(self):
-        assert isinstance(DERIVATION_STOPWORDS, frozenset)
-
     def test_content_is_frozenset(self):
         assert isinstance(CONTENT_STOPWORDS, frozenset)
 
     def test_common_stopwords_present(self):
         for word in ("that", "this", "with", "from", "true", "false"):
-            assert word in DERIVATION_STOPWORDS
             assert word in CONTENT_STOPWORDS
 
     def test_json_schema_terms_present(self):
         for word in ("http", "https", "schema", "json"):
-            assert word in DERIVATION_STOPWORDS
-
-
-# ---------------------------------------------------------------------------
-# tokenize_free_text
-# ---------------------------------------------------------------------------
-
-class TestTokenizeFreeText:
-    """Tests for tokenize_free_text."""
-
-    def test_extracts_long_words(self):
-        result = tokenize_free_text("The authentication module handles user login")
-        assert "authentication" in result
-        assert "module" in result
-        assert "handles" in result
-        assert "login" in result
-
-    def test_filters_short_words(self):
-        result = tokenize_free_text("The cat sat on a mat")
-        # All words are <= 3 chars or stopwords
-        assert result == set()
-
-    def test_removes_stopwords(self):
-        result = tokenize_free_text("this schema will have been were")
-        assert result == set()
-
-    def test_custom_stopwords(self):
-        custom = frozenset({"login"})
-        result = tokenize_free_text("user login page", stopwords=custom)
-        assert "login" not in result
-        assert "user" in result
-        assert "page" in result
-
-    def test_empty_string(self):
-        assert tokenize_free_text("") == set()
-
-    def test_lowercases(self):
-        result = tokenize_free_text("Authentication Module")
-        assert "authentication" in result
-        assert "module" in result
-
-    def test_ignores_numbers_only(self):
-        result = tokenize_free_text("12345 67890")
-        # Pattern requires starting with [a-z]
-        assert result == set()
+            assert word in CONTENT_STOPWORDS
 
 
 # ---------------------------------------------------------------------------
@@ -213,11 +163,12 @@ class TestCollectIdsAndRefs:
         collect_ids_and_refs({"nfr_refs": ["nfr-a", "nfr-b"]}, "test.json", ids, refs)
         assert len(refs) == 2
 
-    def test_collects_requires_list(self):
+    def test_requires_list_is_not_a_reference_source(self):
+        """No schema declares ``requires`` any more, so a ``requires`` list names no reference."""
         ids: set[str] = set()
         refs: list[tuple[str, str, str]] = []
         collect_ids_and_refs({"requires": ["fr-a", "fr-b"]}, "test.json", ids, refs)
-        assert len(refs) == 2
+        assert refs == []
 
     def test_id_in_reference_context_is_ref(self):
         ids: set[str] = set()
@@ -233,54 +184,40 @@ class TestCollectIdsAndRefs:
         collect_ids_and_refs(obj, "test.json", ids, refs)
         assert ids == {"fr-a", "fr-b"}
 
+    def test_skip_ids_for_files_collects_refs_but_no_ids(self):
+        ids: set[str] = set()
+        refs: list[tuple[str, str, str]] = []
+        obj = {"items": [{"fr_id": "fr-a", "id": "x-1"}], "api_ref": "api-create"}
+        collect_ids_and_refs(obj, "04_fr_list.json", ids, refs, skip_ids_for_files={"04_fr_list.json"})
+        assert ids == set()
+        assert [ref[2] for ref in refs] == ["api-create"]
 
-# ---------------------------------------------------------------------------
-# check_no_duplicates
-# ---------------------------------------------------------------------------
+    def test_skip_ids_for_files_matches_a_platform_path(self):
+        ids: set[str] = set()
+        refs: list[tuple[str, str, str]] = []
+        rel = os.path.join("impl_context", "ms_x_plan.json")
+        collect_ids_and_refs({"fr_id": "fr-a"}, rel, ids, refs, skip_ids_for_files={"impl_context/ms_x_plan.json"})
+        assert ids == set()
 
-class TestCheckNoDuplicates:
-    """Tests for check_no_duplicates."""
+    def test_skip_ids_for_other_files_keeps_ids(self):
+        ids: set[str] = set()
+        refs: list[tuple[str, str, str]] = []
+        collect_ids_and_refs({"fr_id": "fr-a"}, "other.json", ids, refs, skip_ids_for_files={"04_fr_list.json"})
+        assert ids == {"fr-a"}
 
-    def test_no_duplicates(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors == []
 
-    def test_duplicate_found(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"id": "b"}, {"id": "a"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert len(errors) == 1
-        assert isinstance(errors[0], SpecError)
-        assert "Duplicate item_id 'a'" in errors[0].message
-        assert "index 2" in errors[0].message
+def test_canonical_stages_are_read_through_the_registry_loader(tmp_path):
+    """A stage entry in ``manifest.json`` counts, as it does for every other canon reader; a retired one does not."""
+    import json
 
-    def test_with_code(self):
-        errors: list[SpecError] = []
-        items = [{"id": "x"}, {"id": "x"}]
-        check_no_duplicates(items, "id", "item_id", errors, code="E310")
-        assert errors[0].code == "E310"
+    from specdev_tools.validation.linter_utils import load_canonical_stages
 
-    def test_non_dict_items_skipped(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, "not-a-dict", {"id": "b"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors == []
+    canon = tmp_path / "canon"
+    canon.mkdir()
+    entries = [
+        {"id": f"cn:core:stage:{name}", "kind": "stage", "preferred_label": name, "status": status}
+        for name, status in (("dev", "active"), ("qa", "active"), ("old", "retired"))
+    ]
+    (canon / "manifest.json").write_text(json.dumps({"registry_version": "1.0.0", "entries": entries}), encoding="utf-8")
 
-    def test_missing_id_field_skipped(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"name": "b"}, {"id": "c"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors == []
-
-    def test_empty_list(self):
-        errors: list[SpecError] = []
-        check_no_duplicates([], "id", "item_id", errors)
-        assert errors == []
-
-    def test_default_code_is_e520(self):
-        errors: list[SpecError] = []
-        items = [{"id": "a"}, {"id": "a"}]
-        check_no_duplicates(items, "id", "item_id", errors)
-        assert errors[0].code == "E520"
+    assert load_canonical_stages(str(canon)) == {"dev", "qa"}

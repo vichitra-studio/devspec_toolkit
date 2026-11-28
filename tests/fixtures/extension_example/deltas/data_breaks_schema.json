@@ -1,0 +1,15 @@
+{
+  "description": "The data file holds a value its schema refuses: columns is a string.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/extensions/ext_01_database.json",
+      "path": [
+        "tables",
+        0,
+        "columns"
+      ],
+      "value": "x"
+    }
+  ]
+}

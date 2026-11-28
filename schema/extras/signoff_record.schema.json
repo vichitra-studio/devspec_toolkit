@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:extras:signoff-record",
+  "title": "Sign-off Record",
+  "description": "A sign-off record states that a person signed a milestone off against one code tree, and lists what the sign-off left open. One record per file, spec/extras/signoff/so-<milestone>-<NNNN>.json, written by 'specdev milestone sign-off' and never by hand. The file holds a records array of exactly one record, and the file name without .json is the record id. The close of the milestone refuses without one.",
+  "type": "object",
+  "required": ["records"],
+  "additionalProperties": false,
+  "properties": {
+    "records": {
+      "description": "The one sign-off record of this file.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "x-node": {
+        "kind": "signoff-record",
+        "role": "record",
+        "contract": [
+          "about", "tree", "git_author", "listed"
+        ],
+        "id": "signoff_id",
+        "files": ["extras/signoff/so-*.json"]
+      },
+      "items": {
+        "description": "A sign-off record: who signed which milestone off, at which code tree, and what was listed as open at that moment.",
+        "type": "object",
+        "required": ["signoff_id", "about", "tree", "git_author", "recorded_at", "listed"],
+        "additionalProperties": false,
+        "properties": {
+          "signoff_id": {
+            "description": "Id of this record: so-, the id of the milestone and a number of at least four digits. Equals the file name without .json. Example: so-ms-account-recovery-0001.",
+            "type": "string",
+            "pattern": "^so-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{4,}$"
+          },
+          "about": {
+            "description": "The one Step 14 roadmap milestone this sign-off is about, as a one-item array.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "vc:core:graph#nodeId"},
+            "x-link": {
+              "kinds": ["roadmap-milestone"],
+              "required": true
+            }
+          },
+          "tree": {
+            "description": "Id of the code tree the person signed off (a git tree id).",
+            "type": "string",
+            "minLength": 1
+          },
+          "git_author": {
+            "description": "The git author of the person who signed off: name and email as git reports them.",
+            "type": "object",
+            "required": ["name", "email"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"description": "Name of the git author.", "type": "string", "minLength": 1},
+              "email": {"description": "Email of the git author.", "type": "string", "minLength": 1}
+            }
+          },
+          "recorded_at": {
+            "description": "UTC time the tool wrote the record, ISO 8601. Informational: nothing compares it.",
+            "type": "string",
+            "minLength": 1
+          },
+          "listed": {
+            "description": "What was open when the person signed off, as the tool counted it: the sign-off shows these to the person and records them. Counts are whole numbers; the lists hold node ids.",
+            "type": "object",
+            "required": ["manual_fixtures", "attested", "deferred_tasks", "wont_do_tasks", "open_items", "staging_prod_proof_owed"],
+            "additionalProperties": false,
+            "properties": {
+              "manual_fixtures": {
+                "description": "Number of nodes of the milestone a person attests at sign-off: manual fixtures and rules enforced by review.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "attested": {
+                "description": "Number of those that carry an attestation.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "deferred_tasks": {
+                "description": "Ids of the tasks of the milestone that are deferred.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"$ref": "vc:core:graph#nodeId"}
+              },
+              "wont_do_tasks": {
+                "description": "Ids of the tasks of the milestone that will not be done.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"$ref": "vc:core:graph#nodeId"}
+              },
+              "open_items": {
+                "description": "Number of open items of the plan the person was shown.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "staging_prod_proof_owed": {
+                "description": "Ids of the nodes whose proof is owed at staging or prod.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"$ref": "vc:core:graph#nodeId"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

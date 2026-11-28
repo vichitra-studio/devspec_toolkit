@@ -47,11 +47,12 @@ message)`` pairs, hint-agnostic.  The hint-enhancement loop stays in
 from __future__ import annotations
 
 import json
+import re
+from typing import Any, NamedTuple
 
-from jsonschema import Draft202012Validator
-from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
+from jsonschema.exceptions import ValidationError, _WrappedReferencingError  # type: ignore[attr-defined]
 
-from .registry import SchemaRegistry
+from .registry import get_schema_validator, get_shared_registry
 
 
 # ---------------------------------------------------------------------------
@@ -138,12 +139,53 @@ class SchemaRuntimeError(SchemaValidationError):
 
 
 # ---------------------------------------------------------------------------
-# Public helper
+# Public helpers
 # ---------------------------------------------------------------------------
+
+class SchemaViolation(NamedTuple):
+    """One schema violation: where (``path``), which JSON Schema keyword failed (``keyword``) and the message."""
+
+    path: tuple
+    keyword: str
+    message: str
+
+
+_JQ_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def jq_key(name: str) -> str:
+    """The jq path step that selects the key *name* of an object: ``.name``, or ``["name"]`` for a key that is not a plain word."""
+    return f".{name}" if _JQ_IDENTIFIER.fullmatch(name) else f"[{json.dumps(name)}]"
+
+
+def jq_path_of(path: tuple[Any, ...]) -> str:
+    """The jq path of a violation's place: ``('frs', 1, 'scope')`` gives ``.frs[1].scope``; the document itself is ``.``.
+
+    A key that is not a jq identifier is written ``["00"]`` (JSON-quoted); as the first segment, like an index, it is
+    ``.["00"]`` and ``.[0]``.
+    """
+    out = ""
+    for part in path:
+        step = f"[{part}]" if isinstance(part, int) else jq_key(part)
+        out += "." + step if not out and step.startswith("[") else step
+    return out or "."
+
+
+_SHORT_MESSAGES = {"maxItems": "has more items than the schema allows", "minItems": "has fewer items than the schema requires"}
+_MAX_MESSAGE = 200
+
+
+def violation_text(item: SchemaViolation) -> str:
+    """What is wrong at the violation: its message, but not the whole value the message quotes (a long one is cut)."""
+    if item.keyword in _SHORT_MESSAGES:
+        return _SHORT_MESSAGES[item.keyword]
+    return item.message if len(item.message) <= _MAX_MESSAGE else item.message[:_MAX_MESSAGE] + " ..."
+
 
 def validate_data_against_schema(
     repo_root: str,
     data: dict,
+    spec_root: str | None = None,
 ) -> list[tuple[tuple, str]]:
     """Validate *data* against the schema declared by its ``"$schema"`` key.
 
@@ -156,7 +198,13 @@ def validate_data_against_schema(
     data:
         The document to validate.  Must be a ``dict``; the ``"$schema"``
         field is read from it and then stripped from the validation payload
-        (mirrors ``validate.py:215-216``).
+        (mirrors ``validate.py``).
+    spec_root:
+        The spec folder *data* belongs to.  Its extension schemas
+        (``<spec_root>/extensions/*.schema.json``, see ``core/host_schemas.py``)
+        are known beside the toolkit's, so an extension's data file validates.
+        ``None`` (the default), or a folder with no such schema, gives the
+        toolkit's schemas alone, exactly as before the argument existed.
 
     Returns
     -------
@@ -193,6 +241,21 @@ def validate_data_against_schema(
     All of the above are subclasses of ``SchemaValidationError`` so a single
     ``except SchemaValidationError`` clause handles the whole family.
     """
+    return [(tuple(e.path), e.message) for e in _schema_errors(repo_root, data, spec_root)]
+
+
+def schema_violations(repo_root: str, data: dict, spec_root: str | None = None) -> list[SchemaViolation]:
+    """The violations of *data* against its own ``$schema``, each with the keyword that failed.
+
+    Same contract, *spec_root* and exceptions as ``validate_data_against_schema``; the list is unsorted.  A caller that must tell a
+    violation that already existed from one an edit caused compares ``(path, keyword)``: the message of a keyword such
+    as ``minItems`` or ``anyOf`` quotes the instance and so changes with any edit inside it.
+    """
+    return [SchemaViolation(tuple(e.path), str(e.validator), e.message) for e in _schema_errors(repo_root, data, spec_root)]
+
+
+def _schema_errors(repo_root: str, data: dict, spec_root: str | None = None) -> list[ValidationError]:
+    """The raw ``jsonschema`` errors of *data*; the typed exceptions are those of ``validate_data_against_schema``."""
     # --- Step 1: validate and extract $schema ---
     schema_uri = data.get("$schema")
     if schema_uri is None:
@@ -205,7 +268,7 @@ def validate_data_against_schema(
 
     # --- Step 2: bootstrap registry (wrapped as typed exception) ---
     try:
-        registry = SchemaRegistry(repo_root)
+        registry = get_shared_registry(repo_root, spec_root)
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         raise SchemaBootstrapError(original=exc) from exc
 
@@ -224,7 +287,7 @@ def validate_data_against_schema(
     except json.JSONDecodeError as exc:
         raise SchemaDecodeError(uri=schema_uri, detail=str(exc)) from exc
 
-    # --- Step 4: build validation payload (strip $schema, mirror validate.py:215-216) ---
+    # --- Step 4: build validation payload (strip $schema, mirror validate.py) ---
     payload = dict(data)
     payload.pop("$schema", None)
 
@@ -236,12 +299,7 @@ def validate_data_against_schema(
     # raise ``AttributeError``.  Both escape the existing family — route them
     # into SchemaRuntimeError so callers see the typed E521 path.
     try:
-        reg = registry.to_referencing_registry()
-        v = Draft202012Validator(
-            schema,
-            registry=reg,
-            format_checker=Draft202012Validator.FORMAT_CHECKER,
-        )
+        v = get_schema_validator(registry, schema_uri, schema)
     except SchemaValidationError:
         raise
     except Exception as exc:
@@ -255,4 +313,4 @@ def validate_data_against_schema(
     except Exception as exc:
         raise SchemaRuntimeError(original=exc) from exc
 
-    return [(tuple(e.path), e.message) for e in raw_errors]
+    return raw_errors

@@ -30,9 +30,15 @@ resolution: |
     hallucination-lint bypasses the prefix check when a command_ref is
     present; canonical-integrity (E110/E210) then validates the ref.
 
+  A different case, at step 10: a rule's `cli_command` is not a command of the
+  toolkit (tools/cli_commands.json). The message reads "the cli_command '<name>'
+  of rule '<id>' is not a specdev command". Neither option above applies: give
+  the command as you type it after specdev, for example `spec-check` or
+  `third-party check`:
+    specdev json patch --id <rule-id> .cli_command '"spec-check"'
+
   Note: `bash -c "<inner>"` / `sh -c '<inner>'` wrappers are legal but
   discouraged.  Compound commands containing &&, ||, or ; are skipped by
   the path-validation check.
 see_also:
-  - E530-LINKED_TEST_FILE_NOT_FOUND
   - E110

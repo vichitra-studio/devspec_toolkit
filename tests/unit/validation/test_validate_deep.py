@@ -64,8 +64,6 @@ def _run_validate_dir_with_injected_failures(
          patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
          patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
          patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
-         patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
-         patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
          patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]), \
          patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]):
         return validate_dir(str(root), str(root / "spec"))
@@ -368,8 +366,8 @@ class TestR9PromotablePairsIntegrity(unittest.TestCase):
     """Sanity checks on the PROMOTABLE_PAIRS data structure."""
 
     def test_promotable_pairs_count(self):
-        """PROMOTABLE_PAIRS has the expected entries (W561 excluded to prevent double-promotion with W566; W590 and W597 excluded — no semantically-correct E-counterpart)."""
-        self.assertEqual(len(PROMOTABLE_PAIRS), 25)
+        """PROMOTABLE_PAIRS has the expected entries (W590 and W597 excluded — no semantically-correct E-counterpart)."""
+        self.assertEqual(len(PROMOTABLE_PAIRS), 8)
 
     def test_all_w_codes_map_to_e_codes(self):
         """Every key is a W-code and every value is the corresponding E-code."""
@@ -410,8 +408,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
-             patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
-                 patch("specdev_tools.validation.validate.check_extraction_intent", return_value=intent_errors):
+                     patch("specdev_tools.validation.validate.check_extraction_intent", return_value=intent_errors):
             result = validate_dir(str(self.root), str(self.root / "spec"))
         codes = [err.code for err in result]
         self.assertIn("E597", codes)
@@ -426,8 +423,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
-             patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
-                 patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]) as mock_intent:
+                     patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]) as mock_intent:
             validate_dir(str(self.root), str(self.root / "spec"))
         mock_intent.assert_called_once_with(str(self.root))
 
@@ -442,8 +438,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
-             patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
-                 patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]) as mock_intent:
+                     patch("specdev_tools.validation.validate.check_extraction_intent", return_value=[]) as mock_intent:
             validate_dir(str(self.root), str(self.root / "spec"))
         mock_intent.assert_not_called()
 
@@ -466,8 +461,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
-             patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
-                 patch("specdev_tools.validation.validate.check_extraction_intent", return_value=intent_errors):
+                     patch("specdev_tools.validation.validate.check_extraction_intent", return_value=intent_errors):
             result = validate_dir(str(self.root), str(self.root / "spec"))
         codes = [err.code for err in result]
         self.assertIn("W597", codes)

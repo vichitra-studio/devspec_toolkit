@@ -10,6 +10,10 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "title": {
           "description": "Short human-readable title for the project charter. Use 2–6 words in Title Case, noun phrase identifying the system. Examples: 'Billing Reconciliation API', 'Customer Self-Service Portal', 'Inventory Management Service', 'Checkout Payment Flow'. Anti-patterns: 'Project Charter' (generic placeholder), 'System' (too vague), multi-sentence titles.",
           "type": "string"
@@ -19,60 +23,418 @@
           "type": "string",
           "minLength": 20
         },
-        "in_scope": {
-          "description": "Items explicitly within the boundaries of this project. At least 3 items must be provided (enforced by minItems). Each item should be a concrete deliverable, capability, or integration point.",
-          "$ref": "vc:core:collections#stringArray",
-          "minItems": 3,
+        "scope_items": {
+          "description": "Single list of the project's scope boundaries: what is delivered now (in), what is deferred (later) and what is excluded (out). At least one item is required (enforced by minItems); there is no per-class floor. Each item states one concrete deliverable, capability, integration, data domain or delivery boundary, and derives from the seed or from a stakeholder need.",
+          "type": "array",
+          "minItems": 1,
+          "x-node": {
+            "kind": "scope-item",
+            "role": "obligation-system",
+            "contract": [
+              "text",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "scope_id",
+            "coarse": true
+          },
           "items": {
-            "type": "string",
-            "description": "A specific, bounded statement of what this project includes. Each item should cover one of: a capability delivered ('JWT-based authentication for web and mobile clients'), an integration built ('Stripe payment gateway integration for one-time charges'), a data domain managed ('User profile storage with GDPR-compliant soft-delete'), or a delivery boundary ('Production deployment to AWS eu-west-1'). Avoid vague items like 'authentication' or 'user management' — every item should name a concrete deliverable. At least one item per category (capability, integration, data domain) produces a well-bounded scope."
-          }
-        },
-        "out_of_scope": {
-          "description": "Items explicitly excluded from this project. At least 3 items must be provided (enforced by minItems). Use to prevent scope creep and set stakeholder expectations.",
-          "$ref": "vc:core:collections#stringArray",
-          "minItems": 3,
-          "items": {
-            "type": "string",
-            "description": "A specific statement of what this project explicitly excludes. Items should address the same categories as in_scope: capabilities deferred ('OAuth third-party identity provider — post-launch only'), integrations excluded ('Mobile biometric authentication via Face ID/Touch ID'), data domains out of bounds ('Historical order archive migration — separate initiative'), and delivery targets not in scope ('On-premises deployment — cloud-only for this release'). Vague items like 'everything else' or 'future features' are not useful — name the specific thing being excluded and (optionally) why."
+            "description": "A single scope boundary of the project, carrying its scope class and the links that justify it.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "scope_id": {
+                "description": "Unique kebab-case identifier for this scope item. Must be stable across spec versions: links from other nodes reference it. Example: 'scope-jwt-auth'.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "text": {
+                "description": "A specific, bounded statement of what this project includes (scope in), defers (later) or excludes (out). Name a concrete capability ('JWT-based authentication for web and mobile clients'), integration ('Stripe payment gateway integration for one-time charges'), data domain ('User profile storage with GDPR-compliant soft-delete') or delivery boundary ('Production deployment to AWS eu-west-1'). Avoid vague items like 'authentication' or 'everything else'. For later and out items, name the specific thing deferred or excluded.",
+                "type": "string",
+                "minLength": 1
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this scope item is derived from (seed documents or stakeholder needs). At least one is required; every scope item must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed",
+                    "need"
+                  ],
+                  "required": true,
+                  "built": true,
+                  "same_step_kinds": [
+                    "need"
+                  ]
+                },
+                "minItems": 1
+              },
+              "scope": {
+                "description": "Whether this scope item is in scope now (in), deferred (later) or excluded (out). later and out require scope_reason.",
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "description": "Why this scope item is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this scope item relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this scope item: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this scope item; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this scope item replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "scope_id",
+              "text",
+              "scope",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
           }
         },
         "assumptions": {
           "description": "Assumptions made during project scoping that could affect delivery if invalidated. At least one must be provided (enforced by minItems). Each should be falsifiable and monitorable.",
-          "$ref": "vc:core:collections#stringArray",
+          "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "assumption",
+            "role": "context",
+            "contract": [
+              "text"
+            ],
+            "id": "assumption_id"
+          },
           "items": {
-            "type": "string",
-            "description": "A specific, falsifiable statement about a condition taken for granted during project scoping. Write in present tense as a fact: 'Existing PostgreSQL user database schema remains unchanged during development', 'Email delivery via SendGrid is available in all target regions', 'Legal review for PII retention policy will complete before beta launch'. Distinguish assumptions from risks: an assumption is something you believe to be true (and must monitor); a risk is something that could go wrong. If an assumption is invalidated during delivery, it becomes a blocking issue."
+            "description": "A single falsifiable condition taken for granted during project scoping.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "assumption_id": {
+                "description": "Unique kebab-case identifier for this assumption. Must be stable across spec versions: links from other nodes reference it. Example: 'asm-legacy-db-unchanged'.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "text": {
+                "description": "A specific, falsifiable statement about a condition taken for granted during project scoping. Write in present tense as a fact: 'Existing PostgreSQL user database schema remains unchanged during development', 'Email delivery via SendGrid is available in all target regions', 'Legal review for PII retention policy will complete before beta launch'. Distinguish assumptions from risks: an assumption is something you believe to be true (and must monitor); a risk is something that could go wrong. If an assumption is invalidated during delivery, it becomes a blocking issue.",
+                "type": "string",
+                "minLength": 1
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this assumption is derived from (seed documents). At least one is required; every assumption must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this assumption: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this assumption; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this assumption replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "assumption_id",
+              "text",
+              "derives_from"
+            ]
           }
         },
         "risks": {
           "description": "Known risks that could impact project success or timeline. At least one must be provided (enforced by minItems). Each should be specific enough to have a mitigation strategy.",
-          "$ref": "vc:core:collections#stringArray",
+          "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "risk",
+            "role": "obligation-system",
+            "contract": [
+              "text",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "risk_id",
+            "coarse": true
+          },
           "items": {
-            "type": "string",
-            "description": "A specific, named risk that could impact project success, timeline, or quality. Use concise noun-phrase format: 'Third-party payment gateway API instability during peak load periods', 'Legal review timeline for PII data retention policy exceeds sprint schedule', 'Mobile team dependency on auth service API contract finalisation before Sprint 3'. Distinguish risks from assumptions: a risk is something that might go wrong; an assumption is something believed to be true. Each risk should be specific enough that a mitigation strategy can be written for it."
+            "description": "A single named risk, carrying its scope class and the links that justify it.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "risk_id": {
+                "description": "Unique kebab-case identifier for this risk. Must be stable across spec versions: links from other nodes reference it. Example: 'risk-gateway-instability'.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "text": {
+                "description": "A specific, named risk that could impact project success, timeline, or quality. Use concise noun-phrase format: 'Third-party payment gateway API instability during peak load periods', 'Legal review timeline for PII data retention policy exceeds sprint schedule', 'Mobile team dependency on auth service API contract finalisation before Sprint 3'. Distinguish risks from assumptions: a risk is something that might go wrong; an assumption is something believed to be true. Each risk should be specific enough that a mitigation strategy can be written for it.",
+                "type": "string",
+                "minLength": 1
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this risk is derived from (seed documents or charter assumptions). At least one is required; every risk must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed",
+                    "assumption"
+                  ],
+                  "required": true,
+                  "built": true,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                },
+                "minItems": 1
+              },
+              "scope": {
+                "description": "Whether this risk is in scope now (in), deferred (later) or excluded (out). later and out require scope_reason.",
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "description": "Why this risk is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this risk relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this risk: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this risk; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this risk replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "risk_id",
+              "text",
+              "scope",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
           }
         },
         "stakeholders": {
           "description": "Array of stakeholder roles and their needs relevant to this project.",
           "type": "array",
+          "x-node": {
+            "kind": "stakeholder",
+            "role": "context",
+            "contract": [
+              "role",
+              "role_ref"
+            ],
+            "id": "stakeholder_id"
+          },
           "items": {
             "description": "A single stakeholder entry identifying a role and what that role needs from the project.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
+              "stakeholder_id": {
+                "description": "Unique kebab-case identifier for this stakeholder. Must be stable across spec versions: links from other nodes reference it. Example: 'sh-product-manager'.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
               "role": {
                 "description": "Functional role describing how this stakeholder relates to this project's outcomes — not their org-chart title or personal name. Decision rule: use the role that captures their accountability to the project deliverables, kept to 2-4 words. Examples: 'Product Manager' (owns feature prioritisation), 'Compliance Officer' (accountable for regulatory sign-off), 'Support Agent' (handles end-user escalations), 'External Auditor' (reviews access and audit logs), 'End User' (primary consumer of the delivered capability). Anti-patterns: 'John Smith' (a name, not a role — names change and cannot be traced to accountability), 'Senior Engineer' (org-chart title that does not describe what this person is accountable for in this project).",
                 "type": "string"
               },
               "needs": {
-                "description": "What this stakeholder needs from the project. Be specific about their measurable success criteria. At least one need per stakeholder (enforced by minItems). Each item should name a specific, verifiable outcome — see item description for the full format guide. Stakeholder needs must be specific enough to inform downstream FRs (Step 04) and NFRs (Step 07) — each need should be traceable to at least one functional requirement or non-functional requirement. Anti-pattern: vague needs like 'good performance' that cannot be mapped to a specific FR or NFR metric.",
-                "$ref": "vc:core:collections#stringArray",
+                "description": "What this stakeholder needs from the project. Be specific about their measurable success criteria. At least one need per stakeholder (enforced by minItems). Each item names a specific, verifiable outcome and is its own node. Stakeholder needs must be specific enough to inform downstream FRs (Step 04) and NFRs (Step 07) — each need should be traceable to at least one functional requirement or non-functional requirement. Anti-pattern: vague needs like 'good performance' that cannot be mapped to a specific FR or NFR metric.",
+                "type": "array",
+                "minItems": 1,
+                "x-node": {
+                  "kind": "need",
+                  "role": "context",
+                  "contract": [
+                    "text"
+                  ],
+                  "id": "need_id"
+                },
                 "items": {
-                  "type": "string",
-                  "description": "What this stakeholder requires the project to deliver for them to consider it successful. Write as a specific, measurable requirement from their perspective: 'Audit logs retained for 12 months and exportable as CSV for compliance reviews', 'P95 API latency under 200ms so the mobile app meets App Store performance guidelines', 'Role-based access control so support agents cannot view raw payment data'. Avoid vague entries like 'good performance' or 'security requirements' — name the specific outcome this stakeholder needs."
+                  "description": "A single stakeholder need, as its own graph node.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "need_id": {
+                      "description": "Unique kebab-case identifier for this stakeholder need. Must be stable across spec versions: links from other nodes reference it. Example: 'need-audit-export'.",
+                      "$ref": "vc:core:atoms#kebabId"
+                    },
+                    "text": {
+                      "description": "What this stakeholder requires the project to deliver for them to consider it successful. Write as a specific, measurable requirement from their perspective: 'Audit logs retained for 12 months and exportable as CSV for compliance reviews', 'P95 API latency under 200ms so the mobile app meets App Store performance guidelines', 'Role-based access control so support agents cannot view raw payment data'. Avoid vague entries like 'good performance' or 'security requirements' — name the specific outcome this stakeholder needs.",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "derives_from": {
+                      "description": "Ids of the upstream nodes this need is derived from (seed documents). At least one is required; every need must be justified by what it derives from.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "vc:core:atoms#kebabId"
+                      },
+                      "uniqueItems": true,
+                      "x-link": {
+                        "kinds": [
+                          "seed"
+                        ],
+                        "required": true,
+                        "built": true
+                      },
+                      "minItems": 1
+                    },
+                    "assumes": {
+                      "description": "Ids of the charter assumptions this need relies on. Optional; omit when it rests on no recorded assumption.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "vc:core:atoms#kebabId"
+                      },
+                      "uniqueItems": true,
+                      "x-link": {
+                        "kinds": [
+                          "assumption"
+                        ],
+                        "required": false,
+                        "same_step_kinds": [
+                          "assumption"
+                        ]
+                      }
+                    },
+                    "lifecycle": {
+                      "description": "Lifecycle state of this need: active (default), deprecated or not_applicable.",
+                      "$ref": "vc:core:graph#lifecycle"
+                    },
+                    "aliases": {
+                      "description": "Former ids of this need; `specdev node rename` adds the old id here. Optional.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "vc:core:atoms#kebabId"
+                      },
+                      "uniqueItems": true
+                    },
+                    "replaces": {
+                      "description": "Ids of nodes that this need replaces. Optional.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "vc:core:graph#nodeId"
+                      },
+                      "uniqueItems": true,
+                      "x-link": {
+                        "kinds": "*",
+                        "required": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "need_id",
+                    "text",
+                    "derives_from"
+                  ]
                 }
               },
               "role_ref": {
@@ -81,9 +443,51 @@
                   { "properties": { "kind": { "const": "role" } } }
                 ],
                 "description": "Canonical reference to a role defined in the canonical registry. Kind is structurally pinned to role. Example: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"Reviewer\"}. Omit if no canon entry exists for this role — do not fabricate an ID. Create a canonical_proposals entry instead. Use real example ID: cn:core:role:reviewer"
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this stakeholder relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this stakeholder: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this stakeholder; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this stakeholder replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
+              "stakeholder_id",
               "role",
               "needs"
             ]
@@ -92,13 +496,24 @@
         "user_segments": {
           "description": "Array of distinct user segments the project serves, each with jobs-to-be-done analysis.",
           "type": "array",
+          "x-node": {
+            "kind": "segment",
+            "role": "context",
+            "contract": [
+              "description",
+              "jobs_to_be_done",
+              "pains",
+              "gains"
+            ],
+            "id": "segment_id"
+          },
           "items": {
             "description": "A user segment describing a target audience, their goals, pains, and gains.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "segment_id": {
-                "description": "Unique kebab-case identifier for this user segment. Convention: seg-{descriptive-noun}. Examples: 'seg-finance-admin', 'seg-api-integrator', 'seg-self-service-customer', 'seg-support-agent'. Should be stable — downstream steps (01 capabilities, 04 FRs) reference this ID in trace links. Anti-pattern: 'seg-1', 'seg-power-user' — sequential labels and generic names cannot be traced to meaning.",
+                "description": "Unique kebab-case identifier for this user segment. Convention: seg-{descriptive-noun}. Examples: 'seg-finance-admin', 'seg-api-integrator', 'seg-self-service-customer', 'seg-support-agent'. Should be stable — downstream nodes (01 capabilities) reference this ID from their derives_from. Anti-pattern: 'seg-1', 'seg-power-user' — sequential labels and generic names cannot be traced to meaning.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "description": {
@@ -124,6 +539,63 @@
                   "type": "string",
                   "description": "A concrete, measurable benefit this segment will gain from the solution. Include the outcome and an indicator of its scale or value where possible. Examples: 'Reduce monthly billing reconciliation from 4 hours to under 30 minutes by consolidating all billing data in one view', 'See pending charge status in real-time during checkout — eliminates avoidable dispute support tickets', 'Export full transaction history as CSV without human intervention — required for SOC2 audit preparation'. Avoid vague positives: 'Better performance', 'Easier to use', 'Save time' — these do not name the specific outcome or its measure."
                 }
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this segment is derived from (seed documents). At least one is required; every segment must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this segment relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this segment: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this segment; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this segment replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -131,7 +603,8 @@
               "description",
               "jobs_to_be_done",
               "pains",
-              "gains"
+              "gains",
+              "derives_from"
             ]
           }
         },
@@ -139,13 +612,26 @@
           "description": "Quantifiable metrics used to measure project success. At least 2 must be provided (enforced by minItems).",
           "type": "array",
           "minItems": 2,
+          "x-node": {
+            "kind": "metric",
+            "role": "context",
+            "contract": [
+              "name",
+              "baseline",
+              "target",
+              "unit",
+              "measurement_method",
+              "unit_ref"
+            ],
+            "id": "metric_id"
+          },
           "items": {
             "description": "A single success metric with target and measurement method, plus optional baseline. When baseline is unknown, omit it rather than guessing — measurement can establish it post-launch.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "metric_id": {
-                "description": "Unique kebab-case identifier for this metric. Convention: metric-{noun-phrase}. Examples: 'metric-checkout-conversion', 'metric-api-p95-latency', 'metric-monthly-active-users', 'metric-reconciliation-error-rate'. Must be stable across spec versions — downstream steps reference this ID in capability success_metric_refs. Anti-pattern: 'metric-1', 'metric-kpi-3' — sequential labels cannot be traced to meaning.",
+                "description": "Unique kebab-case identifier for this metric. Convention: metric-{noun-phrase}. Examples: 'metric-checkout-conversion', 'metric-api-p95-latency', 'metric-monthly-active-users', 'metric-reconciliation-error-rate'. Must be stable across spec versions — downstream nodes (such as 01 capabilities) reference this ID from their derives_from. Anti-pattern: 'metric-1', 'metric-kpi-3' — sequential labels cannot be traced to meaning.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "name": {
@@ -179,7 +665,7 @@
                 ]
               },
               "unit": {
-                "description": "Unit of measurement for this metric. Use standard abbreviations: 'ms' (milliseconds), 'percent' (percentage points), 'count' (raw count), 'req/s' (requests per second), 'MB' (megabytes), 'USD' (currency). The `unit_ref` field links this to the canonical unit registry. Always use the abbreviated form from the approved list: 'ms' (not 'milliseconds'), 'percent' (not 'pct' or '%'), 'count' (not 'number' or 'qty'), 'req/s' (not 'rps' or 'requests per second'). Anti-pattern: 'milliseconds' or 'percentage points' — use the canonical abbreviation so unit_ref can reference the exact term in the canon registry.",
+                "description": "Unit of measurement for this metric. Use the abbreviated form. A unit is a canon entry of kind 'unit', and the `unit_ref` field names that entry. The toolkit's canon (canon/kinds/unit.json) holds three: 'ms' (milliseconds, cn:core:unit:ms), 'percent' (percentage points, cn:core:unit:percent), 'count' (raw count, cn:core:unit:count). Write 'ms' (not 'milliseconds'), 'percent' (not 'pct' or '%'), 'count' (not 'number' or 'qty'). A unit the canon does not hold (e.g. 'req/s' for requests per second, 'MB', 'USD') follows the same abbreviation convention, and its unit_ref needs a canon entry of kind 'unit'. Anti-pattern: 'milliseconds' or 'percentage points' — use the canonical abbreviation so unit_ref can reference the exact term in the canon registry.",
                 "type": "string"
               },
               "measurement_method": {
@@ -192,6 +678,67 @@
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "unit" } } }
                 ]
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this metric is derived from (seed documents or stakeholder needs). At least one is required; every metric must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed",
+                    "need"
+                  ],
+                  "required": true,
+                  "built": true,
+                  "same_step_kinds": [
+                    "need"
+                  ]
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this metric relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this metric: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this metric; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this metric replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -200,23 +747,126 @@
               "target",
               "unit",
               "measurement_method",
-              "unit_ref"
+              "unit_ref",
+              "derives_from"
             ]
           }
         },
-        "links": {
-          "description": "Array of external links relevant to the charter (design docs, research, stakeholder briefs). Each entry should use a meaningful 'rel' value. Common rel values: 'source' (the original requirements document), 'design' (Figma, Miro, or architecture doc), 'research' (user research or market analysis), 'documentation' (existing API or product docs). Complete example: {\"rel\": \"design\", \"href\": \"https://www.figma.com/file/abc123\", \"spec_ref\": \"figma-wireframes\"}. A 'relevant' link directly informs spec decisions (design files, research reports, requirements documents). An 'irrelevant' link is a general reference that doesn't affect any spec decision (company homepage, Wikipedia). Omit if no relevant external links exist. Anti-pattern: adding links to project management tools (Jira, Linear) — use stakeholder or governance fields for those.",
+        "constraints": {
+          "description": "Fixed limits the design must respect (regulation, budget, platform, contractual or organisational constraints). Optional; no minimum number of items.",
           "type": "array",
+          "x-node": {
+            "kind": "constraint",
+            "role": "obligation-system",
+            "contract": [
+              "text",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "constraint_id",
+            "coarse": true
+          },
           "items": {
-            "$ref": "vc:core:collections#link",
-            "description": "A link to an external resource related to the charter."
+            "description": "A single constraint, carrying its scope class and the links that justify it.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "constraint_id": {
+                "description": "Unique kebab-case identifier for this constraint. Must be stable across spec versions: links from other nodes reference it. Example: 'con-eu-data-residency'.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "text": {
+                "description": "A specific, verifiable limit the design must respect. Name the source and the boundary: 'Customer data must be stored in EU regions only (GDPR, contract clause 4.2)', 'Total infrastructure spend below 5,000 USD per month', 'Must run on the existing Kubernetes platform, no new runtime'. Avoid preferences ('should be fast') and goals that belong in success metrics.",
+                "type": "string",
+                "minLength": 1
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this constraint is derived from (seed documents or stakeholder needs). At least one is required; every constraint must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed",
+                    "need"
+                  ],
+                  "required": true,
+                  "built": true,
+                  "same_step_kinds": [
+                    "need"
+                  ]
+                },
+                "minItems": 1
+              },
+              "scope": {
+                "description": "Whether this constraint is in scope now (in), deferred (later) or excluded (out). later and out require scope_reason.",
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "description": "Why this constraint is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this constraint relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this constraint: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this constraint; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this constraint replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "constraint_id",
+              "text",
+              "scope",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
           }
         }
       },
       "required": [
         "problem_statement",
-        "in_scope",
-        "out_of_scope",
+        "scope_items",
         "assumptions",
         "risks",
         "success_metrics",

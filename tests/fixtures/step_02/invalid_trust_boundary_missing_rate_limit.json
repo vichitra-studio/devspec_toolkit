@@ -12,11 +12,8 @@
         "Handle password resets"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        }
+      "derives_from": [
+        "capability-user-auth"
       ]
     },
     {
@@ -28,11 +25,8 @@
         "Serve profile lookups"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
+      "derives_from": [
+        "capability-user-profile"
       ]
     },
     {
@@ -44,55 +38,35 @@
         "Handle payment failures"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
-      ]
-    },
-    {
-      "component_id": "stripe-api",
-      "type": "external",
-      "responsibilities": [
-        "Tokenize payment details",
-        "Authorize card payments",
-        "Return payment confirmations"
-      ],
-      "owner": "business",
-      "tags": [
-        "external-dependency",
-        "critical-path"
-      ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "derives_from": [
+        "capability-payment-processing"
       ]
     }
   ],
   "connections": [
     {
-      "from": "payment-service",
-      "to": "stripe-api",
+      "connection_id": "payment-service-to-stripe-api",
+      "derives_from": [
+        "payment-service"
+      ],
+      "connects_to": [
+        "stripe-api"
+      ],
       "protocol": "http",
       "trust_boundary": "partner",
-      "schema_ref": "https://stripe.com/docs/api",
-      "auth": "oauth2",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "auth": "oauth2"
+    }
+  ],
+  "third_parties": [
+    {
+      "third_party_id": "stripe-api",
+      "name": "Stripe API",
+      "pin": "api-v3",
+      "rationale": "Hosted card payment processor",
+      "derives_from": [
+        "seed-payments-provider"
       ]
     }
   ],
-  "tech_stack": {
-    "languages": [{ "name": "Python", "version": "3.12" }],
-    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
-    "infrastructure": [{ "name": "SQLite", "version": "3" }],
-    "tools": [{ "name": "pytest", "version": "8.0" }]
-  },
   "canonical_refs_used": []
 }

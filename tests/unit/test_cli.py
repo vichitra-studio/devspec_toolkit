@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+import unittest.mock
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Optional
@@ -67,7 +68,6 @@ class CliTests(unittest.TestCase):
             "spec-quality-lint",
             "hallucination-lint",
             "dependency-order-lint",
-            "forward-replay-check",
         ):
             self.assertIn(name, out)
 
@@ -298,29 +298,6 @@ class CliTests(unittest.TestCase):
                                     },
                                 },
                             },
-                            "tech_stack": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "tech_stack_ref": {"type": "object"},
-                                    },
-                                },
-                            },
-                            "dependencies": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "type": {"type": "string"},
-                                        "id": {"type": "string"},
-                                        "dependency_ref": {"type": "object"},
-                                    },
-                                },
-                            },
                             "terms": {
                                 "type": "array",
                                 "items": {
@@ -431,22 +408,6 @@ class CliTests(unittest.TestCase):
                                 "status": "active",
                                 "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
                             },
-                            {
-                                "id": "cn:core:tech_stack:python",
-                                "kind": "tech_stack",
-                                "preferred_label": "python",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
-                            {
-                                "id": "cn:core:dependency:auth-service",
-                                "kind": "dependency",
-                                "preferred_label": "auth-service",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
                         ],
                         "aliases": [],
                     }
@@ -471,14 +432,6 @@ class CliTests(unittest.TestCase):
                         "extensions": [
                             {"area_of_concern": "security"},
                             {"area_of_concern": "unknown-area"},
-                        ],
-                        "tech_stack": [
-                            {"name": "python"},
-                            {"name": "unknown-tech"},
-                        ],
-                        "dependencies": [
-                            {"type": "external", "id": "auth-service"},
-                            {"type": "external", "id": "unknown-dependency"},
                         ],
                         "terms": [
                             {"term": "JWT"},
@@ -544,21 +497,11 @@ class CliTests(unittest.TestCase):
                 payload["extensions"][0].get("governance_label_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:tech_stack:python", "kind": "tech_stack"},
-                payload["tech_stack"][0].get("tech_stack_ref"),
-            )
-            self.assertEqual(
-                {"id": "cn:core:dependency:auth-service", "kind": "dependency"},
-                payload["dependencies"][0].get("dependency_ref"),
-            )
-            self.assertEqual(
                 {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
                 payload["threats"][0].get("risk_category_ref"),
             )
             self.assertNotIn("action_ref", payload["items"][0])
             self.assertNotIn("governance_label_ref", payload["extensions"][1])
-            self.assertNotIn("tech_stack_ref", payload["tech_stack"][1])
-            self.assertNotIn("dependency_ref", payload["dependencies"][1])
             self.assertNotIn("risk_category_ref", payload["threats"][1])
 
     def test_canonical_autofix_infers_term_and_risk_category_with_negative_cases(self):
@@ -775,79 +718,7 @@ class CliTests(unittest.TestCase):
                 payload.get("environment_ref"),
             )
 
-    def test_canonical_autofix_does_not_infer_dependency_ref_from_top_level_id(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            canon_dir = repo_root / "canon"
-            tools_dir = repo_root / "tools"
-            schema_dir = repo_root / "schema"
-            spec_dir.mkdir()
-            canon_dir.mkdir()
-            tools_dir.mkdir()
-            schema_dir.mkdir()
-            self._write_schema_registry_with_canon(
-                repo_root,
-                {"vc:test": "schema/test.schema.json"},
-            )
-            (schema_dir / "test.schema.json").write_text(
-                json.dumps(
-                    {
-                        "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "vc:test",
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "id": {"type": "string"},
-                            "dependency_ref": {"type": "object"},
-                            "canonical_refs_used": {"type": "array"},
-                        },
-                        "required": ["id", "canonical_refs_used"],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (canon_dir / "manifest.json").write_text(
-                json.dumps(
-                    {
-                        "registry_version": "1.0.0",
-                        "entries": [
-                            {
-                                "id": "cn:core:dependency:artifact-id",
-                                "kind": "dependency",
-                                "preferred_label": "artifact-id",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
-                        ],
-                        "aliases": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            artifact = spec_dir / "artifact.json"
-            artifact.write_text(
-                json.dumps(
-                    {
-                        "$schema": "vc:test",
-                        "id": "artifact-id",
-                        "canonical_refs_used": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            code, out, err = self._run_cli(
-                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
-            )
-            self.assertEqual(0, code, msg=err)
-            self.assertIn("OK", out)
-
-            payload = json.loads(artifact.read_text(encoding="utf-8"))
-            self.assertNotIn("dependency_ref", payload)
-
-    def test_canonical_autofix_infers_acronym_and_completeness_dimension_refs(self):
+    def test_canonical_autofix_infers_acronym_refs(self):
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
             spec_dir = repo_root / "spec"
@@ -882,17 +753,6 @@ class CliTests(unittest.TestCase):
                                     },
                                 },
                             },
-                            "missing_elements": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "category": {"type": "string"},
-                                        "completeness_dimension_ref": {"type": "object"},
-                                    },
-                                },
-                            },
                         },
                     }
                 ),
@@ -911,14 +771,6 @@ class CliTests(unittest.TestCase):
                                 "status": "active",
                                 "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
                             },
-                            {
-                                "id": "cn:core:completeness_dimension:traceability",
-                                "kind": "completeness_dimension",
-                                "preferred_label": "traceability",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
                         ],
                         "aliases": [],
                     }
@@ -931,10 +783,6 @@ class CliTests(unittest.TestCase):
                     {
                         "$schema": "vc:test",
                         "terms": [{"acronym": "JWT"}, {"acronym": "XYZ"}],
-                        "missing_elements": [
-                            {"category": "traceability"},
-                            {"category": "unknown-dimension"},
-                        ],
                         "canonical_refs_used": [],
                     }
                 ),
@@ -953,11 +801,6 @@ class CliTests(unittest.TestCase):
                 payload["terms"][0].get("acronym_ref"),
             )
             self.assertNotIn("acronym_ref", payload["terms"][1])
-            self.assertEqual(
-                {"id": "cn:core:completeness_dimension:traceability", "kind": "completeness_dimension"},
-                payload["missing_elements"][0].get("completeness_dimension_ref"),
-            )
-            self.assertNotIn("completeness_dimension_ref", payload["missing_elements"][1])
 
     def test_canonical_autofix_reports_invalid_json_deterministically(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1325,6 +1168,99 @@ class CliTests(unittest.TestCase):
             _, kwargs = p_update.call_args
             self.assertTrue(kwargs.get("dry_run"))
 
+    def _install_host(self, td: str, spec_version: str, piece_result):
+        """A git host, a toolkit with templates, and a fake registry of one piece returning *piece_result*."""
+        import subprocess
+        from specdev_tools import host_install as hi
+
+        host = Path(td) / "host"
+        spec_dir = host / "spec"
+        spec_dir.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(host)], check=True)
+        (spec_dir / "specdev_version").write_text(f'toolkit_version: "{spec_version}"\n', encoding="utf-8")
+        toolkit = Path(td) / "toolkit"
+        (toolkit / "tools").mkdir(parents=True)
+        (toolkit / "tools" / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n', encoding="utf-8")
+        (toolkit / "templates").mkdir()
+
+        def install(ctx):
+            (ctx.git_root / "fake.txt").write_text("x", encoding="utf-8")
+            return piece_result
+
+        return host, spec_dir, toolkit, patch.object(hi, "PIECES", (hi.HostPiece("fake", install),))
+
+    def test_update_cli_json_includes_host_install(self):
+        from specdev_tools import host_install as hi
+
+        with tempfile.TemporaryDirectory() as td:
+            host, spec_dir, toolkit, pieces = self._install_host(td, "1.0.0", hi.PieceResult(hi.CREATED))
+            with pieces:
+                code, out, err = self._run_cli(["update", str(spec_dir), "--repo-root", str(toolkit), "--json"])
+            self.assertEqual(0, code, msg=err)
+            payload = json.loads(out)
+            self.assertEqual(
+                {"status", "error_count", "warning_count", "command", "errors", "warnings", "output",
+                 "update_status", "from_version", "to_version", "dry_run", "host_install"},
+                set(payload),
+            )
+            self.assertEqual("created", payload["host_install"]["pieces"]["fake"]["status"])
+            self.assertTrue((host / "fake.txt").is_file())
+
+    def test_needs_migration_still_exits_1_after_install(self):
+        from specdev_tools import host_install as hi
+
+        diff = unittest.mock.MagicMock()
+        diff.summary = {"steps_missing": 1}
+        with tempfile.TemporaryDirectory() as td:
+            host, spec_dir, toolkit, pieces = self._install_host(td, "0.9.0", hi.PieceResult(hi.CREATED))
+            with pieces, \
+                    patch("specdev_tools.update.refresh_venv_installation", return_value=(True, "ok")), \
+                    patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff):
+                code, out, _ = self._run_cli(["update", str(spec_dir), "--repo-root", str(toolkit), "--json"])
+            self.assertEqual(1, code)
+            self.assertEqual("needs_migration", json.loads(out)["update_status"])
+            self.assertTrue((host / "fake.txt").is_file())
+
+    def test_update_json_warning_count_with_drift_exit_0(self):
+        from specdev_tools import host_install as hi
+
+        drift = hi.PieceResult(hi.DRIFT, "differs", (hi.Finding(hi.W_TEMPLATE_DRIFT, file="x.yaml", line=2, text="replace it"),))
+        with tempfile.TemporaryDirectory() as td:
+            _, spec_dir, toolkit, pieces = self._install_host(td, "1.0.0", drift)
+            with pieces, patch.dict(os.environ, {"SPECDEV_WARNINGS_AS_ERRORS": "1", "SPECDEV_PROMOTE_CODES": "W930"}):
+                code, out, _ = self._run_cli(["update", str(spec_dir), "--repo-root", str(toolkit), "--json"])
+            payload = json.loads(out)
+            self.assertEqual(0, code)
+            self.assertEqual(1, payload["warning_count"])
+            self.assertEqual(["W930 HOST_TEMPLATE_DRIFT: x.yaml:2: replace it"], payload["warnings"])
+            self.assertEqual(0, payload["error_count"])
+
+    def test_update_flags_are_forwarded_as_keywords(self):
+        from specdev_tools.update import UpdateResult
+
+        fake = UpdateResult(exit_code=0, status="installed", from_version=None, to_version="1.0.0", message="ok")
+        with tempfile.TemporaryDirectory() as td:
+            spec_dir = Path(td) / "spec"
+            spec_dir.mkdir()
+            with patch("specdev_tools.update.run_update", return_value=fake) as p_update:
+                code, _, err = self._run_cli(
+                    ["update", str(spec_dir), "--repo-root", td, "--git-root", td, "--install-only", "--adopt", "--force-claude"]
+                )
+            self.assertEqual(0, code, msg=err)
+            _, kwargs = p_update.call_args
+            self.assertEqual(Path(td).resolve(), Path(kwargs["git_root"]).resolve())
+            self.assertEqual((True, False, True, True), (kwargs["install_only"], kwargs["no_install"], kwargs["adopt"], kwargs["force_claude"]))
+            with patch("specdev_tools.update.run_update", return_value=fake) as p_update:
+                self._run_cli(["update", str(spec_dir), "--repo-root", td, "--no-install"])
+            _, kwargs = p_update.call_args
+            self.assertEqual((None, False, True, False, False), (kwargs["git_root"], kwargs["install_only"], kwargs["no_install"], kwargs["adopt"], kwargs["force_claude"]))
+
+    def test_update_install_only_and_no_install_are_exclusive(self):
+        with tempfile.TemporaryDirectory() as td:
+            code, _, err = self._run_cli(["update", td, "--repo-root", td, "--install-only", "--no-install"])
+        self.assertEqual(2, code)
+        self.assertIn("not allowed with", err)
+
     def test_update_command_missing_spec_dir_errors(self):
         """`update` on a non-existent spec dir errors out before calling run_update."""
         with tempfile.TemporaryDirectory() as td:
@@ -1405,7 +1341,8 @@ class CliTests(unittest.TestCase):
             with patch("specdev_tools.canonical.autofix.canonical_autofix", return_value={}) as p_autofix:
                 code, out, err = self._run_cli(["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root)])
                 self.assertEqual(0, code, msg=err)
-                self.assertIn("OK (no changes)", out)
+                self.assertIn("E607 is out of its scope", out)
+                self.assertNotIn("OK (no changes)", out)
                 p_autofix.assert_called_once_with(
                     os.path.abspath(str(repo_root)),
                     os.path.abspath(str(spec_dir)),
@@ -1441,19 +1378,52 @@ class CliTests(unittest.TestCase):
                 self.assertIn("OK", out)
                 p_dep.assert_called_once_with(os.path.abspath(str(repo_root)))
 
-            with patch("specdev_tools.validation.validate._resolve_replay_base_ref", return_value="feature/x") as p_base, \
-                 patch("specdev_tools.validation.forward_replay_check.check_forward_replay", return_value=[]) as p_replay:
-                code, out, err = self._run_cli(["forward-replay-check", "--repo-root", str(repo_root)])
-                self.assertEqual(0, code, msg=err)
-                self.assertIn("OK", out)
-                p_base.assert_called_once_with(Path(os.path.abspath(str(repo_root))))
-                p_replay.assert_called_once_with(
-                    os.path.abspath(str(repo_root)),
-                    base_ref="feature/x",
-                    diff_error_mode="error",
-                    git_root=None,
-                    spec_root=None,
-                )
+    def test_forward_replay_check_hard_fails_with_pointer(self):
+        code, out, err = self._run_cli(["forward-replay-check", "--repo-root", "."])
+        self.assertEqual(2, code)
+        self.assertEqual("", out)
+        self.assertIn("forward-replay-check was removed in 1.2.0", err)
+        self.assertIn("specdev stale", err)
+
+    def test_matrix_command_hard_fails_with_pointer(self):
+        code, out, err = self._run_cli(["matrix", "spec", "--repo-root", "."])
+        self.assertEqual(2, code)
+        self.assertEqual("", out)
+        self.assertIn("matrix was removed in 1.2.0", err)
+        self.assertIn("specdev coverage --by fr", err)
+        self.assertIn("specdev trace", err)
+
+    def test_retired_closure_commands_hard_fail_with_pointer(self):
+        for command, pointer in (("completeness-check", "specdev coverage"), ("traceability-check", "specdev spec-check")):
+            with self.subTest(command=command):
+                code, out, err = self._run_cli([command, "spec", "--repo-root", "."])
+                self.assertEqual(2, code)
+                self.assertEqual("", out)
+                self.assertIn(f"{command} was removed in 1.2.0", err)
+                self.assertIn(pointer, err)
+
+    def test_a_removed_name_is_refused_only_in_first_position(self):
+        """`spec-check matrix` names a spec folder `matrix`, and `matrixx` is no command: neither gets the pointer."""
+        from specdev_tools.cli import _refuse_removed_command
+
+        _refuse_removed_command(["spec-check", "matrix"])
+        _refuse_removed_command(["--repo-root", ".", "matrix"])
+        _refuse_removed_command(["matrixx", "spec"])
+        code, out, err = self._run_cli(["spec-check", "matrix", "--repo-root", "."])
+        self.assertNotIn("was removed", out + err)
+        code, out, err = self._run_cli(["matrixx", "spec", "--repo-root", "."])
+        self.assertEqual(2, code)
+        self.assertEqual("", out)
+        self.assertIn("invalid choice: 'matrixx'", err)
+        self.assertNotIn("was removed", err)
+
+    def test_spec_check_has_no_include_forward_replay_flag(self):
+        code, out, _ = self._run_cli(["spec-check", "--help"])
+        self.assertEqual(0, code)
+        self.assertNotIn("--include-forward-replay", out)
+        code, _, err = self._run_cli(["spec-check", "spec", "--include-forward-replay"])
+        self.assertEqual(2, code)
+        self.assertIn("unrecognized arguments: --include-forward-replay", err)
 
     def test_hallucination_lint_fails_when_canon_dir_missing(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1492,65 +1462,6 @@ class CliTests(unittest.TestCase):
             self.assertEqual(1, code)
             self.assertEqual("", out.strip())
             self.assertIn("missing_spec_dir", err)
-
-    def test_matrix_non_strict_writes_output_with_integrity_errors(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            out_file = repo_root / "matrix.json"
-
-            payload = {
-                "matrix": [],
-                "coverage": {"fr_total": 0},
-                "integrity_errors": ["Broken Trace in probe.json: Reference to 'fr-missing' not found."],
-            }
-            with patch("specdev_tools.validation.matrix.build_trace_matrix", return_value=payload), patch.dict(
-                os.environ,
-                {"SPECDEV_MATRIX_STRICT": "0"},
-                clear=False,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--out", str(out_file), "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(0, code, msg=err)
-            self.assertIn(str(out_file), out)
-            self.assertEqual("", err.strip())
-            self.assertTrue(out_file.exists())
-            written = json.loads(out_file.read_text(encoding="utf-8"))
-            self.assertIn("integrity_errors", written)
-            self.assertEqual(payload["integrity_errors"], written["integrity_errors"])
-
-    def test_matrix_strict_writes_output_and_fails_on_integrity_errors(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            out_file = repo_root / "matrix.json"
-
-            payload = {
-                "matrix": [],
-                "coverage": {"fr_total": 0},
-                "integrity_errors": ["Broken Trace in probe.json: Reference to 'fr-missing' not found."],
-            }
-            with patch("specdev_tools.validation.matrix.build_trace_matrix", return_value=payload), patch.dict(
-                os.environ,
-                {"SPECDEV_MATRIX_STRICT": "1"},
-                clear=False,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--out", str(out_file), "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(1, code)
-            self.assertIn(str(out_file), out)
-            self.assertIn("E210 TRACE_INTEGRITY matrix_failed count=1", err)
-            self.assertIn(payload["integrity_errors"][0], err)
-            self.assertTrue(out_file.exists())
-            written = json.loads(out_file.read_text(encoding="utf-8"))
-            self.assertIn("integrity_errors", written)
-            self.assertEqual(payload["integrity_errors"], written["integrity_errors"])
 
     def test_strict_canonical_manifest_schema_registration_is_enforced_across_commands(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1650,15 +1561,15 @@ class CliTests(unittest.TestCase):
                 "version": "1.0.0",
                 "steps": [
                     "00", "01", "02", "02a", "03", "04", "05", "06", "07",
-                    "08", "09", "10", "11", "12", "13", "13a", "14", "15",
+                    "08", "09", "10", "11", "12", "13", "14", "15",
                     "16", "16a", "16b", "16c"
                 ],
                 "downstream_consumers": {
-                    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"],
-                    "01": ["02", "03", "04", "09", "13", "13a"],
+                    "00": ["01", "03", "04", "07", "09", "10", "13", "14"],
+                    "01": ["02", "03", "04", "09", "13"],
                     "02": ["02a", "05", "09", "11", "13", "15"],
                     "03": ["04", "05", "07"],
-                    "04": ["05", "06", "07", "08", "09", "11", "13", "13a", "14", "15", "16", "16a", "16c"]
+                    "04": ["05", "06", "07", "08", "09", "11", "13", "14", "15", "16", "16a", "16b", "16c"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1688,11 +1599,11 @@ class CliTests(unittest.TestCase):
                 "version": "1.0.0",
                 "steps": [
                     "00", "01", "02", "02a", "03", "04", "05", "06", "07",
-                    "08", "09", "10", "11", "12", "13", "13a", "14", "15",
+                    "08", "09", "10", "11", "12", "13", "14", "15",
                     "16", "16a", "16b", "16c"
                 ],
                 "downstream_consumers": {
-                    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"]
+                    "00": ["01", "03", "04", "07", "09", "10", "13", "14"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1841,270 +1752,6 @@ class CliTests(unittest.TestCase):
             self.assertEqual(code, 0, f"stderr: {stderr}")
 
 
-    def test_completeness_check_runs_without_error_on_empty_spec_dir(self):
-        """completeness-check with an empty spec dir should exit 0 with no errors."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root)]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-
-    def test_completeness_check_json_output_has_coverage_key(self):
-        """completeness-check --json should include a 'coverage' key in output."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            self.assertIn("coverage", payload, f"Expected 'coverage' key in JSON output. Got: {payload}")
-
-    def test_completeness_check_excludes_wont_have_frs_from_total(self):
-        """A priority:"wont-have" FR must not count toward fr_api_coverage's
-        total_frs denominator (DEVSPEC-122 follow-up) -- it is parked by
-        design and was never expected to have API coverage."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            frs = {"functional_requirements": [
-                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
-                {"fr_id": "fr-legacy-export", "priority": "wont-have"},
-            ]}
-            caps = {"capabilities": [{"capability_id": "cap-auth"}]}
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
-
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            self.assertEqual(
-                1, payload["coverage"]["fr_api_coverage"]["total_count"],
-                f"Expected wont-have FR excluded from total_count. Got: {payload['coverage']}"
-            )
-
-    def test_completeness_check_step05_oos_excluded_from_api_not_fixture_total(self):
-        """An FR exempted via Step 05 apis.out_of_scope[] must be excluded from
-        fr_api_coverage/fr_milestone_coverage's denominator, but NOT from
-        fr_fixture_coverage's -- traceability_closure.py deliberately keeps the
-        Step 05 (no API surface) and Step 08 (no fixture) exemption sets
-        separate, since an FR with no API can still need a fixture."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            frs = {"functional_requirements": [
-                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
-                {"fr_id": "fr-batch-job"},
-            ]}
-            apis = {"out_of_scope": [{"fr_id": "fr-batch-job", "rationale": "no HTTP surface"}]}
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-            (spec_dir / "05_interface_contracts.json").write_text(json.dumps(apis), encoding="utf-8")
-
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            self.assertEqual(
-                1, payload["coverage"]["fr_api_coverage"]["total_count"],
-                f"Expected Step-05 out_of_scope FR excluded from fr_api_coverage total. Got: {payload['coverage']}"
-            )
-            self.assertEqual(
-                1, payload["coverage"]["fr_milestone_coverage"]["total_count"],
-                f"Expected Step-05 out_of_scope FR excluded from fr_milestone_coverage total. Got: {payload['coverage']}"
-            )
-            self.assertEqual(
-                2, payload["coverage"]["fr_fixture_coverage"]["total_count"],
-                f"Expected Step-05 out_of_scope FR to remain in fr_fixture_coverage total "
-                f"(it's a different exemption set). Got: {payload['coverage']}"
-            )
-
-    def test_completeness_check_step08_oos_excluded_from_fixture_not_api_total(self):
-        """An FR exempted via Step 08 fixtures.out_of_scope[] must be excluded
-        from fr_fixture_coverage's denominator only -- the mirror-image control
-        of the Step 05 case above."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            frs = {"functional_requirements": [
-                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
-                {"fr_id": "fr-webhook"},
-            ]}
-            fixtures = {"out_of_scope": [{"fr_id": "fr-webhook", "rationale": "no fixture yet"}]}
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-            (spec_dir / "08_fixtures.json").write_text(json.dumps(fixtures), encoding="utf-8")
-
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            self.assertEqual(
-                1, payload["coverage"]["fr_fixture_coverage"]["total_count"],
-                f"Expected Step-08 out_of_scope FR excluded from fr_fixture_coverage total. Got: {payload['coverage']}"
-            )
-            self.assertEqual(
-                2, payload["coverage"]["fr_api_coverage"]["total_count"],
-                f"Expected Step-08 out_of_scope FR to remain in fr_api_coverage total "
-                f"(it's a different exemption set). Got: {payload['coverage']}"
-            )
-            self.assertEqual(
-                2, payload["coverage"]["fr_milestone_coverage"]["total_count"],
-                f"Expected Step-08 out_of_scope FR to remain in fr_milestone_coverage total "
-                f"(it's a different exemption set). Got: {payload['coverage']}"
-            )
-
-    def test_completeness_check_control_all_must_have_frs_counted(self):
-        """Control: with no wont-have FRs, both FRs count toward the total."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            frs = {"functional_requirements": [
-                {"fr_id": "fr-login", "priority": "must-have"},
-                {"fr_id": "fr-logout", "priority": "should-have"},
-            ]}
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            self.assertEqual(2, payload["coverage"]["fr_api_coverage"]["total_count"])
-
-    def test_completeness_check_excludes_scope_out_and_future_capabilities_from_total(self):
-        """scope:"out" and scope:"future" capabilities must not count toward
-        capability_fr_coverage's total_caps denominator (DEVSPEC-122
-        follow-up). Both are parked by design -- "out" permanently, "future"
-        deferred to a later release -- so W568 UNCOVERED_CAPABILITY itself
-        exempts both (traceability_closure.py's capability_parked_ids), and
-        this denominator mirrors that exemption set exactly."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            caps = {"capabilities": [
-                {"capability_id": "cap-auth", "scope": "in"},
-                {"capability_id": "cap-legacy", "scope": "out"},
-                {"capability_id": "cap-roadmap-v2", "scope": "future"},
-            ]}
-            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
-            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            cov = payload["coverage"]["capability_fr_coverage"]
-            self.assertEqual(
-                1, cov["total_count"],
-                f"Expected scope:out/future capabilities excluded from total_count. Got: {cov}"
-            )
-            self.assertEqual(
-                [], cov["uncovered_ids"],
-                f"Expected no uncovered ids -- the only counted capability (cap-auth) is covered. Got: {cov}"
-            )
-            self.assertEqual(1, cov["covered_count"])
-
-    def test_completeness_check_control_scope_in_capabilities_counted(self):
-        """Control: with only scope:"in" capabilities, all count toward the total."""
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            caps = {"capabilities": [
-                {"capability_id": "cap-auth", "scope": "in"},
-                {"capability_id": "cap-billing", "scope": "in"},
-            ]}
-            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
-
-            code, out, err = self._run_cli(
-                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
-            )
-            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
-            payload = json.loads(out)
-            self.assertEqual(2, payload["coverage"]["capability_fr_coverage"]["total_count"])
-
-    def test_completeness_check_exits_nonzero_on_wcodes_with_warnings_as_errors(self):
-        """With SPECDEV_WARNINGS_AS_ERRORS=1, W-codes from completeness-check cause non-zero exit."""
-        import os as _os
-        # Build a minimal spec dir that triggers W568 (capability with no FR tracing to it)
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-
-            # Write capabilities with cap-auth but no FRs tracing to it
-            caps = {"capabilities": [{"capability_id": "cap-auth"}]}
-            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
-            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-
-            with patch("specdev_tools.cli.check_venv", return_value=None), \
-                 patch.object(sys, "argv", ["specdev-tools", "completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]):
-                from specdev_tools.core.config import reset_config
-                reset_config()
-                with patch.dict(_os.environ, {"SPECDEV_WARNINGS_AS_ERRORS": "1"}):
-                    stdout = io.StringIO()
-                    stderr = io.StringIO()
-                    with redirect_stdout(stdout), redirect_stderr(stderr):
-                        try:
-                            reset_config()
-                            cli.main()
-                            code = 0
-                        except SystemExit as exc:
-                            code = int(exc.code) if isinstance(exc.code, int) else 1
-                        finally:
-                            reset_config()
-            self.assertEqual(1, code, msg=f"Expected exit 1 with SPECDEV_WARNINGS_AS_ERRORS=1. stdout: {stdout.getvalue()}")
-
-    def test_completeness_check_exits_nonzero_non_json_with_warnings_as_errors(self):
-        """Non-JSON path exits non-zero when W-codes are present with WARNINGS_AS_ERRORS."""
-        import os as _os
-        # Build a minimal spec dir that triggers W568 (capability with no FR tracing to it)
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-
-            # Write capabilities with cap-auth but no FRs tracing to it — W568 fires
-            caps = {"capabilities": [{"capability_id": "cap-auth"}]}
-            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
-            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
-            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
-
-            with patch("specdev_tools.cli.check_venv", return_value=None), \
-                 patch.object(sys, "argv", ["specdev-tools", "completeness-check", str(spec_dir), "--repo-root", str(repo_root)]):
-                from specdev_tools.core.config import reset_config
-                reset_config()
-                with patch.dict(_os.environ, {"SPECDEV_WARNINGS_AS_ERRORS": "1"}):
-                    stdout = io.StringIO()
-                    stderr = io.StringIO()
-                    with redirect_stdout(stdout), redirect_stderr(stderr):
-                        try:
-                            reset_config()
-                            cli.main()
-                            code = 0
-                        except SystemExit as exc:
-                            code = int(exc.code) if isinstance(exc.code, int) else 1
-                        finally:
-                            reset_config()
-            self.assertEqual(1, code, msg=f"Expected exit 1 for non-JSON path with SPECDEV_WARNINGS_AS_ERRORS=1. stdout: {stdout.getvalue()}")
-
-
     # ------------------------------------------------------------------
     # J.1 — `json` family tolerates --spec-root / --git-root by silently
     # dropping them before dispatching to json_main. Agents over-apply
@@ -2187,55 +1834,6 @@ class CliTests(unittest.TestCase):
              "--spec-root", "./spec",
              "--git-root", "."],
         )
-
-    # ------------------------------------------------------------------
-    # H.B — `matrix` writes to <spec_dir>/extras/trace_matrix.json when
-    # --out is omitted. Explicit --out and --out - still work.
-    # ------------------------------------------------------------------
-
-    def test_matrix_default_out_writes_to_canonical_extras_path(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-            expected_path = spec_dir.resolve() / "extras" / "trace_matrix.json"
-
-            payload = {"matrix": [], "coverage": {"fr_total": 0}}
-            with patch(
-                "specdev_tools.validation.matrix.build_trace_matrix",
-                return_value=payload,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(0, code, msg=err)
-            self.assertTrue(expected_path.exists())
-            self.assertIn(str(expected_path), out)
-            written = json.loads(expected_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["coverage"], written["coverage"])
-
-    def test_matrix_explicit_dash_still_streams_to_stdout(self):
-        with tempfile.TemporaryDirectory() as td:
-            repo_root = Path(td)
-            spec_dir = repo_root / "spec"
-            spec_dir.mkdir()
-
-            payload = {"matrix": [], "coverage": {"fr_total": 7}}
-            with patch(
-                "specdev_tools.validation.matrix.build_trace_matrix",
-                return_value=payload,
-            ):
-                code, out, err = self._run_cli(
-                    ["matrix", str(spec_dir), "--out", "-", "--repo-root", str(repo_root)]
-                )
-
-            self.assertEqual(0, code, msg=err)
-            # stdout should contain serialized JSON, not a file path.
-            written = json.loads(out)
-            self.assertEqual(payload["coverage"], written["coverage"])
-            # And no extras dir created.
-            self.assertFalse((spec_dir / "extras").exists())
 
 
 if __name__ == "__main__":

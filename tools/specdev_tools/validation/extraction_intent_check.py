@@ -13,11 +13,18 @@ from ._extraction_intent_parser import parse_extraction_intent
 # Pattern to match step number from prompt filenames: prompt_05_interface_contracts.md -> "05"
 _PROMPT_STEP_RE = re.compile(r"prompt_(\d{2}[a-z]?)_")
 
-# Vague-intent trigger words — aligned with dag_lint._VAGUE_MARKERS
+# Vague-intent trigger words: this regex is the one source of the W597 trigger words
 _VAGUE_WORDS_RE = re.compile(
     r"\b(?:relevant|as needed|as appropriate|etc\.?|various|TBD|TODO)\b",
     re.IGNORECASE,
 )
+
+
+def _comes_after(ref_step: str, step_id: str, steps_list: list[str]) -> bool:
+    """True when ``ref_step`` is later than ``step_id`` in ``steps_list`` (both must be listed)."""
+    if ref_step not in steps_list or step_id not in steps_list:
+        return False
+    return steps_list.index(ref_step) > steps_list.index(step_id)
 
 
 def check_extraction_intent(
@@ -26,7 +33,7 @@ def check_extraction_intent(
 ) -> list[SpecError]:
     """Validate extraction intent sections against step_order.json.
 
-    For each prompt file that contains a ``### Extraction Intent`` section:
+    For each prompt file; one with no ``Extraction Intent`` section (level two or three) is E591:
     1. Parse declared upstream artifact references from the section.
     2. Cross-reference against the step's declared consumption set — preferring
        ``step_metadata[step_id].required_spec_inputs`` (the authoritative
@@ -36,12 +43,10 @@ def check_extraction_intent(
     3. Report missing intent entries, invalid references, and vague descriptions.
 
     Error codes:
-        E591 — required extraction intent field missing or empty
+        E591 — extraction intent section missing, unreadable or without entries
         E597 — a required upstream dep has no corresponding extraction intent entry
         W597 — intent text is vague (<10 words or contains "relevant"/"as needed")
-        E598 — intent references an artifact not in step_order.json steps list
-
-    Prompts without a ``### Extraction Intent`` section are skipped gracefully.
+        E598 — intent references a step that does not exist or that comes after the prompt's own step
     """
     errors: list[SpecError] = []
     prompts_path = prompts_dir or os.path.join(repo_root, "prompts")
@@ -93,7 +98,12 @@ def check_extraction_intent(
         prompt_path = os.path.join(prompts_path, fn)
         parsed = parse_extraction_intent(Path(prompt_path))
         if parsed is None:
-            continue  # Graceful skip — no section or unreadable
+            errors.append(make_error(
+                "E591",
+                f"EXTRACTION_INTENT_EMPTY prompt_{step_id} "
+                f"has no Extraction Intent section (or the file cannot be read)",
+            ))
+            continue
 
         intent_entries = parsed.step_entries
         has_seed_entries = parsed.has_seed_entries
@@ -105,7 +115,7 @@ def check_extraction_intent(
             errors.append(make_error(
                 "E591",
                 f"EXTRACTION_INTENT_EMPTY prompt_{step_id} "
-                f"has ### Extraction Intent section but no entries were parsed",
+                f"has an Extraction Intent section but no entries were parsed",
             ))
             continue
 
@@ -128,6 +138,12 @@ def check_extraction_intent(
                     "E598",
                     f"EXTRACTION_INTENT_INVALID_REF prompt_{step_id} "
                     f"extraction intent references unknown step '{ref_step}'",
+                ))
+            elif _comes_after(ref_step, step_id, steps_list):
+                errors.append(make_error(
+                    "E598",
+                    f"EXTRACTION_INTENT_INVALID_REF prompt_{step_id} "
+                    f"extraction intent reads step '{ref_step}', which comes after this step",
                 ))
 
             # W597: vague intent — too short or contains weasel words

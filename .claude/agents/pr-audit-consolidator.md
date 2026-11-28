@@ -262,8 +262,9 @@ Schema: `schema/infra/findings.schema.json`. The schema enforces `additionalProp
 at both the document root and each finding object.
 
 **Forbidden top-level keys** (the schema rejects them outright):
-`$schema`, `run_id`, `agent`, `bin_id`, `slice_name`, `semantic_work`, `summary`,
+`run_id`, `agent`, `bin_id`, `slice_name`, `semantic_work`, `summary`,
 `procedure`, `files_analyzed`, `null_results`, `agent_id`, `iteration`.
+`$schema` is allowed on a findings file (its only value is `vc:infra:findings`).
 
 **Required top-level keys**: `round`, `scope`, `generated_at`, `findings`.
 

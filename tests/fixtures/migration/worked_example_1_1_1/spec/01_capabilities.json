@@ -1,0 +1,26 @@
+{
+    "$schema": "vc:01-capabilities",
+    "id": "capabilities-catalog",
+    "owner": "product",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "capabilities": [
+        {
+            "capability_id": "cap-account-recovery",
+            "verb": "recover",
+            "scope": "in",
+            "owner": "product",
+            "description": "A registered member can regain access to their account without contacting support.",
+            "trace": [
+                {
+                    "type": "charter-goal",
+                    "id": "seg-registered-member"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:account-recovery",
+                "kind": "capability"
+            }
+        }
+    ]
+}

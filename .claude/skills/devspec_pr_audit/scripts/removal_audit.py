@@ -66,6 +66,28 @@ except Exception:
             json.dump(manifest, fh, indent=2)
         tmp.replace(manifest_path)
 
+def record_suppressed_removals(manifest_path: Path, locations: list[str]) -> None:
+    """Add the removed files whose P0 finding the override suppressed to ``removal_audit_suppressed`` of the manifest.
+
+    A suppressed finding is not in ``tier0_findings.json``; the manifest is the only record of it. A re-run that
+    suppresses nothing new leaves the list as it is.
+    """
+    if not locations:
+        return
+    try:
+        with manifest_path.open(encoding="utf-8") as fh:
+            manifest: dict[str, Any] = json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"WARNING: could not record the suppressed removals in the manifest: {exc}", file=sys.stderr)
+        return
+    manifest["removal_audit_suppressed"] = sorted(set(manifest.get("removal_audit_suppressed", [])) | set(locations))
+    manifest["updated_at"] = int(time.time())
+    tmp = manifest_path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2)
+    tmp.replace(manifest_path)
+
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 # SCRIPT_DIR = .claude/skills/devspec_pr_audit/scripts
 # parents[0] = .claude/skills/devspec_pr_audit
@@ -78,17 +100,18 @@ FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 
 # High-value, deterministic toolkit files whose deletion is held to a P0 (D9) bar.
 # NOTE: despite the historical variable name, NOT all of these are generator
-# outputs — only entry_key_registry.json and extraction_paths.json are produced by
-# `registry-generate`. schema_registry.json, step_order.json, command_prefixes.json,
+# outputs — entry_key_registry.json, extraction_paths.json, step_order.json and
+# cli_commands.json are produced by `registry-generate`. schema_registry.json, command_prefixes.json
 # and step_docs.json are manually maintained but equally load-bearing, so their
 # deletion is treated with the same severity. (This set is NOT synced to
-# slices.yaml's generated_artifacts slice, which now lists only the two true
-# generator outputs.)
+# slices.yaml's generated_artifacts slice, which routes step_order.json to
+# pipeline_topology.)
 GENERATED_ARTIFACT_NAMES: set[str] = {
     "schema_registry.json",
     "step_order.json",
     "entry_key_registry.json",
     "extraction_paths.json",
+    "cli_commands.json",
     "command_prefixes.json",
     "step_docs.json",
 }
@@ -138,9 +161,11 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
     explicitly covers a "removed value" not propagated to dependents. So every
     removal is tagged D7, EXCEPT a load-bearing deterministic toolkit artifact
     (the GENERATED_ARTIFACT_NAMES set), whose absence is treated as a D9
-    generator-integrity defect. For the true generator outputs
-    (entry_key_registry.json, extraction_paths.json) that is literal — the
-    generator would re-emit them, so a committed deletion is provably wrong. For
+    generator-integrity defect. For the fully derived generator outputs
+    (entry_key_registry.json, extraction_paths.json, cli_commands.json) that is
+    literal — the generator would re-emit them, so a committed deletion is
+    provably wrong. step_order.json is generated too, but from itself (its
+    hand-kept keys), so the generator cannot run without it. For it and for
     the manually-maintained members of the set the D9/P0 tag is a deliberate
     high-severity choice (their loss silently breaks routing, ai-help, or
     schema/step resolution), not a claim that a generator owns them. The catalog
@@ -155,9 +180,13 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
       canon/**                               → D7, P0  (registry everything references)
       tools/{schema_registry,step_order,
              entry_key_registry,extraction_paths,
+             cli_commands,
              command_prefixes,step_docs}.json → D9, P0  (load-bearing toolkit
                                                           data; see note above —
-                                                          only 2 are generator outputs)
+                                                          schema_registry,
+                                                          command_prefixes and
+                                                          step_docs are hand-kept,
+                                                          the others generated)
       *.schema.json                          → D7, P1
       prompts/**/*.md                        → D7, P1
       tools/specdev_tools/**/*.py            → D7, P1
@@ -265,8 +294,17 @@ def main() -> int:
             with output_path.open(encoding="utf-8") as fh:
                 existing_doc = json.load(fh)
             existing_findings = existing_doc.get("findings", [])
-        except (json.JSONDecodeError, KeyError):
-            pass  # Start fresh
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"ERROR: {output_path} is unreadable ({exc}); the Tier-0 findings in it would be lost. "
+                  "Run tier0_checks.py again, then this script.", file=sys.stderr)
+            return 2
+        if not isinstance(existing_findings, list) or any(
+            not isinstance(f, dict) or not all(k in f for k in ("kind", "location", "signature"))
+            for f in existing_findings
+        ):
+            print(f"ERROR: {output_path} holds a finding without kind, location or signature; "
+                  "run tier0_checks.py again, then this script.", file=sys.stderr)
+            return 2
 
     # Dedup by (kind, location, signature)
     seen_keys: set[tuple[str, str, str]] = {
@@ -279,7 +317,9 @@ def main() -> int:
 
     # Filter P0 removal-audit findings BEFORE merging with existing
     # so tier0_checks.py P0s (e.g. T0-06, T0-10) are never dropped.
+    suppressed_p0: list[str] = []
     if "removal-audit" in allow_failures:
+        suppressed_p0 = sorted(str(f["location"]) for f in deduped_new if f.get("severity") == "P0")
         deduped_new = [f for f in deduped_new if f.get("severity") != "P0"]
 
     merged = existing_findings + deduped_new
@@ -307,8 +347,11 @@ def main() -> int:
     # IMPT-2: Always record override in manifest when flag is present, regardless
     # of p0_count (idempotent re-runs where deduped_new is empty must still log).
     if "removal-audit" in allow_failures:
-        print(f"  [OVERRIDE] removal-audit: {p0_count} P0 finding(s) suppressed by --allow-tier0-failure")
+        print(f"  [OVERRIDE] removal-audit: {len(suppressed_p0)} P0 finding(s) suppressed by --allow-tier0-failure")
+        for location in suppressed_p0:
+            print(f"    suppressed P0 removal: {location}")
         update_manifest_overrides(manifest_path, "removal-audit")
+        record_suppressed_removals(manifest_path, suppressed_p0)
         gate = "pass (overridden)"
         print(f"removal-audit: {len(deduped_new)} new findings "
               f"(P0={p0_count} P1={p1_count} P2={p2_count}) — gate: {gate}")

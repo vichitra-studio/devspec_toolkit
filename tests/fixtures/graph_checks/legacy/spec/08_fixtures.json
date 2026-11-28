@@ -1,0 +1,17 @@
+{
+  "$schema": "vc:08-fixtures",
+  "id": "legacy-fixtures",
+  "owner": "api",
+  "created_at": "2026-03-01T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fix-legacy-signin",
+      "mode": "contract",
+      "targets": ["api-legacy-signin"],
+      "input": {"method": "POST", "path": "/v1/sessions", "body": {"email": "a@example.com", "password": "pw"}},
+      "expected": {"status": 201},
+      "tag_ref": {"id": "cn:core:tag:critical-path", "kind": "tag", "version": "1.0.0"}
+    }
+  ],
+  "canonical_refs_used": [{"id": "cn:core:tag:critical-path", "kind": "tag", "version": "^1.0.0"}]
+}

@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Collection
 from typing import Dict, List, Optional, Tuple
 
 import yaml
@@ -23,6 +24,8 @@ from .errors import SpecError, make_error
 class MigrationInfo:
     """Migration action specification for a change."""
     action: str  # "auto", "ai_assisted", "merge", "archive"
+    script: Optional[str] = None  # id of the migration script that performs an ``auto`` entry (see format.yaml)
+    kind: Optional[str] = None  # "mechanical", "judgement" or "none" (see format.yaml ``migration_kinds``)
     prompt: Optional[str] = None
     operations: List[str] = field(default_factory=list)
     source: Optional[str] = None
@@ -69,6 +72,7 @@ class ChangelogFormat:
     optional_fields: List[str]
     change_types: List[str]
     migration_actions: List[str]
+    migration_kinds: List[str] = field(default_factory=list)
 
 
 # -----------------------------------------------------------------------------
@@ -111,6 +115,7 @@ def load_format(changelog_dir: Path) -> ChangelogFormat:
         optional_fields=data.get("optional_fields", []),
         change_types=data.get("change_types", []),
         migration_actions=data.get("migration_actions", []),
+        migration_kinds=data.get("migration_kinds", []),
     )
 
 
@@ -152,12 +157,19 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
     
     # Parse changes
     changes: List[ChangelogEntry] = []
-    for change_data in data.get("changes", []):
+    raw_changes = data.get("changes", [])
+    if not isinstance(raw_changes, list):
+        raise ValueError(f"Field 'changes' must be a list, got {raw_changes!r} in {yaml_path}")
+    for index, change_data in enumerate(raw_changes):
+        if not isinstance(change_data, dict):
+            raise ValueError(f"Change {index} must be a mapping, got {change_data!r} in {yaml_path}")
         migration = None
         if "migration" in change_data:
             m = change_data["migration"]
             migration = MigrationInfo(
                 action=m.get("action", "auto"),
+                script=m.get("script"),
+                kind=m.get("kind"),
                 prompt=m.get("prompt"),
                 operations=m.get("operations", []),
                 source=m.get("source"),
@@ -221,19 +233,6 @@ def list_versions(changelog_dir: Path) -> List[str]:
     return sorted(versions, key=_parse_semver)
 
 
-def get_latest_version(changelog_dir: Path) -> Optional[str]:
-    """Get the latest version from the changelog directory.
-    
-    Args:
-        changelog_dir: Path to the changelog/ directory
-        
-    Returns:
-        Latest version string, or None if no versions found
-    """
-    versions = list_versions(changelog_dir)
-    return versions[-1] if versions else None
-
-
 def compare_versions(v1: str, v2: str) -> int:
     """Compare two semantic version strings.
     
@@ -288,12 +287,52 @@ def get_changes_between(
     return all_changes
 
 
-def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
+# The last released version whose ``auto`` entries are not required to name a script: its changelog files are
+# never edited after release, and its one scripted migration lives under ``migration/scripts/v1_1_0/``.
+LAST_SCRIPTLESS_VERSION = "1.1.1"
+
+
+def _script_findings(
+    changes: List[ChangelogEntry], version: str, known_scripts: Optional[Collection[str]]
+) -> List[SpecError]:
+    """E884 for every ``auto`` entry of kind ``mechanical`` that names no script, or one outside *known_scripts*.
+
+    Versions up to ``LAST_SCRIPTLESS_VERSION`` are exempt (a malformed version is E520's, not checked here).  With *known_scripts* ``None`` only the presence of the
+    ``script`` key is checked.
+    """
+    if version != "unreleased" and (not _is_valid_semver(version) or compare_versions(version, LAST_SCRIPTLESS_VERSION) <= 0):
+        return []
+    errors: List[SpecError] = []
+    for i, change in enumerate(changes):
+        migration = change.migration
+        if migration is None or migration.action != "auto" or migration.kind != "mechanical":
+            continue
+        where = f"Change {i} ({change.type}) of {version}"
+        if not migration.script:
+            errors.append(make_error(
+                "E884",
+                f"{where}: migration is `auto` with kind `mechanical` but names no script. "
+                "Add `script: <script id>`, or mark the entry `kind: none` when no host data is touched.",
+            ))
+        elif known_scripts is not None and migration.script not in known_scripts:
+            errors.append(make_error(
+                "E884",
+                f"{where}: migration names script {migration.script!r}, which no migration script module "
+                "of this toolkit defines. Registered scripts: " + (", ".join(sorted(known_scripts)) or "none") + ".",
+            ))
+    return errors
+
+
+def validate_changelog(
+    changelog_dir: Path, version: str, known_scripts: Optional[Collection[str]] = None
+) -> List[SpecError]:
     """Validate a version changelog against the format schema.
 
     Args:
         changelog_dir: Path to the changelog/ directory
         version: Version string to validate
+        known_scripts: ids of the registered migration scripts; ``None`` checks only that an ``auto`` entry of kind
+            ``mechanical`` has a ``script`` (this module imports nothing from ``migration/``)
 
     Returns:
         List of SpecError objects (empty if valid)
@@ -448,7 +487,16 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
                     f"Valid actions: {fmt.migration_actions}",
                 )
             )
+        if change.migration and change.migration.kind is not None and change.migration.kind not in fmt.migration_kinds:
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Change {i}: Invalid migration kind '{change.migration.kind}'. "
+                    f"Valid kinds: {fmt.migration_kinds}",
+                )
+            )
 
+    errors.extend(_script_findings(changelog.changes, version, known_scripts))
     return errors
 
 
@@ -511,11 +559,12 @@ def _is_valid_semver(version: str) -> bool:
     return bool(re.match(pattern, version))
 
 
-def _parse_semver(version: str) -> Tuple[int, int, int, str]:
+def _parse_semver(version: str) -> Tuple[int, int, int, int, str]:
     """Parse semantic version into comparable tuple.
-    
-    Returns tuple of (major, minor, patch, prerelease).
-    Prerelease is empty string for release versions.
+
+    Returns tuple of (major, minor, patch, is_release, prerelease).
+    is_release is 0 for a prerelease and 1 for a release, so a prerelease
+    sorts before its release. Prerelease is empty string for release versions.
     """
     # Handle prerelease suffix
     prerelease = ""
@@ -527,9 +576,4 @@ def _parse_semver(version: str) -> Tuple[int, int, int, str]:
     minor = int(parts[1]) if len(parts) > 1 else 0
     patch = int(parts[2]) if len(parts) > 2 else 0
     
-    # Prerelease versions sort before release versions
-    # Using '~' prefix for prereleases makes them sort before empty string
-    if prerelease:
-        prerelease = "~" + prerelease
-    
-    return (major, minor, patch, prerelease)
+    return (major, minor, patch, 0 if prerelease else 1, prerelease)

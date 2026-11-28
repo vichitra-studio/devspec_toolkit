@@ -1,0 +1,67 @@
+{
+    "$schema": "vc:02-system-sketch",
+    "id": "system-sketch-lantern",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "components": [
+        {
+            "component_id": "identity-service",
+            "type": "service",
+            "owner": "engineering",
+            "responsibilities": [
+                "Issues and redeems password reset tokens",
+                "Stores password hashes"
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-account-recovery"
+                }
+            ]
+        },
+        {
+            "component_id": "email-provider",
+            "type": "external",
+            "owner": "engineering",
+            "responsibilities": [
+                "Delivers transactional email"
+            ],
+            "tags": [
+                "external-dependency"
+            ],
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-account-recovery"
+                }
+            ]
+        }
+    ],
+    "connections": [
+        {
+            "from": "identity-service",
+            "to": "email-provider",
+            "protocol": "http",
+            "trust_boundary": "partner",
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-account-recovery"
+                }
+            ]
+        }
+    ],
+    "tech_stack": {
+        "languages": [
+            "TypeScript 5.x"
+        ],
+        "frameworks": [
+            "argon2 0.41"
+        ],
+        "infrastructure": [
+            "MailRelay"
+        ],
+        "tools": []
+    }
+}

@@ -1,0 +1,43 @@
+{
+  "description": "A step-04 requirement that links to a node that does not exist: E700, owned by step 04 (DOC 13.9 row 4).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/04_fr_list.json",
+      "path": [
+        "functional_requirements"
+      ],
+      "value": {
+        "fr_id": "fr-broken-link",
+        "priority": "should-have",
+        "scope": "in",
+        "statement": "The system shall remember a member's preferred language.",
+        "acceptance_criteria": [
+          {
+            "criterion_id": "ac-broken-link-1",
+            "scope": "in",
+            "text": "Given a registered member with a language set, when they sign in, then pages show in that language."
+          },
+          {
+            "criterion_id": "ac-broken-link-2",
+            "scope": "in",
+            "text": "Given a member with no language set, when they sign in, then pages show in the default language."
+          },
+          {
+            "criterion_id": "ac-broken-link-3",
+            "scope": "in",
+            "text": "Given a member who changes the language, when the next page loads, then it shows in the new language."
+          }
+        ],
+        "derives_from": [
+          "cap-ghost"
+        ],
+        "capability_ref": {
+          "id": "cn:project:capability:account-recovery",
+          "kind": "capability",
+          "version": "1.0.0"
+        }
+      }
+    }
+  ]
+}

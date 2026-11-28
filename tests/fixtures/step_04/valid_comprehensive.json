@@ -17,21 +17,26 @@
         "Access token is returned"
       ],
       "acceptance_criteria": [
-        {"criterion_id": "ac-user-login-1", "text": "Valid credentials return 200 with access token"},
-        {"criterion_id": "ac-user-login-2", "text": "Invalid credentials return 401 with error message"}
-      ],
-      "priority": "must-have",
-      "trace": [
         {
-          "type": "api",
-          "id": "api-login",
-          "note": "Authentication API endpoint"
+          "criterion_id": "ac-user-login-1",
+          "text": "Valid credentials return 200 with access token",
+          "scope": "in"
+        },
+        {
+          "criterion_id": "ac-user-login-2",
+          "text": "Invalid credentials return 401 with error message",
+          "scope": "in"
         }
       ],
+      "priority": "must-have",
       "capability_ref": {
         "id": "cn:project:capability:cap-user-authentication",
         "kind": "capability"
-      }
+      },
+      "derives_from": [
+        "cap-user-authentication"
+      ],
+      "scope": "in"
     },
     {
       "fr_id": "fr-user-logout",
@@ -45,25 +50,36 @@
         "User cannot access protected resources"
       ],
       "acceptance_criteria": [
-        {"criterion_id": "ac-user-logout-1", "text": "Logout invalidates session token"},
-        {"criterion_id": "ac-user-logout-2", "text": "Subsequent requests with old token return 401"}
-      ],
-      "priority": "must-have",
-      "trace": [
         {
-          "type": "capability",
-          "id": "cap-user-session-management",
-          "note": "Manages user session lifecycle"
+          "criterion_id": "ac-user-logout-1",
+          "text": "Logout invalidates session token",
+          "scope": "in"
+        },
+        {
+          "criterion_id": "ac-user-logout-2",
+          "text": "Subsequent requests with old token return 401",
+          "scope": "in"
         }
       ],
+      "priority": "must-have",
       "capability_ref": {
         "id": "cn:project:capability:cap-user-session-management",
         "kind": "capability"
-      }
+      },
+      "derives_from": [
+        "cap-user-session-management"
+      ],
+      "scope": "in"
     }
   ],
   "canonical_refs_used": [
-    {"id": "cn:project:capability:cap-user-authentication", "kind": "capability"},
-    {"id": "cn:project:capability:cap-user-session-management", "kind": "capability"}
+    {
+      "id": "cn:project:capability:cap-user-authentication",
+      "kind": "capability"
+    },
+    {
+      "id": "cn:project:capability:cap-user-session-management",
+      "kind": "capability"
+    }
   ]
 }

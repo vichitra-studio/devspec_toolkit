@@ -1,0 +1,23 @@
+# Invented fixture: the CI of a small service; it has its own build and never ran the toolkit's checks.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make build
+      - name: Test
+        run: make test
+      # Once the spec exists the next line may come back:
+      #   run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+      - name: Spec check
+        run: ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+      - name: Deploy notice
+        run: echo "deploy to https://app.example.invalid"

@@ -63,6 +63,8 @@ class TestCheckToolkitVersionMatch:
         assert err.code == "E608"
         assert "specdev_version" in err.message
         assert "specdev update" in err.message
+        assert 'toolkit_version: "<version>"' in err.message
+        assert "written with an older one" in err.message
 
     def test_malformed_specdev_version_file_returns_e608(self, tmp_path):
         """specdev_version exists but lacks the toolkit_version key — must get a distinct E608."""
@@ -83,6 +85,8 @@ class TestCheckToolkitVersionMatch:
         # Must indicate the file is malformed/missing the key, NOT the absent-file message
         assert "malformed" in err.message or "missing the `toolkit_version` key" in err.message
         assert "No toolkit version recorded" not in err.message
+        assert 'toolkit_version: "<version>"' in err.message
+        assert "which then says a migration is needed" in err.message
 
     def test_missing_pyproject_returns_e608(self, tmp_path):
         # toolkit root exists but has no tools/pyproject.toml

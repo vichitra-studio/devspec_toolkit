@@ -12,16 +12,21 @@
     "findings"
   ],
   "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "vc:infra:findings",
+      "description": "The schema this document conforms to. Required by `specdev validate` (E520 without it); optional here so that a plain JSON Schema check also accepts the file the review loop merges."
+    },
     "round": {
       "description": "1+ (no hard cap; spec-phase skills cap at 5 procedurally; K2 trinity uses soft-warn semantics). Increments per review-fix iteration.",
       "type": "integer",
       "minimum": 1
     },
     "scope": {
-      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan'. Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename under .specdev/findings/ using one of three patterns per §11.7: per-reviewer 'findings_<scope>_<round>_r<reviewer_id>.json', merged 'findings_<scope>_<round>.json', or HALT 'findings_<scope>_5_<unix_timestamp>.json'.",
+      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan', or a plan-item id as the plan schema spells it ('PWRESET_CONFIRM_EXPIRED_01'). Lowercase letters, digits, '_' and '-', or uppercase letters, digits and '_' (no mixing). Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename under .specdev/findings/ using one of three patterns per §11.7: per-reviewer 'findings_<scope>_<round>_<reviewer_id>.json' (reviewer ids are 'r1', 'r2', ...), merged 'findings_<scope>_<round>.json', or HALT 'findings_<scope>_5_<unix_timestamp>.json'.",
       "type": "string",
       "minLength": 1,
-      "pattern": "^[a-z0-9_-]+$"
+      "pattern": "^([a-z0-9_-]+|[A-Z0-9_]+)$"
     },
     "generated_at": {
       "description": "Unix-epoch seconds (integer) when this document was emitted. Used for run correlation; not a uniqueness key.",
@@ -68,7 +73,7 @@
           ]
         },
         "location": {
-          "description": "Where the finding sits. Free-form string holding a file path, a JSON pointer, or a combined 'file#pointer' form (e.g. 'spec/04_fr_list.json#/fr[3]/acceptance_criteria'). Kept as a string to accommodate non-pointer locations (e.g. cross-file drift descriptions).",
+          "description": "Where the finding sits: the id of the node it is about, with '#<field>' for one field of it (e.g. 'fr-password-reset#statement'); a finding about no node holds a file path, a JSON pointer or 'file#pointer'; a code-phase finding holds '<file>#<function or class>' (e.g. 'src/routes/confirm.ts#confirmPasswordReset'), no line number. A string, not a pattern.",
           "type": "string",
           "minLength": 1
         },
@@ -128,8 +133,40 @@
           },
           "minItems": 1,
           "uniqueItems": true
+        },
+        "origin": {
+          "description": "Where the defect came from. 'introduced-on-branch' = the text was changed on this branch; 'pre-existing-on-main' = already present at the base ref; 'stale-after-fix' = left behind or made wrong by a fix of this loop. Optional. A finding of kind 'regression' (a downstream artifact broken by an upstream change) is never 'introduced-on-branch': text changed against the base is a 'bug' or a 'drift' with this origin.",
+          "type": "string",
+          "enum": [
+            "introduced-on-branch",
+            "pre-existing-on-main",
+            "stale-after-fix"
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "regression"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "not": {
+                  "const": "introduced-on-branch"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

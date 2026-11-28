@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:01-capabilities",
+  "title": "Capabilities (fixture)",
+  "type": "object",
+  "properties": {
+    "capabilities": {
+      "type": "array",
+      "x-node": {
+        "kind": "capability",
+        "id": "capability_id",
+        "role": "obligation-system",
+        "contract": [
+          "statement"
+        ],
+        "coarse": true
+      },
+      "items": {
+        "type": "object",
+        "properties": {
+          "capability_id": {
+            "$ref": "vc:core:atoms#kebabId"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "vc:core:graph#lifecycle"
+          },
+          "scope": {
+            "$ref": "vc:core:graph#scope"
+          },
+          "scope_reason": {
+            "$ref": "vc:core:graph#scopeReason"
+          },
+          "derives_from": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "x-link": {
+              "kinds": [
+                "seed"
+              ],
+              "required": false
+            }
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "vc:core:graph#scopeReasonRule"
+          }
+        ],
+        "required": [
+          "capability_id"
+        ]
+      }
+    }
+  }
+}

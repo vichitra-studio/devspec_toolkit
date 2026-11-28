@@ -1,0 +1,38 @@
+{
+  "description": "Open items in the other two places items live in: the plan of the anchor (about a step-04 requirement) and the plan of the example milestone (about a requirement and an interface, so in two steps). Layered over open_items.json for the backlog scenario.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/16_impl_context.json",
+      "path": [
+        "plan",
+        "ambiguities"
+      ],
+      "value": {
+        "id": "amb-anchor-lockout",
+        "description": "How many wrong tries lock a reset link?",
+        "about": [
+          "fr-password-reset"
+        ]
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/impl_context/ms_account_recovery_plan.json",
+      "path": [
+        "plan",
+        "ambiguities"
+      ],
+      "create": true,
+      "value": {
+        "id": "amb-plan-lockout-contract",
+        "description": "The requirement and the contract disagree on the lock-out.",
+        "about": [
+          "fr-password-reset",
+          "api-password-reset-confirm"
+        ],
+        "decision": "Lock after five wrong tries."
+      }
+    }
+  ]
+}

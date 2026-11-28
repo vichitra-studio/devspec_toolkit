@@ -1,0 +1,84 @@
+{
+  "id": "system-sketch-invalid-third-party-without-pin",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Authenticate users",
+        "Manage user profiles",
+        "Serve account lookups"
+      ],
+      "owner": "api",
+      "tags": [
+        "critical-path",
+        "stateless"
+      ],
+      "derives_from": [
+        "capability-user-auth",
+        "capability-user-profile"
+      ]
+    },
+    {
+      "component_id": "payment-service",
+      "type": "service",
+      "responsibilities": [
+        "Create payment intents",
+        "Confirm payment status",
+        "Handle payment failures"
+      ],
+      "owner": "api",
+      "tags": [
+        "critical-path",
+        "stateful"
+      ],
+      "derives_from": [
+        "capability-payment-processing"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "connection_id": "user-service-to-payment-service",
+      "derives_from": [
+        "user-service"
+      ],
+      "connects_to": [
+        "payment-service"
+      ],
+      "protocol": "http",
+      "trust_boundary": "internal"
+    },
+    {
+      "connection_id": "payment-service-to-stripe-api",
+      "derives_from": [
+        "payment-service"
+      ],
+      "connects_to": [
+        "stripe-api"
+      ],
+      "protocol": "http",
+      "trust_boundary": "partner",
+      "auth": "jwt",
+      "rate_limit": {
+        "rps": 50,
+        "burst": 100,
+        "window_s": 60,
+        "scope": "client"
+      }
+    }
+  ],
+  "third_parties": [
+    {
+      "third_party_id": "stripe-api",
+      "name": "Stripe API",
+      "rationale": "Hosted card payment processor",
+      "derives_from": [
+        "seed-payments-provider"
+      ]
+    }
+  ],
+  "canonical_refs_used": []
+}

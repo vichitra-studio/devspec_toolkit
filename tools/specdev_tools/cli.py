@@ -15,10 +15,13 @@ from __future__ import annotations
 import argparse, os, json, re, sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NoReturn
 # Lazy imports handled inside main/command blocks to improve CLI responsiveness
 
 from .core.config import get_config, reset_config
+from .core.constants import REMOVED_COMMANDS
 from .core.errors import SpecError
+from .core.toolkit_root import detect_toolkit_root
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
 # Also match warnings prefixed with file paths (e.g., "spec/05_x.json: W590 ...")
@@ -106,6 +109,60 @@ def _discover_project_canon_dir(
     return None
 
 
+def _told(spec_root: str | None) -> dict[str, str]:
+    """The ``spec_root`` argument of a folder command when ``--spec-root`` was given; with no flag the call is unchanged."""
+    return {"spec_root": spec_root} if spec_root else {}
+
+
+def _refuse_spec_check(error: SpecError, json_output: bool) -> NoReturn:
+    """Print a refusal of ``spec-check`` (one finding: E520, E706, E708) and exit 1."""
+    from .core.json_output import format_errors_json
+
+    if json_output:
+        print(format_errors_json([error], context={"command": "spec-check"}))
+    else:
+        print(error.render(), file=sys.stderr)
+    sys.exit(1)
+
+
+def _spec_check_step_gate(
+    args: argparse.Namespace,
+    repo_root: str,
+    spec_dir: str,
+    git_root: str | None,
+    spec_root: str | None,
+    project_canon_dir: str | None,
+) -> NoReturn:
+    """``spec-check --step`` and ``spec-check --paths``: print the step gate report and exit 0 (clear) or 1 (blocked).
+
+    ``validation.step_gate_run.gate_run`` decides what is gated and in which order the notes come; this prints them, then
+    the report, and exits.  The exit code comes from the gate alone: ``_json_exit`` is not used, because it fails on any
+    finding under ``SPECDEV_WARNINGS_AS_ERRORS`` and on pending or upstream debt.  A refusal (E520 for a missing spec
+    folder, E706 for an unknown step, E708) is printed as one finding and exits 1.
+    """
+    from .core.errors import FindingError
+    from .core.json_output import format_errors_json
+    from .validation.step_gate import gate_exit_code, reported_errors
+    from .validation.step_gate_report import DETAIL_SUMMARY, render_step_gate, step_gate_json
+    from .validation.step_gate_run import gate_run
+
+    try:
+        run = gate_run(
+            repo_root, spec_dir, steps=args.steps, paths=args.paths, git_root=git_root, spec_root=spec_root,
+            project_canon_dir=project_canon_dir, base_ref=args.base_ref,
+        )
+    except FindingError as exc:
+        _refuse_spec_check(exc.error, args.json_output)
+    for note in run.notes:
+        print(note, file=sys.stderr)
+    if args.json_output:
+        context = {"command": "spec-check", "step_gate": step_gate_json(run.results, run.baseline)}
+        print(format_errors_json(reported_errors(run.results), context=context))
+    elif run.results:
+        print(render_step_gate(run.results, run.baseline, args.detail or DETAIL_SUMMARY))
+    sys.exit(gate_exit_code(run.results))
+
+
 def _derive_step_names(repo_root: str) -> dict[str, str]:
     """Derive step ID -> display name mapping from schema_registry.json.
 
@@ -139,21 +196,19 @@ def check_venv():
         print("Error: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
         sys.exit(1)
 
-def main():
-    # --version must bypass venv check so it works in any environment.
-    # We short-circuit here before check_venv() and before argparse, because
-    # required=True on add_subparsers would otherwise reject bare --version.
-    if "--version" in sys.argv[1:]:
-        _toolkit_root = Path(__file__).resolve().parent.parent.parent
-        from .core.changelog_parser import get_toolkit_version as _gtv
-        _ver = _gtv(_toolkit_root) or "unknown"
-        print(f"specdev {_ver}")
-        sys.exit(0)
+class _SpecdevParser(argparse.ArgumentParser):
+    """The top-level parser; ``ctx_parser`` is the ``context`` group parser."""
 
-    check_venv()
-    # Reset config singleton so each CLI invocation reads current env vars
-    reset_config()
-    p = argparse.ArgumentParser(prog="specdev-tools")
+    ctx_parser: argparse.ArgumentParser
+
+
+def build_parser() -> _SpecdevParser:
+    """Build the full ``specdev`` argparse parser (no parsing, no side effects).
+
+    The ``context`` group parser is attached as ``parser.ctx_parser`` because the
+    dispatch block prints its help when no sub-command is given.
+    """
+    p = _SpecdevParser(prog="specdev-tools")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     v = sub.add_parser("validate")
@@ -169,17 +224,6 @@ def main():
     va.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     va.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     va.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
-    m = sub.add_parser("matrix")
-    m.add_argument("spec_dir")
-    # Default: write to <spec_dir>/extras/trace_matrix.json (resolved at action
-    # time once spec_dir is known). Pass --out - explicitly for stdout, or
-    # --out <path> for a non-canonical location.
-    m.add_argument("--out", default=None)
-    m.add_argument("--repo-root", default=".")
-    m.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    m.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    m.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     fx = sub.add_parser("fixtures-lint")
     fx.add_argument("spec_dir")
@@ -268,27 +312,20 @@ def main():
     gd.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     gd.add_argument("--json", action="store_true", dest="json_output", help="Emit JSON output")
 
-    tc = sub.add_parser("traceability-check")
-    tc.add_argument("spec_dir")
-    tc.add_argument("--repo-root", default=".")
-    tc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    tc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    tc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
-    cc = sub.add_parser("completeness-check", help="Run pairwise completeness checks (W564–W568) and report coverage ratios")
-    cc.add_argument("spec_dir")
-    cc.add_argument("--repo-root", default=".")
-    cc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    cc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    cc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
     sc = sub.add_parser("spec-check", help="Run all applicable validation/lint checks in one pass with per-check breakdown")
     sc.add_argument("spec_dir")
     sc.add_argument("--repo-root", default=".")
     sc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     sc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Include forward-replay check")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+    sc_scope = sc.add_mutually_exclusive_group()
+    sc_scope.add_argument("--step", action="append", default=None, metavar="N", dest="steps", help="Gate finishing step N (written as in the file name: 05, 02a, 16) instead of listing every finding: blocks on the step's own errors and on new errors of earlier steps (repeat for several steps; exit 1 when blocked)")
+    sc_scope.add_argument("--paths", nargs="*", default=None, metavar="FILE", help="Gate the steps that the listed touched files belong to (the pre-commit hook passes the commit's files; none mapped: exit 0 without a check); takes every word after it up to the next option")
+    from .validation.step_gate_report import DETAIL_CHOICES
+
+    sc.add_argument("--merge", action="store_true", help="The merge gate: also fail on open items (E631) and on a failing dev or CI binding of a milestone this branch closes (run now, nothing recorded); not with --step, --paths or --detail")
+    sc.add_argument("--base-ref", default=None, help="With --step or --paths (or --merge): the base ref; the baseline is its merge-base with HEAD (default: SPECDEV_REPLAY_BASE_REF, origin/HEAD, then origin/main, origin/master, main, master); with --merge a commit id this clone lacks (the null id of a first push) means the first parent of HEAD")
+    sc.add_argument("--detail", choices=DETAIL_CHOICES, default=None, help="With --step or --paths: 'all' also lists upstream debt, pending and gate-owned findings in full (default summary)")
 
     rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
     rc.add_argument("--spec-root", required=True, help="Project spec directory (used for R003 drift check against live spec files)")
@@ -298,9 +335,10 @@ def main():
 
     rg = sub.add_parser(
         "registry-generate",
-        help="Regenerate the entry-key registry and extraction-paths from toolkit schemas.",
+        help="Regenerate the entry-key registry, extraction-paths, step_order.json, cli_commands.json and the schema-change checklist from toolkit schemas and annotations.",
         description=(
-            "Regenerate the entry-key registry and extraction-paths from toolkit schemas.\n\n"
+            "Regenerate the entry-key registry, extraction-paths, step_order.json, cli_commands.json and the\n"
+            "schema-change checklist from toolkit schemas, annotations and the CLI parser.\n\n"
             "Output is byte-deterministic across runs (sort_keys + indent=2 + trailing newline)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -321,6 +359,33 @@ def main():
         dest="extraction_paths_out",
         help="Output path for extraction_paths.json (default: <repo-root>/tools/extraction_paths.json).",
     )
+    rg.add_argument(
+        "--step-order-out",
+        default=None,
+        dest="step_order_out",
+        help=(
+            "Output path for step_order.json, derived from the x-node/x-link annotations plus the hand-carried keys "
+            "(default: <repo-root>/tools/step_order.json, written only when --out is also absent)."
+        ),
+    )
+    rg.add_argument(
+        "--cli-commands-out",
+        default=None,
+        dest="cli_commands_out",
+        help=(
+            "Output path for cli_commands.json (default: <repo-root>/tools/cli_commands.json, "
+            "written only when --out is also absent)."
+        ),
+    )
+    rg.add_argument(
+        "--checklist-out",
+        default=None,
+        dest="checklist_out",
+        help=(
+            "Output path for the schema-change checklist (default: "
+            "<repo-root>/docs/developers/schema-change-checklist.md, written only when --out is also absent)."
+        ),
+    )
 
     gd = sub.add_parser("guide", help="Show remediation guide for an error code")
     gd.add_argument("code", help="Error code to look up, e.g. E110 or E530-INVENTED_ENUM_OR_ID")
@@ -331,14 +396,6 @@ def main():
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
     dol.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
-    frc = sub.add_parser("forward-replay-check")
-    frc.add_argument("--repo-root", default=".")
-    frc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
-    frc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
-    frc.add_argument("--base-ref", help="Diff base ref (default: auto-resolved in validate-all)")
-    frc.add_argument("--diff-error-mode", choices=["error", "ignore"], default="error")
-    frc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     gov = sub.add_parser("governance-check")
     gov.add_argument("spec_dir")
@@ -363,23 +420,51 @@ def main():
 
     # Align commands (Phase 3-6: Schema Differ + Apply + Prompts)
     al = sub.add_parser("align", help="Toolkit alignment and migration")
-    al.add_argument("action", choices=["status", "diff", "plan", "apply", "prompts", "rollback", "validate"],
-                    help="Alignment action")
+    al.add_argument("action", choices=["status", "diff", "plan", "apply", "propose", "triage", "bind-legacy", "prompts", "rollback", "validate"],
+                    help="Alignment action: apply (the mechanical migration), propose, triage (the worklist), bind-legacy (bind "
+                         "the legacy fixtures), validate (finish the migration), status/diff/plan/prompts (read the structural "
+                         "differences), rollback (restores a pre-1.2.0 backup folder as it was; the restored spec is not validated, "
+                         "it is in the format of the toolkit that made it)")
     al.add_argument("spec_dir", help="Path to user spec/ directory")
     al.add_argument("--repo-root", default=".", help="Toolkit root directory")
+    al.add_argument("--git-root", default=None,
+                    help="Host git work tree (apply, propose, triage, bind-legacy, validate; default: the folder that holds spec_dir)")
     al.add_argument("--auto", action="store_true", help="Apply only auto-fixable changes")
-    al.add_argument("--dry-run", action="store_true", help="Show what would be done")
+    al.add_argument("--dry-run", action="store_true",
+                    help="apply: run the migration on a scratch copy and print the diff, write nothing; "
+                         "propose: print the proposals, add no item to the worklist")
+    al.add_argument("--allow-dirty", action="store_true",
+                    help="apply: do not refuse a spec/ with uncommitted changes")
+    al.add_argument("--kind", metavar="KIND",
+                    help="propose: what to propose: refines (a legacy task criterion's refines link) or prose-ids "
+                         "(the ids a node's text names) or bindings (the command that ran each legacy fixture, as a "
+                         "`verify bind` line); propose writes only spec/extras/migration/worklist.json")
+    al.add_argument("--summary", action="store_true",
+                    help="bind-legacy: print the counts only (bindings written, fixtures covered, made manual, still open)")
+    al.add_argument("--step", metavar="NN", help="triage: list only the items of this step (4 and 04 are the same)")
+    al.add_argument("--audience", choices=["operator", "agent"], help="triage: list only the items for this audience")
+    al.add_argument("--legacy", metavar="NN",
+                    help="triage: print the files of step NN as they were before the migration (git show of the commit "
+                         "the capture names; writes nothing)")
+    al.add_argument("--resolve", metavar="ID",
+                    help="triage: close the worklist item ID (resolved: true plus --note); edits spec/extras/migration/worklist.json only")
+    al.add_argument("--note", help="triage: what was decided, the note that closes the item given to --resolve")
+    al.add_argument("--base-ref", default=None, metavar="REF",
+                    help="validate: the ref spec-check --merge measures against (default: the merge base with the default branch)")
+    al.add_argument("--keep-worklist", action="store_true",
+                    help="validate: keep spec/extras/migration/ even when no item is open")
     al.add_argument("--output", help="Output directory for generated prompts")
     al.add_argument("--mode", choices=["bootstrap", "upgrade"], default="upgrade",
                     help="Prompt generation mode (default: upgrade)")
     al.add_argument("--backup-dir", help="Backup directory to restore from (for rollback)")
     al.add_argument("--yes", "-y", action="store_true",
-                    help="Skip confirmation prompts (for non-interactive use)")
+                    help="Skip confirmation prompts (for non-interactive use; apply never asks, so it is a no-op there; "
+                         "bind-legacy writes the lines of every certain group without asking)")
     al.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     upd = sub.add_parser(
         "update",
-        help="Sync project to current toolkit version (re-stamp or direct to align)",
+        help="Sync project to current toolkit version (re-stamp, or say that a migration is needed and name the commands)",
     )
     upd.add_argument("spec_dir", help="Path to project spec/ directory")
     upd.add_argument("--repo-root", default=".", help="Toolkit root directory")
@@ -387,6 +472,21 @@ def main():
         "--dry-run",
         action="store_true",
         help="Show what would be done without writing any files",
+    )
+    upd.add_argument("--git-root", default=None, help="Host repo root to install into (default: the git top folder of spec_dir)")
+    upd_mode = upd.add_mutually_exclusive_group()
+    upd_mode.add_argument(
+        "--install-only", action="store_true", help="Install the host files only; skip the version check and the stamp"
+    )
+    upd_mode.add_argument(
+        "--no-install", action="store_true", help="Do not install host files; check and stamp the version only"
+    )
+    upd.add_argument(
+        "--adopt", action="store_true", help="Rewrite drifted host hooks and wrappers that update only reports by default"
+    )
+    upd.add_argument(
+        "--force-claude", action="store_true",
+        help="Replace stale .claude/skills/ and .claude/agents/ symlinks (never overwrites real files/dirs)",
     )
     upd.add_argument(
         "--json", action="store_true", help="Output results as JSON", dest="json_output"
@@ -424,16 +524,16 @@ def main():
 
     ub = sub.add_parser(
         "upstream-backlog",
-        help="Aggregate both plan.ambiguities[] (16a) and execution.emergent_ambiguities[] (16b/16c) across impl_context plans by implicated upstream step (read-only)",
+        help="List every open ambiguity item of all artifacts (steps 00-15, anchor, milestone plans) grouped by the step its about nodes belong to (read-only)",
     )
     ub.add_argument("spec_dir")
     ub.add_argument("--repo-root", default=".")
     ub.add_argument("--spec-root", default=None,
-                    help="(reserved; no effect in MVP — accepted for submodule CLI symmetry)")
+                    help="(accepted and ignored: the positional spec_dir is the spec folder)")
     ub.add_argument("--severity", choices=["low", "medium", "high", "critical"], default="low",
-                    help="Minimum severity (default: low)")
+                    help="Minimum severity of legacy-shape items (default: low); items with an about field always pass")
     ub.add_argument("--status", choices=["open", "resolved", "all"], default="open",
-                    help="Status filter (default: open = status != resolved)")
+                    help="Status filter for legacy-shape items (default: open = status != resolved); items with an about field always pass")
     ub.add_argument("--json", action="store_true", dest="json_output",
                     help="Emit JSON instead of plain text")
 
@@ -443,6 +543,9 @@ def main():
     cca.add_argument("--repo-root", default=".")
     cca.add_argument("--git-root", default=None, help="Host repo git root (writes to <git-root>/spec/canon/ as project canon)")
     cca.add_argument("--owner", default=None, help="Owner to assign to accepted entries (default: no owner)")
+    cca.add_argument("--update", action="store_true",
+                     help="Rewrite the definition, preferred label and aliases of an existing entry whose proposal changed "
+                          "(default: report it and change nothing)")
     cca.add_argument("--dry-run", action="store_true", help="Report what would be added without writing")
     cca.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
@@ -500,8 +603,9 @@ def main():
     ctx_scope.add_argument("--entry", required=True)
     ctx_scope.add_argument("--repo-root", default=".")
 
-    # DEPRECATED: extract is removed; all args are optional so the handler always
-    # fires and emits the migration message regardless of what the user passed.
+    # DEPRECATED: extract is removed; the words after it are optional, so the handler
+    # fires and emits the migration message for any of them, except a leading
+    # option-like word (--step, --repo-root): argparse rejects it first (exit 2, no message).
     ctx_extract = ctx_sub.add_parser("extract", add_help=False)
     ctx_extract.add_argument("args", nargs=argparse.REMAINDER)
 
@@ -535,26 +639,108 @@ def main():
             "  patch              Replace a value at a jq path\n"
             "  insert             Append to an array at a jq path\n"
             "  delete             Remove a value at a jq path\n"
+            "  keys               List the keys at a jq path\n"
             "  schema             Resolve the schema URI for a file\n"
             "  structure          Print the structural outline of a file\n"
             "  resolve-pointers   Verify a list of file:jq pointers\n\n"
+            "patch, insert and delete also write a node by id: 'specdev json patch --id <node-id> <field-path> <value>',\n"
+            "'json insert --id <node-id> ...', 'json insert --step NN <collection-path> <value>', 'json delete --id <node-id>'\n"
+            "(add --help after --id to see them).\n\n"
             "Run 'specdev json <subcommand> --help' for subcommand details."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     json_p.add_argument("args", nargs=argparse.REMAINDER, help="json subcommand and arguments")
 
+    # --- graph commands: node (REMAINDER group), trace, diff ---
+    from .graph.commands import add_graph_parsers
+    add_graph_parsers(sub)
+    # --- trace commands (stale, ...): each parser names its handler ---
+    from .trace.commands import add_trace_parsers
+    add_trace_parsers(sub)
+    # --- verify commands (bind, run) ---
+    from .verify.commands import add_verify_parsers
+    add_verify_parsers(sub)
+    # --- third-party commands (pin, check) ---
+    from .thirdparty.commands import add_thirdparty_parsers
+    add_thirdparty_parsers(sub)
+    # --- lifecycle commands (plan record, review record) ---
+    from .lifecycle.commands import add_lifecycle_parsers
+    add_lifecycle_parsers(sub)
+    # --- release commands (release, release check, release rollback) and the release sections of `status` ---
+    from .release.commands import add_release_parsers
+    add_release_parsers(sub, _discover_project_canon_dir)
+    from .release.status_sections import install as install_release_sections
+    install_release_sections(_discover_project_canon_dir)
+    # `stale`, `coverage` and `step ready` read the coverage gaps; the role gap provider they ask is installed by a call.
+    from .validation.graph_checks import install_gap_provider
+    install_gap_provider()
+    # the graph checks every command can run read the proof package through seams; bind them once (three are bound, `extra_verifiers` keeps its default)
+    from .proof.built_evidence import bind_proof_seams
+    bind_proof_seams()
+    p.ctx_parser = ctx_p
+    return p
+
+
+def _refuse_removed_command(argv: list[str]) -> None:
+    """Exit 2 with a pointer when the first word of *argv* names a command that 1.2.0 removed (before argparse sees it)."""
+    if argv and argv[0] in REMOVED_COMMANDS:
+        print(f"specdev: {argv[0]} was removed in 1.2.0; {REMOVED_COMMANDS[argv[0]]}", file=sys.stderr)
+        sys.exit(2)
+
+
+def _print_canon_accept_report(result: dict, dry_run: bool) -> None:
+    """Print the text report of ``canon-accept``: one line per entry, then the OK or WARN summary line."""
+    added, skipped, changed = result["added"], result["skipped"], result["changed"]
+    updated, would_update, malformed = result["updated"], result["would_update"], result["malformed"]
+    for cid in added:
+        print(f"  + {'would add' if dry_run else 'added'}: {cid}")
+    for cid in skipped:
+        print(f"  ~ unchanged: {cid}")
+    for item in changed:
+        print(f"  ! changed (not updated, use --update): {item['id']} ({', '.join(item['fields'])})")
+    for cid in updated:
+        print(f"  ~ updated: {cid}")
+    for cid in would_update:
+        print(f"  ~ would update: {cid}")
+    if malformed:
+        print(f"  ! {malformed} malformed proposal(s) skipped (missing required fields)")
+    if not (added or skipped or changed or updated or would_update or malformed):
+        print("OK (no proposals found)")
+        return
+    n_updated = len(would_update) if dry_run else len(updated)
+    prefix = "dry-run: " if dry_run else ""
+    counts = f"{len(added)} {'would be ' if dry_run else ''}added, {n_updated} {'would be ' if dry_run else ''}updated, {len(skipped)} unchanged"
+    if changed:
+        print(f"WARN ({prefix}{counts}, {len(changed)} changed and not updated, {malformed} malformed)")
+    else:
+        print(f"OK ({prefix}{counts}, {malformed} malformed)")
+
+
+def main():
+    # --version must bypass venv check so it works in any environment.
+    # We short-circuit here before check_venv() and before argparse, because
+    # required=True on add_subparsers would otherwise reject bare --version.
+    # Only as the first argument: `specdev changelog --version X` is that subcommand's own flag.
+    if sys.argv[1:2] == ["--version"]:
+        _toolkit_root = Path(__file__).resolve().parent.parent.parent
+        from .core.changelog_parser import get_toolkit_version as _gtv
+        _ver = _gtv(_toolkit_root) or "unknown"
+        print(f"specdev {_ver}")
+        sys.exit(0)
+
+    _refuse_removed_command(sys.argv[1:])
+    check_venv()
+    # Reset config singleton so each CLI invocation reads current env vars
+    reset_config()
+    p = build_parser()
+    ctx_p = p.ctx_parser
+
     args = p.parse_args()
 
     if getattr(args, "repo_root", None) == ".":
         # Auto-detect toolkit root by scanning immediate subdirectories
-        current_dir = Path(".")
-        for child in current_dir.iterdir():
-            if child.is_dir():
-                potential_marker = child / "tools" / "specdev_tools" / "__init__.py"
-                if potential_marker.exists():
-                    args.repo_root = str(child)
-                    break
+        args.repo_root = detect_toolkit_root(args.repo_root)
 
     if args.cmd == "validate":
         from .validation.validate import validate_file
@@ -581,53 +767,6 @@ def main():
             _json_exit(errs, "validate-all", {"spec_dir": spec_dir})
         else:
             _print_and_exit_if_errors(errs)
-    elif args.cmd == "matrix":
-        from .validation.matrix import build_trace_matrix
-        repo_root = os.path.abspath(args.repo_root)
-        spec_dir = os.path.abspath(args.spec_dir)
-        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
-        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
-        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        res = build_trace_matrix(repo_root, spec_dir, project_canon_dir=project_canon_dir)
-        if getattr(args, "json_output", False):
-            cfg = get_config()
-            integrity_errors = res.get("integrity_errors")
-            has_integrity_err = (
-                cfg.matrix_strict
-                and isinstance(integrity_errors, list)
-                and bool(integrity_errors)
-            )
-            envelope = {
-                "status": "FAIL" if has_integrity_err else "PASS",
-                "error_count": len(integrity_errors) if has_integrity_err and integrity_errors is not None else 0,
-                "warning_count": 0,
-                "errors": [],
-                "command": "matrix",
-                "matrix": res,
-            }
-            print(json.dumps(envelope, indent=2))
-            if has_integrity_err:
-                sys.exit(1)
-        else:
-            out = json.dumps(res, indent=2, sort_keys=True) + "\n"
-            if args.out == "-":
-                print(out, end="")
-            else:
-                from .core.constants import resolve_extras_path
-                out_arg = args.out if args.out else resolve_extras_path(spec_dir, "trace_matrix.json")
-                out_path = os.path.abspath(out_arg)
-                os.makedirs(os.path.dirname(out_path), exist_ok=True)
-                with open(out_path, "w", encoding="utf-8") as f:
-                    f.write(out)
-                print(out_arg)
-            cfg = get_config()
-            matrix_strict = cfg.matrix_strict
-            integrity_errors = res.get("integrity_errors")
-            if matrix_strict and isinstance(integrity_errors, list) and integrity_errors:
-                print(f"E210 TRACE_INTEGRITY matrix_failed count={len(integrity_errors)}", file=sys.stderr)
-                for error in integrity_errors:
-                    print(error, file=sys.stderr)
-                sys.exit(1)
     elif args.cmd == "fixtures-lint":
         from .validation.fixtures_lint import lint_fixtures
         spec_dir = os.path.abspath(args.spec_dir)
@@ -806,6 +945,7 @@ def main():
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
+            **_told(spec_root),
         )
         if getattr(args, "json_output", False):
             _json_exit(errs, "canonical-integrity")
@@ -833,6 +973,7 @@ def main():
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
+            **_told(spec_root),
         )
         if getattr(args, "json_output", False):
             # Flatten changes dict into a list of SpecError / str items
@@ -863,7 +1004,8 @@ def main():
             sys.exit(1 if any(e.code.startswith("E") for e in spec_errors) else 0)
         else:
             if not changes:
-                print("OK (no changes)")
+                print("No changes. canonical-autofix does not sync a canon definition with the glossary: "
+                      "E607 is out of its scope (specdev guide E607).")
                 return
             from .core.errors import SpecError as _SE
             def _is_error_item(item):
@@ -905,7 +1047,8 @@ def main():
     elif args.cmd == "spec-quality-lint":
         from .validation.spec_quality_lint import lint_spec_quality
         spec_dir = os.path.abspath(args.spec_dir)
-        errs = lint_spec_quality(spec_dir)
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        errs = lint_spec_quality(spec_dir, **_told(spec_root))
         if getattr(args, "json_output", False):
             _json_exit(errs, "spec-quality-lint")
         else:
@@ -964,219 +1107,12 @@ def main():
             _json_exit(errs, "glossary-drift-check")
         else:
             _print_and_exit_if_errors(errs)
-    elif args.cmd == "traceability-check":
-        from .validation.traceability_closure import check_traceability_closure
-        spec_dir = os.path.abspath(args.spec_dir)
-        repo_root = os.path.abspath(args.repo_root)
-        errs = check_traceability_closure(spec_dir, repo_root)
-        if getattr(args, "json_output", False):
-            _json_exit(errs, "traceability-check", {"spec_dir": spec_dir})
-        else:
-            _print_and_exit_if_errors(errs)
-    elif args.cmd == "completeness-check":
-        from .validation.traceability_closure import check_traceability_closure
-        spec_dir = os.path.abspath(args.spec_dir)
-        repo_root = os.path.abspath(args.repo_root)
-        all_errs = check_traceability_closure(spec_dir, repo_root)
-
-        # Filter for pairwise completeness codes W564–W568 (and E-code counterparts).
-        # W561 (UNCOVERED_FR legacy co-fire) is intentionally excluded — W566 covers the same FRs
-        # and is the promotable pairwise code for completeness reporting.
-        _completeness_codes = frozenset({
-            "W564", "W565", "W566", "W567", "W568",
-            "E564", "E565", "E566", "E567", "E568",
-        })
-        from .core.errors import SpecError
-        completeness_errs = [
-            e for e in all_errs
-            if (isinstance(e, SpecError) and e.code in _completeness_codes)
-            or (isinstance(e, str) and any(e.lstrip().startswith(c) for c in _completeness_codes))
-        ]
-
-        # Compute per-check coverage ratios by counting uncovered IDs.
-        # Each warning message has the form: "LABEL {id} [optional tail...]"
-        # For W564–W568 the uncovered ID is always the second token (parts[1]).
-        # Message forms:
-        #   W564: "UNCOVERED_FR_API {fr_id}"
-        #   W565: "UNCOVERED_FR_FIXTURE {fr_id}"
-        #   W566: "UNCOVERED_FR_MILESTONE {fr_id}"
-        #   W567: "INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}" or
-        #          "INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}: fr_ref {fr_id} not covered ..."
-        #   W568: "UNCOVERED_CAPABILITY {cap_id}"
-        _PAIRWISE_CODES = frozenset({"W564", "W565", "W566", "W567", "W568",
-                                     "E564", "E565", "E566", "E567", "E568"})
-
-        def _extract_ids_for_code(code: str) -> list[str]:
-            result = []
-            # e_variant: the E-code counterpart of the W-code passed by callers (e.g. "W564" → "E564").
-            # Callers always pass W-codes (W564–W568); e_variant lets us match promoted E-code errors too.
-            e_variant = code.replace("W", "E", 1)
-            for e in completeness_errs:
-                msg = e.message if isinstance(e, SpecError) else e
-                # Match both W-code and promoted E-code
-                if isinstance(e, SpecError) and e.code in (code, e_variant):
-                    parts = msg.split()
-                    if len(parts) >= 2 and code in _PAIRWISE_CODES:
-                        # ID is always the second token for W564–W568.
-                        # Strip trailing colon: the fr_ref W567 variant emits
-                        # "INCOMPLETE_MILESTONE_DECOMPOSITION ms-id: fr_ref ..."
-                        # so parts[1] is "ms-id:" — normalise to "ms-id".
-                        result.append(parts[1].rstrip(':'))
-                    elif parts:
-                        result.append(parts[1] if len(parts) >= 2 else parts[-1])
-                # String format: legacy support; check_traceability_closure always returns SpecError objects
-                elif isinstance(e, str) and (e.lstrip().startswith(code) or e.lstrip().startswith(e_variant)):
-                    parts = e.split()
-                    if len(parts) >= 2:
-                        result.append(parts[1] if code in _PAIRWISE_CODES else parts[-1])
-            return list(dict.fromkeys(result))
-
-        # Gather totals by loading spec data inline (cheap re-read for ratio computation).
-        # We parse the raw spec files directly to avoid coupling with internal state.
-        def _load_spec_json(filename: str) -> dict:
-            import json as _json
-            path = os.path.join(spec_dir, filename)
-            if not os.path.isfile(path):
-                return {}
-            try:
-                with open(path, encoding="utf-8") as _f:
-                    return _json.load(_f)
-            except (OSError, ValueError):
-                return {}
-
-        # Exclude FRs that will never be built (priority:"wont-have") from
-        # every FR-based denominator below. W564 (API coverage) and W566
-        # (milestone coverage) additionally exempt FRs listed in Step 05's
-        # apis.out_of_scope[]; W565 (fixture coverage) exempts a *different*
-        # set -- FRs listed in Step 08's fixtures.out_of_scope[] -- per
-        # traceability_closure.py's deliberate separation (DEVSPEC-122: "no
-        # API surface" and "no fixture" are independent scoping decisions).
-        # A single shared denominator for all three would desync from what
-        # each W-code's own uncovered-set actually excludes.
-        frs_data = _load_spec_json("04_fr_list.json")
-        all_fr_ids = {
-            fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
-            if fr.get("fr_id")
-        }
-        wont_have_fr_ids = {
-            fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
-            if fr.get("priority") == "wont-have" and fr.get("fr_id")
-        }
-        apis_data = _load_spec_json("05_interface_contracts.json")
-        step05_oos_fr_ids = {
-            entry["fr_id"] for entry in apis_data.get("out_of_scope", [])
-            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
-        }
-        fixtures_data = _load_spec_json("08_fixtures.json")
-        step08_oos_fr_ids = {
-            entry["fr_id"] for entry in fixtures_data.get("out_of_scope", [])
-            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
-        }
-        total_frs_api_milestone = len(all_fr_ids - wont_have_fr_ids - step05_oos_fr_ids)
-        total_frs_fixture = len(all_fr_ids - wont_have_fr_ids - step08_oos_fr_ids)
-
-        # Capabilities marked scope:"out" (permanently excluded) or scope:"future"
-        # (acknowledged, deferred to a later release) are both exempt from W568
-        # (mirrors traceability_closure.py's capability_parked_ids exactly) --
-        # neither is expected to have an FR trace yet.
-        caps_data = _load_spec_json("01_capabilities.json")
-        total_caps = sum(
-            1 for cap in caps_data.get("capabilities", [])
-            if cap.get("scope") not in ("out", "future")
-        )
-
-        roadmap_data = _load_spec_json("14_roadmap.json")
-        total_milestones = len(roadmap_data.get("milestones", [])) if roadmap_data else 0
-
-        def _ratio(total: int, uncovered_count: int) -> float:
-            if total == 0:
-                return 1.0
-            return round((total - uncovered_count) / total, 4)
-
-        uncovered_w564 = _extract_ids_for_code("W564")
-        uncovered_w565 = _extract_ids_for_code("W565")
-        uncovered_w566 = _extract_ids_for_code("W566")
-        uncovered_w567 = _extract_ids_for_code("W567")
-        uncovered_w568 = _extract_ids_for_code("W568")
-
-        def _dim(total: int, uncovered: list) -> dict:
-            covered = max(0, total - len(uncovered))
-            return {
-                "covered_count": covered,
-                "total_count": total,
-                "ratio": _ratio(total, len(uncovered)),
-                "uncovered_ids": uncovered,
-            }
-
-        coverage = {
-            "fr_api_coverage":               _dim(total_frs_api_milestone, uncovered_w564),
-            "fr_fixture_coverage":           _dim(total_frs_fixture,       uncovered_w565),
-            "fr_milestone_coverage":         _dim(total_frs_api_milestone, uncovered_w566),
-            "milestone_decomp_completeness": _dim(total_milestones,        uncovered_w567),
-            "capability_fr_coverage":        _dim(total_caps,              uncovered_w568),
-        }
-
-        if getattr(args, "json_output", False):
-            from .core.errors import ensure_spec_errors
-            from .core.json_output import format_errors_json
-            spec_errors = ensure_spec_errors(completeness_errs)
-            ctx: dict = {
-                "command": "completeness-check",
-                "spec_dir": spec_dir,
-                "coverage": coverage,
-            }
-            print(format_errors_json(spec_errors, context=ctx))
-            has_ecodes = any(not e.code.startswith("W") for e in spec_errors)
-            if _warnings_as_errors() and spec_errors:
-                sys.exit(1)
-            if has_ecodes:
-                sys.exit(1)
-            sys.exit(0)
-        else:
-            print("=== Pairwise Completeness Check ===")
-            print()
-            labels = [
-                ("W564", "FR → API coverage",              coverage["fr_api_coverage"]),
-                ("W565", "FR → Fixture coverage",          coverage["fr_fixture_coverage"]),
-                ("W566", "FR → Milestone coverage",        coverage["fr_milestone_coverage"]),
-                ("W567", "Milestone decomp completeness",  coverage["milestone_decomp_completeness"]),
-                ("W568", "Capability → FR coverage",       coverage["capability_fr_coverage"]),
-            ]
-            for _, label, dim in labels:
-                ratio = dim["ratio"]
-                uncovered = dim["uncovered_ids"]
-                pct = f"{ratio * 100:.1f}%"
-                status = "OK" if ratio == 1.0 else "WARN"
-                print(f"  [{status}] {label}: {pct}")
-                for uid in uncovered:
-                    print(f"        - uncovered: {uid}")
-            print()
-            if _has_error_messages(completeness_errs):
-                sys.exit(1)
     elif args.cmd == "dependency-order-lint":
         from .validation.dependency_order_lint import lint_dependency_order
         repo_root = os.path.abspath(args.repo_root)
         errs = lint_dependency_order(repo_root)
         if getattr(args, "json_output", False):
             _json_exit(errs, "dependency-order-lint")
-        else:
-            _print_and_exit_if_errors(errs)
-    elif args.cmd == "forward-replay-check":
-        from .validation.forward_replay_check import check_forward_replay
-        from .validation.validate import _resolve_replay_base_ref
-        repo_root = os.path.abspath(args.repo_root)
-        git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
-        spec_root = os.path.abspath(args.spec_root) if getattr(args, 'spec_root', None) else None
-        base_ref = args.base_ref or _resolve_replay_base_ref(Path(git_root or repo_root))
-        errs = check_forward_replay(
-            repo_root,
-            base_ref=base_ref,
-            diff_error_mode=args.diff_error_mode,
-            git_root=git_root,
-            spec_root=spec_root,
-        )
-        if getattr(args, "json_output", False):
-            _json_exit(errs, "forward-replay-check")
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "governance-check":
@@ -1204,6 +1140,24 @@ def main():
         except (OSError, KeyError, json.JSONDecodeError):
             pass  # silently skip if file missing or malformed
 
+        _ai_help_step_lines = {
+            "16a": (
+                "Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the plan file of the batch: specdev step create 16a <batch> --from <draft> (it writes spec/impl_context/ms_<batch>_plan.json; an existing plan is edited with specdev json patch|insert|delete --id)",
+                "Validate: specdev spec-check spec --step 16a",
+            ),
+            "16b": (
+                "Step 16b has no file of its own: it is a part of the plan file of step 16a. Record each carried-out action with specdev plan record <item>/<action> --outcome done|failed|blocked; write an open item into execution.emergent_ambiguities with specdev json patch <plan> '.execution.emergent_ambiguities' '[<item>]' (the array is missing) or specdev json insert <plan> '.execution.emergent_ambiguities' '<item>' (it exists)",
+                "Validate: specdev spec-check spec --step 16b",
+            ),
+            "16c": (
+                "Step 16c has no file of its own: it is a part of the plan file of step 16a. Write a findings file under .specdev/findings/ and record the verdict with specdev review record <milestone-id> --verdict verified|needs_work|blocked|deferred --findings-file <file>",
+                "Validate: specdev spec-check spec --step 16c",
+            ),
+        }
+        _ai_help_step = _ai_help_step_lines.get(args.step) or (
+            f"Write the AI-produced JSON to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create {args.step} --from <draft> (an existing step is edited with specdev json patch|insert|delete --id)",
+            f"Validate: specdev spec-check spec --step {args.step}",
+        )
         if getattr(args, "json_output", False):
             lines = []
             if args.step:
@@ -1211,16 +1165,16 @@ def main():
                     f"AI help for step {args.step}:",
                     f"1. Open the prompt file: prompts/prompt_{args.step}_*.md",
                     f"2. Copy the content into your AI assistant",
-                    f"3. Write the AI-produced JSON directly to spec/{args.step}_*.json",
-                    f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>",
+                    f"3. {_ai_help_step[0]}",
+                    f"4. {_ai_help_step[1]}",
                 ]
             else:
                 lines = [
                     "AI Interaction Guide:",
                     "1. Locate the prompt file in prompts/prompt_XX_stepname.md",
                     "2. Copy the full content into your AI assistant",
-                    "3. Write the JSON artifact directly to spec/NN_name.json",
-                    "4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>",
+                    "3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (an existing step is edited with specdev json patch|insert|delete --id)",
+                    "4. Validate with: specdev spec-check spec --step NN (the step is written as in the file name: 05, 02a, 16)",
                     "5. Ensure all IDs use kebab-case format",
                     "6. No examples should be included in the AI output",
                 ]
@@ -1243,8 +1197,8 @@ def main():
                 print(f"AI help for step {args.step}:")
                 print(f"1. Open the prompt file: prompts/prompt_{args.step}_*.md")
                 print(f"2. Copy the content into your AI assistant")
-                print(f"3. Write the AI-produced JSON directly to spec/{args.step}_*.json")
-                print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>")
+                print(f"3. {_ai_help_step[0]}")
+                print(f"4. {_ai_help_step[1]}")
                 if args.step in _step_docs:
                     print("")
                     print("Reference docs:")
@@ -1254,8 +1208,8 @@ def main():
                 print("AI Interaction Guide:")
                 print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")
                 print("2. Copy the full content into your AI assistant")
-                print("3. Write the JSON artifact directly to spec/NN_name.json")
-                print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>")
+                print("3. Write the JSON artifact to a draft file outside spec/ (for example under .specdev/drafts/), then create the step: specdev step create NN --from <draft> (an existing step is edited with specdev json patch|insert|delete --id)")
+                print("4. Validate with: specdev spec-check spec --step NN (the step is written as in the file name: 05, 02a, 16)")
                 print("5. Ensure all IDs use kebab-case format")
                 print("6. No examples should be included in the AI output")
     elif args.cmd == "changelog":
@@ -1342,7 +1296,9 @@ def main():
                     sys.exit(1)
         elif args.validate:
             # Validate a version's changelog
-            errs = validate_changelog(changelog_dir, args.validate)
+            from .migration.registry import discover_scripts
+
+            errs = validate_changelog(changelog_dir, args.validate, known_scripts={script.id for script in discover_scripts()})
             if getattr(args, "json_output", False):
                 _json_exit(errs, "changelog")
             else:
@@ -1369,11 +1325,8 @@ def main():
             format_status_report,
             format_diff_report,
             format_plan_report,
-            apply_auto_fixes,
-            format_apply_report,
             list_backups,
             restore_backup,
-            validate_pre_migration,
             log_operation,
         )
         from .generation.prompt_generator import (
@@ -1392,7 +1345,8 @@ def main():
                 print(f"Error: Spec directory not found: {spec_dir}", file=sys.stderr)
                 sys.exit(1)
 
-        diff = diff_spec_directory(spec_dir, repo_root)
+        if args.action in ("status", "diff", "plan", "prompts"):
+            diff = diff_spec_directory(spec_dir, repo_root)
 
         if args.action == "status":
             if getattr(args, "json_output", False):
@@ -1452,40 +1406,101 @@ def main():
                     print("       Full apply (including AI-assisted) is not yet supported")
                     sys.exit(1)
 
-            # Pre-migration validation
-            validation = validate_pre_migration(spec_dir, repo_root)
-            if not validation.can_proceed:
-                if getattr(args, "json_output", False):
-                    err_items = [f"E520 {e}" for e in validation.errors]
-                    _json_exit(err_items, "align")
-                else:
-                    for warning in validation.warnings:
-                        print(f"\u26a0\ufe0f  Warning: {warning}", file=sys.stderr)
-                    for error in validation.errors:
-                        print(f"\u274c Error: {error}", file=sys.stderr)
-                    sys.exit(1)
-            else:
-                if not getattr(args, "json_output", False):
-                    for warning in validation.warnings:
-                        print(f"\u26a0\ufe0f  Warning: {warning}", file=sys.stderr)
+            from .migration.runner import run_migration
 
-            result = apply_auto_fixes(diff, spec_dir, repo_root, dry_run=args.dry_run)
+            report = run_migration(
+                spec_dir,
+                toolkit_root=repo_root,
+                git_root=Path(os.path.abspath(args.git_root)) if args.git_root else None,
+                dry_run=args.dry_run,
+                allow_dirty=args.allow_dirty,
+            )
             if getattr(args, "json_output", False):
-                report = format_apply_report(result)
-                pre_warnings = list(validation.warnings) if validation.warnings else []
-                output = {
-                    "status": "PASS",
-                    "error_count": 0,
-                    "warning_count": len(pre_warnings),
-                    "command": "align",
-                    "action": "apply",
-                    "errors": [],
-                    "warnings": pre_warnings,
-                    "output": report,
-                }
-                print(json.dumps(output, indent=2))
+                print(json.dumps(report.to_json(), indent=2))
             else:
-                print(format_apply_report(result))
+                print(report.render(), file=sys.stderr if report.errors else sys.stdout)
+            if report.errors:
+                sys.exit(1)
+        elif args.action == "propose":
+            from .migration.proposers import KINDS, ProposeError, propose
+
+            if args.kind not in KINDS:
+                p.error(f"align propose needs --kind {{{','.join(KINDS)}}}" + (f" (not {args.kind!r})" if args.kind else ""))
+            try:
+                outcome = propose(
+                    spec_dir,
+                    kind=args.kind,
+                    toolkit_root=repo_root,
+                    git_root=Path(os.path.abspath(args.git_root)) if args.git_root else None,
+                    dry_run=args.dry_run,
+                )
+            except ProposeError as error:
+                if getattr(args, "json_output", False):
+                    _json_exit([f"E520 UNRESOLVED_INPUT {error}"], "align", {"action": "propose"})
+                print(f"align propose: {error}", file=sys.stderr)
+                sys.exit(1)
+            print(json.dumps(outcome.to_json(), indent=2) if getattr(args, "json_output", False) else outcome.render())
+        elif args.action == "triage":
+            from .migration.triage import TriageError, legacy_text, read_worklist, render_triage, resolve_item, select
+
+            if args.resolve and not args.note:
+                p.error("align triage --resolve needs --note: what was decided")
+            if args.note and not args.resolve:
+                p.error("align triage --note closes the item named by --resolve")
+            if args.resolve and (args.legacy or args.step or args.audience):
+                p.error("align triage --resolve closes one item; it takes no --legacy, --step or --audience")
+            git_root = args.git_root
+            try:
+                if args.resolve:
+                    line = resolve_item(spec_dir, repo_root, args.resolve, args.note, git_root)
+                    outcome = {"action": "triage", "resolved": args.resolve}
+                elif args.legacy:
+                    line = legacy_text(spec_dir, repo_root, args.legacy, git_root)
+                    outcome = {"action": "triage", "legacy": args.legacy, "output": line}
+                else:
+                    items = select(read_worklist(spec_dir, repo_root, git_root), args.step, args.audience)
+                    still_open = [item for item in items if not item.resolved]
+                    outcome = {
+                        "status": "PASS", "error_count": 0, "warning_count": 0, "command": "align", "action": "triage", "errors": [],
+                        "open": len(still_open), "blocking_open": sum(1 for item in still_open if item.blocking),
+                        "items": [item.to_json() for item in items],
+                    }
+                    selected = "".join(f" [{name} {value}]" for name, value in (("step", args.step), ("audience", args.audience)) if value)
+                    line = render_triage(items, spec_dir, selection=selected)
+            except TriageError as error:
+                if getattr(args, "json_output", False):
+                    _json_exit([f"E520 UNRESOLVED_INPUT {error}"], "align", {"action": "triage"})
+                print(f"align triage: {error}", file=sys.stderr)
+                sys.exit(1)
+            print(json.dumps({"status": "PASS", "error_count": 0, "warning_count": 0, "command": "align", "errors": [], **outcome}, indent=2) if getattr(args, "json_output", False) else line)
+        elif args.action == "bind-legacy":
+            from .migration.legacy_bindings import PassOutcome, run_pass, summary_of
+            from .migration.proposers.bindings import BindGroup
+            from .migration.proposers import ProposeError
+
+            git_arg = Path(os.path.abspath(args.git_root)) if args.git_root else None
+
+            def ask(group: BindGroup) -> bool:
+                if args.yes:
+                    return True
+                try:
+                    return input(f"Write the {sum(len(m.lines) for m in group.members)} binding line(s) of {' && '.join(group.commands)}? [y/N]: ").strip().lower() == "y"
+                except (EOFError, KeyboardInterrupt):
+                    return False
+
+            try:
+                if args.summary:
+                    legacy = summary_of(spec_dir, toolkit_root=repo_root, git_root=git_arg)
+                else:
+                    legacy = run_pass(spec_dir, toolkit_root=repo_root, git_root=git_arg, answer=ask if (args.yes or sys.stdin.isatty()) else None, dry_run=args.dry_run)
+            except ProposeError as error:
+                if getattr(args, "json_output", False):
+                    _json_exit([f"E520 UNRESOLVED_INPUT {error}"], "align", {"action": "bind-legacy"})
+                print(f"align bind-legacy: {error}", file=sys.stderr)
+                sys.exit(1)
+            print(json.dumps(legacy.to_json(), indent=2) if getattr(args, "json_output", False) else legacy.render())
+            if isinstance(legacy, PassOutcome) and legacy.refused:
+                sys.exit(1)
         elif args.action == "prompts":
             # Generate AI prompts for semantic migrations
             prompts = generate_prompts(
@@ -1586,50 +1601,53 @@ def main():
                     restore_backup(spec_dir, selected)
                     log_operation(spec_dir, f"Restored from {selected.backup_dir.name}", "success")
                     print(f"\u2705 Restored from {selected.backup_dir.name}")
+                    print("  Not validated: the backup is in the format of the toolkit that made it; check it with that toolkit version.")
         elif args.action == "validate":
-             # Post-migration validation
-            from .generation.schema_differ import validate_post_migration, get_toolkit_version
+            from .graph.gitview import host_root_of
+            from .migration.triage import validate_migration
 
-            toolkit_version = get_toolkit_version(repo_root)
-            if not toolkit_version:
-                if getattr(args, "json_output", False):
-                    _json_exit(
-                        ["E520 UNRESOLVED_INPUT could_not_determine_toolkit_version"],
-                        "align",
-                    )
-                else:
-                    print("Error: Could not determine toolkit version", file=sys.stderr)
-                    sys.exit(1)
-
-            assert toolkit_version is not None  # guarded by sys.exit above
-            result = validate_post_migration(spec_dir, repo_root, toolkit_version)
-
+            git_root = host_root_of(spec_dir, args.git_root)
+            outcome = validate_migration(
+                spec_dir,
+                repo_root,
+                git_root=git_root,
+                project_canon_dir=_discover_project_canon_dir(git_root=git_root, spec_root=str(spec_dir), spec_dir=str(spec_dir)),
+                base_ref=args.base_ref,
+                keep_worklist=args.keep_worklist,
+            )
             if getattr(args, "json_output", False):
-                err_items = [f"E520 {e}" for e in result.errors]
-                warn_items = [f"W570 {w}" for w in result.warnings]
-                _json_exit(err_items + warn_items, "align")
-            else:
-                print("\U0001f50d Post-Migration Validation")
-                print("\u2501" * 27)
-
-                # Print warnings
-                if result.warnings:
-                    print("\n\u26a0\ufe0f  Warnings:")
-                    for w in result.warnings:
-                        print(f"  - {w}")
-
-                # Print errors
-                if result.errors:
-                    print("\n\u274c Errors:")
-                    for e in result.errors:
-                        print(f"  - {e}")
-                    print("\nResult: \u274c FAILED")
-                    sys.exit(1)
-
-                print("\n\u2705 Trace Integrity: OK")
-                print(f"\u2705 Toolkit Version: {toolkit_version}")
-                print("\nResult: \u2705 PASSED")
-                print("Migration complete. spec/specdev_version updated.")
+                items = [f"E520 UNRESOLVED_INPUT {outcome.refused}"] if outcome.refused else list(outcome.errors)
+                _json_exit(items, "align", {
+                    "action": "validate",
+                    "unresolved": outcome.unresolved,
+                    "blocking": outcome.blocking,
+                    "deleted": outcome.deleted,
+                    "stamp_finished": outcome.stamp_finished,
+                })
+            if outcome.refused:
+                print(f"align validate: refused: {outcome.refused}", file=sys.stderr)
+                sys.exit(1)
+            for finding in outcome.errors:
+                print(finding.render(), file=sys.stderr)
+            if outcome.failed_errors:
+                print(
+                    f"align validate: spec-check --merge reports {len(outcome.failed_errors)} error(s); the migration is not finished "
+                    "and nothing was changed. Fix them (specdev spec-check explains each), then run validate again.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            print(f"align validate: spec-check --merge: no error ({len(outcome.errors)} warning(s)).")
+            print(f"worklist: {outcome.unresolved} item(s) not resolved, {outcome.blocking} of them marked blocking (information, not a failure)." if outcome.unresolved else "worklist: every item is resolved.")
+            if outcome.deleted:
+                print(f"deleted: {', '.join('spec/' + rel for rel in outcome.deleted)}")
+            if outcome.kept:
+                print(outcome.kept)
+            for note in outcome.notes:
+                print(note)
+            if outcome.stamp_finished:
+                print("stamp: migration_status cleared, last_migration refreshed (spec/specdev_version).")
+            if outcome.stamp_finished or outcome.deleted:
+                print("Migration finished. Commit the result.")
 
     elif args.cmd == "update":
         from .update import run_update, UpdateResult
@@ -1645,14 +1663,21 @@ def main():
                 sys.exit(1)
 
         result: UpdateResult = run_update(
-            spec_dir, repo_root, dry_run=getattr(args, "dry_run", False)
+            spec_dir,
+            repo_root,
+            dry_run=getattr(args, "dry_run", False),
+            git_root=Path(os.path.abspath(args.git_root)) if args.git_root else None,
+            install_only=args.install_only,
+            no_install=args.no_install,
+            adopt=args.adopt,
+            force_claude=args.force_claude,
         )
 
         if getattr(args, "json_output", False):
             status_str = "PASS" if result.exit_code == 0 else "FAIL"
             errors_list = (
                 [{"code": "E608", "message": result.message, "severity": "error"}]
-                if result.exit_code != 0 and result.status in ("error", "needs_migration")
+                if result.exit_code != 0 and result.status in ("error", "needs_migration", "migration_in_progress")
                 else []
             )
             out = {
@@ -1667,6 +1692,7 @@ def main():
                 "from_version": result.from_version,
                 "to_version": result.to_version,
                 "dry_run": result.dry_run,
+                "host_install": result.host_install,
             }
             print(json.dumps(out, indent=2))
             sys.exit(result.exit_code)
@@ -1755,14 +1781,6 @@ def main():
             promote_codes_list = sorted(env_cfg.promote_codes) if env_cfg.promote_codes else []
             spec_dir = os.path.join(repo_root, "spec")
             step_order_path = os.path.join(repo_root, "tools", "step_order.json")
-            coverage_thresholds = None
-            if os.path.isfile(step_order_path):
-                try:
-                    with open(step_order_path, "r", encoding="utf-8") as f:
-                        so_data = json.load(f)
-                    coverage_thresholds = so_data.get("coverage_thresholds")
-                except (OSError, json.JSONDecodeError):
-                    pass
             output = {
                 "status": "PASS",
                 "error_count": 0,
@@ -1778,9 +1796,7 @@ def main():
                 "spec_dir_exists": os.path.isdir(spec_dir),
                 "step_order_path": step_order_path,
                 "step_order_exists": os.path.isfile(step_order_path),
-                "coverage_thresholds": coverage_thresholds,
                 "replay_base_ref": env_cfg.replay_base_ref or None,
-                "matrix_strict": env_cfg.matrix_strict,
             }
             print(json.dumps(output, indent=2))
         else:
@@ -1814,22 +1830,8 @@ def main():
             print(f"Spec dir: {spec_dir} ({'exists' if os.path.isdir(spec_dir) else 'NOT FOUND'})")
             step_order_path = os.path.join(repo_root, "tools", "step_order.json")
             print(f"Step order: {step_order_path} ({'exists' if os.path.isfile(step_order_path) else 'NOT FOUND'})")
-            # Coverage thresholds
-            if os.path.isfile(step_order_path):
-                try:
-                    with open(step_order_path, "r", encoding="utf-8") as f:
-                        so_data = json.load(f)
-                    ct = so_data.get("coverage_thresholds")
-                    if ct:
-                        print(f"Coverage thresholds: {json.dumps(ct)}")
-                    else:
-                        print("Coverage thresholds: not configured")
-                except (OSError, json.JSONDecodeError):
-                    print("Coverage thresholds: error reading step_order.json")
             replay_base = env_cfg.replay_base_ref or ""
             print(f"Replay base ref: {replay_base or '(auto-resolved)'}")
-            matrix_strict_val = env_cfg.matrix_strict
-            print(f"Matrix strict mode: {'ON' if matrix_strict_val else 'OFF'}")
             print()
             print("=== End Environment Check ===")
 
@@ -1867,7 +1869,6 @@ def main():
         stdout_payload, stderr_lines, exit_code = run_upstream_backlog(
             spec_dir=spec_dir_abs,
             repo_root=args.repo_root,
-            spec_root=args.spec_root,
             severity=args.severity,
             status=args.status,
             json_output=args.json_output,
@@ -1889,7 +1890,7 @@ def main():
         else:
             canon_dir = None
             project_canon = False
-        result = run_canon_accept(
+        accept_result = run_canon_accept(
             spec_file=spec_file,
             namespace=args.namespace,
             repo_root=repo_root,
@@ -1897,12 +1898,14 @@ def main():
             owner=getattr(args, "owner", None),
             canon_dir=canon_dir,
             project_canon=project_canon,
+            git_root=git_root,
+            update=args.update,
         )
         if getattr(args, "json_output", False):
-            error_str = result.get("error")
-            added = result.get("added", [])
-            skipped = result.get("skipped", [])
-            malformed = result.get("malformed", 0)
+            error_str = accept_result.get("error")
+            added = accept_result.get("added", [])
+            skipped = accept_result.get("skipped", [])
+            malformed = accept_result.get("malformed", 0)
             errs_list = [f"E521 CANON_ACCEPT_FAILED {error_str}"] if error_str else []
             from .core.errors import ensure_spec_errors
             from .core.json_output import format_errors_json
@@ -1911,37 +1914,24 @@ def main():
                 "command": "canon-accept",
                 "added": added,
                 "skipped": skipped,
+                "changed": accept_result.get("changed", []),
+                "updated": accept_result.get("updated", []),
+                "would_update": accept_result.get("would_update", []),
                 "malformed": malformed,
                 "dry_run": args.dry_run,
             }
             print(format_errors_json(spec_errors, context=ctx))
             sys.exit(1 if error_str else 0)
         else:
-            error_str = result.get("error")
+            error_str = accept_result.get("error")
             if error_str:
                 print(f"E521 CANON_ACCEPT_FAILED {error_str}", file=sys.stderr)
                 sys.exit(1)
-            added = result.get("added", [])
-            skipped = result.get("skipped", [])
-            malformed = result.get("malformed", 0)
-            if added:
-                label = "would add" if args.dry_run else "added"
-                for cid in added:
-                    print(f"  + {label}: {cid}")
-            if skipped:
-                for cid in skipped:
-                    print(f"  ~ skipped (duplicate): {cid}")
-            if malformed:
-                print(f"  ! {malformed} malformed proposal(s) skipped (missing required fields)")
-            if not added and not skipped and not malformed:
-                print("OK (no proposals found)")
-            elif args.dry_run:
-                print(f"OK (dry-run: {len(added)} would be added, {len(skipped)} skipped, {malformed} malformed)")
-            else:
-                print(f"OK ({len(added)} added, {len(skipped)} skipped, {malformed} malformed)")
+            _print_canon_accept_report(accept_result, args.dry_run)
 
     elif args.cmd == "milestone-state":
-        from .context.milestone_state import compute_milestone_state
+        from .context.milestone_state import compute_milestone_state, load_spec_view
+        from .core.step_paths import PLAN_DIR_NAME, plan_file_name
 
         repo_root = os.path.abspath(args.repo_root)
         batch_id: str = args.batch_id
@@ -1951,9 +1941,7 @@ def main():
             spec_root = os.path.abspath(args.spec_root)
         else:
             spec_root = os.path.join(repo_root, "spec")
-        plan_path = os.path.join(
-            spec_root, "impl_context", f"ms_{batch_id}_plan.json"
-        )
+        plan_path = os.path.join(spec_root, PLAN_DIR_NAME, plan_file_name(batch_id))
         if not os.path.isfile(plan_path):
             print(
                 f"E520 UNRESOLVED_INPUT missing_plan_file {plan_path}",
@@ -1972,8 +1960,8 @@ def main():
         with open(plan_path, "r", encoding="utf-8") as _fh:
             plan = json.load(_fh)
 
-        result = compute_milestone_state(plan, findings_dir, batch_id)
-        print(json.dumps(result, indent=2))
+        state = compute_milestone_state(plan, findings_dir, batch_id, load_spec_view(plan, spec_root, repo_root))
+        print(json.dumps(state, indent=2))
 
     elif args.cmd == "context":
         from .context import (
@@ -2007,44 +1995,18 @@ def main():
                 git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
                 result = check_freshness(spec_dir, repo_root, git_root=git_root)
                 print(json.dumps(result, indent=2))
-                # Emit W595 (CONTENT_STALENESS) for any stale seed — §A6
-                stale_seeds = [
-                    sid for sid, info in result.items()
-                    if isinstance(info, dict) and info.get("stale")
-                ]
-                # Emit W595 (SEED_UNTRACKED) for manifest seeds missing from the
-                # index — they escape drift detection until re-indexed.
-                untracked_seeds = [
-                    sid for sid, info in result.items()
-                    if isinstance(info, dict) and info.get("untracked")
-                ]
-                if stale_seeds or untracked_seeds:
-                    cfg = get_config()
-                    warn_or_error = "error" if cfg.warnings_as_errors else "warning"
-                    for sid in stale_seeds:
-                        print(
-                            f"specdev: {warn_or_error} W595: seed '{sid}' is stale — "
-                            "re-index with /specdev-step (CONTENT_STALENESS)",
-                            file=sys.stderr,
-                        )
-                    for sid in untracked_seeds:
-                        print(
-                            f"specdev: {warn_or_error} W595: seed '{sid}' is in the "
-                            "manifest but not hash-tracked in seed_requirements.json — "
-                            "re-index with /specdev-step (SEED_UNTRACKED)",
-                            file=sys.stderr,
-                        )
-                    if cfg.warnings_as_errors:
-                        sys.exit(1)
             elif context_cmd == "review":
                 from .context.reviewer import review_artifact
+                from .core.host_schemas import spec_root_for
                 import dataclasses
                 artifact_path = os.path.abspath(args.artifact_path)
                 git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+                # No --spec-dir: the path alone is read.  A file of an `extensions` folder has its spec folder above that folder; any other file lies in its spec folder.
+                spec_dir = os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else spec_root_for(artifact_path) or os.path.dirname(artifact_path)
                 result = review_artifact(
                     artifact_path,
                     args.step,
-                    os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else os.path.dirname(artifact_path),
+                    spec_dir,
                     repo_root,
                     entry_id=getattr(args, "entry", None),
                     git_root=git_root,
@@ -2054,6 +2016,10 @@ def main():
                 ctx_p.print_help()
 
     elif args.cmd == "json":
+        from .trace.id_write_commands import is_id_write, run_id_write
+        if is_id_write(args.args):
+            # An id-keyed write needs the spec folder, so --spec-root and --git-root are NOT stripped.
+            sys.exit(run_id_write(args.args))
         from .core.json_utils import main as json_main
         # Strip --spec-root / --git-root if present — the json subcommand family
         # accepts --repo-root only, but agents frequently over-apply the
@@ -2088,6 +2054,18 @@ def main():
                 i += 1
         sys.argv = [sys.argv[0]] + filtered
         json_main()
+
+    elif args.cmd == "node":
+        from .graph.commands import run_node
+        sys.exit(run_node(args.args))
+    elif args.cmd == "trace":
+        from .graph.commands import run_trace
+        sys.exit(run_trace(args))
+    elif args.cmd == "diff":
+        from .graph.commands import run_diff
+        sys.exit(run_diff(args))
+    elif getattr(args, "handler", None) is not None:
+        sys.exit(args.handler(args))
 
     elif args.cmd == "guide":
         from .core.guide import format_guide_text, load_guides, lookup_guide
@@ -2132,27 +2110,64 @@ def main():
             if args.extraction_paths_out
             else os.path.join(repo_root, "tools", "extraction_paths.json")
         )
+        def optional_output(flag_value: str | None, *default: str) -> str | None:
+            """The flag's path; without the flag, the default path unless ``--out`` redirects the run."""
+            if flag_value:
+                return os.path.abspath(flag_value)
+            return None if args.out else os.path.join(repo_root, *default)
+
+        step_order_out = optional_output(args.step_order_out, "tools", "step_order.json")
+        cli_commands_out = optional_output(args.cli_commands_out, "tools", "cli_commands.json")
+        checklist_out = optional_output(args.checklist_out, "docs", "developers", "schema-change-checklist.md")
+        from .registry.annotations import AnnotationError
         from .registry.generate import run as registry_generate_run
-        registry_generate_run(
-            repo_root=repo_root,
-            out_path=out_path,
-            extraction_paths_out=extraction_paths_out,
-        )
+        from .registry.schema_checklist import ChecklistError
+        from .registry.step_order_gen import StepOrderError
+        try:
+            registry_generate_run(
+                repo_root=repo_root,
+                out_path=out_path,
+                extraction_paths_out=extraction_paths_out,
+                step_order_out=step_order_out,
+                cli_commands_out=cli_commands_out,
+                checklist_out=checklist_out,
+            )
+        except (AnnotationError, ChecklistError, StepOrderError) as exc:  # the issue list is in the message
+            print(f"registry-generate: failed: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     elif args.cmd == "spec-check":
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
-        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
-        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        git_root = os.path.abspath(args.git_root) if args.git_root else None
+        spec_root = os.path.abspath(args.spec_root) if args.spec_root else None
         project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        if getattr(args, "json_output", False):
-            from .validation.spec_check import run_spec_check_json
-            errs, ctx = run_spec_check_json(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
-            _json_exit(errs, "spec-check", extra_context=ctx)
-        else:
-            from .validation.spec_check import run_spec_check
-            errs = run_spec_check(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
-            _print_and_exit_if_errors(errs)
+        from .core.errors import FindingError
+        from .validation.step_gate_run import gate_usage_error
+        usage = gate_usage_error(
+            steps=args.steps, paths=args.paths, base_ref=args.base_ref, detail=args.detail, merge=args.merge,
+        )
+        if usage:
+            p.error(usage)
+        if args.steps is not None or args.paths is not None:
+            _spec_check_step_gate(args, repo_root, spec_dir, git_root, spec_root, project_canon_dir)
+        try:
+            if args.json_output:
+                from .validation.spec_check import run_spec_check_json
+                errs, ctx = run_spec_check_json(
+                    repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir,
+                    merge=args.merge, base_ref=args.base_ref,
+                )
+                _json_exit(errs, "spec-check", extra_context=ctx)
+            else:
+                from .validation.spec_check import run_spec_check
+                errs = run_spec_check(
+                    repo_root, spec_dir, git_root=git_root, spec_root=spec_root, project_canon_dir=project_canon_dir,
+                    merge=args.merge, base_ref=args.base_ref,
+                )
+                _print_and_exit_if_errors(errs)
+        except FindingError as exc:
+            _refuse_spec_check(exc.error, args.json_output)
 
     else:
         p.print_help()

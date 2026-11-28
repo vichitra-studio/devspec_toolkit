@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:16-impl-context",
   "title": "16_impl_context",
-  "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence binding.",
+  "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation: a plan of checklist items, execution records written by `specdev plan record`, and a review block written by `specdev review record`.",
   "$defs": {
     "specRef": {
       "type": "object",
-      "description": "A reference to a spec artifact with precise code location binding.",
+      "description": "A reference to a spec artifact by type and id. Used by review findings.",
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -30,106 +30,24 @@
         "note": {
           "type": "string",
           "description": "Optional contextual note about this reference."
-        },
-        "line_range": {
-          "type": "string",
-          "pattern": "^L\\d+-L\\d+$",
-          "description": "Line range in the source file (e.g., 'L10-L25')."
-        },
-        "commit_hash": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{40}$",
-          "not": {
-            "pattern": "^0{40}$"
-          },
-          "description": "Full 40-character git commit hash pinning this reference. Must not be all zeros."
         }
       },
       "required": [
         "type",
-        "id",
-        "line_range",
-        "commit_hash"
+        "id"
       ]
     },
     "severityLevel": {
       "$ref": "vc:core:atoms#severityLevel"
-    },
-    "executionStatus": {
-      "type": "string",
-      "enum": [
-        "passed",
-        "failed",
-        "blocked",
-        "partial"
-      ],
-      "description": "Execution outcome. Decision rule: 'partial' = started but not all sub-tasks complete; 'blocked' = cannot proceed due to an unresolved dependency or ambiguity (document the blocker in deferred_reason). Example: use 'blocked' when an upstream API contract is not finalised; use 'partial' when 3 of 5 test suites pass but 2 are still running. Anti-pattern: using 'partial' for a run that has not started at all (use 'passed'/'failed' after completion)."
-    },
-    "evidenceObject": {
-      "type": "object",
-      "description": "Concrete evidence proving that a requirement or check was satisfied. Good evidence example: {content: 'All 47 unit tests pass with 94% branch coverage — see CI run #1234', evidence_ref: 'ci://run/1234', path: 'tests/unit/auth/'}. Bad evidence example: {content: 'tests pass'} — too vague to trace. The 'content' field must contain verbatim output or a precise description; use 'path' and 'section' to pin the source location.",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
-            "log",
-            "snippet",
-            "screenshot",
-            "reference"
-          ],
-          "description": "The form of evidence: log output, code snippet, screenshot, or external reference."
-        },
-        "content": {
-          "type": "string",
-          "minLength": 20,
-          "pattern": "\\S",
-          "description": "The evidence content itself (minimum 20 characters, must contain non-whitespace). Example: '47 unit tests pass, branch coverage 94% per pytest-cov report' (good). Anti-pattern: 'done' or 'completed' — too vague to trace back to an observable outcome."
-        },
-        "evidence_ref": {
-          "type": "string",
-          "description": "URL or CI run reference that makes the evidence independently verifiable. Include when the evidence has a stable external URL or CI run reference. Examples: 'ci://github-actions/run/12345' (CI run reference), 'https://sonarcloud.io/summary/new_code?id=myproject' (external quality dashboard). Omit when the evidence is inline command output with no external reference (e.g., a local test run captured in the 'content' field). Anti-pattern: leaving blank when a CI run URL is available — the URL is what makes the evidence auditable and reproducible."
-        },
-        "path": {
-          "type": "string",
-          "description": "Relative path from repo root where the evidence was captured. Examples: 'src/auth/handlers.py', 'tests/unit/auth/'. Anti-pattern: absolute paths like '/Users/dev/project/src/auth/'."
-        },
-        "section": {
-          "type": "string",
-          "description": "Section or function name within the file where evidence was found. Examples: 'authenticate_user function', 'AuthMiddleware class', 'POST /auth/login handler'. Anti-pattern: 'main' or 'utils' (too vague to locate)."
-        }
-      },
-      "required": [
-        "type",
-        "content"
-      ]
     }
   },
   "type": "object",
   "properties": {
     "extensions": {
       "type": "object",
-      "description": "Structured extensions for host-repo-specific additions that do not fit standard fields. Examples: {\"deployment_runbook\": \"https://runbooks.example.com/auth-deploy\"}, {\"slack_channel\": \"#auth-team\"}. Anti-pattern: duplicating data already captured in standard fields (e.g., restating plan.status here).",
+      "description": "Structured extensions for host-repo-specific additions that do not fit standard fields. Examples: {\"deployment_runbook\": \"https://runbooks.example.com/auth-deploy\"}, {\"slack_channel\": \"#auth-team\"}. Anti-pattern: duplicating data already captured in standard fields (e.g., restating plan.scope_validation here).",
       "additionalProperties": false,
       "properties": {
-        "review_state": {
-          "type": "object",
-          "description": "Records the outcome of a human or automated review pass on this implementation context. Populate after a review cycle completes — leave absent until a review has run. Sub-fields: outcome (the result of the review), verified_by (reviewer identity as a GitHub handle or CI system name), review_date (ISO 8601 timestamp of when the review occurred). Example: {outcome: 'approved', verified_by: '@alice', review_date: '2025-10-16T10:00:00Z'}. Anti-pattern: populating review_state with outcome: 'pending' before any review has occurred — leave the entire field absent until a review cycle has completed.",
-          "additionalProperties": false,
-          "properties": {
-            "outcome": {
-              "type": "string",
-              "description": "Review outcome. Standard values with decision rules: 'verified' = all checklist items satisfied and tests pass; 'partial' = majority done, 1–2 non-blocking gaps; 'failed' = blocking finding present; 'changes_requested' = reviewer has blocking findings (use this, not 'rejected' — findings are fixable); 'blocked' = cannot review until upstream issues resolved; 'pending' = not yet reviewed. Anti-pattern: 'done' (not a standard value)."
-            },
-            "verified_by": {
-              "type": "string",
-              "description": "Identity of the person or system that verified the review. Format: GitHub handle or CI system name. Examples: '@alice', 'github-actions[bot]', 'ci-pipeline-12345'. Anti-pattern: 'me' or 'developer' (not traceable)."
-            }
-          },
-          "required": [
-            "outcome"
-          ]
-        },
         "execution_context": {
           "type": "object",
           "description": "Extension for execution-time overrides and configuration.",
@@ -137,7 +55,7 @@
           "properties": {
             "command_overrides": {
               "type": "object",
-              "description": "Map of command names to override values for execution. Example: {\"validate\": \"python -m pytest tests/unit/ --tb=short\", \"lint\": \"ruff check src/\"}. Anti-pattern: overriding commands without documenting why in a code comment or the plan's deferred_reason.",
+              "description": "Map of command names to override values for execution. Example: {\"validate\": \"python -m pytest tests/unit/ --tb=short\", \"lint\": \"ruff check src/\"}. Anti-pattern: overriding commands without documenting why in a code comment.",
               "additionalProperties": {
                 "type": "string",
                 "description": "Override value for a specific command name."
@@ -152,18 +70,6 @@
       "additionalProperties": false,
       "description": "Trinity loop plan (scope, checklist, review requirements, and documentation impact).",
       "properties": {
-        "status": {
-          "type": "string",
-          "enum": [
-            "active",
-            "deferred"
-          ],
-          "description": "Plan lifecycle status. Decision rules: 'active' = plan is being worked; 'deferred' = explicitly postponed with documented reason. Transition: active → deferred requires populating deferred_reason. Anti-pattern: using 'deferred' without populating deferred_reason."
-        },
-        "deferred_reason": {
-          "type": "string",
-          "description": "Explanation for why this plan was deferred. Format: name the blocker and the condition required to undefer. Example: 'Waiting for auth service API contract finalisation (expected Sprint 3). Unblock: auth-service publishes OpenAPI 3.0 spec.' Anti-pattern: 'TBD' or 'not ready' (provides no actionable condition)."
-        },
         "summary": {
           "type": "object",
           "description": "High-level scope summary including what is in and out of scope.",
@@ -199,7 +105,8 @@
                 "type": "string",
                 "description": "Glob pattern relative to repo root. Examples: 'src/auth/**/*.py', 'tests/unit/auth/test_*.py'. Anti-pattern: '*.py' (matches entire repo)."
               },
-              "description": "Per-milestone file globs that bound execution.files_touched. Lives on each 16a milestone plan; the Trinity Anchor (vc:16-anchor) does not carry this field — scope at the anchor level is expressed via scope_in/scope_out, file-level enforcement is per-milestone."
+              "description": "Per-milestone file globs that bound execution.files_touched. Lives on each 16a milestone plan; the Trinity Anchor (vc:16-anchor) does not carry this field — scope at the anchor level is expressed via scope_in/scope_out, file-level enforcement is per-milestone.",
+              "minItems": 1
             },
             "milestone_supporting_files": {
               "type": "array",
@@ -281,38 +188,30 @@
           "properties": {
             "requirements_summary": {
               "type": "array",
-              "description": "2–4 themed requirement groups, each with a business-domain name and 2–6 requirements. Themes are business-domain names (e.g., 'Authentication & Authorization', 'Payment Handling'), not technical layers. Anti-pattern: one giant unthemed list, or themes named 'Theme 1', 'General', 'Misc'.",
+              "description": "2–4 themes, each with a business-domain name and a summary. Themes are business-domain names (e.g., 'Authentication & Authorization', 'Payment Handling'), not technical layers. Anti-pattern: one giant unthemed list, or themes named 'Theme 1', 'General', 'Misc'.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "theme": {
                     "type": "string",
-                    "description": "Business-domain label grouping related requirements — NOT a technical layer. Group by what the system does for users, not how it is built. Examples: 'Authentication & Authorization', 'Order Processing', 'Payment Handling'. A good theme has 2–6 requirements; split if >8. Anti-pattern: 'Utils', 'Helpers', 'Services' (technical layers); 'Theme 1', 'General', 'Misc' (generic/empty labels). Keep under 50 characters."
+                    "description": "Business-domain label grouping related requirements — NOT a technical layer. Group by what the system does for users, not how it is built. Examples: 'Authentication & Authorization', 'Order Processing', 'Payment Handling'. Anti-pattern: 'Utils', 'Helpers', 'Services' (technical layers); 'Theme 1', 'General', 'Misc' (generic/empty labels). Keep under 50 characters."
                   },
                   "summary": {
                     "type": "string",
                     "description": "1–2 sentences naming the key actors, interactions, and constraints that define this theme's scope. Include what the system does and for whom. Examples: 'User authentication flows using JWT tokens with 24-hour TTL; covers login, token refresh, and revocation endpoints.' 'Order lifecycle management from cart submission to fulfilment confirmation; includes payment capture and inventory reservation.' Anti-pattern: 'This theme covers authentication.' (too brief, no actors or constraints); copy-pasting requirement statements directly into the summary."
-                  },
-                  "spec_refs": {
-                    "type": "array",
-                    "description": "Spec references that belong to this thematic group.",
-                    "items": {
-                      "$ref": "#/$defs/specRef",
-                      "description": "A specRef object pointing to the spec artifact this requirement derives from. Example: {type: 'doc', id: 'vc:04-fr-list', field: 'functional_requirements[0].statement'}. Anti-pattern: pointing to a code file instead of a spec document."
-                    }
                   }
                 },
                 "required": [
                   "theme",
                   "summary"
                 ],
-                "description": "A thematic grouping of related spec requirements with optional references."
+                "description": "A thematic grouping of related requirements."
               }
             },
             "checklist": {
               "type": "array",
-              "description": "Checklist items that must be satisfied for spec compliance.",
+              "description": "Plan items: the units of implementation work of this milestone. Each item realises one or more acceptance criteria of the milestone's roadmap tasks.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
@@ -321,9 +220,20 @@
                     "$ref": "vc:core:atoms#screamingSnakeId",
                     "description": "Unique SCREAMING_SNAKE_CASE identifier for this checklist item. Name it after the requirement it verifies. Examples: 'AUTH_JWT_VALIDATION', 'PAYMENT_IDEMPOTENCY_KEY', 'RATE_LIMIT_ENFORCEMENT'. Anti-pattern: 'ITEM_1', 'CHECK_001' (sequential numbers are not traceable to a spec requirement)."
                   },
-                  "spec_ref": {
-                    "$ref": "#/$defs/specRef",
-                    "description": "Reference to the spec artifact this checklist item verifies. Use type='doc' for schema/spec references. Example: {type: 'doc', id: 'vc:06-invariants', field: 'rules[0].expression'} for an item verifying an invariant expression. Example: {type: 'doc', id: 'vc:04-fr-list', field: 'functional_requirements[0].acceptance_criteria[0].text'} for an acceptance criterion. Anti-pattern: pointing to a code file (type='code') — checklist spec_refs should point to the spec document, not the implementation."
+                  "realises": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "$ref": "vc:core:atoms#kebabId"
+                    },
+                    "x-link": {
+                      "kinds": [
+                        "task-criterion"
+                      ],
+                      "required": true
+                    },
+                    "description": "Ids of the Step 14 task acceptance criteria this item realises (the criterion ids). At least one. The task, the milestone, the fixtures and the NFRs of the item are computed from them. Example: [\"tc-confirm-expired-token\"]. Anti-pattern: naming a task id, a functional requirement or a criterion the roadmap does not define."
                   },
                   "description": {
                     "type": "string",
@@ -341,7 +251,7 @@
                       "docs",
                       "security"
                     ],
-                    "description": "Classification of this checklist item by the type of requirement it represents. Decision rules: 'behavior' — a functional action the system performs (login flow, submit order, redirect after auth); 'constraint' — a limit or boundary condition (rate limit, max file size, character limit); 'validation' — an input/output correctness check (schema valid, format check, referential integrity); 'security' — an auth, authz, encryption, or injection-prevention surface; 'performance' — a latency, throughput, or resource usage requirement; 'logging' — an audit trail, observability, or monitoring event; 'docs' — documentation that must be produced or updated; 'metadata' — canonical reference or traceability field correctness. Anti-pattern: using 'behavior' as the default when 'security' or 'constraint' applies — the type drives per-type rollup reporting."
+                    "description": "Classification of this checklist item by the type of requirement it represents. Decision rules: 'behavior' — a functional action the system performs (login flow, submit order, redirect after auth); 'constraint' — a limit or boundary condition (rate limit, max file size, character limit); 'validation' — an input/output correctness check (schema valid, format check, referential integrity); 'security' — an auth, authz, encryption, or injection-prevention surface; 'perf' — a latency, throughput, or resource usage requirement; 'logging' — an audit trail, observability, or monitoring event; 'docs' — documentation that must be produced or updated; 'metadata' — canonical reference or traceability field correctness. Anti-pattern: using 'behavior' as the default when 'security' or 'constraint' applies — the type drives per-type rollup reporting. The step 16 validator requires this field (E530 when it is absent) although the schema does not list it under required."
                   },
                   "layer": {
                     "type": "string",
@@ -356,76 +266,13 @@
                       "config",
                       "security"
                     ],
-                    "description": "Architecture layer this checklist item targets. Decision rules: 'api' = HTTP routes and request handling; 'service' = business/domain logic and rules; 'db' = database schema, migrations, storage operations; 'security' = auth/authz/crypto/input validation middleware; 'tests' = test files and fixtures; 'config' = environment config and feature flags; 'docs' = documentation files; 'model' = domain objects and type definitions; 'integration' = external system calls and adapters. Example: use 'api' for the route handler; use 'service' for the token validation logic called by that handler. Anti-pattern: using 'api' for business logic that happens to be triggered via an API call."
-                  },
-                  "checklist_status": {
-                    "type": "string",
-                    "enum": [
-                      "active",
-                      "deferred",
-                      "wont_do"
-                    ],
-                    "default": "active",
-                    "description": "Lifecycle of this checklist item. Decision rules: 'active' = required for the current plan; 'deferred' = explicitly postponed (requires this item's own `deferred_reason`), will resume later under a named condition; 'wont_do' = permanently cancelled (requires this item's own `wont_do_reason`), will never be built. Impact: any 'deferred' or 'wont_do' item is excluded from milestone phase-position computation and exempt from proof-of-work requirements. Anti-pattern: 'deferred' as a synonym for 'not started yet' — use 'active' with implementation.status 'pending' for items not yet begun. Anti-pattern: deleting a checklist item to work around coverage validation instead of marking it 'deferred'/'wont_do' with a reason."
-                  },
-                  "deferred_reason": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Required when checklist_status is 'deferred'. Explanation for why this specific item was postponed. Format: name the blocker and the condition required to undefer. Example: 'Waiting for auth service API contract finalisation (expected Sprint 3). Unblock: auth-service publishes OpenAPI 3.0 spec.' Anti-pattern: 'TBD' or 'not ready' (provides no actionable condition). This is independent of `plan.deferred_reason`, which documents deferral of the whole plan, not a single item."
-                  },
-                  "wont_do_reason": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Required when checklist_status is 'wont_do'. Explanation for why this specific item will never be built. Format: name the decision and, if applicable, what supersedes it. Example: 'Superseded by checklist item CHK_UNIFIED_ROUTING; wallet-specific routing folded into that flow.' Anti-pattern: 'not doing this' (provides no actionable context). Independent of `deferred_reason` — a 'wont_do' item is permanently cancelled, not paused."
-                  },
-                  "linked_test_expectation": {
-                    "description": "Test expectation(s) that validate this checklist item. Required when checklist_status is 'active'; optional when 'deferred' or 'wont_do' (the eventual test contract isn't always known before work starts, or will never be needed). Format: test function name or test description string. Examples: 'test_login_invalid_credentials_returns_401', 'POST /auth/login with unknown email → 401 INVALID_CREDENTIALS'. Can be a single string or array of strings. Anti-pattern: 'see tests' (not traceable to a specific test).",
-                    "oneOf": [
-                      {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "A single test expectation string — test function name or description."
-                      },
-                      {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "description": "A test expectation string — test function name or description (non-empty)."
-                        },
-                        "description": "An array of test expectation strings."
-                      }
-                    ]
-                  },
-                  "nfr_refs": {
-                    "$ref": "vc:core:collections#kebabIdArray",
-                    "description": "Kebab-case IDs of the NFRs from 07_nfrs.json that this checklist item verifies. Example: ['nfr-auth-p95-latency', 'nfr-auth-availability']. Anti-pattern: using the nfr display name as a string instead of the kebab-case nfr_id format."
-                  },
-                  "fixture_ref": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Fixture ID from 08_fixtures.json that validates this checklist item. Example: 'fix-auth-login-invalid-credentials'. Anti-pattern: referencing a test file path instead of a fixture ID."
-                  },
-                  "milestone_ref": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                    "description": "Milestone ID from step 14 (spec/14_roadmap.json) that this checklist item belongs to. Format: kebab-case matching a milestones[*].milestone_id value from the roadmap. Example: 'milestone-q1-core-auth'. When an impl_context covers a single milestone, all checklist items share the same milestone_ref. When it spans multiple milestones, set milestone_ref on each item to enable per-milestone progress tracking."
+                    "description": "Architecture layer this checklist item targets. Decision rules: 'api' = HTTP routes and request handling; 'service' = business/domain logic and rules; 'db' = database schema, migrations, storage operations; 'security' = auth/authz/crypto/input validation middleware; 'tests' = test files and fixtures; 'config' = environment config and feature flags; 'docs' = documentation files; 'model' = domain objects and type definitions; 'integration' = external system calls and adapters. Example: use 'api' for the route handler; use 'service' for the token validation logic called by that handler. Anti-pattern: using 'api' for business logic that happens to be triggered via an API call. The step 16 validator requires this field (E530 when it is absent) although the schema does not list it under required."
                   },
                   "implementation": {
                     "type": "object",
                     "description": "Atomic work definition for this specific requirement.",
                     "additionalProperties": false,
                     "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "pending",
-                          "in_progress",
-                          "verified",
-                          "deferred"
-                        ],
-                        "description": "Current implementation status. Transition rules: pending → in_progress (when first file is touched) → verified (all checklist items have evidence) → deferred (if paused mid-implementation with documented reason). Anti-pattern: jumping to 'verified' without populating action evidence."
-                      },
                       "files_touched": {
                         "type": "array",
                         "description": "Files modified or created to implement this checklist item.",
@@ -442,6 +289,25 @@
                           "type": "object",
                           "additionalProperties": false,
                           "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^a[0-9]{2,}$",
+                              "description": "Id of this action within its plan item: 'a' and at least two digits, numbered in order and never reused. Example: 'a01'. Execution records and 'specdev plan record <item>/<action>' name the action by it. Anti-pattern: a kebab-case or free-text id, or the id of another action of the item."
+                            },
+                            "at_deploy": {
+                              "type": "array",
+                              "minItems": 1,
+                              "uniqueItems": true,
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "staging",
+                                  "prod"
+                                ],
+                                "description": "A deploy stage at which this action runs."
+                              },
+                              "description": "Marks an action that can only run in a deploy job, and the stages it runs at: 'staging', 'prod' or both. Such an action does not hold up closing the milestone; its proof is a record written by the deploy job. Example: [\"staging\", \"prod\"]. Anti-pattern: naming a stage of the pipeline other than staging or prod, or an empty list (leave the field out)."
+                            },
                             "type": {
                               "type": "string",
                               "enum": [
@@ -464,10 +330,6 @@
                               "type": "string",
                               "description": "Shell command to execute for run_command actions. Must be executable as-is. Examples: 'pytest tests/unit/auth/ --tb=short', 'ruff check src/auth/', 'python -m mypy src/auth/'. Anti-pattern: 'run tests' (not executable as-is)."
                             },
-                            "evidence": {
-                              "$ref": "#/$defs/evidenceObject",
-                              "description": "Evidence proving this action was completed successfully."
-                            },
                             "command_ref": {
                               "description": "Canonical reference for the command in the registry.",
                               "allOf": [
@@ -485,6 +347,7 @@
                             }
                           },
                           "required": [
+                            "id",
                             "type",
                             "description"
                           ],
@@ -542,137 +405,56 @@
                       }
                     },
                     "required": [
-                      "status",
                       "actions"
-                    ],
-                    "allOf": [
-                      {
-                        "if": {
-                          "properties": {
-                            "status": {
-                              "const": "verified"
-                            }
-                          },
-                          "required": [
-                            "status"
-                          ]
-                        },
-                        "then": {
-                          "properties": {
-                            "actions": {
-                              "items": {
-                                "required": [
-                                  "evidence"
-                                ]
-                              }
-                            }
-                          }
-                        }
-                      }
                     ]
+                  },
+                  "lifecycle": {
+                    "$ref": "vc:core:graph#lifecycle",
+                    "description": "Lifecycle state of this plan item: active (default), deprecated or not_applicable."
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "vc:core:atoms#screamingSnakeId"
+                    },
+                    "uniqueItems": true,
+                    "description": "Former ids of this plan item; `specdev node rename` adds the old id here. Optional."
+                  },
+                  "replaces": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "vc:core:graph#nodeId"
+                    },
+                    "uniqueItems": true,
+                    "x-link": {
+                      "kinds": "*",
+                      "required": false
+                    },
+                    "description": "Ids of nodes that this plan item replaces. Optional."
                   }
                 },
                 "required": [
                   "id",
-                  "spec_ref",
-                  "description"
+                  "realises",
+                  "description",
+                  "implementation"
                 ],
-                "allOf": [
-                  {
-                    "if": {
-                      "not": {
-                        "properties": {
-                          "checklist_status": {
-                            "enum": ["deferred", "wont_do"]
-                          }
-                        },
-                        "required": [
-                          "checklist_status"
-                        ]
-                      }
-                    },
-                    "then": {
-                      "required": [
-                        "implementation",
-                        "linked_test_expectation"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "allOf": [
-                        {
-                          "not": {
-                            "properties": {
-                              "checklist_status": {
-                                "enum": ["deferred", "wont_do"]
-                              }
-                            },
-                            "required": [
-                              "checklist_status"
-                            ]
-                          }
-                        },
-                        {
-                          "properties": {
-                            "type": {
-                              "enum": [
-                                "behavior",
-                                "constraint",
-                                "validation",
-                                "perf",
-                                "security"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "type"
-                          ]
-                        }
-                      ]
-                    },
-                    "then": {
-                      "required": [
-                        "fixture_ref"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "properties": {
-                        "checklist_status": {
-                          "const": "deferred"
-                        }
-                      },
-                      "required": [
-                        "checklist_status"
-                      ]
-                    },
-                    "then": {
-                      "required": [
-                        "deferred_reason"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "properties": {
-                        "checklist_status": {
-                          "const": "wont_do"
-                        }
-                      },
-                      "required": [
-                        "checklist_status"
-                      ]
-                    },
-                    "then": {
-                      "required": [
-                        "wont_do_reason"
-                      ]
-                    }
-                  }
+                "description": "A plan item: one unit of implementation work, bound to the acceptance criteria it realises, with the actions that carry it out."
+              },
+              "x-node": {
+                "kind": "plan-item",
+                "role": "plan",
+                "contract": [
+                  "description",
+                  "type",
+                  "layer",
+                  "implementation"
                 ],
-                "description": "A single checklist item binding a spec requirement to its implementation, tests, and evidence."
+                "id": "id",
+                "step": "16a",
+                "files": [
+                  "impl_context/ms_*_plan.json"
+                ]
               }
             }
           },
@@ -681,104 +463,8 @@
           ]
         },
         "ambiguities": {
-          "type": "array",
-          "description": "Spec ambiguities discovered during planning that need resolution or tracking.",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this ambiguity."
-              },
-              "description": {
-                "type": "string",
-                "description": "Description of the ambiguity and its potential impact."
-              },
-              "source": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "code",
-                  "plan",
-                  "mixed",
-                  "review"
-                ],
-                "description": "Where the ambiguity originated. Decision rules: 'spec' = the spec document itself contains conflicting requirements; 'code' = the spec is clear but implementation exposed an edge case (e.g., a race condition not covered); 'mixed' = spec is unclear AND implementation exposed it further; 'plan' = the planning step introduced a gap; 'review' = discovered during code review. Example: use 'code' when you discover a race condition not covered by the spec."
-              },
-              "severity": {
-                "type": "string",
-                "enum": [
-                  "blocking",
-                  "non_blocking"
-                ],
-                "description": "Whether this planning-phase ambiguity blocks progress or can be worked around. Decision rules: 'blocking' = implementation cannot proceed without resolution (e.g., conflicting invariants, missing auth requirements); 'non_blocking' = implementation can proceed with a documented assumption (e.g., UI copy, logging format). Anti-pattern: marking everything 'blocking' — only use for genuine blockers that halt implementation. Uses a binary scale — distinct from emergent_ambiguities[].severity which uses low/medium/high/critical."
-              },
-              "impact": {
-                "type": "array",
-                "description": "List of areas or artifacts affected by this ambiguity.",
-                "items": {
-                  "type": "string",
-                  "description": "An area or artifact affected by this ambiguity."
-                }
-              },
-              "proposed_assumption": {
-                "type": "string",
-                "description": "Proposed assumption to resolve the ambiguity if no authoritative answer is available."
-              },
-              "mitigation": {
-                "type": "string",
-                "minLength": 10,
-                "description": "Mitigation strategy for non-blocking ambiguities (minimum 10 characters)."
-              },
-              "status": {
-                "$ref": "vc:core:atoms#ambiguityStatus",
-                "description": "Current resolution status of this ambiguity. Uses the shared ambiguityStatus atom (resolved/tracking/deferred/blocked) — matches emergent_ambiguities and the anchor's ambiguities."
-              },
-              "decision": {
-                "type": "string",
-                "description": "The decision made to resolve this ambiguity, if resolved."
-              },
-              "resolved": {
-                "description": "Resolution indicator -- a string explanation or boolean flag.",
-                "oneOf": [
-                  {
-                    "type": "string",
-                    "description": "String explanation of how the ambiguity was resolved."
-                  },
-                  {
-                    "type": "boolean",
-                    "description": "Boolean flag indicating whether the ambiguity has been resolved."
-                  }
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "description",
-              "severity"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "severity": {
-                      "const": "non_blocking"
-                    }
-                  },
-                  "required": [
-                    "severity"
-                  ]
-                },
-                "then": {
-                  "required": [
-                    "mitigation"
-                  ]
-                }
-              }
-            ],
-            "description": "A spec ambiguity discovered during planning with severity, impact, and resolution tracking."
-          }
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities discovered during planning. An item is deleted once its answer is applied."
         },
         "solution": {
           "type": "object",
@@ -817,7 +503,7 @@
           "properties": {
             "existing_structures": {
               "type": "array",
-              "description": "Code artifacts relevant to this implementation. Each entry identifies a specific function or class, not just a file. Object form example: {signature: 'def validate_jwt(token: str) -> Claims:', source_file: 'src/auth/jwt.py', line_range: 'L45-L62'}. String form for non-code artifacts. Anti-pattern: listing file names without identifying the specific function or class.",
+              "description": "Code artifacts relevant to this implementation. Each entry identifies a specific function or class, not just a file. Object form example: {signature: 'def validate_jwt(token: str) -> Claims:', source_file: 'src/auth/jwt.py'}. String form for non-code artifacts. Anti-pattern: listing file names without identifying the specific function or class.",
               "items": {
                 "oneOf": [
                   {
@@ -834,13 +520,8 @@
                       },
                       "source_file": {
                         "type": "string",
-                        "pattern": "^[^/].*\\.(py|ts|js|go|rs)$",
-                        "description": "Relative path to the source file containing this structure."
-                      },
-                      "line_range": {
-                        "type": "string",
-                        "pattern": "^L\\d+-L\\d+$",
-                        "description": "Line range where the structure is defined (e.g., 'L10-L25')."
+                        "pattern": "^[^/].*$",
+                        "description": "Repo-relative path of the file that holds this structure (any file type)."
                       }
                     },
                     "required": [
@@ -948,7 +629,8 @@
                   }
                 ],
                 "description": "A test command. Use string form for a single shell command; use object form when structured metadata (timeout, env vars, expected exit code) is needed. Example string: 'pytest tests/unit/auth/ --tb=short -q'. Example object: {command: 'pytest tests/integration/auth/', timeout_seconds: 120, expected_exit_code: 0}. Anti-pattern: 'run tests' (string form must be executable as-is)."
-              }
+              },
+              "minItems": 1
             },
             "nfr_measurement_methods": {
               "type": "object",
@@ -1070,7 +752,7 @@
           ]
         },
         "security": {
-          "description": "Security plan: either not applicable with a reason, or planned with fixtures and spec mutations.",
+          "description": "Security plan: either not applicable with a reason, or planned.",
           "oneOf": [
             {
               "type": "object",
@@ -1098,44 +780,12 @@
                 "status": {
                   "const": "planned",
                   "description": "Whether a security review is required for this change. Decision rule: use 'planned' when the implementation touches authentication/authorization logic, input validation for user-supplied data, cryptographic operations, secrets handling, or any public-facing endpoint. Use 'not_applicable' only for test-only changes, documentation-only updates, or purely internal refactors that do not alter security surfaces. When in doubt, use 'planned' — it is safer to include a security review than to skip one. Anti-pattern: always writing 'not_applicable' for every implementation task (defeats the security review gate)."
-                },
-                "new_fixtures": {
-                  "$ref": "vc:core:collections#kebabIdArray",
-                  "description": "IDs of new security fixtures to create."
-                },
-                "spec_mutations": {
-                  "type": "array",
-                  "description": "Planned mutations to security-related spec artifacts.",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "$ref": "vc:core:collections#traceRef",
-                        "description": "Trace reference to the spec artifact being mutated."
-                      },
-                      "change": {
-                        "type": "string",
-                        "description": "Description of the change to make."
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "Reason for the security-related spec mutation."
-                      }
-                    },
-                    "required": [
-                      "ref",
-                      "change",
-                      "reason"
-                    ],
-                    "description": "A planned security-related mutation to a spec artifact."
-                  }
                 }
               },
               "required": [
                 "status"
               ],
-              "description": "Security status when changes are planned, with fixtures and spec mutations."
+              "description": "Security status when changes are planned."
             }
           ]
         },
@@ -1327,39 +977,6 @@
             }
           ]
         },
-        "coverage_status": {
-          "type": "object",
-          "description": "Summary counts of checklist item states.",
-          "additionalProperties": false,
-          "properties": {
-            "total": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Total number of checklist items."
-            },
-            "verified": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of checklist items that have been verified."
-            },
-            "deferred": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of checklist items that have been deferred."
-            },
-            "pending": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of checklist items still pending."
-            }
-          },
-          "required": [
-            "total",
-            "verified",
-            "deferred",
-            "pending"
-          ]
-        },
         "scope_validation": {
           "type": "object",
           "description": "Validation that implementation stayed within declared scope.",
@@ -1413,89 +1030,13 @@
           ]
         }
       },
-      "required": [
-        "status"
-      ],
+      "required": [],
       "allOf": [
         {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "const": "deferred"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "deferred_reason"
-            ],
-            "properties": {
-              "summary": {
-                "properties": {
-                  "target_file_patterns": {
-                    "maxItems": 0
-                  }
-                }
-              },
-              "review_requirements": {
-                "properties": {
-                  "test_commands": {
-                    "maxItems": 0
-                  }
-                }
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "summary": {
-                "properties": {
-                  "target_file_patterns": {
-                    "minItems": 1
-                  }
-                }
-              },
-              "review_requirements": {
-                "properties": {
-                  "test_commands": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": {
-                "const": "active"
-              }
-            },
-            "required": [
-              "status"
-            ]
-          },
-          "then": {
-            "required": [
-              "review_requirements"
-            ],
-            "properties": {
-              "review_requirements": {
-                "required": [
-                  "test_commands"
-                ],
-                "properties": {
-                  "test_commands": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          }
+          "required": [
+            "review_requirements"
+          ],
+          "description": "Every plan names the commands that prove it: review_requirements is required."
         }
       ]
     },
@@ -1512,155 +1053,116 @@
             "description": "A file path modified or created during execution."
           }
         },
-        "execution_results": {
+        "records": {
           "type": "array",
-          "description": "Results from running test and verification commands.",
+          "maxItems": 1000,
+          "description": "Execution records: one entry for each time an action of a plan item was carried out, failed or blocked. Written by 'specdev plan record', never by hand. Whether an item counts as executed is computed from these records, not stored.",
+          "x-node": {
+            "kind": "execution-record",
+            "role": "record",
+            "contract": [
+              "action",
+              "outcome",
+              "note",
+              "realises_hash",
+              "recorded_at",
+              "git_author"
+            ],
+            "id": "record_id",
+            "step": "16b",
+            "files": [
+              "impl_context/ms_*_plan.json"
+            ]
+          },
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "properties": {
-              "status": {
-                "$ref": "#/$defs/executionStatus",
-                "description": "Outcome status of this execution result."
-              },
-              "outcome_description": {
-                "type": "string",
-                "description": "Human-readable description of the execution outcome."
-              },
-              "reasoning": {
-                "type": "string",
-                "description": "Explanation of why this outcome occurred."
-              },
-              "command": {
-                "type": "string",
-                "description": "The command that was executed."
-              },
-              "evidence": {
-                "type": "string",
-                "minLength": 20,
-                "description": "Concrete evidence supporting this execution result. Should contain raw command output, test runner output, or observable system behavior — not assertions. Include file paths, test counts (e.g., '5 passed'), commit hashes, or exit codes. Avoid vague claims like 'it worked'; capture actual output. Minimum 20 characters."
-              },
-              "evidence_ref": {
-                "type": "string",
-                "description": "External reference or URI pointing to the evidence source."
-              },
-              "evidence_binding": {
-                "type": "object",
-                "description": "Cryptographic binding proving evidence authenticity.",
-                "additionalProperties": false,
-                "properties": {
-                  "timestamp": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "ISO 8601 timestamp of when the evidence was captured."
-                  },
-                  "sha256": {
-                    "type": "string",
-                    "pattern": "^[a-f0-9]{64}$",
-                    "description": "SHA-256 hash of the evidence content."
-                  },
-                  "exit_code": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255,
-                    "description": "Exit code returned by the command."
-                  },
-                  "command": {
-                    "type": "string",
-                    "description": "The command that produced this evidence."
-                  },
-                  "command_ref": {
-                    "description": "Canonical reference for the command in the registry.",
-                    "allOf": [
-                      {
-                        "$ref": "vc:core:collections#canonicalRef"
-                      },
-                      {
-                        "properties": {
-                          "kind": {
-                            "const": "command"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "timestamp",
-                  "sha256",
-                  "exit_code"
-                ]
-              },
-              "command_ref": {
-                "description": "Canonical reference for the command in the registry.",
-                "allOf": [
-                  {
-                    "$ref": "vc:core:collections#canonicalRef"
-                  },
-                  {
-                    "properties": {
-                      "kind": {
-                        "const": "command"
-                      }
-                    }
-                  }
-                ]
-              }
-            },
             "required": [
-              "status",
-              "outcome_description",
-              "reasoning",
-              "command",
-              "evidence"
+              "record_id",
+              "about",
+              "action",
+              "outcome",
+              "recorded_at",
+              "git_author"
             ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "status": {
-                      "const": "passed"
-                    }
-                  },
-                  "required": [
-                    "status"
+            "description": "One execution record: the outcome of one action of one plan item, with the git author who recorded it.",
+            "properties": {
+              "record_id": {
+                "type": "string",
+                "pattern": "^rec-[0-9]{4,}$",
+                "description": "Id of this record: 'rec-' and at least four digits, minted by the tool. Example: 'rec-0001'."
+              },
+              "about": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "plan-item"
+                  ],
+                  "required": true,
+                  "same_step_kinds": [
+                    "plan-item"
                   ]
                 },
-                "then": {
-                  "required": [
-                    "evidence_ref",
-                    "evidence_binding"
-                  ],
-                  "properties": {
-                    "evidence": {
-                      "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
-                    }
+                "description": "The one plan item the action belongs to, as a one-item array. Example: [\"PWRESET_CONFIRM_EXPIRED_01\"]."
+              },
+              "action": {
+                "type": "string",
+                "pattern": "^a[0-9]{2,}$",
+                "description": "Id of the action of that item this record is about. Example: 'a02'."
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "failed",
+                  "blocked"
+                ],
+                "description": "What happened: 'done' (carried out), 'failed' (tried and did not work) or 'blocked' (could not be tried; the note says why)."
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 200,
+                "description": "Optional short note, at most 200 characters: what was done, or why it failed or is blocked."
+              },
+              "realises_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "description": "Hash of the criteria the item realised when the record was written, 'sha256:' and 64 lower-case hex digits; null when there was no trace lock. A later change to those criteria makes the record stale; the staleness is computed, never stored."
+              },
+              "recorded_at": {
+                "type": "string",
+                "minLength": 1,
+                "description": "UTC time the tool wrote the record, ISO 8601. Informational: nothing compares it."
+              },
+              "git_author": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "additionalProperties": false,
+                "description": "The git author of the person or agent that ran the command, as git reports it.",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Name of the git author."
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Email of the git author."
                   }
                 }
-              }
-            ],
-            "description": "Result from running a single test or verification command during execution."
-          }
-        },
-        "critical_evidence": {
-          "type": "object",
-          "description": "Summary of critical evidence linking checklist items to test outcomes.",
-          "additionalProperties": false,
-          "properties": {
-            "satisfied_checklist_ids": {
-              "type": "array",
-              "description": "Checklist item IDs that have been satisfied with evidence.",
-              "items": {
-                "type": "string",
-                "description": "A checklist item ID that has been satisfied with evidence."
-              }
-            },
-            "passed_test_commands": {
-              "type": "array",
-              "description": "Test commands that passed during execution.",
-              "items": {
-                "type": "string",
-                "description": "A test command that passed during execution."
               }
             }
           }
@@ -1689,35 +1191,8 @@
           }
         },
         "emergent_ambiguities": {
-          "type": "array",
-          "description": "Ambiguities discovered during execution that were not anticipated in planning. Reuses the shared `crossCycleAmbiguityItem` shape (same as the anchor's ambiguities) — distinct from planning-phase ambiguities which carry richer 16a-only fields (source/proposed_assumption/mitigation/decision/resolved) and a blocking/non_blocking binary severity.",
-          "items": {
-            "$ref": "vc:core:collections#crossCycleAmbiguityItem",
-            "description": "An ambiguity discovered during execution that was not anticipated in planning."
-          }
-        },
-        "final_status": {
-          "type": "object",
-          "description": "Final execution status summarizing test results and CI outcome.",
-          "additionalProperties": false,
-          "properties": {
-            "test_results": {
-              "type": "array",
-              "description": "Summary of test results from execution.",
-              "items": {
-                "type": "object",
-                "description": "A test result summary object. Structure is intentionally flexible to accommodate different test runners. Should include at minimum a test name/ID and pass/fail status."
-              }
-            },
-            "ci_status": {
-              "type": "string",
-              "enum": [
-                "green",
-                "red"
-              ],
-              "description": "Overall CI status: green (all passing) or red (failures present)."
-            }
-          }
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities discovered during execution that planning did not anticipate. An item is deleted once its answer is applied."
         }
       }
     },
@@ -1729,6 +1204,7 @@
         "findings": {
           "type": "array",
           "description": "Issues found during review with severity and remediation plans.",
+          "maxItems": 50,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -1748,7 +1224,7 @@
                   "tests",
                   "docs"
                 ],
-                "description": "Category of the finding: bug, gap, scope creep, style, design, tests, or docs."
+                "description": "Category of the finding: bug, gap, scope_creep, style, design, tests, or docs."
               },
               "severity": {
                 "type": "string",
@@ -1758,7 +1234,7 @@
                   "minor",
                   "nit"
                 ],
-                "description": "Severity of the finding from blocking (must fix) to nit (optional). Uses a review-specific four-tier scale (blocking/major/minor/nit) — distinct from severityLevel (low/medium/high/critical) and ambiguity severity (blocking/non_blocking) used elsewhere in this schema."
+                "description": "Severity of the finding from blocking (must fix) to nit (optional). Uses a review-specific four-tier scale (blocking/major/minor/nit) — distinct from severityLevel (low/medium/high/critical) used elsewhere in this schema."
               },
               "spec_ref": {
                 "$ref": "#/$defs/specRef",
@@ -1766,7 +1242,8 @@
               },
               "description": {
                 "type": "string",
-                "description": "A finding description must include: (1) what was observed (file:line reference where applicable), (2) why it matters (the impact), (3) which spec requirement it violates (checklist item ID or FR/NFR reference). Minimum 40 characters. Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
+                "maxLength": 600,
+                "description": "The text of one finding, at most 600 characters; `specdev review record` writes it from the `message` of the findings file. Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
               },
               "related_checklist_ids": {
                 "type": "array",
@@ -1875,7 +1352,7 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5,
-              "description": "Rating of how completely the spec requirements were implemented (integer 0–5). Rubric: 0 = no spec requirements addressed; 1 = fewer than 25% of FRs implemented or all implementations are stubs; 2 = 25–50% of FRs implemented with some evidence; 3 = 50–75% of FRs implemented with test coverage; 4 = more than 75% of FRs implemented with minor documented gaps; 5 = all FRs fully implemented with evidence binding to fixtures and acceptance criteria. Anti-pattern: assigning 5 when any FR lacks test coverage."
+              "description": "Rating of how completely the spec requirements were implemented (integer 0–5). Rubric: 0 = no spec requirements addressed; 1 = fewer than 25% of FRs implemented or all implementations are stubs; 2 = 25–50% of FRs implemented with some evidence; 3 = 50–75% of FRs implemented with test coverage; 4 = more than 75% of FRs implemented with minor documented gaps; 5 = all FRs fully implemented with evidence tied to fixtures and acceptance criteria. Anti-pattern: assigning 5 when any FR lacks test coverage."
             },
             "code_quality": {
               "type": "integer",
@@ -1899,7 +1376,7 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5,
-              "description": "Rating of how well canonical references and traceability metadata are used (integer 0–5). Rubric: 0 = no canonical_refs_used, no trace links; 1 = canonical_refs_used present but empty when refs exist, trace links missing; 2 = some canonical refs populated but inconsistent (missing kinds or labels); 3 = all *_ref fields populated with valid cn: IDs, canonical_refs_used aggregated; 4 = all refs populated, canonical_refs_used correctly deduplicated, canonical_proposals added for new terms; 5 = all refs populated, proposals complete, no fabricated cn: IDs, all trace links resolve. Anti-pattern: assigning 5 without running canonical-integrity lint."
+              "description": "Rating of how well canonical references are used (integer 0–5). Rubric: 0 = no canonical_refs_used; 1 = canonical_refs_used present but empty when refs exist; 2 = some canonical refs populated but inconsistent (missing kinds or labels); 3 = all *_ref fields populated with valid cn: IDs, canonical_refs_used aggregated; 4 = all refs populated, canonical_refs_used correctly deduplicated, canonical_proposals added for new terms; 5 = all refs populated, proposals complete, no fabricated cn: IDs. Anti-pattern: assigning 5 without running canonical-integrity lint."
             }
           },
           "required": [
@@ -1922,67 +1399,8 @@
         },
         "next_actions": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Specify the concrete action, the responsible party (if known), and the prerequisite condition. Next actions must be executable without further clarification. Examples: 'Fix 3 BLOCKING findings (auth null check, missing retry logic, uncovered error states) before resubmitting for APPROVED verdict.'; 'Deploy to staging via CI pipeline after this APPROVED verdict — coordinate with @platform-team on deployment slot.'; 'Schedule security review with @security-team — required before prod deployment per governance rule gr-security-review.' Anti-pattern: 'Continue with implementation' (not a specific action); 'Review the findings' (circular — this is the current step)."
-        },
-        "fixture_status": {
-          "type": "object",
-          "description": "Status of fixture test results and CI for implemented interfaces.",
-          "additionalProperties": false,
-          "properties": {
-            "implemented_interfaces": {
-              "type": "array",
-              "description": "Trace IDs of interfaces that have been implemented.",
-              "items": {
-                "$ref": "vc:core:collections#traceId",
-                "description": "Trace ID of an implemented interface."
-              }
-            },
-            "test_results": {
-              "type": "array",
-              "description": "Per-fixture test outcomes.",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "fixture_ref": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Fixture ID being tested."
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pass",
-                      "fail",
-                      "skip"
-                    ],
-                    "description": "Test result: pass, fail, or skip."
-                  },
-                  "notes": {
-                    "type": "string",
-                    "description": "Additional notes about this test result."
-                  }
-                },
-                "required": [
-                  "fixture_ref",
-                  "status"
-                ],
-                "description": "Per-fixture test result with pass/fail/skip status."
-              }
-            },
-            "ci_status": {
-              "type": "string",
-              "enum": [
-                "green",
-                "red"
-              ],
-              "description": "CI status for fixture tests: green (all passing) or red (failures)."
-            }
-          },
-          "required": [
-            "implemented_interfaces",
-            "test_results",
-            "ci_status"
-          ]
         },
         "security_status": {
           "type": "string",
@@ -1991,6 +1409,11 @@
             "red"
           ],
           "description": "Security review status: green (no issues) or red (issues present)."
+        },
+        "recorded_at": {
+          "type": "string",
+          "minLength": 1,
+          "description": "UTC time the tool wrote this review block, ISO 8601. Written by 'specdev review record'; informational, nothing compares it."
         },
         "delivery_status": {
           "type": "object",
@@ -2046,48 +1469,8 @@
         },
         "semantic_review": {
           "type": "object",
-          "description": "Semantic review checking FR coverage, hallucinated features, and scope delta. A quality semantic review: (1) traces every FR from the spec to at least one checklist item and evidence summary; (2) explicitly lists any features implemented without spec backing under hallucinated_features; (3) provides a scope_delta narrative if unplanned work occurred. Avoid marking FRs 'satisfied' without linking concrete evidence. The review should be machine-verifiable: reference checklist IDs, not vague assertions.",
+          "description": "Semantic review of the finished work: hallucinated features (implemented without spec backing) and a scope delta narrative if unplanned work occurred. A quality semantic review lists every feature implemented without spec backing under hallucinated_features and explains unplanned work in scope_delta. Reference checklist IDs, not vague assertions.",
           "properties": {
-            "fr_coverage": {
-              "type": "array",
-              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. Should cover every FR referenced in the plan's spec_alignment. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence binding.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "fr_id": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                    "description": "Functional requirement ID being assessed."
-                  },
-                  "satisfied": {
-                    "type": "boolean",
-                    "description": "Whether this FR has been satisfied by the implementation."
-                  },
-                  "evidence_summary": {
-                    "type": "string",
-                    "minLength": 20,
-                    "description": "Concrete evidence summary showing how this FR was satisfied. Should reference file paths, test output, commit hashes, or observable system behavior. Avoid assertions without supporting data (e.g., prefer 'IMPL_CHECK_001 verified at tests/test_auth.py:L45 — 3 passing tests' over 'implemented correctly'). Minimum 20 characters."
-                  },
-                  "checklist_ids": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "vc:core:atoms#screamingSnakeId"
-                    },
-                    "uniqueItems": true,
-                    "description": "IDs of checklist items verified for this FR. Each must be a SCREAMING_SNAKE_CASE identifier matching a checklist item defined in plan.spec_alignment.checklist."
-                  }
-                },
-                "required": [
-                  "fr_id",
-                  "satisfied",
-                  "evidence_summary",
-                  "checklist_ids"
-                ],
-                "additionalProperties": false,
-                "description": "Per-FR coverage assessment with satisfaction status and evidence summary."
-              },
-              "minItems": 1
-            },
             "hallucinated_features": {
               "type": "array",
               "description": "Features implemented that were not specified in the spec (scope creep detection).",
@@ -2103,61 +1486,11 @@
             }
           },
           "required": [
-            "fr_coverage",
             "hallucinated_features"
           ],
           "additionalProperties": false
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "verdict"
-            ],
-            "properties": {
-              "verdict": {
-                "const": "verified"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "fixture_status"
-            ],
-            "properties": {
-              "fixture_status": {
-                "properties": {
-                  "ci_status": {
-                    "const": "green",
-                    "description": "CI status must be green when verdict is verified."
-                  }
-                },
-                "required": [
-                  "ci_status"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "verdict"
-            ],
-            "properties": {
-              "verdict": {
-                "const": "verified"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "semantic_review"
-            ]
-          }
-        }
-      ]
+      }
     },
     "policy_ref": {
       "description": "Canonical reference to the governance policy applicable to this implementation context. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Validated by canonical-integrity lint.",
@@ -2188,10 +1521,15 @@
           }
         }
       ]
+    },
+    "milestone": {
+      "$ref": "vc:core:atoms#kebabId",
+      "description": "Id of the Step 14 roadmap milestone this plan file is for. A file-level key: the plan names its milestone here, and the anchor row about that milestone is found through it. Example: 'ms-account-recovery'. Anti-pattern: naming a task or a spec requirement, or a milestone the roadmap does not define."
     }
   },
   "required": [
-    "plan"
+    "plan",
+    "milestone"
   ],
   "allOf": [
     {

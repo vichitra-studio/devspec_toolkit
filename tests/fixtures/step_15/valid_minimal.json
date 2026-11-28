@@ -11,11 +11,5 @@
     "spec-validate"
   ],
   "build_status": "pending",
-  "trace": [
-    {
-      "type": "implements",
-      "id": "trace-target-id"
-    }
-  ],
   "canonical_refs_used": []
 }

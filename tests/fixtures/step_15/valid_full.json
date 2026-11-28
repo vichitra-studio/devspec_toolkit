@@ -13,14 +13,21 @@
   },
   "interface_map": [
     {
-      "interface_ref": "api-get-users",
-      "path": "/users",
-      "method": "GET"
+      "row_id": "scaffold-get-users",
+      "realises": ["api-get-users"],
+      "path": "src/api/users.py"
     },
     {
-      "interface_ref": "api-create-user",
-      "path": "/users",
-      "method": "POST"
+      "row_id": "scaffold-create-user",
+      "realises": ["api-create-user"],
+      "path": "src/api/users_create.py",
+      "lifecycle": "active",
+      "aliases": ["scaffold-new-user"]
+    },
+    {
+      "row_id": "scaffold-users-tests",
+      "realises": ["api-get-users", "api-create-user"],
+      "path": "tests/integration/test_users.py"
     }
   ],
   "validators": [
@@ -28,17 +35,5 @@
     "lint"
   ],
   "build_status": "green",
-  "trace": [
-    {
-      "type": "implements",
-      "id": "req-001"
-    }
-  ],
-  "links": [
-    {
-      "rel": "documentation",
-      "href": "https://example.com/docs"
-    }
-  ],
   "canonical_refs_used": []
 }

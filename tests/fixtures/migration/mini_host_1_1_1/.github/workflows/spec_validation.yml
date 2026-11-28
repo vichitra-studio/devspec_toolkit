@@ -1,0 +1,14 @@
+name: spec validation
+on:
+  pull_request:
+    paths: ["spec/**"]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m venv devspec_env && ./devspec_env/bin/pip install ./devspec_toolkit/tools
+      - run: ./devspec_env/bin/specdev validate-all spec --repo-root ./devspec_toolkit
+      - run: ./devspec_env/bin/specdev matrix spec --repo-root ./devspec_toolkit
+      - run: ./devspec_env/bin/specdev governance-check spec --repo-root ./devspec_toolkit --message "${{ github.event.pull_request.title }}"
+

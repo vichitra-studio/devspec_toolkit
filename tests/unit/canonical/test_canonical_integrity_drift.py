@@ -133,7 +133,9 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
-            self.assertTrue(any("canonical_refs_used_missing" in e.render() for e in errs))
+            drift = [e.render() for e in errs if "canonical_refs_used_missing" in e.render()]
+            self.assertTrue(drift)
+            self.assertTrue(all("canonical-autofix spec --write" in message for message in drift))
 
     def test_extra_canonical_refs_used_entry_is_detected(self):
         with tempfile.TemporaryDirectory() as td:
@@ -172,7 +174,9 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
-            self.assertTrue(any("canonical_refs_used_extra" in e.render() for e in errs))
+            drift = [e.render() for e in errs if "canonical_refs_used_extra" in e.render()]
+            self.assertTrue(drift)
+            self.assertTrue(all("canonical-autofix spec --write" in message for message in drift))
 
     def test_unresolved_semantic_without_proposal_is_detected(self):
         with tempfile.TemporaryDirectory() as td:
@@ -315,6 +319,45 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertFalse(any("field=nfrs[0].category" in e.render() for e in errs))
+
+
+class WildcardSourceFieldTests(unittest.TestCase):
+    """A proposal's ``source_field`` suppresses E210 in the form ``terms[*].term`` and in the form ``terms[0].term``."""
+
+    def _unresolved_semantic(self, source_field: str, kind: str = "term", label: str = "json web token") -> bool:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir()
+            (root / "spec").mkdir()
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}), encoding="utf-8"
+            )
+            proposal = {
+                "temp_id": "jwt-term", "kind": kind, "proposed_label": label,
+                "definition": "JWT term proposal", "source_field": source_field,
+            }
+            (root / "spec" / "03_glossary.json").write_text(
+                json.dumps({
+                    "terms": [{"term": "json web token"}],
+                    "canonical_proposals": [proposal],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
+            return any("unresolved_canonical_semantic" in e.render() for e in errs)
+
+    def test_wildcard_source_field_suppresses_e210(self):
+        self.assertFalse(self._unresolved_semantic("terms[*].term"))
+
+    def test_indexed_source_field_still_suppresses_e210(self):
+        self.assertFalse(self._unresolved_semantic("terms[0].term"))
+
+    def test_wildcard_source_field_of_another_label_does_not_suppress(self):
+        self.assertTrue(self._unresolved_semantic("terms[*].term", label="another label"))
+
+    def test_wildcard_source_field_of_another_kind_does_not_suppress(self):
+        self.assertTrue(self._unresolved_semantic("terms[*].term", kind="metric"))
 
 
 if __name__ == "__main__":

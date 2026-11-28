@@ -1,9 +1,9 @@
-"""Two-pass structural + semantic review gate for freshly-emitted spec artifacts.
+"""Semantic review gate for freshly-emitted spec artifacts.
 
-Implements A5 from the toolkit optimisation plan:
-  - Pass 1: Structural review (zero LLM tokens) — ID coverage, reverse trace.
-  - Pass 2: Semantic pair generation (heuristics, no LLM) — faithfulness, acceptance_gap,
-            quantifier_weakening, seed_distillation, scope_completeness.
+Implements A5 from the toolkit optimisation plan: generates semantic review pairs by heuristics, with no LLM
+(faithfulness, acceptance_gap, quantifier_weakening, seed_distillation, scope_completeness), and gives the verdict
+``PASS`` (no pair) or ``NEEDS_SEMANTIC_REVIEW`` (at least one pair).  Coverage of upstream ids is not checked here: it is
+graph-based, see ``trace/`` and ``graph_checks/``.
 
 Public API:
     review_artifact(artifact_path, step_id, spec_dir, repo_root, entry_id=None) -> ReviewResult
@@ -16,7 +16,10 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from ..core.registry import SchemaRegistry
+from ..core.host_schemas import schema_place_of
+from ..core.registry import get_shared_registry
+from ..core.step_paths import is_extension_file
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
@@ -38,8 +41,7 @@ _STOPWORDS: frozenset[str] = frozenset([
 # checklists).  Running it on invariants, NFRs, etc. produces noise because
 # those artifacts use constraint language rather than Given/When/Then vocabulary.
 #
-# Step 13a produces a completeness-assessment (dimension counts), not a
-# checklist — it is NOT in this set.  Step 16 is the Trinity Anchor
+# Step 16 is the Trinity Anchor
 # (vc:16-anchor) — a scope/ownership/drift declaration with no checklist — so
 # it is NOT in this set either. Steps 16a/16b/16c share the vc:16-impl-context
 # schema and carry the implementation checklist, so they ARE in this set.
@@ -117,76 +119,16 @@ class ReviewPair:
 
 
 @dataclass
-class StructuralReview:
-    """Results from Pass 1 structural analysis."""
-    upstream_coverage: dict  # {covered: [id...], dropped: [id...]}
-    reverse_trace: dict      # {unjustified: [id...], scope_creep: [id...]}
-
-
-@dataclass
 class ReviewResult:
-    """Aggregated result of both review passes."""
-    structural: StructuralReview
+    """The result of the review: the semantic pairs, the verdict and the estimated token cost."""
     semantic_pairs: list          # list[ReviewPair]
-    verdict: str                  # PASS | NEEDS_SEMANTIC_REVIEW | FAIL
-    token_cost: dict              # {structural: 0, semantic_total: N}
+    verdict: str                  # PASS | NEEDS_SEMANTIC_REVIEW
+    token_cost: dict              # {semantic_total: N}
 
 
 # ---------------------------------------------------------------------------
 # Helpers — JSON traversal
 # ---------------------------------------------------------------------------
-
-def _collect_id_values(obj: Any, suffix: str = "_id") -> list[str]:
-    """Recursively collect all string values whose key ends with `suffix`."""
-    results: list[str] = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k.endswith(suffix) and isinstance(v, str):
-                results.append(v)
-            results.extend(_collect_id_values(v, suffix))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_collect_id_values(item, suffix))
-    return results
-
-
-def _collect_trace_ids(obj: Any) -> list[str]:
-    """Recursively collect all IDs found inside 'trace' arrays.
-
-    Handles both:
-      - trace: [{id: "...", ...}, ...]          (list of objects with an 'id' key)
-      - trace: ["fr-foo", "api-bar"]             (list of plain strings)
-    """
-    results: list[str] = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k == "trace" and isinstance(v, list):
-                for item in v:
-                    if isinstance(item, str):
-                        results.append(item)
-                    elif isinstance(item, dict) and "id" in item:
-                        results.append(item["id"])
-            else:
-                results.extend(_collect_trace_ids(v))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_collect_trace_ids(item))
-    return results
-
-
-def _find_items_by_key(obj: Any, key: str) -> list[Any]:
-    """Recursively collect all values whose dict key equals `key`."""
-    results: list[Any] = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k == key:
-                results.append(v)
-            results.extend(_find_items_by_key(v, key))
-    elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_find_items_by_key(item, key))
-    return results
-
 
 def _find_dicts_with_key(obj: Any, key: str, path: str = "") -> list[tuple[str, dict]]:
     """Recursively find all dicts that contain `key`, returning (path, dict) pairs."""
@@ -265,71 +207,7 @@ def _load_upstream_specs(step_id: str, spec_dir: str, repo_root: str) -> list[tu
 
 
 # ---------------------------------------------------------------------------
-# Pass 1 — Structural review
-# ---------------------------------------------------------------------------
-
-def _run_structural_pass(
-    artifact: dict,
-    artifact_path: str,
-    upstream_specs: list[tuple[str, dict]],
-    step_id: str = "",
-) -> StructuralReview:
-    """Execute Pass 1: automated structural analysis with zero LLM token cost."""
-    _ = artifact_path  # currently unused
-
-    # --- Collect upstream entity IDs ---
-    all_upstream_ids: set[str] = set()
-    for _, spec_data in upstream_specs:
-        ids = _collect_id_values(spec_data, suffix="_id")
-        all_upstream_ids.update(ids)
-
-    # For non-checklist steps, acceptance criteria (ac-*) are child entities of
-    # FRs and are covered at FR granularity via trace arrays — not individually.
-    # Including them in the coverage denominator causes a false FAIL because
-    # ~80% of upstream IDs would always be "dropped".
-    if step_id not in _CHECKLIST_STEPS:
-        all_upstream_ids = {uid for uid in all_upstream_ids if not uid.startswith("ac-")}
-
-    # --- Collect artifact trace IDs ---
-    artifact_trace_ids: set[str] = set(_collect_trace_ids(artifact))
-
-    # Also collect IDs referenced in scope.apis and scope.components fields.
-    # Invariant-style artifacts (step 06) express API and component coverage via
-    # the scope object rather than trace arrays; both are valid traceability refs.
-    for scope_dict in _find_items_by_key(artifact, "scope"):
-        if isinstance(scope_dict, dict):
-            for scope_key in ("apis", "components"):
-                scope_val = scope_dict.get(scope_key, [])
-                if not isinstance(scope_val, list):
-                    continue  # guard: a string "api-foo" would iterate as chars
-                for item in scope_val:
-                    if isinstance(item, str):
-                        artifact_trace_ids.add(item)
-
-    # --- ID coverage ---
-    covered = sorted(all_upstream_ids & artifact_trace_ids)
-    dropped = sorted(all_upstream_ids - artifact_trace_ids)
-
-    upstream_coverage = {
-        "covered": covered,
-        "dropped": dropped,
-    }
-
-    # --- Reverse trace / scope creep ---
-    unjustified = sorted(artifact_trace_ids - all_upstream_ids)
-    reverse_trace = {
-        "unjustified": unjustified,
-        "scope_creep": list(unjustified),
-    }
-
-    return StructuralReview(
-        upstream_coverage=upstream_coverage,
-        reverse_trace=reverse_trace,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Pass 2 — Semantic pair generation (heuristics, no LLM)
+# Semantic pair generation (heuristics, no LLM)
 # ---------------------------------------------------------------------------
 
 def _tokenize(text: str) -> set[str]:
@@ -593,7 +471,7 @@ def _check_seed_distillation(
 
     # The manifest always lives inside spec_dir (spec_dir/common/seed_manifest.json).
     # project_root is used only to resolve the seeds[].path entries within it.
-    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    manifest_path = os.path.join(spec_dir_abs, SEED_MANIFEST_FILE)
     try:
         with open(manifest_path, "r", encoding="utf-8") as _f:
             manifest: dict = json.load(_f)
@@ -666,13 +544,19 @@ def _check_scope_completeness(
     artifact_path: str,
     step_id: str,
     repo_root: str,
+    spec_dir: str | None = None,
 ) -> list[ReviewPair]:
-    """Check 5: are expected output fields (from schema) present in the artifact?"""
+    """Check 5: are expected output fields (from schema) present in the artifact?
+
+    With *spec_dir* the extension schemas of that spec folder are known, and a data file of its extensions folder is
+    compared with its own schema (the schema of its step, 13, is the manifest's).
+    """
     pairs: list[ReviewPair] = []
 
     try:
-        registry = SchemaRegistry(repo_root)
-        schema_uri = _u_find_step_schema_uri(step_id, registry)
+        registry = get_shared_registry(repo_root, spec_dir)
+        own_schema = spec_dir is not None and is_extension_file(artifact_path, spec_dir)
+        schema_uri = None if own_schema else _u_find_step_schema_uri(step_id, registry)
         if not schema_uri:
             # Fallback: try the artifact's own $schema field
             schema_uri = artifact.get("$schema")
@@ -706,7 +590,7 @@ def _check_scope_completeness(
                 description=f"Required field '{key}' (from step schema) missing from artifact",
                 source=SourceRef(
                     id=schema_uri,
-                    file=f"schema/{step_id}_*.schema.json",
+                    file=schema_place_of(schema_uri) or f"schema/{step_id}_*.schema.json",
                     path=f".properties.{key}",
                     text=f"Required schema field: {key}",
                 ),
@@ -726,26 +610,9 @@ def _check_scope_completeness(
 # Verdict computation
 # ---------------------------------------------------------------------------
 
-def _compute_verdict(structural: StructuralReview, semantic_pairs: list) -> str:
-    """Determine overall verdict from structural results and semantic pairs.
-
-    - FAIL if dropped fraction > 0.20 (more than 20% of upstream IDs dropped)
-    - NEEDS_SEMANTIC_REVIEW if any semantic pairs were generated
-    - PASS otherwise
-    """
-    dropped = structural.upstream_coverage.get("dropped", [])
-    covered = structural.upstream_coverage.get("covered", [])
-    total_upstream = len(dropped) + len(covered)
-
-    if total_upstream > 0 and len(dropped) > 0:
-        dropped_fraction = len(dropped) / total_upstream
-        if dropped_fraction > 0.20:
-            return "FAIL"
-
-    if semantic_pairs:
-        return "NEEDS_SEMANTIC_REVIEW"
-
-    return "PASS"
+def _compute_verdict(semantic_pairs: list) -> str:
+    """``NEEDS_SEMANTIC_REVIEW`` if any semantic pairs were generated, ``PASS`` otherwise."""
+    return "NEEDS_SEMANTIC_REVIEW" if semantic_pairs else "PASS"
 
 
 # ---------------------------------------------------------------------------
@@ -760,47 +627,34 @@ def review_artifact(
     entry_id: str | None = None,
     git_root: str | None = None,
 ) -> ReviewResult:
-    """Run a two-pass structural + semantic review on a freshly-emitted spec artifact.
+    """Run the semantic review on a freshly-emitted spec artifact.
 
     Args:
         artifact_path: Absolute or relative path to the artifact JSON file.
         step_id:       Step identifier (e.g., "04", "16a").
         spec_dir:      Directory containing spec/*.json files.
         repo_root:     Root of the devspec_toolkit (for schema_registry, step_order).
-        entry_id:      Optional entity ID to scope the review (currently informational).
+        entry_id:      Optional entity ID to scope the review (currently informational; not used).
         git_root:      Host repo root (authoritative for seed path resolution).
                        When None, falls back to os.path.dirname(spec_dir), which is
                        correct for the standard flat layout.
 
     Returns:
-        ReviewResult with structural analysis, semantic pairs, verdict, and token cost.
+        ReviewResult with the semantic pairs, the verdict and the token cost.
         Returns a minimal PASS result if the artifact cannot be read.
     """
     # --- Load artifact ---
-    _ = entry_id  # currently informational; future: scope-filter structural pass
+    _ = entry_id  # accepted for the command line; not used
     artifact = _load_json_safe(artifact_path)
     if artifact is None:
-        empty_structural = StructuralReview(
-            upstream_coverage={"covered": [], "dropped": []},
-            reverse_trace={"unjustified": [], "scope_creep": []},
-        )
         return ReviewResult(
-            structural=empty_structural,
             semantic_pairs=[],
             verdict="PASS",
-            token_cost={"structural": 0, "semantic_total": 0},
+            token_cost={"semantic_total": 0},
         )
 
-    # Load upstream specs once for both passes.
+    # Load upstream specs once for the semantic checks.
     upstream_specs = _load_upstream_specs(step_id, spec_dir, repo_root)
-
-    # --- Pass 1: Structural ---
-    structural = _run_structural_pass(
-        artifact=artifact,
-        artifact_path=artifact_path,
-        upstream_specs=upstream_specs,
-        step_id=step_id,
-    )
 
     semantic_pairs: list[ReviewPair] = []
 
@@ -821,20 +675,18 @@ def review_artifact(
         _check_seed_distillation(artifact, artifact_path, step_id, spec_dir, git_root=git_root)
     )
     semantic_pairs.extend(
-        _check_scope_completeness(artifact, artifact_path, step_id, repo_root)
+        _check_scope_completeness(artifact, artifact_path, step_id, repo_root, spec_dir)
     )
 
     # --- Verdict ---
-    verdict = _compute_verdict(structural, semantic_pairs)
+    verdict = _compute_verdict(semantic_pairs)
 
-    # --- Token cost (estimated; structural is always 0 LLM tokens) ---
+    # --- Token cost (estimated) ---
     token_cost = {
-        "structural": 0,
         "semantic_total": len(semantic_pairs) * 50,
     }
 
     return ReviewResult(
-        structural=structural,
         semantic_pairs=semantic_pairs,
         verdict=verdict,
         token_cost=token_cost,

@@ -1,0 +1,36 @@
+{
+  "$schema": "vc:13-extension-manifest",
+  "id": "extension-generator-manifest-two-sections",
+  "owner": "system",
+  "created_at": "2026-01-15T00:00:00Z",
+  "extension_decision": {
+    "status": "extensions-required",
+    "rationale": "The Data domain requires entity-relationship modeling, migration sequencing, and index strategy not expressible in core steps 05-07."
+  },
+  "extensions": [
+    {
+      "extension_id": "ext-01-database-schema",
+      "title": "Database Schema",
+      "area_of_concern": "Data",
+      "justification": "Core spec steps lack entity-relationship modeling, migration sequencing, and index strategy \u2014 three dedicated schema sections are needed to cover the data domain.",
+      "required_schema_sections": [
+        "tables",
+        "relationships"
+      ],
+      "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for table IDs. Each table must include a validation_rules section with at least one check constraint. Verify referential integrity across foreign key relationships.",
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:mandatory",
+        "kind": "governance_label"
+      },
+      "justified_by": [
+        "fr-order-history"
+      ]
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label"
+    }
+  ]
+}

@@ -2,102 +2,91 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 09` to see downstream consumers. This prompt's output feeds 3 downstream steps.
+Run `specdev prompt-context 09` to see downstream consumers.
 
 ## Role
-You are a **technical program manager and delivery planner**. Your job is to emit a single JSON artifact for **Step 09 · Implementation Plan** that sequences deliverables into milestones with explicit dependencies, resource estimates, and traceability to capabilities. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+You are a **technical program manager and delivery planner**. Your job is to emit a single JSON artifact for **Step 09 · Implementation Plan** that groups the upstream nodes into milestones with target dates, risks and spikes, each milestone naming what it schedules. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
 ## Purpose
-Translate the validated spec into an executable delivery roadmap that covers technology choices, sequencing, risks, and migration strategy. The implementation plan aligns teams on what will ship when, how dependencies are managed, and which experiments or spikes de-risk the path.
+Translate the validated spec into an executable delivery roadmap that covers sequencing by date, risks, and migration strategy. The implementation plan aligns teams on what will ship when, how dependencies are managed, and which experiments or spikes de-risk the path.
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Project constraints, stated risks, timeline boundaries, and success metrics that bound milestone sequencing, target dates, and risk mitigation planning
-- **01_capabilities.json**: Capability IDs and priority rankings to ensure every capability is covered by at least one milestone deliverable or explicitly scoped out with rationale
-- **02_system_sketch.json**: Component IDs, component status (active vs deprecated), inter-component data flows, and **tech_stack** decisions (languages, frameworks, infrastructure, tools) as the baseline technology stack to inherit and optionally refine
-- **02a_delivery_baseline.json**: Deployment environment definitions, infrastructure constraints, and CI gate expectations that shape infrastructure tech stack selections and milestone phasing
-- **03_glossary.json**: Domain term definitions and canonical vocabulary to ensure milestone names, deliverable descriptions, and tech stack rationale use consistent domain language
-- **04_fr_list.json**: Functional requirement IDs and acceptance criteria to populate milestone deliverables arrays with traceable FR references ensuring full coverage
-- **05_interface_contracts.json**: API IDs, protocol choices, and endpoint definitions to populate milestone deliverables arrays with traceable API references and inform framework selection
-- **06_invariants.json**: Invariant IDs and enforcement conditions that constrain tech stack choices and must be satisfied as acceptance criteria within milestone deliverables
-- **07_nfrs.json**: Non-functional requirement IDs, performance targets, and quality thresholds that constrain tech stack selection and define spike success criteria for unknowns
-- **08_fixtures.json**: Test fixture definitions and target coverage expectations that validate milestone acceptance signals and inform spike scoping for test infrastructure
+- **01_capabilities.json**: Capability IDs to ensure every capability is reached by at least one milestone or explicitly scoped out with rationale
+- **02_system_sketch.json**: Component IDs, inter-component data flows, and `third_parties` (pinned services, libraries and platforms) to see which components and environments a milestone must have ready and which third-party limits bear on milestone dates
+- **02a_delivery_baseline.json**: Deployment environment definitions, infrastructure constraints, and CI gate expectations that shape milestone phasing
+- **03_glossary.json**: Domain term definitions and canonical vocabulary to ensure milestone names, risks and spikes use consistent domain language
+- **04_fr_list.json**: Functional requirement IDs and acceptance criteria to name in each milestone's `schedules` the FRs and acceptance criteria it delivers, ensuring full coverage
+- **05_interface_contracts.json**: API IDs, protocol choices, and endpoint definitions to name in each milestone's `schedules` the APIs it delivers
+- **06_invariants.json**: Invariant IDs and enforcement conditions that a milestone must have in place before the behavior they govern ships
+- **07_nfrs.json**: Non-functional requirement IDs, performance targets, and quality thresholds that milestones schedule and that define spike success criteria for unknowns
+- **08_fixtures.json**: Test fixture definitions that validate milestone acceptance signals and inform spike scoping for test infrastructure
 
-## Operating Flow: Scope → Sequence → Resource → Trace → Reconcile → Emit
-- **Scope**: Derive the set of deliverables from in-scope capabilities and FRs. Every in-scope capability must appear in ≥1 deliverable.
-- **Sequence**: Order milestones using `depends_on` references. Identify the critical path. A later milestone cannot depend on a future milestone (no cycles).
-- **Resource**: Inherit `tech_stack` from `spec/02_system_sketch.json` as the baseline. Refine only when implementation planning reveals needs not covered at architecture time (e.g., a testing tool discovered during spike scoping, a version pin change based on compatibility testing). Validate feasibility against charter constraints.
-- **Trace**: Link each milestone to the capability(ies) it delivers. Reference FR IDs where applicable.
+## Operating Flow: Scope → Sequence → Resource → Link → Reconcile → Emit
+- **Scope**: Derive the set of milestones from in-scope capabilities and FRs. Every in-scope capability must be reached by ≥1 milestone through the FRs it schedules.
+- **Sequence**: Give every milestone a `target_date` (not required by the schema; a date that is present is checked) and list the milestones in ascending date order (a plan out of order is reported as `E520`). The dates are the only statement of order: a milestone names no predecessor, and `schedules` never names another milestone. Identify the critical path from the dates.
+- **Resource**: Validate each milestone's feasibility against charter constraints and the `third_parties` of `spec/02_system_sketch.json`. Technology choices and pins belong to Step 02; this step does not restate them. A choice that planning shows to be wrong is a gap question for Step 02.
+- **Link**: Name in `schedules` every node a milestone delivers: FRs or acceptance criteria, APIs, invariants, NFRs, components, environments and charter risks, at least one. The capability a milestone serves follows from the FRs it schedules.
 - **Reconcile**: Verify cross-step consistency before emitting:
-  - Verify `tech_stack` entries are a superset of `spec/02_system_sketch.json` `tech_stack` — Step 09 may ADD refinements (version pins, spike-discovered tools) but MUST NOT REMOVE or contradict entries from Step 02. Any tech stack item in Step 02 that is absent from Step 09 is a gap requiring explicit justification.
-  - Verify milestones collectively cover all in-scope FRs from `spec/04_fr_list.json` — any uncovered FR must be explained in a gap question (enter Clarify mode).
-  - Verify milestone delivery order does not contradict enforcement conditions in `spec/06_invariants.json` — a milestone must not ship a behavior before the invariant that governs it is in place.
+  - Verify the milestones' `schedules` collectively name all in-scope FRs from `spec/04_fr_list.json` — any unscheduled FR must be explained in a gap question (enter Clarify mode).
+  - Verify milestone dates do not contradict enforcement conditions in `spec/06_invariants.json` — a milestone must not ship a behavior before the invariant that governs it is in place.
   - If any inconsistency is found, add it as a gap question (enter Clarify mode) — do not silently resolve or defer.
-- **Emit**: Write the artifact only when all milestones are sequenced without cycles, all in-scope capabilities are covered, and Reconcile found no unresolved inconsistencies.
+- **Emit**: Write the artifact only when all milestones carry target dates in ascending order, all in-scope capabilities are covered, and Reconcile found no unresolved inconsistencies.
 
-**Milestone Ordering with `depends_on`**: Use the `depends_on` field on each milestone to declare prerequisite milestone IDs. This enables dependency-order validation via `specdev dependency-order-lint`. Rules:
-- A milestone with no prerequisites has an empty or absent `depends_on`.
-- Circular dependencies (A → B → A) are forbidden and will fail lint.
-- `depends_on` IDs must reference milestone IDs defined in this same artifact.
-
-**Extraction Mandate**: Every in-scope capability from `01_capabilities.json` must appear in ≥1 milestone `deliverables` array. List any capability not addressed and explain why (e.g., deferred to a future milestone, handled by infrastructure).
+**Extraction Mandate**: Every in-scope capability from `01_capabilities.json` must be reached by ≥1 milestone: a milestone's `schedules` names an FR of the capability. List any capability not reached and explain why (e.g., deferred with `scope` `later` in Step 01, handled by infrastructure).
 
 ## Heuristics For Completeness
-- MUST populate `target_date` when milestones have ordering dependencies (i.e., one milestone's `deliverables` are consumed by another milestone). MUST include `migration_plan` when any `component_id` in `spec/02_system_sketch.json` has `status: deprecated` or is being replaced.
-- Ambiguity scrub: milestones should map to delivered FRs/APIs and passing CI gates.
+- SHOULD populate `target_date` on every milestone and list the milestones in ascending date order (the schema and `spec-check` accept a milestone without a date; a date that is present must be ISO `YYYY-MM-DD` and the dates must not decrease, E520 otherwise). Include `migration_plan` (the sequence and the rollback) when the plan replaces a running system or data schema, or breaks a public API contract (an authoring and review rule: no tool decides whether the plan does).
+- Ambiguity scrub: milestones should schedule the FRs/APIs they deliver and name the CI gates that pass them.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
 - `spec/07_nfrs.json` is present and contains at least one nfr entry.
-- All seeds listed for step "09" in `spec/common/seed_manifest.json` are present and non-empty (if step_requirements["09"] is non-empty).
 
 ## Negative Constraints
-- **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/02_system_sketch.json` `tech_stack` or `spec/01_capabilities.json` without a clear "Spike" justification.
-- **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
-- **NO Orphan Milestones**: Do not create milestones that do not link to at least one FR or API in `deliverables`.
-- **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It must be a structured object with the sections required by schema/09_impl_plan.schema.json.
-- **NO Missing Rationale**: Including `rationale` for `tech_stack` items is strongly recommended. Explain WHY a technology was chosen whenever possible.
+- **NO Orphan Milestones**: Do not create a milestone whose `schedules` is empty or names only another milestone.
+- **NO Order Links**: Do not add `depends_on` or any predecessor field to a milestone; order is the `target_date`.
+- **NO Technology Restating**: Do not list technologies or versions here; they are `third_parties` of Step 02.
+- **NO Free-Text Deliverables**: `schedules` holds ids of existing nodes, never descriptions.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `capability_id` from `spec/01_capabilities.json` appears in ≥1 milestone's scope or deliverables, OR addressed with a gap question (Clarify mode) explaining why it is not covered.
-- All `component_id` values from `spec/02_system_sketch.json` are reflected in the `tech_stack` or architecture decisions.
-- Every charter constraint in `spec/00_charter.json` (`constraints`, `risks`) is addressed in milestones, risks, or migration plan.
-- All dependencies between milestones are explicit — no implicit ordering assumptions.
+- Every `capability_id` from `spec/01_capabilities.json` is reached by ≥1 milestone through a scheduled FR, OR addressed with a gap question (Clarify mode) explaining why it is not covered.
+- Every charter risk in `spec/00_charter.json` is scheduled by a milestone or answered in a gap question, and every charter `constraints` item is respected by the dates, `risks` and `spikes` of the milestones.
+- Every milestone has a `target_date`, and the dates ascend down the list.
+- No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any capability has unclear implementation path: add a gap question (Clarify mode) rather than deferring silently.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] Every in-scope capability maps to ≥1 milestone deliverable
-- [ ] All `depends_on` references resolve to milestone IDs defined in this artifact (no dangling refs)
-- [ ] No circular milestone dependencies exist
-- [ ] Every milestone has at least one acceptance signal (named deliverable, demo, or test gate) that can be used to verify completion
+- [ ] Every in-scope capability is reached by ≥1 milestone through the FRs it schedules
+- [ ] Every id in `schedules` resolves to an existing node of an accepted kind (no dangling ids)
+- [ ] No milestone carries `depends_on` or names another milestone
+- [ ] Every milestone has at least one acceptance signal (a scheduled node, demo, or test gate) that can be used to verify completion
 - [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
 
 ## Step-Specific Completeness Checklist
-- `tech_stack` inherits from `spec/02_system_sketch.json` `tech_stack` and may add implementation-time refinements. All Step 02 `tech_stack` entries must be present (superset rule). New entries require rationale.
-- Milestones include clear names, target dates, risks, and spikes for unknowns.
-- `migration_plan` describes data or API migration if replacing existing systems.
-- `dependencies` enumerate external systems, teams, or contracts that impact delivery.
+- Milestones include clear names, `target_date`, `schedules`, risks, and spikes for unknowns.
+- `migration_plan` describes data or API migration if replacing existing systems, in 2 to 4 sentences (guidance, not checked: the schema description asks for it and no keyword or tool enforces it; say the migration sequence and the rollback. What is replaced is stated by links: `replaces` on the node that takes the place of a deleted one, and the `removes` of a removal task criterion in step 14. What confirms the migration is a task criterion of step 14 with a verifier in `verified_by`. No tool reads a link out of this string: a node id written in it is not a link).
 
 ## Best Practices
-- **Stack**: Capture `tech_stack` decisions with rationale, version constraints, and ownership so scaffold generation is predictable.
-- **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`. Link deliverables to FRs/APIs.
+- **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`. Name the FRs/APIs a milestone delivers in `schedules` (bare ids, no notes).
 - **Adaptability**: Document `risks` and `spikes` with clear mitigation steps to keep delivery adaptable.
-- **Migration**: Detail the `migration_plan` when replacing legacy systems, calling out cutover criteria and rollback triggers.
-- **Dependencies**: Enumerate `dependencies` across teams or vendors to schedule integration work early.
+- **Migration**: Detail the `migration_plan` when replacing legacy systems, calling out the cutover sequence and rollback triggers; the acceptance test of the migration is a task criterion of step 14, not a sentence here.
+- **Third parties**: Put a third party's lead time or rate limit into the `risks` or `spikes` of the milestone it affects, so integration work is scheduled early.
 
 ## Common Pitfalls
-- **Grab Bag**: Treating `tech_stack` as a grab bag with no versioning, leading to incompatible scaffolds.
+- **Order by Hand**: Expressing order through prose or ids in `risks` text instead of `target_date`.
 - **Vague Steps**: Listing milestones without success signals, making it unclear when a stage is truly done.
 - **Surprise**: Ignoring migration steps, which causes surprise downtime or data loss later.
-- **Blockers**: Omitting external dependencies until late, creating critical path delays.
+- **Blockers**: Omitting third-party and vendor constraints until late, creating critical path delays.
 
 # Clarification Questions
-- What tech choices are locked vs flexible? Any org standards to follow?
-- What are the major deliverable milestones with dates? What risks or spikes accompany each?
+- Which FRs, APIs and other nodes does each milestone deliver?
+- What are the major milestones, with dates? What risks or spikes accompany each?
 - Are we migrating from an existing system? What is the plan for data, compatibility, and rollback?
 - What external dependencies (teams, vendors) could block delivery? How will we mitigate?
 
@@ -113,67 +102,23 @@ Before emitting, verify:
   "id": "impl-plan-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "tech_stack": {
-    "languages": [
-      {
-        "name": "python",
-        "version": "^3.9",
-        "rationale": "Required for ONNX Runtime compatibility"
-      }
-    ],
-    "frameworks": [
-      {
-        "name": "FastAPI",
-        "version": "^0.110.0",
-        "rationale": "High-performance web framework"
-      }
-    ],
-    "infrastructure": [
-      {
-        "name": "Raspberry Pi 4",
-        "version": "Model B 4GB",
-        "rationale": "Primary deployment target"
-      }
-    ],
-    "tools": [
-      {
-        "name": "structlog",
-        "version": "^24.1.0",
-        "rationale": "Structured logging implementation"
-      }
-    ]
-  },
   "milestones": [
     {
       "milestone_id": "milestone-setup-core-infrastructure",
       "name": "Setup Core Infrastructure and Environment",
       "target_date": "2025-11-15",
-      "status": "pending",
       "risks": [
         "Raspberry Pi 4 setup and performance profiling may reveal unexpected constraints"
       ],
       "spikes": [
         "Performance testing with small dataset on Raspberry Pi 4 to validate target latency"
       ],
-      "deliverables": [
-        {
-          "type": "fr",
-          "id": "fr-search-hybrid-retrieval"
-        }
+      "schedules": [
+        "fr-search-hybrid-retrieval"
       ]
     }
   ],
   "migration_plan": "No migration required as this is a new implementation of the personal knowledge RAG system.",
-  "dependencies": [
-    "Raspberry Pi 4 hardware (for deployment)",
-    "Cloudflare Access for admin authentication"
-  ],
-  "trace": [
-    {
-      "type": "doc",
-      "id": "personal-knowledge-rag-system"
-    }
-  ],
   "canonical_refs_used": []
 }
 ```

@@ -143,9 +143,9 @@ class TestConstructionWrap:
             def __init__(self, *args, **kwargs):
                 raise AttributeError("injected: non-dict schema has no $schema key")
 
-        import specdev_tools.core.schema_validate as _sv_mod
+        import specdev_tools.core.registry as _reg_mod
 
-        monkeypatch.setattr(_sv_mod, "Draft202012Validator", _FakeBrokenValidator)
+        monkeypatch.setattr(_reg_mod, "Draft202012Validator", _FakeBrokenValidator)
 
         doc = _load_valid_full()
 
@@ -184,16 +184,16 @@ class TestConstructionWrap:
             def __init__(self, *args, **kwargs):
                 raise AttributeError("injected: broken validator")
 
-        import specdev_tools.core.schema_validate as _sv_mod
+        import specdev_tools.core.registry as _reg_mod
 
-        monkeypatch.setattr(_sv_mod, "Draft202012Validator", _FakeBrokenValidator)
+        monkeypatch.setattr(_reg_mod, "Draft202012Validator", _FakeBrokenValidator)
 
         # A syntactically valid patch; the refusal must come from validation, not jq.
         with pytest.raises(JsonUtilsError) as exc_info:
             json_patch(
                 str(dst),
-                ".plan.spec_alignment.checklist[1].implementation.status",
-                '"in_progress"',
+                ".plan.spec_alignment.checklist[1].layer",
+                '"service"',
                 validate=True,
                 repo_root=_TOOLKIT_ROOT,
             )
@@ -202,6 +202,10 @@ class TestConstructionWrap:
         assert "refusing to proceed" in str(exc_info.value), (
             f"Expected 'refusing to proceed' in JsonUtilsError message; got: {exc_info.value!r}"
         )
+        # Only the construction wrap turns the AttributeError into SchemaRuntimeError; without it
+        # json_utils' generic "Unexpected error" branch answers instead.
+        assert "schema resolution/runtime error: injected: broken validator" in str(exc_info.value)
+        assert "Unexpected error" not in str(exc_info.value)
 
         # File must be UNCHANGED — the broken constructor must not allow a silent write.
         assert dst.read_bytes() == original_bytes, (
@@ -344,14 +348,14 @@ class TestSchemaDecodeError:
         guards that ordering and the typed family's completeness if a future
         SchemaRegistry change makes the path reachable.
         """
-        import specdev_tools.core.schema_validate as _sv_mod
+        from specdev_tools.core.registry import SchemaRegistry
 
         def _raise_unicode(self, uri):  # noqa: ANN001
             raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
 
         # Bootstrap (SchemaRegistry.__init__) still runs on the real toolkit root;
         # only .load is replaced, so we reach Step 3 and hit the decode clause.
-        monkeypatch.setattr(_sv_mod.SchemaRegistry, "load", _raise_unicode)
+        monkeypatch.setattr(SchemaRegistry, "load", _raise_unicode)
         doc = {"$schema": "vc:anything", "id": "step-test"}
 
         with pytest.raises(SchemaDecodeError) as exc_info:
@@ -430,8 +434,8 @@ class TestHappyPath:
         and the str is the error message from jsonschema.
         """
         doc = _load_valid_full()
-        # Introduce an invalid enum value in checklist[1].implementation.status.
-        doc["plan"]["spec_alignment"]["checklist"][1]["implementation"]["status"] = "verifyed"
+        # Introduce an invalid enum value in checklist[1].layer.
+        doc["plan"]["spec_alignment"]["checklist"][1]["layer"] = "verifyed"
 
         result = validate_data_against_schema(_TOOLKIT_ROOT, doc)
 
@@ -481,3 +485,15 @@ class TestHappyPath:
 
         assert "$schema" in doc, "$schema key was removed from the input dict"
         assert doc["$schema"] == original_uri, "$schema value was modified"
+
+
+def test_violation_text_cuts_a_long_message_at_200_characters_and_shortens_the_array_size_ones() -> None:
+    """H1-5(b): a message that quotes a whole value is cut; ``maxItems`` and ``minItems`` say their own sentence."""
+    from specdev_tools.core.schema_validate import SchemaViolation, violation_text
+
+    long = SchemaViolation(("a",), "enum", "x" * 500)
+    assert violation_text(long) == "x" * 200 + " ..."
+    exact = SchemaViolation(("a",), "enum", "y" * 200)
+    assert violation_text(exact) == "y" * 200
+    assert violation_text(SchemaViolation(("a",), "maxItems", "[" + "1, " * 300 + "1] is too long")) == "has more items than the schema allows"
+    assert violation_text(SchemaViolation(("a",), "minItems", "[] should be non-empty")) == "has fewer items than the schema requires"

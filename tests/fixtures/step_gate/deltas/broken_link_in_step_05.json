@@ -1,0 +1,49 @@
+{
+  "description": "A step-05 interface that links to a node that does not exist: E700, owned by step 05.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/05_interface_contracts.json",
+      "path": [
+        "apis"
+      ],
+      "value": {
+        "api_id": "api-broken-link",
+        "name": "Broken Link",
+        "version": "v1",
+        "protocol": "http",
+        "path": "/v1/broken-link",
+        "method": "POST",
+        "owner": "api",
+        "security": "none",
+        "errors": [
+          {
+            "error_id": "err-broken-link-token-expired",
+            "code": "token-expired",
+            "severity": "error",
+            "message": "HTTP 410: the reset token has expired or was already used.",
+            "scope": "in",
+            "derives_from": [
+              "ac-password-reset-3"
+            ]
+          }
+        ],
+        "scope": "in",
+        "derives_from": [
+          "fr-ghost"
+        ],
+        "provided_by": [
+          "identity-service"
+        ],
+        "relies_on": [
+          "tp-argon2"
+        ],
+        "interface_ref": {
+          "id": "cn:project:interface:password-reset",
+          "kind": "interface",
+          "version": "1.0.0"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# Snippet (copied by hand into the host's own deploy workflow; `init` and `update` never touch
+# deploy workflows). A list of steps for the deploy job, in this order: the preamble, then the
+# host's own deploy steps, then the post-deploy steps.
+#
+# The deploy job needs: `permissions: contents: write` and `pull-requests: write` (the evidence
+# pull request, see evidence-pr.snippet.yml; no repository setting is changed by this file);
+# a checkout with `fetch-depth: 0` and `submodules: recursive` of the dispatch ref (the default
+# branch head, so merged staging evidence is present; a host that builds from the tag checks the
+# tag out separately); the toolkit installed with its venv `bin` on PATH; and these job-level
+# values: `env: SPECDEV_ENV: staging` (or `prod`) and the tag, e.g. `TAG: ${{ inputs.tag }}`.
+# Edit `tp-example=1.0.0` to the third parties and versions this deploy installs, and
+# `ITEM/ACTION` to the at_deploy action ids of the plan.
+# Exit 1 of a step (E339, E347, E348) stops the job before the deploy.
+- name: Third-party versions match the pins
+  run: |
+    specdev third-party check --installed tp-example=1.0.0 --env "$SPECDEV_ENV" --tag "$TAG" --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+- name: Production gate
+  if: env.SPECDEV_ENV == 'prod'
+  run: |
+    specdev release check --stage prod --tag "$TAG" --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+# --- the host's own deploy steps go here ---
+- name: Verify the deploy stage bindings
+  run: |
+    specdev verify run --all --stage "$SPECDEV_ENV" --only-stage --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+- name: Record the at-deploy action
+  run: |
+    specdev plan record --at-deploy ITEM/ACTION --env "$SPECDEV_ENV" --tag "$TAG" --repo-root ./devspec_toolkit --spec-root ./spec --git-root .

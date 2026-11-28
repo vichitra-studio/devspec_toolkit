@@ -42,3 +42,14 @@ migration_actions:
   - ai_assisted    # Requires AI prompt generation
   - merge          # Step consolidation
   - archive        # Move to archive
+
+# A `migration:` entry may also carry:
+#   script  Id of the migration script that performs the entry (module name under
+#           tools/specdev_tools/migration/scripts/, e.g. p2_id_mint). Required when
+#           `action: auto` and `kind: mechanical`, for versions after 1.1.1 (E884).
+#   kind    What the migration touches (values below). Only `mechanical` entries are
+#           checked for a script.
+migration_kinds:
+  - mechanical     # Edits host data by script: the entry names the script
+  - judgement      # Needs a person or AI decision on host content
+  - none           # Touches no host data (toolkit-internal note)

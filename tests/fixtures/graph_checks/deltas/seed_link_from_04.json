@@ -1,0 +1,15 @@
+{
+  "description": "A requirement of step 04 lists the seed beside its capability, and the manifest does not route the seed to step 04 (E749).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/04_fr_list.json",
+      "path": [
+        "functional_requirements",
+        0,
+        "derives_from"
+      ],
+      "value": "seed-accounts"
+    }
+  ]
+}

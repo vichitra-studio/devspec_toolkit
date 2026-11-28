@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:05-interface-contracts",
+  "title": "Interface contracts (fixture)",
+  "type": "object",
+  "properties": {
+    "interface": {
+      "type": "object",
+      "properties": {
+        "apis": {
+          "type": "array",
+          "x-node": {
+            "kind": "api",
+            "id": "api_id",
+            "role": "obligation-system",
+            "contract": [
+              "statement"
+            ]
+          },
+          "items": {
+            "type": "object",
+            "properties": {
+              "api_id": {
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "statement": {
+                "type": "string"
+              },
+              "lifecycle": {
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "scope": {
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "derives_from": {
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "fr"
+                  ],
+                  "required": true
+                }
+              }
+            },
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ],
+            "required": [
+              "api_id"
+            ]
+          }
+        }
+      }
+    },
+    "ambiguities": {
+      "$ref": "vc:core:ambiguity-fixture#/$defs/ambiguityList"
+    }
+  }
+}

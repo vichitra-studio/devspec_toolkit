@@ -17,6 +17,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
+from ..core.constants import SEED_MANIFEST_FILE
 from ..core.seed_routing import resolve_seed_paths
 
 
@@ -61,7 +62,7 @@ def build_seed_index(
     warnings: list[str] = []
 
     # 1. Load seed_manifest.json
-    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    manifest_path = os.path.join(spec_dir_abs, SEED_MANIFEST_FILE)
     if not os.path.isfile(manifest_path):
         return {}, [f"E520 MISSING_MANIFEST {manifest_path} does not exist"]
 

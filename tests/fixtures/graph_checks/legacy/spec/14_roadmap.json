@@ -1,0 +1,22 @@
+{
+  "$schema": "vc:14-roadmap",
+  "id": "legacy-roadmap",
+  "owner": "product",
+  "created_at": "2026-03-01T00:00:00Z",
+  "milestones": [
+    {
+      "milestone_id": "ms-legacy-signin",
+      "name": "Sign in",
+      "target_date": "2026-06-01",
+      "user_story": "As a member I want to sign in so that I can use my account.",
+      "source_milestones": [],
+      "fr_refs": ["fr-legacy-signin"],
+      "capability_refs": ["cap-legacy-signin"],
+      "tasks": [
+        {"task_id": "task-legacy-signin", "description": "Build the sign-in endpoint.", "fr_refs": ["fr-legacy-signin"]}
+      ],
+      "deliverables": ["Sign-in endpoint"]
+    }
+  ],
+  "canonical_refs_used": []
+}

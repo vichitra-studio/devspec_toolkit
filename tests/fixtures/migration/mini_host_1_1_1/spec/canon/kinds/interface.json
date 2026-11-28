@@ -1,0 +1,22 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "interface",
+    "entries": [
+        {
+            "id": "cn:project:interface:lending-rest",
+            "kind": "interface",
+            "preferred_label": "lending REST interface",
+            "definition": "The JSON over HTTP interface the desk app and the member site use to reach the lending service.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

@@ -1,0 +1,154 @@
+"""One lookup of an id and one order of nodes: ``Graph.find`` and ``SpecShape.order_key`` (round 3, D-1 and D-2)."""
+from __future__ import annotations
+
+import copy
+from typing import Any
+from unittest.mock import patch
+
+import pytest
+
+from specdev_tools.context.scope_resolver import resolve_scope
+from specdev_tools.graph import queries
+from specdev_tools.graph.build import build_graph
+from specdev_tools.graph.lifecycle import plan_lifecycle_change
+from specdev_tools.graph.model import UNRANKED, Graph, Node, SpecShape
+from specdev_tools.graph.recipes import build_pack, load_recipes
+from specdev_tools.graph.trace import trace_node
+from specdev_tools.validation.linter_utils import graph_known_ids
+
+from ._synth import EXAMPLE_SPEC, ROOT, docs_graph
+
+_FR = "fr-password-reset"
+_PLAN_ITEM = "PWRESET_CONFIRM_EXPIRED_01"
+_ALIASES = {"fr-old-name": _FR, "plan-old-name": _PLAN_ITEM}
+
+
+_CAP_OLD, _CAP_NEW = "cap-account-recovery", "cap-account-recovery-v2"
+_CAP_FILE = "01_capabilities.json"
+
+
+@pytest.fixture
+def aliased() -> Graph:
+    """The worked example with an alias index set by hand (no item of the example lists an alias)."""
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT))
+    graph.use_aliases(_ALIASES)
+    return graph
+
+
+def _example_with_capability_renamed() -> Graph:
+    """The worked example whose capability has the id ``_CAP_NEW`` and the alias ``_CAP_OLD``; the FR still links to the old id."""
+    document: dict[str, Any] = copy.deepcopy(dict(build_graph(str(EXAMPLE_SPEC), str(ROOT)).documents[_CAP_FILE]))
+    capability = next(item for item in document["capabilities"] if item["capability_id"] == _CAP_OLD)
+    capability.update(capability_id=_CAP_NEW, aliases=[_CAP_OLD])
+    graph = build_graph(str(EXAMPLE_SPEC), str(ROOT), overrides={_CAP_FILE: document})
+    assert any(link.target == _CAP_OLD for link in graph.by_id[_FR].links)
+    return graph
+
+
+def test_find_looks_up_an_id_then_an_alias(aliased: Graph) -> None:
+    assert aliased.find(_FR) is aliased.by_id[_FR]
+    assert aliased.find("fr-old-name") is aliased.by_id[_FR]
+    assert aliased.find("no-such-node") is None
+
+
+def test_graph_known_ids_holds_the_ids_and_the_aliases(aliased: Graph) -> None:
+    """The lints that read an id a person wrote know what ``Graph.find`` finds: a node id or an alias."""
+    known = graph_known_ids(aliased)
+    assert {_FR, "fr-old-name", "plan-old-name", _PLAN_ITEM} <= known
+    assert all(aliased.find(name) is not None for name in _ALIASES)
+    unaliased = graph_known_ids(build_graph(str(EXAMPLE_SPEC), str(ROOT)))
+    assert _FR in unaliased and not unaliased & set(_ALIASES)
+    assert "fr-never-existed" not in known
+    assert graph_known_ids(None) == set()
+
+
+def test_an_id_wins_over_an_alias_of_the_same_name(aliased: Graph) -> None:
+    aliased.alias_index["ac-password-reset-3"] = _FR
+    assert aliased.find("ac-password-reset-3") is aliased.by_id["ac-password-reset-3"]
+
+
+def test_node_finds_a_node_by_its_alias(aliased: Graph) -> None:
+    assert [view.id for view in queries.node_view(aliased, ["fr-old-name"]).views] == [_FR]
+
+
+def test_candidates_for_finds_the_holder_by_its_alias(aliased: Graph) -> None:
+    by_alias = queries.candidates(aliased, "realises", for_id="plan-old-name")
+    by_id = queries.candidates(aliased, "realises", for_id=_PLAN_ITEM)
+    assert by_alias == by_id and by_id.total > 0
+
+
+def test_trace_finds_the_entry_by_its_alias(aliased: Graph) -> None:
+    assert trace_node(aliased, "fr-old-name").entry.id == _FR
+
+
+def test_node_status_plans_the_change_of_the_node_an_alias_names(aliased: Graph) -> None:
+    change = plan_lifecycle_change(aliased, "fr-old-name", "deprecated")
+    assert (change.node_id, change.old, change.new) == (_FR, "active", "deprecated")
+
+
+def test_a_recipe_starts_from_the_node_an_alias_names(aliased: Graph) -> None:
+    table = load_recipes(str(ROOT))
+    assert build_pack(aliased, table, "16b", "plan-old-name").start.id == _PLAN_ITEM
+
+
+def test_context_scope_finds_the_entry_by_its_alias(aliased: Graph) -> None:
+    with patch("specdev_tools.context.scope_resolver.build_graph", return_value=aliased):
+        by_alias = resolve_scope("fr-old-name", str(EXAMPLE_SPEC), str(ROOT))
+        by_id = resolve_scope(_FR, str(EXAMPLE_SPEC), str(ROOT))
+    assert "scope_warning" not in by_alias
+    assert by_alias["resolved_ids"] == by_id["resolved_ids"] and by_id["resolved_ids"]
+
+
+def _node(node_id: str, step: str | None) -> Node:
+    return Node(node_id, "fr", step, None, "f.json", "", None, (), "active", None, (), "")
+
+
+def test_order_key_is_rank_then_step_then_id() -> None:
+    shape = SpecShape(step_ranks={"04": 4, "05": 5})
+    nodes = [_node("b", "05"), _node("a", "zz"), _node("c", None), _node("a", "04"), _node("a", "yy")]
+    assert [(n.step, n.id) for n in sorted(nodes, key=shape.order_key)] == [
+        ("04", "a"), ("05", "b"), (None, "c"), ("yy", "a"), ("zz", "a"),
+    ]
+    assert shape.order_key(_node("c", None))[0] == UNRANKED
+
+
+def test_step_key_orders_steps_the_way_a_node_is_ordered() -> None:
+    shape = SpecShape(step_ranks={"04": 4})
+    assert sorted(["zz", "04", "aa"], key=shape.step_key) == ["04", "aa", "zz"]
+
+
+# --- the alias index is filled by the build and every reader of a link target follows it (WI-M5-12) ---------------------
+
+def test_build_fills_alias_index_from_the_aliases_of_each_item() -> None:
+    assert build_graph(str(EXAMPLE_SPEC), str(ROOT)).alias_index == {}
+    docs = {"04_fr_list.json": {"functional_requirements": [
+        {"fr_id": "fr-new", "aliases": ["fr-old", "fr-older"]}, {"fr_id": "fr-other", "aliases": ["fr-old", 7]}, {"fr_id": "fr-plain"},
+    ]}}
+    graph = docs_graph(docs)
+    assert graph.by_id["fr-new"].aliases == ("fr-old", "fr-older") and graph.by_id["fr-plain"].aliases == ()
+    assert graph.alias_index == {"fr-old": "fr-new", "fr-older": "fr-new"}
+    assert graph.find("fr-older") is graph.by_id["fr-new"] and graph.canonical_id("fr-old") == "fr-new"
+    assert graph.canonical_id("fr-plain") == "fr-plain" and graph.canonical_id("fr-nobody") == "fr-nobody"
+
+
+def test_incoming_is_keyed_by_the_current_id_so_an_alias_link_is_an_incoming_link() -> None:
+    graph = _example_with_capability_renamed()
+    assert [(link.source, link.target) for link in graph.incoming[_CAP_NEW] if link.source == _FR] == [(_FR, _CAP_OLD)]
+    assert _CAP_OLD not in graph.incoming
+    view = queries.node_view(graph, [_CAP_NEW]).views[0]
+    plain = queries.node_view(build_graph(str(EXAMPLE_SPEC), str(ROOT)), [_CAP_OLD]).views[0]
+    assert view.incoming == plain.incoming and ("derives_from", "fr", 2) in [(i.verb, i.kind, i.count) for i in view.incoming]
+    assert view.aliases == (_CAP_OLD,)
+    assert _CAP_NEW not in {item.id for item in queries.candidates(graph, "derives_from", for_id=_FR).candidates}
+
+
+def test_trace_up_and_down_follow_a_link_stored_under_an_alias() -> None:
+    graph = _example_with_capability_renamed()
+    assert _CAP_NEW in {node.id for node in trace_node(graph, _FR, ("up",)).reached}
+    assert _FR in {node.id for node in trace_node(graph, _CAP_NEW, ("down",)).reached}
+
+
+def test_pack_follows_a_link_stored_under_an_alias() -> None:
+    graph = _example_with_capability_renamed()
+    pack = build_pack(graph, load_recipes(str(ROOT)), "16b", _PLAN_ITEM)
+    assert _CAP_NEW in pack.node_ids and _CAP_OLD not in pack.node_ids

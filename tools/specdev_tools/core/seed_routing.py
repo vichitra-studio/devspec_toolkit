@@ -52,8 +52,7 @@ def resolve_seeds_for_step(
     ``step_id == "16"``
         Raw set = union of ``step_requirements["16"] ∪ ["16a"] ∪ ["16b"] ∪
         ["16c"]``.  All four keys are consulted (including the bare ``"16"``
-        key, unlike the legacy ``seed_lint._collect_required_seeds`` which
-        skipped it).
+        key).
 
     ``step_id ∈ {"16a", "16b", "16c"}``
         Raw set = ``step_requirements[step_id] ∪ step_requirements["16"]``.
@@ -63,7 +62,7 @@ def resolve_seeds_for_step(
     Any other step_id
         Raw set = ``step_requirements[step_id]`` only.  The umbrella semantics
         are **16-family-only** and are NOT generalised to steps like ``"02a"``
-        or ``"13a"``.
+        or ``"04"``.
 
     Ordering of *step_seed_ids*
         Seeds in ``global_seed_order`` appear first (in global order).  Any
@@ -176,15 +175,8 @@ def _collect_raw_ids(
 def _apply_ordering(raw_ids: List[str], global_order: List[str]) -> List[str]:
     """Order *raw_ids* by *global_order* position; append the rest.
 
-    Replicates the ordering logic in ``seed_lint._collect_required_seeds``
-    (lines 63-65)::
-
-        ordered = [s for s in global_order if s in required]
-        remaining = [s for s in required if s not in set(global_order)]
-
-    The difference here is that *raw_ids* is already a de-duplicated list in
-    encounter order, so "remaining" preserves encounter order rather than set
-    iteration order (which is non-deterministic in the original).
+    The seeds named in *global_order* come first, in that order; *raw_ids* is a de-duplicated list in encounter
+    order, so the rest keep their encounter order.
     """
     required_set = set(raw_ids)
     global_set = set(global_order)

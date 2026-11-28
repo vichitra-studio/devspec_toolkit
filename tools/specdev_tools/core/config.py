@@ -1,7 +1,9 @@
 """Centralised environment variable configuration.
 
-Reads all ``SPECDEV_*`` env vars once and exposes them as typed properties
-via the :class:`SpecdevConfig` singleton.
+Reads three ``SPECDEV_*`` env vars once (``SPECDEV_WARNINGS_AS_ERRORS``,
+``SPECDEV_PROMOTE_CODES``, ``SPECDEV_REPLAY_BASE_REF``) and exposes them as typed
+properties via the :class:`SpecdevConfig` singleton.  ``SPECDEV_INVARIANTS_STRICT``
+is not held here: ``cli.py`` reads it from the environment for ``invariants-check``.
 
 Created by FIX-003 (Batch 0).
 """
@@ -25,7 +27,7 @@ def _parse_set(key: str) -> set[str]:
 
 
 class SpecdevConfig:
-    """Typed, read-only view of all ``SPECDEV_*`` environment variables.
+    """Typed, read-only view of three ``SPECDEV_*`` environment variables.
 
     Attributes
     ----------
@@ -33,43 +35,22 @@ class SpecdevConfig:
         ``SPECDEV_WARNINGS_AS_ERRORS`` — promote all W-codes to E-codes.
     promote_codes : set[str]
         ``SPECDEV_PROMOTE_CODES`` — selective W→E promotion set.
-    matrix_strict : bool
-        ``SPECDEV_MATRIX_STRICT`` — make matrix coverage errors fatal.
     replay_base_ref : str | None
         ``SPECDEV_REPLAY_BASE_REF`` — explicit git base ref override.
-    replay_diff_error_mode : str
-        ``SPECDEV_REPLAY_DIFF_ERROR_MODE`` — ``"error"`` or ``"ignore"``.
-    staleness_threshold : int
-        ``SPECDEV_STALENESS_THRESHOLD`` — minimum new upstream tokens for W595 (default 3).
     """
 
     __slots__ = (
         "warnings_as_errors",
         "promote_codes",
-        "matrix_strict",
         "replay_base_ref",
-        "replay_diff_error_mode",
-        "staleness_threshold",
     )
 
     def __init__(self) -> None:
         self.warnings_as_errors: bool = _parse_bool("SPECDEV_WARNINGS_AS_ERRORS")
         self.promote_codes: set[str] = _parse_set("SPECDEV_PROMOTE_CODES")
-        self.matrix_strict: bool = _parse_bool("SPECDEV_MATRIX_STRICT")
 
         raw_base_ref = os.environ.get("SPECDEV_REPLAY_BASE_REF", "").strip()
         self.replay_base_ref: str | None = raw_base_ref if raw_base_ref else None
-
-        self.replay_diff_error_mode: str = os.environ.get(
-            "SPECDEV_REPLAY_DIFF_ERROR_MODE", ""
-        ).strip().lower()
-
-        try:
-            self.staleness_threshold: int = int(
-                os.environ.get("SPECDEV_STALENESS_THRESHOLD", "3")
-            )
-        except (ValueError, TypeError):
-            self.staleness_threshold = 3
 
     def __repr__(self) -> str:
         attrs = ", ".join(f"{attr}={getattr(self, attr)!r}" for attr in self.__slots__)

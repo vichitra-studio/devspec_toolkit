@@ -25,13 +25,23 @@ def _snapshot(root: Path) -> dict[str, str]:
     return out
 
 
+GRAPH_EXAMPLE_SPEC = FIXTURE_DIR.parents[1] / "graph_example" / "spec"
+
+
 def _stage_spec_dir(tmp_path: Path) -> Path:
     spec_dir = tmp_path / "spec"
     impl = spec_dir / "impl_context"
     impl.mkdir(parents=True)
     for name in ("plan_with_six_ambiguities.json", "plan_with_no_execution.json",
                  "plan_with_null_execution.json"):
-        shutil.copy(FIXTURE_DIR / name, impl / name)
+        shutil.copy(FIXTURE_DIR / name, impl / f"ms_{name.removesuffix('.json')}_plan.json")
+    return spec_dir
+
+
+def _stage_unified_spec_dir(tmp_path: Path) -> Path:
+    spec_dir = tmp_path / "spec"
+    shutil.copytree(GRAPH_EXAMPLE_SPEC, spec_dir)
+    shutil.copy(FIXTURE_DIR / "unified_items_plan.json", spec_dir / "impl_context" / "ms_unified_plan.json")
     return spec_dir
 
 
@@ -60,3 +70,13 @@ def test_open_mode_is_read_only(tmp_path: Path, monkeypatch):
         run(str(spec_dir), json_output=True)
     except RuntimeError as exc:
         pytest.fail(f"Read-only invariant violated: {exc}")
+
+
+def test_unified_fixture_run_changes_nothing(tmp_path: Path):
+    spec_dir = _stage_unified_spec_dir(tmp_path)
+    before = _snapshot(spec_dir)
+    stdout, _, exit_code = run(str(spec_dir))
+    run(str(spec_dir), json_output=True)
+    assert exit_code == 0
+    assert "amb-two-steps" in stdout
+    assert _snapshot(spec_dir) == before

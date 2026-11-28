@@ -1,0 +1,38 @@
+{
+  "description": "The seed manifest lists a seed whose file does not exist: E520 from the seed lint, owned by the merge check. The seed is routed to step 00 and the scope item scope-password-reset derives from it, so the seed-routes check (E747, E748) has nothing to say about it.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/common/seed_manifest.json",
+      "path": [
+        "seeds"
+      ],
+      "value": {
+        "seed_id": "seed-ghost",
+        "path": "docs/seed/ghost.md",
+        "description": "Listed but not on disk.",
+        "required": false,
+        "source_type": "doc"
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/common/seed_manifest.json",
+      "path": [
+        "step_requirements",
+        "00"
+      ],
+      "value": "seed-ghost"
+    },
+    {
+      "op": "append",
+      "file": "spec/00_charter.json",
+      "path": [
+        "scope_items",
+        0,
+        "derives_from"
+      ],
+      "value": "seed-ghost"
+    }
+  ]
+}

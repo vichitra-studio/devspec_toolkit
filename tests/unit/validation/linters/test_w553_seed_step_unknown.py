@@ -9,7 +9,7 @@ Covers:
   B2 — phantom/typo keys ("9", "02b", "17") produce W553 SEED_STEP_UNKNOWN.
   B3 — known steps including "16" and "16b" produce no W553.
   B4 — bare "16" key + impl_context artifact: seed_lint union includes the seed
-       (no false W140 / W553), tested at the seed_lint integration level.
+       (no false W553), tested at the seed_lint integration level.
 
 Also colocates (DRY — reuses this module's seed-manifest ``_build_project``
 fixture) one E410 CANONICAL_ALIAS_COLLISION test for the duplicate-``seed_id``
@@ -227,20 +227,11 @@ class TestW553SeedStepUnknown(unittest.TestCase):
     # (seed_lint integration level, complementing test_seed_routing.py helper tests)
     # ------------------------------------------------------------------
 
-    def test_impl_context_artifact_with_bare_16_key_no_false_w140_w553(self):
-        """seed-x routed via step_requirements["16"] only (no 16a/16b/16c entry).
+    def test_a_step_requirement_is_checked_without_w140(self):
+        """seed-x routed via step_requirements["16"] only (no 16a/16b/16c entry) raises no W553.
 
-        An impl_context artifact (path contains 'impl_context/') maps to step "16"
-        via _step_from_path.  The seed-x should be required for step "16" → either:
-          - seed-x distills into the artifact (no W140), or
-          - the artifact has low overlap, but seed-x IS checked (W140 may fire for it).
-
-        What must NOT happen: W553 for the bare "16" key or silence on seed-x
-        (it should be in the step_required set and thus checked).
-
-        To make this deterministic: give the artifact sufficient overlap with seed-x
-        so W140 does NOT fire — proving seed-x was included in the required set and
-        passed the overlap threshold (as opposed to not being checked at all).
+        The bare "16" key is a known pipeline step, so seed-lint accepts it.  What seed-x is routed to is
+        checked by the route checks (``test_seed_routes.py``), not by seed-lint.
         """
         seed_text = "authentication login endpoint validation security xyzzy"
         artifact_data = {
@@ -260,22 +251,8 @@ class TestW553SeedStepUnknown(unittest.TestCase):
                 },
             )
             errors = lint_seeds(repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=tmpdir)
-            rendered = render_errors(errors)
-            # No W553 for the "16" key
-            w553 = [e for e in rendered if "W553" in e]
+            w553 = [e for e in render_errors(errors) if "W553" in e]
             self.assertEqual(w553, [], f"No W553 expected for bare '16' key. Got: {w553}")
-            # Sufficient overlap → no W140 for seed-x (confirms seed-x was checked
-            # and passed the overlap threshold, not skipped)
-            w140 = [e for e in rendered if "W140" in e and "seed-x" in e]
-            self.assertEqual(
-                w140,
-                [],
-                msg=(
-                    "W140 must not fire for seed-x (overlap is sufficient). "
-                    "If it fires, either seed-x was incorrectly routed or the overlap "
-                    f"algorithm degraded. Got: {w140}"
-                ),
-            )
 
 
 class TestE520UnknownSeedIdLintIntegration(unittest.TestCase):

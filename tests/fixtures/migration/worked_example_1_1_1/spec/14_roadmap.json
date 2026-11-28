@@ -1,0 +1,63 @@
+{
+    "$schema": "vc:14-roadmap",
+    "id": "roadmap-lantern",
+    "owner": "system",
+    "created_at": "2026-03-02T09:00:00Z",
+    "canonical_refs_used": [],
+    "tech_stack": {
+        "languages": [
+            "TypeScript 5.x"
+        ],
+        "frameworks": [
+            "argon2 0.41"
+        ],
+        "infrastructure": [
+            "MailRelay"
+        ],
+        "tools": []
+    },
+    "milestones": [
+        {
+            "milestone_id": "ms-account-recovery",
+            "name": "Account Recovery",
+            "target_date": "2026-12-15",
+            "status": "pending",
+            "user_story": "As a registered member, I want to reset a forgotten password so that I can get back in without support.",
+            "source_milestones": [
+                "milestone-account-recovery"
+            ],
+            "fr_refs": [
+                "fr-password-reset"
+            ],
+            "capability_refs": [
+                "cap-account-recovery"
+            ],
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-password-reset"
+                }
+            ],
+            "tasks": [
+                {
+                    "task_id": "task-implement-password-reset-confirm",
+                    "status": "pending",
+                    "description": "Implement the confirm endpoint that redeems a reset token and sets the new password.",
+                    "fr_refs": [
+                        "fr-password-reset"
+                    ],
+                    "invariant_refs": [
+                        "inv-reset-token-single-use"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-implement-password-reset-confirm-1",
+                            "text": "POST /v1/password-resets/{token} with a token issued 31 minutes earlier returns HTTP 410 with error token-expired and leaves the password hash unchanged.",
+                            "fixture_ref": "fix-password-reset-expired-token"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -7,7 +7,7 @@ Checks that the step DAG is complete and consistent:
   E599 — downstream_consumers entry inconsistent with computed upstream dependency order
   W596 — prompt references undeclared artifact not in computed allowed upstream steps
 
-Terminal step 16c is explicitly exempted from E596.
+Steps 03 (no consumer: its terms are used by label) and 16c (terminal) are exempted from E596.
 """
 
 from __future__ import annotations
@@ -20,14 +20,15 @@ from pathlib import Path
 from ..core.errors import SpecError, make_error
 from ..core.registry import derive_allowed_upstream
 from ._extraction_intent_parser import parse_extraction_intent
-from ._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE  # re-exported for tests
 
 
 # Matches prompt filenames like prompt_04_functional_requirements.md -> "04"
 _PROMPT_STEP_RE = re.compile(r"prompt_(\d{2}[a-z]?)_")
 
-# Terminal steps exempted from the dead-end check (E596)
-_TERMINAL_STEPS = frozenset({"16c"})
+# Terminal steps exempted from the dead-end check (E596).  16c ends the pipeline.  03 (glossary
+# terms) is read by label (the ``context`` role), which no stored x-link carries, so the generated
+# step order lists no consumer for it.
+_TERMINAL_STEPS = frozenset({"03", "16c"})
 
 
 def lint_dag(repo_root: str) -> list[SpecError]:
@@ -172,7 +173,7 @@ def _check_extraction_intents(
 ) -> None:
     """Check for undeclared upstream refs in extraction intent sections (W596).
 
-    For each prompt file that has a ``### Extraction Intent`` section:
+    For each prompt file that has an ``Extraction Intent`` section (level two or three):
       - Parse intent entries to identify which upstream artifacts are declared
       - Warn if a referenced artifact is not in the computed allowed upstream steps
 

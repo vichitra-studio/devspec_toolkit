@@ -10,7 +10,7 @@ This guide onboards developers to the end-to-end spec workflow and shows how to 
 - Familiarity with Git and basic JSON editing
 
 ## 0. Initialize the Project
-Before setting up your environment, initialize your project using the toolkit's automated utility. This sets up the directory structure, adds the toolkit as a submodule, seeds context documents, and generates a CI workflow.
+Before setting up your environment, initialize your project using the toolkit's automated utility. This sets up the directory structure, adds the toolkit as a submodule, seeds context documents, creates the virtual environment and then runs `specdev update --install-only`, which installs the pre-commit hooks, the merge-check CI workflow, the wrappers and the other host files (see [host_setup.md](host_setup.md)).
 
 ```bash
 # From within the toolkit checkout (or if you curl the script):
@@ -19,10 +19,11 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/my/project --s
 
 The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
-2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, `.github/workflows/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
+2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
 3.  **Seed Templates**: Copies the seed files declared in `spec/common/seed_manifest.json` (`seeds[].path`) and the manifest itself.
-4.  **Environment**: Creates `devspec_env` and installs dependencies + hooks.
-5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
+4.  **Environment**: Creates `devspec_env` and installs dependencies.
+5.  **Host files**: Runs `specdev update spec --repo-root <toolkit> --install-only` (the same command an existing host runs): the pre-commit hooks, the lock merge driver, `.github/workflows/specdev-merge-check.yml`, `tools/run_specdev.sh` and `tools/ensure_venv.py`, the links of the toolkit's skills and agents into `.claude/`, the ask rules and a `.gitignore` line. Commit what it wrote; run `specdev update` once in every other clone too.
+6.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
 ## 1. Set Up Your Environment
 The initialization utility has already created and configured your virtual environment.
@@ -53,16 +54,16 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev update` whenever the toolkit version changes. Every project must have this file; `spec-check` reports E608 if it is absent.
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev update` whenever the toolkit version changes. `specdev update` also installs the host files each time it runs (see [host_setup.md](host_setup.md)). Every project must have this file; `spec-check` reports E608 if it is absent.
 
 **Sync your project to the current toolkit version:**
 ```bash
 specdev update spec --repo-root ./devspec_toolkit
 ```
 
-*   **No schema changes**: `specdev_version` is re-stamped instantly and you are good to go.
-*   **Schema changes required**: The command directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`). `align validate` runs full post-migration validation and stamps `specdev_version` with a migration-history entry.
-*   See the [Migration Workflow](workflows/workflow_align.md) for the full align walkthrough.
+*   **No schema changes**: `specdev_version` is re-stamped and the host files are refreshed (what changed is printed, piece by piece); commit what `update` wrote.
+*   **A migration is needed**: `update` does not re-stamp. It exits 1 and prints the commands of the migration in order (`align apply --auto`, a commit, `update --adopt`, `align triage`, `align validate`). `align validate` runs `spec-check --merge` and, when it is clean, clears `migration_status` in `specdev_version`.
+*   See [Migrating a 1.1.1 host to 1.2.0](workflows/workflow_migrate_1_2_0.md) for that migration, and the [Migration Workflow](workflows/workflow_align.md) for the general flow.
 
 ```yaml
 # Example spec/specdev_version
@@ -101,9 +102,9 @@ Before writing formal specs, you must define the "Seed" of your project using th
 1. Locate the matching prompt in [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
-   - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate” (and “Context To Ingest” where applicable, or “Coverage Closure” for steps that use it), and outputs only a short bulleted list of targeted questions if critical info is missing.
-   - Phase B — Emit: after answering questions, rerun and write the artifact JSON directly to disk (`spec/NN_name.json`).
-4. Confirm the artifact JSON is written directly to `spec/NN_name.json` in your host repo.
+   - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate”, “Negative Constraints” and “Coverage Closure”, and outputs only a short bulleted list of targeted questions if critical info is missing.
+   - Phase B — Emit: after answering questions, rerun and write the artifact JSON to disk: a step that does not exist yet as a whole draft file outside `spec/`, created with `specdev step create NN --from <draft>`; a step that exists with `specdev json patch|insert|delete --id <node-id>`. A file written by hand into `spec/` gets E761 for each of its links until `specdev attest <node-id> --yes`.
+4. Confirm the artifact JSON is in `spec/NN_name.json` in your host repo (`specdev step create` writes it there).
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
@@ -123,8 +124,8 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
 - Use the two‑phase flow:
   - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.
-  - Phase B — Emit: the assistant writes the artifact JSON directly to disk and validates against the referenced step schema.
-- Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (trace/owners/units/methods/security) and stop after asking until you respond.
+  - Phase B — Emit: the assistant writes the artifact JSON to disk (`specdev step create NN --from <draft>` for a new step, `specdev json patch|insert|delete --id` for an existing one) and validates against the referenced step schema.
+- Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (links/owners/units/security) and stop after asking until you respond.
 - If validation fails, consult the guide, address errors, and re-run the emission.
 - Need a quick reminder of the workflow for a given step? Run `./tools/run_specdev.sh ai-help --step NN`.
 
@@ -135,6 +136,6 @@ Run the [core validation commands](reference.md#core-validation-commands) whenev
 
 ## 8. Where To Go Next
 - Need a conceptual model? See [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md).
-- Looking for troubleshooting tactics? Review [tooling/gap_hunter_checklist.md](tooling/gap_hunter_checklist.md) and [tooling/coverage_matrix.md](tooling/coverage_matrix.md).
+- Looking for troubleshooting tactics? Review [tooling/gap_hunter_checklist.md](tooling/gap_hunter_checklist.md).
 
 By following this single guide, developers share the same source of truth and can collaborate with AI agents without duplicating knowledge across multiple documents.

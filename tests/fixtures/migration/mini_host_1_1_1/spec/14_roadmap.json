@@ -1,0 +1,359 @@
+{
+    "$schema": "vc:14-roadmap",
+    "id": "roadmap-lantern",
+    "owner": "system",
+    "created_at": "2026-03-02T09:00:00Z",
+    "tech_stack": {
+        "languages": [
+            {
+                "name": "TypeScript",
+                "version": "5.5",
+                "rationale": "One language for the service and the desk app"
+            }
+        ],
+        "frameworks": [
+            {
+                "name": "Express",
+                "version": "^4.19",
+                "rationale": "HTTP framework for the lending service"
+            }
+        ],
+        "infrastructure": [
+            {
+                "name": "PostgreSQL",
+                "version": "16",
+                "rationale": "Primary data store"
+            },
+            {
+                "name": "Textline SMS API",
+                "version": "v2",
+                "rationale": "Pickup reminders by text"
+            }
+        ],
+        "tools": [
+            {
+                "name": "ESLint",
+                "version": "Built-in",
+                "rationale": "Linting for the TypeScript code base"
+            }
+        ]
+    },
+    "tech_stack_ref": {
+        "id": "cn:project:tech_stack:typescript-express",
+        "kind": "tech_stack",
+        "version": "1.0.0"
+    },
+    "milestones": [
+        {
+            "milestone_id": "ms-catalog-basics",
+            "name": "Catalog basics",
+            "target_date": "2026-04-15",
+            "status": "done",
+            "risk_status": "low",
+            "user_story": "As a member, I want to search the catalog so that I know whether a tool is on the shelf.",
+            "source_milestones": [
+                "milestone-catalog-basics"
+            ],
+            "tasks": [
+                {
+                    "task_id": "task-catalog-schema",
+                    "description": "Create the catalog tables and seed them",
+                    "status": "done",
+                    "fr_refs": [
+                        "fr-catalog-search"
+                    ],
+                    "invariant_refs": [],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-catalog-schema-1",
+                            "text": "The migration creates the tool and loan tables on an empty database",
+                            "fixture_ref": "fix-search-returns-matches"
+                        }
+                    ],
+                    "assumptions": [
+                        "PostgreSQL is available on the hosting plan"
+                    ],
+                    "exit_conditions": [
+                        "The migration runs on a fresh database without errors"
+                    ]
+                },
+                {
+                    "task_id": "task-catalog-search-endpoint",
+                    "description": "Build the search endpoint",
+                    "status": "done",
+                    "fr_refs": [
+                        "fr-catalog-search"
+                    ],
+                    "invariant_refs": [],
+                    "depends_on": [
+                        "task-catalog-schema"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-catalog-search-1",
+                            "text": "Searching by name returns the first page in under one second on the seed data",
+                            "fixture_ref": "fix-search-returns-matches"
+                        }
+                    ],
+                    "exit_conditions": [
+                        "GET /tools answers 200 with a page of tools"
+                    ]
+                },
+                {
+                    "task_id": "task-catalog-import",
+                    "description": "Import the volunteers' tool list",
+                    "status": "pending",
+                    "status_reason": "Waiting for the volunteers to finish the shelf count",
+                    "fr_refs": [
+                        "fr-catalog-search"
+                    ],
+                    "depends_on": [
+                        "task-catalog-schema"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-catalog-import-1",
+                            "text": "Every row of the volunteers' sheet becomes a tool record"
+                        }
+                    ]
+                }
+            ],
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-catalog-search"
+                }
+            ],
+            "fr_refs": [
+                "fr-catalog-search"
+            ],
+            "capability_refs": [
+                "cap-browse-catalog"
+            ],
+            "risks": [],
+            "spikes": []
+        },
+        {
+            "milestone_id": "ms-reservations",
+            "name": "Reservations and desk",
+            "target_date": "2026-05-15",
+            "status": "pending",
+            "risk_status": "medium",
+            "user_story": "As a member, I want to reserve a tool so that it is waiting for me at the desk.",
+            "source_milestones": [
+                "milestone-reservations"
+            ],
+            "tasks": [
+                {
+                    "task_id": "task-reserve-endpoint",
+                    "description": "Build the reserve endpoint",
+                    "status": "pending",
+                    "fr_refs": [
+                        "fr-reserve-tool"
+                    ],
+                    "invariant_refs": [
+                        "inv-reservation-window"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-reserve-tool-1",
+                            "text": "The reserve endpoint stores the hold and answers 201 with the reservation id",
+                            "fixture_ref": "fix-reserve-happy"
+                        },
+                        {
+                            "criterion_id": "ac-reserve-limit-1",
+                            "text": "A fourth open reservation is refused",
+                            "fixture_ref": "fix-reserve-twice"
+                        }
+                    ],
+                    "assumptions": [
+                        "Members always have a text-capable phone"
+                    ],
+                    "exit_conditions": [
+                        "POST /reservations answers 201 and 409 as specified"
+                    ]
+                },
+                {
+                    "task_id": "task-checkout-return-flow",
+                    "description": "Build checkout and return at the desk",
+                    "status": "done",
+                    "fr_refs": [
+                        "fr-checkout-tool",
+                        "fr-return-tool"
+                    ],
+                    "invariant_refs": [
+                        "inv-no-double-checkout"
+                    ],
+                    "depends_on": [
+                        "task-reserve-endpoint"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-checkout-flow-1",
+                            "text": "A scan of tool and card opens a loan in one call",
+                            "fixture_ref": "fix-checkout-conflict"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-reserve-sms",
+                    "description": "Send the pickup reminder text",
+                    "status": "in_progress",
+                    "fr_refs": [
+                        "fr-reserve-tool"
+                    ],
+                    "invariant_refs": [],
+                    "depends_on": [
+                        "task-reserve-endpoint"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-reserve-sms-1",
+                            "text": "A reminder is handed to the SMS gateway the evening before the pickup day"
+                        }
+                    ]
+                }
+            ],
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-reserve-tool"
+                },
+                {
+                    "type": "fr",
+                    "id": "fr-checkout-tool"
+                },
+                {
+                    "type": "fr",
+                    "id": "fr-return-tool"
+                }
+            ],
+            "fr_refs": [
+                "fr-reserve-tool",
+                "fr-checkout-tool",
+                "fr-return-tool"
+            ],
+            "capability_refs": [
+                "cap-reserve-tool",
+                "cap-checkout-return"
+            ],
+            "risks": [
+                "Texting needs a vendor contract"
+            ],
+            "spikes": [
+                "Try the Textline sandbox"
+            ]
+        },
+        {
+            "milestone_id": "ms-late-fees",
+            "name": "Late fees",
+            "target_date": "2026-06-15",
+            "status": "done",
+            "risk_status": "low",
+            "user_story": "As the desk, I want fees computed so that nobody does arithmetic at closing time.",
+            "source_milestones": [
+                "ms-late-fees"
+            ],
+            "tasks": [
+                {
+                    "task_id": "task-fee-calculator",
+                    "description": "Compute the fee for a loan",
+                    "status": "done",
+                    "fr_refs": [
+                        "fr-late-fee-calc"
+                    ],
+                    "invariant_refs": [
+                        "inv-fee-nonnegative"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-fee-calculator-1",
+                            "text": "Two full days late yields 100 cents",
+                            "fixture_ref": "fix-late-fee-two-days"
+                        }
+                    ]
+                },
+                {
+                    "task_id": "task-fee-endpoint",
+                    "description": "Expose the fee",
+                    "status": "deferred",
+                    "status_reason": "The desk will read fees off the loan screen first",
+                    "fr_refs": [
+                        "fr-late-fee-calc"
+                    ],
+                    "invariant_refs": [],
+                    "depends_on": [
+                        "task-fee-calculator"
+                    ],
+                    "acceptance_criteria": [
+                        {
+                            "criterion_id": "ac-fee-endpoint-1",
+                            "text": "GET /fees/{id} answers 200 with the fee in cents"
+                        }
+                    ]
+                }
+            ],
+            "milestone_status_reason": "Closed by the desk lead after the two-day fee check",
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-late-fee-calc"
+                }
+            ],
+            "fr_refs": [
+                "fr-late-fee-calc"
+            ],
+            "capability_refs": [
+                "cap-late-fees"
+            ],
+            "risks": [],
+            "spikes": []
+        }
+    ],
+    "spec_refs_ingested": [
+        {
+            "step_id": "09",
+            "artifact_id": "impl-plan-lantern"
+        }
+    ],
+    "seed_refs_ingested": [
+        {
+            "seed_id": "seed-hosting-plan"
+        }
+    ],
+    "dependencies": [
+        {
+            "type": "milestone",
+            "id": "ms-catalog-basics"
+        },
+        {
+            "type": "external",
+            "id": "textline-sms",
+            "owner": "Textline support desk",
+            "note": "The SMS gateway must be contracted before reminders can be sent."
+        }
+    ],
+    "dependency_ref": {
+        "id": "cn:project:dependency:textline-sms",
+        "kind": "dependency",
+        "version": "1.0.0"
+    },
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-browse-catalog"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:dependency:textline-sms",
+            "kind": "dependency",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:tech_stack:typescript-express",
+            "kind": "tech_stack",
+            "version": "1.0.0"
+        }
+    ]
+}

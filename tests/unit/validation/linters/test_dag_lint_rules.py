@@ -2,7 +2,7 @@
 
 Covers error codes E520 (file I/O), E585 (circular deps), E596 (dead-end
 producer), E599 (consumer inconsistency), W596 (undeclared upstream ref),
-the 16c terminal exemption, and the _INTENT_ENTRY_RE regex.
+the 03 and 16c terminal exemptions, and the _INTENT_ENTRY_RE regex.
 
 Note: E597, E598, and W597 are now exclusively in extraction_intent_check.py.
 """
@@ -11,8 +11,10 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
-from specdev_tools.validation.dag_lint import _INTENT_ENTRY_RE, lint_dag
+from specdev_tools.validation._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE
+from specdev_tools.validation.dag_lint import lint_dag
 from specdev_tools.core.errors import render_errors
 
 
@@ -149,6 +151,25 @@ class TestDagLint(unittest.TestCase):
                 if "E596 DAG_DEAD_END_PRODUCER" in e and "zero downstream" in e
             ]
             self.assertEqual(e596_dead, [])
+
+    def test_step_03_is_terminal_not_dead_end(self):
+        """Step 03 (terms read by label, no stored link) with zero consumers does NOT trigger E596."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "03", "04"],
+                consumers={"00": ["03", "04"], "03": [], "04": []},
+            )
+            dead_ends = [
+                e for e in render_errors(lint_dag(tmp)) if "E596 DAG_DEAD_END_PRODUCER" in e
+            ]
+            self.assertEqual(len(dead_ends), 1)
+            self.assertIn("'04'", dead_ends[0])
+
+    def test_generated_step_order_has_no_dead_end(self):
+        """The committed, generated tools/step_order.json has no E596 (09 through declared_edges, 03 terminal)."""
+        errors = lint_dag(str(Path(__file__).resolve().parents[4]))
+        self.assertEqual([e for e in render_errors(errors) if "E596" in e], [])
 
     def test_16c_exempt_but_other_dead_ends_flagged(self):
         """16c is exempt, but another dead-end step is still caught."""
@@ -464,11 +485,11 @@ class TestIntentEntryRegex(unittest.TestCase):
         self.assertIsNone(m)
 
     def test_step_with_letter_suffix_matches(self):
-        """Step numbers with letter suffixes like 02a, 13a, 16b match."""
-        line = "- **13a_completeness_assessment.json**: Extract completeness scores and gap analysis for roadmap planning"
+        """Step numbers with letter suffixes like 02a, 16a, 16b match."""
+        line = "- **02a_delivery_baseline.json**: Extract delivery baseline gates for roadmap planning"
         m = _INTENT_ENTRY_RE.match(line)
         assert m is not None
-        self.assertEqual(m.group(1), "13a_completeness_assessment.json")
+        self.assertEqual(m.group(1), "02a_delivery_baseline.json")
 
     def test_non_intent_line_does_not_match(self):
         """A regular markdown bullet without bold artifact name does not match."""

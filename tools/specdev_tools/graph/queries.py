@@ -1,0 +1,489 @@
+"""Read queries over the spec graph: the view of a node (``specdev node <id>``) and the valid targets of a link field
+(``specdev node candidates``).
+
+Both are functions of a built ``Graph`` and read nothing else: a node's own content comes from ``graph.documents``.
+A command usage error (an unknown id, kind or field) is raised as ``QueryTargetError`` carrying the E706 finding in
+``error``; a duplicated id is a finding about the spec and comes back in ``NodeReport.errors`` beside every definition.
+The text and JSON renderers are here so that the command only prints what they return.
+"""
+from __future__ import annotations
+
+import json
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+from specdev_tools.core.constants import SEED_MANIFEST_FILE
+from specdev_tools.core.errors import FindingError, SpecError, make_error
+from specdev_tools.core.json_utils import nearest_ids
+from specdev_tools.graph.contract import item_of
+from specdev_tools.graph.ids import check_unique_ids, defining_file
+from specdev_tools.graph.kinds import SEED_KIND, SEED_STEP, LinkDecl
+from specdev_tools.graph.model import DEPRECATED, NOT_APPLICABLE, Graph, Node
+from specdev_tools.graph.names import (
+    COMPONENT, CONNECTION, CONNECTS_TO, DERIVES_FROM, PROVIDED_BY, RELIES_ON, ROADMAP_MILESTONE, TASK, TASK_CRITERION, THIRD_PARTY,
+)
+from specdev_tools.graph.resolve import HISTORY_FIELDS, link_target_allowed
+
+NEAREST_COUNT = 3
+_NO_VALUE = "-"
+
+
+class QueryTargetError(FindingError):
+    """A read command was given an id, kind or field the graph does not know; the E706 finding is in ``error``."""
+
+
+def milestone_of(graph: Graph, node: Node) -> str | None:
+    """The id of the milestone *node* belongs to: the ``milestone`` of its plan file, else its containing roadmap milestone (walking up through the parents), else ``None``."""
+    current: Node | None = node
+    while current is not None:
+        if current.milestone is not None:
+            return graph.canonical_id(current.milestone)
+        if current.kind == ROADMAP_MILESTONE:
+            return current.id
+        current = graph.by_id.get(current.parent) if current.parent else None
+    return None
+
+
+def task_of(graph: Graph, criterion_id: str) -> Node | None:
+    """The roadmap task node that holds the task criterion *criterion_id* (an alias resolves to the current id); ``None`` when no such criterion, or it has no task parent."""
+    node = graph.by_id.get(graph.canonical_id(criterion_id))
+    task = graph.by_id.get(node.parent) if node is not None and node.kind == TASK_CRITERION and node.parent else None
+    return task if task is not None and task.kind == TASK else None
+
+
+def task_disposition(graph: Graph, task: Node) -> tuple[str | None, str]:
+    """The ``disposition`` value of the roadmap *task* and its reason; ``(None, "")`` for a task that is planned (no ``disposition``).
+
+    The one reader of a task's disposition: whether a value is a pause is ``names.PAUSED_DISPOSITIONS``.
+    """
+    content = item_of(graph, task) or {}
+    disposition = content.get("disposition")
+    if not isinstance(disposition, Mapping):
+        return None, ""
+    reason = disposition.get("reason")
+    return disposition.get("value"), reason if isinstance(reason, str) else ""
+
+
+def relied_on_third_parties(graph: Graph, nodes: Iterable[Node]) -> list[str]:
+    """The ids of the third parties the *nodes* rely on, each once: first what a node links to with ``relies_on``, then the reliance of the components it is ``provided_by``.
+
+    A component has no ``relies_on``; its reliance is computed from its connections: the third parties its connections
+    (the connection nodes that ``derives_from`` the component) ``connects_to`` (design: "A component's reliance is
+    computed from its connections").  Aliases resolve to the current node.
+    """
+    found: list[str] = []
+    for node in nodes:
+        found.extend(graph.canonical_id(link.target) for link in node.links if link.field == RELIES_ON)
+        for link in node.links:
+            if link.field == PROVIDED_BY:
+                found.extend(_component_reliance(graph, graph.canonical_id(link.target)))
+    return list(dict.fromkeys(target for target in found if (third := graph.by_id.get(target)) is not None and third.kind == THIRD_PARTY))
+
+
+def _component_reliance(graph: Graph, component_id: str) -> list[str]:
+    """The ids the connections of the component *component_id* connect to, in listing order (a connection is a node that ``derives_from`` the component)."""
+    component = graph.by_id.get(component_id)
+    if component is None or component.kind != COMPONENT:
+        return []
+    connections = [
+        source for link in graph.incoming.get(component_id, ()) if link.field == DERIVES_FROM
+        if (source := graph.by_id.get(link.source)) is not None and source.kind == CONNECTION
+    ]
+    return [graph.canonical_id(link.target) for connection in connections for link in connection.links if link.field == CONNECTS_TO]
+
+
+def _unknown(message: str, *, unknown_id: bool = False) -> QueryTargetError:
+    return QueryTargetError(make_error("E706", message), unknown_id=unknown_id)
+
+
+@dataclass(frozen=True)
+class LinkView:
+    """One outgoing link of a node and what it points at; ``kind`` is ``None`` when no node has the target id."""
+
+    field: str
+    target: str
+    kind: str | None
+    step: str | None
+    lifecycle: str | None
+    label: str
+
+
+@dataclass(frozen=True)
+class IncomingCount:
+    """How many nodes of ``kind`` point at a node through the link field ``verb``."""
+
+    verb: str
+    kind: str
+    count: int
+
+
+@dataclass(frozen=True)
+class NodeView:
+    """Everything ``specdev node`` shows for one definition of an id.
+
+    ``content`` is the node's own item (its child nodes replaced by their ids unless ``full``), or ``None`` when the
+    document or the path is not on the graph.  ``aliases`` lists the ids the node had before; ``file`` and ``jq_path``
+    say where the node is defined (for a seed, its entry in the seed manifest) and ``document`` is a seed's own file.
+    """
+
+    id: str
+    kind: str
+    step: str | None
+    role: str | None
+    lifecycle: str
+    scope: str | None
+    file: str
+    jq_path: str
+    label: str
+    content: Mapping[str, Any] | None
+    children: tuple[str, ...]
+    outgoing: tuple[LinkView, ...]
+    incoming: tuple[IncomingCount, ...]
+    aliases: tuple[str, ...]
+    document: str | None = None
+
+
+@dataclass(frozen=True)
+class NodeReport:
+    """The views for the ids asked, in order (one per definition, so several for a duplicated id), and the E704 findings."""
+
+    views: tuple[NodeView, ...]
+    errors: tuple[SpecError, ...] = ()
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """One node a link field may point at."""
+
+    id: str
+    kind: str
+    step: str | None
+    file: str
+    lifecycle: str
+    scope: str | None
+    label: str
+
+    @property
+    def deprecated(self) -> bool:
+        return self.lifecycle == DEPRECATED
+
+
+@dataclass(frozen=True)
+class CandidateList:
+    """The candidates shown (cut by ``limit``), how many matched before the cut, and which field they are for."""
+
+    holder_kind: str
+    field: str
+    candidates: tuple[Candidate, ...]
+    total: int = 0
+
+
+def pin_of(graph: Graph, node_id: str) -> str:
+    """The ``pin`` of the third-party node *node_id* as written; ``""`` when it has none."""
+    pin = (item_of(graph, graph.by_id[node_id]) or {}).get("pin")
+    return pin if isinstance(pin, str) else ""
+
+
+def nearest_suffix(wanted: str, known: Iterable[str]) -> str:
+    """The text ``; nearest: a, b, c`` naming the names of *known* closest to *wanted*, or ``""`` when none is close."""
+    near = [entry["id"] for entry in nearest_ids(wanted, sorted(known), NEAREST_COUNT)]
+    return f"; nearest: {', '.join(near)}" if near else ""
+
+
+def _nearest_message(subject: str, wanted: str, known: Iterable[str]) -> str:
+    return f"no {subject} {wanted!r}{nearest_suffix(wanted, known)}"
+
+
+def unknown_node_error(graph: Graph, node_id: str) -> QueryTargetError:
+    """The E706 finding for an id that no node has, naming the three nearest ids; ``unknown_id`` is set."""
+    return _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
+
+
+def require_known_step(graph: Graph, step: str) -> None:
+    """Raise the E706 finding unless *step* is a step of ``tools/step_order.json``; the message names the known steps.
+
+    The seed step is not a step a command takes, so it is unknown here.
+    """
+    require_known_step_in(graph.shape.step_ranks, step)
+
+
+def require_known_step_in(order: Mapping[str, int], step: str) -> None:
+    """``require_known_step`` for a step order (step to place in the waterfall) with no graph: E706 unless *step* is in *order*."""
+    known = sorted((name for name in order if name != SEED_STEP), key=order.__getitem__)
+    if step not in known:
+        raise _unknown(f"no step {step!r}; known steps: {', '.join(known)}")
+
+
+def plural(count: int, noun: str, many: str | None = None) -> str:
+    """``1 link`` or ``3 links``; *many* is the plural when it is not the noun plus ``s`` (``entry``, ``entries``)."""
+    return f"{count} {noun}" if count == 1 else f"{count} {many or noun + 's'}"
+
+
+def _link_view(graph: Graph, link_field: str, target_id: str) -> LinkView:
+    target = graph.find(target_id)
+    if target is None:
+        return LinkView(link_field, target_id, None, None, None, "")
+    return LinkView(link_field, target_id, target.kind, target.step, target.lifecycle, target.label)
+
+
+def _incoming(graph: Graph, node: Node) -> tuple[IncomingCount, ...]:
+    counts: Counter[tuple[str, str]] = Counter()
+    for link in graph.incoming.get(node.id, ()):
+        source = graph.by_id.get(link.source)
+        if source is not None and source.lifecycle != NOT_APPLICABLE:
+            counts[(link.field, source.kind)] += 1
+    return tuple(IncomingCount(verb, kind, count) for (verb, kind), count in sorted(counts.items()))
+
+
+def _kind_of(graph: Graph, node_id: str) -> str | None:
+    node = graph.find(node_id)
+    return node.kind if node is not None else None
+
+
+def own_content(graph: Graph, node: Node, full: bool) -> Mapping[str, Any] | None:
+    """The node's item; unless *full*, each nested collection of the kind is replaced by the ids of its child nodes."""
+    item = item_of(graph, node)
+    decl = graph.decls.get(node.kind)
+    if item is None or full or decl is None:
+        return item
+    shown = dict(item)
+    for nested in decl.nested:
+        key = nested.array_path.lstrip(".")
+        if key in shown:
+            shown[key] = [child for child in node.children if _kind_of(graph, child) == nested.kind]
+    return shown
+
+
+def _view(graph: Graph, node: Node, full: bool) -> NodeView:
+    return NodeView(
+        id=node.id,
+        kind=node.kind,
+        step=node.step,
+        role=node.role,
+        lifecycle=node.lifecycle,
+        scope=node.scope,
+        file=defining_file(graph, node),
+        jq_path=node.jq_path,
+        label=node.label,
+        content=own_content(graph, node, full),
+        children=node.children,
+        outgoing=tuple(_link_view(graph, link.field, link.target) for link in node.links),
+        incoming=_incoming(graph, node),
+        aliases=tuple(sorted(alias for alias, current in graph.alias_index.items() if current == node.id)),
+        document=node.file if node.kind == SEED_KIND else None,
+    )
+
+
+def node_view(graph: Graph, ids: Sequence[str], *, full: bool = False) -> NodeReport:
+    """The view of each id of *ids*, in the order given.
+
+    An id defined more than once gives one view per definition and the E704 findings for it.  Child nodes are shown by
+    id only; *full* includes their content.  Incoming counts leave out nodes whose lifecycle is ``not_applicable``.
+
+    Raises:
+        QueryTargetError: one or more ids are not on the graph (E706, one message naming each with its nearest ids).
+    """
+    resolved = [(node_id, graph.find(node_id)) for node_id in ids]
+    missing = [node_id for node_id, found in resolved if found is None]
+    if missing:
+        raise _unknown(
+            "; ".join(_nearest_message("node with the id", node_id, graph.by_id) for node_id in missing), unknown_id=True
+        )
+    views = [
+        _view(graph, definition, full)
+        for _, found in resolved
+        if found is not None
+        for definition in graph.dups.get(found.id, [found])
+    ]
+    shown = {view.id for view in views}
+    errors = tuple(error for error in check_unique_ids(graph) if error.node_id in shown)
+    return NodeReport(tuple(views), errors)
+
+
+@dataclass(frozen=True)
+class _Holder:
+    """The node or kind a link would start from: its kind, its steps and, for a node, what it already links to."""
+
+    kind: str
+    steps: tuple[str, ...]
+    node: Node | None = None
+    linked: frozenset[str] = field(default_factory=frozenset)
+
+
+def _holder_of_kind(graph: Graph, kind: str) -> _Holder:
+    steps = graph.shape.kind_steps.get(kind)
+    if kind not in graph.decls or steps is None:
+        raise _unknown(_nearest_message("kind", kind, graph.decls))
+    return _Holder(kind, steps)
+
+
+def _holder_of_node(graph: Graph, node_id: str, link_field: str) -> _Holder:
+    node = graph.find(node_id)
+    if node is None:
+        raise _unknown(_nearest_message("node with the id", node_id, graph.by_id), unknown_id=True)
+    linked = frozenset(graph.canonical_id(link.target) for link in node.links if link.field == link_field)
+    return _Holder(node.kind, (node.step,) if node.step is not None else (), node, linked)
+
+
+def _link_decl(graph: Graph, holder_kind: str, link_field: str) -> LinkDecl:
+    if link_field in HISTORY_FIELDS:
+        raise _unknown(f"field {link_field!r} targets deleted ids; there are no candidates")
+    decl = graph.decls.get(holder_kind)
+    links = {link.field: link for link in decl.links} if decl is not None else {}
+    if link_field not in links:
+        known = ", ".join(sorted(links)) or "none"
+        raise _unknown(f"kind {holder_kind!r} has no link field {link_field!r}; its link fields: {known}")
+    return links[link_field]
+
+
+def _same_step_ancestors(graph: Graph, holder: Node) -> set[str]:
+    """Ids of the nodes of the holder's step from which the holder can be reached through links inside that step.
+
+    Linking the holder to one of them would close a cycle (E703).
+    """
+    found: set[str] = set()
+    pending = [holder.id]
+    while pending:
+        for link in graph.incoming.get(pending.pop(), ()):
+            source = graph.by_id.get(link.source)
+            if source is not None and source.step == holder.step and source.id not in found:
+                found.add(source.id)
+                pending.append(source.id)
+    return found
+
+
+def _matches(node: Node, query: str | None) -> bool:
+    return not query or query.casefold() in f"{node.id} {node.label}".casefold()
+
+
+def _candidate(node: Node) -> Candidate:
+    return Candidate(node.id, node.kind, node.step, node.file, node.lifecycle, node.scope, node.label)
+
+
+def _seeds_routed_to(graph: Graph, steps: Iterable[str]) -> set[str]:
+    """The seed ids the seed manifest routes to one of *steps* (``step_requirements``); a value that is not a list is left out."""
+    manifest = graph.documents.get(SEED_MANIFEST_FILE)
+    routes = manifest.get("step_requirements") if isinstance(manifest, Mapping) else None
+    if not isinstance(routes, Mapping):
+        return set()
+    return {seed for step in steps for seed in (routes.get(step) if isinstance(routes.get(step), list) else ()) if isinstance(seed, str)}
+
+
+def candidates(
+    graph: Graph,
+    link_field: str,
+    *,
+    kind: str | None = None,
+    for_id: str | None = None,
+    query: str | None = None,
+    limit: int | None = None,
+) -> CandidateList:
+    """The nodes that the link field *link_field* may point at, for a holder of *kind* or for the node *for_id*.
+
+    A candidate is of a kind the field accepts, in a step earlier than the holder's (or the holder's own step when the
+    field declares the candidate's kind as same-step) and is not ``not_applicable``; a deprecated one is included.  A seed
+    is a candidate only when the seed manifest routes it to a step of the holder (a link to any other seed is E749).  With
+    *for_id* the holder itself, the nodes the holder already links to in this field and the nodes that would close a
+    same-step cycle are left out.  *query* keeps the nodes whose id or label contains the text (case-insensitive);
+    *limit* cuts the list after sorting by step order, then id; ``total`` counts the matches before the cut.
+
+    Exactly one of *kind* and *for_id* is given (anything else is a ``ValueError``: the command's parser prevents it).
+
+    Raises:
+        QueryTargetError: the kind, the node or the field is unknown, or the field is ``replaces`` / ``removes`` (E706).
+    """
+    if (kind is None) == (for_id is None):
+        raise ValueError("give exactly one of kind and for_id")
+    holder = _holder_of_kind(graph, kind) if kind is not None else _holder_of_node(graph, for_id or "", link_field)
+    decl = _link_decl(graph, holder.kind, link_field)
+    excluded = holder.linked
+    if holder.node is not None:
+        excluded = excluded | {holder.node.id} | _same_step_ancestors(graph, holder.node)
+    routed = _seeds_routed_to(graph, holder.steps)
+    matches = sorted(
+        (
+            node
+            for node in graph.gated_nodes()
+            if node.id not in excluded
+            and any(link_target_allowed(decl, step, node, graph.shape) for step in holder.steps or (None,))
+            and (node.kind != SEED_KIND or node.id in routed)
+            and _matches(node, query)
+        ),
+        key=graph.shape.order_key,
+    )
+    shown = matches if limit is None else matches[: max(limit, 0)]
+    return CandidateList(holder.kind, link_field, tuple(_candidate(node) for node in shown), len(matches))
+
+
+def _cell(value: str | None) -> str:
+    return value if value else _NO_VALUE
+
+
+def _link_line(link: LinkView) -> str:
+    if link.kind is None:
+        return f"  {link.field} -> {link.target}  (not found)"
+    return f"  {link.field} -> {link.target}  [{link.kind}, step {_cell(link.step)}, {link.lifecycle}]  {link.label}"
+
+
+def _view_text(view: NodeView) -> list[str]:
+    lines = [
+        f"{view.id}  {view.kind}  step {_cell(view.step)}  role {_cell(view.role)}  lifecycle {view.lifecycle}"
+        f"  scope {_cell(view.scope)}",
+        f"  file {view.file}  path {view.jq_path or '.'}",
+    ]
+    if view.document is not None:
+        lines.append(f"  seed document {view.document}")
+    if view.aliases:
+        lines.append(f"  aliases: {', '.join(view.aliases)}")
+    if view.content is not None:
+        lines.append("  content:")
+        lines.extend(f"    {row}" for row in json.dumps(view.content, indent=2, ensure_ascii=False).splitlines())
+    lines.append("  links out:" if view.outgoing else "  links out: none")
+    lines.extend(_link_line(link) for link in view.outgoing)
+    lines.append("  links in:" if view.incoming else "  links in: none")
+    lines.extend(f"  {entry.verb} <- {entry.count} {entry.kind}" for entry in view.incoming)
+    return lines
+
+
+def node_text(report: NodeReport) -> str:
+    """The short text form of a ``NodeReport``: one block per view, then the E704 findings."""
+    lines: list[str] = []
+    for view in report.views:
+        lines.extend(_view_text(view))
+    lines.extend(error.render() for error in report.errors)
+    return "\n".join(lines)
+
+
+def _error_json(error: SpecError) -> dict[str, Any]:
+    """The JSON form of a finding: its set fields, without ``target`` (the identity of a link finding, never printed)."""
+    return {name: value for name, value in asdict(error).items() if value is not None and name != "target"}
+
+
+def node_json(report: NodeReport) -> dict[str, Any]:
+    """The JSON-able form of a ``NodeReport``: ``{"nodes": [...], "errors": [...]}``."""
+    return {"nodes": [asdict(view) for view in report.views], "errors": [_error_json(e) for e in report.errors]}
+
+
+def candidates_text(result: CandidateList) -> str:
+    """The short text form of a ``CandidateList``: a header, then one line per candidate (a deprecated one is flagged)."""
+    shown = len(result.candidates)
+    lines = [f"{result.total} candidates for {result.holder_kind}.{result.field} (showing {shown})"]
+    for item in result.candidates:
+        flag = "  DEPRECATED" if item.deprecated else ""
+        lines.append(
+            f"{item.id}  {item.kind}  step {_cell(item.step)}  {item.file}  scope {_cell(item.scope)}"
+            f"  {item.lifecycle}{flag}  {item.label}"
+        )
+    return "\n".join(lines)
+
+
+def candidates_json(result: CandidateList) -> dict[str, Any]:
+    """The JSON-able form of a ``CandidateList``."""
+    return {
+        "kind": result.holder_kind,
+        "field": result.field,
+        "total": result.total,
+        "candidates": [{**asdict(item), "deprecated": item.deprecated} for item in result.candidates],
+    }

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from specdev_tools.core.json_utils import json_schema_discovery
+from specdev_tools.core.json_utils import _CONSTRAINT_KEYWORDS, json_schema_discovery
 from specdev_tools.core.schema_nav import effective_schema
 
 # ---------------------------------------------------------------------------
@@ -65,10 +65,10 @@ def test_own_properties_survive_allof_merge():
     assert "branch_field" in result["properties"], "allOf branch property must be merged"
 
 
-def test_own_property_wins_collision_with_allof_branch():
+def test_allof_branch_wins_collision_with_own_property():
     """When own and allOf define the same key, the branch (later) wins.
 
-    merge_allof / _get_all_properties both use .update() (branch-wins semantics).
+    merge_allof uses .update() (branch-wins semantics).
     Our helper must match.
     """
     node = {
@@ -144,7 +144,7 @@ def test_nested_allof_merged_recursively():
 def test_conditionals_not_surfaced_when_flag_off():
     """With include_conditionals=False (default), properties in oneOf/anyOf/then/else
     are NOT merged into the output (the latent-gap behaviour preserved for
-    merge_allof / _get_all_properties callers)."""
+    merge_allof callers)."""
     node = {
         "properties": {"base_field": {}},
         "oneOf": [
@@ -643,3 +643,225 @@ def test_bogus_path_returns_navigate_failure():
     assert "Could not navigate" in info["error"], (
         f"Error message format unexpected: {info['error']!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# WI-M1-01: keywords beside $ref survive (JSON Schema 2020-12 sibling overlay)
+# ---------------------------------------------------------------------------
+
+def test_ref_sibling_x_node_and_x_link_survive():
+    stub = make_stub_resolver({"vc:t": {"type": "string", "description": "target"}})
+    node = {"$ref": "vc:t", "x-node": {"kind": "k"}, "x-link": {"to": "z"}}
+    result = effective_schema(node, stub)
+    assert result["x-node"] == {"kind": "k"}
+    assert result["x-link"] == {"to": "z"}
+    assert result["type"] == "string"
+
+
+def test_ref_sibling_description_and_items_win():
+    stub = make_stub_resolver(
+        {"vc:t": {"description": "target", "items": {"type": "string"}, "minItems": 0}}
+    )
+    node = {"$ref": "vc:t", "description": "own", "items": {"type": "integer"}, "minItems": 1}
+    result = effective_schema(node, stub)
+    assert result["description"] == "own"
+    assert result["items"] == {"type": "integer"}
+    assert result["minItems"] == 1
+
+
+def test_ref_sibling_properties_union_and_required_union_ordered():
+    stub = make_stub_resolver(
+        {"vc:t": {"properties": {"a": {"x": 1}, "b": {"x": 1}}, "required": ["b", "a"]}}
+    )
+    node = {
+        "$ref": "vc:t",
+        "properties": {"b": {"x": 2}, "c": {"x": 2}},
+        "required": ["a", "c"],
+    }
+    result = effective_schema(node, stub)
+    assert result["properties"] == {"a": {"x": 1}, "b": {"x": 2}, "c": {"x": 2}}
+    assert result["required"] == ["b", "a", "c"]
+
+
+def test_ref_sibling_overlay_is_idempotent():
+    stub = make_stub_resolver({"vc:t": {"properties": {"a": {}}, "required": ["a"]}})
+    node = {"$ref": "vc:t", "description": "own", "x-node": {"k": 1}}
+    once = effective_schema(node, stub)
+    assert effective_schema(once, stub) == once
+
+
+def test_ref_sibling_cycle_guard_and_unresolved_unchanged():
+    stub = make_stub_resolver({"vc:loop": {"properties": {"n": {"$ref": "vc:loop"}}}})
+    node = {"$ref": "vc:loop", "description": "own"}
+    result = effective_schema(node, stub)
+    assert result["description"] == "own"
+    assert "n" in result["properties"]
+    assert effective_schema({"$ref": "vc:x", "description": "d"}, lambda n: None) == {
+        "properties": {},
+        "required": [],
+    }
+
+
+def test_schema_ref_sibling_census():
+    """A ``$ref`` node in schema/**/*.json carries no sibling beyond annotations and array bounds.
+
+    Allowed siblings: ``description``, ``default``, ``items``, ``minItems``, ``maxItems``. Any
+    other keyword beside a ``$ref`` (``type``, ``enum``, ``properties``, ...) is ignored or
+    contradicted by some validators, so a schema must not rely on it.
+    """
+    from collections import Counter
+
+    counts: Counter = Counter()
+
+    def walk(n: Any) -> None:
+        if isinstance(n, dict):
+            if "$ref" in n and len(n) > 1:
+                counts[tuple(sorted(k for k in n if k != "$ref"))] += 1
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v)
+
+    for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
+        walk(json.loads(f.read_text(encoding="utf-8")))
+
+    allowed = {"description", "default", "items", "minItems", "maxItems"}
+    offenders = {siblings: n for siblings, n in counts.items() if not set(siblings) <= allowed}
+    assert offenders == {}
+
+
+# ---------------------------------------------------------------------------
+# child_schema: the schema of one member of an already effective node
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402
+
+from specdev_tools.core.schema_nav import child_schema  # noqa: E402
+
+_NODE: dict[str, Any] = {
+    "properties": {"name": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string", "enum": ["a"]}}, "flag": True},
+    "patternProperties": {"^x-": {"type": "integer"}, "(": {"type": "boolean"}},
+    "additionalProperties": {"type": "number"},
+    "items": {"type": "object"},
+}
+
+
+@pytest.mark.parametrize(
+    ("step", "additional", "expected"),
+    [
+        ("name", False, {"type": "string"}),
+        (0, False, {"type": "object"}),
+        ("x-extra", False, {"type": "integer"}),
+        ("other", False, None),
+        ("other", True, {"type": "number"}),
+        ("flag", True, None),
+    ],
+)
+def test_child_schema_reads_property_index_pattern_and_additional(step: str | int, additional: bool, expected: dict[str, Any] | None) -> None:
+    """A property wins over a pattern, an index reads ``items``, a pattern matches by search, ``additionalProperties`` only on request, and a boolean schema is no schema."""
+    assert child_schema(_NODE, step, additional=additional) == expected
+
+
+def test_child_schema_treats_a_pattern_that_is_not_a_regular_expression_as_matching_nothing() -> None:
+    assert child_schema({"patternProperties": {"(": {"type": "boolean"}}}, "(") is None
+    assert child_schema({}, "anything", additional=True) is None
+
+
+# ---------------------------------------------------------------------------
+# 11. json schema prints the constraint keywords of the node (DEVSPEC-211)
+# ---------------------------------------------------------------------------
+
+_EXAMPLE_SPEC = _REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+
+
+def _example_info(file_name: str, path_selector: str) -> dict:
+    raw = json_schema_discovery(str(_EXAMPLE_SPEC / file_name), path_selector, repo_root=str(_REPO_ROOT))
+    assert raw is not None
+    return json.loads(raw)
+
+
+def test_probe_prints_min_and_max_items():
+    info = _example_info("02_system_sketch.json", ".components[].responsibilities")
+    assert (info["minItems"], info["maxItems"]) == (3, 6)
+
+
+def test_probe_prints_min_length():
+    assert _example_info("00_charter.json", ".problem_statement")["minLength"] == 20
+
+
+def test_probe_prints_every_constraint_keyword_of_the_node(tmp_path):
+    values: dict[str, Any] = {
+        "minItems": 1, "maxItems": 2, "uniqueItems": True, "minLength": 1, "maxLength": 9, "pattern": "^a",
+        "format": "date", "minimum": 0, "maximum": 5, "exclusiveMinimum": -1, "exclusiveMaximum": 6,
+        "additionalProperties": False, "const": "x",
+    }
+    assert set(values) == set(_CONSTRAINT_KEYWORDS)
+    schema_dir = tmp_path / "schema"
+    schema_dir.mkdir()
+    (schema_dir / "t.schema.json").write_text(json.dumps({
+        "$id": "vc:test:constraints",
+        "type": "object",
+        "properties": {
+            "field": {"type": "array", "items": {"type": "string", "minLength": 2}, **values},
+        },
+    }), encoding="utf-8")
+    document = tmp_path / "doc.json"
+    document.write_text(json.dumps({"$schema": "vc:test:constraints", "field": []}), encoding="utf-8")
+    raw = json_schema_discovery(str(document), ".field", repo_root=str(tmp_path))
+    info = json.loads(raw)
+    assert {keyword: info[keyword] for keyword in _CONSTRAINT_KEYWORDS} == values
+    assert info["items_constraints"] == {"minLength": 2}
+
+
+# --- a conditional branch adds properties; it never replaces a declaration ---
+
+
+def test_a_conditional_branch_does_not_replace_a_declared_property():
+    """``then`` narrows a declared property for some documents; the declaration (type, description, items) is the one returned."""
+    declared = {"type": "array", "description": "the list", "items": {"type": "object"}}
+    node = {"properties": {"errors": declared}, "if": {}, "then": {"properties": {"errors": {"minItems": 1}, "extra": {"type": "string"}}}}
+    merged = effective_schema(node, lambda n: None, include_conditionals=True)
+    assert merged["properties"]["errors"] == declared
+    assert merged["properties"]["extra"] == {"type": "string"}
+
+
+def test_a_conditional_branch_inside_allof_does_not_replace_a_declared_property():
+    """The shape of the step 05 API item: the condition sits in an ``allOf`` branch beside the declaration."""
+    declared = {"type": "array", "items": {"type": "object"}}
+    node = {"properties": {"errors": declared}, "allOf": [{"if": {}, "then": {"properties": {"errors": {"minItems": 1}}}}]}
+    assert effective_schema(node, lambda n: None, include_conditionals=True)["properties"]["errors"] == declared
+    by_allof = {"allOf": [{"properties": {"errors": declared}}, {"oneOf": [{"properties": {"errors": {"minItems": 1}, "only_here": {}}}]}]}
+    merged = effective_schema(by_allof, lambda n: None, include_conditionals=True)
+    assert merged["properties"]["errors"] == declared and "only_here" in merged["properties"]
+
+
+def test_inside_one_conditional_branch_its_own_declaration_wins_over_a_branch_nested_in_it():
+    outer, inner = {"type": "string"}, {"type": "integer"}
+    node = {"if": {}, "then": {"properties": {"x": outer}, "if": {}, "then": {"properties": {"x": inner, "y": inner}}}}
+    merged = effective_schema(node, lambda n: None, include_conditionals=True)
+    assert merged["properties"] == {"x": outer, "y": inner}
+
+
+def test_json_schema_keeps_the_declaration_of_a_property_a_condition_restates():
+    """``specdev json schema`` on the two real cases: the status of an API error (step 05) and the connections of step 02."""
+    import json
+    from pathlib import Path
+
+    from specdev_tools.core.json_utils import json_schema_discovery
+    root = Path(__file__).resolve().parents[3]
+    spec = root / "tests" / "fixtures" / "graph_example" / "spec"
+
+    def probe(name: str, selector: str) -> dict:
+        printed = json_schema_discovery(str(spec / name), selector, str(root))
+        assert printed is not None
+        return json.loads(printed)
+
+    status = probe("05_interface_contracts.json", ".apis[].errors[].protocol_status")
+    assert (status["type"], status["minimum"], status.get("maximum")) == ("integer", 0, None)
+    assert "status number the protocol" in status["description"]
+    errors = probe("05_interface_contracts.json", ".apis[].errors")
+    assert errors["type"] == "array" and errors["items"] is not None
+    assert probe("05_interface_contracts.json", ".apis[].errors[].code")["type"] == "string"
+    connections = probe("02_system_sketch.json", ".connections")
+    assert connections["type"] == "array" and connections["items"] is not None

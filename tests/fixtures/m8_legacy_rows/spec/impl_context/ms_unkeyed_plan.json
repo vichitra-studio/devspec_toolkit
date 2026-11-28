@@ -1,0 +1,5 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "plan-ms-unkeyed",
+  "plan": { "spec_alignment": { "checklist": [] } }
+}

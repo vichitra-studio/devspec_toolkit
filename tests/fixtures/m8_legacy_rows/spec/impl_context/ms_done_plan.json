@@ -1,0 +1,13 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "plan-ms-done",
+  "milestone": "ms-done",
+  "plan": {
+    "spec_alignment": {
+      "checklist": [
+        { "id": "DONE_ONE_01", "spec_ref": { "task_id": "tk-done-one" }, "milestone_ref": "ms-done", "description": "Closed work keeps its 1.1.1 fields." }
+      ]
+    }
+  },
+  "execution": { "final_status": "complete" }
+}

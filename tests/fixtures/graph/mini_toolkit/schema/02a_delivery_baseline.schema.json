@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:02a-delivery-baseline",
+  "title": "Delivery baseline (fixture)",
+  "type": "object",
+  "properties": {
+    "environments": {
+      "type": "object",
+      "x-node": {
+        "kind": "environment",
+        "map_keyed": true,
+        "role": "obligation-delivery",
+        "contract": [
+          "config"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "lifecycle": {
+            "$ref": "vc:core:graph#lifecycle"
+          },
+          "scope": {
+            "$ref": "vc:core:graph#scope"
+          },
+          "scope_reason": {
+            "$ref": "vc:core:graph#scopeReason"
+          },
+          "derives_from": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "x-link": {
+              "kinds": [
+                "capability"
+              ],
+              "required": false
+            }
+          },
+          "config": {
+            "type": "object",
+            "description": "Host keys."
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "vc:core:graph#scopeReasonRule"
+          }
+        ],
+        "required": []
+      }
+    }
+  }
+}

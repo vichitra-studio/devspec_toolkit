@@ -6,10 +6,9 @@ description: >
   assignments, max_rounds, rationale). Dispatched once per loop invocation before any
   reviewer agents run. Trigger: any invocation of /specdev-review, /specdev-step, or
   /specdev-trinity.
-  Milestone-state mode (mode: "milestone_state"): delegates per-group implementation state
+  Milestone-state mode (mode: "milestone_state"): delegates per-group convergence state
   and milestone-level phase position computation to the `specdev milestone-state` CLI and
-  returns its JSON verbatim; used by /specdev-trinity --phase impl|review orchestration
-  (§11.2 protocol).
+  returns its JSON verbatim; used by /specdev-trinity --phase impl|review orchestration.
 model: haiku
 tools: [Bash, Read, Grep]
 ---
@@ -19,8 +18,6 @@ tools: [Bash, Read, Grep]
 Read-only pre-flight agent. Receives a scope descriptor and an optional change_set hint,
 studies artifact size and change density, and returns a JSON fan-out plan for the review
 round. Cheap to dispatch (Haiku); always runs even when the answer is "no fan-out needed."
-
-**Source spec:** K_agentification.md §5.3.
 
 ---
 
@@ -35,11 +32,13 @@ Bash surface is restricted to these subcommand families only:
 | `specdev json schema <file> '<path>' --repo-root <toolkit>` | Typed constraints at a path |
 | `specdev spec-check spec --json --repo-root <toolkit> --spec-root <spec> --git-root <root>` | Current error density, scoped to in-scope paths |
 | `specdev upstream-backlog <spec> --repo-root <toolkit> --json` | Cross-step churn and unresolved upstream items |
-| `git diff --stat` | Change extent (files touched, lines changed) |
+| `git diff --stat` | Change extent (files touched, lines changed per file) |
+| `wc -l spec/<NN>_*.json` | Line count of a step's file (prints the count, no content) |
 
 No other Bash subcommands. No writes. No edits.
 
-Read is allowed for skill files under `devspec_toolkit/.claude/skills/` only.
+Read is allowed for skill files under `devspec_toolkit/.claude/skills/` and for
+`devspec_toolkit/tools/step_order.json` (its `steps` list is the step order) only.
 Grep is allowed for searching skill or prompt files.
 
 Do NOT Read any file under `spec/` directly.
@@ -49,7 +48,7 @@ Flag discipline:
 - `specdev json` subcommands (`structure`, `keys`, `schema`): pass `--repo-root` only.
 - Exception: `specdev json resolve-pointers` accepts `--git-root` (anchors relative paths) and warns-then-ignores `--spec-root`.
 - `spec-check` and all validation/governance commands: pass all three flags — `--repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
-- `upstream-backlog`: pass `--repo-root` only (does not accept `--spec-root` or `--git-root`).
+- `upstream-backlog`: takes the positional `spec_dir`, `--repo-root` and `--spec-root`; it does not accept `--git-root`.
 
 ---
 
@@ -60,28 +59,34 @@ Dispatcher supplies a JSON object as the invocation prompt:
 ```json
 {
   "scope": "<step-range | file | all | ms-<batch_id>-plan>",
-  "change_set": "<git_diff | recent_commits | upstream_backlog>"
+  "change_set": "<git_diff | recent_commits | upstream_backlog>",
+  "with_backlog": <bool>
 }
 ```
 
-`change_set` is optional. When absent, the agent probes artifact size using `specdev json structure`.
+`change_set` is optional. When absent, there is no change share (see "Decision rule"); the agent probes artifact size with `specdev json structure` for the rationale.
+`with_backlog` is optional (default `false`): the `--with-backlog` flag of `/specdev-review`. Decision rule 3 names the two cases that add the cross-step reviewer: this flag, and a `change_set` of `upstream_backlog` whose backlog lists an open item.
 
 ---
 
-## Decision rule (K_agentification.md §5.3)
+## Decision rule
 
-Execute this rule against the gathered evidence:
+Execute this rule against the gathered evidence. The change share of a step is the lines
+`git diff --stat` reports as changed in the step's file (insertions plus deletions) divided by
+the file's line count (`wc -l`). With no `change_set`, there is no change share and the step
+count alone decides between branches 1 and 2.
 
-1. If the change_set touches >= 80% of artifact bytes OR the scope spans more than 3 steps:
+1. If the change share of an in-scope step is >= 80% OR the scope spans more than 3 steps:
    - Cluster in-scope steps/files by theme or related-file affinity. Never assign one reviewer
      per step or one reviewer per file. Emit each cluster as `scope_kind: "theme_group"`.
    - **Clustering algorithm — spec steps (`spec/NN_*.json`):** walk in-scope steps in the
-     order defined by `tools/step_order.json` (the DAG authority); group consecutive steps
+     order of the `steps` list of `devspec_toolkit/tools/step_order.json` (the DAG authority;
+     Read it); group consecutive steps
      into clusters of ≤6 steps each. Do NOT split below ≤6 unless the cluster must be smaller
      to respect a DAG adjacency boundary visible in `step_order.json`. Cite `step_order.json`
      step order in rationale; do not hardcode a step list.
      Note: "shared FR/domain affinity" grouping requires reading `spec/` content, which this
-     agent is prohibited from doing (§Tools). The DAG-adjacency/≤6 rule is the sole
+     agent is prohibited from doing (see Tools). The DAG-adjacency/≤6 rule is the sole
      deterministic grouping criterion for spec steps.
    - **Clustering algorithm — toolkit/WIP files:** group by file-type affinity — schema files
      together (`schema/`), prompt files together (`prompts/`), CLI/tool source together
@@ -90,32 +95,36 @@ Execute this rule against the gathered evidence:
      to the cluster whose directory bucket shares the longest common leading path prefix with the
      file's path; if two clusters tie on prefix length, choose the one with the lexicographically
      smallest bucket name.
-   - Record the full ordered cluster list in `fan_out[]`. Each cluster gets a unique `reviewer_id`.
+   - Record the full ordered cluster list in `fan_out[]`. Each cluster gets a unique `reviewer_id`, written `r<N>` (`r1`, `r2`, ...): the skills name and glob the reviewer files by it (`findings_<scope>_<round>_r*.json`).
    - Cite `SPECDEV_REVIEW_CONCURRENCY` (default 6) in rationale to document the wave-dispatch
      context for the skill; this agent does NOT enforce wave dispatch (that is the skill's job).
    - `scope_kind` = `theme_group` for each cluster.
 
-2. If the change_set is localized (< 30% of any step's bytes, <= 3 steps total):
-   - Assign one reviewer covering the whole range.
+2. If the change_set is localized (the change share of every in-scope step is < 30%, <= 3 steps total):
+   - Assign one reviewer covering the whole range (a range of one step too).
    - `scope_kind` = `step_range`.
 
-3. Cross-step concerns (relational flags active, replay or backlog data present) OR any
-   `cross_step_relational` need:
+3. Cross-step concerns: `with_backlog` is true, or `change_set` is `upstream_backlog` and
+   `specdev upstream-backlog` lists an open item about a node of an in-scope step:
    - Always add exactly ONE additional reviewer with `scope_kind` = `cross_step_relational`
      covering all in-scope steps.
-   - This reviewer is the consumer of `--with-replay` / `--with-backlog` output.
+   - This reviewer is the consumer of `--with-backlog` output (`specdev upstream-backlog --json`
+     and `specdev stale --json`).
 
 4. If the scope value matches `ms-<batch_id>-plan` (a plan artifact scope from
    `/specdev-trinity`):
    - Assign exactly one reviewer covering the plan artifact.
    - `scope_kind` = `plan_artifact`.
-   - Step-counting and byte-threshold rules (branches 1–2) do not apply.
-   - Cross-step concerns (branch 3) do not apply unless explicitly flagged.
+   - The step-count and change-share rules (branches 1–2) do not apply.
+   - Of branch 3 only the `with_backlog` case applies: the reviewer is added when the flag is true.
 
-The 80% / 30% / 3-step thresholds are starting estimates (K_agentification.md §7 open decision #1).
-K §7 open decision #1 specifies that they may be exposed as env vars after calibration
-on the next 1–2 milestones; no specific env var names have been committed yet.
-Env-var exposure is deferred to a follow-up calibration round; these thresholds are
+5. If the scope value is a file of `spec/common/` that is not a step file (for example `spec/common/seed_manifest.json`):
+   - Assign exactly one reviewer covering that file.
+   - `scope_kind` = `manifest_artifact`; `steps` = `[]`. The skill, not this agent, gives the reviewer its findings `scope` (the file name without folder and extension) and `artifact_path`.
+   - The step-count and change-share rules (branches 1-2) do not apply.
+
+The 80% / 30% / 3-step thresholds are starting estimates. They may be exposed as env vars
+after calibration; no env var names have been committed yet. These thresholds are
 hard-coded constants until that work lands.
 
 ---
@@ -136,7 +145,7 @@ Return a single JSON object to stdout. Do not print any other text.
 }
 ```
 
-`max_rounds` is always 5 (K_agentification.md §3 empirical bound). Do not vary this.
+`max_rounds` is always 5 (a fixed bound on review rounds). Do not vary this.
 `rationale` must cite the threshold values and evidence from the probes.
 
 ---
@@ -147,15 +156,15 @@ Return a single JSON object to stdout. Do not print any other text.
 
 Input: `{ "scope": "04", "change_set": "git_diff" }`
 `git diff --stat` shows 3 lines changed in `spec/04_fr_list.json`.
-`specdev json structure spec/04_fr_list.json` reports 42 KB.
-3 changed lines / 42 KB = < 30%. Steps = 1.
+`wc -l spec/04_fr_list.json` reports 1180 lines.
+3 changed lines of 1180 = < 30%. Steps = 1.
 
 Output:
 ```json
 {
-  "fan_out": [{ "reviewer_id": "r1", "steps": ["04"], "scope_kind": "single_step" }],
+  "fan_out": [{ "reviewer_id": "r1", "steps": ["04"], "scope_kind": "step_range" }],
   "max_rounds": 5,
-  "rationale": "3 lines changed in step 04 (42 KB) = <1% of bytes. Single reviewer covers full step."
+  "rationale": "3 lines changed in step 04 (1180 lines) = <1% of its lines (threshold 30%). Single reviewer covers full step."
 }
 ```
 
@@ -184,16 +193,14 @@ Output:
 ## Mode discriminator
 
 Dispatcher specifies mode in input. Two modes:
-- (default, no `mode` field) — fan-out planning for /specdev-review et al (§5.3 protocol above)
-- `mode: "milestone_state"` — derive milestone-level state for /specdev-trinity --phase impl|review orchestration (§11.2 protocol below)
+- (default, no `mode` field) — fan-out planning for /specdev-review et al (the decision rule above)
+- `mode: "milestone_state"` — derive milestone-level state for /specdev-trinity --phase impl|review orchestration (the section below)
 
 ---
 
 ## Mode: milestone_state
 
-**Source spec:** K_agentification.md §11.2.
-
-**Mode-scoped Bash carve-out (extends §Tools allowlist for this mode only):**
+**Mode-scoped Bash carve-out (extends the Tools allowlist for this mode only):**
 | Command | Purpose |
 |---|---|
 | `specdev milestone-state --batch-id <batch_id> --repo-root <toolkit-root> --spec-root <host-spec> --git-root <host-root>` | Compute full milestone state deterministically |
@@ -218,24 +225,21 @@ specdev milestone-state \
   --git-root .
 ```
 
-The CLI computes the full output contract deterministically: per-group state (using `implementation.status` string as the single source of truth), `derived_phase_position`, `blockers[]`, and `blocking_amb_health` (including `well_formed`, which checks `severity` and `description` presence per the `crossCycleAmbiguityItem` schema). Do not re-derive anything by hand. Do not read plan or findings files directly.
+The CLI computes the full output contract deterministically: per-group `state`, `derived_phase_position` and `blockers[]`. A plan item stores no status: a group's state comes from the review findings under `.specdev/findings/` (convergence), from the `disposition` of the roadmap tasks the item realises (`deferred`, `wont_do`) and from the open items of the plan that are about a node on the item's chain (`blocked`); `closed` comes from the anchor row of the milestone. Do not re-derive anything by hand. Do not read plan or findings files directly.
 
 **Output contract** (single JSON to stdout, no other text):
 ```json
 {
   "milestone_id": "<batch_id>",
+  "milestone": "<the plan's file-level milestone key, or null>",
   "groups": [
     {
       "group_id": "...",
-      "state": "pending|code_converged|blocked|verified|deferred|wont_do",
+      "state": "pending|code_converged|blocked|deferred|wont_do",
       "implementation_converged_at": "<ISO timestamp or null>",
       "reviewer_rounds": 0,
       "findings_resolved_path": "<path or null>",
-      "blocking_amb_ids": ["..."],
-      "blocking_amb_health": [
-        { "id": "...", "status": "...", "resolved": false, "well_formed": true }
-      ],
-      "fixtures_exercised": ["..."]
+      "blocking_amb_ids": ["..."]
     }
   ],
   "derived_phase_position": "pending|impl_in_progress|impl_complete|review_pending|review_complete|operator_pending|closed",
@@ -245,9 +249,9 @@ The CLI computes the full output contract deterministically: per-group state (us
 }
 ```
 
-> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, `deferred`, and `wont_do` (DEVSPEC-122 follow-up). `wont_do` (permanently cancelled) has the same precedence and roll-up exclusion as `deferred` (paused) — both are excluded identically from `derived_phase_position`'s progress computations — but are kept as distinct literals so callers can tell "paused" from "cancelled".
+> Note: the CLI never emits `executing`. The emitted group states are `pending`, `code_converged`, `blocked`, `deferred` and `wont_do`. `wont_do` (permanently cancelled) has the same precedence and roll-up exclusion as `deferred` (paused) — both are excluded identically from `derived_phase_position`'s progress computations — but are kept as distinct literals so callers can tell "paused" from "cancelled". A group is `blocked` only when its findings have converged and an open item of the plan is about a node on its chain; an open item has no status, so every open item counts.
 
-Note: `reactivation_condition` and routable `impact_routes[]` are proposed K2 extensions NOT landed this session — `well_formed` excludes them. When schema lands them, the CLI will be updated.
+`milestone_id` echoes the batch id and is not the milestone: `milestone` is the id of the milestone the plan names in its `milestone` key (`null` when the plan has none). `derived_phase_position` is `closed` only when the anchor row of that milestone is `done`; no group state implies it.
 
 ---
 

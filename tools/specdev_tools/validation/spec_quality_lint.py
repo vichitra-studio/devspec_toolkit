@@ -3,15 +3,27 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core.errors import SpecError, make_error
-from .linter_utils import collect_ids_and_refs, is_reference_context, iter_json
+from ..core.step_paths import is_extension_file
+from .linter_utils import (
+    build_lint_graph,
+    collect_ids_and_refs,
+    graph_covered_files,
+    graph_known_ids,
+    iter_json,
+)
+
+if TYPE_CHECKING:
+    from ..graph.model import Graph
 
 
-PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|XXX|placeholder|<[^>]+>)\b", re.IGNORECASE)
+# Markers only. The English word "placeholder" is not a marker, and a marker written after a hyphen (the sentinel
+# '-tbd', 'api-x-schema-tbd') is the sentinel the schemas and prompts tell authors to write. AUTO-DERIVE is the
+# marker prompt 02 tells the author to resolve.
+PLACEHOLDER_RE = re.compile(r"(?<![\w-])(TBD|TODO|FIXME|XXX|AUTO-DERIVE)\b", re.IGNORECASE)
 STEP_ARTIFACT_RE = re.compile(r"^\d{2}[a-z]?_[a-z0-9_]+\.json$")
-ASSUMPTION_ID_RE = re.compile(r"\b((?:fr|api|cap|nfr|inv|fix|comp|job|step|role|env|unit|stage|owner|trace|gov)-[a-z0-9]+(?:-[a-z0-9]+)*)\b")
 # Spec baseline: few|some|many|several|various — extended with safe additions: fast|reliable|easy|hard|quick
 # R9: additional vague terms: appropriate|adequate|sufficient|reasonable|significant|typical|generally|usually
 VAGUE_QUANTIFIER_RE = re.compile(
@@ -22,7 +34,7 @@ VAGUE_QUANTIFIER_RE = re.compile(
 # Free-text fields to scan for vague language (beyond assumptions)
 _VAGUE_SCAN_FIELDS = {
     "description", "statement", "rationale", "justification", "notes",
-    "narrative", "postconditions", "preconditions", "risks", "spikes",
+    "postconditions", "preconditions", "risks", "spikes",
     "migration_plan", "definition",
 }
 # Metadata fields that should NOT be scanned
@@ -35,9 +47,19 @@ CRITICAL_ARRAY_KEYS = {"functional_requirements", "terms", "apis", "rules", "nfr
 _ASSUMPTION_THRESHOLD = 10
 
 
-def lint_spec_quality(spec_dir: str) -> list[SpecError]:
+def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None, spec_root: str | None = None) -> list[SpecError]:
+    """Quality checks over every artifact of *spec_dir*, plus reference closure over the ids the spec defines.
+
+    Definitions come from *graph* (built here when ``None``) for the files it covers and from a scan of the file
+    for the others.  *spec_root* is the spec folder the caller was told (``--spec-root``; default: *spec_dir*, the
+    folder it was handed): a file of its extensions folder is step 13's whatever its name, and no step artifact
+    here.  Returns the findings; never raises.
+    """
     errors: list[SpecError] = []
-    known_ids: set[str] = set()
+    spec_root = spec_root or spec_dir
+    graph = build_lint_graph(spec_dir) if graph is None else graph
+    covered = graph_covered_files(graph)
+    known_ids = graph_known_ids(graph)
     refs: list[tuple[str, str, str]] = []
 
     for path in iter_json(spec_dir):
@@ -48,7 +70,7 @@ def lint_spec_quality(spec_dir: str) -> list[SpecError]:
             rel = os.path.relpath(path, spec_dir)
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_json {exc}"))
             continue
-        if not _is_step_artifact(path, data):
+        if not _is_step_artifact(path, data, spec_root):
             continue
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_check_required_top_level(rel, data))
@@ -56,27 +78,25 @@ def lint_spec_quality(spec_dir: str) -> list[SpecError]:
         errors.extend(placeholder_errs)
         errors.extend(_check_critical_arrays(rel, data))
         errors.extend(_check_free_text_vague(rel, data))
-        collect_ids_and_refs(data, rel, known_ids, refs)
+        collect_ids_and_refs(data, rel, known_ids, refs, skip_ids_for_files=covered)
 
-    # Second pass: assumption checks with full cross-artifact known_ids
+    # Second pass: assumption checks
     for path in iter_json(spec_dir):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError):
             continue
-        if not _is_step_artifact(path, data):
+        if not _is_step_artifact(path, data, spec_root):
             continue
         rel = os.path.relpath(path, spec_dir)
-        errors.extend(_check_assumptions(rel, data, known_ids))
+        errors.extend(_check_assumptions(rel, data))
 
     for rel, p, ref_id in refs:
         if ref_id.startswith("external:") or ref_id.startswith("cn:"):
             continue
         if ref_id not in known_ids:
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel}:{p} ref={ref_id}"))
-
-    errors.extend(_check_tech_stack_coherence(spec_dir))
 
     return errors
 
@@ -105,16 +125,12 @@ def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[SpecE
     errs.extend(placeholder_errs)
     errs.extend(_check_critical_arrays(rel, data))
     errs.extend(_check_free_text_vague(rel, data))
-    # Intra-artifact assumption check (single-file mode: no cross-artifact IDs)
-    single_ids: set[str] = set()
-    single_refs: list[tuple[str, str, str]] = []
-    collect_ids_and_refs(data, rel, single_ids, single_refs)
-    errs.extend(_check_assumptions(rel, data, single_ids))
+    errs.extend(_check_assumptions(rel, data))
     return errs
 
 
-def _check_assumptions(rel: str, data: Any, known_ids: set[str], path: str = "") -> list[SpecError]:
-    """RFC 3.6: Warn if assumption text references unbound spec IDs."""
+def _check_assumptions(rel: str, data: Any, path: str = "") -> list[SpecError]:
+    """Check each ``assumptions`` value: too many (W572), a marker (E512), a vague word (W571)."""
     errs: list[SpecError] = []
     if isinstance(data, dict):
         for k, v in data.items():
@@ -122,35 +138,51 @@ def _check_assumptions(rel: str, data: Any, known_ids: set[str], path: str = "")
             if k == "assumptions":
                 if isinstance(v, list) and len(v) > _ASSUMPTION_THRESHOLD:
                     errs.append(make_error("W572", f"ASSUMPTION_COUNT_HIGH {rel}:{p} count={len(v)}"))
-                errs.extend(_scan_assumption_value(rel, v, known_ids, p))
+                errs.extend(_scan_assumption_value(rel, v, p))
             else:
-                errs.extend(_check_assumptions(rel, v, known_ids, p))
+                errs.extend(_check_assumptions(rel, v, p))
     elif isinstance(data, list):
         for i, v in enumerate(data):
-            errs.extend(_check_assumptions(rel, v, known_ids, f"{path}[{i}]"))
+            errs.extend(_check_assumptions(rel, v, f"{path}[{i}]"))
     return errs
 
 
-def _scan_assumption_value(rel: str, value: Any, known_ids: set[str], path: str) -> list[SpecError]:
+def _scan_assumption_value(rel: str, value: Any, path: str) -> list[SpecError]:
+    """Scan one ``assumptions`` value: a string, a list of them, or an assumption node whose ``text`` is scanned."""
     errs: list[SpecError] = []
-    if isinstance(value, str):
+    if isinstance(value, dict):
+        if "text" in value:
+            errs.extend(_scan_assumption_value(rel, value["text"], f"{path}.text"))
+    elif isinstance(value, str):
         if PLACEHOLDER_RE.search(value):
             errs.append(make_error("E512", f"ASSUMPTION_HAS_PLACEHOLDER {rel}:{path} value={value}"))
         for token in _scan_for_vague_language(value):
             errs.append(make_error("W571", f"ASSUMPTION_VAGUE_QUANTIFIER {rel}:{path} ref={token}"))
-        for m in ASSUMPTION_ID_RE.finditer(value):
-            token = m.group(1)
-            if token not in known_ids:
-                errs.append(make_error("W573", f"ASSUMPTION_UNBOUND_ID {rel}:{path} ref={token}"))
     elif isinstance(value, list):
         for i, item in enumerate(value):
-            errs.extend(_scan_assumption_value(rel, item, known_ids, f"{path}[{i}]"))
+            errs.extend(_scan_assumption_value(rel, item, f"{path}[{i}]"))
     return errs
 
 
 def _scan_for_vague_language(text: str) -> list[str]:
     """Extract vague terms from a text string. Returns list of matched tokens."""
     return [m.group(1) for m in VAGUE_QUANTIFIER_RE.finditer(text)]
+
+
+def _vague_findings(rel: str, path: str, text: str) -> list[SpecError]:
+    """One W593 for each vague word of *text*, located at *path* of the file *rel*."""
+    return [make_error("W593", f"VAGUE_LANGUAGE_FREE_TEXT {rel}:{path} ref={token}") for token in _scan_for_vague_language(text)]
+
+
+def _check_scan_field_list(rel: str, items: list[Any], path: str) -> list[SpecError]:
+    """W593 for each string of the list *items* of a scan field; an item that is not a string is walked."""
+    errs: list[SpecError] = []
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            errs.extend(_vague_findings(rel, f"{path}[{i}]", item))
+        else:
+            errs.extend(_check_free_text_vague(rel, item, f"{path}[{i}]"))
+    return errs
 
 
 def _check_free_text_vague(rel: str, data: Any, path: str = "") -> list[SpecError]:
@@ -162,8 +194,9 @@ def _check_free_text_vague(rel: str, data: Any, path: str = "") -> list[SpecErro
                 continue
             p = f"{path}.{k}" if path else k
             if k in _VAGUE_SCAN_FIELDS and isinstance(v, str):
-                for token in _scan_for_vague_language(v):
-                    errs.append(make_error("W593", f"VAGUE_LANGUAGE_FREE_TEXT {rel}:{p} ref={token}"))
+                errs.extend(_vague_findings(rel, p, v))
+            elif k in _VAGUE_SCAN_FIELDS and isinstance(v, list):
+                errs.extend(_check_scan_field_list(rel, v, p))
             elif k != "assumptions":
                 errs.extend(_check_free_text_vague(rel, v, p))
     elif isinstance(data, list):
@@ -216,51 +249,10 @@ def _check_critical_arrays(rel: str, data: dict[str, Any]) -> list[SpecError]:
     return errs
 
 
-
-
-def _check_tech_stack_coherence(spec_dir: str) -> list[SpecError]:
-    """W574: Warn if Steps 09 and 14 both define tech_stack with differing entries."""
-    errs: list[SpecError] = []
-    step09_path = os.path.join(spec_dir, "09_impl_plan.json")
-    step14_path = os.path.join(spec_dir, "14_roadmap.json")
-
-    step09_data: dict[str, Any] | None = None
-    step14_data: dict[str, Any] | None = None
-
-    for path, name in [(step09_path, "09_impl_plan.json"), (step14_path, "14_roadmap.json")]:
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                parsed = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-        if name == "09_impl_plan.json":
-            step09_data = parsed
-        else:
-            step14_data = parsed
-
-    if step09_data is None or step14_data is None:
-        return errs
-
-    ts09 = step09_data.get("tech_stack")
-    ts14 = step14_data.get("tech_stack")
-
-    if ts09 is None or ts14 is None:
-        return errs
-
-    if ts09 != ts14:
-        errs.append(
-            make_error(
-                "W574",
-                "TECH_STACK_COHERENCE_MISMATCH 09_impl_plan.json vs 14_roadmap.json tech_stack entries differ",
-            )
-        )
-
-    return errs
-
-
-def _is_step_artifact(path: str, data: dict[str, Any] | None = None) -> bool:
+def _is_step_artifact(path: str, data: dict[str, Any] | None = None, spec_root: str | None = None) -> bool:
+    """Whether *path* is a step artifact by its name or its ``$schema``; never a file of the extensions folder of *spec_root*."""
+    if spec_root is not None and is_extension_file(path, spec_root):
+        return False
     if STEP_ARTIFACT_RE.match(os.path.basename(path)):
         return True
     if isinstance(data, dict):

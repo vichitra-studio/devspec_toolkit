@@ -1,7 +1,6 @@
 """Shared linter helper functions.
 
-Centralises duplicate helpers found across hallucination_lint, spec_quality_lint,
-and forward_replay_check, eliminating ~200 LOC of near-identical code.
+Helpers shared by hallucination_lint, spec_quality_lint and the other linters.
 
 Created by FIX-002 (Batch 0).
 """
@@ -10,23 +9,20 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Collection
 from typing import Any, Iterator
 
-from ..core.errors import SpecError, make_error
+from ..canonical.registry import load_tier_entries
+from ..core.json_utils import resolve_effective_toolkit_root
 from ..core.loaders import iter_spec_artifacts
+from ..graph.build import build_graph
+from ..graph.kinds import KindRegistryError
+from ..graph.model import Graph
 
 
 # ---------------------------------------------------------------------------
-# Stopword sets — aligned across hallucination_lint and forward_replay_check
+# Stopword sets shared by the linters
 # ---------------------------------------------------------------------------
-
-DERIVATION_STOPWORDS: frozenset[str] = frozenset({
-    "that", "this", "with", "from", "have", "will", "been", "were", "they",
-    "their", "than", "each", "which", "when", "what", "there", "about",
-    "would", "make", "like", "into", "only", "also", "most", "some",
-    "could", "should", "does", "must", "shall", "true", "false", "null",
-    "http", "https", "schema", "json", "spec", "step",
-})
 
 CONTENT_STOPWORDS: frozenset[str] = frozenset({
     "that", "this", "with", "from", "have", "will", "been", "were", "they",
@@ -35,33 +31,6 @@ CONTENT_STOPWORDS: frozenset[str] = frozenset({
     "could", "should", "does", "must", "shall", "true", "false", "null",
     "http", "https", "schema", "json", "spec", "step",
 })
-
-
-# ---------------------------------------------------------------------------
-# tokenize_free_text — replaces 3 copies of free-text tokenizer
-# ---------------------------------------------------------------------------
-
-def tokenize_free_text(text: str, *, stopwords: frozenset[str] | None = None) -> set[str]:
-    """Extract significant tokens: 4+ char lowercase words, no stopwords.
-
-    Parameters
-    ----------
-    text : str
-        Raw text to tokenize.
-    stopwords : frozenset[str] | None
-        Custom stopword set.  Defaults to ``DERIVATION_STOPWORDS``.
-
-    Returns
-    -------
-    set[str]
-        Set of significant tokens.
-    """
-    if stopwords is None:
-        stopwords = DERIVATION_STOPWORDS
-    return {
-        w for w in re.findall(r"[a-z][a-z0-9_-]{3,}", text.lower())
-        if w not in stopwords
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +48,40 @@ def iter_json(spec_dir: str) -> Iterator[str]:
 
 
 # ---------------------------------------------------------------------------
+# Definition source — the graph for files it covers, the legacy scan for the rest
+# ---------------------------------------------------------------------------
+
+def build_lint_graph(spec_dir: str, repo_root: str | None = None) -> Graph | None:
+    """Build the spec graph of *spec_dir* for the linters, or ``None`` when the registry is unavailable.
+
+    *repo_root* is the toolkit root; ``None`` selects the toolkit this package belongs to.  ``None`` is the "no graph" answer: callers then scan every file for ids, as before the graph.
+    """
+    try:
+        return build_graph(spec_dir, repo_root or resolve_effective_toolkit_root(None))
+    except KindRegistryError:
+        return None
+
+
+def graph_covered_files(graph: Graph | None) -> frozenset[str]:
+    """Spec-relative paths (``/``-separated) of the files that contribute at least one node to *graph*."""
+    return frozenset(node.file for node in graph.nodes) if graph is not None else frozenset()
+
+
+def graph_known_ids(graph: Graph | None) -> set[str]:
+    """Every id a reference may name: the graph's nodes (first definition of each), their aliases and the root ``id`` of each document read.
+
+    An id a person or a file wrote is looked up as an id, then as an alias (``Graph.find``), so an alias is known too.
+    An artifact's own ``id`` is no node; a 1.1.1 ``trace`` entry may still name it.
+    """
+    if graph is None:
+        return set()
+    known = set(graph.by_id)
+    known.update(graph.alias_index)
+    known.update(root_id for document in graph.documents.values() if isinstance(root_id := document.get("id"), str))
+    return known
+
+
+# ---------------------------------------------------------------------------
 # collect_ids_and_refs — replaces duplicates in hallucination_lint & spec_quality_lint
 # ---------------------------------------------------------------------------
 
@@ -88,13 +91,15 @@ def collect_ids_and_refs(
     ids: set[str],
     refs: list[tuple[str, str, str]],
     path: str = "",
+    skip_ids_for_files: Collection[str] = frozenset(),
 ) -> None:
     """Walk *obj* and populate *ids* (definitions) and *refs* (references).
 
     An ID is any value under a key ending in ``_id``, or ``"id"`` when NOT in
     a reference context.  A ref is ``"id"`` or ``"target_id"`` inside a
-    reference context, any ``*_ref`` string, any item in ``*_refs`` lists,
-    or items in ``"requires"`` lists.
+    reference context, any ``*_ref`` string, or any item in ``*_refs`` lists.
+    A file the graph covers (*skip_ids_for_files*) defines its ids through the
+    graph, so none of its fields is added to *ids*; its refs are still collected.
 
     Parameters
     ----------
@@ -108,14 +113,30 @@ def collect_ids_and_refs(
         Accumulator for discovered references as ``(rel, path, ref_id)``.
     path : str
         Current JSON path (dot-separated).
+    skip_ids_for_files : Collection[str]
+        Spec-relative paths (``/``-separated) of the files whose ids come from
+        the graph.  *rel* is compared after its separators are normalised.
     """
+    covered = rel.replace(os.sep, "/") in skip_ids_for_files
+    _walk_ids_and_refs(obj, rel, None if covered else ids, refs, path)
+
+
+def _walk_ids_and_refs(
+    obj: Any,
+    rel: str,
+    ids: set[str] | None,
+    refs: list[tuple[str, str, str]],
+    path: str,
+) -> None:
+    """Recursive body of :func:`collect_ids_and_refs`; ``ids=None`` collects references only."""
     if isinstance(obj, dict):
         for k, v in obj.items():
             p = f"{path}.{k}" if path else k
-            if k.endswith("_id") and isinstance(v, str):
-                ids.add(v)
-            if k == "id" and isinstance(v, str) and not is_reference_context(path):
-                ids.add(v)
+            if ids is not None:
+                if k.endswith("_id") and isinstance(v, str):
+                    ids.add(v)
+                if k == "id" and isinstance(v, str) and not is_reference_context(path):
+                    ids.add(v)
             if k in {"id", "target_id"} and isinstance(v, str) and is_reference_context(path):
                 refs.append((rel, p, v))
             if k.endswith("_ref") and isinstance(v, str):
@@ -124,14 +145,10 @@ def collect_ids_and_refs(
                 for idx, item in enumerate(v):
                     if isinstance(item, str):
                         refs.append((rel, f"{p}[{idx}]", item))
-            if k == "requires" and isinstance(v, list):
-                for idx, item in enumerate(v):
-                    if isinstance(item, str):
-                        refs.append((rel, f"{p}[{idx}]", item))
-            collect_ids_and_refs(v, rel, ids, refs, p)
+            _walk_ids_and_refs(v, rel, ids, refs, p)
     elif isinstance(obj, list):
         for i, item in enumerate(obj):
-            collect_ids_and_refs(item, rel, ids, refs, f"{path}[{i}]")
+            _walk_ids_and_refs(item, rel, ids, refs, f"{path}[{i}]")
 
 
 # ---------------------------------------------------------------------------
@@ -152,50 +169,6 @@ def is_reference_context(path: str) -> bool:
         "trace", "targets", "target_ids", "mitigations",
         "dependencies", "links", "requires",
     })
-
-
-# ---------------------------------------------------------------------------
-# check_no_duplicates — replaces 11 independent duplicate-ID detection patterns
-# ---------------------------------------------------------------------------
-
-def check_no_duplicates(
-    items: list[dict[str, Any]],
-    id_field: str,
-    label: str,
-    errors: list[SpecError],
-    *,
-    code: str = "",
-) -> None:
-    """Append a :class:`SpecError` for each duplicate *id_field* found in *items*.
-
-    Parameters
-    ----------
-    items : list[dict]
-        Array of objects to check.
-    id_field : str
-        Key to extract the ID value from each item.
-    label : str
-        Human-readable label for error messages (e.g. ``"api_id"``).
-    errors : list[SpecError]
-        Error accumulator.
-    code : str
-        Error code (e.g. ``"E310"``).  Defaults to ``"E520"`` when empty.
-    """
-    seen: set[str] = set()
-    for i, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-        value = item.get(id_field)
-        if not isinstance(value, str):
-            continue
-        if value in seen:
-            errors.append(
-                make_error(
-                    code.strip() or "E520",
-                    f"Duplicate {label} '{value}' at index {i}",
-                )
-            )
-        seen.add(value)
 
 
 # ---------------------------------------------------------------------------
@@ -232,34 +205,26 @@ def is_resolved_canonical_ref(value: Any) -> bool:
 
 
 def load_canonical_stages(canon_dir: str) -> set[str] | None:
-    """Load canonical stage values from canon/kinds/stage.json.
+    """Load canonical stage values: the ``stage`` entries of the canon, read through the registry loader.
 
-    Falls back to canon/manifest.json legacy format.  Returns None if
-    neither source can be loaded (caller falls back to KNOWN_STAGES).
+    That is the union of ``canon/manifest.json`` and ``canon/kinds/*.json`` (not ``kinds/stage.json`` alone);
+    a retired entry does not count.  Falls back to the legacy ``stages.values`` list of ``canon/manifest.json``.
+    Returns None if neither source can be loaded (caller falls back to KNOWN_STAGES).
 
     Parameters
     ----------
     canon_dir : str
         Path to the canon directory (e.g. ``<toolkit_root>/canon``).
     """
-    # Primary: canon/kinds/stage.json
-    stage_path = os.path.join(canon_dir, "kinds", "stage.json")
-    try:
-        with open(stage_path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-        entries = data.get("entries", [])
-        if isinstance(entries, list) and entries:
-            labels = {
-                e["preferred_label"]
-                for e in entries
-                if isinstance(e, dict)
-                and isinstance(e.get("preferred_label"), str)
-                and e.get("status") != "retired"
-            }
-            if labels:
-                return labels
-    except (OSError, json.JSONDecodeError, ValueError, TypeError):
-        pass
+    # Primary: the stage entries of the canon, read through the registry loader (manifest.json and kinds/)
+    canon_root = os.path.abspath(canon_dir)
+    labels = {
+        e["preferred_label"]
+        for e in load_tier_entries(os.path.dirname(canon_root), os.path.basename(canon_root))
+        if e.get("kind") == "stage" and isinstance(e.get("preferred_label"), str) and e.get("status") != "retired"
+    }
+    if labels:
+        return labels
 
     # Fallback: canon/manifest.json (legacy)
     manifest_path = os.path.join(canon_dir, "manifest.json")

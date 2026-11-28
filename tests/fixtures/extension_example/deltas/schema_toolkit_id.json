@@ -1,0 +1,13 @@
+{
+  "description": "The schema takes the $id of a toolkit schema.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/extensions/ext_01_database.schema.json",
+      "path": [
+        "$id"
+      ],
+      "value": "vc:core:atoms"
+    }
+  ]
+}

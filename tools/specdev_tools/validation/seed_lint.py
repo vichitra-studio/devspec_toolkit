@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Dict, List
 
 from ..core.errors import SpecError, ensure_spec_errors, make_error
-from ..core.loaders import iter_spec_artifacts
-from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
+from ..core.constants import SEED_MANIFEST_FILE
+from ..core.seed_routing import resolve_seed_paths
 from .validate import validate_file
 
 
@@ -143,7 +143,7 @@ _project_root_from_spec_dir = project_root_from_spec_dir
 
 
 def _load_manifest(repo_root: str, project_root: str, errors: List[SpecError]) -> Dict:
-    manifest_path = os.path.join(project_root, "spec", "common", "seed_manifest.json")
+    manifest_path = os.path.join(project_root, "spec", SEED_MANIFEST_FILE)
     if not os.path.exists(manifest_path):
         errors.append(make_error("E520", f"Missing seed manifest: {manifest_path}"))
         return {}
@@ -158,86 +158,6 @@ def _load_manifest(repo_root: str, project_root: str, errors: List[SpecError]) -
     except Exception as e:
         errors.append(make_error("E520", f"Failed to read seed manifest: {manifest_path} ({e})"))
         return {}
-
-
-def _step_from_path(path: str) -> str:
-    if os.sep + "impl_context" + os.sep in path:
-        return "16"
-    filename = os.path.basename(path)
-    if "_" in filename:
-        return filename.split("_", 1)[0]
-    return "unknown"
-
-
-def _collect_required_seeds(manifest: Dict, step_id: str) -> List[str]:
-    """Return the ordered list of seed IDs required by *step_id*.
-
-    Delegates to ``seed_routing.resolve_seeds_for_step``.  Returns only
-    *step_seed_ids* (second element of the tuple) — the seeds required by this
-    specific step, ordered by global_seed_order with extras appended.  The
-    global_seed_ids (first element) are intentionally discarded to avoid
-    widening W140 false-positives across all step–artifact pairs.
-    """
-    _, step_seed_ids = resolve_seeds_for_step(step_id, manifest)
-    return step_seed_ids
-
-
-_STOP_WORDS = frozenset({
-    "the", "this", "that", "with", "from", "have", "will", "been", "each",
-    "which", "their", "about", "would", "could", "should", "there", "these",
-    "those", "other", "after", "before", "where", "being", "does", "into",
-    "over", "only", "than", "them", "then", "they", "when", "also", "more",
-    "most", "some", "such", "very", "just", "like", "make", "made", "must",
-    "need", "used",
-})
-
-def _tokenize(text: str) -> set:
-    return {w for w in _re.findall(r"[a-z0-9]{4,}", text.lower()) if w not in _STOP_WORDS}
-
-
-def _check_seed_content_overlap(
-    spec_dir: str, manifest: Dict, project_root: str, errors: List[SpecError]
-) -> None:
-    # Resolve all seed IDs declared in the manifest to absolute paths.
-    # resolve_seed_paths does NOT existence-filter; we keep only paths that
-    # exist on disk, matching the prior behaviour.
-    all_seed_ids = [
-        s.get("seed_id") for s in manifest.get("seeds", [])
-        if isinstance(s, dict) and s.get("seed_id")
-    ]
-    raw_paths = resolve_seed_paths(manifest, all_seed_ids, project_root)
-    seed_paths: Dict[str, str] = {
-        sid: os.path.normpath(p)
-        for sid, p in raw_paths.items()
-        if os.path.isfile(os.path.normpath(p))
-    }
-
-    for file_path in iter_spec_artifacts(spec_dir):
-        try:
-            with open(file_path, "r", encoding="utf-8") as fh:
-                instance = json.load(fh)
-        except Exception:
-            continue
-        step_id = _step_from_path(file_path)
-        required_seeds = _collect_required_seeds(manifest, step_id)
-        if not required_seeds:
-            continue
-        spec_text = json.dumps(instance)
-        spec_tokens = _tokenize(spec_text)
-        for sid in required_seeds:
-            if sid not in seed_paths:
-                continue
-            try:
-                with open(seed_paths[sid], "r", encoding="utf-8") as fh:
-                    seed_text = fh.read()
-            except Exception:
-                continue
-            seed_tokens = _tokenize(seed_text)
-            shared = len(spec_tokens & seed_tokens)
-            if shared < 3:
-                errors.append(make_error(
-                    "W140", f"SEED_CONTENT_OVERLAP_LOW seed_id={sid} artifact={os.path.basename(file_path)} shared_tokens={shared}"
-                ))
 
 
 def _count_substantive_out_of_scope(text: str) -> int:
@@ -330,20 +250,29 @@ def _check_step00_out_of_scope_thin(
             continue
         total_substantive += _count_substantive_out_of_scope(text)
 
-    # Threshold 3 matches schema/00_charter.schema.json "out_of_scope": {"minItems": 3}.
-    # The value is restated inline (not read from the schema at runtime) by design:
-    # (1) it follows the validation layer's established mirror-with-comment convention
-    #     for schema-owned bounds (cf. step_16.py, step_16b.py, linter_utils.py); and
-    # (2) reading a Step-00 schema from the seed layer would couple seeds to Step 00 —
-    #     exactly the separation W555 exists to preserve.
-    # If that schema constraint is bumped, update this threshold to match.
+    # The threshold is a seed-quality heuristic, not a mirror of a schema bound.
+    # It is stated inline (not read from a schema at runtime) so the seed layer
+    # stays decoupled from Step 00, which is what W555 exists to preserve.
     if total_substantive < 3:
         errors.append(make_error(
             "W555",
             f"STEP00_SEED_OUT_OF_SCOPE_THIN seeds routed to step 00 supply"
-            f" {total_substantive} substantive out_of_scope item(s);"
-            f" charter schema requires minItems:3",
+            f" {total_substantive} out-of-scope or non-goal bullet(s);"
+            " at least 3 are expected",
         ))
+
+
+def _is_blank_file(path: str) -> bool:
+    """True when the file at *path* holds nothing but whitespace.
+
+    A file that cannot be opened is not reported here (the existence check
+    of ``lint_seeds`` is the only one that applies to it).
+    """
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read().strip() == ""
+    except OSError:
+        return False
 
 
 def lint_seeds(
@@ -400,6 +329,11 @@ def lint_seeds(
                 f"Seed '{seed_id}' path '{seed_path}' does not exist or is not readable"
                 f" (resolved: {resolved})",
             ))
+        elif _is_blank_file(resolved):
+            errors.append(make_error(
+                "E520",
+                f"Seed '{seed_id}' path '{seed_path}' is empty (a seed that a step reads must hold text)",
+            ))
         try:
             common = os.path.commonpath(
                 [os.path.abspath(project_root), os.path.abspath(resolved)]
@@ -412,32 +346,6 @@ def lint_seeds(
             errors.append(make_error(
                 "E520", f"Seed '{seed_id}' path '{seed_path}' escapes project root (different drive)"
             ))
-
-    # G5: Reverse check — detect on-disk seeds not declared in manifest
-    declared_paths = set()
-    for seed in manifest.get("seeds", []):
-        if isinstance(seed, dict) and seed.get("path"):
-            declared_paths.add(os.path.normpath(os.path.join(project_root, seed["path"])))
-
-    # Derive scan directories from the parent directories of declared seed paths.
-    # This avoids the hardcoded "docs/seed" fallback that misfires when the
-    # host places seeds elsewhere.  Each unique parent is scanned once.
-    scan_dirs: set = set()
-    for seed in manifest.get("seeds", []):
-        if isinstance(seed, dict) and seed.get("path"):
-            seed_abs = os.path.normpath(os.path.join(project_root, seed["path"]))
-            scan_dirs.add(os.path.dirname(seed_abs))
-    for seed_dir_abs in scan_dirs:
-        if not os.path.isdir(seed_dir_abs):
-            continue
-        for fn in os.listdir(seed_dir_abs):
-            if not fn.endswith(".md"):
-                continue
-            on_disk_path = os.path.normpath(os.path.join(seed_dir_abs, fn))
-            if on_disk_path not in declared_paths:
-                errors.append(make_error(
-                    "W551", f"UNDECLARED_SEED on-disk seed '{fn}' not declared in seed_manifest.json"
-                ))
 
     seed_id_set = set(seed_ids)
     for sid in manifest.get("global_seed_order", []):
@@ -463,7 +371,6 @@ def lint_seeds(
                 f"SEED_STEP_UNKNOWN step_requirements[{step_id}] is not a known pipeline step",
             ))
 
-    _check_seed_content_overlap(spec_dir, manifest, project_root, errors)
     _check_step00_out_of_scope_thin(manifest, project_root, errors)
 
     return errors

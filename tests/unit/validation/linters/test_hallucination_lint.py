@@ -11,22 +11,18 @@ from specdev_tools.core.errors import render_errors
 
 
 class HallucinationLintTests(unittest.TestCase):
-    def test_detects_invalid_stage_and_trace_type(self):
+    def test_detects_invalid_stage(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "spec").mkdir()
             (root / "spec" / "07_nfrs.json").write_text(
                 json.dumps(
-                    {
-                        "stage": "preprod",
-                        "trace": [{"type": "unknown-type", "id": "x"}]
-                    }
+                    {"stage": "preprod"}
                 ),
                 encoding="utf-8",
             )
             errs = lint_hallucinations(str(root / "spec"))
             self.assertTrue(any("preprod" in e for e in render_errors(errs)))
-            self.assertTrue(any("unknown-type" in e for e in render_errors(errs)))
 
     def test_detects_invalid_command_and_unknown_ref(self):
         with tempfile.TemporaryDirectory() as td:
@@ -39,7 +35,7 @@ class HallucinationLintTests(unittest.TestCase):
                             {
                                 "job_id": "job-1",
                                 "steps": [{"id": "s-1", "command": "inventcmd run"}],
-                                "requires": ["job-x"],
+                                "job_refs": ["job-x"],
                             }
                         ]
                     }
@@ -281,17 +277,6 @@ class HallucinationLintTests(unittest.TestCase):
             errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
             self.assertFalse(any("EXISTING_STRUCTURE_PATH_NOT_FOUND" in e for e in render_errors(errs)))
 
-    def test_linked_test_expectation_missing_file(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "spec" / "13_impl.json").write_text(
-                json.dumps({"linked_test_expectation": "tests/missing_test.py"}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertTrue(any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)))
-
     # ------------------------------------------------------------------
     # Submodule path resolution: git_root vs repo_root (Bug 1 & Bug 2)
     # ------------------------------------------------------------------
@@ -355,95 +340,6 @@ class HallucinationLintTests(unittest.TestCase):
                 "missing path in em-dash composite must still fire E530",
             )
 
-    def test_linked_test_expectation_playwright_command_no_error(self):
-        """Bug 2 regression: playwright command with --grep flag must extract the
-        test file path and not fire E530 when the file exists."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "tests").mkdir(parents=True)
-            (root / "tests" / "bootstrap.test.js").write_text("// test", encoding="utf-8")
-            cmd = "npx playwright test tests/bootstrap.test.js --grep 'publish post success'"
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "playwright command must extract test file path before existence check",
-            )
-
-    def test_linked_test_expectation_playwright_command_missing(self):
-        """Playwright command: if the extracted test file doesn't exist, E530 fires."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            cmd = "npx playwright test tests/missing.test.js --grep 'some test'"
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertTrue(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "missing test file in playwright command must fire E530",
-            )
-
-    def test_linked_test_expectation_bash_c_wrapped_no_error(self):
-        """Drift #2 (linked_test_expectation side): `bash -c "<cmd>"` wrap must
-        unwrap before path extraction, so the inner test path is checked and no
-        spurious E530 fires when the file exists."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "tests").mkdir(parents=True)
-            (root / "tests" / "wrapped.test.js").write_text("// test", encoding="utf-8")
-            cmd = 'bash -c "npx playwright test tests/wrapped.test.js"'
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "bash -c wrap must not break linked_test_expectation path extraction",
-            )
-
-    def test_linked_test_expectation_bash_c_wrapped_missing_fires(self):
-        """`bash -c "..."` wrap unwraps, then existence check still fires E530
-        when the inner path is missing — wrapping is not an escape from the check."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            cmd = 'bash -c "npx playwright test tests/does_not_exist.test.js"'
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertTrue(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "missing inner path under bash -c wrap must still fire E530",
-            )
-
-    def test_linked_test_expectation_compound_command_no_error(self):
-        """Compound shell commands (&&) must not fire E530 — there is no single
-        authoritative test-file path to validate in a compound command."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            cmd = "npx gulp zip && npx gscan theme/dist/vc-collective.zip"
-            (root / "spec" / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "compound && command must not fire E530 (no single test file to validate)",
-            )
-
     def test_existing_structures_emdash_composite_with_git_root(self):
         """Combined Bug 1A+1B: em-dash composite string AND git_root != repo_root.
         File exists at git_root; path must be extracted from composite before
@@ -469,29 +365,20 @@ class HallucinationLintTests(unittest.TestCase):
                 "em-dash composite at git_root must not fire E530 in submodule deployment",
             )
 
-    def test_linked_test_expectation_git_root_resolves_host_file(self):
-        """Bug 2A regression: test file at git_root must not fire E530 in
-        submodule deployment where repo_root is the toolkit subdirectory."""
+    def test_check_linked_test_expectations_removed(self):
+        """`linked_test_expectation` is no longer a checked path field: no check function, no E530."""
+        import specdev_tools.validation.hallucination_lint as hallucination_lint
+
+        self.assertFalse(hasattr(hallucination_lint, "_check_linked_test_expectations"))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            toolkit = root / "devspec_toolkit"
-            toolkit.mkdir()
-            spec = toolkit / "spec"
-            spec.mkdir()
-            (root / "tests").mkdir()
-            (root / "tests" / "bootstrap.test.js").write_text("// test", encoding="utf-8")
-            cmd = "npx playwright test tests/bootstrap.test.js --grep 'x'"
-            (spec / "16a_plan.json").write_text(
-                json.dumps({"linked_test_expectation": cmd}),
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"linked_test_expectation": "tests/missing_test.py"}),
                 encoding="utf-8",
             )
-            errs = lint_hallucinations(
-                str(spec), repo_root=str(toolkit), git_root=str(root)
-            )
-            self.assertFalse(
-                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
-                "test file at git_root must not trigger E530 in submodule deployment",
-            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual([e for e in errs if e.code == "E530"], [])
 
     def test_nfr_refs_unresolved(self):
         with tempfile.TemporaryDirectory() as td:
@@ -538,6 +425,35 @@ class HallucinationLintTests(unittest.TestCase):
                 any("W570" in e and "GRACEFUL_SKIP" in e for e in rendered),
                 f"expected a W570 GRACEFUL_SKIP diagnostic, got: {rendered}",
             )
+
+    def test_m2_02a_objects_and_capability_without_metric_refs_give_no_e530_e541(self):
+        capabilities = {
+            "$schema": "vc:01-capabilities",
+            "capabilities": [{
+                "capability_id": "cap-checkout",
+                "verb": "pay",
+                "scope": "in",
+                "capability_ref": "cn:project:capability:checkout",
+                "derives_from": ["seg-buyers"],
+            }],
+        }
+        delivery = {
+            "$schema": "vc:02a-delivery-baseline",
+            "environments": {
+                env: {"scope": "in", "derives_from": ["seed-delivery"]} for env in ("dev", "ci", "staging", "prod")
+            },
+            "ci_gates": [{"gate_id": "unit-tests", "scope": "in", "derives_from": ["seed-delivery"]}],
+            "secrets": [{
+                "secret_id": "secret-db-url", "name": "DATABASE_URL", "scope": "in", "derives_from": ["seed-delivery"],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            spec = Path(td) / "spec"
+            spec.mkdir()
+            (spec / "01_capabilities.json").write_text(json.dumps(capabilities), encoding="utf-8")
+            (spec / "02a_delivery_baseline.json").write_text(json.dumps(delivery), encoding="utf-8")
+            errs = render_errors(lint_hallucinations(str(spec), repo_root=str(Path(__file__).resolve().parents[4])))
+        self.assertEqual([], [e for e in errs if "E530" in e], errs)
 
 
 class ExtractPathFromStringTests(unittest.TestCase):
@@ -604,7 +520,7 @@ class ExtractPathFromStringTests(unittest.TestCase):
         self.assertEqual(result, "tests/bootstrap.test.js")
 
     def test_bash_c_double_quoted_wrapper_unwrapped(self):
-        """`bash -c "..."` wrap must not break path extraction. Drift #2 (linked_test_expectation side)."""
+        """`bash -c "..."` wrap must not break path extraction. Drift #2."""
         result = _extract_path_from_string(
             'bash -c "npx playwright test tests/bootstrap.test.js"'
         )
@@ -651,7 +567,7 @@ class SpecCheckGitRootForwardingTests(unittest.TestCase):
     a tempdir for spec artifacts and host-repo files.  This lets canonical-lint
     pass cleanly so hallucination-lint actually runs.
 
-    If git_root=git_root is ever removed from spec_check._run_checks, the
+    If git_root=git_root is ever removed from spec_check.run_checks, the
     positive test will regress to a false-positive E530.
     """
 
@@ -716,7 +632,7 @@ class CommandRefBypassAndProjectAllowlistTests(unittest.TestCase):
 
     # --- helpers ---------------------------------------------------------
 
-    def _write_step16(self, spec_dir: Path, command_entry: dict) -> None:
+    def _write_step16(self, spec_dir: Path, command_entry: dict | str) -> None:
         # Nest under the real schema shape (plan.review_requirements.test_commands)
         # so the fixture mirrors a valid 16a artifact. hallucination-lint walks the
         # tree generically, so structural depth does not affect verb-prefix checks —
@@ -812,6 +728,45 @@ class CommandRefBypassAndProjectAllowlistTests(unittest.TestCase):
                         self._e530_for_prefix(errs, "jq"), [],
                         f"{label}: ref must NOT bypass E530; got errors: {[e.message for e in errs]}",
                     )
+
+    # --- string-form test_commands ---------------------------------------
+
+    def test_string_test_command_with_unknown_verb_raises_e530(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(root / "spec", "inventcmd run all")
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            found = self._e530_for_prefix(errs, "inventcmd")
+            self.assertEqual(len(found), 1, [e.message for e in errs])
+            self.assertIn("test_commands[0]", found[0].message)
+
+    def test_string_test_command_with_known_verb_passes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(root / "spec", "pytest tests/ -q")
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual([e for e in errs if e.code == "E530"], [])
+
+    def test_object_test_command_with_command_ref_still_bypasses_the_check(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(
+                root / "spec",
+                {"command": "inventcmd run", "command_ref": {"id": "cn:project:command:inventcmd"}},
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(self._e530_for_prefix(errs, "inventcmd"), [])
+
+    def test_object_test_command_is_reported_once(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(root / "spec", {"command": "inventcmd run"})
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(len(self._e530_for_prefix(errs, "inventcmd")), 1)
 
     # --- project-tier allowlist -----------------------------------------
 
@@ -1095,25 +1050,6 @@ class StructuredFieldTests(unittest.TestCase):
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
             self.assertEqual(err.value, "theme/missing_dir/bootstrap.sh")
 
-    def test_linked_test_file_not_found_has_structured_fields(self):
-        """LINKED_TEST_FILE_NOT_FOUND E530 must carry all four structured fields."""
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            spec = root / "spec"
-            spec.mkdir()
-            (spec / "09_impl_plan.json").write_text(
-                json.dumps({"linked_test_expectation": "tests/unit/completely_missing.py"}),
-                encoding="utf-8",
-            )
-            errs = lint_hallucinations(str(spec), repo_root=str(root))
-            hits = [e for e in errs if e.code == "E530" and e.subcode == "LINKED_TEST_FILE_NOT_FOUND"]
-            self.assertTrue(hits, "Expected E530 LINKED_TEST_FILE_NOT_FOUND")
-            err = hits[0]
-            self.assertIsNotNone(err.file)
-            assert err.jq_path is not None
-            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
-            self.assertEqual(err.value, "tests/unit/completely_missing.py")
-
     def _lint(self, spec_data: dict, filename: str = "artifact.json") -> list:
         """Helper: write spec_data to a temp dir and run lint_hallucinations."""
         import tempfile
@@ -1140,11 +1076,6 @@ class StructuredFieldTests(unittest.TestCase):
         self.assertIsNotNone(err.value, "E530 value must be set")
         if value:
             self.assertEqual(err.value, value)
-
-    def test_trace_type_invented_has_structured_fields(self):
-        """INVENTED_ENUM_OR_ID on trace .type field must carry all four structured fields."""
-        errs = self._lint({"trace": [{"type": "invented_trace_type", "id": "t-01"}]})
-        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="type", value="invented_trace_type")
 
     def test_stage_invented_has_structured_fields(self):
         """INVENTED_ENUM_OR_ID on .stage field must carry all four structured fields."""
@@ -1175,10 +1106,10 @@ class StructuredFieldTests(unittest.TestCase):
         errs = self._lint({"jobs": [{"steps": [{"command": "frobnicatecli run tests"}]}]})
         self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="command", value="frobnicatecli")
 
-    def test_pr_rules_invented_has_structured_fields(self):
-        """INVENTED_ENUM_OR_ID on .pr_rules[i] must carry all four structured fields."""
+    def test_pr_rules_enum_branch_removed(self):
+        """Step 10 no longer stores pr_rules, so the lint has no enum branch for it."""
         errs = self._lint({"pr_rules": ["validate", "hyperspacecheck"]})
-        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="pr_rules", value="hyperspacecheck")
+        self.assertEqual([e for e in errs if e.code == "E530"], [])
 
     def test_cross_ref_invented_id_has_structured_fields(self):
         """INVENTED_ENUM_OR_ID from the cross-ref loop must carry all four structured fields."""
@@ -1236,25 +1167,25 @@ class CollectPathValuePairsTests(unittest.TestCase):
     """Unit tests for _collect_path_value_pairs — jq_path precision."""
 
     def test_top_level_string_field(self):
-        obj = {"linked_test_expectation": "tests/foo.py"}
-        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
-        assert pairs == [(".linked_test_expectation", "tests/foo.py")]
+        obj = {"existing_structures": "src/foo.py"}
+        pairs = _collect_path_value_pairs(obj, "existing_structures")
+        assert pairs == [(".existing_structures", "src/foo.py")]
 
     def test_nested_field_produces_precise_path(self):
-        obj = {"plan": {"steps": [{"linked_test_expectation": "tests/bar.py"}]}}
-        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
-        assert pairs == [(".plan.steps[0].linked_test_expectation", "tests/bar.py")]
+        obj = {"plan": {"steps": [{"existing_structures": "src/bar.py"}]}}
+        pairs = _collect_path_value_pairs(obj, "existing_structures")
+        assert pairs == [(".plan.steps[0].existing_structures", "src/bar.py")]
 
     def test_multiple_occurrences_all_paths_distinct(self):
         obj = {
             "tasks": [
-                {"linked_test_expectation": "tests/a.py"},
-                {"linked_test_expectation": "tests/b.py"},
+                {"existing_structures": "src/a.py"},
+                {"existing_structures": "src/b.py"},
             ]
         }
-        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
-        assert (".tasks[0].linked_test_expectation", "tests/a.py") in pairs
-        assert (".tasks[1].linked_test_expectation", "tests/b.py") in pairs
+        pairs = _collect_path_value_pairs(obj, "existing_structures")
+        assert (".tasks[0].existing_structures", "src/a.py") in pairs
+        assert (".tasks[1].existing_structures", "src/b.py") in pairs
         assert len(pairs) == 2
 
     def test_list_value_produces_indexed_paths(self):
@@ -1265,7 +1196,7 @@ class CollectPathValuePairsTests(unittest.TestCase):
             (".nfr_refs[1]", "nfr-sec-002"),
         ]
 
-    def test_linked_test_jq_path_appears_in_e530_error(self):
+    def test_existing_structures_jq_path_appears_in_e530_error(self):
         """E530 jq_path must reflect the actual nested location, not a static '.key'."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1275,18 +1206,49 @@ class CollectPathValuePairsTests(unittest.TestCase):
                 json.dumps({
                     "plan": {
                         "tasks": [
-                            {"linked_test_expectation": "tests/unit/missing.py"}
+                            {"existing_structures": "src/missing.py"}
                         ]
                     }
                 }),
                 encoding="utf-8",
             )
             errs = lint_hallucinations(str(spec), repo_root=str(root))
-            e530 = [e for e in errs if e.code == "E530" and e.subcode == "LINKED_TEST_FILE_NOT_FOUND"]
-            assert e530, "Expected an E530 LINKED_TEST_FILE_NOT_FOUND error"
-            assert e530[0].jq_path == ".plan.tasks[0].linked_test_expectation", (
+            e530 = [e for e in errs if e.code == "E530" and e.subcode == "EXISTING_STRUCTURE_PATH_NOT_FOUND"]
+            assert e530, "Expected an E530 EXISTING_STRUCTURE_PATH_NOT_FOUND error"
+            assert e530[0].jq_path == ".plan.tasks[0].existing_structures", (
                 f"Expected precise nested jq_path, got: {e530[0].jq_path!r}"
             )
+
+
+class FreeTextTermMentionTests(unittest.TestCase):
+    """A text field that mentions a canon term needs no `*_ref`: a term is used by its label (a term no node uses is E741)."""
+
+    def test_description_mentioning_a_canon_term_gives_no_e541(self):
+        from specdev_tools.core.errors import ERROR_CODES, make_error
+
+        entry = {
+            "id": "cn:project:term:zebracrossing", "kind": "term", "preferred_label": "zebracrossing",
+            "definition": "A marked place to cross.", "version": "1.0.0", "status": "active", "owners": ["product"],
+            "aliases": [], "lifecycle": {"introduced_at": "2024-01-01T00:00:00Z"},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon = root / "canon"
+            (canon / "kinds").mkdir(parents=True)
+            (canon / "manifest.json").write_text(json.dumps(
+                {"$schema": "vc:core:canon", "registry_version": "1.0.0", "entries": [entry], "aliases": []}), encoding="utf-8")
+            (canon / "kinds" / "term.json").write_text(json.dumps(
+                {"$schema": "vc:canon:kind", "registry_version": "1.0.0", "kind": "term", "entries": [entry]}), encoding="utf-8")
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / "04_fr_list.json").write_text(json.dumps(
+                {"description": "The zebracrossing is used by the walker.", "rationale": "A zebracrossing is safe."}), encoding="utf-8")
+            errs = render_errors(lint_hallucinations(
+                str(spec), repo_root=str(Path(__file__).resolve().parents[4]), project_canon_dir=str(canon)))
+        self.assertEqual([], [e for e in errs if not e.startswith("W570")], errs)
+        self.assertNotIn("E541", ERROR_CODES)
+        with self.assertRaises(ValueError):
+            make_error("E541", "UNBOUND_CANONICAL_TERM x.json:description")
 
 
 if __name__ == "__main__":

@@ -1,26 +1,29 @@
+"""Hallucination checks (E530, E520, W570): an invented stage, environment, unit or command prefix, a ``*_ref`` that names
+no id, an ``existing_structures`` path that does not exist, an ``nfr_ref`` that names no NFR, and a canon directory
+that does not load."""
 from __future__ import annotations
 
 import json
 import os
-import re
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..canonical.lint import lint_canon_dirs
 from ..canonical.registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.json_utils import find_schema_dir, build_id_index, resolve_ref as _resolve_urn_ref
-from ..core.registry import derive_allowed_upstream
-from ..core.schema_nav import effective_schema as _nav_effective_schema
-from ..core.trace_types import is_valid_trace_type
 from .linter_utils import (
+    build_lint_graph,
     collect_ids_and_refs,
+    graph_covered_files,
+    graph_known_ids,
     is_resolved_canonical_ref,
     iter_json,
     load_canonical_stages,
-    tokenize_free_text,
-    DERIVATION_STOPWORDS,
 )
+
+if TYPE_CHECKING:
+    from ..graph.model import Graph
 
 
 KNOWN_STAGES = {"dev", "ci", "staging", "prod"}
@@ -44,9 +47,18 @@ def lint_hallucinations(
     require_manifest_schema_registration: bool = True,
     project_canon_dir: str | None = None,
     git_root: str | None = None,
+    *,
+    graph: Graph | None = None,
 ) -> list[SpecError]:
+    """Hallucination checks over every artifact of *spec_dir*; returns the findings, never raises.
+
+    Ids a ``*_ref`` may name come from *graph* (built from the toolkit at *repo_root* when ``None``) for the files it
+    covers and from a scan of the file for the others.
+    """
     errors: list[SpecError] = []
-    known_ids: set[str] = set()
+    graph = build_lint_graph(spec_dir, repo_root) if graph is None else graph
+    covered = graph_covered_files(graph)
+    known_ids = graph_known_ids(graph)
     refs: list[tuple[str, str, str]] = []
     root = repo_root or spec_dir
     # path_root: for host-file existence checks in submodule deployments,
@@ -71,10 +83,6 @@ def lint_hallucinations(
     # Load canonical stages; fall back to hardcoded KNOWN_STAGES
     canon_stages = load_canonical_stages(canon_root)
     active_stages = canon_stages if canon_stages else KNOWN_STAGES
-    # D13: Build canonical term index for free-text scanning
-    canonical_terms = _build_canonical_term_index(canon)
-    # Build schema resolver context once per invocation (id_index scan is ~O(schema-dir))
-    _schema_ctx = _SchemaResolverCtx(root)
     nfr_ids = _load_nfr_ids(spec_dir)
     if nfr_ids is None:
         errors.append(make_error("W570", "GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent"))
@@ -87,28 +95,11 @@ def lint_hallucinations(
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_json {exc}"))
             continue
         rel = os.path.relpath(path, spec_dir)
-        is_canon = rel.startswith("canon" + os.sep) or rel.startswith("canon/")
         errors.extend(_scan_node(rel, data, canon, known_command_prefixes, stages=active_stages))
-        # Skip E541 for canon files — canon definitions ARE the vocabulary;
-        # they cannot bind *_ref to themselves and should not be flagged.
-        if not is_canon:
-            # Resolve file-level schema context for structural E541 suppression.
-            # Falls back to (None, None) if $schema is absent or unresolvable —
-            # in that case _check_free_text_terms behaves exactly as before.
-            _file_schema, _file_resolve_fn = _schema_ctx.load_file_schema(data)
-            errors.extend(_check_free_text_terms(
-                rel, data, canonical_terms,
-                schema_node=_file_schema,
-                resolve_fn=_file_resolve_fn,
-            ))
         errors.extend(_check_existing_structures_paths(rel, data, path_root))
-        errors.extend(_check_linked_test_expectations(rel, data, path_root))
         if nfr_ids is not None:
             errors.extend(_check_nfr_refs(rel, data, nfr_ids))
-        # Derivation reads step_order.json from the toolkit (repo_root/tools/),
-        # not the host repo, so it uses `root` (toolkit root), not `path_root`.
-        errors.extend(_check_content_derivation(rel, data, spec_dir, root))
-        collect_ids_and_refs(data, rel, known_ids, refs)
+        collect_ids_and_refs(data, rel, known_ids, refs, skip_ids_for_files=covered)
     for rel, p, ref_id in refs:
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
             continue
@@ -136,19 +127,6 @@ def _scan_node(
     active_stages = stages if stages is not None else KNOWN_STAGES
     errs: list[SpecError] = []
     if isinstance(node, dict):
-        in_trace_container = any(token in path for token in ("trace", "targets", "target_ids", "mitigations"))
-        if "type" in node and "id" in node and in_trace_container:
-            t = node.get("type")
-            if isinstance(t, str) and not is_valid_trace_type(t):
-                _type_jq = f".{path}.type" if path else ".type"
-                errs.append(make_error(
-                    "E530",
-                    f"INVENTED_ENUM_OR_ID {rel}:{path}.type={t}",
-                    subcode="INVENTED_ENUM_OR_ID",
-                    file=rel,
-                    jq_path=_type_jq,
-                    value=t,
-                ))
         for key, value in node.items():
             p = f"{path}.{key}" if path else key
             if key in {"stage", "environment"} and isinstance(value, str) and value not in active_stages:
@@ -193,41 +171,11 @@ def _scan_node(
                                 value=item,
                             ))
             if key == "command" and isinstance(value, str):
-                # Skip prefix check when a sibling command_ref asserts a canon ref.
-                # We DO NOT re-validate that the ref resolves — verb validation is
-                # intentionally deferred. canonical-integrity (E210/E110) owns *ref*
-                # resolution and will fail loudly if the asserted id is unresolvable.
-                if not is_resolved_canonical_ref(node.get("command_ref")):
-                    prefix = value.strip().split(" ", 1)[0]
-                    if prefix and prefix not in known_command_prefixes and not canon.resolve_alias("command", prefix):
-                        errs.append(make_error(
-                            "E530",
-                            f"INVENTED_ENUM_OR_ID {rel}:{p}={prefix} "
-                            f"Command prefix '{prefix}' is not in the allowlist. "
-                            f"Resolve by either (a) attaching a sibling command_ref to a registered canon entry "
-                            f"under <spec-root>/canon/kinds/command.json, "
-                            f"or (b) appending the prefix to <spec-root>/canon/command_prefixes.json.",
-                            subcode="INVENTED_ENUM_OR_ID",
-                            file=rel,
-                            jq_path=f".{p}",
-                            value=prefix,
-                        ))
-            if key == "pr_rules" and isinstance(value, list):
-                allowed_pr_rules = {
-                    "validate", "validate-all", "matrix", "fixtures-lint", "invariants-check",
-                    "governance-check", "seed-lint", "test", "build", "lint",
-                    "format", "audit", "security"
-                }
+                errs.extend(_command_prefix_errors(rel, f".{p}", value, node.get("command_ref"), canon, known_command_prefixes))
+            if key == "test_commands" and isinstance(value, list):
                 for idx, item in enumerate(value):
-                    if isinstance(item, str) and item not in allowed_pr_rules:
-                        errs.append(make_error(
-                            "E530",
-                            f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}",
-                            subcode="INVENTED_ENUM_OR_ID",
-                            file=rel,
-                            jq_path=f".{p}[{idx}]",
-                            value=item,
-                        ))
+                    if isinstance(item, str):
+                        errs.extend(_command_prefix_errors(rel, f".{p}[{idx}]", item, None, canon, known_command_prefixes))
             errs.extend(_scan_node(rel, value, canon, known_command_prefixes, p, stages=active_stages))
     elif isinstance(node, list):
         for idx, item in enumerate(node):
@@ -235,6 +183,36 @@ def _scan_node(
     return errs
 
 
+def _command_prefix_errors(
+    rel: str,
+    jq_path: str,
+    command: str,
+    command_ref: Any,
+    canon: CanonicalRegistry,
+    known_command_prefixes: set[str],
+) -> list[SpecError]:
+    """E530 for a *command* whose first word is in no prefix allowlist, unless *command_ref* asserts a canon ref.
+
+    The ref is not re-validated here: verb validation is deferred, canonical-integrity (E210/E110) owns *ref*
+    resolution and fails loudly if the asserted id is unresolvable.  *jq_path* locates the command in the file.
+    """
+    if is_resolved_canonical_ref(command_ref):
+        return []
+    prefix = command.strip().split(" ", 1)[0]
+    if not prefix or prefix in known_command_prefixes or canon.resolve_alias("command", prefix):
+        return []
+    return [make_error(
+        "E530",
+        f"INVENTED_ENUM_OR_ID {rel}:{jq_path.lstrip('.')}={prefix} "
+        f"Command prefix '{prefix}' is not in the allowlist. "
+        f"Resolve by either (a) attaching a sibling command_ref to a registered canon entry "
+        f"under <spec-root>/canon/kinds/command.json, "
+        f"or (b) appending the prefix to <spec-root>/canon/command_prefixes.json.",
+        subcode="INVENTED_ENUM_OR_ID",
+        file=rel,
+        jq_path=jq_path,
+        value=prefix,
+    )]
 
 
 def _is_valid_unit(value: str, canon: CanonicalRegistry) -> bool:
@@ -243,36 +221,20 @@ def _is_valid_unit(value: str, canon: CanonicalRegistry) -> bool:
     return " ".join(value.strip().lower().split()) in KNOWN_UNITS
 
 
-# ---------------------------------------------------------------------------
-# E541 structural schema resolver
-#
-# Builds a per-lint-invocation schema resolution context so that
-# _check_free_text_terms can determine whether a dict node's schema is
-# structurally ref-capable (additionalProperties:false AND at least one
-# *_ref/*_refs property).  If it is NOT ref-capable, E541 cannot be satisfied
-# by the spec author and must be suppressed.
-#
-# The resolver mirrors the pattern in json_utils.json_schema_discovery
-# (lines 760–787) but is shaped for use in a recursive linter rather than
-# an interactive CLI command.  Schema loading is done once per lint invocation,
-# not per file, to avoid repeated directory scans.
-# ---------------------------------------------------------------------------
+class SchemaResolverCtx:
+    """Schema resolution context: the schema a file names in ``$schema``, and a ``$ref`` resolver for it.
 
-class _SchemaResolverCtx:
-    """Lightweight schema resolution context for structural E541 suppression.
+    Holds the built id_index and a ref cache; ``make_resolve_fn`` returns a closure suitable for use with
+    schema_nav's ``effective_schema``.  Only the id_index scan (once per schema dir) is expensive.  If the schema
+    dir is unavailable the instance is still usable but every lookup returns ``None``.
 
-    Holds the built id_index and a per-invocation ref cache; provides a
-    ``resolve_node`` closure factory suitable for use with schema_nav's
-    ``effective_schema``.
-
-    Instances are cheap — only the id_index scan (once per schema dir) is
-    expensive.  If the schema dir is unavailable the instance is still usable
-    but all resolution returns ``None`` (fall back to current E541 behaviour).
+    *spec_root* is the spec folder of the files: its extension schemas (``build_id_index``) are resolved beside the
+    toolkit's.  ``None`` gives the toolkit's schemas alone.
     """
 
-    def __init__(self, repo_root: str | None) -> None:
+    def __init__(self, repo_root: str | None, spec_root: str | None = None) -> None:
         schema_dir = find_schema_dir(repo_root)
-        self._id_index: dict[str, str] = build_id_index(schema_dir) if schema_dir else {}
+        self._id_index: dict[str, str] = build_id_index(schema_dir, spec_root) if schema_dir else {}
         self._ref_cache: dict[str, dict] = {}
 
     def make_resolve_fn(self, root_schema: dict):
@@ -294,122 +256,20 @@ class _SchemaResolverCtx:
             return _resolve_urn_ref(ref, self._id_index, self._ref_cache)
         return _resolve
 
-    def load_file_schema(self, data: dict) -> tuple[dict, Any] | tuple[None, None]:
-        """Return ``(effective_root_schema, resolve_fn)`` for *data*, or ``(None, None)``.
-
-        Reads the ``$schema`` URI from *data*, looks it up in the id_index,
-        loads the schema file, and returns the allOf-merged root node together
-        with the bound resolve_fn closure.  Both are needed by
-        ``_check_free_text_terms``, which navigates into sub-schemas inline via
-        ``_nav_effective_schema`` as it recurses.
-
-        Falls back to ``(None, None)`` on any error so callers treat it as
-        "schema unknown → fire E541 as usual."
-        """
+    def load_raw_schema(self, data: dict) -> dict | None:
+        """The schema file named by the ``$schema`` of *data*, as written (nothing merged), or ``None`` when *data* names none the toolkit has or the file cannot be read."""
         schema_uri = data.get("$schema") if isinstance(data, dict) else None
         if not isinstance(schema_uri, str) or not schema_uri:
-            return None, None
+            return None
         schema_path = self._id_index.get(schema_uri)
         if not schema_path:
-            return None, None
+            return None
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
                 raw_schema = json.load(f)
         except (OSError, json.JSONDecodeError):
-            return None, None
-        resolve_fn = self.make_resolve_fn(raw_schema)
-        try:
-            eff = _nav_effective_schema(raw_schema, resolve_fn, include_conditionals=True)
-            return eff, resolve_fn
-        except Exception:
-            return None, None
-
-
-
-def _is_structurally_unbindable(schema_node: dict | None) -> bool:
-    """Return True iff *schema_node* describes an object that structurally
-    cannot carry a canonical binding ref.
-
-    Criterion: the node sets ``additionalProperties: false`` (explicit, not
-    default) AND its ``properties`` map contains no key ending in ``_ref``
-    or ``_refs``.
-
-    When this is True, demanding a *_ref binding from the spec author is a
-    schema violation — E541 must be suppressed for all free-text fields on
-    that object.  When False (or when *schema_node* is None / unresolvable),
-    we fall back to the current behaviour (E541 may fire).
-
-    Note: this is the coarse (all-or-nothing) check.  Callers that know the
-    specific canonical term's *kind* should prefer ``_extract_slot_kinds`` +
-    ``_term_kinds_from_cids`` for the finer namespace-aware suppression that
-    was introduced in round 4.
-    """
-    if not isinstance(schema_node, dict):
-        return False
-    if schema_node.get("additionalProperties") is not False:
-        return False
-    props = schema_node.get("properties", {})
-    has_ref_slot = any(
-        k.endswith("_ref") or k.endswith("_refs")
-        for k in props
-    )
-    return not has_ref_slot
-
-
-def _extract_slot_kinds(schema_node: dict | None) -> set[str] | None:
-    """Return the set of canonical *kinds* accepted by the object's ``*_ref``/
-    ``*_refs`` slots, or ``None`` when the schema is unavailable.
-
-    The kind is inferred by stripping the ``_ref`` / ``_refs`` suffix from
-    each property key whose name ends with that suffix, then removing any
-    leading underscores.  Examples::
-
-        term_ref      → "term"
-        acronym_ref   → "acronym"
-        unit_ref      → "unit"
-        metric_ref    → "metric"
-        fr_refs       → "fr"
-        success_metric_refs → "success_metric"
-
-    Returns ``None`` (not an empty set) when *schema_node* is absent or does
-    not set ``additionalProperties: false``, signalling that the caller should
-    skip namespace suppression and fall through to the runtime ref-value check.
-    An empty set is returned only when the schema IS closed (ap:false) but
-    defines no ref slots at all — in that case every namespace is suppressed.
-    """
-    if not isinstance(schema_node, dict):
-        return None
-    if schema_node.get("additionalProperties") is not False:
-        return None
-    props = schema_node.get("properties", {})
-    kinds: set[str] = set()
-    for k in props:
-        if k.endswith("_refs"):
-            kinds.add(k[:-len("_refs")])
-        elif k.endswith("_ref"):
-            kinds.add(k[:-len("_ref")])
-    return kinds
-
-
-def _term_kinds_from_cids(cids: set[str]) -> set[str]:
-    """Derive canonical *kind* labels from a set of canonical IDs.
-
-    A canonical ID has the form ``cn:<tier>:<kind>:<label>``.  This function
-    extracts the ``<kind>`` segment from each ID.  Examples::
-
-        cn:project:term:ghost   → "term"
-        cn:core:acronym:jwt     → "acronym"
-        cn:project:metric:p99   → "metric"
-
-    IDs that do not conform to the expected four-segment format are silently
-    ignored (they cannot produce a reliable kind label).
-    """
-    kinds: set[str] = set()
-    for cid in cids:
-        parts = cid.split(":")
-        if len(parts) >= 4:
-            kinds.add(parts[2])
-    return kinds
+            return None
+        return raw_schema if isinstance(raw_schema, dict) else None
 
 
 def _load_command_prefixes(
@@ -455,35 +315,6 @@ def _merge_prefixes_from_file(cfg_path: str, prefixes: set[str]) -> None:
             token = item.strip().split(" ", 1)[0]
             if token:
                 prefixes.add(token)
-
-
-# D13: Free-text canonical term scanning
-
-# Fields checked for unbound canonical term mentions
-_FREE_TEXT_FIELDS = {"name", "description", "rationale", "justification", "definition"}
-
-# Fields that indicate a canonical ref is already bound nearby
-_REF_SUFFIXES = {"_ref", "_refs"}
-
-
-def _build_canonical_term_index(canon: CanonicalRegistry) -> dict[str, set[str]]:
-    """Build a lowercase label → set of canonical IDs index for term/acronym kinds."""
-    index: dict[str, set[str]] = {}
-    for cid, entry in canon.entries.items():
-        if entry.status == "retired":
-            continue
-        if entry.kind not in ("term", "acronym"):
-            continue
-        label = entry.payload.get("preferred_label", "")
-        if isinstance(label, str) and len(label) >= 3:
-            index.setdefault(label.lower(), set()).add(cid)
-        # Also index aliases
-        aliases = entry.payload.get("aliases", [])
-        if isinstance(aliases, list):
-            for alias in aliases:
-                if isinstance(alias, str) and len(alias) >= 3:
-                    index.setdefault(alias.lower(), set()).add(cid)
-    return index
 
 
 _PATH_EXTENSIONS = (".py", ".ts", ".js", ".go", ".java", ".rb", ".sh", ".json")
@@ -606,10 +437,6 @@ def _check_existing_structures_paths(rel: str, data: Any, path_root: str) -> lis
     return _check_path_values(rel, data, path_root, "existing_structures", "EXISTING_STRUCTURE_PATH_NOT_FOUND")
 
 
-def _check_linked_test_expectations(rel: str, data: Any, path_root: str) -> list[SpecError]:
-    return _check_path_values(rel, data, path_root, "linked_test_expectation", "LINKED_TEST_FILE_NOT_FOUND")
-
-
 def _load_nfr_ids(spec_dir: str) -> set[str] | None:
     path = os.path.join(spec_dir, "07_nfrs.json")
     if not os.path.isfile(path):
@@ -636,357 +463,3 @@ def _check_nfr_refs(rel: str, data: Any, nfr_ids: set[str]) -> list[SpecError]:
                     value=ref,
                 ))
     return errs
-
-
-# R9/T20: Content derivation check
-# Minimum token overlap between a downstream artifact and its upstream
-# dependencies before W594 CONTENT_DERIVATION_LOW_OVERLAP fires.  Chosen
-# empirically: well-derived artifacts share at least 5 domain-specific tokens.
-_DERIVATION_OVERLAP_THRESHOLD = 5
-
-_DERIVATION_FREE_TEXT_FIELDS = {
-    "description", "statement", "rationale", "justification", "notes",
-    "narrative", "definition", "postconditions", "preconditions",
-}
-
-
-def _extract_free_text_tokens(obj: Any) -> set[str]:
-    """Extract tokens from all free-text fields in a spec artifact."""
-    tokens: set[str] = set()
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k in _DERIVATION_FREE_TEXT_FIELDS and isinstance(v, str):
-                tokens |= tokenize_free_text(v, stopwords=DERIVATION_STOPWORDS)
-            elif isinstance(v, (dict, list)):
-                tokens |= _extract_free_text_tokens(v)
-    elif isinstance(obj, list):
-        for item in obj:
-            tokens |= _extract_free_text_tokens(item)
-    return tokens
-
-
-def _check_content_derivation(
-    rel: str,
-    data: Any,
-    spec_dir: str,
-    repo_root: str,
-    threshold: int = _DERIVATION_OVERLAP_THRESHOLD,
-) -> list[SpecError]:
-    """R9/T20: Check that downstream content derives from upstream artifacts."""
-    errs: list[SpecError] = []
-    # Load step_order.json to find upstream dependencies
-    step_order_path = os.path.join(repo_root, "tools", "step_order.json")
-    if not os.path.isfile(step_order_path):
-        return errs
-
-    # Determine current step from filename
-    basename = os.path.basename(rel)
-    step_match = re.match(r"^(\d{2}[a-z]?)_", basename)
-    if not step_match:
-        return errs
-    step_id = step_match.group(1)
-
-    try:
-        with open(step_order_path, "r", encoding="utf-8") as f:
-            order_data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return errs
-
-    upstream_deps = derive_allowed_upstream(step_id, order_data.get("steps", []))
-    if not upstream_deps:
-        return errs
-
-    # Extract tokens from downstream (current artifact)
-    downstream_tokens = _extract_free_text_tokens(data)
-    if not downstream_tokens:
-        return errs
-
-    # Load and tokenize upstream artifacts
-    upstream_tokens: set[str] = set()
-    missing_upstreams: list[str] = []
-    for dep_step in upstream_deps:
-        found = False
-        if os.path.isdir(spec_dir):
-            for fn in os.listdir(spec_dir):
-                if fn.startswith(f"{dep_step}_") and fn.endswith(".json"):
-                    dep_path = os.path.join(spec_dir, fn)
-                    try:
-                        with open(dep_path, "r", encoding="utf-8") as f:
-                            dep_data = json.load(f)
-                        upstream_tokens |= _extract_free_text_tokens(dep_data)
-                        found = True
-                    except (OSError, json.JSONDecodeError):
-                        pass
-                    break
-        if not found:
-            missing_upstreams.append(dep_step)
-
-    for dep in missing_upstreams:
-        errs.append(make_error("W590", f"CROSS_STEP_UPSTREAM_MISSING upstream step {dep} artifact not found; skipping derivation check"))
-
-    if not upstream_tokens:
-        return errs
-
-    # Count overlap
-    overlap = downstream_tokens & upstream_tokens
-    if len(overlap) < threshold:
-        errs.append(make_error(
-            "W594",
-            f"CONTENT_DERIVATION_LOW_OVERLAP {rel} "
-            f"overlap={len(overlap)} threshold={threshold} "
-            f"(downstream has {len(downstream_tokens)} tokens, upstream has {len(upstream_tokens)} tokens)",
-        ))
-
-    return errs
-
-
-# Keys whose subtrees are excluded from E541 scanning.
-#
-# PRIMARY MECHANISM (preferred): The structural rule in _check_free_text_terms
-# suppresses E541 for any dict whose JSON Schema declares
-# additionalProperties:false with no *_ref/*_refs property.  That rule is
-# self-maintaining: it fires on schema structure, not key names.
-#
-# SECONDARY MECHANISM (this list): explicit key-name skips are kept for two
-# categories that the structural rule cannot cover:
-#
-# Category A — SEMANTIC skips: the subtree IS vocabulary (canon definitions),
-#   so E541 can never be satisfied by binding a *_ref back to itself.  These
-#   remain regardless of schema additionalProperties settings.
-#
-# Category B — STRUCTURAL skips for keys not reachable by the per-file schema
-#   resolver (e.g. Step 16a artifacts in impl_context/ have variable filenames
-#   so load_file_schema resolves no $schema → structural rule cannot activate).
-#   These are kept as belt-and-suspenders until schema coverage is guaranteed.
-#
-# Category C — FREE-FORM subtrees: objects whose schema intentionally omits
-#   additionalProperties (defaults to true / open), making them structurally
-#   bindable in theory but practically unbindable (test-runner output, etc.).
-#   The structural rule requires additionalProperties:false to suppress, so
-#   these need explicit skips.
-#
-# Note: emergent_ambiguities / ambiguities / docs_impact / edge_cases all have
-#   additionalProperties:false + no ref slot — the structural rule now handles
-#   them when $schema resolves.  The key-name entries below act as belt-and-
-#   suspenders for files where $schema is absent (old/hand-authored artifacts).
-#   They are retained rather than removed to avoid a silent regression if the
-#   structural rule ever loses coverage (e.g. schema file absent at runtime).
-_E541_SKIP_KEYS = {
-    # Category A: Canonical vocabulary subtrees
-    "canonical_proposals", "canonical_refs_used", "canonical_conflicts",
-    "tech_stack", "user_segments", "seeds",
-
-    # Category B: Step 16a/16b implementation subtrees — belt-and-suspenders
-    # for impl_context/ artifacts with variable filenames (no reliable $schema
-    # lookup).  Both keys appear exclusively in Step 16 schemas; no other
-    # current pipeline step defines them.
-    "actions",
-    "coding_examples",
-
-    # Category B: Step 16 narrative subtrees — belt-and-suspenders for the same
-    # reason as actions/coding_examples.  All three have additionalProperties:false
-    # + no *_ref in their Step 16 schemas; structural rule handles them when
-    # $schema resolves.  These entries ensure suppression when it does not.
-    "emergent_ambiguities",
-    "ambiguities",
-    "docs_impact",
-
-    # Category B: Step 16 review_requirements subtree — belt-and-suspenders.
-    # ``review_requirements`` exists only in 16_impl_context.schema.json and
-    # contains operational verification instructions (test commands and NFR
-    # measurement methods); these are not canonical term-binding sites.
-    # The structural rule cannot suppress them because:
-    #   - ``test_commands[]`` uses ``oneOf`` (string | object); schema-nav merges
-    #     properties but loses ``additionalProperties`` from the object branch,
-    #     so _extract_slot_kinds returns None → no namespace suppression.
-    #   - ``nfr_measurement_methods`` uses ``patternProperties``; the effective
-    #     plan schema after conditional merging omits it from properties → its
-    #     values receive no child_schema → slot_kinds is None → E541 fires.
-    # This key-name skip ensures suppression when schema resolution is incomplete.
-    # ``review_requirements`` appears only in Step 16 schemas; no other current
-    # pipeline step defines it, so the skip scope is effectively Step-16-only.
-    "review_requirements",
-
-    # Category C: execution subtree (16_impl_context.schema.json only).
-    # execution.final_status.test_results items have additionalProperties unset
-    # (intentionally free-form test-runner output — not bindable spec vocabulary).
-    # The structural rule requires additionalProperties:false and will NOT suppress
-    # items with unset additionalProperties, so this key-name skip is necessary.
-    # "execution" appears only in 16_impl_context.schema.json; no other current
-    # pipeline step defines it.
-    "execution",
-}
-
-# File-scoped exemptions: ``edge_cases`` is an unbindable narrative subtree
-# *only* in 11_redteam.json (schema sets additionalProperties:false and
-# defines no *_ref field on edge_cases items).  Scoping the skip to that
-# file prevents a future step that introduces a literal ``edge_cases`` key
-# from silently inheriting the exemption.
-# NOTE: The structural rule also suppresses edge_cases when $schema resolves;
-# this file-scoped entry is belt-and-suspenders for files without $schema.
-#
-# Category A (round-4): ``definition`` in 03_glossary.json is vocabulary —
-# the glossary IS the vocabulary source, so each definition field is defining
-# a term by referencing domain concepts; it cannot bind every mentioned term
-# back via a *_ref.  The glossary ``terms[]`` object DOES have ``term_ref``/
-# ``acronym_ref`` slots (used to pin the entry's OWN canonical id), so the
-# namespace-aware structural rule does NOT suppress it — this explicit skip
-# is required.  Scoped narrowly to ``03_glossary.json`` to avoid silencing
-# ``definition`` fields in any other artifact that may be legitimately bindable.
-_E541_SKIP_KEYS_BY_FILE: dict[str, set[str]] = {
-    "11_redteam.json": {"edge_cases"},
-    "03_glossary.json": {"definition"},
-}
-
-
-def _is_e541_skipped(rel: str, key: str) -> bool:
-    if key in _E541_SKIP_KEYS:
-        return True
-    basename = os.path.basename(rel)
-    return key in _E541_SKIP_KEYS_BY_FILE.get(basename, set())
-
-
-def _check_free_text_terms(
-    rel: str,
-    obj: Any,
-    canonical_terms: dict[str, set[str]],
-    path: str = "",
-    schema_node: dict | None = None,
-    resolve_fn: Any = None,
-) -> list[SpecError]:
-    """Check free-text fields for mentions of canonical terms without a binding ref.
-
-    Structural suppression (E541 skip): if *schema_node* describes a dict whose
-    JSON Schema sets ``additionalProperties: false`` and defines no ``*_ref`` /
-    ``*_refs`` property, a canonical binding ref is a schema violation — E541 is
-    suppressed for ALL free-text fields of that object.
-
-    When *schema_node* is ``None`` (schema absent or unresolvable) the function
-    falls back to the original behaviour (ref-presence at runtime is the only
-    suppressor).  This keeps the change safe: a missing ``$schema`` field never
-    causes false silences.
-    """
-    if not canonical_terms:
-        return []
-    errs: list[SpecError] = []
-    if isinstance(obj, dict):
-        # --- Structural suppression check ---
-        # Resolve the effective schema for THIS dict level (allOf-merge etc.).
-        effective_node: dict | None = None
-        if schema_node is not None and resolve_fn is not None:
-            try:
-                effective_node = _nav_effective_schema(
-                    schema_node, resolve_fn, include_conditionals=True
-                )
-            except Exception:
-                effective_node = None
-
-        structurally_unbindable = _is_structurally_unbindable(effective_node)
-
-        # Round-4: namespace-aware slot-kind suppression.
-        # _extract_slot_kinds returns None when schema is unavailable (open
-        # schema or unresolvable $schema → fall through to runtime check).
-        # When it returns a set, E541 is suppressed for any term whose kind
-        # is absent from that set — binding is structurally impossible.
-        slot_kinds: set[str] | None = _extract_slot_kinds(effective_node)
-
-        # Collect the canonical-id VALUES bound by *_ref / *_refs keys at this
-        # level (runtime fallback). Term-specific: a sibling ref suppresses E541
-        # for a given term only if one of its bound values is one of that term's
-        # canonical ids. Merely having *some* unrelated ref present does NOT
-        # suppress (that object-level behaviour over-suppressed E541).
-        bound_ref_ids: set[str] = set()
-        for _rk, _rv in obj.items():
-            if any(_rk.endswith(s) for s in _REF_SUFFIXES):
-                if isinstance(_rv, str):
-                    bound_ref_ids.add(_rv)
-                elif isinstance(_rv, list):
-                    bound_ref_ids.update(x for x in _rv if isinstance(x, str))
-        for key, value in obj.items():
-            # Skip canonical metadata subtrees entirely — these are
-            # vocabulary definitions, not spec content that should bind refs.
-            if _is_e541_skipped(rel, key):
-                continue
-            p = f"{path}.{key}" if path else key
-
-            # Compute child schema node for recursion.
-            # Check ``properties`` first, then fall back to ``patternProperties``
-            # (match the first pattern whose regex matches the key).
-            child_schema: dict | None = None
-            if effective_node is not None and resolve_fn is not None:
-                props = effective_node.get("properties", {})
-                if key in props:
-                    child_schema = props[key]
-                else:
-                    # patternProperties: find the first pattern that matches key
-                    pattern_props = effective_node.get("patternProperties", {})
-                    for pattern, p_schema in pattern_props.items():
-                        try:
-                            if re.search(pattern, key) is not None:
-                                child_schema = p_schema
-                                break
-                        except re.error:
-                            pass
-
-            if key in _FREE_TEXT_FIELDS and isinstance(value, str) and len(value) >= 3:
-                # Skip if the schema says this object structurally cannot carry
-                # a binding ref (additionalProperties:false, no *_ref slot at all).
-                if structurally_unbindable:
-                    pass  # skip the E541 binding check — object cannot carry a *_ref
-                    # (the unconditional _check_free_text_terms recursion below is a
-                    #  no-op for this string value, so descent is not re-triggered here)
-                else:
-                    text_lower = value.lower()
-                    for term, cids in canonical_terms.items():
-                        if term in text_lower:
-                            # Round-4 namespace-aware suppression: if the schema is
-                            # closed (ap:false) and none of its *_ref/*_refs slots can
-                            # accept the fired term's kind, binding is structurally
-                            # impossible → suppress E541 for this term.
-                            # slot_kinds is None when schema is unavailable → skip this
-                            # check and fall through to the runtime bound_ref_ids path.
-                            if slot_kinds is not None:
-                                term_kinds = _term_kinds_from_cids(cids)
-                                if not (term_kinds & slot_kinds):
-                                    # No namespace overlap — structurally unbindable
-                                    # for this term's kind.  Suppress and continue.
-                                    continue
-                            # Term-specific runtime suppression (round 2): a sibling
-                            # *_ref/*_refs whose value is one of THIS term's canonical
-                            # ids pins the mention — skip E541 for this term only.
-                            # An unrelated ref (binding a different id) does not
-                            # suppress, so a genuinely unbound term still fires.
-                            if cids & bound_ref_ids:
-                                continue
-                            errs.append(make_error(
-                                "E541",
-                                f"UNBOUND_CANONICAL_TERM {rel}:{p} "
-                                f"mentions canonical term '{term}' "
-                                f"(ids={sorted(cids)}) without a binding *_ref",
-                            ))
-                            break  # One warning per field is enough
-
-            errs.extend(_check_free_text_terms(
-                rel, value, canonical_terms, p,
-                schema_node=child_schema,
-                resolve_fn=resolve_fn,
-            ))
-    elif isinstance(obj, list):
-        # Navigate into items schema for list elements
-        items_schema: dict | None = None
-        if schema_node is not None and resolve_fn is not None:
-            try:
-                eff = _nav_effective_schema(schema_node, resolve_fn, include_conditionals=True)
-                items_raw = eff.get("items")
-                if isinstance(items_raw, dict):
-                    items_schema = items_raw
-            except Exception:
-                items_schema = None
-        for idx, item in enumerate(obj):
-            errs.extend(_check_free_text_terms(
-                rel, item, canonical_terms, f"{path}[{idx}]",
-                schema_node=items_schema,
-                resolve_fn=resolve_fn,
-            ))
-    return errs
-

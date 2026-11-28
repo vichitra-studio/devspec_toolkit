@@ -1,0 +1,26 @@
+{
+  "description": "A criterion of the confirm task that refines api-password-reset-confirm directly and names the fixture that verifies the API.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/14_roadmap.json",
+      "path": [
+        "milestones",
+        0,
+        "tasks",
+        0,
+        "acceptance_criteria"
+      ],
+      "value": {
+        "criterion_id": "tc-confirm-api",
+        "text": "POST /v1/password-resets/{token} answers with the documented statuses and the error body of the contract.",
+        "refines": [
+          "api-password-reset-confirm"
+        ],
+        "verified_by": [
+          "fix-password-reset-expired-token"
+        ]
+      }
+    }
+  ]
+}

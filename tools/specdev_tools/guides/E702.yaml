@@ -1,0 +1,29 @@
+code: E702
+subcode: LINK_POINTS_DOWNSTREAM
+title: "A link points to a later step, or to the same step where that is not allowed"
+trigger: |
+  A link names a node of a later step, or a node of the same step that the
+  field does not declare as a same-step target:
+    E702 amb-x (step 04), field about, target 'api-y' (step 05): the target is
+    in a later step; a link points to an earlier step
+    E702 amb-x (step 04), field about, target 'fr-z' (step 04): the target is in
+    the same step and a fr is not declared as a same-step target of the field
+  An open item (`ambiguities` entry) is the usual holder: its `about` must name
+  nodes of an EARLIER step than the step that holds it.
+resolution: |
+  1. Decide where the item or link belongs. An open item about a step-05 node
+     belongs in step 05 or later, not in step 04.
+  2. Move it: delete the item where it is and insert it into the step of the
+     later node, or give it an `about` that names an earlier node:
+       specdev json patch --id <holder id> .about '["<id of an earlier node>"]'
+  3. For a link field, link only to a node of an earlier step:
+       specdev node candidates --for <holder id> --field <field>
+  4. An open item in step 14 about a step-14 task cannot name it (same step):
+     write the answer into the task's own text and delete the item, or give
+     the item an `about` that names an earlier node the question also
+     concerns.
+  5. `specdev spec-check spec --step NN ...`.
+see_also:
+  - E700
+  - E701
+  - E703

@@ -58,6 +58,27 @@ class PromptSchemaSyncTests(unittest.TestCase):
             ),
         )
 
+    def test_load_contract_resolves_allof_required(self):
+        from specdev_tools.context._utils import merge_allof
+        from specdev_tools.core.registry import SchemaRegistry
+        from specdev_tools.generation.prompt_schema_sync import _load_contract
+
+        repo_root = Path(__file__).resolve().parents[3]
+        schema_path = repo_root / "schema" / "04_fr_list.schema.json"
+        required, _props, _schema = _load_contract(str(schema_path), repo_root)
+        expected = merge_allof(json.loads(schema_path.read_text(encoding="utf-8")), SchemaRegistry(str(repo_root)))
+        self.assertEqual(set(expected["required"]), set(required))
+        self.assertTrue(required)
+
+    def test_every_step_schema_has_a_required_set_in_the_contract(self):
+        from specdev_tools.generation.prompt_schema_sync import _load_contract
+
+        repo_root = Path(__file__).resolve().parents[3]
+        schema_paths = sorted((repo_root / "schema").glob("[0-9][0-9]*.schema.json"))
+        self.assertTrue(schema_paths)
+        empty = [p.name for p in schema_paths if not _load_contract(str(p), repo_root)[0]]
+        self.assertEqual([], empty, msg=f"schemas with no required set: {empty}")
+
     def test_detects_missing_required(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -96,131 +117,6 @@ class PromptSchemaSyncTests(unittest.TestCase):
             )
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("invalid_schema" in e for e in render_errors(errs)))
-
-    def test_detects_drift_sensitive_property_shape_mismatch(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "schema").mkdir()
-            (root / "prompts").mkdir()
-            (root / "schema" / "09_impl_plan.schema.json").write_text(
-                json.dumps(
-                    {
-                        "type": "object",
-                        "properties": {
-                            "dependencies": {
-                                "$ref": "vc:core:collections#/$defs/dependencyList"
-                            }
-                        },
-                        "required": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (root / "prompts" / "prompt_09_impl_plan.md").write_text(
-                (
-                    "## Embedded Schema\n"
-                    "```json\n"
-                    "{\"type\":\"object\",\"properties\":{\"dependencies\":{\"$ref\":\"vc:core:collections#stringArray\"}},\"required\":[]}\n"
-                    "```\n"
-                ),
-                encoding="utf-8",
-            )
-            errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("property_drift field='dependencies'" in e for e in render_errors(errs)))
-
-    def test_detects_dependency_drift_when_prompt_uses_inline_shape(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "schema").mkdir()
-            (root / "prompts").mkdir()
-            (root / "schema" / "09_impl_plan.schema.json").write_text(
-                json.dumps(
-                    {
-                        "type": "object",
-                        "properties": {
-                            "dependencies": {
-                                "$ref": "vc:core:collections#/$defs/dependencyList"
-                            }
-                        },
-                        "required": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (root / "prompts" / "prompt_09_impl_plan.md").write_text(
-                (
-                    "## Embedded Schema\n"
-                    "```json\n"
-                    "{\"type\":\"object\",\"properties\":{\"dependencies\":{\"type\":\"integer\"}},\"required\":[]}\n"
-                    "```\n"
-                ),
-                encoding="utf-8",
-            )
-            errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("property_drift field='dependencies'" in e for e in render_errors(errs)))
-
-    def test_detects_trace_property_drift(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "schema").mkdir()
-            (root / "prompts").mkdir()
-            (root / "schema" / "11_redteam.schema.json").write_text(
-                json.dumps(
-                    {
-                        "type": "object",
-                        "properties": {
-                            "trace": {
-                                "type": "array",
-                                "items": {"$ref": "vc:core:collections#traceRef"},
-                            }
-                        },
-                        "required": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (root / "prompts" / "prompt_11_redteam.md").write_text(
-                (
-                    "## Embedded Schema\n"
-                    "```json\n"
-                    "{\"type\":\"object\",\"properties\":{\"trace\":{\"$ref\":\"vc:core:collections#traceRef\"}},\"required\":[]}\n"
-                    "```\n"
-                ),
-                encoding="utf-8",
-            )
-            errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("property_drift field='trace'" in e for e in render_errors(errs)))
-
-    def test_detects_missing_metadata_property_when_not_declared_anywhere(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "schema").mkdir()
-            (root / "prompts").mkdir()
-            (root / "schema" / "00_charter.schema.json").write_text(
-                json.dumps(
-                    {
-                        "type": "object",
-                        "properties": {
-                            "canonical_refs_used": {
-                                "$ref": "vc:core:collections#/$defs/canonicalRefArray"
-                            }
-                        },
-                        "required": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (root / "prompts" / "prompt_00_project_charter.md").write_text(
-                (
-                    "## Embedded Schema\n"
-                    "```json\n"
-                    "{\"type\":\"object\",\"properties\":{},\"required\":[]}\n"
-                    "```\n"
-                ),
-                encoding="utf-8",
-            )
-            errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("missing property field='canonical_refs_used'" in e for e in render_errors(errs)))
 
     def test_detects_missing_required_nested_canonical_refs(self):
         with tempfile.TemporaryDirectory() as td:
@@ -264,39 +160,6 @@ class PromptSchemaSyncTests(unittest.TestCase):
             )
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("missing_required_canonical_refs" in e for e in render_errors(errs)))
-
-    def test_metadata_text_mention_does_not_bypass_missing_property_check(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "schema").mkdir()
-            (root / "prompts").mkdir()
-            (root / "schema" / "00_charter.schema.json").write_text(
-                json.dumps(
-                    {
-                        "type": "object",
-                        "properties": {
-                            "canonical_refs_used": {
-                                "$ref": "vc:core:collections#/$defs/canonicalRefArray"
-                            }
-                        },
-                        "required": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (root / "prompts" / "prompt_00_project_charter.md").write_text(
-                (
-                    "## Embedded Schema\n"
-                    "```json\n"
-                    "{\"type\":\"object\",\"properties\":{},\"required\":[]}\n"
-                    "```\n\n"
-                    "## Metadata Contract\n"
-                    "- Include `canonical_refs_used` in the output artifact.\n"
-                ),
-                encoding="utf-8",
-            )
-            errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("missing property field='canonical_refs_used'" in e for e in render_errors(errs)))
 
     def test_detects_output_contract_schema_violation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -572,6 +435,50 @@ class PromptSchemaSyncTests(unittest.TestCase):
             )
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("schema_uri_mismatch" in e for e in render_errors(errs)))
+
+    def test_detects_schema_reference_mismatch_in_the_step_16_prompts(self):
+        """The Schema URI and Schema File of the anchor prompt and of the 16a, 16b and 16c prompts are checked."""
+        anchor = ("vc:16-anchor", "schema/16_anchor.schema.json")
+        plan = ("vc:16-impl-context", "schema/16_impl_context.schema.json")
+        prompts = {
+            "prompt_16_impl_context.md": anchor,
+            "prompt_16a_impl_planner.md": plan,
+            "prompt_16b_impl_coder.md": plan,
+            "prompt_16c_impl_reviewer.md": plan,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for folder in ("tools", "schema", "prompts"):
+                (root / folder).mkdir()
+            (root / "tools" / "schema_registry.json").write_text(json.dumps(dict([anchor, plan])), encoding="utf-8")
+            draft = "https://json-schema.org/draft/2020-12/schema"
+            for uri, rel in (anchor, plan):
+                (root / rel).write_text(
+                    json.dumps({"$schema": draft, "$id": uri, "type": "object", "properties": {}, "required": []}),
+                    encoding="utf-8",
+                )
+
+            def reference_errors(cited: dict[str, tuple[str, str]]) -> list[str]:
+                for name, (uri, rel) in cited.items():
+                    (root / "prompts" / name).write_text(
+                        "# Schema Reference\n"
+                        f"- Schema URI: {uri}\n"
+                        f"- Schema File: {rel}\n\n"
+                        "# Output Contract\n"
+                        "```json\n"
+                        f"{{\"$schema\": \"{prompts[name][0]}\"}}\n"
+                        "```\n",
+                        encoding="utf-8",
+                    )
+                rendered = render_errors(run_prompt_schema_sync(str(root)))
+                return [e for e in rendered if "schema_uri_mismatch" in e or "schema_file_mismatch" in e or "schema reference" in e]
+
+            self.assertEqual(reference_errors(prompts), [])
+            swapped = {name: (plan if cited == anchor else anchor) for name, cited in prompts.items()}
+            errs = reference_errors(swapped)
+            for name in prompts:
+                self.assertTrue(any(name in e and "schema_uri_mismatch" in e for e in errs), f"{name}: {errs}")
+                self.assertTrue(any(name in e and "schema_file_mismatch" in e for e in errs), f"{name}: {errs}")
 
     def test_step_from_prompt_name_returns_substep_id(self):
         """_step_from_prompt_name should return '16a', not '16'."""

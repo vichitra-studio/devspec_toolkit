@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:core:graph",
+  "title": "Core Graph Annotations",
+  "description": "Annotation language for the spec graph: the x-node and x-link keywords that step schemas use to declare graph nodes and links, plus the lifecycle and scope fields shared by node items.",
+  "$defs": {
+    "kindName": {
+      "$anchor": "kindName",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "A node kind name in kebab-case, e.g. 'fr', 'criterion', 'scope-item'."
+    },
+    "nodeRole": {
+      "$anchor": "nodeRole",
+      "enum": ["obligation-system", "obligation-delivery", "verifier", "plan", "context", "record"],
+      "description": "The role a node plays in the graph. 'seed' is deliberately absent: the top of the graph is declared with top_of_graph, not a role."
+    },
+    "xNode": {
+      "$anchor": "xNode",
+      "type": "object",
+      "description": "Value of the x-node keyword: declares that each item of an array (or each value of a map) is a graph node. Exactly one of id or map_keyed names the id; exactly one of role or top_of_graph gives the role.",
+      "properties": {
+        "kind": {
+          "$ref": "vc:core:graph#kindName",
+          "description": "The node kind, kebab-case."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the property that holds the id on each item."
+        },
+        "map_keyed": {
+          "const": true,
+          "description": "True when the container is a map and the map key is the node id."
+        },
+        "role": {
+          "$ref": "vc:core:graph#nodeRole",
+          "description": "The node role."
+        },
+        "top_of_graph": {
+          "const": true,
+          "description": "True only for the seed kind: the node sits at the top of the graph and has no role or contract."
+        },
+        "contract": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Property names that make up the node's contract. Required unless top_of_graph."
+        },
+        "coarse": {
+          "type": "boolean",
+          "description": "True when the node is a coarse obligation. The annotation is copied into the entry-key registry; the built computation decides coarseness by kind (scope-item, risk, capability) and does not read it."
+        },
+        "step": {
+          "type": "string",
+          "pattern": "^[0-9]{2}[a-z]?$",
+          "description": "Step id the node belongs to. Default is the numeric prefix of the schema file name."
+        },
+        "files": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Relative file globs holding the nodes, e.g. 'impl_context/ms_*_plan.json'. Default is the step's spec file."
+        }
+      },
+      "required": ["kind"],
+      "allOf": [
+        {
+          "oneOf": [
+            {"required": ["id"], "not": {"required": ["map_keyed"]}},
+            {"required": ["map_keyed"], "not": {"required": ["id"]}}
+          ]
+        },
+        {
+          "oneOf": [
+            {"required": ["role"], "not": {"required": ["top_of_graph"]}},
+            {"required": ["top_of_graph"], "not": {"required": ["role"]}}
+          ]
+        },
+        {
+          "if": {"not": {"required": ["top_of_graph"]}},
+          "then": {"required": ["contract"]}
+        },
+        {
+          "if": {"required": ["top_of_graph"]},
+          "then": {"properties": {"kind": {"const": "seed"}}}
+        }
+      ],
+      "additionalProperties": false
+    },
+    "xLink": {
+      "$anchor": "xLink",
+      "type": "object",
+      "description": "Value of the x-link keyword: declares that a field holds links to nodes of the named kinds. The literal '*' is meant only for the verbs replaces, removes and about.",
+      "properties": {
+        "kinds": {
+          "oneOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"$ref": "vc:core:graph#kindName"},
+              "description": "The kinds the link may target."
+            },
+            {
+              "const": "*",
+              "description": "Any kind. Meant only for the verbs replaces, removes and about; not enforced by a lint."
+            }
+          ],
+          "description": "Target kinds: a non-empty array of kind names, or the single literal '*'."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "True when every item must carry at least one value for this link."
+        },
+        "built": {
+          "type": "boolean",
+          "default": false,
+          "description": "True when the link counts toward the built computation. Default false."
+        },
+        "same_step_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "vc:core:graph#kindName"},
+          "description": "Subset of kinds that may be held in the same step as the source."
+        },
+        "additional_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "vc:core:graph#kindName"},
+          "description": "Subset of kinds that the field accepts in addition to the others: when the link is required, a value that holds only targets of these kinds does not satisfy it (E701), and a target that cannot be found is looked for in the steps of the other kinds."
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "vc:core:graph#nodeRole"},
+          "description": "Roles whose kinds a host declares in its extension schemas (step 13) and the field accepts in addition to kinds. A kind of the toolkit is never added by role: the toolkit lists its own kinds in kinds."
+        }
+      },
+      "required": ["kinds", "required"],
+      "additionalProperties": false
+    },
+    "linkVerb": {
+      "$anchor": "linkVerb",
+      "enum": [
+        "derives_from", "refines", "realises", "mitigated_by", "assumes", "constrains",
+        "provided_by", "relies_on", "connects_to", "verifies", "verified_by", "threatens",
+        "schedules", "justified_by", "depends_on", "part_of", "replaces", "removes", "about",
+        "expects"
+      ],
+      "description": "The closed vocabulary of link field names. A field name never changes meaning between steps."
+    },
+    "nodeId": {
+      "$anchor": "nodeId",
+      "anyOf": [
+        {"$ref": "vc:core:atoms#kebabId"},
+        {"$ref": "vc:core:atoms#screamingSnakeId"}
+      ],
+      "description": "A node id in either kebab-case or SCREAMING_SNAKE_CASE, for fields that may hold either form."
+    },
+    "lifecycle": {
+      "$anchor": "lifecycle",
+      "type": "string",
+      "enum": ["active", "deprecated", "not_applicable"],
+      "default": "active",
+      "description": "Lifecycle state of a node item. Default active."
+    },
+    "scope": {
+      "$anchor": "scope",
+      "type": "string",
+      "enum": ["in", "later", "out"],
+      "description": "Whether the item is in scope now, deferred (later), or out of scope. later and out require scope_reason."
+    },
+    "scopeReason": {
+      "$anchor": "scopeReason",
+      "type": "string",
+      "minLength": 1,
+      "description": "Why the item is later or out of scope."
+    },
+    "scopeReasonRule": {
+      "$anchor": "scopeReasonRule",
+      "description": "Attach in an item's allOf: when scope is later or out, scope_reason is required.",
+      "if": {
+        "required": ["scope"],
+        "properties": {"scope": {"enum": ["later", "out"]}}
+      },
+      "then": {"required": ["scope_reason"]}
+    }
+  }
+}

@@ -17,8 +17,11 @@ from pathlib import Path
 import yaml
 
 from specdev_tools.core.changelog_parser import (
+    compare_versions,
     get_toolkit_version,
     list_versions,
+    load_format,
+    load_version,
     validate_changelog,
 )
 
@@ -552,3 +555,42 @@ class TestOSErrorHardening:
             assert False, "expected FileNotFoundError"
         except FileNotFoundError:
             pass
+
+
+class TestChangesShape:
+    def test_empty_changes_is_an_error_not_a_traceback(self, tmp_path):
+        _write_format(tmp_path)
+        for changes, wording in ((None, "'changes' must be a list"), (["just a string"], "Change 0 must be a mapping")):
+            _write_version(tmp_path, "1.0.0", {**_valid_base(), "changes": changes})
+            errors = validate_changelog(tmp_path, "1.0.0")
+            assert [e.code for e in errors] == ["E520"]
+            assert wording in errors[0].message
+
+
+class TestMigrationScriptAndKind:
+    def test_migration_info_reads_script_and_kind(self, tmp_path):
+        _write_format(tmp_path)
+        content = _valid_base("1.2.0")
+        content["changes"] = [
+            {"type": "fix", "migration": {"action": "auto", "script": "p2_id_mint", "kind": "mechanical"}},
+            {"type": "fix", "migration": {"action": "none"}},
+        ]
+        _write_version(tmp_path, "1.2.0", content)
+        first, second = load_version(tmp_path, "1.2.0").changes
+        assert (first.migration.script, first.migration.kind) == ("p2_id_mint", "mechanical")
+        assert (second.migration.script, second.migration.kind) == (None, None)
+
+    def test_format_yaml_lists_kind_values(self):
+        real = Path(__file__).resolve().parents[3] / "changelog"
+        assert load_format(real).migration_kinds == ["mechanical", "judgement", "none"]
+
+
+class TestVersionOrder:
+    def test_a_prerelease_sorts_before_its_release(self, tmp_path):
+        assert compare_versions("1.2.0-rc1", "1.2.0") == -1
+        assert compare_versions("1.2.0", "1.2.0-rc1") == 1
+        assert compare_versions("1.1.9", "1.2.0-rc1") == -1
+        assert compare_versions("1.2.0-rc1", "1.2.0-rc2") == -1
+        for name in ("v1.2.0.yaml", "v1.2.0-rc1.yaml", "v1.1.1.yaml"):
+            (tmp_path / name).write_text("version: x\n", encoding="utf-8")
+        assert list_versions(tmp_path) == ["1.1.1", "1.2.0-rc1", "1.2.0"]

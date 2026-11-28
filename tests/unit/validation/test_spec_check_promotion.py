@@ -11,7 +11,7 @@ Regression coverage for the two findings fixed in spec_check.py:
     only errors were promotable W-codes was reported WARN instead of FAIL under
     that contract.
 
-Both surfaces are now built through the single ``_check_result`` fix-point,
+Both surfaces are now built through the single ``check_result`` fix-point,
 which promotes first. These tests exercise that helper directly (it is the only
 place per-check results are constructed) under each env configuration.
 """
@@ -22,7 +22,7 @@ import pytest
 
 from specdev_tools.core.config import reset_config
 from specdev_tools.core.errors import SpecError
-from specdev_tools.validation.spec_check import _check_result
+from specdev_tools.validation.check_registry import check_result
 
 # W615 is in PROMOTABLE_PAIRS (-> E615). Used as a representative promotable
 # W-code emitted by one of checks #2-#14 (step-11 invariant/threat drift).
@@ -48,7 +48,7 @@ def test_no_promotion_env_keeps_warn(monkeypatch):
     monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
     reset_config()
 
-    result = _check_result(_warn_only())
+    result = check_result(_warn_only())
 
     assert result["status"] == "WARN"
     assert result["warning_count"] == 1
@@ -66,7 +66,7 @@ def test_warnings_as_errors_promotes_and_flips_status(monkeypatch):
     monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
     reset_config()
 
-    result = _check_result(_warn_only())
+    result = check_result(_warn_only())
 
     assert result["status"] == "FAIL"
     assert result["error_count"] == 1
@@ -80,7 +80,7 @@ def test_selective_promote_codes_promotes_listed_code(monkeypatch):
     monkeypatch.setenv("SPECDEV_PROMOTE_CODES", PROMOTABLE_W)
     reset_config()
 
-    result = _check_result(_warn_only())
+    result = check_result(_warn_only())
 
     assert result["status"] == "FAIL"
     assert [e.code for e in result["errors"]] == [PROMOTED_E]
@@ -92,7 +92,7 @@ def test_selective_promote_codes_leaves_unlisted_warn(monkeypatch):
     monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W571")
     reset_config()
 
-    result = _check_result(_warn_only())
+    result = check_result(_warn_only())
 
     assert result["status"] == "WARN"
     assert [e.code for e in result["errors"]] == [PROMOTABLE_W]

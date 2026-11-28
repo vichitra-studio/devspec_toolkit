@@ -1,0 +1,173 @@
+{
+  "start_kinds": {"16a": "task", "16b": "plan-item", "16c": "roadmap-milestone"},
+  "suffix_fields": {"third-party": "pin"},
+  "sections": [
+    {
+      "name": "core criteria", "roles": ["16b"], "start_set": ["start"],
+      "hops": [
+        {"verb": "realises", "direction": "out", "kinds": ["task-criterion"]},
+        {"direction": "parent", "kinds": ["task"]},
+        {"direction": "parent", "kinds": ["roadmap-milestone"]}
+      ],
+      "kinds": ["task-criterion", "task", "roadmap-milestone"]
+    },
+    {
+      "name": "core criteria", "roles": ["16a"], "start_set": ["start"],
+      "hops": [
+        {"direction": "children", "kinds": ["task-criterion"]},
+        {"direction": "parent", "kinds": ["roadmap-milestone"]}
+      ],
+      "kinds": ["task-criterion", "task", "roadmap-milestone"]
+    },
+    {
+      "name": "core criteria", "roles": ["16c"], "start_set": ["start"],
+      "hops": [
+        {"direction": "children", "kinds": ["task"]},
+        {"direction": "children", "kinds": ["task-criterion"]},
+        {"verb": "realises", "direction": "in", "kinds": ["plan-item"]},
+        {"verb": "about", "direction": "in", "kinds": ["anchor-row"]},
+        {"verb": "refines", "direction": "out", "kinds": []},
+        {"direction": "parent", "kinds": ["fr"]},
+        {"verb": "schedules", "direction": "in", "kinds": ["design-milestone"]}
+      ],
+      "kinds": ["task-criterion", "task", "plan-item", "anchor-row", "design-milestone"]
+    },
+    {
+      "name": "obligations", "roles": ["16a", "16b", "16c"], "start_set": ["core criteria"],
+      "hops": [
+        {"verb": "refines", "direction": "out", "kinds": ["criterion", "fr", "api", "api-error", "invariant", "nfr"]},
+        {"direction": "parent", "kinds": ["fr"]}
+      ],
+      "kinds": ["criterion", "fr", "api", "api-error", "invariant", "nfr"]
+    },
+    {
+      "name": "APIs and errors", "roles": ["16a", "16b", "16c"], "start_set": ["obligations"],
+      "include_start_set": true,
+      "hops": [{"verb": "derives_from", "direction": "in", "kinds": ["api", "api-error"]}],
+      "kinds": ["api", "api-error"]
+    },
+    {
+      "name": "lineage", "roles": ["16b", "16c"], "start_set": ["obligations"],
+      "include_start_set": true,
+      "hops": [{"verb": "derives_from", "direction": "out", "kinds": ["fr", "capability", "scope-item"], "repeat": true}],
+      "kinds": ["fr", "capability", "scope-item"]
+    },
+    {
+      "name": "lineage", "roles": ["16a"], "start_set": ["obligations", "APIs and errors", "threats", "delivery"],
+      "include_start_set": true,
+      "hops": [
+        {"verb": "derives_from", "direction": "out", "kinds": [], "repeat": true},
+        {"direction": "parent", "kinds": ["stakeholder"]}
+      ],
+      "kinds": ["fr", "capability", "scope-item", "need", "segment", "metric", "risk", "constraint", "stakeholder"]
+    },
+    {
+      "name": "assumptions", "roles": ["16a", "16b"], "start_set": ["obligations", "lineage"],
+      "hops": [{"verb": "assumes", "direction": "out", "kinds": ["assumption"]}],
+      "kinds": ["assumption"]
+    },
+    {
+      "name": "needs", "roles": ["16a"], "start_set": ["lineage"],
+      "include_start_set": true, "hops": [], "kinds": ["need"]
+    },
+    {
+      "name": "constraints", "roles": ["16a", "16b", "16c"], "start_set": ["obligations", "APIs and errors", "delivery"],
+      "hops": [{"verb": "constrains", "direction": "in", "kinds": ["invariant", "nfr"]}],
+      "kinds": ["invariant", "nfr"]
+    },
+    {
+      "name": "threats", "roles": ["16a", "16b", "16c"],
+      "start_set": ["core criteria", "obligations", "APIs and errors", "delivery"],
+      "hops": [
+        {"verb": "threatens", "direction": "in", "kinds": ["threat", "edge-case"]},
+        {"verb": "refines", "direction": "out", "kinds": ["threat", "edge-case"]}
+      ],
+      "kinds": ["threat", "edge-case"]
+    },
+    {
+      "name": "delivery", "roles": ["16b"], "start_set": ["APIs and errors"],
+      "hops": [
+        {"verb": "realises", "direction": "in", "kinds": ["scaffold-row"]},
+        {"verb": "provided_by", "direction": "out", "kinds": ["component"]},
+        {"verb": "derives_from", "direction": "in", "kinds": ["connection", "gate", "secret"]},
+        {"verb": "derives_from", "direction": "in", "kinds": ["secret"]},
+        {"verb": "realises", "direction": "in", "kinds": ["job"]},
+        {"verb": "realises", "direction": "out", "kinds": ["environment"]}
+      ],
+      "kinds": ["scaffold-row", "gate", "secret", "connection", "job", "environment"]
+    },
+    {
+      "name": "delivery", "roles": ["16a", "16c"], "start_set": ["APIs and errors"],
+      "hops": [
+        {"verb": "realises", "direction": "in", "kinds": ["scaffold-row"]},
+        {"verb": "provided_by", "direction": "out", "kinds": ["component"]},
+        {"verb": "derives_from", "direction": "in", "kinds": ["connection", "gate", "secret"]},
+        {"verb": "derives_from", "direction": "in", "kinds": ["secret"]},
+        {"verb": "realises", "direction": "in", "kinds": ["job"]},
+        {"verb": "realises", "direction": "out", "kinds": ["environment"]}
+      ],
+      "kinds": ["scaffold-row", "component", "gate", "secret", "connection", "job", "environment"]
+    },
+    {
+      "name": "dependencies", "roles": ["16a", "16b", "16c"], "start_set": ["obligations", "APIs and errors"],
+      "hops": [{"verb": "depends_on", "direction": "out", "kinds": ["fr", "api"]}],
+      "kinds": ["fr", "api"]
+    },
+    {
+      "name": "third parties", "roles": ["16a", "16b", "16c"], "start_set": ["APIs and errors", "constraints", "delivery"],
+      "hops": [
+        {"verb": "relies_on", "direction": "out", "kinds": ["third-party"]},
+        {"verb": "connects_to", "direction": "out", "kinds": ["third-party"]},
+        {"verb": "part_of", "direction": "out", "kinds": ["third-party"]}
+      ],
+      "kinds": ["third-party"]
+    },
+    {
+      "name": "verifiers", "roles": ["16a", "16b"], "start_set": ["core criteria", "obligations", "APIs and errors"],
+      "hops": [
+        {"verb": "verified_by", "direction": "out", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["verification-record"]}
+      ],
+      "kinds": ["fixture", "job", "verification-record"]
+    },
+    {
+      "name": "verifiers", "roles": ["16c"], "start_set": ["core criteria", "obligations", "APIs and errors"],
+      "hops": [
+        {"verb": "verified_by", "direction": "out", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["fixture", "job"]},
+        {"verb": "verifies", "direction": "in", "kinds": ["verification-record"]},
+        {"verb": "about", "direction": "in", "kinds": ["evidence-record"]}
+      ],
+      "kinds": ["fixture", "job", "verification-record", "evidence-record"]
+    },
+    {
+      "name": "universal", "roles": ["16a", "16b", "16c"],
+      "whole_kinds": ["rule"],
+      "matched": [{"kind": "term", "field": "term"}],
+      "pointer": {"file": "15_scaffold.json", "path": ".interface_map"}
+    }
+  ],
+  "reports": {
+    "ambiguity": {"roles": ["16a", "16b", "16c"], "kinds": ["ambiguity-item"]},
+    "dependency": {
+      "roles": ["16b"], "start_set": ["obligations", "APIs and errors"],
+      "hops": [
+        {"verb": "provided_by", "direction": "out", "kinds": ["component"]},
+        {"verb": "derives_from", "direction": "in", "kinds": ["connection"]},
+        {"verb": "connects_to", "direction": "out", "kinds": ["third-party"]},
+        {"verb": "relies_on", "direction": "out", "kinds": ["third-party"]},
+        {"verb": "part_of", "direction": "out", "kinds": ["third-party"]},
+        {"verb": "depends_on", "direction": "out", "kinds": ["fr", "api"], "repeat": true}
+      ]
+    }
+  },
+  "host_kinds": {"roles": ["16a", "16b", "16c"], "obligations": "obligations", "context": "extension context"},
+  "exempt": [
+    {"kind": "seed", "authority": "top of the graph, not a role (design doc L600)"},
+    {"kind": "extension", "authority": "the entry of the manifest that declares an extension: a plan kind that no pack names (declared with role `plan` in schema/13_extension_manifest.schema.json); the kinds an extension's own schema declares are placed by `host_kinds`"},
+    {"kind": "execution-record", "authority": "written by 'specdev plan record' and read by the executed rule; no pack names it (M8, WI-M8-02)"},
+    {"kind": "signoff-record", "authority": "written by 'specdev milestone sign-off' and read by the close gate; no pack names it (M8, WI-M8-02)"},
+    {"kind": "at-deploy-record", "authority": "written by 'specdev plan record --at-deploy' and read by the proof rule; no pack names it (M8, WI-M8-02)"}
+  ]
+}

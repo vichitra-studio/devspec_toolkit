@@ -17,7 +17,7 @@ class TestLoadGuides:
 
     def test_loads_all_bundled_yaml_files(self) -> None:
         guides = load_guides()
-        assert len(guides) >= 5, "Expected E110, E110-UNKNOWN_CANONICAL_ID, E530, E530-INVENTED_ENUM_OR_ID, E530-LINKED_TEST_FILE_NOT_FOUND"
+        assert len(guides) >= 4, "Expected E110, E110-UNKNOWN_CANONICAL_ID, E530, E530-INVENTED_ENUM_OR_ID"
 
     def test_e110_key_present(self) -> None:
         guides = load_guides()
@@ -27,9 +27,9 @@ class TestLoadGuides:
         guides = load_guides()
         assert "E530-INVENTED_ENUM_OR_ID" in guides
 
-    def test_e530_linked_key_present(self) -> None:
+    def test_linted_test_file_guide_removed(self) -> None:
         guides = load_guides()
-        assert "E530-LINKED_TEST_FILE_NOT_FOUND" in guides
+        assert "E530-LINKED_TEST_FILE_NOT_FOUND" not in guides
 
     def test_e530_base_key_present(self) -> None:
         guides = load_guides()
@@ -72,10 +72,13 @@ class TestLookupGuide:
         assert entry is not None
         assert entry.get("subcode") == "INVENTED_ENUM_OR_ID"
 
-    def test_subcoded_e530_linked_found(self) -> None:
-        entry = lookup_guide("E530-LINKED_TEST_FILE_NOT_FOUND")
+    def test_guide_e607_exists_and_names_both_canon_files(self) -> None:
+        entry = lookup_guide("E607")
         assert entry is not None
-        assert entry.get("subcode") == "LINKED_TEST_FILE_NOT_FOUND"
+        text = format_guide_text(entry)
+        assert "E210" in text
+        assert "manifest.json" in text
+        assert "kinds/<kind>.json" in text
 
     def test_unknown_code_returns_none(self) -> None:
         entry = lookup_guide("EXXXUNKNOWN")
@@ -147,12 +150,6 @@ class TestFormatGuideText:
         text = format_guide_text(entry)
         assert len(text.strip()) > 0
 
-    def test_e530_linked_text_non_empty(self) -> None:
-        entry = lookup_guide("E530-LINKED_TEST_FILE_NOT_FOUND")
-        assert entry is not None
-        text = format_guide_text(entry)
-        assert len(text.strip()) > 0
-
 
 # ---------------------------------------------------------------------------
 # CLI dispatch tests (via sys.argv patching)
@@ -185,11 +182,6 @@ class TestGuideCLI:
 
     def test_e530_invented_human_output_non_empty(self) -> None:
         code, out, _ = _run_cli("guide", "E530-INVENTED_ENUM_OR_ID")
-        assert code == 0
-        assert len(out.strip()) > 0
-
-    def test_e530_linked_human_output_non_empty(self) -> None:
-        code, out, _ = _run_cli("guide", "E530-LINKED_TEST_FILE_NOT_FOUND")
         assert code == 0
         assert len(out.strip()) > 0
 

@@ -1,0 +1,53 @@
+code: E607
+title: "A glossary term or proposal differs from its accepted canon entry"
+trigger: |
+  `specdev spec-check` (the glossary-drift check) found text that differs from
+  the `cn:project:` canon entry it was made into. Three cases, told apart by the
+  message:
+    - a term of `spec/03_glossary.json` whose `definition` differs from the
+      `definition` of the entry its `term_ref` names;
+    - a term whose label (`term`) is neither the entry's `preferred_label` nor
+      one of its `aliases` (the message has `field=preferred_label`; case is
+      ignored);
+    - a `canonical_proposals` item of any step (a capability, a metric, ...)
+      whose `definition` or `proposed_label` differs from the entry made from it
+      (the message starts `CANON_PROPOSAL_DRIFT`).
+  Texts that differ only by whitespace, Unicode form, curly quotes or dashes are
+  not drift.
+resolution: |
+  1. Decide which text is right: the glossary term (or proposal) or the canon
+     entry.
+  2. If the canon text is right, patch the term. Read the canon text first:
+       specdev json read spec/canon/kinds/term.json '.entries[] | select(.id=="<canon-id>") | .definition' --repo-root ./devspec_toolkit
+     (when the project canon has no `kinds/` folder, read it from
+     `spec/canon/manifest.json` the same way) then:
+       specdev json patch --id <term-id> .definition '"<canon text>"' --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+     For a label use `.term`; for a proposal of another step patch the item in
+     `canonical_proposals` of its file.
+  3. If the glossary (or proposal) text is right, update the canon entry with
+     `canon-accept`; do not edit the canon files by hand. The proposal is the
+     source `canon-accept` reads, so `canonical_proposals` must hold an item
+     with the new text (with no proposals it prints `OK (no proposals found)`
+     and changes nothing). For a glossary term the proposal must also equal the
+     term (E606): add it when it is missing (the array empty or absent:
+       specdev json patch spec/03_glossary.json '.canonical_proposals' '[<item>]' --repo-root ./devspec_toolkit
+     it has items:
+       specdev json insert spec/03_glossary.json '.canonical_proposals' '<item>' --repo-root ./devspec_toolkit
+     `json insert --step 03` is refused; the item holds `temp_id` (the canon id without `cn:project:term:`), `kind`
+     (`term`), `proposed_label`, `definition` and `source_field`
+     (`terms[0].term`)), or patch its `definition` and `proposed_label`. Then see what would change, and write it:
+       specdev canon-accept --from spec/03_glossary.json --namespace cn:project: --update --dry-run --repo-root ./devspec_toolkit --git-root .
+       specdev canon-accept --from spec/03_glossary.json --namespace cn:project: --update --repo-root ./devspec_toolkit --git-root .
+     It prints `~ updated: <canon-id>`. `--update` rewrites `definition`,
+     `preferred_label` and `aliases` in `spec/canon/manifest.json` and, when the
+     canon has one for that kind, in `spec/canon/kinds/<kind>.json`; a changed
+     label stays as an alias. Without `--update` it prints
+     `! changed (not updated, use --update)` and changes nothing. For a proposal
+     of another step, name that step's file in `--from`.
+  4. Check:
+       specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+     reports no E607 and no E606.
+see_also:
+  - E606
+  - E210
+  - W606

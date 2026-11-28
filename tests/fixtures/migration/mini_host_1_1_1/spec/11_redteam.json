@@ -1,0 +1,132 @@
+{
+    "$schema": "vc:11-redteam",
+    "id": "redteam-lantern",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-checkout-return"
+        }
+    ],
+    "threats": [
+        {
+            "threat_id": "threat-card-sharing",
+            "description": "A member lends their card to a neighbour, who then borrows tools on the member's account and never returns them.",
+            "vector": "card-sharing",
+            "target_ids": [
+                {
+                    "type": "api",
+                    "id": "api-checkout-create"
+                },
+                {
+                    "type": "api",
+                    "id": "api-reserve-create"
+                },
+                {
+                    "type": "api",
+                    "id": "api-reserve-cancel"
+                }
+            ],
+            "category": "authz",
+            "mitigations": [
+                {
+                    "type": "inv",
+                    "id": "inv-no-double-checkout"
+                },
+                {
+                    "type": "capability",
+                    "id": "cap-late-fees",
+                    "note": "Fees discourage lending a card"
+                }
+            ],
+            "severity": "medium",
+            "risk_category_ref": {
+                "id": "cn:core:risk_category:authz",
+                "kind": "risk_category",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "threat_id": "threat-fee-tampering",
+            "description": "A volunteer edits a fee by hand to waive it for a friend, leaving the books out of step with the ledger.",
+            "vector": "manual-override",
+            "target_ids": [
+                {
+                    "type": "api",
+                    "id": "api-fee-get"
+                },
+                {
+                    "type": "api",
+                    "id": "api-return-create"
+                }
+            ],
+            "category": "business_logic",
+            "mitigations": [
+                {
+                    "type": "nfr",
+                    "id": "nfr-fee-accuracy"
+                }
+            ],
+            "severity": "low",
+            "risk_category_ref": {
+                "id": "cn:core:risk_category:data-integrity",
+                "kind": "risk_category",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "threat_id": "threat-catalog-scraping",
+            "description": "A script pages through the whole catalog to copy the tool list, loading the search endpoint for everyone else.",
+            "vector": "bulk-scrape",
+            "target_ids": [
+                {
+                    "type": "api",
+                    "id": "api-catalog-search"
+                }
+            ],
+            "category": "business_logic",
+            "mitigations": [
+                {
+                    "type": "nfr",
+                    "id": "nfr-search-latency"
+                }
+            ],
+            "severity": "low",
+            "risk_category_ref": {
+                "id": "cn:core:risk_category:business-logic",
+                "kind": "risk_category",
+                "version": "1.0.0"
+            }
+        }
+    ],
+    "edge_cases": [
+        {
+            "id": "ec-card-expired-at-desk",
+            "description": "The member card expires while the loan is open",
+            "trigger": "Card expiry date before due date"
+        },
+        {
+            "id": "ec-tool-found-after-loss",
+            "description": "A tool marked lost is handed back",
+            "trigger": "Return scan of a tool in lost state"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:risk_category:authz",
+            "kind": "risk_category",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:risk_category:business-logic",
+            "kind": "risk_category",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:core:risk_category:data-integrity",
+            "kind": "risk_category",
+            "version": "1.0.0"
+        }
+    ]
+}

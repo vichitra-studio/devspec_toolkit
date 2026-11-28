@@ -1,0 +1,253 @@
+{
+    "$schema": "vc:04-fr-list",
+    "id": "functional-requirements-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "functional_requirements": [
+        {
+            "fr_id": "fr-catalog-search",
+            "statement": "The system shall let a member search the tool catalog by name and see whether each match is on the shelf.",
+            "rationale": "Members should not walk to the desk to find an empty shelf.",
+            "preconditions": [
+                "The catalog holds at least one tool"
+            ],
+            "postconditions": [
+                "A page of matching tools is returned"
+            ],
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-catalog-search-1",
+                    "text": "A search for a partial name returns every tool whose name contains the text"
+                },
+                {
+                    "criterion_id": "ac-catalog-search-2",
+                    "text": "Each match carries a shelf state of on-shelf or on-loan"
+                }
+            ],
+            "priority": "must-have",
+            "trace": [
+                {
+                    "type": "api",
+                    "id": "api-catalog-search",
+                    "note": "Search endpoint"
+                },
+                {
+                    "type": "capability",
+                    "id": "cap-browse-catalog"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:browse-catalog",
+                "kind": "capability",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "fr_id": "fr-reserve-tool",
+            "statement": "The system shall let a member reserve an on-shelf tool for one pickup day.",
+            "rationale": "A reservation turns a wasted trip into a confirmed one.",
+            "preconditions": [
+                "The tool is on the shelf on the pickup day"
+            ],
+            "postconditions": [
+                "The tool is held for the member until the desk closes"
+            ],
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-reserve-tool-1",
+                    "text": "A reservation for a tool already reserved for that day is refused"
+                },
+                {
+                    "criterion_id": "ac-reserve-tool-2",
+                    "text": "A member holds at most three reservations at a time"
+                }
+            ],
+            "priority": "must-have",
+            "trace": [
+                {
+                    "type": "api",
+                    "id": "api-reserve-create"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:reserve-tool",
+                "kind": "capability",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "fr_id": "fr-checkout-tool",
+            "statement": "The system shall let a volunteer check a tool out to a member for seven days.",
+            "rationale": "The desk lends a tool in one scan.",
+            "preconditions": [
+                "The member card is valid",
+                "The tool is on the shelf"
+            ],
+            "postconditions": [
+                "A loan is open with a due date seven days out"
+            ],
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-checkout-tool-1",
+                    "text": "Checking out a tool that is already on loan is refused with a conflict error"
+                },
+                {
+                    "criterion_id": "ac-checkout-tool-2",
+                    "text": "A successful checkout sets the due date seven days after the checkout day"
+                }
+            ],
+            "priority": "must-have",
+            "trace": [
+                {
+                    "type": "api",
+                    "id": "api-checkout-create"
+                },
+                {
+                    "type": "capability",
+                    "id": "cap-checkout-return"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:checkout-return",
+                "kind": "capability",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "fr_id": "fr-return-tool",
+            "statement": "The system shall let a volunteer record the return of a tool.",
+            "rationale": "A closed loan puts the tool back on the shelf.",
+            "preconditions": [
+                "A loan is open for the tool"
+            ],
+            "postconditions": [
+                "The loan is closed and the tool is on the shelf"
+            ],
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-return-tool-1",
+                    "text": "Returning a tool closes its open loan and sets the shelf state to on-shelf"
+                },
+                {
+                    "criterion_id": "ac-return-tool-2",
+                    "text": "Returning a tool with no open loan is refused"
+                }
+            ],
+            "priority": "must-have",
+            "trace": [
+                {
+                    "type": "api",
+                    "id": "api-return-create"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:checkout-return",
+                "kind": "capability",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "fr_id": "fr-late-fee-calc",
+            "statement": "The system shall compute a late fee of 50 cents for each full day a loan stays open after its due date.",
+            "rationale": "A small fee keeps tools circulating.",
+            "preconditions": [
+                "A loan is past its due date"
+            ],
+            "postconditions": [
+                "The fee owed is recorded on the loan"
+            ],
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-late-fee-calc-1",
+                    "text": "A loan returned two full days late owes 100 cents"
+                },
+                {
+                    "criterion_id": "ac-late-fee-calc-2",
+                    "text": "A loan returned on its due date owes nothing"
+                }
+            ],
+            "priority": "should-have",
+            "trace": [
+                {
+                    "type": "api",
+                    "id": "api-fee-get"
+                },
+                {
+                    "type": "capability",
+                    "id": "cap-late-fees"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:late-fees",
+                "kind": "capability",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "fr_id": "fr-waitlist-notify",
+            "statement": "The system shall text a member when a waitlisted tool comes back.",
+            "rationale": "Reduces repeat visits.",
+            "preconditions": [
+                "The member joined a waitlist"
+            ],
+            "postconditions": [
+                "The member received a text"
+            ],
+            "acceptance_criteria": [
+                {
+                    "criterion_id": "ac-waitlist-notify-1",
+                    "text": "A waitlisted member is texted within five minutes of the return"
+                },
+                {
+                    "criterion_id": "ac-waitlist-notify-2",
+                    "text": "A member leaves a waitlist by replying with a stop word"
+                }
+            ],
+            "priority": "wont-have",
+            "trace": [
+                {
+                    "type": "capability",
+                    "id": "cap-reserve-tool"
+                }
+            ],
+            "capability_ref": {
+                "id": "cn:project:capability:reserve-tool",
+                "kind": "capability",
+                "version": "1.0.0"
+            }
+        }
+    ],
+    "spec_refs_ingested": [
+        {
+            "step_id": "01",
+            "artifact_id": "capabilities-catalog"
+        }
+    ],
+    "seed_refs_ingested": [
+        {
+            "seed_id": "seed-lending-overview"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:capability:browse-catalog",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:checkout-return",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:late-fees",
+            "kind": "capability",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:capability:reserve-tool",
+            "kind": "capability",
+            "version": "1.0.0"
+        }
+    ]
+}

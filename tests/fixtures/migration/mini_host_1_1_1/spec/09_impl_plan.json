@@ -1,0 +1,145 @@
+{
+    "$schema": "vc:09-impl-plan",
+    "id": "impl-plan-lantern",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "tech_stack": {
+        "languages": [
+            {
+                "name": "TypeScript",
+                "version": "5.5",
+                "rationale": "One language for the service and the desk app"
+            }
+        ],
+        "frameworks": [
+            {
+                "name": "Express",
+                "version": "^4.19",
+                "rationale": "HTTP framework for the lending service"
+            }
+        ],
+        "infrastructure": [
+            {
+                "name": "PostgreSQL",
+                "version": "16",
+                "rationale": "Primary data store"
+            },
+            {
+                "name": "Textline SMS API",
+                "version": "v2",
+                "rationale": "Pickup reminders by text"
+            }
+        ],
+        "tools": [
+            {
+                "name": "ESLint",
+                "version": "Built-in",
+                "rationale": "Linting for the TypeScript code base"
+            }
+        ]
+    },
+    "tech_stack_ref": {
+        "id": "cn:project:tech_stack:typescript-express",
+        "kind": "tech_stack",
+        "version": "1.0.0"
+    },
+    "milestones": [
+        {
+            "milestone_id": "milestone-catalog-basics",
+            "name": "Catalog basics",
+            "target_date": "2026-04-15",
+            "status": "done",
+            "risks": [
+                "Seed data for the catalog is not ready"
+            ],
+            "spikes": [
+                "Check search speed on 2,000 tools"
+            ],
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-catalog-search"
+                }
+            ]
+        },
+        {
+            "milestone_id": "milestone-reservations",
+            "name": "Reservations",
+            "target_date": "2026-05-15",
+            "status": "pending",
+            "risks": [
+                "Texting needs a vendor contract"
+            ],
+            "spikes": [
+                "Try the Textline sandbox"
+            ],
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-reserve-tool"
+                },
+                {
+                    "type": "fr",
+                    "id": "fr-checkout-tool"
+                },
+                {
+                    "type": "fr",
+                    "id": "fr-return-tool"
+                }
+            ],
+            "depends_on": [
+                "milestone-catalog-basics"
+            ]
+        },
+        {
+            "milestone_id": "ms-late-fees",
+            "name": "Late fees",
+            "target_date": "2026-06-15",
+            "status": "pending",
+            "risks": [
+                "Fee rounding is not agreed"
+            ],
+            "spikes": [],
+            "deliverables": [
+                {
+                    "type": "fr",
+                    "id": "fr-late-fee-calc"
+                }
+            ],
+            "depends_on": [
+                "milestone-reservations"
+            ]
+        }
+    ],
+    "dependencies": [
+        {
+            "type": "external",
+            "id": "textline-sms",
+            "owner": "Textline support desk",
+            "note": "The SMS gateway must be contracted before reminders can be sent."
+        }
+    ],
+    "dependency_ref": {
+        "id": "cn:project:dependency:textline-sms",
+        "kind": "dependency",
+        "version": "1.0.0"
+    },
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-checkout-return"
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:dependency:textline-sms",
+            "kind": "dependency",
+            "version": "1.0.0"
+        },
+        {
+            "id": "cn:project:tech_stack:typescript-express",
+            "kind": "tech_stack",
+            "version": "1.0.0"
+        }
+    ]
+}

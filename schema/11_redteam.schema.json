@@ -10,18 +10,14 @@
     {
       "type": "object",
       "properties": {
-        "trace": {
-          "type": "array",
-          "description": "Traceability links connecting this red team assessment to the capabilities and APIs it covers. Every threat must trace to at least one upstream capability or API it targets. type = the canonical kind of the target: use type='capability' for cap-* IDs, type='api' for api-* IDs. The relationship verb (derives_from) goes in note. Example: [{\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"derives_from: threat targets the credential validation flow\"}]. Threats without trace links cannot be validated against the attack surface defined in Steps 01–05. Multiple traces allowed when a threat crosses capability boundaries.",
-          "items": {
-            "$ref": "vc:core:collections#traceRef",
-            "description": "A single traceability reference. At step 11, type = the canonical kind of the target: use type='api' for api-* IDs, type='capability' for cap-* IDs. The relationship verb (derives_from) goes in note. Example: {\"type\": \"api\", \"id\": \"api-session-create\", \"note\": \"derives_from: token forgery and session fixation threats target this endpoint\"}. Anti-pattern: type='implements' or type='derives_from' — these are relationship verbs, not canonical kinds; type must be the kind of the target artifact."
-          }
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
         },
         "threats": {
           "type": "array",
           "minItems": 1,
-          "description": "Identified security threats with severity, mitigations, and traceability. Must contain at least one threat (enforced by minItems).",
+          "description": "Identified security threats with severity, the nodes each threatens, and the obligations that mitigate it.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -29,6 +25,69 @@
               "threat_id": {
                 "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this threat. Recommended format: threat-{category}-{description}. Example: 'threat-auth-token-forgery', 'threat-data-sql-injection', 'threat-dos-api-flooding'. Should be stable across spec versions."
+              },
+              "derives_from": {
+                "description": "Ids of the charter risks this threat comes from. Optional; naming the risk is what lets the risk be built. Example: [\"risk-reset-link-takeover\"]. A seed routed to this step may also be listed, for content taken straight from the seed and not through an upstream node.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "risk",
+                    "seed"
+                  ],
+                  "required": false,
+                  "built": true,
+                  "additional_kinds": [
+                    "seed"
+                  ]
+                }
+              },
+              "threatens": {
+                "description": "Ids of the nodes this threat attacks: APIs, components, connections or third parties. At least one. Example: [\"api-password-reset-confirm\"]. Anti-pattern: naming a functional requirement or an NFR here (a threat attacks a runtime surface).",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "minItems": 1,
+                "x-link": {
+                  "kinds": [
+                    "api",
+                    "component",
+                    "connection",
+                    "third-party"
+                  ],
+                  "required": true
+                }
+              },
+              "mitigated_by": {
+                "description": "Ids of the nodes that mitigate this threat: requirements, criteria, APIs, API errors, invariants, NFRs, rules, gates, secrets, environments, constraints or fixtures. Optional: the schema accepts a threat with no mitigation. Example: [\"inv-reset-token-single-use\", \"fix-password-reset-expired-token\"]. Anti-pattern: naming a capability here.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "fr",
+                    "criterion",
+                    "api",
+                    "api-error",
+                    "invariant",
+                    "nfr",
+                    "rule",
+                    "gate",
+                    "secret",
+                    "environment",
+                    "constraint",
+                    "fixture"
+                  ],
+                  "required": false,
+                  "built": true
+                }
               },
               "description": {
                 "type": "string",
@@ -38,55 +97,9 @@
                 "type": "string",
                 "description": "Attack vector or method by which the threat could be exploited. Describe the attacker's entry point, technique, and preconditions. Example: 'Attacker crafts a JWT with alg=none header bypassing signature verification on the token validation middleware'. The vector should be specific enough that a penetration tester could begin probing immediately. Anti-pattern: 'via the API' (too generic — name the specific endpoint, field, or header); 'through user input' (does not specify which input or which manipulation)."
               },
-              "target_ids": {
-                "type": "array",
-                "minItems": 1,
-                "description": "Trace references to spec artifacts this threat targets. Valid target types are: api (api_id from Step 05) and component (component_id from Step 02). Each threat must target at least one concrete artifact (enforced by minItems) — generic 'the whole system' threats are not actionable. Targeting specific APIs and components enables cross-referencing with Step 05 interface contracts and Step 02 system sketch.",
-                "items": {
-                  "$ref": "vc:core:collections#traceRef",
-                  "description": "A trace reference to a specific spec artifact (API from Step 05 or component from Step 02) targeted by this threat."
-                }
-              },
               "category": {
                 "$ref": "vc:core:atoms#threatCategory",
                 "description": "Security domain category with one concrete example per value: 'authn' — JWT algorithm confusion attack where an attacker signs a token with 'alg: none'; 'authz' — IDOR via direct object reference where a user accesses another user's order by incrementing the ID; 'business_logic' — double-charge in a payment flow triggered by rapid duplicate POST requests; 'transport' — MITM attack stripping HTTPS to HTTP at a misconfigured proxy; 'data_privacy' — PII exposure in verbose error messages that include email addresses and stack traces. When a threat spans categories, assign the category of the primary attack surface. Anti-pattern: using 'transport' for network-level data leakage (that is 'data_privacy' if the data is the target, 'transport' only if the attack is the network path itself). Do NOT use expanded or alternate forms — they will fail enum validation."
-              },
-              "mitigations": {
-                "type": "array",
-                "minItems": 1,
-                "description": "Structured mitigations for this threat. Each mitigation should be a concrete action, not a vague aspiration. Include: (1) a specific technical or process control, (2) where it is applied (component, layer, or process), (3) how effectiveness is measured. Example: 'Apply HMAC-SHA256 signature verification on all incoming webhooks at the API gateway layer. Verified by integration test fix-05-webhook-tampered'. Mitigations must be structured objects — not plain strings. Valid mitigation target types: inv-* (invariant from Step 06 — adds an invariant to prevent the threat), nfr-* (NFR from Step 07 — adds a performance/security requirement), fr-* (FR from Step 04 — adds a functional requirement to address the threat), doc (net-new proposed control or documentation-based mitigation that has no existing upstream spec ID; exempt from cross-reference validation because there is no doc-ID registry in the toolkit). Each mitigation must reference an existing artifact ID. Anti-pattern: listing a mitigation without a target ID ('add input validation' with no fr-* or inv-* reference — not traceable to a spec change).",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "enum": [
-                        "fr",
-                        "api",
-                        "nfr",
-                        "inv",
-                        "fixture",
-                        "doc",
-                        "capability"
-                      ],
-                      "description": "The artifact type that provides the mitigation (e.g., 'fr' for a functional requirement, 'inv' for an invariant, 'fixture' for a test fixture). For type 'capability', the id should reference a cap-* ID from Step 01 capabilities. Use 'doc' for a net-new proposed control or documentation-based mitigation that has no existing upstream spec ID; 'doc' mitigations are exempt from cross-reference validation because there is no doc-ID registry in the toolkit."
-                    },
-                    "id": {
-                      "$ref": "vc:core:atoms#kebabId",
-                      "description": "Kebab-case ID of the mitigating artifact. Should match a valid ID in the referenced artifact type's spec file (validated by linters)."
-                    },
-                    "note": {
-                      "type": "string",
-                      "description": "Specific explanation of how this artifact mitigates the threat — include the control mechanism, layer of application, and how effectiveness is verified."
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "id"
-                  ],
-                  "description": "A structured mitigation linking a concrete spec artifact to this threat. Must specify artifact type, artifact ID, and optionally a note explaining the control."
-                }
               },
               "severity": {
                 "$ref": "vc:core:atoms#severityLevel",
@@ -95,16 +108,79 @@
               "risk_category_ref": {
                 "description": "Canonical reference to the risk category in the canonical registry. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Registered core IDs: 'cn:core:risk_category:security', 'cn:core:risk_category:data-privacy', 'cn:core:risk_category:business-logic', 'cn:core:risk_category:data-integrity', 'cn:core:risk_category:authz', 'cn:core:risk_category:delivery-risk'. Must exist in canon/manifest.json before authoring (resolve there, or add a new entry via canonical_proposals + canon-accept) — validated by canonical-integrity lint (E110).",
                 "allOf": [
-                  { "$ref": "vc:core:collections#canonicalRef" },
-                  { "properties": { "kind": { "const": "risk_category" } } }
+                  {
+                    "$ref": "vc:core:collections#canonicalRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "risk_category"
+                      }
+                    }
+                  }
                 ]
               },
               "policy_ref": {
-                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'policy'. Example: for a JWT attack threat → {\"id\": \"cn:core:policy:authn-required\", \"kind\": \"policy\", \"label\": \"authn-required\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref.",
+                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\", \"label\": \"spec-first\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref.",
                 "allOf": [
-                  { "$ref": "vc:core:collections#canonicalRef" },
-                  { "properties": { "kind": { "const": "policy" } } }
+                  {
+                    "$ref": "vc:core:collections#canonicalRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "policy"
+                      }
+                    }
+                  }
                 ]
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this threat relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this threat: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "scope": {
+                "description": "Delivery scope for this threat: 'in' for the current release (the default when the field is omitted), 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope",
+                "default": "in"
+              },
+              "scope_reason": {
+                "description": "Why this threat is 'later' or 'out' of scope. Required when scope is 'later' or 'out'.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "aliases": {
+                "description": "Former ids of this threat; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this threat replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -112,11 +188,30 @@
               "description",
               "severity",
               "category",
-              "target_ids",
-              "mitigations",
+              "threatens",
               "risk_category_ref"
             ],
-            "description": "A single security threat with severity, mitigations, and targeted artifact IDs."
+            "description": "A single security threat with severity, the nodes it threatens and the nodes that mitigate it.",
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
+          },
+          "x-node": {
+            "kind": "threat",
+            "role": "obligation-system",
+            "contract": [
+              "description",
+              "vector",
+              "category",
+              "severity",
+              "risk_category_ref",
+              "policy_ref",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "threat_id"
           }
         },
         "edge_cases": {
@@ -137,13 +232,137 @@
               "trigger": {
                 "type": "string",
                 "description": "Description of how to reproduce this edge case — the trigger must be reproducible step-by-step without domain knowledge. Include: (1) exact input format or API call, (2) system state preconditions, (3) sequence of actions. Minimum specificity rule: the trigger must be reproducible — someone reading it must be able to reproduce the edge case without additional context. Good: 'Set JWT alg header to none and remove the signature — send as: eyJ...' (includes exact method). Examples: 'Submit POST /api/search with q parameter set to a 10,001-character string', 'Send authenticated request with token that expires exactly 1 second before the request reaches the validator', 'POST /api/auth/login with Authorization header containing a JWT signed with alg:none — e.g., curl -X POST /api/auth/login -H \\'Authorization: Bearer eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjoxfQ.\\''. Reference the related threat_id if this edge case is a boundary condition of a named threat. Anti-pattern: 'Malformed JWT' (too vague — specify what malformation and how to reproduce it); 'Send unusual request to the API' (not reproducible); omitting the expected vs. actual outcome contrast."
+              },
+              "threatens": {
+                "description": "Ids of the nodes this edge case strains: APIs, components or functional requirements. At least one. Example: [\"api-password-reset-confirm\"].",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "minItems": 1,
+                "x-link": {
+                  "kinds": [
+                    "api",
+                    "component",
+                    "fr"
+                  ],
+                  "required": true
+                }
+              },
+              "mitigated_by": {
+                "description": "Ids of the nodes that deal with this edge case: requirements, criteria, APIs, API errors, invariants, NFRs, rules, gates, secrets, environments, constraints or fixtures. At least one: an edge case nobody handles is not an edge case worth recording. Example: [\"ac-password-reset-3\", \"fix-password-reset-expired-token\"].",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "minItems": 1,
+                "x-link": {
+                  "kinds": [
+                    "fr",
+                    "criterion",
+                    "api",
+                    "api-error",
+                    "invariant",
+                    "nfr",
+                    "rule",
+                    "gate",
+                    "secret",
+                    "environment",
+                    "constraint",
+                    "fixture"
+                  ],
+                  "required": true,
+                  "built": true
+                }
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this edge case relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this edge case: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "scope": {
+                "description": "Delivery scope for this edge case: 'in' for the current release (the default when the field is omitted), 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope",
+                "default": "in"
+              },
+              "scope_reason": {
+                "description": "Why this edge case is 'later' or 'out' of scope. Required when scope is 'later' or 'out'.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "aliases": {
+                "description": "Former ids of this edge case; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "derives_from": {
+                "description": "Ids of the seeds this edge case takes content from directly. Optional: list a seed routed to this step, and only for content taken straight from the seed and not through an upstream node.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": false,
+                  "built": true
+                }
+              },
+              "replaces": {
+                "description": "Ids of nodes that this edge case replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
               "id",
-              "description"
+              "description",
+              "threatens",
+              "mitigated_by"
             ],
-            "description": "A single edge case with identifier, description, and optional trigger."
+            "description": "A single edge case with identifier, description, and optional trigger.",
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
+          },
+          "x-node": {
+            "kind": "edge-case",
+            "role": "obligation-system",
+            "contract": [
+              "description",
+              "trigger",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "id"
           }
         }
       },

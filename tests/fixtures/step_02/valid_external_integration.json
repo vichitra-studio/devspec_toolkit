@@ -16,15 +16,9 @@
         "critical-path",
         "stateless"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        },
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
+      "derives_from": [
+        "capability-user-auth",
+        "capability-user-profile"
       ]
     },
     {
@@ -40,77 +34,52 @@
         "critical-path",
         "stateful"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
-      ]
-    },
-    {
-      "component_id": "stripe-api",
-      "type": "external",
-      "responsibilities": [
-        "Tokenize payment details",
-        "Authorize card payments",
-        "Return payment confirmations"
-      ],
-      "owner": "business",
-      "tags": [
-        "external-dependency",
-        "critical-path"
-      ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "derives_from": [
+        "capability-payment-processing"
       ]
     }
   ],
   "connections": [
     {
-      "from": "user-service",
-      "to": "payment-service",
+      "connection_id": "user-service-to-payment-service",
+      "derives_from": [
+        "user-service"
+      ],
+      "connects_to": [
+        "payment-service"
+      ],
       "protocol": "http",
-      "trust_boundary": "internal",
-      "schema_ref": "file://schemas/payments.json",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
-      ]
+      "trust_boundary": "internal"
     },
     {
-      "from": "payment-service",
-      "to": "stripe-api",
+      "connection_id": "payment-service-to-stripe-api",
+      "derives_from": [
+        "payment-service"
+      ],
+      "connects_to": [
+        "stripe-api"
+      ],
       "protocol": "http",
       "trust_boundary": "partner",
-      "schema_ref": "https://stripe.com/docs/api",
       "auth": "jwt",
       "rate_limit": {
         "rps": 50,
         "burst": 100,
         "window_s": 60,
         "scope": "client"
-      },
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      }
+    }
+  ],
+  "third_parties": [
+    {
+      "third_party_id": "stripe-api",
+      "name": "Stripe API",
+      "pin": "api-v3",
+      "rationale": "Hosted card payment processor",
+      "derives_from": [
+        "seed-payments-provider"
       ]
     }
   ],
-  "tech_stack": {
-    "languages": [{ "name": "Python", "version": "3.12" }],
-    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
-    "infrastructure": [
-      { "name": "SQLite", "version": "3" },
-      { "name": "httpx", "version": "0.27", "rationale": "HTTP client for external integration" }
-    ],
-    "tools": [{ "name": "pytest", "version": "8.0" }]
-  },
   "canonical_refs_used": []
 }

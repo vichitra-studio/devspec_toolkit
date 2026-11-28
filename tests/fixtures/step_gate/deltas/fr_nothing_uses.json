@@ -1,0 +1,43 @@
+{
+  "description": "A new step-04 requirement that no later step uses yet: pending until the furthest step that can use its kind (DOC 13.9 row 3).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/04_fr_list.json",
+      "path": [
+        "functional_requirements"
+      ],
+      "value": {
+        "fr_id": "fr-account-export",
+        "priority": "should-have",
+        "scope": "in",
+        "statement": "The system shall let a registered member download the data held about their account.",
+        "acceptance_criteria": [
+          {
+            "criterion_id": "ac-account-export-1",
+            "scope": "in",
+            "text": "Given a registered member, when an export is requested, then a file with their account data is offered for download."
+          },
+          {
+            "criterion_id": "ac-account-export-2",
+            "scope": "in",
+            "text": "Given an export that is ready, when the member downloads it, then the file holds only their own account data."
+          },
+          {
+            "criterion_id": "ac-account-export-3",
+            "scope": "in",
+            "text": "Given an export older than seven days, when the member opens its link, then the request is rejected."
+          }
+        ],
+        "derives_from": [
+          "cap-account-recovery"
+        ],
+        "capability_ref": {
+          "id": "cn:project:capability:account-recovery",
+          "kind": "capability",
+          "version": "1.0.0"
+        }
+      }
+    }
+  ]
+}

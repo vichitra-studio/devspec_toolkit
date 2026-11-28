@@ -1,0 +1,131 @@
+# specdev-managed: merge-check toolkit=__SPECDEV_TOOLKIT_VERSION__
+#
+# Toolkit-owned workflow: `specdev init` / `specdev update` write it to
+# .github/workflows/specdev-merge-check.yml and refresh it; do not edit it by hand.
+#
+# Placeholders (the installer replaces each by literal text; one syntax, double underscores around SPECDEV_<NAME>):
+#   __SPECDEV_TOOLKIT_VERSION__  the toolkit version in the header above
+#   __SPECDEV_SETUP_COMMAND__    the host's declared setup command (one line) between the
+#                                `specdev:setup-begin` / `specdev:setup-end` marker lines;
+#                                with no declared command the installer removes the marker
+#                                lines and everything between them
+# Literal names the installer also rewrites when the host differs: the toolkit path
+# `devspec_toolkit`, the venv folder `devspec_env`, the spec folder `./spec`.
+#
+# Optional host settings (none is required):
+#   secret   SPECDEV_CHECKOUT_TOKEN        token that can read private submodules
+#                                          (falls back to the job's own github.token)
+#   variable SPECDEV_RELEASE_PREP_PREFIX   branch prefix of a release-prep pull request
+#                                          (default release-prep/)
+# A host MAY require the `merge-check` job on its branches; nothing here depends on it.
+# Pull-request text (title, branch names) reaches the shell only through `env:`.
+name: specdev merge check
+
+on:
+  pull_request:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: specdev-merge-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  merge-check:
+    name: merge-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SPECDEV_CHECKOUT_TOKEN || github.token }}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+      - name: Install the toolkit
+        run: |
+          uv python install 3.13
+          uv venv devspec_env --python 3.13
+          echo "$GITHUB_WORKSPACE/devspec_env/bin" >> "$GITHUB_PATH"
+          uv pip install --python devspec_env/bin/python -e devspec_toolkit/tools/
+      # specdev:setup-begin
+      - name: Host setup
+        run: |
+          __SPECDEV_SETUP_COMMAND__
+      # specdev:setup-end
+      - name: Governance check of the pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          specdev governance-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --message "$PR_TITLE"
+      - name: Merge gate (pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --merge --base-ref "origin/$BASE"
+      - name: Merge gate (push to the default branch)
+        if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --merge --base-ref "$BEFORE"
+      - name: Spec check (other runs)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name != github.event.repository.default_branch)
+        run: |
+          specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
+  # Records the evidence of the dev and CI bindings on the pull request branch.
+  # Runs only on release-prep branches of this repository (a fork's token is read-only).
+  # Runs next to merge-check, not after it: both run the dev and CI bindings.
+  release-prep:
+    name: release-prep
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, vars.SPECDEV_RELEASE_PREP_PREFIX || 'release-prep/')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout the pull request branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: true
+          token: ${{ secrets.SPECDEV_CHECKOUT_TOKEN || github.token }}
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+      - name: Install the toolkit
+        run: |
+          uv python install 3.13
+          uv venv devspec_env --python 3.13
+          echo "$GITHUB_WORKSPACE/devspec_env/bin" >> "$GITHUB_PATH"
+          uv pip install --python devspec_env/bin/python -e devspec_toolkit/tools/
+      # specdev:setup-begin
+      - name: Host setup
+        run: |
+          __SPECDEV_SETUP_COMMAND__
+      # specdev:setup-end
+      - name: Release prep
+        run: |
+          specdev release prep --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+      - name: Commit the evidence to the pull request branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git config user.name "specdev-release-prep"
+          git config user.email "specdev-release-prep@users.noreply.github.com"
+          git add -- spec/extras/verification
+          if ! git diff --cached --quiet; then
+            git commit -m "specdev: release-prep evidence"
+            git push origin HEAD:"$HEAD_REF"
+          fi

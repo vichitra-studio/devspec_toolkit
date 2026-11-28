@@ -1,0 +1,38 @@
+{
+  "$schema": "vc:seed-manifest",
+  "seed_manifest_id": "seed-manifest-routes-fixture",
+  "version": "0.1.0",
+  "created_at": "2026-11-15T00:00:00Z",
+  "last_updated": "2026-11-15T00:00:00Z",
+  "global_seed_order": [
+    "seed-accounts",
+    "seed-extra"
+  ],
+  "seeds": [
+    {
+      "seed_id": "seed-accounts",
+      "path": "docs/seed/seed_accounts.md",
+      "description": "A seed.",
+      "required": true,
+      "source_type": "doc"
+    },
+    {
+      "seed_id": "seed-extra",
+      "path": "docs/seed/seed_extra.md",
+      "description": "A seed.",
+      "required": true,
+      "source_type": "doc"
+    }
+  ],
+  "step_requirements": {
+    "00": [
+      "seed-accounts"
+    ],
+    "02": [
+      "seed-accounts"
+    ]
+  },
+  "doc_paths": [
+    "docs/**/*.md"
+  ]
+}

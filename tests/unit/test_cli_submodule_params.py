@@ -49,22 +49,16 @@ class TestValidateAllSpecRootParam:
         assert "--spec-root" in capsys.readouterr().out
 
 
-class TestForwardReplayCheckParams:
-    def test_help_shows_spec_root(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+class TestSpecCheckStepFlags:
+    def test_help_shows_step_paths_base_ref_detail(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
         import specdev_tools.cli as cli_module
         monkeypatch.setattr(cli_module, "check_venv", lambda: None)
-        monkeypatch.setattr(sys, "argv", ["specdev", "forward-replay-check", "--help"])
+        monkeypatch.setattr(sys, "argv", ["specdev", "spec-check", "--help"])
         with pytest.raises(SystemExit):
             cli_module.main()
-        assert "--spec-root" in capsys.readouterr().out
-
-    def test_help_shows_git_root(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
-        import specdev_tools.cli as cli_module
-        monkeypatch.setattr(cli_module, "check_venv", lambda: None)
-        monkeypatch.setattr(sys, "argv", ["specdev", "forward-replay-check", "--help"])
-        with pytest.raises(SystemExit):
-            cli_module.main()
-        assert "--git-root" in capsys.readouterr().out
+        help_text = capsys.readouterr().out
+        for flag in ("--step", "--paths", "--base-ref", "--detail"):
+            assert flag in help_text, flag
 
 
 class TestCanonAcceptGitRootParam:

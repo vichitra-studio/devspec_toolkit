@@ -1,7 +1,6 @@
 """Behavior-preservation gate for merge_allof / effective_schema (F2, §5 WS3).
 
-WS3 rerouted ``merge_allof`` (context/_utils.py) and ``_get_all_properties``
-(registry/generate.py) through ``core/schema_nav.py::effective_schema``.  The
+WS3 rerouted ``merge_allof`` (context/_utils.py) through ``core/schema_nav.py::effective_schema``.  The
 critical invariant to preserve is the **own-first UNION merge**: a step's OWN
 properties must survive alongside the step-base properties contributed by the
 ``allOf: [$ref vc:core:step-base]`` branch.
@@ -51,9 +50,9 @@ _STEP_BASE_KEYS: frozenset[str] = frozenset(
 #
 # Chosen steps:
 #   "00"  — two-branch allOf schema: allOf[0] = step-base $ref, allOf[1] =
-#            own properties (title, problem_statement, in_scope, …); NO root
+#            own properties (title, problem_statement, scope_items, …); NO root
 #            `properties` block at schema top level
-#   "02"  — has both own properties (components, connections, tech_stack) AND
+#   "02"  — has both own properties (components, connections) AND
 #            allOf step-base; named explicitly in the F2 finding
 #   "03"  — minimal step-own (terms); exercises the same allOf merge path
 #   "04"  — single step-own key (functional_requirements); clean signal
@@ -66,8 +65,8 @@ _STEP_BASE_KEYS: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 
 _STEP_CASES: list[tuple[str, frozenset[str]]] = [
-    ("00", frozenset({"title", "problem_statement", "in_scope", "out_of_scope"})),
-    ("02", frozenset({"components", "connections", "tech_stack"})),
+    ("00", frozenset({"title", "problem_statement", "scope_items"})),
+    ("02", frozenset({"components", "connections"})),
     ("03", frozenset({"terms"})),
     ("04", frozenset({"functional_requirements"})),
     ("09", frozenset({"milestones"})),
@@ -186,88 +185,47 @@ class TestMergeAllofUnionInvariant:
 
 
 # ---------------------------------------------------------------------------
-# _get_all_properties (registry/generate.py) — WS3 second reroute guard
+# Conditional-branch properties (DEVSPEC-95)
 # ---------------------------------------------------------------------------
 
-# Own root-level properties for the two steps whose own keys are declared at
-# the schema ROOT (alongside allOf step-base $ref).  The no-op resolver in
-# _get_all_properties intentionally does NOT resolve vc:core:step-base, so
-# step-base keys will be ABSENT from the result — that is the expected behavior.
-#
-# Steps selected:
-#   "09"  — root properties: tech_stack, tech_stack_ref, milestones, …
-#   "16"  — root properties: extensions, plan, execution, review, …
-_GET_ALL_PROPS_CASES: list[tuple[str, frozenset[str]]] = [
-    ("09", frozenset({"milestones", "tech_stack"})),
-    ("16", frozenset({"plan", "execution"})),
-]
+_CONDITIONAL_SCHEMA: dict[str, Any] = {
+    "allOf": [
+        {
+            "required": ["extensions"],
+            "properties": {"extensions": {"type": "array", "items": {"type": "object"}}},
+        }
+    ],
+    "oneOf": [{"properties": {"only_in_one_of": {"type": "string"}}, "required": ["only_in_one_of"]}],
+    "then": {"properties": {"extensions": {"type": "array"}, "only_in_then": {"type": "string"}}},
+}
 
 
-def _get_all_props_for_step(step_id: str) -> dict:
-    """Return the _get_all_properties result for *step_id*.
+def _merge_allof_of_conditional_schema() -> dict[str, Any]:
+    """``merge_allof`` properties of the conditional schema."""
+    from specdev_tools.context._utils import merge_allof  # noqa: PLC0415
 
-    Mirrors how generate.py itself invokes _get_all_properties inside
-    _scan_schema_for_arrays: load the schema file, call the function directly.
-    """
-    from specdev_tools.registry import generate  # noqa: PLC0415
-
-    schema_dir = str(_TOOLKIT_ROOT / "schema")
-    schema_path = generate._schema_file_for_step(step_id, schema_dir)
-    assert schema_path, f"No schema file found for step {step_id!r}"
-    schema = generate._load_json(schema_path)
-    return generate._get_all_properties(schema)
+    return merge_allof(_CONDITIONAL_SCHEMA, _load_registry())["properties"]
 
 
-class TestGetAllPropertiesNoopResolver:
-    """Behavior-preservation gate for _get_all_properties (WS3 second reroute).
+_CONDITIONAL_MERGES = pytest.mark.parametrize(
+    "merged_props",
+    [_merge_allof_of_conditional_schema],
+    ids=["merge_allof"],
+)
 
-    _get_all_properties uses a no-op resolver — it intentionally does NOT
-    resolve the vc:core:step-base $ref branch.  The critical invariant is:
 
-    1. Own root-level properties SURVIVE the merge (regression guard: an
-       overwrite bug would clobber root props to empty).
-    2. Step-base keys are ABSENT (proves the no-op resolver is genuinely
-       exercised and the allOf $ref branch is correctly skipped).
+class TestConditionalBranchProperties:
+    @_CONDITIONAL_MERGES
+    def test_a_property_only_in_a_oneof_branch_is_merged(self, merged_props) -> None:
+        props = merged_props()
+        assert {"only_in_one_of", "only_in_then"} <= set(props)
 
-    This contrasts with TestMergeAllofUnionInvariant where step-base keys ARE
-    expected to be present (merge_allof resolves the $ref fully).
-    """
+    @_CONDITIONAL_MERGES
+    def test_a_conditional_branch_does_not_replace_an_allof_property(self, merged_props) -> None:
+        props = merged_props()
+        assert props["extensions"]["items"] == {"type": "object"}
 
-    @pytest.mark.parametrize("step_id,expected_own_keys", _GET_ALL_PROPS_CASES)
-    def test_own_root_keys_survive(
-        self, step_id: str, expected_own_keys: frozenset[str]
-    ) -> None:
-        """Own root-level keys must be present in _get_all_properties output.
+    def test_required_is_never_taken_from_a_conditional_branch(self) -> None:
+        from specdev_tools.context._utils import merge_allof  # noqa: PLC0415
 
-        These keys are declared directly in ``properties`` at the schema root.
-        Under the original overwrite regression, the allOf merge would clobber
-        root properties to empty, dropping all own keys.
-        """
-        props = _get_all_props_for_step(step_id)
-        missing = expected_own_keys - set(props)
-        assert not missing, (
-            f"Step {step_id!r}: own root keys dropped from _get_all_properties "
-            f"output — missing: {sorted(missing)}. "
-            f"Actual props: {sorted(props)}"
-        )
-
-    @pytest.mark.parametrize("step_id", [c[0] for c in _GET_ALL_PROPS_CASES])
-    def test_step_base_keys_absent_with_noop_resolver(
-        self, step_id: str
-    ) -> None:
-        """Step-base keys must be ABSENT from _get_all_properties output.
-
-        The no-op resolver in _get_all_properties returns None for any $ref
-        node, causing effective_schema to treat the vc:core:step-base allOf
-        branch as empty.  Step-base keys (id, owner, created_at,
-        canonical_refs_used) must therefore NOT appear — their presence would
-        indicate the no-op resolver is not being applied correctly.
-        """
-        props = _get_all_props_for_step(step_id)
-        unexpectedly_present = _STEP_BASE_KEYS & set(props)
-        assert not unexpectedly_present, (
-            f"Step {step_id!r}: step-base keys unexpectedly present in "
-            f"_get_all_properties output (no-op resolver should have skipped "
-            f"the $ref branch) — found: {sorted(unexpectedly_present)}. "
-            f"Actual props: {sorted(props)}"
-        )
+        assert merge_allof(_CONDITIONAL_SCHEMA, _load_registry())["required"] == ["extensions"]

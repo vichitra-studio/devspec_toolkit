@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:extras:trace-lock",
+  "title": "Trace Lock",
+  "description": "The trace lock of a spec (spec/extras/trace.lock.json): for every link between two nodes, the hashes of the target as the holder last accepted it. A link whose target hash differs from the lock is suspect. Written by the toolkit, never by hand.",
+  "type": "object",
+  "required": ["version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "The schema URI of the lock file.",
+      "const": "vc:extras:trace-lock"
+    },
+    "version": {
+      "description": "Format version of the lock file. Only version 1 exists.",
+      "const": 1
+    },
+    "entries": {
+      "description": "One entry per link, sorted by source, field and target. The triple (source, field, target) is the key and occurs once.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "hash": {
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lower-case hex digits.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "entry": {
+      "description": "The accepted state of one link.",
+      "type": "object",
+      "required": ["source", "field", "target", "content_hash", "chain_stamp"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "description": "Id of the node that holds the link.",
+          "type": "string",
+          "minLength": 1
+        },
+        "field": {
+          "description": "Name of the link field of the source node that holds the link.",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "Id of the node the link points at.",
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "description": "Hash of the target's own content when the link was last accepted.",
+          "$ref": "#/$defs/hash"
+        },
+        "chain_stamp": {
+          "description": "Hash of the target's whole upstream chain when the link was last accepted.",
+          "$ref": "#/$defs/hash"
+        },
+        "target_containers": {
+          "description": "Ids of the nodes that enclose the target (its containment parent, then that node's parent, up to the top), nearest first, as they were when the entry was written. Absent when the target had no enclosing node or the entry was written before this field existed; absent means none recorded.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "baseline": {
+          "description": "Present, and true, only when the entry was stamped by migration and has not been attested since.",
+          "const": true
+        }
+      }
+    }
+  }
+}

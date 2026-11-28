@@ -1,0 +1,292 @@
+{
+    "$schema": "vc:05-interface-contracts",
+    "id": "interface-contracts-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "apis": [
+        {
+            "api_id": "api-catalog-search",
+            "name": "Search Catalog",
+            "version": "v1",
+            "protocol": "http",
+            "path": "/tools",
+            "method": "GET",
+            "errors": [
+                {
+                    "code": "query-too-short",
+                    "message": "The search text is shorter than two characters",
+                    "severity": "error"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "required": true,
+                    "schema": "string"
+                }
+            ],
+            "security": "none",
+            "owner": "api",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "enum_provenance": {
+                "source_url": "https://example.org/lantern/api-errors",
+                "source_date": "2026-03-02",
+                "resolved_at": "2026-03-02T09:00:00Z"
+            },
+            "example_refs": [
+                "fix-search-returns-matches"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-catalog-search"
+                }
+            ]
+        },
+        {
+            "api_id": "api-reserve-create",
+            "name": "Create Reservation",
+            "version": "v1",
+            "protocol": "http",
+            "path": "/reservations",
+            "method": "POST",
+            "errors": [
+                {
+                    "code": "tool-already-reserved",
+                    "message": "The tool is already held for that day",
+                    "severity": "error"
+                },
+                {
+                    "code": "reservation-limit",
+                    "message": "The member already holds three reservations",
+                    "severity": "error"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "tool_id",
+                    "in": "query",
+                    "required": true,
+                    "schema": "string"
+                }
+            ],
+            "security": "jwt",
+            "owner": "api",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "enum_provenance": {
+                "source_url": "https://example.org/lantern/api-errors",
+                "source_date": "2026-03-02",
+                "resolved_at": "2026-03-02T09:00:00Z"
+            },
+            "example_refs": [
+                "fix-reserve-happy",
+                "fix-reserve-twice"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-reserve-tool"
+                }
+            ]
+        },
+        {
+            "api_id": "api-reserve-cancel",
+            "name": "Cancel Reservation",
+            "version": "v1",
+            "protocol": "http",
+            "path": "/reservations/{id}",
+            "method": "DELETE",
+            "errors": [
+                {
+                    "code": "reservation-not-found",
+                    "message": "No open reservation exists for that id",
+                    "severity": "error"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": "string"
+                }
+            ],
+            "security": "jwt",
+            "owner": "api",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "enum_provenance": {
+                "source_url": "https://example.org/lantern/api-errors",
+                "source_date": "2026-03-02",
+                "resolved_at": "2026-03-02T09:00:00Z"
+            },
+            "example_refs": [
+                "fix-reserve-twice"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-reserve-tool"
+                }
+            ]
+        },
+        {
+            "api_id": "api-checkout-create",
+            "name": "Create Checkout",
+            "version": "v1",
+            "protocol": "http",
+            "path": "/checkouts",
+            "method": "POST",
+            "errors": [
+                {
+                    "code": "tool-on-loan",
+                    "message": "The tool is already on loan",
+                    "severity": "error"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "tool_id",
+                    "in": "query",
+                    "required": true,
+                    "schema": "string"
+                }
+            ],
+            "security": "jwt",
+            "owner": "api",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "enum_provenance": {
+                "source_url": "https://example.org/lantern/api-errors",
+                "source_date": "2026-03-02",
+                "resolved_at": "2026-03-02T09:00:00Z"
+            },
+            "example_refs": [
+                "fix-checkout-conflict"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-checkout-tool"
+                }
+            ]
+        },
+        {
+            "api_id": "api-return-create",
+            "name": "Record Return",
+            "version": "v1",
+            "protocol": "http",
+            "path": "/checkouts/{id}/return",
+            "method": "PUT",
+            "errors": [
+                {
+                    "code": "loan-not-open",
+                    "message": "No open loan exists for that id",
+                    "severity": "error"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": "string"
+                }
+            ],
+            "security": "jwt",
+            "owner": "api",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "enum_provenance": {
+                "source_url": "https://example.org/lantern/api-errors",
+                "source_date": "2026-03-02",
+                "resolved_at": "2026-03-02T09:00:00Z"
+            },
+            "example_refs": [
+                "fix-return-closes-loan"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-return-tool"
+                }
+            ]
+        },
+        {
+            "api_id": "api-fee-get",
+            "name": "Get Fee",
+            "version": "v1",
+            "protocol": "http",
+            "path": "/fees/{id}",
+            "method": "GET",
+            "errors": [
+                {
+                    "code": "fee-not-found",
+                    "message": "No fee is recorded for that loan",
+                    "severity": "warn"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "schema": "string"
+                }
+            ],
+            "security": "jwt",
+            "owner": "api",
+            "interface_ref": {
+                "id": "cn:project:interface:lending-rest",
+                "kind": "interface",
+                "version": "1.0.0"
+            },
+            "enum_provenance": {
+                "source_url": "https://example.org/lantern/api-errors",
+                "source_date": "2026-03-02",
+                "resolved_at": "2026-03-02T09:00:00Z",
+                "resolved_version": "Textline SMS API v2"
+            },
+            "example_refs": [
+                "fix-late-fee-two-days"
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-late-fee-calc"
+                }
+            ]
+        }
+    ],
+    "out_of_scope": [
+        {
+            "fr_id": "fr-waitlist-notify",
+            "rationale": "Waitlists are deferred; the desk phones members for now."
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:project:interface:lending-rest",
+            "kind": "interface",
+            "version": "1.0.0"
+        }
+    ]
+}

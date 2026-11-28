@@ -1,0 +1,22 @@
+{
+    "$schema": "vc:canon:kind",
+    "registry_version": "1.0.0",
+    "kind": "inv",
+    "entries": [
+        {
+            "id": "cn:project:inv:no-double-checkout",
+            "kind": "inv",
+            "preferred_label": "no double checkout",
+            "definition": "A tool is never on loan to two members at once.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+                "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+                "introduced_at": "2026-03-02T00:00:00Z"
+            }
+        }
+    ]
+}

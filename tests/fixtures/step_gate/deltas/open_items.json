@@ -1,0 +1,36 @@
+{
+  "description": "The two open items of DOC 13.2: a step-05 item about the seed with its answer known, a step-08 item about a criterion with no answer.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/05_interface_contracts.json",
+      "path": [
+        "ambiguities"
+      ],
+      "create": true,
+      "value": {
+        "id": "amb-reset-seed",
+        "description": "Does the reset link also go out by SMS?",
+        "about": [
+          "seed-accounts"
+        ],
+        "decision": "No: the link is sent by email only."
+      }
+    },
+    {
+      "op": "append",
+      "file": "spec/08_fixtures.json",
+      "path": [
+        "ambiguities"
+      ],
+      "create": true,
+      "value": {
+        "id": "amb-reset-criterion",
+        "description": "How old is an expired token in the fixture: 30 minutes or 31?",
+        "about": [
+          "ac-password-reset-3"
+        ]
+      }
+    }
+  ]
+}

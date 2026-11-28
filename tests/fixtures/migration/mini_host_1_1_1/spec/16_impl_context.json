@@ -1,0 +1,83 @@
+{
+    "$schema": "vc:16-anchor",
+    "id": "anchor-lantern",
+    "owner": "api",
+    "created_at": "2026-04-01T09:00:00Z",
+    "artifact_role": "anchor",
+    "canonical_refs_used": [],
+    "plan": {
+        "summary": {
+            "functional_summary": "Catalog, reservations and late fees for the Lantern Lending desk.",
+            "scope_in": [
+                "catalog-search",
+                "reservations",
+                "late-fees"
+            ],
+            "scope_out": [
+                "waitlists",
+                "online-payment"
+            ]
+        },
+        "ambiguities": [
+            {
+                "id": "amb-fee-rounding",
+                "description": "It is not stated whether a part day owes a fee.",
+                "severity": "medium",
+                "impact": [
+                    "fr-late-fee-calc"
+                ],
+                "status": "tracking"
+            },
+            {
+                "id": "amb-card-renewal",
+                "description": "Whether a lapsed member card blocks reservations is open.",
+                "severity": "low",
+                "impact": [
+                    "fr-reserve-tool",
+                    "api-reserve-create"
+                ],
+                "status": "tracking"
+            }
+        ],
+        "drift": {
+            "checks": [
+                "Removed the old status_ref fields from the roadmap during the 1.1.0 upgrade (2026-03-20)",
+                "Verified ms-reservations fr_refs do not overlap ms-late-fees fr_refs (2026-05-20)"
+            ]
+        },
+        "milestone_index": [
+            {
+                "milestone_id": "ms-catalog-basics",
+                "context_path": "spec/impl_context/ms_catalog_plan.json",
+                "status": "done",
+                "fr_refs": [
+                    "fr-catalog-search"
+                ],
+                "checklist_id_prefix": "CATALOG",
+                "summary": "Catalog search — all checklist items verified, CI green"
+            },
+            {
+                "milestone_id": "ms-reservations",
+                "context_path": "spec/impl_context/ms_reservations_plan.json",
+                "status": "in_progress",
+                "fr_refs": [
+                    "fr-reserve-tool",
+                    "fr-checkout-tool",
+                    "fr-return-tool"
+                ],
+                "checklist_id_prefix": "RESERVE",
+                "summary": "Reservations — endpoint in progress"
+            },
+            {
+                "milestone_id": "ms-late-fees",
+                "context_path": "spec/impl_context/ms_late_fees_plan.json",
+                "status": "pending",
+                "fr_refs": [
+                    "fr-late-fee-calc"
+                ],
+                "checklist_id_prefix": "FEE",
+                "summary": "Late fees — calculator written, row not yet updated"
+            }
+        ]
+    }
+}

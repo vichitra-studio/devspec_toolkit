@@ -1,0 +1,13 @@
+{
+  "description": "The schema's $id is not vc: and the extension id of its file name.",
+  "ops": [
+    {
+      "op": "set",
+      "file": "spec/extensions/ext_01_database.schema.json",
+      "path": [
+        "$id"
+      ],
+      "value": "vc:ext-01-db"
+    }
+  ]
+}

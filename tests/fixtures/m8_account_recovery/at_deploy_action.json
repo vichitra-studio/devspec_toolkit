@@ -1,0 +1,7 @@
+{
+  "id": "a03",
+  "type": "file_edit",
+  "target": "src/routes/password-resets/confirm.ts",
+  "description": "Rotate the signing key of the reset tokens when the milestone is deployed.",
+  "at_deploy": ["staging", "prod"]
+}

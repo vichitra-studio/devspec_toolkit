@@ -1,38 +1,33 @@
-import json
 import os
 import sys
+import unittest
+from pathlib import Path
 
-from specdev_tools.validation.validators.step_01 import validate_step_01
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
 
-# Adjust these for when the script is moved to tests/integration
 TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
-REPO_ROOT = os.path.abspath(os.path.join(TOOLKIT_ROOT, os.pardir))
 FIXTURES_DIR = os.path.join(TOOLKIT_ROOT, "tests", "fixtures", "step_01")
-SYSTEM_SKETCH_PATH = os.path.join(REPO_ROOT, "spec", "02_system_sketch.json")
 
-def load_system_sketch_components(path: str):
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path) as f:
-            data = json.load(f)
-            components = data.get("components", [])
-            return {
-                c.get("component_id") 
-                for c in components 
-                if c.get("component_id")
-            }
-    except Exception as e:
-        print(f"Warning: Failed to load system sketch components: {e}")
-        return None
 
-def validate_file(file_path: str, should_pass: bool, component_ids) -> bool:
-    with open(file_path) as handle:
-        instance = json.load(handle)
+def schema_errors(file_path: str) -> list[str]:
+    """Rendered schema (E520) and deep-validator errors for one fixture.
 
-    errors = validate_step_01(instance, TOOLKIT_ROOT, component_ids)
+    Canonical-integrity and quality-lint results are excluded: the fixtures use
+    project-tier canonical ids that core canon does not know (E110), and this
+    test only checks the step-01 schema and deep validator.
+    """
+    errors = specdev_validate_file(
+        TOOLKIT_ROOT,
+        file_path,
+        include_quality_lint=False,
+        include_canonical_integrity=False,
+    )
+    return [e.render() for e in errors if e.code.startswith("E")]
 
-    passed = len(errors) == 0
+
+def validate_fixture(file_path: str, should_pass: bool) -> bool:
+    errors = schema_errors(file_path)
+    passed = not errors
 
     if should_pass:
         if passed:
@@ -45,24 +40,20 @@ def validate_file(file_path: str, should_pass: bool, component_ids) -> bool:
         print("❌ FAIL (Unexpected Pass)")
         return False
 
-    if errors:
-        print(f"✅ Expected Failure: {errors[0]}")
+    print(f"✅ Expected Failure: {errors[0]}")
     return True
 
+
 def main() -> None:
-    component_ids = load_system_sketch_components(SYSTEM_SKETCH_PATH)
-    
-    # Deep validator only checks trace integrity — schema validation is handled
-    # by the orchestrator (validate.py) before the deep validator is called.
-    # Both fixtures pass deep validation since neither has trace integrity issues.
-    valid_fixtures = ["valid_minimal.json", "invalid_missing_required.json"]
+    # Schema validation runs first (as validate.py does); the step-01 deep
+    # validator then has no content check left to add.
+    cases = [("valid_minimal.json", True), ("invalid_missing_required.json", False)]
 
     results = []
-
-    for fixture in valid_fixtures:
+    for fixture, should_pass in cases:
         path = os.path.join(FIXTURES_DIR, fixture)
         if os.path.exists(path):
-            results.append(validate_file(path, True, component_ids))
+            results.append(validate_fixture(path, should_pass))
         else:
             print(f"Missing {path}")
             results.append(False)
@@ -74,5 +65,36 @@ def main() -> None:
     print("\n💀 Some tests failed.")
     sys.exit(1)
 
+
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+
+class Step01IntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.fixtures_dir = Path(FIXTURES_DIR)
+
+    def _assert_fails_naming(self, fixture: str, needle: str) -> None:
+        rendered = schema_errors(str(self.fixtures_dir / fixture))
+        self.assertTrue(rendered, f"Expected schema errors for {fixture}")
+        self.assertTrue(
+            any(needle in msg for msg in rendered),
+            f"Expected an error mentioning {needle!r}, got: {rendered}",
+        )
+
+    def test_capability_scope_future_fails(self):
+        self._assert_fails_naming("invalid_scope_future.json", "'future' is not one of")
+
+    def test_capability_scope_later_without_scope_reason_fails(self):
+        self._assert_fails_naming("invalid_later_without_scope_reason.json", "scope_reason")
+
+    def test_capability_empty_derives_from_fails(self):
+        self._assert_fails_naming("invalid_empty_derives_from.json", "derives_from")
+
+    def test_capability_derives_from_metric_id_passes_schema(self):
+        self.assertEqual(schema_errors(str(self.fixtures_dir / "valid_derives_from_metric.json")), [])

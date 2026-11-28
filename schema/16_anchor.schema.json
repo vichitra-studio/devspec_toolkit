@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:16-anchor",
   "title": "16_anchor (Trinity Anchor)",
-  "description": "Trinity Anchor artifact for Step 16. Declares the full scope of a multi-milestone implementation, tracks which milestones own which FRs, and is the cross-milestone drift-detection surface. Does NOT carry a per-FR checklist — that detail lives in each 16a milestone plan. Does NOT carry execution or review sections — those are milestone-plan concerns.",
+  "description": "Trinity Anchor artifact for Step 16. Declares the full scope of a multi-milestone implementation, holds one row per roadmap milestone with its status, and is the cross-milestone drift-detection surface. Does NOT carry a per-FR checklist — that detail lives in each 16a milestone plan. Does NOT carry execution or review sections — those are milestone-plan concerns.",
   "type": "object",
   "required": [
     "artifact_role",
@@ -65,13 +65,8 @@
           }
         },
         "ambiguities": {
-          "type": "array",
-          "minItems": 0,
-          "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Reuses the shared crossCycleAmbiguityItem shape. An empty array on a fresh anchor is valid.",
-          "items": {
-            "$ref": "vc:core:collections#crossCycleAmbiguityItem",
-            "description": "A cross-milestone ambiguity or unresolved architectural decision."
-          }
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities across all Trinity cycles. An empty array on a fresh anchor is valid."
         },
         "drift": {
           "type": "object",
@@ -97,42 +92,171 @@
         "milestone_index": {
           "type": "array",
           "minItems": 0,
-          "description": "Registry of all milestones covered by this anchor. Each entry declares which FRs/APIs a milestone owns and the checklist ID namespace it uses. An empty array is valid on a fresh anchor before any milestone plans are created.",
+          "description": "Registry of all milestones covered by this anchor: one status row per roadmap milestone. Each row names the milestone it is about, its progress status and the checklist ID namespace its plan uses. An empty array is valid on a fresh anchor before any milestone plans are created.",
+          "x-node": {
+            "kind": "anchor-row",
+            "role": "record",
+            "contract": ["summary", "checklist_id_prefix"],
+            "id": "anchor_id"
+          },
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "milestone_id",
-              "context_path",
-              "status",
-              "fr_refs",
+              "anchor_id",
+              "about",
               "checklist_id_prefix",
               "summary"
             ],
-            "description": "A milestone entry in the anchor index.",
-            "properties": {
-              "milestone_id": {
-                "$ref": "vc:core:atoms#kebabId",
-                "description": "Kebab-case ID matching the milestone_id in 14_roadmap.json."
+            "description": "A status record about one roadmap milestone. It is created and deleted, never retired, so it carries no lifecycle.",
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "deferred"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "deferral_reason"
+                  ]
+                }
               },
-              "context_path": {
-                "type": "string",
-                "pattern": "^(spec/)?impl_context/[a-z0-9_]+\\.json$",
-                "description": "Relative path to this milestone's 16a plan. Canonical form: 'impl_context/ms_auth_plan.json' (relative to spec/). The 'spec/' prefix form is accepted for repo-root-relative conventions. Must point at a file inside impl_context/ with a lowercase/underscore/digit filename ending in .json."
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "done"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "close"
+                  ]
+                }
+              }
+            ],
+            "properties": {
+              "anchor_id": {
+                "$ref": "vc:core:atoms#kebabId",
+                "description": "Unique kebab-case identifier of this anchor row. Suggested form: 'anchor-' followed by the milestone id. Example: 'anchor-ms-account-recovery'."
+              },
+              "about": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "x-link": {
+                  "kinds": ["roadmap-milestone"],
+                  "required": true
+                },
+                "description": "The one Step 14 roadmap milestone this row is about, as a one-item array. Example: [\"ms-account-recovery\"]. Anti-pattern: naming several milestones (one row per milestone) or a task."
               },
               "status": {
                 "$ref": "vc:core:atoms#milestoneStatus",
-                "description": "Lifecycle status of this milestone, reusing the shared milestoneStatus atom (same enum as 14_roadmap.json). Values: 'pending', 'in_progress', 'done', 'deferred'. Only 'done' milestones are exempt from FR ownership conflict detection."
+                "default": "pending",
+                "description": "Optional; an absent status reads as 'pending'. Progress status of this milestone: 'pending' (default), 'in_progress', 'deferred' or 'done'. 'deferred' requires deferral_reason; 'done' requires close."
               },
-              "fr_refs": {
-                "type": "array",
-                "uniqueItems": true,
-                "items": {
-                  "type": "string",
-                  "pattern": "^(fr|api)-[a-z0-9]+(?:-[a-z0-9]+)*$",
-                  "description": "An FR or API ID owned by this milestone. Must start with 'fr-' or 'api-'."
+              "deferral_reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300,
+                "description": "Why the milestone was deferred, at most 300 characters. Required when status is 'deferred'. Written by 'specdev milestone defer'; 'specdev milestone start' removes it. Example: 'Waits for the payment provider contract.'"
+              },
+              "close": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "signed_off_by"
+                ],
+                "description": "How the milestone was closed. Required when status is 'done'. Written by 'specdev milestone close', which fills every field but source; a milestone that was already done before the migration carries signed_off_by 'legacy-migration' and its source instead.",
+                "properties": {
+                  "signed_off_by": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Who signed the milestone off. The literal 'legacy-migration' marks a milestone that was already done before the migration to this shape; the migration writes source with it."
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Names the legacy status source this close was taken from. Written by the migration, together with signed_off_by 'legacy-migration'."
+                  },
+                  "tree": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Id of the code tree (a git tree id) the milestone was closed at. Example: '4b825dc642cb6eb9a060e54bf8d69288fbee4904'."
+                  },
+                  "signoff": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^so-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9]{4,}$",
+                    "description": "Id of the sign-off record the close rests on, in spec/extras/signoff/; null for a legacy close, which has none. Example: 'so-ms-account-recovery-0001'."
+                  },
+                  "plan_hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "description": "Hash of the milestone's plan file when it was closed, 'sha256:' and 64 lower-case hex digits. The frozen-plan check compares the plan with it, or with the last migration's hash_after."
+                  },
+                  "closed_at": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "UTC time the close was written, ISO 8601. Informational: nothing compares it."
+                  },
+                  "migrations": {
+                    "type": "array",
+                    "description": "Recorded migrations of the frozen plan, oldest first. A plan changes after close only through one of these.",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "hash_after",
+                        "note"
+                      ],
+                      "description": "One recorded migration of the frozen plan.",
+                      "properties": {
+                        "hash_after": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$",
+                          "description": "Hash of the plan file after this migration, 'sha256:' and 64 lower-case hex digits."
+                        },
+                        "note": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "What the migration changed and why."
+                        }
+                      }
+                    }
+                  }
                 },
-                "description": "FR and API IDs owned by this milestone. Duplicates within the array are a schema error. Two non-done milestones claiming the same ID is a scope conflict. Pattern restricts entries to fr-* or api-* IDs."
+                "if": {
+                  "properties": {
+                    "signed_off_by": {
+                      "const": "legacy-migration"
+                    }
+                  },
+                  "required": [
+                    "signed_off_by"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "source"
+                  ]
+                }
               },
               "checklist_id_prefix": {
                 "type": "string",

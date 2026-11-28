@@ -1,0 +1,32 @@
+{
+  "$schema": "vc:16-anchor",
+  "id": "anchor-legacy-rows",
+  "owner": "api",
+  "created_at": "2026-01-01T00:00:00Z",
+  "artifact_role": "anchor",
+  "plan": {
+    "summary": {
+      "functional_summary": "Rows as a 1.1.1 project left them, for the readers that must not fail on them.",
+      "scope_in": ["legacy-rows"],
+      "scope_out": []
+    },
+    "ambiguities": [],
+    "drift": { "checks": [] },
+    "milestone_index": [
+      {
+        "anchor_id": "anchor-ms-pending",
+        "about": ["ms-pending"],
+        "checklist_id_prefix": "PEND",
+        "summary": "A pending row that carries no status."
+      },
+      {
+        "anchor_id": "anchor-ms-done",
+        "about": ["ms-done"],
+        "status": "done",
+        "checklist_id_prefix": "DONE",
+        "summary": "A done row closed by the migration.",
+        "close": { "signed_off_by": "legacy-migration", "source": "14.status" }
+      }
+    ]
+  }
+}

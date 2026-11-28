@@ -1,0 +1,187 @@
+{
+  "$schema": "vc:08-fixtures",
+  "id": "fixtures-catalog",
+  "owner": "system",
+  "created_at": "2026-03-02T09:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fix-search-returns-matches",
+      "description": "A partial name returns the matching tools",
+      "targets": [
+        {
+          "type": "api",
+          "id": "api-catalog-search"
+        },
+        {
+          "type": "fr",
+          "id": "fr-catalog-search"
+        }
+      ],
+      "mode": "contract",
+      "input": {
+        "q": "drill"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "tools": [
+            {
+              "name": "Cordless drill",
+              "shelf": "on-shelf"
+            }
+          ]
+        }
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fixture_id": "fix-reserve-happy",
+      "description": "A member reserves an on-shelf tool",
+      "targets": [
+        {
+          "type": "fr",
+          "id": "fr-reserve-tool"
+        }
+      ],
+      "mode": "e2e",
+      "input": {
+        "tool_id": "tool-ladder-3m",
+        "pickup_day": "2026-04-11"
+      },
+      "expected": {
+        "status": 201
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fixture_id": "fix-reserve-twice",
+      "description": "A second reservation for the same day is refused",
+      "targets": [
+        {
+          "type": "api",
+          "id": "api-reserve-create"
+        },
+        {
+          "type": "fr",
+          "id": "fr-reserve-tool"
+        }
+      ],
+      "mode": "e2e",
+      "input": {
+        "tool_id": "tool-ladder-3m",
+        "pickup_day": "2026-04-11"
+      },
+      "expected": {
+        "status": 409
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fixture_id": "fix-checkout-conflict",
+      "description": "Checking out a tool on loan is refused",
+      "targets": [
+        {
+          "type": "api",
+          "id": "api-checkout-create"
+        },
+        {
+          "type": "fr",
+          "id": "fr-checkout-tool"
+        },
+        {
+          "type": "inv",
+          "id": "inv-no-double-checkout"
+        }
+      ],
+      "mode": "unit",
+      "input": {
+        "tool_id": "tool-ladder-3m"
+      },
+      "expected": {
+        "status": 409
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fixture_id": "fix-return-closes-loan",
+      "description": "A return closes the loan",
+      "targets": [
+        {
+          "type": "api",
+          "id": "api-return-create"
+        },
+        {
+          "type": "fr",
+          "id": "fr-return-tool"
+        }
+      ],
+      "mode": "contract",
+      "input": {
+        "id": "loan-1"
+      },
+      "expected": {
+        "status": 200
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fixture_id": "fix-late-fee-two-days",
+      "description": "Two days late owes 100 cents",
+      "targets": [
+        {
+          "type": "fr",
+          "id": "fr-late-fee-calc"
+        },
+        {
+          "type": "nfr",
+          "id": "nfr-fee-accuracy"
+        }
+      ],
+      "mode": "unit",
+      "input": {
+        "days_late": 2
+      },
+      "expected": {
+        "fee_cents": 100
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "out_of_scope": [
+    {
+      "fr_id": "fr-waitlist-notify",
+      "rationale": "Waitlists are deferred to a later phase; no executable fixture exists to target."
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag",
+      "version": "1.0.0"
+    }
+  ]
+}

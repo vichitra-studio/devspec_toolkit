@@ -11,13 +11,14 @@ because the registry generator (W3) guarantees coverage as an internal contract.
   R003 / E622 REGISTRY_DRIFT
       For every registered ``(spec_file, array_path, id_field)`` triple,
       read ``<spec_root>/<spec_file>`` and verify:
-      - The array_path resolves to a non-null array in the file.
+      - The array_path, when present, resolves to an array (or map, for a
+        ``{}`` wide path) in the file.
       - The first entry of the array contains the registered ``id_field``.
-      - Nested arrays are checked only when present: a present-but-wrong-shape
-        nested array (wrong id_field or not an array) still fires E622, but a
-        missing nested array is not drift (nested arrays may be optional per
-        schema; a missing *required* nested array is caught by schema
-        validation in ``spec-check`` instead).
+      - Every collection, root or nested, is checked only when present: a
+        present-but-wrong-shape collection (wrong id_field or not an array)
+        still fires E622, but an absent one is not drift (collections may be
+        optional per schema; a missing *required* collection is caught by
+        schema validation in ``spec-check`` instead).
 
   R004 / W614 UNREGISTERED_ARRAY
       For every ``.json`` file in ``<spec_root>/``, scan top-level arrays
@@ -41,19 +42,20 @@ W614 warnings do not cause a non-zero exit unless promoted via
 
 Integration
 -----------
-Folded into ``spec-check`` via ``_run_checks`` in ``validation/spec_check.py``.
+Folded into ``spec-check`` via ``run_checks`` in ``validation/spec_check.py``.
 """
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
 from typing import Any
 
+from ..core.entry_key_registry import REGISTRY_FILENAME, parse_array_path, is_glob_key, iter_nodes, match_glob_key
 from ..core.errors import SpecError
 
-_REGISTRY_FILENAME = "entry_key_registry.json"
 _SENTINEL_KEYS = frozenset({"canonical_refs_used", "canonical_proposals"})
 
 # R004: pattern that identifies an entry-id field (e.g. fr_id, capability_id, bare id).
@@ -93,7 +95,7 @@ def _load_registry(repo_root: str) -> dict[str, Any]:
 
     Reads from ``<repo_root>/tools/entry_key_registry.json`` (toolkit-side).
     """
-    path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+    path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
     if not os.path.isfile(path):
         return {}
     data = _load_json(path)
@@ -105,7 +107,7 @@ def _load_registry_doc(repo_root: str) -> dict[str, Any]:
 
     Used by R004 to access ``_sentinels`` alongside ``registry``.
     """
-    path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+    path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
     if not os.path.isfile(path):
         return {}
     return _load_json(path)
@@ -140,6 +142,9 @@ def _check_phantom_basenames(
             continue
         if basename in _SENTINEL_KEYS:
             continue
+        if is_glob_key(basename):
+            # A glob key names files the toolkit cannot list; it is never a phantom.
+            continue
         if basename not in extraction_basenames:
             errs.append(SpecError(
                 code="E621",
@@ -171,24 +176,105 @@ def _check_drift(
 
         arrays = entry.get("arrays", [])
         if not arrays:
-            # Registered with arrays:[] — no drift to check (e.g. 13a, 16)
+            # Registered with arrays:[] — no drift to check (e.g. 16)
             continue
 
-        spec_file_path = os.path.join(spec_root, basename)
-        if not os.path.isfile(spec_file_path):
-            # File doesn't exist yet (future step) — skip drift check
-            continue
+        for live_name, spec_file_path in _live_files(spec_root, basename):
+            try:
+                with open(spec_file_path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+            except (json.JSONDecodeError, OSError):
+                continue
 
-        try:
-            with open(spec_file_path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-        except (json.JSONDecodeError, OSError):
-            continue
-
-        for arr in arrays:
-            _check_array_entry(arr, data, basename, "", errs, is_root=True)
+            for arr in arrays:
+                _check_array_entry(arr, data, live_name, "", errs, is_root=True)
 
     return errs
+
+
+def _live_files(spec_root: str, key: str) -> list[tuple[str, str]]:
+    """``(display_name, path)`` of the live spec files a registry key stands for.
+
+    A plain basename gives its one file when it exists.  A glob key gives every matching
+    file under *spec_root* and nothing when none matches (no phantom or drift error).
+    """
+    if not is_glob_key(key):
+        path = os.path.join(spec_root, key)
+        # File doesn't exist yet (future step) — skip drift check
+        return [(key, path)] if os.path.isfile(path) else []
+    # Must agree with ``match_glob_key``, which R004 uses for the same keys.
+    found = sorted(glob.glob(os.path.join(glob.escape(spec_root), key)))
+    return [
+        (os.path.relpath(p, spec_root).replace(os.sep, "/"), p)
+        for p in found
+        if os.path.isfile(p)
+    ]
+
+
+def _drift(basename: str, text: str) -> SpecError:
+    """An E622 R003 REGISTRY_DRIFT error for *basename*."""
+    return SpecError(code="E622", message=f"R003 REGISTRY_DRIFT: {text}", path=basename)
+
+
+def _check_wide_first_hop(entry: dict, container, basename: str, errs: list) -> None:
+    """E622 for a root wide-path entry whose first hop is present but of the wrong type.
+
+    An absent first hop is not drift (required presence is owned by schema validation,
+    as for plain-name roots); an empty collection is not drift either.  Only the first
+    hop is tested (deeper hops may legitimately be empty).
+    """
+    path = entry["array_path"]
+    keys, marker = parse_array_path(path)[0]
+    cur: Any = container
+    for k in keys:
+        if not isinstance(cur, dict):
+            errs.append(_drift(
+                basename, f"'{basename}': array_path '{path}' exists but is not an object at '{k}'."
+            ))
+            return
+        if k not in cur:
+            return
+        cur = cur[k]
+    want = dict if marker == "{}" else list
+    if not isinstance(cur, want):
+        errs.append(_drift(
+            basename,
+            f"'{basename}': array_path '{path}' exists but is not "
+            f"{'a map' if want is dict else 'an array'} (got {type(cur).__name__}).",
+        ))
+
+
+def _id_field_drift(basename: str, array_key: str, id_field: str, item: dict) -> SpecError:
+    """E622 for a first entry that lacks the registered ``id_field``."""
+    return _drift(
+        basename,
+        f"'{basename}': array '{array_key}' registered id_field='{id_field}' but first entry has "
+        f"fields {list(item.keys())[:6]!r}. Rename id_field in the registry or update the spec.",
+    )
+
+
+def _check_wide_entry(
+    entry: dict,
+    container,
+    basename: str,
+    display_prefix: str,
+    errs: list,
+    *,
+    is_root: bool,
+) -> None:
+    """Sample the first node of an entry in the wider path grammar (dotted, ``{}``, inner ``[]``)."""
+    first_node = next(iter_nodes(container, entry["array_path"]), None)
+    if first_node is None:
+        if is_root:
+            _check_wide_first_hop(entry, container, basename, errs)
+        return  # empty container: nothing to sample
+    item, _path, key = first_node
+    id_field = entry.get("id_field", "")
+    if id_field and id_field not in item and key is None:
+        errs.append(_id_field_drift(basename, entry["array_path"].lstrip("."), id_field, item))
+    nested_prefix = f"{display_prefix}{entry['array_path']}[]"
+    for nested in entry.get("nested", []):
+        _check_array_entry(nested, item, basename, nested_prefix, errs, is_root=False)
 
 
 def _check_array_entry(
@@ -211,52 +297,37 @@ def _check_array_entry(
 
     ``display_prefix`` accumulates the human-readable path used in messages,
     e.g. ``.milestones[]`` when validating a nested entry under milestones.
-    ``is_root`` distinguishes the top-level "not found in file" wording from
-    the nested "not found under first parent entry" wording, preserving the
-    original R003 message text for existing (one-level) cases.
+    ``is_root`` marks a top-level entry; for a wide path only a root entry has its
+    first hop shape-checked.  An absent collection is never drift at any level.
     """
+    if not _is_plain_name(entry["array_path"]):
+        return _check_wide_entry(entry, container, basename, display_prefix, errs, is_root=is_root)
+
     array_key = entry["array_path"].lstrip(".")
-    id_field = entry["id_field"]
+    id_field = entry.get("id_field", "")
     full_display = f"{display_prefix}{entry['array_path']}"
-
-    val = container.get(array_key) if isinstance(container, dict) else None
-
-    if val is None:
-        # Top-level registered arrays are the file's primary entries — an absent
-        # one is genuine drift.  Nested arrays, however, may be OPTIONAL per
-        # schema (e.g. a roadmap task's ``acceptance_criteria``); their required
-        # presence is owned by schema validation and the registry-generate
-        # byte-exact gate, so a missing nested key is NOT drift here — only a
-        # present-but-wrong-shape nested array is (checked below).  Flagging
-        # missing optional nested arrays would false-positive on schema-valid
-        # host specs (DEVSPEC-125).
-        #
-        # DECISION (DEVSPEC-125): this deliberately narrows standalone
-        # ``registry-check`` — a missing *required* nested array is no longer
-        # flagged here.  registry_check cannot read the schema's ``required``, so
-        # it cannot tell required from optional; the canonical ``spec-check`` gate
-        # runs schema validation alongside this check and catches a missing
-        # required array (e.g. milestone.tasks) with its own E-code, so the
-        # signal is preserved end-to-end without the false-positive.
-        if is_root:
-            errs.append(SpecError(
-                code="E622",
-                message=(
-                    f"R003 REGISTRY_DRIFT: '{basename}': array_path '{full_display}' "
-                    f"not found in file (key '{array_key}' missing)."
-                ),
-                path=basename,
-            ))
+    if is_root and not isinstance(container, dict):
+        errs.append(_drift(
+            basename,
+            f"'{basename}': array_path '{full_display}' exists but the file's top level is not an object "
+            f"(got {type(container).__name__}).",
+        ))
         return
+    if not isinstance(container, dict) or array_key not in container:
+        # An absent collection is never drift, at any level: it may be OPTIONAL per
+        # schema (a root ``constraints``, a roadmap task's ``acceptance_criteria``).
+        # Required presence is owned by schema validation, which ``spec-check`` runs
+        # beside this check (DEVSPEC-125, extended to root collections by D4). "Absent"
+        # means the key is not there: a present ``null`` is a wrong-shape collection
+        # (checked below), as it is for a wide-path root.
+        return
+    val = container[array_key]
 
     if not isinstance(val, list):
-        errs.append(SpecError(
-            code="E622",
-            message=(
-                f"R003 REGISTRY_DRIFT: '{basename}': array_path '{full_display}' "
-                f"exists but is not an array (got {type(val).__name__})."
-            ),
-            path=basename,
+        errs.append(_drift(
+            basename,
+            f"'{basename}': array_path '{full_display}' exists but is not an array "
+            f"(got {type(val).__name__}).",
         ))
         return
 
@@ -265,16 +336,7 @@ def _check_array_entry(
 
     first_entry = val[0]
     if isinstance(first_entry, dict) and id_field not in first_entry:
-        actual = list(first_entry.keys())[:6]
-        errs.append(SpecError(
-            code="E622",
-            message=(
-                f"R003 REGISTRY_DRIFT: '{basename}': array '{array_key}' "
-                f"registered id_field='{id_field}' but first entry has "
-                f"fields {actual!r}. Rename id_field in the registry or update the spec."
-            ),
-            path=basename,
-        ))
+        errs.append(_id_field_drift(basename, array_key, id_field, first_entry))
 
     # Recurse into deeper nested arrays using the first element as the container.
     if not isinstance(first_entry, dict):
@@ -283,6 +345,14 @@ def _check_array_entry(
         _check_array_entry(
             nested, first_entry, basename, f"{full_display}[]", errs, is_root=False
         )
+
+
+_PLAIN_NAME = re.compile(r"^\.?[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _is_plain_name(array_path: str) -> bool:
+    """True for the legacy single-key form ``.name`` (no dotted, ``[]`` or ``{}`` segments)."""
+    return bool(_PLAIN_NAME.match(array_path))
 
 
 # ---------------------------------------------------------------------------
@@ -319,8 +389,10 @@ def _check_unregistered_arrays(
     - TraceRef arrays (``.trace``) — cross-step foreign-key refs intentionally
       absent from the registry per generator Rule B.
     - Arrays whose first item has no id-like field (e.g. pure config arrays).
-    - Files that are not registered AND not in ``steps_without_entry_arrays``
-      (those are future/unknown steps — skip entirely rather than flood output).
+
+    Every top-level ``.json`` file of the spec root is scanned, registered or
+    not: a file the registry does not know gets W614 for each of its
+    id-bearing arrays.
     """
     errs: list[SpecError] = []
 
@@ -331,11 +403,15 @@ def _check_unregistered_arrays(
 
     # Build set of (basename, array_path) pairs already declared in registry
     registered_pairs: set[tuple[str, str]] = set()
+    glob_pairs: list[tuple[str, str]] = []
     for bn, entry in registry.items():
         if entry.get("_special", False) or bn in _SENTINEL_KEYS:
             continue
         for arr in entry.get("arrays", []):
-            registered_pairs.add((bn, arr["array_path"]))
+            if is_glob_key(bn):
+                glob_pairs.append((bn, arr["array_path"]))
+            else:
+                registered_pairs.add((bn, arr["array_path"]))
 
     if not os.path.isdir(spec_root):
         return errs
@@ -371,7 +447,9 @@ def _check_unregistered_arrays(
                 continue
 
             array_path = f".{key}"
-            if (fname, array_path) not in registered_pairs:
+            if (fname, array_path) not in registered_pairs and not any(
+                ap == array_path and match_glob_key(fname, gk) for gk, ap in glob_pairs
+            ):
                 # Infer kind from the id field
                 id_field = id_fields[0]
                 if id_field == "id":
@@ -420,7 +498,7 @@ def run_registry_check(
     """
     del git_root  # accepted for API symmetry; not used by registry checks
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json
-    registry_path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
+    registry_path = os.path.join(repo_root, "tools", REGISTRY_FILENAME)
     if not os.path.isfile(registry_path):
         # No registry file — skip all checks silently (toolkit hasn't generated it yet)
         return []

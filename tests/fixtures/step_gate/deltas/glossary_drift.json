@@ -1,0 +1,31 @@
+{
+  "description": "A project canon term whose definition differs from the glossary term that cites it: E607, owned by step 03.",
+  "ops": [
+    {
+      "op": "write",
+      "file": "spec/canon/kinds/term.json",
+      "value": {
+        "$schema": "vc:canon:kind",
+        "registry_version": "1.0.0",
+        "kind": "term",
+        "entries": [
+          {
+            "id": "cn:project:term:reset-token",
+            "kind": "term",
+            "preferred_label": "reset token",
+            "definition": "A different definition than the glossary gives.",
+            "version": "1.0.0",
+            "status": "active",
+            "owners": [
+              "product"
+            ],
+            "aliases": [],
+            "lifecycle": {
+              "introduced_at": "2026-11-15T00:00:00Z"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

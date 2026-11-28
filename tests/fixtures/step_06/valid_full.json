@@ -5,56 +5,33 @@
   "created_at": "2025-01-01T00:00:00Z",
   "rules": [
     {
-      "inv_id": "invariant-user-authentication",
+      "inv_id": "inv-user-authentication",
       "description": "All user authentication requests must include a valid JWT token",
       "language": "jsonlogic",
       "expression": "{ \"and\": [ { \"in\": [ \"auth-token\", { \"var\": \"headers\" } ] }, { \"not\": { \"empty\": { \"var\": \"auth-token\" } } } ] }",
-      "scope": {
-        "components": [
-          "auth-service"
-        ],
-        "apis": [
-          "api-login",
-          "api-secure-endpoint"
-        ]
-      },
-      "severity": "error",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-authentication"
-        },
-        {
-          "type": "nfr",
-          "id": "nfr-security-1"
-        }
+      "constrains": [
+        "fr-user-authentication",
+        "api-login",
+        "api-secure-endpoint",
+        "auth-service"
       ],
+      "severity": "error",
       "policy_ref": {
         "id": "cn:core:policy:spec-first",
         "kind": "policy"
       }
     },
     {
-      "inv_id": "invariant-data-consistency",
+      "inv_id": "inv-data-consistency",
       "description": "All financial transactions must have matching debit and credit amounts",
       "language": "cel",
       "expression": "transaction.debit_amount == transaction.credit_amount",
-      "scope": {
-        "components": [
-          "financial-service",
-          "database"
-        ],
-        "apis": [
-          "api-transaction-create"
-        ]
-      },
-      "severity": "error",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-financial-data"
-        }
+      "constrains": [
+        "fr-financial-data",
+        "api-transaction-create",
+        "financial-service"
       ],
+      "severity": "error",
       "policy_ref": {
         "id": "cn:core:policy:spec-first",
         "kind": "policy"

@@ -1,50 +1,55 @@
 """Tests for gap-remediation features added during the v0.3.0 release cycle.
 
 Covers:
-- ``_get_step_from_path`` handling of ``impl_context/`` directories
+- ``get_step_from_path`` handling of ``impl_context/`` directories
 - ``DEEP_VALIDATORS`` entries for steps 16a, 16b, 16c
 - ``validators`` sub-package importability
-- Migration runner ``execute_single_step`` importability
+- Migration runner ``run_migration`` importability
 - ``init_project.py`` support for ``--venv-name`` argument
+- the verb-named property rule on the step 16 plan schema
 """
 
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from specdev_tools.validation.validate import DEEP_VALIDATORS, _get_step_from_path
+from specdev_tools.core.step_paths import get_step_from_path
+from specdev_tools.validation import validate as validate_module
+from specdev_tools.validation.validate import DEEP_VALIDATORS
 
 
 # ---------------------------------------------------------------------------
-# 1. _get_step_from_path: impl_context/ paths
+# 1. get_step_from_path: impl_context/ paths
 # ---------------------------------------------------------------------------
 
 class TestGetStepFromPathImplContext:
     """Files inside an ``impl_context/`` directory should map to step 16a (milestone plans)."""
 
     def test_relative_path(self):
-        assert _get_step_from_path("spec/impl_context/step-api-core.json") == "16a"
+        assert get_step_from_path("spec/impl_context/step-api-core.json") == "16a"
 
     def test_absolute_path(self):
-        assert _get_step_from_path("/abs/path/spec/impl_context/my-file.json") == "16a"
+        assert get_step_from_path("/abs/path/spec/impl_context/my-file.json") == "16a"
 
     def test_normal_step_still_works(self):
-        assert _get_step_from_path("spec/04_frs.json") == "04"
+        assert get_step_from_path("spec/04_frs.json") == "04"
 
     def test_unknown_file(self):
-        assert _get_step_from_path("random_file.json") == "unknown"
+        assert get_step_from_path("random_file.json") == "unknown"
 
     def test_step_16a(self):
-        assert _get_step_from_path("spec/16a_impl_planner.json") == "16a"
+        assert get_step_from_path("spec/16a_impl_planner.json") == "16a"
 
     def test_step_16b(self):
-        assert _get_step_from_path("spec/16b_code.json") == "16b"
+        assert get_step_from_path("spec/16b_code.json") == "16b"
 
     def test_step_16c(self):
-        assert _get_step_from_path("spec/16c_review.json") == "16c"
+        assert get_step_from_path("spec/16c_review.json") == "16c"
 
 
 # ---------------------------------------------------------------------------
@@ -68,15 +73,27 @@ class TestDeepValidatorsSubSteps:
         assert callable(DEEP_VALIDATORS[step])
 
     @pytest.mark.parametrize("step", ["16a", "16b", "16c"])
-    def test_shares_validator_with_step_16(self, step):
-        """Sub-steps should delegate to the same validator logic as step 16."""
-        # Both lambdas wrap step_16.validate_step_16; we can verify by
-        # checking that calling with trivially empty data does not raise.
-        validator = DEEP_VALIDATORS[step]
-        # A minimal call — validators return a list of error strings.
-        # An empty dict will likely produce errors, but should not raise.
-        result = validator({}, ".", {})
-        assert isinstance(result, list)
+    def test_returns_a_list_for_empty_data(self, step):
+        """A validator called with an empty document returns a list and does not raise."""
+        assert isinstance(DEEP_VALIDATORS[step]({}, ".", {}), list)
+
+    @pytest.mark.parametrize(
+        ("step", "expected"),
+        [
+            ("16", "step_16_anchor.validate_step_16_anchor"),
+            ("16a", "step_16a.validate_step_16a"),
+            ("16b", "step_16a.validate_step_16a"),
+            ("16c", "step_16c.validate_step_16c"),
+        ],
+    )
+    def test_each_step_16_key_runs_its_validator(self, monkeypatch, step, expected):
+        """``16`` runs the anchor validator, ``16a`` and ``16b`` the 16a validator, ``16c`` the 16c validator."""
+        called: list[str] = []
+        for name in ("step_16_anchor.validate_step_16_anchor", "step_16a.validate_step_16a", "step_16c.validate_step_16c"):
+            module, function = name.split(".")
+            monkeypatch.setattr(getattr(validate_module, module), function, lambda *args, name=name: called.append(name) or [])
+        assert DEEP_VALIDATORS[step]({}, ".", {}) == []
+        assert called == [expected]
 
 
 # ---------------------------------------------------------------------------
@@ -90,10 +107,6 @@ class TestValidatorsPackage:
         mod = importlib.import_module("specdev_tools.validation.validators")
         assert mod is not None
 
-    def test_step_01_importable(self):
-        mod = importlib.import_module("specdev_tools.validation.validators.step_01")
-        assert hasattr(mod, "validate_step_01")
-
 
 # ---------------------------------------------------------------------------
 # 4. Migration runner importability
@@ -102,10 +115,10 @@ class TestValidatorsPackage:
 class TestMigrationRunner:
     """Verify that the migration runner module imports without errors."""
 
-    def test_execute_single_step_importable(self):
-        from specdev_tools.migration.runner import execute_single_step
+    def test_run_migration_importable(self):
+        from specdev_tools.migration.runner import run_migration
 
-        assert callable(execute_single_step)
+        assert callable(run_migration)
 
 
 # ---------------------------------------------------------------------------
@@ -130,3 +143,39 @@ class TestInitProjectVenvName:
         source = self._INIT_SCRIPT.read_text()
         # The default value should be devspec_env
         assert 'default="devspec_env"' in source
+
+
+# ---------------------------------------------------------------------------
+# 6. Verb-named properties of the step 16 plan schema
+# ---------------------------------------------------------------------------
+
+_SCHEMA_DIR = Path(__file__).resolve().parents[4] / "schema"
+
+
+def _verb_named_properties(node: Any, verbs: frozenset[str], path: str = "") -> dict[str, dict[str, Any]]:
+    """Every property named like a link verb anywhere under *node*, keyed by its path."""
+    found: dict[str, dict[str, Any]] = {}
+    if isinstance(node, dict):
+        props = node.get("properties")
+        if isinstance(props, dict):
+            for name, sub in props.items():
+                if name in verbs and isinstance(sub, dict):
+                    found[f"{path}.{name}"] = sub
+        for key, value in node.items():
+            found.update(_verb_named_properties(value, verbs, f"{path}.{key}"))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found.update(_verb_named_properties(value, verbs, f"{path}[{index}]"))
+    return found
+
+
+def test_verb_named_property_rule_in_impl_context_schema():
+    """Every verb-named property of the plan schema declares ``x-link``; the old ``review_state.verified_by`` is gone."""
+    verbs = frozenset(
+        json.loads((_SCHEMA_DIR / "core" / "graph.schema.json").read_text())["$defs"]["linkVerb"]["enum"]
+    )
+    schema = json.loads((_SCHEMA_DIR / "16_impl_context.schema.json").read_text())
+    found = _verb_named_properties(schema, verbs)
+    assert found, "the plan item declares at least its realises link"
+    assert [path for path, sub in found.items() if "x-link" not in sub] == []
+    assert "review_state" not in schema["properties"]["extensions"]["properties"]

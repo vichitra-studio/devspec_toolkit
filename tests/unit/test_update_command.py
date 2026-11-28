@@ -505,7 +505,7 @@ class TestRunUpdate:
 
     def test_steps_needs_update_includes_align_prompts_in_message(self, tmp_path):
         """steps_needs_update may include TYPE_MISMATCH/MISSING_REQUIRED/EXTRA_FIELD diffs that
-        apply_auto_fixes cannot clear (auto_fixable=False).  The message must include 'align prompts'
+        the migration runner behind `align apply --auto` does not clear (auto_fixable=False).  The message must include 'align prompts'
         so the user is not stuck in an apply-then-re-run loop with no exit."""
         from specdev_tools.update import run_update
 
@@ -528,11 +528,12 @@ class TestRunUpdate:
 
     def test_migration_finalizer_is_align_validate_not_rerun_update(self, tmp_path):
         """The migration remediation must finalize with `align validate`, NOT a re-run
-        of `update`.  validate runs full post-migration validation (schema + trace
-        integrity) and stamps with a migration_history entry (is_migration=True); a
-        re-run of update would only re-stamp after a weaker structural-diff check
-        (is_migration=False), dropping the audit trail and risking marking a
-        half-migrated spec as current."""
+        of `update`.  validate runs merge mode, checks the worklist and finishes the stamp
+        (clears migration_status); a re-run of update would only re-stamp after a weaker
+        structural-diff check, losing the audit trail and risking marking a
+        half-migrated spec as current.  `update` appears twice in the flow, both times
+        as something other than the finalizer: the detection (`--no-install --dry-run`)
+        and the host-file install (`--adopt`)."""
         from specdev_tools.update import run_update
 
         toolkit_root = _make_toolkit_root(tmp_path / "tk", "1.0.0")
@@ -545,15 +546,11 @@ class TestRunUpdate:
         ):
             result = run_update(spec_dir, toolkit_root)
 
-        assert "align validate" in result.message, (
-            "Migration message must finalize with `align validate` so the version is "
-            "stamped only after full post-migration validation"
-        )
-        # The finalizer must not be a re-run of `update` (would drop migration_history).
-        assert "specdev update" not in result.message, (
-            "Migration message must not direct the user to re-run `specdev update` as "
-            "the finalizer — that re-stamps without a migration_history entry"
-        )
+        commands = [line.strip() for line in result.message.splitlines() if "specdev " in line or "git " in line]
+        assert "align validate" in commands[-1], "the last command of the flow must be `align validate`"
+        update_lines = [c for c in commands if "specdev update" in c]
+        assert len(update_lines) == 2
+        assert "--no-install --dry-run" in update_lines[0] and "--adopt" in update_lines[1]
 
     def test_only_unknown_and_extension_steps_does_not_block_stamp(self, tmp_path):
         """steps_unknown and steps_extension must never trigger migration requirement."""
@@ -893,6 +890,173 @@ class TestUpdateCli(_CliMixin, unittest.TestCase):
         payload = json.loads(out)
         self.assertEqual(payload["status"], "FAIL")
         self.assertGreater(payload["error_count"], 0)
+
+
+# ---------------------------------------------------------------------------
+# Unit: run_update with the host installer (WI-M9-11a)
+# ---------------------------------------------------------------------------
+
+class TestRunUpdateHostInstall:
+    """`run_update` installs first, then runs the version logic; a fake piece stands in for the registry."""
+
+    def _host(self, tmp_path: Path, spec_version: str | None, toolkit_version: str = "1.0.0", templates: bool = True):
+        import subprocess
+
+        host = tmp_path / "host"
+        host.mkdir()
+        subprocess.run(["git", "init", "-q", str(host)], check=True)
+        toolkit_root = _make_toolkit_root(tmp_path / "tk", toolkit_version)
+        if templates:
+            (toolkit_root / "templates").mkdir()
+        return host, _make_spec_dir(host, spec_version), toolkit_root
+
+    def _pieces(self, calls: list):
+        from specdev_tools import host_install as hi
+
+        def install(ctx):
+            calls.append(ctx)
+            return hi.PieceResult(hi.write_if_changed(ctx.git_root / "fake.txt", "x\n", dry_run=ctx.dry_run))
+
+        return patch.object(hi, "PIECES", (hi.HostPiece("fake", install),))
+
+    def test_install_runs_when_host_already_current(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, toolkit_root = self._host(tmp_path, "1.0.0")
+        calls: list = []
+        with self._pieces(calls):
+            result = run_update(spec, toolkit_root)
+        assert result.status == "already_current"
+        assert (host / "fake.txt").is_file() and len(calls) == 1
+        assert result.host_install["pieces"]["fake"]["status"] == "created"
+        assert result.message.startswith("Already at toolkit v1.0.0. Nothing to do.")
+        assert "fake: created" in result.message
+
+    def test_install_runs_when_migration_needed(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, toolkit_root = self._host(tmp_path, "0.9.0")
+        diff = _make_minimal_diff(steps_missing=1)
+        with (
+            self._pieces([]),
+            patch("specdev_tools.update.refresh_venv_installation", return_value=(True, "ok")),
+            patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff),
+        ):
+            result = run_update(spec, toolkit_root)
+        assert result.status == "needs_migration" and result.exit_code == 1
+        assert (host / "fake.txt").is_file()
+
+    def test_install_only_skips_version_logic(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, toolkit_root = self._host(tmp_path, "0.9.0")
+        with (
+            self._pieces([]),
+            patch("specdev_tools.generation.schema_differ.diff_spec_directory") as diff,
+            patch("specdev_tools.update.refresh_venv_installation") as refresh,
+        ):
+            result = run_update(spec, toolkit_root, install_only=True)
+        diff.assert_not_called()
+        refresh.assert_not_called()
+        assert (result.status, result.exit_code, result.to_version) == ("installed", 0, "1.0.0")
+        assert "0.9.0" in (spec / "specdev_version").read_text()
+        assert (host / "fake.txt").is_file()
+
+    def test_no_install_writes_no_host_file(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, toolkit_root = self._host(tmp_path, "1.0.0")
+        calls: list = []
+        with self._pieces(calls):
+            result = run_update(spec, toolkit_root, no_install=True)
+        assert calls == [] and not (host / "fake.txt").exists()
+        assert result.host_install == {"skipped": "--no-install", "pieces": {}}
+
+    def test_update_bad_repo_root_runs_no_install(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, _ = self._host(tmp_path, "1.0.0")
+        bad_root = tmp_path / "not_a_toolkit"
+        bad_root.mkdir()
+        calls: list = []
+        with self._pieces(calls):
+            result = run_update(spec, bad_root)
+        assert (result.status, result.exit_code) == ("error", 1)
+        assert "E608" in result.message
+        assert calls == [] and not (host / "fake.txt").exists()
+
+    def test_update_missing_templates_dir_skips_install(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, toolkit_root = self._host(tmp_path, "1.0.0", templates=False)
+        calls: list = []
+        with self._pieces(calls):
+            result = run_update(spec, toolkit_root)
+        assert result.status == "already_current"
+        assert calls == [] and not (host / "fake.txt").exists()
+        assert result.host_install["skipped"]
+
+    def test_update_git_root_resolution_spec_dir_not_at_host_root(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, _, toolkit_root = self._host(tmp_path, None)
+        sub = host / "docs" / "specs"
+        sub.mkdir(parents=True)
+        other = tmp_path / "other"
+        other.mkdir()
+        calls: list = []
+        with self._pieces(calls):
+            run_update(sub, toolkit_root, install_only=True)
+            run_update(sub, toolkit_root, git_root=host, install_only=True)
+        assert [(c.git_root, c.spec_rel) for c in calls] == [(host.resolve(), "docs/specs")] * 2
+        calls.clear()
+        with self._pieces(calls):
+            result = run_update(sub, toolkit_root, git_root=other, install_only=True)
+        assert calls == []
+        assert result.host_install["pieces"]["fake"]["status"] == "refused"
+
+    def test_update_outside_git_repository_refuses_every_piece(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        toolkit_root = _make_toolkit_root(tmp_path / "tk", "1.0.0")
+        (toolkit_root / "templates").mkdir()
+        spec = _make_spec_dir(tmp_path / "sp", "1.0.0")
+        calls: list = []
+        with self._pieces(calls):
+            result = run_update(spec, toolkit_root)
+        assert calls == []
+        assert result.host_install["pieces"]["fake"]["status"] == "refused"
+        assert result.warnings and result.warnings[0].startswith("W931 HOST_INSTALL_REFUSED")
+        assert result.exit_code == 0
+
+    @pytest.mark.parametrize(
+        "case", ["error", "already_current", "needs_migration", "updated", "would_update", "install_only", "no_install"]
+    )
+    def test_every_return_path_carries_host_install(self, tmp_path, case):
+        from specdev_tools.update import run_update
+
+        spec_version = {"already_current": "1.0.0", "needs_migration": "0.9.0"}.get(case, "0.9.5")
+        host, spec, toolkit_root = self._host(tmp_path, spec_version)
+        if case == "error":
+            toolkit_root = tmp_path / "missing_toolkit"
+        diff = _make_minimal_diff(steps_missing=1 if case == "needs_migration" else 0)
+        kwargs = {"dry_run": case == "would_update", "install_only": case == "install_only", "no_install": case == "no_install"}
+        with (
+            patch("specdev_tools.update.refresh_venv_installation", return_value=(True, "ok")),
+            patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff),
+        ):
+            result = run_update(spec, toolkit_root, **kwargs)
+        assert set(result.host_install) == {"skipped", "pieces"}
+
+    def test_flags_reach_the_piece_context(self, tmp_path):
+        from specdev_tools.update import run_update
+
+        host, spec, toolkit_root = self._host(tmp_path, "1.0.0")
+        calls: list = []
+        with self._pieces(calls):
+            run_update(spec, toolkit_root, dry_run=True, adopt=True, force_claude=True)
+        assert [(c.dry_run, c.adopt, c.force_claude) for c in calls] == [(True, True, True)]
+        assert not (host / "fake.txt").exists()
 
 
 if __name__ == "__main__":

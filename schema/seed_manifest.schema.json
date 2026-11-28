@@ -28,10 +28,15 @@
     },
     "global_seed_order": {
       "$ref": "vc:core:collections#kebabIdArray",
-      "description": "Defines the canonical READ ORDER for seeds. It does NOT by itself cause a seed to be ingested at any step — per-step inclusion is governed by step_requirements[NN]. When a step's required seeds are resolved they are emitted in this order; required seeds absent from this list are appended afterward. Should include at minimum the IDs for the host's declared seed files."
+      "description": "Defines the canonical READ ORDER for seeds. It does NOT by itself cause a seed to be ingested at any step — per-step inclusion is governed by step_requirements[NN]. When a step's required seeds are resolved they are emitted in this order; required seeds absent from this list are appended afterward. A seed may be left out of this list: it is then read after the listed ones, in the order the step lists it."
     },
     "seeds": {
       "type": "array",
+      "x-node": {
+        "kind": "seed",
+        "id": "seed_id",
+        "top_of_graph": true
+      },
       "minItems": 1,
       "items": {
         "type": "object",
@@ -90,12 +95,12 @@
       "type": "object",
       "patternProperties": {
         "^(\\d{2}[a-c]?)$": {
-          "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '04': ['seed-overview', 'seed-tech-stack'] (FR list step requires both seeds). For multi-part steps use the full step key: '16a': ['seed-overview', 'seed-tech-stack', 'seed-domain-model']. Anti-pattern: key format '4' instead of '04' — step keys must be zero-padded two-digit strings, or the full step identifier for multi-part steps (e.g., '16a', '16b').",
+          "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '00': ['seed-overview', 'seed-tech-stack'] (the charter step reads both seeds). A step with a letter uses its full key: '02a': ['seed-tech-stack']. Route a seed to every step that distils a part of it: a node of that step must list the seed in derives_from, and a route no node of its step uses is E748 at spec-check. No node of step 13 or the trinity steps can list a seed, so a route there is always E748. Anti-pattern: key format '0' instead of '00' — step keys must be zero-padded two-digit strings, with the letter for a multi-part step.",
           "$ref": "vc:core:collections#kebabIdArray"
         }
       },
       "additionalProperties": false,
-      "description": "Mapping from pipeline step IDs to the seed files required by that step. Each step's AI prompt uses this to know which seed files to ingest. Key: step ID matching the pattern NN or NNx (e.g., '04', '05', '16a'). Value: array of seed IDs from the seeds registry. This is the authoritative inclusion set — only seeds listed here are ingested at a step. Steps with no entry (or an empty array) require no seeds — there is no fallback to global_seed_order, which governs read order only."
+      "description": "Mapping from pipeline step IDs to the seed files required by that step. Each step's AI prompt uses this to know which seed files to ingest. Key: the ID of the step, '00' to '15' with its letter ('02a') (the pattern accepts any NN or NNx, but spec-check reports a route to step 13 or a trinity step, and a route no node of its step uses, as E748). Value: array of seed IDs from the seeds registry. This is the authoritative inclusion set — only seeds listed here are ingested at a step. Steps with no entry (or an empty array) require no seeds — there is no fallback to global_seed_order, which governs read order only."
     },
     "doc_paths": {
       "description": "Array of glob patterns identifying documentation files in the repository that the step_16 docs_impact validator monitors. Use forward-slash glob syntax relative to the repository root. Examples: ['docs/**/*.md', 'README.md', 'api-reference/**/*.yaml', 'guides/*.md']. Anti-pattern: absolute paths or OS-specific separators ('docs\\*.md') — use forward-slash glob syntax only. Anti-pattern: listing individual files when a glob covers them ('README.md', 'SETUP.md' → use '*.md' at the root level instead).",

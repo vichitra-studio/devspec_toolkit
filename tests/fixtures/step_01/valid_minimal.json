@@ -14,6 +14,9 @@
         "id": "cn:product:capability:search-products",
         "kind": "capability"
       },
+      "derives_from": [
+        "scope-product-search"
+      ],
       "inputs": [
         "query_string",
         "page_number"
@@ -33,30 +36,22 @@
           "code": "invalid-query",
           "message": "Query string too short"
         }
-      ],
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-search-01"
-        }
       ]
     },
     {
       "capability_id": "capability-archive-user",
       "verb": "archive",
       "description": "Archive a user account.",
-      "scope": "out",
+      "scope": "later",
       "owner": "ops",
       "capability_ref": {
         "id": "cn:ops:capability:archive-user",
         "kind": "capability"
       },
-      "trace": [
-        {
-          "type": "capability",
-          "id": "cap-archive-tbd"
-        }
-      ]
+      "derives_from": [
+        "scope-user-archive"
+      ],
+      "scope_reason": "Deferred until the account lifecycle work starts."
     }
   ],
   "canonical_refs_used": [

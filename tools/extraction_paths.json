@@ -1,75 +1,134 @@
 {
   "00": {
     "00_charter.json": [
+      ".ambiguities",
+      ".scope_items",
+      ".assumptions",
+      ".risks",
+      ".stakeholders",
+      ".stakeholders[].needs",
       ".user_segments",
-      ".success_metrics"
+      ".success_metrics",
+      ".constraints"
     ]
   },
   "01": {
     "01_capabilities.json": [
+      ".ambiguities",
       ".capabilities"
     ]
   },
   "02": {
     "02_system_sketch.json": [
-      ".components"
+      ".ambiguities",
+      ".components",
+      ".connections",
+      ".third_parties"
+    ]
+  },
+  "02a": {
+    "02a_delivery_baseline.json": [
+      ".ambiguities",
+      ".environments{}",
+      ".ci_gates",
+      ".secrets"
     ]
   },
   "03": {
     "03_glossary.json": [
+      ".ambiguities",
       ".terms"
     ]
   },
   "04": {
     "04_fr_list.json": [
-      ".functional_requirements"
+      ".ambiguities",
+      ".functional_requirements",
+      ".functional_requirements[].acceptance_criteria"
     ]
   },
   "05": {
     "05_interface_contracts.json": [
-      ".apis"
+      ".ambiguities",
+      ".apis",
+      ".apis[].errors"
     ]
   },
   "06": {
     "06_invariants.json": [
+      ".ambiguities",
       ".rules"
     ]
   },
   "07": {
     "07_nfrs.json": [
+      ".ambiguities",
       ".nfrs"
     ]
   },
   "08": {
     "08_fixtures.json": [
+      ".ambiguities",
       ".fixtures"
     ]
   },
   "09": {
     "09_impl_plan.json": [
+      ".ambiguities",
       ".milestones"
+    ]
+  },
+  "10": {
+    "10_governance.json": [
+      ".ambiguities",
+      ".rules"
     ]
   },
   "11": {
     "11_redteam.json": [
+      ".ambiguities",
       ".threats",
       ".edge_cases"
     ]
   },
   "12": {
     "12_ci_gates.json": [
+      ".ambiguities",
       ".jobs"
     ]
   },
   "13": {
     "13_extension_manifest.json": [
+      ".ambiguities",
       ".extensions"
     ]
   },
   "14": {
     "14_roadmap.json": [
+      ".ambiguities",
       ".milestones",
-      ".dependencies"
+      ".milestones[].tasks",
+      ".milestones[].tasks[].acceptance_criteria"
+    ]
+  },
+  "15": {
+    "15_scaffold.json": [
+      ".ambiguities",
+      ".interface_map"
+    ]
+  },
+  "16": {
+    "16_impl_context.json": [
+      ".plan.ambiguities",
+      ".plan.milestone_index"
+    ]
+  },
+  "16a": {
+    "impl_context/ms_*_plan.json": [
+      ".plan.spec_alignment.checklist",
+      ".plan.ambiguities",
+      ".execution.records",
+      ".execution.emergent_ambiguities"
     ]
   },
   "_meta": {

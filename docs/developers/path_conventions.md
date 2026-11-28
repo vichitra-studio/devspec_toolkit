@@ -8,7 +8,7 @@ When the toolkit is vendored as a git submodule at `<host-repo>/devspec_toolkit/
 |------|-----------|----------|
 | `--repo-root` | `devspec_toolkit/` | Schema registry, step_order.json, canon/ |
 | `--spec-root` | `<host-repo>/spec/` | Spec artifact discovery, step existence checks |
-| `--git-root` | `<host-repo>/` | Git diff operations, forward replay checks |
+| `--git-root` | `<host-repo>/` | Git base and diff operations (the step gate, `specdev diff`, the trace lock), governance checks |
 
 ### Why This Matters
 
@@ -20,14 +20,13 @@ Without explicit flags, the toolkit auto-detects:
 1. `git_root`: Runs `git rev-parse --show-toplevel` from `repo_root`
 2. `spec_root`: Falls back to `repo_root/spec`
 
-### Base Ref Resolution (for forward-replay)
+### Base Ref Resolution (step gate and `specdev diff`)
 
-The base ref for diff comparison is resolved in this order:
-1. `SPECDEV_REPLAY_BASE_REF` environment variable
-2. Current branch's upstream tracking branch (`@{upstream}`)
-3. `origin/main` → `origin/master` → `main` → `master`
-4. Current branch name (self-diff)
-5. Fallback: `origin/main`
+The base ref for diff comparison is resolved in this order (the first that exists; the current branch's upstream tracking branch is never used):
+1. The `--base-ref` flag
+2. `SPECDEV_REPLAY_BASE_REF` environment variable
+3. `origin/HEAD`
+4. `origin/main` → `origin/master` → `main` → `master`
 
 ---
 
@@ -42,6 +41,7 @@ This document defines the canonical path variables used across the DevSpec Toolk
 | `$PRODUCT_ROOT` | Root of the consumer (host) repository | `/path/to/my-product/` |
 | `$TOOLKIT_ROOT` | Root of the vendored devspec_toolkit | `$PRODUCT_ROOT/devspec_toolkit/` |
 | `$SPEC_DIR` | Directory containing live spec artifacts | `$PRODUCT_ROOT/spec/` (consumer) or `$TOOLKIT_ROOT/spec` (toolkit itself) |
+| `$SPEC_DIR/extensions/` | The two files of each extension the step-13 manifest declares: `ext_NN_<topic>.schema.json` (the host's schema) and `ext_NN_<topic>.json` (its data). Found by a scan of the folder; see [extension_schemas.md](extension_schemas.md) | `$PRODUCT_ROOT/spec/extensions/` |
 | `$SEED_DIR` | Default directory for seed documents (authoritative locations are in `spec/common/seed_manifest.json` `seeds[].path`) | `$PRODUCT_ROOT/docs/seed/` (default layout) |
 | `$CANON_DIR` | Canonical registry directory | `$TOOLKIT_ROOT/canon/` |
 | `$SCHEMA_DIR` | JSON Schema definitions | `$TOOLKIT_ROOT/schema/` |
@@ -58,7 +58,7 @@ Prompts reference spec inputs using paths relative to `$SPEC_DIR`:
 
 ### CLI Context
 
-CLI commands accept `--repo-root` to resolve `$TOOLKIT_ROOT` and `--spec-dir` or positional `spec` to resolve `$SPEC_DIR`:
+CLI commands accept `--repo-root` to resolve `$TOOLKIT_ROOT`, and `--spec-root` or a positional `spec_dir` to resolve `$SPEC_DIR` (see the three-root table above); `--spec-dir` exists only on `specdev context review`:
 
 ```bash
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
@@ -74,6 +74,10 @@ Schema `$id` URIs use the `vc:` namespace and resolve via the schema registry:
 - `vc:04-fr-list` — resolves to `$SCHEMA_DIR/04_fr_list.schema.json`
 
 The registry file at `$TOOLKIT_ROOT/tools/schema_registry.json` maps URIs to relative file paths.
+
+A URI of the form `vc:ext-NN-<topic>` is the schema of a host extension and is not in the registry:
+
+- `vc:ext-01-database` — resolves to `$SPEC_DIR/extensions/ext_01_database.schema.json`
 
 ## Dual-Root Convention
 

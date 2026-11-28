@@ -209,3 +209,16 @@ class TestFormatPromptsReport:
         result = format_prompts_report(prompts)
         assert "1 prompt(s) generated" in result
         assert "04_frs" in result
+
+
+class TestRequiredFieldsAcrossAllOf:
+    def test_required_fields_include_allof_branches(self):
+        from specdev_tools.context._utils import merged_required_and_properties
+
+        schema = {
+            "allOf": [
+                {"required": ["name"], "properties": {"name": {"type": "string", "description": "d"}}},
+            ],
+        }
+        fields = _extract_required_fields(merged_required_and_properties(schema, None))
+        assert [f["path"] for f in fields] == ["name"]

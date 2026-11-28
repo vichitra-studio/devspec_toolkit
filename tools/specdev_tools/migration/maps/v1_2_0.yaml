@@ -1,0 +1,1969 @@
+# The 1.1.1 -> 1.2.0 shape migration map: ONE row per row of tools/schema_changes.json (the generated schema-change
+# checklist: the authority for which field 1.2.0 removed, changed or added), and what the migration does with it.
+# tests/unit/migration/test_migration_dispositions.py fails when a checklist row has no row here, when a row here names
+# a checklist row that does not exist or whose path or change differs, and when a row has more or less than one
+# disposition.  Rows are written against the checklist; the 1.1.1 shapes are those of the released toolkit
+# (tests/fixtures/schema_baseline/paths_1.1.1.json lists their paths).
+#
+# disposition (exactly one per row):
+#   convert              the field's value becomes a declared 1.2.0 field or shape (the source field goes with it)
+#   remove               the field is removed; nothing replaces it and no later phase reads its value
+#   copy-dropped         the field held copies of text kept elsewhere (artifact-level trace: FR statements in its notes)
+#   capture-then-remove  the value is in capture.json (captured_in names the section) before it is removed
+#   worklist             judgement: the script writes one worklist item per case and changes the data only as stated
+#   none                 nothing to migrate (an addition, or a schema definition with no data of its own)
+# script: the migration script that applies the row (a p3_* script of this file's bundle, or the p2/p4/p5 script that owns it).
+# captured_in: the section of spec/extras/migration/capture.json that holds the value first.
+# closed_plans (rows about a plan file only): keep (default) or strip.  A legacy-closed plan loses the stored computed
+#   names (strip) and nothing else; it keeps the rest as history (ruling P13).  Open plans get the whole map.
+# convert: how p3_convert applies the row (type refs | typed | rename | value | out-of-scope | rule-scope |
+#   environment-config | schedules | spec-ref | defaults); the field-to-kind rules it uses are those of legacy_ref_fields.yaml.
+
+# Files the migration deletes whole (not rows of the checklist: step 13a is row SC-13a-01).  `step` files are found by
+# the step id of their name, `path` files by their path in the spec folder.
+retired_files:
+  - {step: "13a", why: "step 13a is retired as a step and as a file (DS L226)"}
+  - {path: extras/trace_matrix.json, why: "the stored trace matrix is retired (DOC L1193); a leftover file is read by nothing"}
+
+# Host canon (spec/canon): kinds the toolkit's canon no longer has are reported and removed with their manifest entries;
+# a renamed kind is rewritten in the host's kind file, manifest entries and aliases.
+host_canon:
+  retired_kinds: [completeness_dimension, trace_type]
+  renamed_kinds: {inv: invariant}
+
+rows:
+- id: SC-00-01
+  path: in_scope
+  change: remove
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-00-02
+  path: out_of_scope
+  change: remove
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-00-03
+  path: links
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: 'links: not coverage (DOC L1182)'
+- id: SC-00-04
+  path: scope_items
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-05
+  path: constraints
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-06
+  path: stakeholders[].stakeholder_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-07
+  path: assumptions
+  change: change
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-00-08
+  path: risks
+  change: change
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-00-09
+  path: stakeholders[].needs
+  change: change
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-00-10
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-11
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-12
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-13
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-14
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-00-15
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-00-16
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-01-01
+  path: capabilities[].goal_id
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: &id001
+    type: refs
+    fields:
+    - goal_id
+    - success_metric_refs
+    target: metric
+  note: derives_from to the charter metric, type-checked
+- id: SC-01-02
+  path: capabilities[].success_metric_refs
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id001
+  note: derives_from to the charter metric, type-checked
+- id: SC-01-03
+  path: capabilities[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: &id002
+    type: typed
+    field: trace
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-01-04
+  path: capabilities[].scope_reason
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-05
+  path: capabilities[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: &id003
+    type: defaults
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-01-06
+  path: capabilities[].scope
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: value
+    field: scope
+    old: future
+    new: later
+  note: plus a scope-reason worklist item
+- id: SC-01-07
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-08
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-09
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-10
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-11
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-12
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-01-13
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-02-01
+  path: components[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id002
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-02-02
+  path: connections[].from
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: refs
+    fields:
+    - from
+    target: component
+    to: derives_from
+- id: SC-02-03
+  path: connections[].to
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: refs
+    fields:
+    - to
+    target: component
+    to: connects_to
+  note: a target that is an external component stays for the third-party pass (worklist item)
+- id: SC-02-04
+  path: connections[].schema_ref
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-02-05
+  path: connections[].interface_ref
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-02-06
+  path: connections[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id002
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-02-07
+  path: components[].type
+  change: change
+  disposition: convert
+  script: p4_third_party
+  note: the external component and its tag become a third_parties[] entry (captured)
+- id: SC-02-08
+  path: components[].tags[]
+  change: change
+  disposition: convert
+  script: p4_third_party
+  note: the external component and its tag become a third_parties[] entry (captured)
+- id: SC-02-09
+  path: connections[].connection_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-10
+  path: connections[].connects_to
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-11
+  path: third_parties
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-12
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-13
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-14
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-15
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-16
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-17
+  path: tech_stack
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: third_party.tech_stacks
+  note: WI-06 p4_third_party reads the capture
+- id: SC-02-18
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-02-19
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-02a-01
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-02a-02
+  path: environments{}{}
+  change: remove
+  disposition: convert
+  script: p3_convert
+  captured_in: environment_host_keys
+  convert:
+    type: environment-config
+  note: keys the schema has no property for move into config
+- id: SC-02a-03
+  path: environments{}.config
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-04
+  path: environments{}
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-02a-05
+  path: ci_gates[]
+  change: change
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-02a-06
+  path: secrets
+  change: change
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-02a-07
+  path: ci_gates[].gate_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-08
+  path: secrets[].secret_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-09
+  path: '**.scope'
+  change: add
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-02a-10
+  path: '**.scope_reason'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-11
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-12
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-13
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-14
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-15
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-16
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-02a-17
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-03-01
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-03-02
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-03-03
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-03-04
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-03-05
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-04-01
+  path: functional_requirements[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id002
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-04-02
+  path: functional_requirements[].depends_on
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-03
+  path: functional_requirements[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-04-04
+  path: functional_requirements[].acceptance_criteria[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-04-05
+  path: '**.scope'
+  change: add
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-04-06
+  path: '**.scope_reason'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-07
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-08
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-09
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-10
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-11
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-12
+  path: functional_requirements[].priority
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: value
+    field: priority
+    old: wont-have
+    scope: later
+  note: priority is removed; the FR gets scope later plus a scope-reason item
+- id: SC-04-13
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-04-14
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-05-01
+  path: apis[].example_refs
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-05-02
+  path: apis[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id002
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-05-03
+  path: apis[].errors[].error_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-04
+  path: apis[].parameters[].enum
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-05
+  path: apis[].provided_by
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-06
+  path: apis[].relies_on
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-07
+  path: apis[].depends_on
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-08
+  path: apis[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-05-09
+  path: apis[].errors[]
+  change: change
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-05-10
+  path: '**.scope'
+  change: add
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-05-11
+  path: '**.scope_reason'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-12
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-13
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-14
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-15
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-16
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-17
+  path: out_of_scope
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: &id004
+    type: out-of-scope
+  note: scope out on the named obligation; the entry rationale is its scope_reason
+- id: SC-05-18
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-05-19
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-06-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-06-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-07-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-07-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-08-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-08-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-08-03
+  path: fixtures[].mode
+  change: change
+  disposition: none
+  note: the value manual is added; it is not inferred (the step-08 pass proposes it)
+- id: SC-09-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-09-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-10-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-10-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-11-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-11-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-12-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-12-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-13-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-13-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-13a-01
+  path: '**'
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: the whole file is retired (see retired_files)
+- id: SC-14-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-14-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-15-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-15-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-16_anchor-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-16_anchor-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-16_impl_context-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-16_impl_context-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: '*_refs_ingested (DOC L1167-1186)'
+- id: SC-core-atoms-01
+  path: $defs.componentType
+  change: change
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-atoms-02
+  path: $defs.testingMode
+  change: change
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-01
+  path: $defs.specRefIngested*
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-02
+  path: $defs.seedRef*
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-03
+  path: $defs.ambiguity*
+  change: add
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-graph-01
+  path: $defs.**
+  change: add
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-step_base-01
+  path: spec_refs_ingested
+  change: remove
+  disposition: none
+  note: schema definition only; each step has its own row
+- id: SC-core-step_base-02
+  path: seed_refs_ingested
+  change: remove
+  disposition: none
+  note: schema definition only; each step has its own row
+- id: SC-00-17
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-01-14
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02-20
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-02a-18
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-03-06
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-04-15
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-20
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-05-21
+  path: apis[].errors[].protocol_status
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-06-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-04
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-10-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-13-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-03
+  path: ambiguities
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_anchor-03
+  path: plan.ambiguities
+  change: change
+  disposition: convert
+  script: p4_ambiguities
+  captured_in: ambiguities
+- id: SC-16_impl_context-03
+  path: plan.ambiguities
+  change: change
+  disposition: convert
+  script: p4_ambiguities
+  captured_in: ambiguities
+- id: SC-16_impl_context-04
+  path: execution.emergent_ambiguities
+  change: change
+  disposition: convert
+  script: p4_ambiguities
+  captured_in: ambiguities
+- id: SC-core-collections-04
+  path: $defs.crossCycleAmbiguityItem
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-atoms-03
+  path: $defs.ambiguityStatus
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-06-04
+  path: rules[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id002
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-06-05
+  path: rules[].scope
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: rule-scope
+  note: the object {components, apis} goes to constrains; scope becomes in
+- id: SC-06-06
+  path: rules[].constrains
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-06-07
+  path: rules[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-06-08
+  path: '**.scope_reason'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-06-09
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-06-10
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-06-11
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-06-12
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-04
+  path: nfrs[].trace
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id002
+  note: typed entries become the one declared link field; the rest is a worklist item (kind trace-link)
+- id: SC-07-05
+  path: nfrs[].constrains
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-06
+  path: nfrs[].relies_on
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-07
+  path: nfrs[].derives_from
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-08
+  path: nfrs[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-07-09
+  path: '**.scope'
+  change: add
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-07-10
+  path: '**.scope_reason'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-11
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-12
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-13
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-07-14
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-05
+  path: fixtures[].targets
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: typed
+    field: targets
+    item_kind: fixture-target
+  note: 'FR targets have no verifies field: worklist item with the FR criteria as proposal'
+- id: SC-08-06
+  path: out_of_scope
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert: *id004
+  note: scope out on the named obligation; the entry rationale is its scope_reason
+- id: SC-08-07
+  path: fixtures[].verifies
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-08
+  path: fixtures[].removes
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-09
+  path: fixtures[].manual_reason
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-10
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-11
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-12
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-04
+  path: tech_stack
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: third_party.tech_stacks
+  note: WI-06 p4_third_party reads the capture
+- id: SC-09-05
+  path: tech_stack_ref
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-09-06
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-09-07
+  path: dependencies
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_ordering.typed_dependencies
+  note: p3_ordering and WI-06 read the capture
+- id: SC-09-08
+  path: dependency_ref
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_ordering.dependency_refs
+- id: SC-09-09
+  path: milestones[].status
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_status.impl_plan
+  note: status lives only on the anchor row
+- id: SC-09-10
+  path: milestones[].deliverables
+  change: remove
+  disposition: worklist
+  script: p3_convert
+  captured_in: milestone_links
+  convert:
+    type: schedules
+  note: 'a typed deliverable (type, id, note) whose id resolves to a node `schedules` accepts is written to schedules; a capability, an unknown id, a string or a type that disagrees with the id is not, and the milestone then gets one schedules item naming it, with a proposal from the paired 14 milestone; the note is not carried (the capture has it)'
+- id: SC-09-11
+  path: milestones[].depends_on
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_ordering.pairs
+  note: p3_ordering reports the pairs before this runs
+- id: SC-09-12
+  path: milestones[].schedules
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-13
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-14
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-15
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-10-04
+  path: pr_rules
+  change: remove
+  disposition: convert
+  script: p2_id_mint
+  note: ids and objects for string lists
+- id: SC-10-05
+  path: spec_first_policy
+  change: remove
+  disposition: capture-then-remove
+  script: p4_step10_rules
+  captured_in: governance
+- id: SC-10-06
+  path: review_policy
+  change: remove
+  disposition: capture-then-remove
+  script: p4_step10_rules
+  captured_in: governance
+- id: SC-10-07
+  path: reviewers
+  change: remove
+  disposition: capture-then-remove
+  script: p4_step10_rules
+  captured_in: governance
+- id: SC-10-08
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-10-09
+  path: links
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: 'links: not coverage (DOC L1182)'
+- id: SC-10-10
+  path: rules
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-04
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-11-05
+  path: threats[].target_ids
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: typed
+    field: target_ids
+    to: threatens
+- id: SC-11-06
+  path: threats[].mitigations
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: typed
+    field: mitigations
+    to: mitigated_by
+  note: 'a mitigation by a capability has no field: worklist item'
+- id: SC-11-07
+  path: threats[].derives_from
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-08
+  path: threats[].threatens
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-09
+  path: threats[].mitigated_by
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-10
+  path: edge_cases[].threatens
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-11
+  path: edge_cases[].mitigated_by
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-12
+  path: '**.scope'
+  change: add
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-11-13
+  path: '**.scope_reason'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-14
+  path: '**.assumes'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-15
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-16
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-17
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-18
+  path: threats[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-11-19
+  path: edge_cases[]
+  change: change
+  disposition: convert
+  script: p3_convert
+  convert: *id003
+  note: 'node shape change: scope in where the schema requires scope and the node has none'
+- id: SC-core-collections-05
+  path: $defs.dependencyList
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-12-04
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-12-05
+  path: jobs[].requires
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: rename
+    field: requires
+    to: depends_on
+- id: SC-12-06
+  path: jobs[].steps[].id
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-12-07
+  path: jobs[].realises
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-08
+  path: jobs[].verifies
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-09
+  path: jobs[].depends_on
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-10
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-11
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-12
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-04
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-14-05
+  path: tech_stack
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: third_party.tech_stacks
+  note: WI-06 p4_third_party reads the capture
+- id: SC-14-06
+  path: tech_stack_ref
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-14-07
+  path: dependencies
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_ordering.typed_dependencies
+  note: p3_ordering and WI-06 read the capture
+- id: SC-14-08
+  path: dependency_ref
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_ordering.dependency_refs
+- id: SC-14-09
+  path: milestones[].status
+  change: remove
+  disposition: capture-then-remove
+  script: p5_legacy_close
+  captured_in: milestone_status.roadmap
+  note: 'NOT removed in phase 3: p2_action_ids and the closed-plan rule read the 14 status of the live tree (closed_milestones); the legacy close removes it'
+- id: SC-14-10
+  path: milestones[].milestone_status_reason
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_status.roadmap
+- id: SC-14-11
+  path: milestones[].source_milestones
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_links
+  note: stored computed name on a 14 milestone (E768)
+- id: SC-14-12
+  path: milestones[].fr_refs
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_links
+  note: stored computed name on a 14 milestone (E768)
+- id: SC-14-13
+  path: milestones[].capability_refs
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_links
+  note: stored computed name on a 14 milestone (E768)
+- id: SC-14-14
+  path: milestones[].deliverables
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_links
+  note: stored computed name on a 14 milestone (E768)
+- id: SC-14-15
+  path: milestones[].tasks[].status
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: task_status
+- id: SC-14-16
+  path: milestones[].tasks[].status_reason
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: task_status
+- id: SC-14-17
+  path: milestones[].tasks[].assumptions
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: task_assumptions
+- id: SC-14-18
+  path: milestones[].tasks[].exit_conditions
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: task_exit_conditions
+- id: SC-14-19
+  path: milestones[].tasks[].fr_refs
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: task_status
+  note: legacy_fr_refs / legacy_invariant_refs; stored computed names (E768)
+- id: SC-14-20
+  path: milestones[].tasks[].invariant_refs
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: task_status
+  note: legacy_fr_refs / legacy_invariant_refs; stored computed names (E768)
+- id: SC-14-21
+  path: milestones[].tasks[].acceptance_criteria[].fixture_ref
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: rename
+    field: fixture_ref
+    to: verified_by
+    as_list: true
+- id: SC-14-22
+  path: milestones[].tasks[].disposition
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-23
+  path: milestones[].tasks[].acceptance_criteria[].refines
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-24
+  path: milestones[].tasks[].acceptance_criteria[].removes
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-25
+  path: milestones[].tasks[].acceptance_criteria[].verified_by
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-26
+  path: milestones[].tasks[].depends_on[]
+  change: change
+  disposition: none
+  note: task to task depends_on is unchanged
+- id: SC-14-27
+  path: '**.lifecycle'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-28
+  path: '**.aliases'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-29
+  path: '**.replaces'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-core-collections-06
+  path: $defs.techStack
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-07
+  path: $defs.techStackItem
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-08
+  path: $defs.techStackList
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-09
+  path: $defs.dependencyItem
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-10
+  path: $defs.dependencyObjectList
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-15-04
+  path: trace
+  change: remove
+  disposition: copy-dropped
+  script: p3_copies
+  note: 'artifact-level trace: not coverage; its notes hold FR statement copies (DEVSPEC-218). Typed entries of a NODE are converted by p3_convert'
+- id: SC-15-05
+  path: links
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: 'links: not coverage (DOC L1182)'
+- id: SC-15-06
+  path: interface_map[].interface_ref
+  change: remove
+  disposition: convert
+  script: p3_convert
+  convert:
+    type: rename
+    field: interface_ref
+    to: realises
+    as_list: true
+- id: SC-15-07
+  path: interface_map[].method
+  change: remove
+  disposition: remove
+  script: p3_remove
+  note: nothing replaces it and no later pack reads it
+- id: SC-15-08
+  path: interface_map[].row_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-09
+  path: interface_map[].realises
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-10
+  path: interface_map[].lifecycle
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-11
+  path: interface_map[].aliases
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-12
+  path: interface_map[].replaces
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_anchor-04
+  path: plan.milestone_index[].milestone_id
+  change: remove
+  disposition: convert
+  script: p2_anchor_rows
+- id: SC-16_anchor-05
+  path: plan.milestone_index[].context_path
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_links
+  note: anchor context_path and fr_refs (fr_refs is an E768 name)
+- id: SC-16_anchor-06
+  path: plan.milestone_index[].fr_refs
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: milestone_links
+  note: anchor context_path and fr_refs (fr_refs is an E768 name)
+- id: SC-16_anchor-07
+  path: plan.milestone_index[].anchor_id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_anchor-08
+  path: plan.milestone_index[].about
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_anchor-09
+  path: plan.milestone_index[].deferral_reason
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_anchor-10
+  path: plan.milestone_index[].close
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-core-collections-11
+  path: $defs.link
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-atoms-04
+  path: $defs.httpMethodFull
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-16_impl_context-05
+  path: milestone
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-06
+  path: plan.status
+  change: remove
+  disposition: capture-then-remove
+  script: p4_plan_dispositions
+  captured_in: milestone_status.plans
+  note: plan_items for the item-level ones
+- id: SC-16_impl_context-07
+  path: plan.deferred_reason
+  change: remove
+  disposition: capture-then-remove
+  script: p4_plan_dispositions
+  captured_in: milestone_status.plans
+  note: plan_items for the item-level ones
+- id: SC-16_impl_context-08
+  path: plan.coverage_status
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-09
+  path: plan.spec_alignment.checklist[].spec_ref
+  change: remove
+  disposition: worklist
+  script: p3_convert
+  convert:
+    type: spec-ref
+  note: 'open plans: one item per plan item (realises is judgement); a legacy-closed plan keeps spec_ref as history'
+- id: SC-16_impl_context-10
+  path: plan.spec_alignment.checklist[].realises
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-11
+  path: plan.spec_alignment.checklist[].milestone_ref
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: strip
+  note: 'stored computed name (E768): removed in every plan'
+- id: SC-16_impl_context-12
+  path: plan.spec_alignment.checklist[].nfr_refs
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: strip
+  note: 'stored computed name (E768): removed in every plan'
+- id: SC-16_impl_context-13
+  path: plan.spec_alignment.checklist[].fixture_ref
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: plan_items
+  closed_plans: strip
+  note: 'stored computed name (E768): removed in every plan'
+- id: SC-16_impl_context-14
+  path: plan.spec_alignment.checklist[].checklist_status
+  change: remove
+  disposition: capture-then-remove
+  script: p4_plan_dispositions
+  captured_in: milestone_status.plans
+  note: plan_items for the item-level ones
+- id: SC-16_impl_context-15
+  path: plan.spec_alignment.checklist[].deferred_reason
+  change: remove
+  disposition: capture-then-remove
+  script: p4_plan_dispositions
+  captured_in: milestone_status.plans
+  note: plan_items for the item-level ones
+- id: SC-16_impl_context-16
+  path: plan.spec_alignment.checklist[].wont_do_reason
+  change: remove
+  disposition: capture-then-remove
+  script: p4_plan_dispositions
+  captured_in: milestone_status.plans
+  note: plan_items for the item-level ones
+- id: SC-16_impl_context-17
+  path: plan.spec_alignment.checklist[].linked_test_expectation
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: plan_items
+  closed_plans: keep
+  note: WI-17 reads the capture; a closed plan keeps it as history
+- id: SC-16_impl_context-18
+  path: plan.spec_alignment.checklist[].implementation.status
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-19
+  path: plan.spec_alignment.checklist[].lifecycle
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-20
+  path: plan.spec_alignment.checklist[].aliases
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-21
+  path: plan.spec_alignment.checklist[].replaces
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-22
+  path: plan.spec_alignment.requirements_summary[].spec_refs
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-23
+  path: plan.security.new_fixtures
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: plan_security
+  closed_plans: keep
+  note: WI-06 p4_plan_security_items reads the capture
+- id: SC-16_impl_context-24
+  path: plan.security.spec_mutations
+  change: remove
+  disposition: capture-then-remove
+  script: p3_remove
+  captured_in: plan_security
+  closed_plans: keep
+  note: WI-06 p4_plan_security_items reads the capture
+- id: SC-16_impl_context-25
+  path: execution.execution_results
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-26
+  path: execution.critical_evidence
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-27
+  path: review.fixture_status
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-28
+  path: review.semantic_review.fr_coverage
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-29
+  path: extensions.review_state
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-30
+  path: review.findings[].spec_ref.line_range
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-31
+  path: review.findings[].spec_ref.commit_hash
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-32
+  path: execution.records
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-33
+  path: plan.spec_alignment.checklist[].implementation.actions[].id
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-34
+  path: plan.spec_alignment.checklist[].implementation.actions[].at_deploy
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-35
+  path: review.recorded_at
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-36
+  path: execution.final_status
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-16_impl_context-37
+  path: plan.spec_alignment.checklist[].implementation.actions[].evidence
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-core-collections-12
+  path: $defs.traceRef
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-core-collections-13
+  path: $defs.traceId
+  change: remove
+  disposition: none
+  note: schema definition only; the data rows carry the migration
+- id: SC-06-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-08-14
+  path: fixtures[].expects
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-09-16
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-11-20
+  path: edge_cases[].derives_from
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-12-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-14-30
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-15-13
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-03-07
+  path: '**.derives_from'
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'
+- id: SC-16_impl_context-38
+  path: plan.context.existing_structures[].line_range
+  change: remove
+  disposition: remove
+  script: p3_remove
+  closed_plans: keep
+  note: plan-schema removal; a legacy-closed plan keeps it as history (P13)
+- id: SC-13-04
+  path: extensions[].justified_by
+  change: add
+  disposition: none
+  note: 'addition, required: a 1.1.1 entry names no upstream node and no script invents one; the step-13 check reports the entry (E520) until a person names the nodes, and `align propose --kind prose-ids` lists the ids its text names'
+- id: SC-13-05
+  path: extensions[].lifecycle
+  change: add
+  disposition: none
+  note: 'addition: nothing to migrate'

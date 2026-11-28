@@ -1,6 +1,6 @@
 {
   "name": "specdev-agent-guide",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "entrypoint": "docs/agents/agents.md",
   "description": "Operational contract for AI agents working with the AI Spec Driven Development Toolkit",
   "interaction_mode": "two_phase",
@@ -9,9 +9,9 @@
       "purpose": "Collect missing, high-impact details before artifact emission.",
       "output_contract": {
         "type": "questions",
-        "format": "markdown_bullets_only",
+        "format": "markdown_bullets_or_blocker_json",
         "restrictions": [
-          "Do not emit JSON or code fences"
+          "In an interactive session do not emit JSON or code fences; an agent dispatched by a skill returns a blocker JSON (see docs/agents/agents.md section 9)"
         ]
       }
     },
@@ -20,7 +20,7 @@
       "output_contract": {
         "type": "json_artifact",
         "restrictions": [
-          "Write the JSON artifact to disk at the configured step artifact path",
+          "Write a new step as a draft outside spec/ and create it with `specdev step create NN --from <draft>`; edit an existing step with `specdev json patch|insert|delete --id`",
           "Do not return fenced JSON as primary output"
         ],
         "write_to_disk": true,
@@ -36,21 +36,20 @@
     },
     "16a": {
       "mode": "one_shot",
-      "artifact": "spec/impl_context/{step_id}.json",
+      "artifact": "spec/impl_context/ms_<batch>_plan.json",
       "schema": "16_impl_context"
     },
     "16b": {
       "mode": "loop",
-      "artifact": "spec/impl_context/{step_id}.json",
+      "artifact": "spec/impl_context/ms_<batch>_plan.json",
       "schema": "16_impl_context"
     },
     "16c": {
       "mode": "one_shot",
-      "artifact": "spec/impl_context/{step_id}.json",
+      "artifact": "spec/impl_context/ms_<batch>_plan.json",
       "schema": "16_impl_context"
     }
   },
-  "phase_triggers": {},
   "commands": [
     "See docs/developers/reference.md"
   ],

@@ -1,0 +1,99 @@
+{
+    "$schema": "vc:06-invariants",
+    "id": "invariants-catalog",
+    "owner": "api",
+    "created_at": "2026-03-02T09:00:00Z",
+    "rules": [
+        {
+            "inv_id": "inv-no-double-checkout",
+            "description": "A tool is never on loan to two members at once.",
+            "language": "cel",
+            "expression": "tool.open_loans <= 1",
+            "scope": {
+                "components": [
+                    "lending-service",
+                    "catalog-db"
+                ],
+                "apis": [
+                    "api-checkout-create"
+                ]
+            },
+            "severity": "error",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-checkout-tool",
+                    "note": "A checkout of a tool on loan is refused"
+                }
+            ],
+            "policy_ref": {
+                "id": "cn:core:policy:spec-first",
+                "kind": "policy",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "inv_id": "inv-fee-nonnegative",
+            "description": "A late fee is never negative.",
+            "language": "cel",
+            "expression": "loan.fee_cents >= 0",
+            "scope": {
+                "components": [
+                    "lending-service"
+                ],
+                "apis": [
+                    "api-fee-get"
+                ]
+            },
+            "severity": "error",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-late-fee-calc"
+                },
+                {
+                    "type": "nfr",
+                    "id": "nfr-fee-accuracy"
+                }
+            ],
+            "policy_ref": {
+                "id": "cn:core:policy:spec-first",
+                "kind": "policy",
+                "version": "1.0.0"
+            }
+        },
+        {
+            "inv_id": "inv-reservation-window",
+            "description": "A reservation holds a tool for one pickup day only.",
+            "language": "cel",
+            "expression": "reservation.days == 1",
+            "scope": {
+                "components": [
+                    "lending-service"
+                ],
+                "apis": [
+                    "api-reserve-create"
+                ]
+            },
+            "severity": "warn",
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-reserve-tool"
+                }
+            ],
+            "policy_ref": {
+                "id": "cn:core:policy:spec-first",
+                "kind": "policy",
+                "version": "1.0.0"
+            }
+        }
+    ],
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:policy:spec-first",
+            "kind": "policy",
+            "version": "1.0.0"
+        }
+    ]
+}

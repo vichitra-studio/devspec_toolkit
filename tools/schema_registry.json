@@ -6,6 +6,7 @@
   "vc:canon:kind": "canon/kind.schema.json",
   "vc:core:collections": "schema/core/collections.schema.json",
   "vc:core:errors": "schema/core/errors.schema.json",
+  "vc:core:graph": "schema/core/graph.schema.json",
   "vc:core:step-base": "schema/core/step_base.schema.json",
   "vc:00-charter": "schema/00_charter.schema.json",
   "vc:01-capabilities": "schema/01_capabilities.schema.json",
@@ -20,7 +21,6 @@
   "vc:10-governance": "schema/10_governance.schema.json",
   "vc:11-redteam": "schema/11_redteam.schema.json",
   "vc:12-ci-gates": "schema/12_ci_gates.schema.json",
-  "vc:13a-completeness-assessment": "schema/13a_completeness_assessment.schema.json",
   "vc:13-extension-manifest": "schema/13_extension_manifest.schema.json",
   "vc:14-roadmap": "schema/14_roadmap.schema.json",
   "vc:15-scaffold": "schema/15_scaffold.schema.json",
@@ -30,7 +30,16 @@
   "vc:entry-key-registry": "schema/entry_key_registry.schema.json",
   "vc:seed-manifest": "schema/seed_manifest.schema.json",
   "vc:seed-requirements": "schema/seed_requirements.schema.json",
+  "vc:host-declarations": "schema/host_declarations.schema.json",
   "vc:step-order": "schema/step_order.schema.json",
+  "vc:cli-commands": "schema/cli_commands.schema.json",
+  "vc:extras:trace-lock": "schema/extras/trace_lock.schema.json",
+  "vc:extras:verification-record": "schema/extras/verification_record.schema.json",
+  "vc:extras:evidence-record": "schema/extras/evidence_record.schema.json",
+  "vc:extras:signoff-record": "schema/extras/signoff_record.schema.json",
+  "vc:extras:at-deploy-record": "schema/extras/at_deploy_record.schema.json",
   "vc:infra:findings": "schema/infra/findings.schema.json",
-  "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json"
+  "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json",
+  "vc:infra:migration-capture": "schema/infra/migration_capture.schema.json",
+  "vc:infra:migration-worklist": "schema/infra/migration_worklist.schema.json"
 }

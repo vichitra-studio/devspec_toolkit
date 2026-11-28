@@ -1,0 +1,12 @@
+# Snippet (copied by hand, not installed): the one specdev step for a host that adds the
+# merge gate to its own pull-request test workflow instead of using specdev-merge-check.yml.
+# Add it to a job that already checks out with `fetch-depth: 0` and `submodules: recursive`
+# and has the toolkit installed with its venv `bin` on PATH (see specdev-merge-check.yml).
+# The job needs `permissions: contents: read` only. Run it on `pull_request` events.
+# `BASE` comes from `env:`, never from `${{ }}` inside `run:`. Edit the paths if the toolkit
+# or the spec folder is not at ./devspec_toolkit and ./spec.
+- name: specdev merge gate
+  env:
+    BASE: ${{ github.base_ref }}
+  run: |
+    specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --merge --base-ref "origin/$BASE"

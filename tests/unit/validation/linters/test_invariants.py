@@ -311,7 +311,7 @@ class TestRunInvariants:
         assert len(results) >= 2, f"Expected at least 2 rules, got {len(results)}"
 
         # All jsonlogic auth rules should be evaluable and pass with our sample
-        auth_rules = [r for r in results if r["inv_id"] == "invariant-user-authentication"]
+        auth_rules = [r for r in results if r["inv_id"] == "inv-user-authentication"]
         assert len(auth_rules) >= 1
         for r in auth_rules:
             assert r["evaluable"] is True
@@ -321,7 +321,7 @@ class TestRunInvariants:
         # (transaction.debit_amount == transaction.credit_amount against an empty
         # sample) evaluates to BoolType(True) — both sides resolve to the same
         # falsy default and are considered equal.
-        cel_rules = [r for r in results if r["inv_id"] == "invariant-data-consistency"]
+        cel_rules = [r for r in results if r["inv_id"] == "inv-data-consistency"]
         assert len(cel_rules) == 1
         assert cel_rules[0]["language"] == "cel"
         assert cel_rules[0]["evaluable"] is True

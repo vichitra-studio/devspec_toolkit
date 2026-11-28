@@ -1,0 +1,19 @@
+{
+  "$schema": "vc:04-fr-list",
+  "id": "legacy-fr-list",
+  "owner": "product",
+  "created_at": "2026-03-01T00:00:00Z",
+  "functional_requirements": [
+    {
+      "fr_id": "fr-legacy-signin",
+      "statement": "The system shall let a member sign in with an email address and a password.",
+      "priority": "must-have",
+      "acceptance_criteria": [
+        {"criterion_id": "ac-legacy-signin-1", "text": "Given a valid email and password, when the member signs in, then a session is created."}
+      ],
+      "trace": ["cap-legacy-signin"],
+      "capability_ref": {"id": "cn:project:capability:legacy-signin", "kind": "capability", "version": "1.0.0"}
+    }
+  ],
+  "canonical_refs_used": []
+}

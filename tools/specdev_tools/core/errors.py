@@ -15,6 +15,12 @@ class SpecError:
     file: Optional[str] = None
     jq_path: Optional[str] = None
     value: Optional[str] = None
+    owner: Optional[str] = None
+    node_id: Optional[str] = None
+    target: Optional[str] = None
+    """The link a finding is about, as ``<field>-><target id>``; part of the identity of a link finding, never printed."""
+    route: Optional[tuple[str, str]] = None
+    """The seed route a finding is about, as ``(seed id, step)``; the step gate reads it to tell whether an open item about the seed makes the finding wait."""
 
     def render(self) -> str:
         if self.path:
@@ -22,6 +28,39 @@ class SpecError:
         return f"{self.code} {self.message}"
 
 
+def link_target(field: str, target: str) -> str:
+    """The ``SpecError.target`` of a finding about the link *field* of a node to *target*: ``<field>-><target>``."""
+    return f"{field}->{target}"
+
+
+class FindingError(Exception):
+    """An exception that carries one finding: ``error`` is the ``SpecError`` a command prints before exiting 1.
+
+    The base of the graph library's refusals (``QueryTargetError``, ``RecipeError``, ``GitViewError``, ...), so a
+    command catches this one class instead of listing each.  ``unknown_id`` is set by the raiser when the finding says that
+    no node has the id the user typed; a command may then add what it knows about files it could not read.
+    """
+
+    def __init__(self, error: SpecError, *, unknown_id: bool = False) -> None:
+        super().__init__(error.message)
+        self.error = error
+        self.unknown_id = unknown_id
+
+
+# Codes removed in 1.2.0 (numbers are not reused; `docs/developers/error-codes.md`, "Removed Codes", says what replaced each):
+#   forward replay and the seed overlap check: E550, W550, E555, W598, W140, W551;
+#   the traceability closure and completeness checks: E535, E536, E560, E561, E562, E563, E564, E565, E568, E569, E575, E576
+#   and their warnings W560, W561, W562, W563, W564, W565, W568, W569, W575, W576 (W566 and W567 are gone too: E566 and E567
+#   stay, as errors computed from the graph);
+#   the trace matrix and the coverage thresholds: E592, W592, E604, W604;
+#   the proof and review checks of the step-16 validator, whose inputs the plan schema no longer has (a milestone closes
+#   on the close gate, E810 to E814): E301, E302, E305, E306, E307, W599, W600, W601.
+#   the assumption id scan and the derivation token-overlap check, which are gone (an id in prose that names a node is E752; one
+#   that names nothing is a review item; derivation is `derives_from`): E573, W573, E594, W594.
+#   the free-text term binding check, which asked for a `*_ref` beside any text that mentions a term (a 1.2.0 spec uses a term by
+#   its label; a term no node uses is E741): E541.
+# E303 stays: `governance-check` raises it for a commit message that does not match the governance rule.
+# `tests/unit/core/test_error_code_registry.py` (REMOVED_CODES) fails if one of them is registered or written as a code literal again.
 ERROR_CODES = {
     # Canonical integrity (1xx)
     "E110": "UNKNOWN_CANONICAL_ID",
@@ -29,30 +68,45 @@ ERROR_CODES = {
     "E125": "ALIAS_SUNSET_EXPIRED",
     "E130": "CANONICAL_VERSION_MISMATCH",
     "E140": "AMBIGUOUS_ALIAS",
-    "E141": "TASK_DEPENDENCY_CYCLE",
-    "E142": "TECH_STACK_MISMATCH",
     "E150": "SEED_MANIFEST_NOT_PROVIDED",
     "W110": "DEPRECATED_CANONICAL_USED",
     "W120": "ALIAS_DEPRECATED",
     "W130": "CANONICAL_REF_VERSION_OMITTED",
-    "W140": "SEED_CONTENT_OVERLAP_LOW",
     "W150": "SEED_MANIFEST_NOT_PROVIDED",
     # Cross-artifact drift (2xx)
     "E210": "CROSS_ARTIFACT_DRIFT",
     "E211": "PARTIAL_DRIFT",
     # Proof / review closure (3xx)
-    "E301": "MISSING_PROOF_CLOSURE",
-    "E302": "UNPROVEN_VERIFIED_REVIEW",
-    "E303": "CI_GATE_VIOLATION",
+    "E303": "COMMIT_MESSAGE_MISMATCH",
     "E304": "ROADMAP_TASK_UNCOVERED",
-    "E305": "PLANNED_UNEXECUTED",
-    "E306": "SEMANTIC_REVIEW_FR_MISMATCH",
-    "E307": "BEHAVIOR_VALIDATION_PAIRING",
     "E308": "ANCHOR_SCOPE_DRIFT",
     "E309": "ANCHOR_CHECKLIST_DRIFT",
     "E310": "PROMPT_SCHEMA_DRIFT",
     "E311": "MISSING_ENUM_PROVENANCE",
     "E320": "STEP13_EXTENSION_ERROR",
+    # Bindings and runs (33x, 35x): E330 to E334 are refusals of ``verify bind`` (E330 and E334 are also findings of the
+    # record check, owner merge-check); W350 and W351 are warnings of ``verify run``.
+    "E330": "BINDING_STAGE_MISMATCH",
+    "E331": "BINDING_TARGET_NOT_VERIFIED",
+    "E332": "BINDING_GUARD_INVALID",
+    "E333": "BINDING_DUPLICATE_TARGET",
+    "E334": "UNKNOWN_STAGE_FOR_ENVIRONMENT",
+    # Third-party pins: E336 to E338 are findings of ``third-party check`` and refusals of ``third-party pin`` (owner
+    # step 02); E339 stops a deploy and has no owner.
+    "E336": "THIRD_PARTY_PIN_NOT_EXACT",
+    "E337": "THIRD_PARTY_PIN_MISMATCH",
+    "E338": "THIRD_PARTY_SOURCE_UNRESOLVED",
+    "E339": "THIRD_PARTY_INSTALLED_MISMATCH",
+    # Removal and proof: E341 and E342 are findings of the ``removal-rules`` check (owner step 14); E343 and E344 are the release
+    # gate's (owner release-gate, computed by ``proof.realisation``); E347 and E348 are the findings of ``proof_errors`` (owner: the step of the node).
+    "E341": "REMOVAL_FIXTURE_MISMATCH",
+    "E342": "REMOVES_TARGET_PRESENT",
+    "E343": "REALISATION_OUTDATED",
+    "E344": "REALISATION_REMOVED",
+    "E347": "VERIFIER_NO_VALID_EVIDENCE",
+    "E348": "OBLIGATION_NOT_PROVEN",
+    "W350": "SUBMODULE_DIRTY_NOT_COVERED",
+    "W351": "RUN_CHANGED_CODE_TREE",
     # Canonical registry (4xx)
     "E410": "CANONICAL_ALIAS_COLLISION",
     "E420": "INVALID_DEPRECATION_LIFECYCLE",
@@ -64,66 +118,29 @@ ERROR_CODES = {
     "E520": "UNRESOLVED_INPUT",
     "E521": "VALIDATOR_RUNTIME",
     "E530": "INVENTED_ENUM_OR_ID",
-    "E535": "CONTRADICTORY_OUT_OF_SCOPE_FR",
-    "E536": "CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE",
     "E540": "SELF_OR_FORWARD_DEPENDENCY",
-    "E541": "UNBOUND_CANONICAL_TERM",
     "E543": "STEP_METADATA_INCONSISTENT",
-    "E550": "FORWARD_REPLAY_MISSING",
     "E551": "SCHEMA_ENUM_EXTRA",
     "E552": "MISSING_PAIRED_SCHEMA",
     "E553": "MISSING_ENUM_PATH",
     "E554": "CANON_ENUM_DRIFT",
-    "E555": "SEMANTIC_COVERAGE_REGRESSION",
-    "E560": "TRACEABILITY_GAP",
-    "E561": "UNCOVERED_FR",
-    "E562": "ORPHAN_MILESTONE",
-    "E563": "CHECKLIST_ROADMAP_MISMATCH",
-    "E564": "UNCOVERED_FR_API",
-    "E565": "UNCOVERED_FR_FIXTURE",
     "E566": "UNCOVERED_FR_MILESTONE",
     "E567": "INCOMPLETE_MILESTONE_DECOMPOSITION",
-    "E568": "UNCOVERED_CAPABILITY",
-    "E569": "GOVERNANCE_PR_RULE_UNCOVERED",
     "E571": "ASSUMPTION_VAGUE_QUANTIFIER",
     "E572": "ASSUMPTION_COUNT_HIGH",
-    "E573": "ASSUMPTION_UNBOUND_ID",
-    "E575": "IMPL_PLAN_DELIVERABLE_UNCOVERED",
-    "E576": "TASK_EXECUTION_MISSING",
     "E580": "SUBSTEP_DRIFT",
-    "E581": "MILESTONE_REF_MISSING",
-    "E582": "UNCOVERED_FR_REVIEW_COVERAGE",
     "E585": "DAG_CIRCULAR_DEPENDENCY",
-    "W550": "SEMANTIC_COVERAGE_SKIP",
-    "W551": "UNDECLARED_SEED",
     "W552": "POTENTIAL_UNREGISTERED_PAIRING",
     "W553": "SEED_STEP_UNKNOWN",
     "W554": "HARDCODED_SEED_REFERENCE",
     # W555 STEP00_SEED_OUT_OF_SCOPE_THIN — warn-only, non-promotable.
-    # E555 is SEMANTIC_COVERAGE_REGRESSION (different semantic); W555 is intentionally
-    # excluded from PROMOTABLE_PAIRS so neither SPECDEV_WARNINGS_AS_ERRORS nor
-    # SPECDEV_PROMOTE_CODES can escalate it.
+    # W555 is intentionally excluded from PROMOTABLE_PAIRS so neither
+    # SPECDEV_WARNINGS_AS_ERRORS nor SPECDEV_PROMOTE_CODES can escalate it.
     "W555": "STEP00_SEED_OUT_OF_SCOPE_THIN",
-    "W560": "TRACEABILITY_GAP",
-    "W561": "UNCOVERED_FR",
-    "W562": "ORPHAN_MILESTONE",
-    "W563": "CHECKLIST_ROADMAP_MISMATCH",
-    "W564": "UNCOVERED_FR_API",
-    "W565": "UNCOVERED_FR_FIXTURE",
-    "W566": "UNCOVERED_FR_MILESTONE",
-    "W567": "INCOMPLETE_MILESTONE_DECOMPOSITION",
-    "W568": "UNCOVERED_CAPABILITY",
-    "W569": "GOVERNANCE_PR_RULE_UNCOVERED",
     "W570": "GRACEFUL_SKIP",
     "W571": "ASSUMPTION_VAGUE_QUANTIFIER",
     "W572": "ASSUMPTION_COUNT_HIGH",
-    "W573": "ASSUMPTION_UNBOUND_ID",
-    "W574": "TECH_STACK_COHERENCE_MISMATCH",
-    "W575": "IMPL_PLAN_DELIVERABLE_UNCOVERED",
-    "W576": "TASK_EXECUTION_MISSING",
     "W580": "SUBSTEP_DRIFT",
-    "W581": "MILESTONE_REF_MISSING",
-    "W582": "UNCOVERED_FR_REVIEW_COVERAGE",
     "W583": "API_UNCOVERED_BY_THREAT",
     "W584": "REMEDIATION_TASK_LINK_UNKNOWN",
     "W585": "ANCHOR_DRIFT_SKIP",
@@ -134,9 +151,7 @@ ERROR_CODES = {
     # R9: Cross-step validation (59x)
     "E590": "CROSS_STEP_ID_NOT_FOUND",
     "E591": "EXTRACTION_INTENT_EMPTY",
-    "E592": "COVERAGE_THRESHOLD_BREACH",
     "E593": "VAGUE_LANGUAGE_FREE_TEXT",
-    "E594": "CONTENT_DERIVATION_LOW_OVERLAP",
     "E595": "CONTENT_STALENESS",
     "E596": "DAG_DEAD_END_PRODUCER",
     "E597": "EXTRACTION_INTENT_UPSTREAM_GAP",
@@ -144,41 +159,29 @@ ERROR_CODES = {
     "E599": "DAG_CONSUMER_INCONSISTENCY",
     "W590": "CROSS_STEP_UPSTREAM_MISSING",
     "W591": "EXTRACTION_INTENT_EMPTY",
-    "W592": "COVERAGE_THRESHOLD_WARN",
     "W593": "VAGUE_LANGUAGE_FREE_TEXT",
-    "W594": "CONTENT_DERIVATION_LOW_OVERLAP",
     "W595": "CONTENT_STALENESS",
     "W596": "UNDECLARED_UPSTREAM_REF",
     "W597": "EXTRACTION_INTENT_VAGUE",
-    "W598": "ID_STABILITY_REMOVAL",
-    "W599": "EVIDENCE_TOO_SHORT",
-    "W600": "VERIFIED_ACTION_NO_EVIDENCE",
-    "W601": "EVIDENCE_NO_ARTIFACT_REF",
-    "W602": "TECH_STACK_02_MISMATCH",
     "W603": "FILES_OUTSIDE_TASK_SCOPE",
-    "E604": "TRACE_MATRIX_STALE",
-    "W604": "TRACE_MATRIX_STALE",
-    "W605": "TECH_STACK_02_MISSING",
     # Glossary parity (6xx)
     "E606": "GLOSSARY_PROPOSAL_DRIFT",
     "E607": "GLOSSARY_CANON_DRIFT",
     # Toolkit version gate (6xx)
     "E608": "TOOLKIT_VERSION_MISMATCH",
     "W606": "GLOSSARY_CANON_ORPHAN",
-    # Anchor context_path integrity (follows the W585-W589 anchor group;
-    # W590-W606 are already allocated to unrelated semantics).
-    "W607": "ANCHOR_CONTEXT_PATH_MISSING",
     # Legacy schema surfaced when a post-split host repo still declares the
     # pre-split schema on its anchor artifact.  Soft-warn only — schema
     # validation against vc:16-impl-context still passes, but host repos
-    # need the signal to migrate per the 0.6.0 breaking-change entry.
+    # need the signal to migrate per the 0.6.0 breaking-change entry.  Also
+    # reported for a plan file in impl_context/ that has no `milestone` key.
     "W608": "ANCHOR_LEGACY_SCHEMA",
     # Misfiled anchor: an artifact_role="anchor" file landed inside
     # spec/impl_context/ instead of at spec/ root.  Routing
-    # (validate.py:_refine_impl_context_substep) demotes the dispatch back
+    # (core/step_paths.py:refine_impl_context_substep) demotes the dispatch back
     # to "16" so the anchor validator runs, but every drift check then
     # resolves impl_context_dir to spec/impl_context/impl_context/ — which
-    # does not exist — so E308/E309/W607/W588/W589 silently no-op.  Without
+    # does not exist — so E308/E309/W588/W589 silently no-op.  Without
     # this warning the misfiling is invisible: the file passes the anchor
     # schema and emits zero drift errors despite contributing nothing to
     # cross-milestone drift detection.  W609 makes the misfiling
@@ -191,19 +194,14 @@ ERROR_CODES = {
     # collisions — violating it doesn't break anything immediately but
     # undermines the anchor's drift-prevention guarantee.
     "W610": "ANCHOR_PREFIX_VIOLATION",
-    # All JSON files in impl_context/ were filtered out by W588/W589 (parse
-    # failures or wrong $schema).  Cross-milestone E308/E309 drift detection
-    # is completely suppressed because no milestone contexts survived filtering.
-    # Without this warning, the anchor appears clean while contributing nothing
-    # to drift detection.
+    # impl_context/ holds JSON files and none takes part in E308/E309 drift
+    # detection (W588/W589/W608 filtered them all out), or a plan file names a
+    # milestone that no anchor row is about.  Without this warning the anchor
+    # appears clean while contributing nothing to drift detection.
     "W611": "ANCHOR_DRIFT_SUPPRESSED",
-    # Milestone ID declared in milestone_index does not match any milestone in
-    # 14_roadmap.json.  Phantom milestones bypass all downstream checks —
-    # ownership, prefix, and scope drift detection are silently skipped for IDs
-    # that don't exist in the roadmap.
-    "W612": "ANCHOR_PHANTOM_MILESTONE",
-    # Upstream backlog: ambiguity's impact[] matches none of the 4 classifier
-    # rules (see analysis/upstream_backlog.py). Informational only — never
+    # Upstream backlog: a legacy-shape ambiguity's impact[] matches none of the three
+    # classifier rules (see analysis/upstream_backlog.py); a 1.2.0 open item has
+    # no impact[] and never fires it. Informational only — never
     # promoted (deliberately excluded from PROMOTABLE_PAIRS).
     "W613": "UPSTREAM_BACKLOG_UNCLASSIFIED",
     # Registry checks (R001–R003 / 620–622) and R004 / W614
@@ -220,14 +218,6 @@ ERROR_CODES = {
     # E615 is its promotable counterpart (SPECDEV_WARNINGS_AS_ERRORS or SPECDEV_PROMOTE_CODES=W615).
     "W615": "INVARIANT_UNEXERCISED_BY_THREAT",
     "E615": "INVARIANT_UNEXERCISED_BY_THREAT",
-    # DEVSPEC-122 follow-up: a checklist item marked checklist_status="deferred"
-    # or "wont_do" while its implementation.status still says "verified" (with
-    # full evidence) is a stale contradiction -- either the item isn't really
-    # paused/cancelled, or the implementation record needs its own reconciling
-    # note. Advisory only, no promotable E-counterpart (deliberately excluded
-    # from PROMOTABLE_PAIRS, like W570/W590/W597): this is a human-reconcile
-    # nudge, not a correctness failure with a single unambiguous fix direction.
-    "W616": "PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED",
     # DEVSPEC-123: upstream-backlog's --status filter (default "open") drops
     # resolved records from the per-bucket detail view without any indication
     # that anything was hidden -- the exact condition that made a real
@@ -236,46 +226,138 @@ ERROR_CODES = {
     # promoted, like W613): the filtering itself is correct behavior, this
     # just discloses that it happened.
     "W617": "UPSTREAM_BACKLOG_STATUS_FILTERED",
+    # Open items (63x). W630 and W633 are warn-only and non-promotable: like W555 they are excluded from
+    # PROMOTABLE_PAIRS (E630 and E633 do not exist), so SPECDEV_WARNINGS_AS_ERRORS and SPECDEV_PROMOTE_CODES
+    # cannot turn an open-item warning into a step blocker.  E631 (merge) and E632 (close) are errors of their gate.
+    "W630": "OPEN_ITEM",
+    "E631": "OPEN_ITEM_AT_MERGE",
+    "E632": "OPEN_ITEM_IN_PLAN",
+    "W633": "OPEN_ITEM_LEGACY_TRIAGE",
+    # Spec graph (7xx). E700-E704 are findings about the spec and carry an owner
+    # and a node id; E705-E709 are command usage errors and carry neither.
+    "E700": "LINK_TARGET_NOT_FOUND",
+    "E701": "LINK_TARGET_WRONG_KIND",
+    "E702": "LINK_POINTS_DOWNSTREAM",
+    "E703": "LINK_CYCLE_SAME_STEP",
+    "E704": "DUPLICATE_NODE_ID",
+    "E705": "LIFECYCLE_CHANGE_REFUSED",
+    "E706": "GRAPH_COMMAND_TARGET_UNKNOWN",
+    "E707": "RECIPE_START_KIND_INVALID",
+    "E708": "DIFF_REF_UNRESOLVED",
+    "E709": "DIFF_REF_PREDATES_GRAPH_MODEL",
+    # Trace lock (76x, 77x). E760 is a finding about the spec (owner merge-check); E761, E762, E763, E768, E771, E772,
+    # E774, E778 and E882 are findings (an owner and a node id, or the merge check); E764, E765, E767, E769, E770 and
+    # E773 are command refusals. E766 is unassigned (an unknown id is E706).
+    "E760": "TRACE_LOCK_MALFORMED",
+    "E761": "LINK_LOCK_ENTRY_MISSING",
+    "E762": "LOCK_ENTRY_ORPHAN",
+    "E763": "SUSPECT_LINK",
+    "E764": "ATTEST_REFUSED_TARGET_SUSPECT",
+    "E765": "ATTEST_REFUSED_HISTORICAL",
+    "E767": "WRITE_REFUSED",
+    "E768": "STORED_COMPUTED_FIELD",
+    "E769": "LOCK_WRITE_CONFLICT",
+    "E770": "RENAME_REFUSED",
+    "E771": "ALIAS_COLLISION",
+    "E772": "REPLACES_NAMES_LIVE_NODE",
+    "E773": "STEP_NOT_READY",
+    "E774": "RECORD_INVALID",
+    "E778": "STALE_ALIAS_USE",
+    # Graph role checks (74x): findings about the spec, each with an owner and a node id (E743, E747 and E754 to E756 owned by a
+    # fixed step).  E750, E751 and E753 are unassigned; E757..E759 are reserved.
+    "E740": "NODE_DANGLING",
+    "E741": "TERM_NOT_USED_BY_LABEL",
+    "E742": "UNUSED_VERIFIER",
+    "E743": "MISSING_VERIFIER",
+    "E744": "CROSS_CUTTING_NOT_REFINED",
+    "E745": "VERIFIER_DOES_NOT_VERIFY_REFINED",
+    "E746": "SCAFFOLD_PATH_NOT_TRACKED",
+    "E747": "SEED_NOT_ROUTED",
+    "E748": "SEED_ROUTE_UNUSED",
+    "E749": "SEED_LINK_NOT_ROUTED",
+    "E752": "NODE_ID_IN_PROSE",
+    "E754": "FIXTURE_ERROR_NOT_NAMED",
+    "E755": "FIXTURE_STATUS_DIFFERS_FROM_ERROR",
+    "E756": "FIXTURE_ERROR_NOT_CONSTRAINED",
+    # Migration (880 to 884): ``specdev align apply --auto`` refuses with E880 (a host the runner cannot start on) and
+    # stops with E881 (a script broke an invariant; nothing was written); E884 is a finding of the changelog check (an
+    # ``auto`` entry that names no script).  E882 is the baseline residue finding of the trace check; E883 is unassigned.
+    "E880": "MIGRATION_PREFLIGHT",
+    "E881": "MIGRATION_SCRIPT_INVARIANT",
+    "E882": "MIGRATION_BASELINE_NOT_REATTESTED",
+    "E884": "MIGRATION_CHANGELOG_SCRIPT_MISSING",
+    # Merge gate (900 to 901): findings of ``spec-check --merge`` (owner merge-check).
+    "E900": "MERGE_BASE_UNRESOLVED",
+    "E901": "MERGE_BINDING_FAILED",
+    # Release (910 to 914, 920 to 928): ``specdev release`` and ``release rollback`` refuse with E910 to E912 and E925 to
+    # E927 (command usage errors, no owner).  The release gate reports E913 and E914 (re-checks of the close gate's and
+    # the consumer step's classes: owners close-gate and consumer_step), E920 and E928 (owner release-gate); the
+    # production-deploy gate of ``release check --stage prod`` reports E921, E923 and E924 (owner release-gate).
+    "E910": "RELEASE_REPO_DIRTY",
+    "E911": "RELEASE_TAG_PATTERN_UNDECLARED",
+    "E912": "RELEASE_TAG_INVALID",
+    "E913": "RELEASE_MILESTONE_UNSIGNED",
+    "E914": "RELEASE_OBLIGATION_NOT_BUILT",
+    "E920": "RELEASE_PREVIOUS_UNVERIFIED",
+    "E921": "PROD_TAG_UNRESOLVED",
+    "E923": "PROD_DELIVERY_NOT_BUILT",
+    "E924": "PROD_RELIEVED_NODE_FAILS",
+    "E925": "ROLLBACK_TAG_UNKNOWN",
+    "E926": "ROLLBACK_REASON_EMPTY",
+    "E927": "ROLLBACK_ALREADY_RECORDED",
+    "E928": "RELEASE_UNREALISED_DESIGN_MILESTONE",
+    "W720": "LINK_TO_DEPRECATED_NODE",
+    # Host install and release warnings (930 to 938; none is promotable).  W930, W931, W932 and W935 are strings in
+    # ``UpdateResult.warnings`` of ``specdev update`` (no owner); W933, W934 and W936 to W938 are findings of the release
+    # gate and of ``release check --stage prod`` (owner release-gate).
+    "W930": "HOST_TEMPLATE_DRIFT",
+    "W931": "HOST_INSTALL_REFUSED",
+    "W932": "HOST_RETIRED_COMMAND",
+    "W933": "RELEASE_SCOPE_LISTED",
+    "W934": "PROD_STAGING_SKIPPED",
+    "W935": "HOST_SETUP_UNDECLARED",
+    "W936": "RELEASE_STAGE_SKIPPED",
+    "W937": "RELEASE_NO_PREVIOUS",
+    "W938": "RELEASE_PREVIOUS_PREDATES_1_2_0",
+    # Milestone lifecycle (8xx). E800 to E803, E820 to E824 are command refusals (no owner, no node; E820 is raised by the
+    # plan and review writers, not by a validator).  E810 to E814 are the close gate's (owner close-gate) and E830 the
+    # release gate's.  E827 is a finding of the ``frozen-plans`` check (owner step 16); W825 and W826 are findings of the
+    # ``plan-records`` check (owner step 16) and W837 of the step-16 validator.
+    "E800": "MILESTONE_NOT_STARTABLE",
+    "E801": "MILESTONE_TRANSITION_INVALID",
+    "E802": "DEFER_REASON_MISSING",
+    "E803": "PLAN_MILESTONE_UNKNOWN",
+    "E810": "CLOSE_CRITERION_UNREALISED",
+    "E811": "CLOSE_CRITERION_UNPROVEN",
+    "E812": "CLOSE_ITEM_NOT_EXECUTED",
+    "E813": "CLOSE_REVIEW_NOT_VERIFIED",
+    "E814": "CLOSE_NO_SIGNOFF",
+    "E820": "PLAN_FROZEN",
+    "E821": "RECORD_TARGET_UNKNOWN",
+    "E822": "RECORD_ACTION_NAMES_VERIFIER",
+    "E823": "REVIEW_RECORD_INVALID",
+    "E824": "ATTEST_TARGET_NOT_ATTESTABLE",
+    "E827": "PLAN_CHANGED_AFTER_CLOSE",
+    "E830": "REVIEW_RULE_UNATTESTED",
+    "W825": "EXECUTION_STALE",
+    "W826": "PLAN_ITEM_REALISES_EXCLUDED_TASK",
+    "W837": "PLAN_FILE_LARGE",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W553/W554/W555/W590/
-# W596/W597/W606 have E-counterparts with different semantics; W570
-# (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
-# its name with the registered-but-unemitted E604 and stays advisory (see the
-# inline W604 note below). W616 (PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED) and
-# W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) have no E-counterpart at all -- both
-# are informational nudges, not hard failures.
+# Non-promotable codes are excluded: W110/W120/W130/W552/W553/W554/W590/
+# W596/W597/W606 have E-counterparts with different semantics; W555
+# (STEP00_SEED_OUT_OF_SCOPE_THIN) and W570
+# (GRACEFUL_SKIP) have no E-counterpart at all; W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) has no
+# E-counterpart at all -- it is an informational nudge, not a hard failure.
+# W720 (LINK_TO_DEPRECATED_NODE) likewise has no E-counterpart (no E720 exists).
+# W630 (OPEN_ITEM) and W633 (OPEN_ITEM_LEGACY_TRIAGE) likewise have none (no E630 or E633 exists).
 PROMOTABLE_PAIRS = {
-    # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
-    # on semantic coverage; the warning fires when coverage is skipped, the
-    # error when it is provably missing — promotion is appropriate.
-    "W550": "E550",
-    "W560": "E560",
-    # W561 (UNCOVERED_FR) is intentionally NOT in PROMOTABLE_PAIRS.
-    # W561 is a legacy informational signal that co-fires with W566 for the
-    # same condition (FR not covered by any milestone fr_refs). W566 is the
-    # designated pairwise completeness code that is promoted. Including W561
-    # here would cause double-promotion: one FR gap would generate both E561
-    # and E566 under SPECDEV_WARNINGS_AS_ERRORS=1.
-    "W562": "E562",
-    "W563": "E563",
-    "W564": "E564",
-    "W565": "E565",
-    "W566": "E566",
-    "W567": "E567",
-    "W568": "E568",
-    "W569": "E569",
     "W571": "E571",
     "W572": "E572",
-    "W573": "E573",
-    "W575": "E575",
-    "W576": "E576",
     "W580": "E580",
-    "W581": "E581",
-    "W582": "E582",
     "W150": "E150",
     # W590 (CROSS_STEP_UPSTREAM_MISSING) is intentionally NOT in PROMOTABLE_PAIRS.
     # E590 (CROSS_STEP_ID_NOT_FOUND) is a structurally different condition — a
@@ -287,9 +369,7 @@ PROMOTABLE_PAIRS = {
     # semantically-correct E-counterpart at this time; a fatal "upstream missing"
     # would need a new dedicated E-code rather than reusing E590.
     "W591": "E591",
-    "W592": "E592",
     "W593": "E593",
-    "W594": "E594",
     "W595": "E595",
     # W597 (EXTRACTION_INTENT_VAGUE) is intentionally NOT in PROMOTABLE_PAIRS.
     # E597 (EXTRACTION_INTENT_UPSTREAM_GAP) is a structurally different
@@ -298,14 +378,6 @@ PROMOTABLE_PAIRS = {
     # UPSTREAM_GAP code for a present-but-vague entry, mislabelling the defect
     # and pointing users at the wrong fix (add an entry vs. expand its text).
     # W597 has no semantically-correct E-counterpart, so it stays a warning.
-    # W604 (TRACE_MATRIX_STALE) is intentionally NOT in PROMOTABLE_PAIRS.
-    # Only W604 is emitted — by the step_14 staleness check, when
-    # trace_matrix.json is missing or older than 14_roadmap.json (an mtime-based
-    # freshness heuristic that can false-positive on checkout/touch order). E604
-    # is registered under the same name as the nominal error form but is never
-    # emitted by any code path, and staleness is advisory (regenerate the matrix)
-    # rather than a hard correctness failure — so W604 stays a warning and E604
-    # is not wired to promotion.
     # W615 INVARIANT_UNEXERCISED_BY_THREAT → E615: step-06 invariant with a
     # risk_category_ref is not referenced by any step-11 threat mitigation.
     "W615": "E615",
@@ -321,13 +393,23 @@ def make_error(
     file: Optional[str] = None,
     jq_path: Optional[str] = None,
     value: Optional[str] = None,
+    owner: Optional[str] = None,
+    node_id: Optional[str] = None,
+    target: Optional[str] = None,
+    route: Optional[tuple[str, str]] = None,
 ) -> SpecError:
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
     return SpecError(
         code=code, message=message, path=path,
         subcode=subcode, file=file, jq_path=jq_path, value=value,
+        owner=owner, node_id=node_id, target=target, route=route,
     )
+
+
+def refusal(code: str, message: str) -> FindingError:
+    """The finding a command prints before it exits 1: *code* with *message*, no owner, no node."""
+    return FindingError(make_error(code, message))
 
 
 def render_errors(errors: list[SpecError]) -> list[str]:

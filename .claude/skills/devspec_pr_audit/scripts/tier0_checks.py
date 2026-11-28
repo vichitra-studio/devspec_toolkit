@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -52,9 +53,19 @@ FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 # migration_versioning slice changed OR any schema change OR cli.py changed).
 # We detect these directly from the changed file lists rather than by slice flag.
 
-# T0-09: CLI-relevant file detection
+# T0-09: CLI-relevant file detection. The entry point is cli.py; each package registers its
+# subcommands in a module named commands.py or <name>_commands.py (trace/commands.py,
+# trace/id_write_commands.py, graph/commands.py, lifecycle/commands.py, ...).
 CLI_PATHS: set[str] = {"tools/specdev_tools/cli.py"}
-CLI_PREFIX: str = "tools/specdev_tools/commands/"
+CLI_PACKAGE_PREFIX: str = "tools/specdev_tools/"
+
+
+def _is_cli_file(path: str) -> bool:
+    """Whether *path* is cli.py or a command module of a package under tools/specdev_tools/."""
+    if path in CLI_PATHS:
+        return True
+    name = path.rsplit("/", 1)[-1]
+    return path.startswith(CLI_PACKAGE_PREFIX) and (name == "commands.py" or name.endswith("_commands.py"))
 
 # ---------------------------------------------------------------------------
 # Utility helpers
@@ -195,8 +206,9 @@ def check_t05_json_parse_clean(
 ) -> list[dict[str, Any]]:
     """T0-05: Every changed *.json parses cleanly.
 
-    Skips files under tests/fixtures/ whose basename starts with 'invalid'
-    or 'malformed' — those are intentionally-broken test fixtures.
+    Skips a file that has a directory named 'fixtures' in its path and whose
+    file stem contains 'invalid' or 'malformed' — those are intentionally-broken
+    test fixtures.
     """
     findings: list[dict[str, Any]] = []
     json_files = [f for f in changed_files if f.endswith(".json")]
@@ -371,11 +383,11 @@ def check_t09_changelog_entry_present(
     routing: dict[str, list[str]],
     changed_files: list[str],
 ) -> list[dict[str, Any]]:
-    """T0-09: If migration_versioning, schemas, or cli.py changed, require unreleased entry."""
+    """T0-09: If migration_versioning, schemas, cli.py or a command module changed, require unreleased entry."""
     # Determine if there are triggering changes
     migration_files = routing.get("migration_versioning", [])
     schema_files = [f for f in changed_files if f.endswith(".schema.json")]
-    cli_files = [f for f in changed_files if f in CLI_PATHS or f.startswith(CLI_PREFIX)]
+    cli_files = [f for f in changed_files if _is_cli_file(f)]
 
     # Filter out changelog files themselves from migration trigger
     non_changelog_migration = [
@@ -386,44 +398,25 @@ def check_t09_changelog_entry_present(
     if not (non_changelog_migration or schema_files or cli_files):
         return []  # No trigger
 
-    # Check for unreleased entry in three locations
-    has_entry = False
-
-    # 1. changelog/unreleased.md
-    unreleased_md = REPO_ROOT / "changelog" / "unreleased.md"
-    if unreleased_md.exists():
-        content = unreleased_md.read_text(encoding="utf-8").strip()
-        # Non-empty beyond a bare header line?
-        non_header = [ln for ln in content.splitlines() if ln.strip() and not ln.startswith("#")]
-        if non_header:
-            has_entry = True
-
-    # 2. changelog/unreleased.yaml
+    # The entry is the YAML (the migration reads it): a `changes` item in changelog/unreleased.yaml, or a
+    # changelog/v<X.Y.Z>.yaml that the diff itself changes. A Markdown entry alone does not count.
+    has_entry = any(re.fullmatch(r"changelog/v\d+\.\d+\.\d+\.yaml", f) for f in changed_files)
+    unreadable = ""
     if not has_entry:
         unreleased_yaml = REPO_ROOT / "changelog" / "unreleased.yaml"
         if unreleased_yaml.exists():
-            content = unreleased_yaml.read_text(encoding="utf-8").strip()
-            non_comment = [ln for ln in content.splitlines()
-                           if ln.strip() and not ln.startswith("#")]
-            if non_comment:
-                has_entry = True
+            try:
+                import yaml
 
-    # 3. CHANGELOG.md — look for ## [Unreleased] section with content
-    if not has_entry:
-        changelog_md = REPO_ROOT / "CHANGELOG.md"
-        if changelog_md.exists():
-            text = changelog_md.read_text(encoding="utf-8")
-            in_unreleased = False
-            for line in text.splitlines():
-                if line.strip().lower().startswith("## [unreleased]"):
-                    in_unreleased = True
-                    continue
-                if in_unreleased:
-                    if line.startswith("## "):
-                        break  # Next version section
-                    if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("<!--"):
-                        has_entry = True
-                        break
+                document = yaml.safe_load(unreleased_yaml.read_text(encoding="utf-8"))
+            except ImportError:
+                document = None
+                unreadable = "PyYAML is not installed for this python3, so changelog/unreleased.yaml was not read"
+            except Exception as exc:
+                document = None
+                unreadable = f"changelog/unreleased.yaml is unreadable ({type(exc).__name__})"
+            changes = document.get("changes") if isinstance(document, dict) else None
+            has_entry = isinstance(changes, list) and len(changes) > 0
 
     if has_entry:
         return []
@@ -441,28 +434,40 @@ def check_t09_changelog_entry_present(
     return [_finding(
         kind="gap",
         location="CHANGELOG.md",
-        message=(f"Slices {', '.join(trigger_slices)} have changed files but no unreleased changelog entry found. "
-                 "Add an entry to changelog/unreleased.md, changelog/unreleased.yaml, "
-                 "or CHANGELOG.md ## [Unreleased] section."),
+        message=(f"Slices {', '.join(trigger_slices)} have changed files but "
+                 + (f"{unreadable}, so the check cannot tell whether an entry exists. " if unreadable
+                    else "no changelog YAML entry found. ")
+                 + "Add a `changes` item to changelog/unreleased.yaml (or change changelog/v<version>.yaml in this diff); "
+                 "the Markdown is rendered from it and does not count."),
         severity="P1",
         check_id="changelog-entry-present",
         catalog_tag="D11",
         evidence=[
             (
-                f"Slice '{trigger_slices[0]}' has changed files but no unreleased changelog entry found"
+                f"Slice '{trigger_slices[0]}' has changed files but {unreadable or 'no unreleased changelog entry found'}"
                 if len(trigger_slices) == 1
-                else f"Slices {', '.join(trigger_slices)} have changed files but no unreleased changelog entry found"
+                else f"Slices {', '.join(trigger_slices)} have changed files but {unreadable or 'no unreleased changelog entry found'}"
             ),
             f"Changed files in triggering slices: {', '.join(trigger_files[:10])}{' ...' if len(trigger_files) > 10 else ''}",
         ],
     )]
 
 
+# Every file `specdev registry-generate` writes: (redirect flag, committed path).
+GENERATED_OUTPUTS: tuple[tuple[str, str], ...] = (
+    ("--out", "tools/entry_key_registry.json"),
+    ("--extraction-paths-out", "tools/extraction_paths.json"),
+    ("--step-order-out", "tools/step_order.json"),
+    ("--cli-commands-out", "tools/cli_commands.json"),
+    ("--checklist-out", "docs/developers/schema-change-checklist.md"),
+)
+
+
 def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
     """T0-10: Re-run registry-generate to temp files; diff against committed files.
 
-    The generator supports: --repo-root, --out (entry_key_registry),
-    --extraction-paths-out. We generate to temp paths then diff.
+    Every output of the generator (GENERATED_OUTPUTS) is redirected to a temp
+    path and compared with the committed file.
 
     Falls back to a P2 informational finding if specdev is unavailable.
     """
@@ -496,17 +501,14 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
         ))
         return findings
 
-    # The generator supports --out and --extraction-paths-out for redirect output.
+    # Every output of the generator has a redirect flag (GENERATED_OUTPUTS).
     # Generate to temp files, then diff against committed files.
-    # The two generator-owned artifacts are entry_key_registry.json and extraction_paths.json.
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_ekr = Path(tmpdir) / "entry_key_registry.json"
-        tmp_ep = Path(tmpdir) / "extraction_paths.json"
-
-        gen_cmd = (
-            f"{env_setup}specdev registry-generate --repo-root . "
-            f"--out {tmp_ekr} --extraction-paths-out {tmp_ep}"
+        tmp_paths = [Path(tmpdir) / Path(rel).name for _flag, rel in GENERATED_OUTPUTS]
+        redirects = " ".join(
+            f"{flag} {tmp}" for (flag, _rel), tmp in zip(GENERATED_OUTPUTS, tmp_paths)
         )
+        gen_cmd = f"{env_setup}specdev registry-generate --repo-root . {redirects}"
         gen_result = subprocess.run(
             ["bash", "-c", gen_cmd],
             capture_output=True, text=True, cwd=REPO_ROOT,
@@ -529,8 +531,7 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
             ))
             return findings
 
-        tmp_paths = [tmp_ekr, tmp_ep]
-        disk_rels = ["tools/entry_key_registry.json", "tools/extraction_paths.json"]
+        disk_rels = [rel for _flag, rel in GENERATED_OUTPUTS]
         for tmp_file, rel in zip(tmp_paths, disk_rels):
             disk_file = REPO_ROOT / rel
             if not tmp_file.exists():
@@ -574,8 +575,9 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
 def check_t11_new_module_has_test(
     base_sha: str,
 ) -> list[dict[str, Any]]:
-    """T0-11: Every new tools/specdev_tools/**/*.py must have tests/**/test_<module>*.py."""
+    """T0-11: every new tools/specdev_tools/**/*.py has a test: tests/**/test_<module>*.py, or a test file that imports it."""
     findings: list[dict[str, Any]] = []
+    test_texts: list[str] | None = None
 
     # Find added Python files in tools/specdev_tools/
     diff_result = subprocess.run(
@@ -600,21 +602,37 @@ def check_t11_new_module_has_test(
         tests_dir = REPO_ROOT / "tests"
         pattern = f"test_{module_name}*.py"
         matches = list(tests_dir.rglob(pattern))
-        if not matches:
-            findings.append(_finding(
-                kind="coverage",
-                location=path,
-                message=(f"New module '{path}' introduced in this PR has no matching test file. "
-                         f"Expected pattern: tests/**/test_{module_name}*.py"),
-                severity="P1",
-                check_id="new-module-has-test",
-                catalog_tag="I8",
-                evidence=[
-                    f"New module introduced in this PR; no matching test file found under tests/",
-                    f"Expected pattern: tests/**/test_{module_name}*.py",
-                ],
-            ))
+        if matches:
+            continue
+        if test_texts is None:
+            test_texts = [p.read_text(encoding="utf-8", errors="replace") for p in tests_dir.rglob("*.py")]
+        if _imported_by_a_test(path, test_texts):
+            continue
+        findings.append(_finding(
+            kind="coverage",
+            location=path,
+            message=(f"New module '{path}' introduced in this PR has no matching test file and no test imports it. "
+                     f"Expected pattern: tests/**/test_{module_name}*.py"),
+            severity="P1",
+            check_id="new-module-has-test",
+            catalog_tag="I8",
+            evidence=[
+                f"New module introduced in this PR; no matching test file found under tests/ and no test imports it",
+                f"Expected pattern: tests/**/test_{module_name}*.py",
+            ],
+        ))
     return findings
+
+
+def _imported_by_a_test(module_path: str, test_texts: list[str]) -> bool:
+    """True when a test file names the dotted path of *module_path* or imports its last name from its package."""
+    parts = Path(module_path).with_suffix("").parts[1:]  # drop the leading "tools"
+    dotted = ".".join(parts)
+    package, name = ".".join(parts[:-1]), parts[-1]
+    wanted = rf"\b{re.escape(name)}\b"
+    from_import = re.compile(rf"from\s+{re.escape(package)}\s+import\s+(?:\([^)]*{wanted}|[^(\n]*{wanted})")
+    dotted_use = re.compile(rf"\b{re.escape(dotted)}\b")
+    return any(dotted_use.search(text) or from_import.search(text) for text in test_texts)
 
 
 # ---------------------------------------------------------------------------

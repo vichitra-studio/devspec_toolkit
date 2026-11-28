@@ -1,0 +1,264 @@
+{
+  "rows": [
+    {
+      "class": "bad-link",
+      "owner": "holder_step",
+      "codes": [
+        "E700",
+        "E701",
+        "E702",
+        "E703",
+        "E761",
+        "E778",
+        "W720"
+      ],
+      "authority": "DOC L824-840 row 1; DS L420"
+    },
+    {
+      "class": "node-not-justified-upstream",
+      "owner": "node_step",
+      "codes": [],
+      "authority": "DOC L824-840 row 2; DS L420"
+    },
+    {
+      "class": "dangling-node",
+      "owner": "furthest_usable_step",
+      "codes": [
+        "E740"
+      ],
+      "authority": "DOC L824-840 row 3; DS L420"
+    },
+    {
+      "class": "obligation-not-built-or-verifier-without-evidence",
+      "owner": "consumer_step",
+      "codes": [
+        "E347",
+        "E348",
+        "E914"
+      ],
+      "authority": "DOC L824-840 row 4; DS L420; M9 WI-M9-03 (E914: the release gate re-check); DOC L830"
+    },
+    {
+      "class": "missing-verifier",
+      "owner": "fixed_step:08",
+      "codes": [
+        "E743"
+      ],
+      "authority": "DOC L824-840 row 5; DS L420"
+    },
+    {
+      "class": "fixture-outcome",
+      "owner": "fixed_step:08",
+      "codes": [
+        "E754",
+        "E755",
+        "E756"
+      ],
+      "authority": "the fixture is the verifier of an outcome, so step 08 owns it as it owns E743 (DOC L824-840 row 5; DS L420)"
+    },
+    {
+      "class": "unused-verifier",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E742"
+      ],
+      "authority": "DOC L824-840 row 6; DS L420"
+    },
+    {
+      "class": "scaffold-row-path-not-tracked",
+      "owner": "fixed_step:15",
+      "codes": [
+        "E746"
+      ],
+      "authority": "DOC L824-840 row 7; DS L420"
+    },
+    {
+      "class": "node-id-in-prose",
+      "owner": "node_step",
+      "codes": [
+        "E752"
+      ],
+      "authority": "DOC L824-840 row 8; DS L420"
+    },
+    {
+      "class": "derives-from-seed-not-routed",
+      "owner": "node_step",
+      "codes": [
+        "E749"
+      ],
+      "authority": "DOC L824-840 row 9; DS L420"
+    },
+    {
+      "class": "listed-seed-routed-nowhere",
+      "owner": "fixed_step:00",
+      "codes": [
+        "E747"
+      ],
+      "authority": "DOC L824-840 row 10; DS L402; DS L420"
+    },
+    {
+      "class": "pin-differs-from-repo-sources",
+      "owner": "fixed_step:02",
+      "codes": [
+        "E336",
+        "E337",
+        "E338"
+      ],
+      "authority": "DOC L824-840 row 11; DS L420"
+    },
+    {
+      "class": "cross-cutting-obligation-not-refined",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E744"
+      ],
+      "authority": "DOC L824-840 row 12; DS L420"
+    },
+    {
+      "class": "orphan-lock-entry",
+      "owner": "merge-check",
+      "codes": [
+        "E762"
+      ],
+      "authority": "DOC L824-840 row 13; DS L402; DS L420"
+    },
+    {
+      "class": "close-gate-failure",
+      "owner": "close-gate",
+      "codes": [
+        "E810",
+        "E811",
+        "E812",
+        "E813",
+        "E814",
+        "E913"
+      ],
+      "authority": "DOC L824-840 row 14; DS L420; M9 WI-M9-03 (E913: the release gate re-states E814); DOC L806, L839"
+    },
+    {
+      "class": "release-gate-failure",
+      "owner": "release-gate",
+      "codes": [
+        "E343",
+        "E344",
+        "E830",
+        "E920",
+        "E921",
+        "E923",
+        "E924",
+        "E928",
+        "W933",
+        "W934",
+        "W936",
+        "W937",
+        "W938"
+      ],
+      "authority": "DOC L824-840 row 15; DS L402; DS L420; M9 WI-M9-03, -04, -07; DOC L806-807, L840; E921, E923, E924, E928 and the warnings are reporter-only (plan S-041)"
+    },
+    {
+      "class": "glossary-canon-drift",
+      "owner": "fixed_step:03",
+      "codes": [
+        "E607"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "toolkit-version-mismatch",
+      "owner": "merge-check",
+      "codes": [
+        "E608"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "registry-drift",
+      "owner": "merge-check",
+      "codes": [
+        "E620",
+        "E621",
+        "E622"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "hardcoded-seed-reference",
+      "owner": "merge-check",
+      "codes": [
+        "W554"
+      ],
+      "authority": "M6a PD"
+    },
+    {
+      "class": "term-not-used-by-label",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E741"
+      ],
+      "authority": "M6b PD"
+    },
+    {
+      "class": "verifier-does-not-verify-refined",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E745"
+      ],
+      "authority": "M6b PD"
+    },
+    {
+      "class": "seed-route-unused",
+      "owner": "node_step",
+      "codes": [
+        "E748"
+      ],
+      "authority": "M6b PD"
+    },
+    {
+      "class": "binding-stage",
+      "owner": "merge-check",
+      "codes": [
+        "E330",
+        "E334"
+      ],
+      "authority": "M7 WI-14"
+    },
+    {
+      "class": "milestone-numbers",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E566",
+        "E567"
+      ],
+      "authority": "M6c WI-04"
+    },
+    {
+      "class": "removal-rules",
+      "owner": "fixed_step:14",
+      "codes": [
+        "E341",
+        "E342"
+      ],
+      "authority": "M7 WI-09"
+    },
+    {
+      "class": "plan-lifecycle",
+      "owner": "fixed_step:16",
+      "codes": [
+        "E820",
+        "E827",
+        "W825",
+        "W826"
+      ],
+      "authority": "M8 WI-01"
+    },
+    {
+      "class": "merge-gate-failure",
+      "owner": "merge-check",
+      "codes": [
+        "E900",
+        "E901"
+      ],
+      "authority": "M9 WI-M9-01, WI-M9-02; DOC L804, L838"
+    }
+  ]
+}

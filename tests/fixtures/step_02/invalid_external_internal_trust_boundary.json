@@ -16,62 +16,36 @@
         "critical-path",
         "stateless"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        },
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        },
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
-      ]
-    },
-    {
-      "component_id": "stripe-api",
-      "type": "external",
-      "responsibilities": [
-        "Tokenize payment details",
-        "Authorize card payments",
-        "Return payment confirmations"
-      ],
-      "owner": "business",
-      "tags": [
-        "external-dependency",
-        "critical-path"
-      ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "derives_from": [
+        "capability-user-auth",
+        "capability-user-profile",
+        "capability-payment-processing"
       ]
     }
   ],
   "connections": [
     {
-      "from": "core-service",
-      "to": "stripe-api",
+      "connection_id": "core-service-to-stripe-api",
+      "derives_from": [
+        "core-service"
+      ],
+      "connects_to": [
+        "stripe-api"
+      ],
       "protocol": "http",
-      "trust_boundary": "internal",
-      "schema_ref": "https://stripe.com/docs/api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "trust_boundary": "internal"
+    }
+  ],
+  "third_parties": [
+    {
+      "third_party_id": "stripe-api",
+      "name": "Stripe API",
+      "pin": "api-v3",
+      "rationale": "Hosted card payment processor",
+      "derives_from": [
+        "seed-payments-provider"
       ]
     }
   ],
-  "tech_stack": {
-    "languages": [{ "name": "Python", "version": "3.12" }],
-    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
-    "infrastructure": [{ "name": "SQLite", "version": "3" }],
-    "tools": [{ "name": "pytest", "version": "8.0" }]
-  },
   "canonical_refs_used": []
 }

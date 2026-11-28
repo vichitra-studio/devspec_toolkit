@@ -15,6 +15,8 @@ from jsonschema import Draft202012Validator
 from specdev_tools.core.registry import SchemaRegistry
 from specdev_tools.validation.validators.step_13 import validate_step_13
 
+from ...graph._synth import unique_id_errors
+
 TOOLKIT_ROOT = Path(__file__).resolve().parents[4]
 FIXTURES_DIR = TOOLKIT_ROOT / "tests" / "fixtures" / "step_13"
 
@@ -68,9 +70,10 @@ class TestValidatorJustification:
         assert any("E320" in e and "justification" in e for e in rendered)
 
 
-class TestValidatorCrossStep:
-    def test_governance_label_not_in_step_10_raises_e590(self, base_extension):
-        """When spec_root points at fixture dir with 10_governance.json, unknown label → E590."""
+class TestValidatorNoStep10Check:
+    """E-030: governance_label_ref is checked by canonical-integrity only, not against step 10."""
+
+    def test_label_absent_from_step_10_emits_no_e590(self, base_extension):
         base_extension["governance_label_ref"] = {
             "id": "cn:core:governance_label:nonexistent",
             "kind": "governance_label",
@@ -78,21 +81,13 @@ class TestValidatorCrossStep:
         instance = {"extensions": [base_extension]}
         errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
         rendered = _render(errors)
-        assert any("E590" in e and "nonexistent" in e for e in rendered)
+        assert not any("E590" in e or "W590" in e for e in rendered)
 
-    def test_governance_label_in_step_10_passes(self, base_extension):
-        """When spec_root points at fixture dir, known label → no E590."""
-        instance = {"extensions": [base_extension]}
-        errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
-        rendered = _render(errors)
-        assert not any("E590" in e for e in rendered)
-
-    def test_no_step_10_file_raises_w590(self, base_extension, tmp_path):
-        """When spec_root points at a dir with no 10_*.json and extensions exist → W590."""
+    def test_no_step_10_file_emits_no_w590(self, base_extension, tmp_path):
         instance = {"extensions": [base_extension]}
         errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(tmp_path))
         rendered = _render(errors)
-        assert any("W590" in e for e in rendered)
+        assert not any("E590" in e or "W590" in e for e in rendered)
 
 
 # ---------------------------------------------------------------------------
@@ -189,9 +184,9 @@ class TestValidatorDuplicateExtensionId:
         """Two extensions with the same extension_id → duplicate error."""
         base_extension["extension_id"] = "ext-01-dup"
         instance = {"extensions": [base_extension, base_extension.copy()]}
-        errors = validate_step_13(instance, str(TOOLKIT_ROOT))
-        rendered = _render(errors)
-        assert any("E520" in e and "ext-01-dup" in e for e in rendered)
+        assert not any("ext-01-dup" in e and "Duplicate" in e for e in _render(validate_step_13(instance, str(TOOLKIT_ROOT))))
+        errors = unique_id_errors({"13_extension_manifest.json": instance})
+        assert [(e.code, e.owner, e.node_id) for e in errors] == [("E704", "step:13", "ext-01-dup")]
 
 
 class TestValidatorNoW590WhenEmpty:
@@ -244,7 +239,7 @@ class TestSchemaGovernanceLabelRefKind:
 
 
 class TestSchemaRequiredItemProperties:
-    """Schema requires 7 properties on each extension item."""
+    """Each extension item has 7 required properties: the six removed here and ``governance_label_ref`` (``TestSchemaGovernanceLabelRef``)."""
 
     @pytest.mark.parametrize("field", [
         "extension_id", "title", "area_of_concern", "justification",
@@ -283,16 +278,3 @@ class TestSchemaAdditionalPropertiesArbitrary:
         errors = list(schema_validator.iter_errors(valid_instance))
         additional_errors = [e for e in errors if "additional" in e.message.lower()]
         assert len(additional_errors) > 0, f"Expected additionalProperties error, got: {[e.message for e in errors]}"
-
-
-# ---------------------------------------------------------------------------
-# F6 — Fixture-based test: use orphaned invalid_missing_ref.json
-# ---------------------------------------------------------------------------
-
-class TestValidatorFixtureMissingRef:
-    def test_invalid_missing_ref_fixture_raises_e590(self):
-        """Shipped invalid_missing_ref.json fixture triggers E590 for nonexistent label."""
-        instance = json.loads((FIXTURES_DIR / "invalid_missing_ref.json").read_text())
-        errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
-        rendered = _render(errors)
-        assert any("E590" in e and "nonexistent" in e for e in rendered)

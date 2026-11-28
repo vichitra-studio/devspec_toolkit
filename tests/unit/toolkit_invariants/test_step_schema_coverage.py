@@ -3,11 +3,13 @@
 Covers W6-T3 invariant: no step is schema-orphaned.
 
 Steps that don't have dedicated schemas are explicitly modelled in the test
-via the STEPS_WITHOUT_SCHEMAS allowlist below. Currently that set is empty —
-all active steps (00 through 16, 16a/16b/16c) have schemas. If a new step
-is added without a schema, add it to the allowlist with a rationale comment.
+via the STEPS_WITHOUT_SCHEMAS allowlist below. That set holds 16a, 16b and
+16c: their artifact is the milestone plan file, which validates against
+16_impl_context.schema.json (vc:16-impl-context). Steps 00 through 16 have
+schemas. If a new step is added without a schema, add it to the allowlist
+with a rationale comment.
 
-Toolkit root from this file: Path(__file__).parents[4]
+Toolkit root from this file: Path(__file__).parents[3]
   → devspec_toolkit/tests/unit/toolkit_invariants/test_step_schema_coverage.py
   → parents[0] = devspec_toolkit/tests/unit/toolkit_invariants/
   → parents[1] = devspec_toolkit/tests/unit/
@@ -31,12 +33,13 @@ _SCHEMA_DIR = _TOOLKIT_ROOT / "schema"
 _STEP_ORDER_PATH = _TOOLKIT_ROOT / "tools" / "step_order.json"
 
 # Steps known to have no dedicated schema file (documented exceptions only).
-# 16a/16b/16c are per-milestone artifacts covered by 16_anchor.schema.json
-# and 16_impl_context.schema.json rather than separate per-substep files.
+# 16a/16b/16c write sections of one per-milestone plan file, which validates
+# against 16_impl_context.schema.json (vc:16-impl-context) rather than
+# separate per-substep files.
 STEPS_WITHOUT_SCHEMAS: dict[str, str] = {
-    "16a": "Per-milestone anchor; covered by 16_anchor.schema.json",
-    "16b": "Per-milestone implementation; covered by 16_impl_context.schema.json",
-    "16c": "Per-milestone review; no dedicated schema (review is narrative output)",
+    "16a": "Per-milestone plan; validates against 16_impl_context.schema.json (vc:16-impl-context)",
+    "16b": "Per-milestone implementation; its execution records are a section of 16_impl_context.schema.json",
+    "16c": "Per-milestone review; the review block is a section of 16_impl_context.schema.json",
 }
 
 # Steps that intentionally have MORE than one schema file (documented exceptions only).

@@ -55,6 +55,31 @@ class SeedPathValidationTests(unittest.TestCase):
         path_errors = [e for e in render_errors(errors) if "does not exist" in e]
         self.assertEqual(path_errors, [], f"Unexpected errors: {path_errors}")
 
+    def _empty_errors(self, content):
+        """E520 messages that say a seed is empty, for one seed file holding *content*."""
+        manifest = {
+            "$schema": "vc:seed-manifest",
+            "seeds": [{"seed_id": "seed-overview", "path": "docs/seed/overview.md"}],
+            "global_seed_order": ["seed-overview"],
+        }
+        _tmpdir, spec_dir, repo_root = self._create_temp_project(manifest, seed_files=["docs/seed/overview.md"])
+        with open(os.path.join(repo_root, "docs/seed/overview.md"), "w") as f:
+            f.write(content)
+        return [e for e in render_errors(lint_seeds(repo_root, spec_dir)) if "is empty" in e]
+
+    def test_empty_seed_file_is_e520(self):
+        errors = self._empty_errors("")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("E520", errors[0])
+
+    def test_whitespace_only_seed_file_is_e520(self):
+        errors = self._empty_errors(" \n\t\n")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("E520", errors[0])
+
+    def test_non_empty_seed_file_passes(self):
+        self.assertEqual(self._empty_errors("one line"), [])
+
     def test_missing_seed_path_fails(self):
         """Seed path that doesn't exist on disk produces an error."""
         manifest = {
@@ -87,8 +112,8 @@ class SeedPathValidationTests(unittest.TestCase):
             f"Expected missing path field error, got: {errors}",
         )
 
-    def test_undeclared_seed_on_disk_emits_warning(self):
-        """On-disk .md file not declared in manifest triggers W551 UNDECLARED_SEED."""
+    def test_unlisted_seed_on_disk_is_silent(self):
+        """A markdown file next to the seeds but not in the manifest produces no seed-lint finding."""
         manifest = {
             "$schema": "vc:seed-manifest",
             "seeds": [
@@ -98,18 +123,10 @@ class SeedPathValidationTests(unittest.TestCase):
             "seed_directory": "docs/seed",
         }
         tmpdir, spec_dir, repo_root = self._create_temp_project(
-            manifest, seed_files=["docs/seed/overview.md", "docs/seed/extra_undeclared.md"]
+            manifest, seed_files=["docs/seed/overview.md", "docs/seed/extra_unlisted.md"]
         )
         errors = lint_seeds(repo_root, spec_dir)
-        w551_errors = [e for e in render_errors(errors) if "W551" in e or "UNDECLARED_SEED" in e]
-        self.assertTrue(
-            len(w551_errors) > 0,
-            f"Expected W551 UNDECLARED_SEED warning for extra_undeclared.md, got: {errors}",
-        )
-        self.assertTrue(
-            any("extra_undeclared.md" in e for e in w551_errors),
-            f"W551 should mention the undeclared file, got: {w551_errors}",
-        )
+        self.assertEqual([], [e for e in render_errors(errors) if "extra_unlisted" in e or "W551" in e], errors)
 
     def test_path_escape_fails(self):
         """Seed path that escapes project root produces an error."""

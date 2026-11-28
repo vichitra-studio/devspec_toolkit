@@ -1,0 +1,122 @@
+{
+  "$schema": "vc:05-interface-contracts",
+  "id": "interface-contracts-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "apis": [
+    {
+      "api_id": "api-user-login",
+      "name": "User Login",
+      "version": "v1",
+      "protocol": "http",
+      "method": "POST",
+      "input_schema_ref": "schemas/payloads/login-request.json",
+      "output_schema_ref": "schemas/payloads/login-response.json",
+      "errors": [
+        {
+          "code": "invalid-credentials",
+          "message": "The provided username or password is invalid",
+          "severity": "error",
+          "error_id": "err-invalid-credentials",
+          "derives_from": [
+            "ac-user-login-2"
+          ],
+          "scope": "in"
+        },
+        {
+          "code": "account-disabled",
+          "message": "The account has been disabled",
+          "severity": "error",
+          "error_id": "err-account-disabled",
+          "derives_from": [
+            "ac-user-login-2"
+          ],
+          "scope": "in"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "username",
+          "in": "query",
+          "required": true,
+          "schema": "string"
+        },
+        {
+          "name": "password",
+          "in": "query",
+          "required": true,
+          "schema": "string"
+        }
+      ],
+      "security": "none",
+      "owner": "api",
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface",
+        "version": "1.0.0"
+      },
+      "enum_provenance": {
+        "source_url": "https://example.com/api-errors",
+        "source_date": "2025-01-01",
+        "resolved_at": "2025-01-01T00:00:00Z"
+      },
+      "derives_from": [
+        "fr-user-login"
+      ],
+      "scope": "in"
+    },
+    {
+      "api_id": "api-user-profile",
+      "name": "User Profile",
+      "version": "v1",
+      "protocol": "http",
+      "path": "/users/{id}",
+      "method": "GET",
+      "input_schema_ref": "schemas/payloads/user-profile-request.json",
+      "output_schema_ref": "schemas/payloads/user-profile.json",
+      "errors": [
+        {
+          "code": "user-not-found",
+          "message": "The requested user was not found",
+          "severity": "error",
+          "error_id": "err-user-not-found",
+          "derives_from": [
+            "ac-user-profile-2"
+          ],
+          "scope": "in"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": "string"
+        }
+      ],
+      "security": "jwt",
+      "owner": "api",
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface",
+        "version": "1.0.0"
+      },
+      "enum_provenance": {
+        "source_url": "https://example.com/api-errors",
+        "source_date": "2025-01-01",
+        "resolved_at": "2025-01-01T00:00:00Z"
+      },
+      "derives_from": [
+        "fr-user-profile"
+      ],
+      "scope": "in"
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:interface:http-json",
+      "kind": "interface",
+      "version": "1.0.0"
+    }
+  ]
+}

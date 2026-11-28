@@ -3,78 +3,66 @@
   "id": "redteam-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "trace": [
-    {
-      "type": "doc",
-      "id": "spec-11-redteam"
-    }
-  ],
   "threats": [
     {
       "threat_id": "threat-input-injection",
       "description": "Malicious input in queries or document content can lead to injection attacks that bypass validation and potentially affect system behavior",
       "vector": "input-injection",
-      "target_ids": [
-        {
-          "type": "api",
-          "id": "api-ask"
-        },
-        {
-          "type": "api",
-          "id": "api-search"
-        }
-      ],
       "category": "business_logic",
-      "mitigations": [
-        {
-          "type": "inv",
-          "id": "invariant-payload-validation"
-        },
-        {
-          "type": "nfr",
-          "id": "nfr-availability-api"
-        }
-      ],
       "severity": "high",
       "risk_category_ref": {
         "id": "cn:core:risk_category:business-logic",
         "kind": "risk_category"
-      }
+      },
+      "threatens": [
+        "api-ask",
+        "api-search"
+      ],
+      "mitigated_by": [
+        "invariant-payload-validation",
+        "nfr-availability-api"
+      ]
     },
     {
       "threat_id": "threat-authz-bypass",
       "description": "Authorization bypass in admin endpoints can allow unauthorized access to sensitive operations and data",
       "vector": "authz-bypass",
-      "target_ids": [
-        {
-          "type": "api",
-          "id": "api-trace-retrieval"
-        }
-      ],
       "category": "authz",
-      "mitigations": [
-        {
-          "type": "fr",
-          "id": "fr-read-document"
-        }
-      ],
       "severity": "critical",
       "risk_category_ref": {
         "id": "cn:core:risk_category:auth",
         "kind": "risk_category"
-      }
+      },
+      "threatens": [
+        "api-trace-retrieval"
+      ],
+      "mitigated_by": [
+        "fr-read-document"
+      ]
     }
   ],
   "edge_cases": [
     {
       "id": "ec-query-timeout",
       "description": "Query timeouts during complex retrieval operations",
-      "trigger": "Latency > 5s"
+      "trigger": "Latency > 5s",
+      "threatens": [
+        "api-ask"
+      ],
+      "mitigated_by": [
+        "inv-input-validation"
+      ]
     },
     {
       "id": "ec-session-expiration",
       "description": "Session expiration during long-running conversation",
-      "trigger": "Inactivity > 30m"
+      "trigger": "Inactivity > 30m",
+      "threatens": [
+        "api-ask"
+      ],
+      "mitigated_by": [
+        "inv-input-validation"
+      ]
     }
   ],
   "canonical_refs_used": []

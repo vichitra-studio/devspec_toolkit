@@ -10,7 +10,7 @@ canon/
   aliases.json           # Alias mappings for alternate term spellings
   aliases.schema.json    # JSON Schema for aliases.json
   kind.schema.json       # JSON Schema for individual kinds/ files
-  kinds/                 # 25 per-kind JSON files (one per vocabulary kind)
+  kinds/                 # 22 per-kind JSON files (one per vocabulary kind)
 ```
 
 `manifest.json` is the authoritative flat registry. The `kinds/` files are the editable source; `manifest.json` is regenerated from them.
@@ -24,11 +24,10 @@ Canon entry IDs follow the pattern: `cn:<namespace>:<kind>:<label>`
 Pre-populated and maintained by the toolkit team. These are stable, shared vocabulary that all spec pipelines use regardless of project domain.
 
 - **Managed by**: toolkit team (`spec-platform` owner)
-- **Contents**: owner values, trace types, pipeline stages, environments, units, NFR categories, governance labels, roles, etc.
+- **Contents**: owner values, pipeline stages, environments, units, NFR categories, governance labels, roles, etc.
 - **Stability**: stable across toolkit versions; changes are versioned
 - **Examples**:
   - `cn:core:owner:api` — artifact ownership domain
-  - `cn:core:trace-type:implements` — traceability link type
   - `cn:core:stage:ci` — CI pipeline stage
   - `cn:core:unit:ms` — milliseconds unit
 

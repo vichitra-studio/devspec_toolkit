@@ -125,9 +125,9 @@ DEEP DIVE QUESTIONS:
 
 ### 3.2 Out-of-Scope (Non-Goals)
 - **Expectation**: Explicit list of "Phase 2" items to prevent scope creep. Must list at
-  least 3 specific non-goals. Step 00 charter schema requires `out_of_scope minItems:3`;
-  the `seed-lint` gate (W555) will warn if fewer than 3 substantive items are supplied
-  across all seeds routed to step 00.
+  least 3 specific non-goals. The `seed-lint` gate (W555) will warn if fewer than 3
+  substantive items are supplied across all seeds routed to step 00; this is a
+  seed-quality heuristic, not a Step 00 charter schema bound.
 - **Content**:
   - [Non-goal 1]
   - [Non-goal 2]
@@ -233,7 +233,7 @@ DEEP DIVE QUESTIONS:
 ### 7.1 Owners
 - **Expectation**: Who is responsible? List key stakeholders. Format: `[Role]: [Need]`.
 - **Content**:
-  - Owner: [Name] (Team: api/ui/system/ops/data/product/business)
+  - Owner: [Name] (Team: api/ui/system/ops/data/product/business/engineering)
   - Stakeholder: [Role] needs [Requirement] (e.g. Compliance: Audit trail required)
 
 ### 7.2 Process

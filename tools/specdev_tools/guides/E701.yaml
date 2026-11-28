@@ -1,0 +1,30 @@
+code: E701
+subcode: LINK_TARGET_WRONG_KIND
+title: "A link names a node of a kind the field does not accept"
+trigger: |
+  A link field holds the id of a node that exists, and the node's kind is not
+  one the field allows:
+    E701 fr-x, field derives_from, target 'fix-y' is a fixture; the field
+    accepts: capability, seed
+  Also: a required field holds only a seed, which it accepts in addition to
+  the upstream node and not in its place:
+    E701 fr-x, field derives_from holds only targets of kind seed (seed-y);
+    the field accepts seed in addition and needs at least one of: capability
+  After a migration this is the sign of an old reference that did not say which
+  kind it pointed at.
+resolution: |
+  1. The message names the kinds the field accepts. List the nodes of those
+     kinds:
+       specdev node candidates --for <holder id> --field <field>
+  2. Point the field at the right node:
+       specdev json patch --id <holder id> .<field> '["<id of an accepted kind>"]'
+  3. If the relation is real but belongs in another field (a fixture proves a
+     criterion through `verifies`, not through `derives_from`), remove the
+     wrong link and write the relation in the field that accepts it.
+  4. For the seed-only form, add the upstream node the message names and keep
+     the seed beside it:
+       specdev json insert --id <holder id> .<field> '"<upstream id>"'
+  5. `specdev spec-check spec --step NN ...`.
+see_also:
+  - E700
+  - E702

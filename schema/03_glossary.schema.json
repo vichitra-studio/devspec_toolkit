@@ -10,28 +10,47 @@
     {
       "type": "object",
       "properties": {
+        "ambiguities": {
+          "$ref": "vc:core:collections#ambiguityList",
+          "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+        },
         "terms": {
           "description": "Array of domain-specific terms with definitions, used to establish shared vocabulary across specs.",
           "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "term",
+            "role": "context",
+            "contract": [
+              "term",
+              "acronym",
+              "definition",
+              "domain",
+              "units",
+              "term_ref",
+              "acronym_ref",
+              "unit_ref"
+            ],
+            "id": "term_id"
+          },
           "items": {
             "description": "A single glossary term with its definition, domain classification, and canonical references.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "term_id": {
-                "description": "Unique kebab-case identifier for this glossary term. Convention: term-{domain}-{noun}. Examples: 'term-billing-reconciliation', 'term-auth-session-token', 'term-payment-settlement'. The domain segment should match the 'domain' field value. Must be stable — downstream steps reference this ID in trace links. Anti-pattern: 'term-1', 'term-concept-a' — sequential labels cannot be traced to meaning.",
+                "description": "Unique kebab-case identifier for this glossary term. Convention: term-{domain}-{noun}. Examples: 'term-billing-reconciliation', 'term-auth-session-token', 'term-payment-settlement'. The domain segment should match the 'domain' field value. Must be stable — downstream steps reference this ID. Anti-pattern: 'term-1', 'term-concept-a' — sequential labels cannot be traced to meaning.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "term": {
-                "description": "The glossary term being defined. Use the canonical form of the term as it appears in project documentation. Capitalization should match usage: capitalize proper nouns and acronyms (e.g., 'JWT Token', 'REST API'), lowercase common technical terms ('endpoint', 'payload'). The term should be a noun or noun phrase. Avoid defining verbs or phrases.",
+                "description": "The glossary term being defined. Use the canonical form of the term as it appears in project documentation. Capitalization should match usage: capitalize proper nouns and acronyms (e.g., 'JWT Token', 'REST API'), lowercase common technical terms ('endpoint', 'payload'). The term should be a noun or noun phrase. Avoid defining verbs or phrases. Each term must be unique within the glossary, compared case-insensitively (the step 03 validator rejects a duplicate, E520).",
                 "type": "string",
                 "minLength": 2
               },
               "acronym": {
-                "description": "Optional uppercase acronym or abbreviation for this term (e.g., 'JWT' for JSON Web Token, 'API' for Application Programming Interface). Must be 2+ uppercase letters/digits. Include only if the acronym (1) appears ≥3 times in project documentation or code, OR (2) is standard industry usage that any practitioner would know. Examples of valid inclusions: 'JWT' (industry standard, appears in all auth flows), 'PII' (regulatory term used throughout compliance sections), 'API' (foundational term). Examples of when to omit: 'MP' for 'Monthly Payment' that appears only once; 'CCO' for an internal role title never referenced in code. Anti-pattern: including every capitalised phrase in the spec — acronyms should genuinely save space and reduce ambiguity.",
+                "description": "Optional uppercase acronym or abbreviation for this term (e.g., 'JWT' for JSON Web Token, 'API' for Application Programming Interface). Must be 2+ characters: uppercase letters and digits, with `/` or `-` allowed inside (for example 'JWT', 'CI/CD', 'JSON-LD'), never at the start or the end. Include only if the acronym (1) appears ≥3 times in project documentation or code, OR (2) is standard industry usage that any practitioner would know. Examples of valid inclusions: 'JWT' (industry standard, appears in all auth flows), 'PII' (regulatory term used throughout compliance sections), 'API' (foundational term). Examples of when to omit: 'MP' for 'Monthly Payment' that appears only once; 'CCO' for an internal role title never referenced in code. Anti-pattern: including every capitalised phrase in the spec — acronyms should genuinely save space and reduce ambiguity.",
                 "type": "string",
-                "pattern": "^[A-Z0-9]{2,}$"
+                "pattern": "^[A-Z0-9][A-Z0-9/-]*[A-Z0-9]$"
               },
               "definition": {
                 "description": "Clear, precise definition of the term as used in THIS project. Must be at least 20 characters (enforced by minLength). Should: (1) define the term without using the term itself, (2) distinguish it from similar terms in the domain, (3) be specific to the project context rather than a generic dictionary definition. Example: 'A short-lived cryptographic credential issued by the authentication service upon successful login, valid for 15 minutes. Distinct from the refresh_token which is long-lived.' Avoid: circular definitions, vague descriptions, generic Wikipedia-style prose.",
@@ -51,7 +70,7 @@
                 "pattern": "^[A-Za-z0-9/]+$"
               },
               "term_ref": {
-                "description": "Canonical reference to the canon entry for this term. Kind must be 'term'. Example: {\"id\": \"cn:project:term:billing-reconciliation\", \"kind\": \"term\", \"label\": \"billing reconciliation\"}. The id must match an entry in canon/manifest.json, or a canonical_proposals entry must be added. This is the primary mechanism for promoting a glossary term to the shared vocabulary. Validated by canonical-integrity lint.",
+                "description": "Canonical reference to the canon entry for this term. Kind must be 'term'. Example: {\"id\": \"cn:project:term:billing-reconciliation\", \"kind\": \"term\", \"label\": \"billing reconciliation\"}. The id must match an entry in canon/manifest.json, or a canonical_proposals entry must be added. This is the primary mechanism for promoting a glossary term to the shared vocabulary. Validated by canonical-integrity lint. A glossary term is vocabulary, so the kind is always 'term'. A role, a unit, an environment or an entity is not a glossary term: it is a canon entry of its own kind, proposed in `canonical_proposals` with that kind and bound by the `*_ref` field of the node that uses it.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "term" } } }
@@ -70,6 +89,45 @@
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "unit" } } }
                 ]
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this term: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former ids of this term; `specdev node rename` adds the old id here. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "derives_from": {
+                "description": "Ids of the seeds this term takes its definition from directly. Optional: list a seed routed to this step, and only for content taken straight from the seed and not through an upstream node.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": false,
+                  "built": true
+                }
+              },
+              "replaces": {
+                "description": "Ids of nodes that this term replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [

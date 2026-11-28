@@ -1,0 +1,524 @@
+{
+    "criteria": {
+        "tc-borrow-packet-1": {
+            "half": "tune",
+            "refines": "ac-borrow-packet-1",
+            "shape": "high"
+        },
+        "tc-borrow-packet-2": {
+            "half": "tune",
+            "refines": "ac-borrow-packet-2",
+            "shape": "high"
+        },
+        "tc-borrow-packet-3": {
+            "half": "tune",
+            "refines": "ac-borrow-packet-3",
+            "shape": "low"
+        },
+        "tc-borrow-packet-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-borrow-packet-5": {
+            "half": "tune",
+            "refines": "inv-six-packet-limit",
+            "shape": "other-kind"
+        },
+        "tc-borrow-packet-6": {
+            "half": "tune",
+            "refines": "err-borrow-limit-reached",
+            "shape": "other-kind"
+        },
+        "tc-return-packet-1": {
+            "half": "tune",
+            "refines": "ac-return-packet-1",
+            "shape": "high"
+        },
+        "tc-return-packet-2": {
+            "half": "tune",
+            "refines": "ac-return-packet-2",
+            "shape": "high"
+        },
+        "tc-return-packet-3": {
+            "half": "tune",
+            "refines": "ac-return-packet-3",
+            "shape": "high"
+        },
+        "tc-return-packet-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-return-packet-5": {
+            "half": "tune",
+            "refines": "nfr-return-confirm-time",
+            "shape": "other-kind"
+        },
+        "tc-seed-donation-1": {
+            "half": "tune",
+            "refines": "ac-seed-donation-1",
+            "shape": "high"
+        },
+        "tc-seed-donation-2": {
+            "half": "tune",
+            "refines": "ac-seed-donation-2",
+            "shape": "high"
+        },
+        "tc-seed-donation-3": {
+            "half": "tune",
+            "refines": "ac-seed-donation-3",
+            "shape": "low"
+        },
+        "tc-seed-donation-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-membership-renewal-1": {
+            "half": "tune",
+            "refines": "ac-membership-renewal-1",
+            "shape": "high"
+        },
+        "tc-membership-renewal-2": {
+            "half": "tune",
+            "refines": "ac-membership-renewal-2",
+            "shape": "high"
+        },
+        "tc-membership-renewal-3": {
+            "half": "tune",
+            "refines": "ac-membership-renewal-3",
+            "shape": "low"
+        },
+        "tc-membership-renewal-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-germination-notes-1": {
+            "half": "tune",
+            "refines": "ac-germination-notes-1",
+            "shape": "high"
+        },
+        "tc-germination-notes-2": {
+            "half": "tune",
+            "refines": "ac-germination-notes-2",
+            "shape": "high"
+        },
+        "tc-germination-notes-3": {
+            "half": "tune",
+            "refines": "ac-germination-notes-3",
+            "shape": "high"
+        },
+        "tc-germination-notes-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-volunteer-shifts-1": {
+            "half": "tune",
+            "refines": "ac-volunteer-shifts-1",
+            "shape": "high"
+        },
+        "tc-volunteer-shifts-2": {
+            "half": "tune",
+            "refines": "ac-volunteer-shifts-2",
+            "shape": "high"
+        },
+        "tc-volunteer-shifts-3": {
+            "half": "tune",
+            "refines": "ac-volunteer-shifts-3",
+            "shape": "low"
+        },
+        "tc-volunteer-shifts-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-plant-sale-1": {
+            "half": "tune",
+            "refines": "ac-plant-sale-1",
+            "shape": "high"
+        },
+        "tc-plant-sale-2": {
+            "half": "tune",
+            "refines": "ac-plant-sale-2",
+            "shape": "high"
+        },
+        "tc-plant-sale-3": {
+            "half": "tune",
+            "refines": "ac-plant-sale-3",
+            "shape": "high"
+        },
+        "tc-plant-sale-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-workshop-booking-1": {
+            "half": "tune",
+            "refines": "ac-workshop-booking-1",
+            "shape": "high"
+        },
+        "tc-workshop-booking-2": {
+            "half": "tune",
+            "refines": "ac-workshop-booking-2",
+            "shape": "high"
+        },
+        "tc-workshop-booking-3": {
+            "half": "tune",
+            "refines": "ac-workshop-booking-3",
+            "shape": "high"
+        },
+        "tc-workshop-booking-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-workshop-booking-5": {
+            "half": "tune",
+            "refines": "inv-waitlist-order",
+            "shape": "other-kind"
+        },
+        "tc-lost-packet-1": {
+            "half": "tune",
+            "refines": "ac-lost-packet-1",
+            "shape": "high"
+        },
+        "tc-lost-packet-2": {
+            "half": "tune",
+            "refines": "ac-lost-packet-2",
+            "shape": "high"
+        },
+        "tc-lost-packet-3": {
+            "half": "tune",
+            "refines": "ac-lost-packet-3",
+            "shape": "low"
+        },
+        "tc-lost-packet-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-newsletter-1": {
+            "half": "tune",
+            "refines": "ac-newsletter-1",
+            "shape": "high"
+        },
+        "tc-newsletter-2": {
+            "half": "tune",
+            "refines": "ac-newsletter-2",
+            "shape": "low"
+        },
+        "tc-newsletter-3": {
+            "half": "tune",
+            "refines": "ac-newsletter-3",
+            "shape": "high"
+        },
+        "tc-newsletter-4": {
+            "half": "tune",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-catalog-browse-1": {
+            "half": "scored",
+            "refines": "ac-catalog-browse-1",
+            "shape": "high"
+        },
+        "tc-catalog-browse-2": {
+            "half": "scored",
+            "refines": "ac-catalog-browse-2",
+            "shape": "high"
+        },
+        "tc-catalog-browse-3": {
+            "half": "scored",
+            "refines": "ac-catalog-browse-3",
+            "shape": "high"
+        },
+        "tc-catalog-browse-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-packet-labels-1": {
+            "half": "scored",
+            "refines": "ac-packet-labels-1",
+            "shape": "high"
+        },
+        "tc-packet-labels-2": {
+            "half": "scored",
+            "refines": "ac-packet-labels-2",
+            "shape": "high"
+        },
+        "tc-packet-labels-3": {
+            "half": "scored",
+            "refines": "ac-packet-labels-3",
+            "shape": "high"
+        },
+        "tc-packet-labels-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-overdue-reminders-1": {
+            "half": "scored",
+            "refines": "ac-overdue-reminders-1",
+            "shape": "high"
+        },
+        "tc-overdue-reminders-2": {
+            "half": "scored",
+            "refines": "ac-overdue-reminders-2",
+            "shape": "high"
+        },
+        "tc-overdue-reminders-3": {
+            "half": "scored",
+            "refines": "ac-overdue-reminders-3",
+            "shape": "high"
+        },
+        "tc-overdue-reminders-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-grower-profiles-1": {
+            "half": "scored",
+            "refines": "ac-grower-profiles-1",
+            "shape": "high"
+        },
+        "tc-grower-profiles-2": {
+            "half": "scored",
+            "refines": "ac-grower-profiles-2",
+            "shape": "high"
+        },
+        "tc-grower-profiles-3": {
+            "half": "scored",
+            "refines": "ac-grower-profiles-3",
+            "shape": "high"
+        },
+        "tc-grower-profiles-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-desk-checkout-1": {
+            "half": "scored",
+            "refines": "ac-desk-checkout-1",
+            "shape": "high"
+        },
+        "tc-desk-checkout-2": {
+            "half": "scored",
+            "refines": "ac-desk-checkout-2",
+            "shape": "high"
+        },
+        "tc-desk-checkout-3": {
+            "half": "scored",
+            "refines": "ac-desk-checkout-3",
+            "shape": "high"
+        },
+        "tc-desk-checkout-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-desk-checkout-5": {
+            "half": "scored",
+            "refines": "inv-single-active-loan",
+            "shape": "other-kind"
+        },
+        "tc-variety-search-1": {
+            "half": "scored",
+            "refines": "ac-variety-search-1",
+            "shape": "high"
+        },
+        "tc-variety-search-2": {
+            "half": "scored",
+            "refines": "ac-variety-search-2",
+            "shape": "high"
+        },
+        "tc-variety-search-3": {
+            "half": "scored",
+            "refines": "ac-variety-search-3",
+            "shape": "high"
+        },
+        "tc-variety-search-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-variety-search-5": {
+            "half": "scored",
+            "refines": "nfr-search-latency",
+            "shape": "other-kind"
+        },
+        "tc-seed-swap-event-1": {
+            "half": "scored",
+            "refines": "ac-seed-swap-event-1",
+            "shape": "high"
+        },
+        "tc-seed-swap-event-2": {
+            "half": "scored",
+            "refines": "ac-seed-swap-event-2",
+            "shape": "high"
+        },
+        "tc-seed-swap-event-3": {
+            "half": "scored",
+            "refines": "ac-seed-swap-event-3",
+            "shape": "high"
+        },
+        "tc-seed-swap-event-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-fee-waivers-1": {
+            "half": "scored",
+            "refines": "ac-fee-waivers-1",
+            "shape": "high"
+        },
+        "tc-fee-waivers-2": {
+            "half": "scored",
+            "refines": "ac-fee-waivers-2",
+            "shape": "high"
+        },
+        "tc-fee-waivers-3": {
+            "half": "scored",
+            "refines": "ac-fee-waivers-3",
+            "shape": "high"
+        },
+        "tc-fee-waivers-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-fee-waivers-5": {
+            "half": "scored",
+            "refines": "inv-no-negative-fees",
+            "shape": "other-kind"
+        },
+        "tc-packet-photos-1": {
+            "half": "scored",
+            "refines": "ac-packet-photos-1",
+            "shape": "high"
+        },
+        "tc-packet-photos-2": {
+            "half": "scored",
+            "refines": "ac-packet-photos-2",
+            "shape": "high"
+        },
+        "tc-packet-photos-3": {
+            "half": "scored",
+            "refines": "ac-packet-photos-3",
+            "shape": "high"
+        },
+        "tc-packet-photos-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-packet-photos-5": {
+            "half": "scored",
+            "refines": "err-photo-too-large",
+            "shape": "other-kind"
+        },
+        "tc-annual-report-1": {
+            "half": "scored",
+            "refines": "ac-annual-report-1",
+            "shape": "high"
+        },
+        "tc-annual-report-2": {
+            "half": "scored",
+            "refines": "ac-annual-report-2",
+            "shape": "high"
+        },
+        "tc-annual-report-3": {
+            "half": "scored",
+            "refines": "ac-annual-report-3",
+            "shape": "high"
+        },
+        "tc-annual-report-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-seed-quarantine-1": {
+            "half": "scored",
+            "refines": "ac-seed-quarantine-1",
+            "shape": "high"
+        },
+        "tc-seed-quarantine-2": {
+            "half": "scored",
+            "refines": "ac-seed-quarantine-2",
+            "shape": "high"
+        },
+        "tc-seed-quarantine-3": {
+            "half": "scored",
+            "refines": "ac-seed-quarantine-3",
+            "shape": "high"
+        },
+        "tc-seed-quarantine-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-member-directory-1": {
+            "half": "scored",
+            "refines": "ac-member-directory-1",
+            "shape": "high"
+        },
+        "tc-member-directory-2": {
+            "half": "scored",
+            "refines": "ac-member-directory-2",
+            "shape": "high"
+        },
+        "tc-member-directory-3": {
+            "half": "scored",
+            "refines": "ac-member-directory-3",
+            "shape": "high"
+        },
+        "tc-member-directory-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-workshop-feedback-1": {
+            "half": "scored",
+            "refines": "ac-workshop-feedback-1",
+            "shape": "high"
+        },
+        "tc-workshop-feedback-2": {
+            "half": "scored",
+            "refines": "ac-workshop-feedback-2",
+            "shape": "high"
+        },
+        "tc-workshop-feedback-3": {
+            "half": "scored",
+            "refines": "ac-workshop-feedback-3",
+            "shape": "high"
+        },
+        "tc-workshop-feedback-4": {
+            "half": "scored",
+            "refines": null,
+            "shape": "near-miss"
+        },
+        "tc-board-deck-1": {
+            "half": "tune",
+            "refines": null,
+            "shape": "no-refs"
+        },
+        "tc-board-deck-2": {
+            "half": "tune",
+            "refines": null,
+            "shape": "no-refs"
+        },
+        "tc-site-hosting-1": {
+            "half": "scored",
+            "refines": null,
+            "shape": "no-refs"
+        },
+        "tc-site-hosting-2": {
+            "half": "scored",
+            "refines": null,
+            "shape": "no-refs"
+        }
+    }
+}

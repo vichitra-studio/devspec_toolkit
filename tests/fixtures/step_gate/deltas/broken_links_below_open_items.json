@@ -1,0 +1,51 @@
+{
+  "description": "A new step-05 interface below fr-password-reset with a broken link, and an error entry of it below ac-password-reset-3 with another: two E700 owned by step 05 on nodes that the open items of open_items.json explain (DOC 13.2 rows 1 and 2).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/05_interface_contracts.json",
+      "path": [
+        "apis"
+      ],
+      "value": {
+        "api_id": "api-below-items",
+        "name": "Below Items",
+        "version": "v1",
+        "protocol": "http",
+        "path": "/v1/below-items",
+        "method": "POST",
+        "owner": "api",
+        "security": "none",
+        "errors": [
+          {
+            "error_id": "err-below-items-token-expired",
+            "code": "token-expired",
+            "severity": "error",
+            "message": "HTTP 410: the reset token has expired or was already used.",
+            "scope": "in",
+            "derives_from": [
+              "ac-password-reset-3",
+              "ac-ghost"
+            ]
+          }
+        ],
+        "scope": "in",
+        "derives_from": [
+          "fr-password-reset",
+          "fr-ghost"
+        ],
+        "provided_by": [
+          "identity-service"
+        ],
+        "relies_on": [
+          "tp-argon2"
+        ],
+        "interface_ref": {
+          "id": "cn:project:interface:password-reset",
+          "kind": "interface",
+          "version": "1.0.0"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "$schema": "vc:core:canon",
+  "registry_version": "1.0.0",
+  "entries": [
+    {
+      "id": "cn:project:capability:account-recovery",
+      "kind": "capability",
+      "preferred_label": "account recovery",
+      "definition": "A registered member regains access to their account without contacting support.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:project:interface:password-reset",
+      "kind": "interface",
+      "preferred_label": "password reset",
+      "definition": "The HTTP interface through which a member confirms a password reset.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:project:term:reset-token",
+      "kind": "term",
+      "preferred_label": "reset token",
+      "definition": "A single-use secret, sent by email, that authorises one password change for one account until it expires.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:project:unit:min",
+      "kind": "unit",
+      "preferred_label": "minutes",
+      "definition": "Duration measured in minutes.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [
+        "min"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:project:role:support-lead",
+      "kind": "role",
+      "preferred_label": "support lead",
+      "definition": "The person who leads the support team.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:project:term:reset-email-delivery-time-p95",
+      "kind": "term",
+      "preferred_label": "reset email delivery time p95",
+      "definition": "The 95th percentile of the time from a reset request to the reset email arriving in the member's inbox.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "product"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-11-15T00:00:00Z"
+      }
+    }
+  ],
+  "aliases": []
+}

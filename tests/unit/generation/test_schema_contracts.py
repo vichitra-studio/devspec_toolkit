@@ -78,7 +78,6 @@ class SchemaContractsTests(unittest.TestCase):
         # collections.schema.json — so schemas that delegate all their canonical
         # references through shared $defs would otherwise fail this guard.
         no_step_specific_refs = {
-            "13a_completeness_assessment.schema.json",
             # vc:16-anchor has zero step-specific canonical-ref slots after
             # DEVSPEC-38 removed `status_ref` from `crossCycleAmbiguityItem`
             # in vc:core:collections.  The inline counter (which does not
@@ -98,7 +97,7 @@ class SchemaContractsTests(unittest.TestCase):
         expected_by_step = {
             "00": {"role", "unit"},
             "01": {"capability", "action", "entity", "role"},
-            "02": {"entity", "interface", "event"},
+            "02": {"entity", "event"},
             "02a": {"environment", "policy", "command"},
             "03": {"term", "acronym", "unit"},
             "04": {"capability", "action", "entity"},
@@ -106,12 +105,12 @@ class SchemaContractsTests(unittest.TestCase):
             "06": {"policy", "risk_category"},
             "07": {"metric", "unit", "stage", "environment"},
             "08": {"tag"},
-            "09": {"environment", "tech_stack", "dependency"},
+            "09": {"environment"},
             "10": {"policy", "command", "id_pattern"},
             "11": {"risk_category", "policy"},
             "12": {"command", "environment", "role"},
             "13": {"tag", "policy", "id_pattern", "governance_label"},
-            "14": {"environment", "metric", "tech_stack", "dependency"},
+            "14": {"environment", "metric"},
             "15": {"command"},
             "16": {"command", "policy", "risk_category"},
         }
@@ -129,7 +128,7 @@ class SchemaContractsTests(unittest.TestCase):
             missing = sorted(expected_kinds - present)
             self.assertEqual([], missing, msg=f"{target.name} missing canonical kinds {missing}")
 
-    def test_d022_targeted_schemas_reuse_shared_environment_stage_and_dependency_anchors(self):
+    def test_d022_targeted_schemas_reuse_shared_environment_and_stage_anchors(self):
         expected_refs = {
             "02a_delivery_baseline.schema.json": {
                 "#environmentName",
@@ -137,14 +136,6 @@ class SchemaContractsTests(unittest.TestCase):
             },
             "07_nfrs.schema.json": {
                 "#stageName",
-            },
-            "09_impl_plan.schema.json": {
-                "#techStack",
-                "#dependencyList",
-            },
-            "14_roadmap.schema.json": {
-                "#techStack",
-                "#dependencyObjectList",
             },
             "16_impl_context.schema.json": {
                 "#environmentName",
@@ -185,35 +176,24 @@ class SchemaContractsTests(unittest.TestCase):
         missing = sorted(kind for kind in ref_kinds if kind not in manifest_kinds)
         self.assertEqual([], missing, msg=f"Missing canonical bootstrap kinds: {missing}")
 
-    def test_dependency_item_requires_owner_and_note_when_external(self):
-        registry = SchemaRegistry(str(self.repo_root))
-        core = registry.load("vc:core:collections")
-        dep_item = core["$defs"]["dependencyItem"]
-        validator = Draft202012Validator(dep_item, registry=registry.to_referencing_registry())
-        errors = list(validator.iter_errors({"type": "external", "id": "dep-a"}))
-        self.assertTrue(errors)
-
     def test_02a_environment_config_rejects_unbounded_nested_values(self):
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:02a-delivery-baseline")
         validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
+        environment = {"scope": "in", "derives_from": ["seed-delivery"]}
         payload = {
             "id": "delivery-baseline",
             "owner": "api",
             "created_at": "2026-01-01T00:00:00Z",
-            "environments": {
-                "dev": {"nested": {"a": 1}},
-                "ci": {"runner": "gha"},
-                "staging": {"url": "https://staging.example.com"},
-                "prod": {"url": "https://example.com"},
-            },
-            "ci_gates": ["validate-all"],
+            "environments": {name: dict(environment) for name in ("dev", "ci", "staging", "prod")},
+            "ci_gates": [{"gate_id": "unit-tests", "scope": "in", "derives_from": ["seed-delivery"]}],
             "canonical_refs_used": [],
-            "canonical_proposals": [],
-            "canonical_conflicts": [],
         }
-        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        self.assertTrue(errors, msg="Nested free-form environment payload unexpectedly passed")
+        self.assertEqual([], list(validator.iter_errors(payload)), msg="baseline payload must be valid")
+
+        payload["environments"]["dev"]["config"] = {"nested": {"a": 1}}
+        paths = [list(e.absolute_path) for e in validator.iter_errors(payload)]
+        self.assertIn(["environments", "dev", "config", "nested"], paths)
 
     def test_validate_file_runtime_error_is_not_misclassified_as_ref_resolution(self):
         # Write a minimal valid-JSON sample with a registered $schema URI into
@@ -286,6 +266,39 @@ class SchemaContractsTests(unittest.TestCase):
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
         self.assertTrue(errors, msg="String dependency payload unexpectedly passed")
 
+    def _schema_errors(self, schema_uri: str, fixture: str, mutate) -> list:
+        """Validate the fixture payload, after *mutate* edits it, against the schema *schema_uri*."""
+        registry = SchemaRegistry(str(self.repo_root))
+        validator = Draft202012Validator(registry.load(schema_uri), registry=registry.to_referencing_registry())
+        payload = json.loads((self.repo_root / "tests" / "fixtures" / fixture).read_text(encoding="utf-8"))
+        payload.pop("$schema", None)
+        mutate(payload)
+        return list(validator.iter_errors(payload))
+
+    def test_fr_schema_rejects_priority_wont_have(self):
+        def mutate(payload):
+            payload["functional_requirements"][0]["priority"] = "wont-have"
+
+        fixture = "step_04/valid_comprehensive.json"
+        self.assertEqual([], self._schema_errors("vc:04-fr-list", fixture, lambda payload: None))
+        self.assertTrue(self._schema_errors("vc:04-fr-list", fixture, mutate))
+
+    def test_interface_contracts_schema_rejects_out_of_scope(self):
+        def mutate(payload):
+            payload["out_of_scope"] = [{"fr_id": "fr-user-logout", "rationale": "no API surface"}]
+
+        fixture = "step_05/valid_rest_api.json"
+        self.assertEqual([], self._schema_errors("vc:05-interface-contracts", fixture, lambda payload: None))
+        self.assertTrue(self._schema_errors("vc:05-interface-contracts", fixture, mutate))
+
+    def test_system_sketch_schema_rejects_tech_stack(self):
+        def mutate(payload):
+            payload["tech_stack"] = {"languages": [], "frameworks": [], "infrastructure": [], "tools": []}
+
+        fixture = "step_02/valid_minimal.json"
+        self.assertEqual([], self._schema_errors("vc:02-system-sketch", fixture, lambda payload: None))
+        self.assertTrue(self._schema_errors("vc:02-system-sketch", fixture, mutate))
+
     def test_validate_file_enforces_metadata_top_level_fields_for_step_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -297,6 +310,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:01-capabilities": "schema/01_capabilities.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -310,6 +324,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             sample = root / "spec" / "01_capabilities.json"
@@ -328,6 +346,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "description": "valid description",
                                 "scope": "in",
                                 "owner": "api",
+                                "derives_from": ["scope-a"],
                             }
                         ],
                     }
@@ -353,6 +372,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:01-capabilities": "schema/01_capabilities.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -366,6 +386,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             sample = root / "spec" / "artifact.json"
@@ -384,6 +408,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "description": "valid description",
                                 "scope": "in",
                                 "owner": "api",
+                                "derives_from": ["scope-a"],
                             }
                         ],
                     }
@@ -406,6 +431,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:07-nfrs": "schema/07_nfrs.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
                 "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
@@ -420,6 +446,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "schema" / "canon.schema.json").write_text(
@@ -464,22 +494,7 @@ class SchemaContractsTests(unittest.TestCase):
             errs = validate_file(str(root), str(sample))
             self.assertTrue(any("canonical_refs_used_missing" in e.render() for e in errs))
 
-    def test_step_09_allows_string_dependencies_without_oneof_overlap(self):
-        registry = SchemaRegistry(str(self.repo_root))
-        schema = registry.load("vc:09-impl-plan")
-        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
-
-        with (self.repo_root / "tests" / "fixtures" / "step_09" / "valid_complete.json").open(
-            "r", encoding="utf-8"
-        ) as f:
-            payload = json.load(f)
-        payload.pop("$schema", None)
-        payload["dependencies"] = ["dep-one"]
-
-        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        self.assertEqual([], errors, msg=f"Unexpected errors for string dependencies: {errors}")
-
-    def test_step_16_plan_requires_explicit_status(self):
+    def test_step_16_plan_file_names_its_milestone_and_takes_no_status(self):
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:16-impl-context")
         validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
@@ -488,6 +503,7 @@ class SchemaContractsTests(unittest.TestCase):
             "owner": "api",
             "created_at": "2026-01-01T00:00:00Z",
             "plan": {
+                "status": "active",
                 "summary": {
                     "functional_summary": "Implement auth core",
                     "scope_in": ["Login"],
@@ -498,7 +514,8 @@ class SchemaContractsTests(unittest.TestCase):
             },
         }
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        self.assertTrue(any(list(e.path) == ["plan"] and "'status' is a required property" in e.message for e in errors))
+        self.assertTrue(any(list(e.path) == [] and "'milestone' is a required property" in e.message for e in errors))
+        self.assertTrue(any(list(e.path) == ["plan"] and "'status' was unexpected" in e.message for e in errors))
 
     def test_canonical_autofix_does_not_add_schema_invalid_unit_ref_from_units(self):
         with tempfile.TemporaryDirectory() as td:
@@ -624,6 +641,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:07-nfrs": "schema/07_nfrs.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
                 "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
@@ -638,6 +656,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "schema" / "canon.schema.json").write_text(
@@ -714,6 +736,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:11-redteam": "schema/11_redteam.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
                 "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
@@ -728,6 +751,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "schema" / "canon.schema.json").write_text(
@@ -771,9 +798,9 @@ class SchemaContractsTests(unittest.TestCase):
                                 "threat_id": "threat-authz-bypass",
                                 "description": "Unauthorized access through missing authorization check.",
                                 "vector": "parameter tampering",
-                                "target_ids": [{"type": "api", "id": "api-auth"}],
+                                "threatens": ["api-auth"],
                                 "category": "authz",
-                                "mitigations": [{"type": "fr", "id": "fr-authz-enforced"}],
+                                "mitigated_by": ["fr-authz-enforced"],
                                 "severity": "high",
                             }
                         ],
@@ -973,8 +1000,8 @@ class SchemaContractsTests(unittest.TestCase):
         threats_errors = [e for e in errors if list(e.path) == ["threats"]]
         self.assertTrue(threats_errors, msg="Empty threats[] must be rejected by minItems constraint")
 
-    def test_step_11_rejects_empty_target_ids_on_threat(self):
-        """Step 11 schema requires minItems: 1 on target_ids within a threat — empty array must fail."""
+    def test_step_11_rejects_empty_threatens_on_threat(self):
+        """Step 11 schema requires minItems: 1 on threatens within a threat — empty array must fail."""
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:11-redteam")
         validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
@@ -984,15 +1011,15 @@ class SchemaContractsTests(unittest.TestCase):
         ) as f:
             payload = json.load(f)
         payload.pop("$schema", None)
-        payload["threats"][0]["target_ids"] = []
+        payload["threats"][0]["threatens"] = []
 
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        target_errors = [
+        threatens_errors = [
             e for e in errors
             if len(e.path) >= 3 and list(e.path)[:2] == ["threats", 0]
-            and "target_ids" in str(list(e.path))
+            and "threatens" in str(list(e.path))
         ]
-        self.assertTrue(target_errors, msg="Empty target_ids[] on a threat must be rejected by minItems constraint")
+        self.assertTrue(threatens_errors, msg="Empty threatens[] on a threat must be rejected by minItems constraint")
 
     def test_step_12_rejects_empty_jobs_array(self):
         """Step 12 schema requires minItems: 1 on jobs — empty array must fail."""

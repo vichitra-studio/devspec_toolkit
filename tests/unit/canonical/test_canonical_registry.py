@@ -3,7 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specdev_tools.canonical.registry import CanonicalRegistry
+from specdev_tools.canonical import lint as canonical_lint
+from specdev_tools.canonical.registry import CanonicalRegistry, load_tier_entries, merge_manifest_data
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "canonical"
 
@@ -449,6 +450,41 @@ class CanonicalRegistryTests(unittest.TestCase):
             assert entry is not None, "cn:core:unit:percent must be resolvable"
             self.assertEqual("1.0.0", entry.version,
                              "Manifest entry (v1.0.0) must win over examples entry (v9.9.9)")
+
+
+def _write_manifest(canon: Path, entries: list[dict]) -> None:
+    canon.mkdir(parents=True)
+    (canon / "manifest.json").write_text(
+        json.dumps({"registry_version": "1.0.0", "entries": entries, "aliases": []}), encoding="utf-8",
+    )
+
+
+def _unit_entry(entry_id: str, definition: str) -> dict:
+    return {
+        "id": entry_id, "kind": "unit", "preferred_label": "percent", "definition": definition,
+        "version": "1.0.0", "status": "active",
+    }
+
+
+def test_load_tier_entries_project_entry_wins(tmp_path):
+    shared_id = "cn:core:unit:percent"
+    _write_manifest(tmp_path / "toolkit" / "canon", [
+        _unit_entry(shared_id, "core text"),
+        _unit_entry("cn:core:unit:second", "only in core"),
+    ])
+    _write_manifest(tmp_path / "spec" / "canon", [_unit_entry(shared_id, "project text")])
+
+    entries = load_tier_entries(str(tmp_path / "toolkit"), "canon", str(tmp_path / "spec" / "canon"))
+
+    assert [(e["id"], e["definition"]) for e in entries] == [
+        (shared_id, "project text"),
+        ("cn:core:unit:second", "only in core"),
+    ]
+
+
+def test_canonical_lint_uses_the_registry_merge():
+    assert not hasattr(canonical_lint, "_merge_manifest_data")
+    assert canonical_lint.merge_manifest_data is merge_manifest_data
 
 
 if __name__ == "__main__":

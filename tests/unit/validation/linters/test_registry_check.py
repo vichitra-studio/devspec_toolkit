@@ -6,7 +6,7 @@ Tests cover:
   E620 is retained in ERROR_CODES for backward compatibility but no longer emitted
   at host-runtime. See tests/unit/toolkit_invariants/test_step_registry_coverage.py.
 - R002 PHANTOM_BASENAME: registered basename not in extraction_paths.json.
-- R003 REGISTRY_DRIFT: id_field rename, array_path rename, missing array.
+- R003 REGISTRY_DRIFT: id_field rename, wrong-shape array; an absent collection is not drift.
 - R003 nested: nested array missing, nested id_field mismatch.
 - R004 UNREGISTERED_ARRAY: host spec has id-bearing array absent from toolkit registry.
 - spec-check wiring: registry-check SKIP when no registry file, PASS/WARN when present.
@@ -291,27 +291,6 @@ class TestR003Drift:
             }
         })
 
-    def test_array_path_rename_fires_E622(self) -> None:
-        """Registered array_path doesn't exist in file → E622."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            spec_root = os.path.join(tmpdir, "spec")
-            repo_root = os.path.join(tmpdir, "toolkit")
-            os.makedirs(spec_root)
-            os.makedirs(os.path.join(repo_root, "tools"))
-
-            _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
-            _write(repo_root, "tools/extraction_paths.json",
-                   _make_extraction_paths(["04_fr_list.json"], step="04"))
-
-            # Registry says ".functional_requirements" but file has ".frs"
-            _write(repo_root, "tools/entry_key_registry.json",
-                   self._minimal_registry_with(".functional_requirements", "fr_id"))
-            _write(spec_root, "04_fr_list.json", {"frs": [{"fr_id": "fr-x"}]})
-
-            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
-            codes = [e.code for e in errs]
-            assert "E622" in codes, f"Expected E622 for array_path rename, got: {errs}"
-
     def test_id_field_rename_fires_E622(self) -> None:
         """Array exists but first entry lacks registered id_field → E622."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -337,26 +316,63 @@ class TestR003Drift:
             msgs = " ".join(e.message for e in errs)
             assert "fr_id" in msgs
 
-    def test_missing_array_fires_E622(self) -> None:
-        """Spec file exists but the registered array key is missing → E622."""
+    def _run(self, registry: dict, spec_files: dict[str, Any]) -> list:
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_root = os.path.join(tmpdir, "spec")
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(spec_root)
             os.makedirs(os.path.join(repo_root, "tools"))
-
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
             _write(repo_root, "tools/extraction_paths.json",
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            for name, body in spec_files.items():
+                _write(spec_root, name, body)
+            return run_registry_check(spec_root=spec_root, repo_root=repo_root)
 
-            _write(repo_root, "tools/entry_key_registry.json",
-                   self._minimal_registry_with(".functional_requirements", "fr_id"))
-            # File has no 'functional_requirements' at all
-            _write(spec_root, "04_fr_list.json", {"title": "FRs"})
+    def test_absent_optional_root_collection_is_not_drift(self) -> None:
+        """D4: a registered root collection absent from the file is not drift."""
+        registry = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(registry, {"04_fr_list.json": {"title": "FRs"}})
+        assert "E622" not in [e.code for e in errs], errs
 
-            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
-            codes = [e.code for e in errs]
-            assert "E622" in codes, f"Expected E622 for missing array, got: {errs}"
+    def test_absent_wide_path_root_is_not_drift(self) -> None:
+        """D4: an absent first hop of a wide root path (map or dotted) is not drift."""
+        for path, body in ((".environments{}", {}), (".plan.items", {"plan": {}}), (".plan.items", {})):
+            registry = self._minimal_registry_with(path, "item_id")
+            errs = self._run(registry, {"04_fr_list.json": body})
+            assert "E622" not in [e.code for e in errs], (path, errs)
+
+    def test_present_root_collection_of_wrong_type_is_still_drift(self) -> None:
+        """D4 keeps the shape check: a present root collection of the wrong type is E622."""
+        registry = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(registry, {"04_fr_list.json": {"functional_requirements": "oops"}})
+        assert [e.code for e in errs if e.code == "E622"] == ["E622"]
+        assert "not an array" in errs[0].message
+        wide = self._minimal_registry_with(".environments{}", "item_id")
+        errs = self._run(wide, {"04_fr_list.json": {"environments": []}})
+        assert [e.code for e in errs if e.code == "E622"] == ["E622"]
+
+    def test_null_root_collection_is_drift_for_plain_and_wide_roots(self) -> None:
+        """D4 means absent: a root key present with ``null`` is E622 (as on main), plain or wide."""
+        plain = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(plain, {"04_fr_list.json": {"functional_requirements": None}})
+        assert [e.code for e in errs if e.code == "E622"] == ["E622"]
+        wide = self._minimal_registry_with(".environments{}", "item_id")
+        errs = self._run(wide, {"04_fr_list.json": {"environments": None}})
+        assert [e.code for e in errs if e.code == "E622"] == ["E622"]
+
+    def test_non_object_top_level_is_drift(self) -> None:
+        """A file whose top level is a list is E622 for a plain-name root (as on main)."""
+        registry = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(registry, {"04_fr_list.json": []})
+        assert "E622" in [e.code for e in errs], errs
+
+    def test_array_path_rename_is_not_drift_when_old_key_is_absent(self) -> None:
+        """A renamed key reads as an absent collection; the schema check owns that signal."""
+        registry = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(registry, {"04_fr_list.json": {"frs": [{"fr_id": "fr-x"}]}})
+        assert "E622" not in [e.code for e in errs], errs
 
     def test_empty_array_no_error(self) -> None:
         """An empty array cannot drift — no entries to check id_field against."""
@@ -767,7 +783,7 @@ class TestJsonEnvelopeShape:
 class TestSpecCheckWiring:
     def test_registry_check_skip_when_no_registry(self) -> None:
         """spec-check reports registry-check as SKIP when entry_key_registry.json is absent."""
-        from specdev_tools.validation.spec_check import _run_checks
+        from specdev_tools.validation.spec_check import run_checks
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Minimal spec_dir — no registry file
@@ -775,20 +791,22 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
 
-            checks = _run_checks(repo_root=repo_root, spec_dir=spec_dir)
+            checks = run_checks(repo_root=repo_root, spec_dir=spec_dir)
             rc = checks.get("registry-check", {})
             assert rc.get("status") == "SKIP", f"Expected SKIP, got: {rc}"
 
     def test_registry_check_in_checks_output_when_registry_present(self) -> None:
         """spec-check includes registry-check with PASS when registry is clean."""
-        from specdev_tools.validation.spec_check import _run_checks
+        from specdev_tools.validation.spec_check import run_checks
 
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_dir = tmpdir
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Write registry to toolkit-side tools/ directory
             _write(repo_root, "tools/entry_key_registry.json", _make_registry(
@@ -796,7 +814,7 @@ class TestSpecCheckWiring:
                 steps_without_entry_arrays={}
             ))
 
-            checks = _run_checks(repo_root=repo_root, spec_dir=spec_dir)
+            checks = run_checks(repo_root=repo_root, spec_dir=spec_dir)
             rc = checks.get("registry-check", {})
             assert rc.get("status") in ("PASS", "WARN"), f"Expected PASS/WARN, got: {rc}"
 
@@ -817,6 +835,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             # extraction_paths has no entries → registered basename becomes phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Registry references a basename not in extraction_paths → E621
@@ -854,6 +873,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             # No registry → registry-check will be SKIP
 
             captured = io.StringIO()
@@ -883,6 +903,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Write a clean registry so registry-check runs (not SKIP) and passes
             _write(spec_dir, "entry_key_registry.json", _make_registry(
@@ -924,6 +945,7 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            _write(repo_root, "tools/error_ownership.json", {"rows": []})
             # extraction_paths has no entries → registered basename becomes phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
             # Registry references a basename not in extraction_paths → E621

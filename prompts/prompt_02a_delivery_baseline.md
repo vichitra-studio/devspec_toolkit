@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds 1 downstream step.
+Run `specdev prompt-context 02a` to see downstream consumers.
 
 ## Role
 You are a **senior delivery baseline analyst and deployment environment specialist**. Your job is to emit a single JSON artifact for **Step 02a · Delivery Baseline** that captures environment definitions, deployment stages, and baseline infrastructure constraints. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
@@ -15,7 +15,7 @@ Capture the minimum delivery infrastructure (environments, CI expectations, and 
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Deployment targets, compliance requirements, and operational constraints for environment scoping
 - **01_capabilities.json**: Capability owners and operational modes to determine environment tier requirements and CI pipeline stages
-- **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure; do not depend on downstream NFR/governance specs — use charter constraints and required seeds for baseline coverage
+- **02_system_sketch.json**: Component ids, `third_parties` and connections that affect environment setup; connection protocols requiring specific infrastructure; do not depend on downstream NFR/governance specs — use charter constraints and required seeds for baseline coverage
 - **Seeds**: per spec/common/seed_manifest.json step_requirements["02a"]
 - **Current CI configs** (if present): Existing pipeline configuration and `$TOOLKIT_ROOT/tests/run.sh` usage for gate alignment
 
@@ -26,15 +26,15 @@ For each upstream artifact ingested, extract the following:
 - **Emit**: Write the artifact when all stages are defined and constraints are sourced from seed documents.
 
 ## Heuristics For Completeness
-- Include `secrets` (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external` when secrets are required by those systems; MUST include compliance labels when `spec/00_charter.json` constraints or the ingested seeds reference regulatory frameworks.
+- Include a `secrets` item (names only) for every connection in `spec/02_system_sketch.json` whose `connects_to` names a third party that requires a credential; the secret names that connection (or the component or charter constraint behind it) in its `derives_from`. MUST include compliance labels when `spec/00_charter.json` constraints or the ingested seeds reference regulatory frameworks.
 - Staging parity: staging should reflect prod's configuration as closely as possible; explicitly document any intentional deviations with rationale.
-- Ambiguity scrub: MUST use kebab-case gate names derived from the actual CI pipeline steps in this project (e.g., `schema-validate`, `fixtures-lint`, `governance-check`); do not invent gate names that do not correspond to real pipeline steps.
+- Ambiguity scrub: MUST use kebab-case gate names derived from the actual CI pipeline steps in this project (e.g., `schema-validate`, `fixtures-lint`, `governance-check`); do not invent gate names that do not correspond to real pipeline steps (an authoring and review rule: the schema checks only that a gate name is kebab-case; no tool checks that a gate exists in the pipeline).
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/02_system_sketch.json` is present and contains at least one component entry.
 - All seeds listed for step "02a" in `spec/common/seed_manifest.json` are present and non-empty.
-- `spec/00_charter.json` is present and contains at least one in_scope entry.
+- `spec/00_charter.json` is present and contains at least one `scope_items` entry.
 
 ## Negative Constraints
 - **DO NOT** include actual secret values (use names only); specific values belong in secure stores.
@@ -45,29 +45,30 @@ For each upstream artifact ingested, extract the following:
 ## Coverage Closure
 Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that requires deployment has a corresponding environment config in `environments`.
-- All external dependencies listed in `spec/02_system_sketch.json` connections appear in `dependencies` or `secrets` sections.
-- No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
+- Every connection in `spec/02_system_sketch.json` to a third party that needs a credential has a `secrets` item deriving from it.
+- No component's infrastructure needs are silently omitted — databases and queues must be represented in `environments` config, and third-party credentials in `secrets`.
 - All environment names align with the canonical stage values defined in the schema.
 - If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
-- Compliance labels in `environments[].compliance_labels` reflect real obligations documented in upstream specs or are explicitly marked as none.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- The entries of the top-level `compliance` array reflect real obligations documented in upstream specs; the array is empty when none applies.
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every deployment stage identified in the ingested seeds is represented
 - [ ] All environment-specific constraints and SLA targets are explicitly defined
-- [ ] No environment name referenced in other spec files is missing from this baseline
+- [ ] No environment name referenced in an upstream spec file is missing from this baseline
+- [ ] No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 
 ## Step-Specific Completeness Checklist
 - All required environments present (see schema for the required set) with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
-- `ci_gates` enumerates the gates we actually enforce (schema-validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
+- `ci_gates` enumerates the gates we actually enforce (for example schema-validate, fixtures-lint, invariants-check, governance-check); every gate names the components or charter constraints it checks in `derives_from`.
 - `secrets` includes names of required secrets; values are not embedded.
-- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI-DSS) if relevant; use the canonical short names defined in the schema.
+- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI-DSS) if relevant; use the short names the schema description lists (SOC2, GDPR, HIPAA, PCI-DSS, ISO27001); `compliance` is a free list of strings, so no tool checks the spelling.
 
 ## Best Practices
 - **Environments**: Document each environment (`dev`, `ci`, `staging`, `prod`) with the critical configuration knobs, dependencies, and access paths.
 - **Reproducibility**: Define minimal environment descriptors to make CI/CD reproducible (runner type, region, base images).
-- **Gates**: Enumerate `ci_gates` as actionable job names (schema, fixtures, security scans) that map directly to Step 12 output.
-- **Secrets**: Track sensitive material in `secrets` by name only (no values), with ownership and rotation expectations.
+- **Gates**: Enumerate `ci_gates` as actionable check names (schema, fixtures, security scans), each one a check a pipeline can run on its own.
+- **Secrets**: Track sensitive material in `secrets` by name only (no values).
 - **Compliance**: Capture regulatory or contractual obligations under `compliance` to feed governance.
 
 ## Common Pitfalls
@@ -97,36 +98,81 @@ Before emitting, verify:
   "created_at": "2025-01-01T00:01:00Z",
   "environments": {
     "dev": {
-      "runtime": "python3.11",
-      "region": "us-east-1",
-      "replica_count": 1,
-      "log_level": "debug"
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runtime": "python3.11",
+        "region": "us-east-1",
+        "replica_count": 1,
+        "log_level": "debug"
+      }
     },
     "ci": {
-      "runner": "ubuntu-latest",
-      "region": "us-east-1",
-      "replica_count": 1
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runner": "ubuntu-latest",
+        "region": "us-east-1",
+        "replica_count": 1
+      }
     },
     "staging": {
-      "runtime": "python3.11",
-      "region": "us-east-1",
-      "replica_count": 2,
-      "log_level": "warn"
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runtime": "python3.11",
+        "region": "us-east-1",
+        "replica_count": 2,
+        "log_level": "warn"
+      }
     },
     "prod": {
-      "runtime": "python3.11",
-      "region": "us-east-1",
-      "replica_count": 3,
-      "log_level": "warn"
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runtime": "python3.11",
+        "region": "us-east-1",
+        "replica_count": 3,
+        "log_level": "warn"
+      }
     }
   },
   "ci_gates": [
-    "schema-validate",
-    "fixtures-lint",
-    "invariants-check",
-    "governance-check"
+    {
+      "gate_id": "schema-validate",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "gate_id": "fixtures-lint",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "gate_id": "invariants-check",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "gate_id": "governance-check",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    }
   ],
-  "secrets": ["DATABASE_URL", "JWT_SECRET"],
+  "secrets": [
+    {
+      "secret_id": "secret-database-url",
+      "name": "DATABASE_URL",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "secret_id": "secret-jwt-secret",
+      "name": "JWT_SECRET",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    }
+  ],
   "compliance": ["SOC2"],
   "canonical_refs_used": []
 }

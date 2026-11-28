@@ -1,0 +1,46 @@
+{
+  "$schema": "vc:14-roadmap",
+  "id": "roadmap-invalid-missing-refines",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "risk_status": "low",
+      "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
+      "tasks": [
+        {
+          "task_id": "init-fastapi-project",
+          "description": "Initialize FastAPI project structure",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "project-structure-ready",
+              "text": "FastAPI app boots with expected folder layout in place.",
+              "verified_by": [
+                "fix-no-duplicate-sessions"
+              ]
+            }
+          ]
+        },
+        {
+          "task_id": "configure-docker-compose",
+          "description": "Configure Docker compose for DB and App",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "docker-compose-runs",
+              "text": "Docker compose up starts both DB and app containers successfully.",
+              "refines": [
+                "ac-docker-compose-runs"
+              ]
+            }
+          ]
+        }
+      ],
+      "risks": [],
+      "spikes": []
+    }
+  ],
+  "canonical_refs_used": []
+}

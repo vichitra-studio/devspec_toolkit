@@ -1,0 +1,24 @@
+# Snippet (copied by hand into the host's own deploy workflow, after the post-deploy steps of
+# deploy-preamble.snippet.yml): carries the evidence the deploy wrote to the repository through
+# a pull request. A list of steps.
+#
+# The job needs `permissions: contents: write` and `pull-requests: write`. A push or a pull
+# request made with GITHUB_TOKEN starts no workflow run, and a pull request it opens needs an
+# approval before workflows run on it; whether Actions may open pull requests is a repository
+# setting (Settings > Actions > General). No setting is changed by this file.
+# Job-level `env:` values used here: `SPECDEV_ENV` (staging or prod) and `TAG`.
+# `GH_TOKEN` is the job's own token for `gh`; nothing is printed.
+- name: Open the evidence pull request
+  env:
+    GH_TOKEN: ${{ github.token }}
+    BRANCH: specdev-evidence/${{ github.run_id }}
+  run: |
+    git config user.name "specdev-evidence"
+    git config user.email "specdev-evidence@users.noreply.github.com"
+    git add -- spec/extras/verification
+    if ! git diff --cached --quiet; then
+      git switch -c "$BRANCH"
+      git commit -m "specdev: $SPECDEV_ENV evidence for $TAG"
+      git push origin "$BRANCH"
+      gh pr create --title "specdev: $SPECDEV_ENV evidence for $TAG" --body "Evidence recorded by the $SPECDEV_ENV deploy of $TAG." --head "$BRANCH"
+    fi

@@ -1,0 +1,21 @@
+{
+  "description": "An open item in the plan of the example milestone (a 16a plan ambiguity).",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/impl_context/ms_account_recovery_plan.json",
+      "path": [
+        "plan",
+        "ambiguities"
+      ],
+      "create": true,
+      "value": {
+        "id": "amb-plan-confirm-status",
+        "description": "Which status code does the confirm endpoint return for a spent token?",
+        "about": [
+          "api-password-reset-confirm"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "description": "An environment of step 02a derives from the seed, which the manifest routes to steps 00 and 02 only.",
+  "ops": [
+    {
+      "op": "append",
+      "file": "spec/02a_delivery_baseline.json",
+      "path": [
+        "environments",
+        "dev",
+        "derives_from"
+      ],
+      "value": "seed-accounts"
+    }
+  ]
+}

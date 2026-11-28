@@ -1,0 +1,53 @@
+{
+  "id": "delivery-baseline-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "environments": {
+    "dev": {
+      "scope": "in",
+      "derives_from": [
+        "seed-delivery-baseline"
+      ],
+      "config": {
+        "region": "us-east-1"
+      }
+    },
+    "ci": {
+      "scope": "in",
+      "derives_from": [
+        "seed-delivery-baseline"
+      ],
+      "config": {
+        "runner": "ubuntu-latest"
+      }
+    },
+    "staging": {
+      "scope": "in",
+      "derives_from": [
+        "seed-delivery-baseline"
+      ],
+      "config": {
+        "region": "us-east-1"
+      }
+    },
+    "prod": {
+      "scope": "in",
+      "derives_from": [
+        "seed-delivery-baseline"
+      ],
+      "config": {
+        "lifecycle": "decommissioned-at-production-go-live"
+      }
+    }
+  },
+  "ci_gates": [
+    {
+      "gate_id": "schema-validate",
+      "scope": "in",
+      "derives_from": [
+        "core-service"
+      ]
+    }
+  ],
+  "canonical_refs_used": []
+}

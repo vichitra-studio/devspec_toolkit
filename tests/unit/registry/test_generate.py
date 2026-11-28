@@ -24,7 +24,11 @@ from typing import Any
 
 import pytest
 
-from specdev_tools.registry.generate import _serialize, generate_registry
+from specdev_tools.core.entry_key_registry import join_nested_path
+from specdev_tools.registry import generate as generate_module
+from specdev_tools.registry.annotations import collect_annotations, lint_annotations
+from specdev_tools.registry.generate import _serialize, generate_registry, run
+from specdev_tools.registry.schema_checklist import CHECKLIST_FILE, ChecklistError, generate_checklist
 
 # ---------------------------------------------------------------------------
 # Toolkit root resolution
@@ -38,6 +42,21 @@ _GOLDEN_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "entry_key_registry_golden
 
 _STEP_ORDER_PATH = _TOOLKIT_ROOT / "tools" / "step_order.json"
 """step_order.json for Test 4."""
+
+_CHECKLIST_PATH = _TOOLKIT_ROOT / CHECKLIST_FILE
+"""The generated schema-change checklist, committed."""
+
+_KIND_ROLE_TABLE_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "graph" / "kind_role_table.json"
+"""Kind to step and role table of the spec graph (M1 fixture, extended with the M3 kinds)."""
+
+_UNLISTED_KINDS = frozenset({"extension", "signoff-record", "at-deploy-record"})
+"""Registered kinds the table leaves out: step 13 extension kinds are declared when they become first-class; the sign-off and at-deploy records are M8's own record kinds (the table is the design's)."""
+
+_UNREGISTERED_KINDS = frozenset({"seed", "review-record"})
+"""Table kinds with no registry entry: the seed is an external kind; the review block is one object, not an array of nodes, so it is no kind."""
+
+_KINDS_IN_A_SHARED_GLOB_ENTRY = {"execution-record": "16a"}
+"""Kinds whose node step the table gives, but whose registry entry is the plan-file glob that plan-item opened first: the entry step is that of the first node (M1), the node step is read from the ``x-node`` declaration."""
 
 
 def _run_generator() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -159,8 +178,7 @@ class TestSentinelsPresent:
 
 class TestStepCoverageCompleteness:
     """Every step in step_order.json must appear in exactly one of:
-    registry (via its file's step), steps_without_entry_arrays, or
-    steps_with_deferred_registration.
+    registry (via its file's step) or steps_without_entry_arrays.
     """
 
     def test_all_steps_accounted_for(self) -> None:
@@ -176,20 +194,16 @@ class TestStepCoverageCompleteness:
         without_steps: set[str] = {
             item["step"] for item in reg_doc["steps_without_entry_arrays"]
         }
-        deferred_steps: set[str] = {
-            item["step"] for item in reg_doc["steps_with_deferred_registration"]
-        }
 
-        covered = registry_steps | without_steps | deferred_steps
+        covered = registry_steps | without_steps
         missing = [s for s in all_steps if s not in covered]
 
         assert not missing, (
-            f"Steps not accounted for in registry, steps_without_entry_arrays, "
-            f"or steps_with_deferred_registration: {missing}"
+            f"Steps not accounted for in registry or steps_without_entry_arrays: {missing}"
         )
 
     def test_no_step_is_double_counted(self) -> None:
-        """No step should appear in more than one bucket."""
+        """No step should appear in both buckets."""
         reg_doc, _ = _run_generator()
 
         registry_steps: set[str] = {
@@ -198,17 +212,10 @@ class TestStepCoverageCompleteness:
         without_steps: set[str] = {
             item["step"] for item in reg_doc["steps_without_entry_arrays"]
         }
-        deferred_steps: set[str] = {
-            item["step"] for item in reg_doc["steps_with_deferred_registration"]
-        }
 
         reg_and_without = registry_steps & without_steps
-        reg_and_deferred = registry_steps & deferred_steps
-        without_and_deferred = without_steps & deferred_steps
 
         assert not reg_and_without, f"Steps in both registry and without-entry-arrays: {reg_and_without}"
-        assert not reg_and_deferred, f"Steps in both registry and deferred: {reg_and_deferred}"
-        assert not without_and_deferred, f"Steps in both without-entry-arrays and deferred: {without_and_deferred}"
 
 
 # ---------------------------------------------------------------------------
@@ -217,63 +224,134 @@ class TestStepCoverageCompleteness:
 
 
 class TestNoArraysSteps:
-    """Steps 13a and 16 must appear in steps_without_entry_arrays with non-empty rationale."""
+    """A step with no schema file is listed in steps_without_entry_arrays with a rationale; step 16 registers its arrays."""
 
-    def test_13a_in_steps_without_entry_arrays(self) -> None:
+    def test_a_step_without_a_schema_file_is_listed_with_a_rationale(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        real = generate_module._schema_file_for_step
+        monkeypatch.setattr(generate_module, "_schema_file_for_step", lambda step, schema_dir: None if step == "12" else real(step, schema_dir))
         reg_doc, _ = _run_generator()
-        without_steps = {item["step"]: item for item in reg_doc["steps_without_entry_arrays"]}
-        assert "13a" in without_steps, (
-            "Step '13a' not found in steps_without_entry_arrays."
-        )
-        assert without_steps["13a"]["rationale"], (
-            "Step '13a' in steps_without_entry_arrays has empty rationale."
-        )
+        assert {"step": "12", "rationale": "no schema file"} in reg_doc["steps_without_entry_arrays"]
 
-    def test_16_in_steps_without_entry_arrays(self) -> None:
+    def test_16_registers_its_ambiguity_arrays(self) -> None:
         reg_doc, _ = _run_generator()
-        without_steps = {item["step"]: item for item in reg_doc["steps_without_entry_arrays"]}
-        assert "16" in without_steps, (
-            "Step '16' not found in steps_without_entry_arrays."
-        )
-        assert without_steps["16"]["rationale"], (
-            "Step '16' in steps_without_entry_arrays has empty rationale."
-        )
+        without_steps = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
+        assert "16" not in without_steps
+        paths = {a["array_path"] for a in reg_doc["registry"]["16_impl_context.json"]["arrays"]}
+        # The anchor file holds what 16_anchor.schema.json declares; the plan schema's lists
+        # belong to the plan files and are registered under their glob key.
+        assert paths == {".plan.ambiguities", ".plan.milestone_index"}
+        plan_paths = {a["array_path"] for a in reg_doc["registry"]["impl_context/ms_*_plan.json"]["arrays"]}
+        assert plan_paths == {
+            ".plan.spec_alignment.checklist", ".plan.ambiguities", ".execution.records", ".execution.emergent_ambiguities"
+        }
 
 
 # ---------------------------------------------------------------------------
-# Test 6: Deferred registration
+# Test 6: Steps inside the plan file
 # ---------------------------------------------------------------------------
 
 
-class TestDeferredRegistration:
-    """Steps 16a, 16b, 16c must be in steps_with_deferred_registration only."""
+class TestPlanFileSteps:
+    """Steps 16b and 16c are listed in steps_without_entry_arrays, never in the registry; 16a is registered by annotation."""
 
-    def test_deferred_steps_are_present(self) -> None:
+    def test_16b_and_16c_are_listed_without_entry_arrays_not_deferred(self) -> None:
         reg_doc, _ = _run_generator()
-        deferred = {item["step"]: item for item in reg_doc["steps_with_deferred_registration"]}
-        for step in ("16a", "16b", "16c"):
-            assert step in deferred, f"Step '{step}' not found in steps_with_deferred_registration."
-            assert deferred[step]["rationale"], f"Step '{step}' has empty rationale."
-
-    def test_deferred_steps_not_in_without_entry_arrays(self) -> None:
-        """Disjoint sets: 16a/16b/16c must not appear in steps_without_entry_arrays."""
-        reg_doc, _ = _run_generator()
-        without_steps_set = {item["step"] for item in reg_doc["steps_without_entry_arrays"]}
-        for step in ("16a", "16b", "16c"):
-            assert step not in without_steps_set, (
-                f"Deferred step '{step}' found in steps_without_entry_arrays — "
-                "deferred and without-entry-arrays must be disjoint."
-            )
-
-    def test_deferred_steps_not_in_registry(self) -> None:
-        """Deferred steps must not appear as 'step' values inside the registry."""
-        reg_doc, _ = _run_generator()
+        listed = {item["step"]: item for item in reg_doc["steps_without_entry_arrays"]}
+        for step in ("16b", "16c"):
+            assert listed[step]["rationale"] == generate_module.INSIDE_PLAN_FILE_RATIONALE, step
         registry_steps = {entry["step"] for entry in reg_doc["registry"].values()}
-        for step in ("16a", "16b", "16c"):
-            assert step not in registry_steps, (
-                f"Deferred step '{step}' found as a 'step' value in registry — "
-                "deferred steps should not have registry entries."
-            )
+        assert registry_steps.isdisjoint({"16b", "16c"})
+        assert "16a" in registry_steps
+
+    def test_registry_has_no_deferred_key(self) -> None:
+        reg_doc, _ = _run_generator()
+        assert "steps_with_deferred_registration" not in reg_doc
+
+    def test_plan_item_kind_is_registered_under_the_plan_file_glob(self) -> None:
+        """The plan-item kind reaches the registry through its ``x-node`` ``files`` glob, as step 16a."""
+        reg_doc, _ = _run_generator()
+        entry = reg_doc["registry"]["impl_context/ms_*_plan.json"]
+        assert entry["step"] == "16a"
+        arr = next(a for a in entry["arrays"] if a["array_path"] == ".plan.spec_alignment.checklist")
+        assert (arr["kind"], arr["id_field"], arr["role"]) == ("plan-item", "id", "plan")
+        assert [lk["field"] for lk in arr["links"]] == ["realises", "replaces"]
+
+    def test_execution_record_kind_is_registered(self) -> None:
+        """``execution.records[]`` is the ``execution-record`` kind (a record of step 16b) in the plan-file glob entry; its ``about`` is a link to plan items."""
+        reg_doc, _ = _run_generator()
+        arr = next(a for a in reg_doc["registry"]["impl_context/ms_*_plan.json"]["arrays"] if a["array_path"] == ".execution.records")
+        assert (arr["kind"], arr["id_field"], arr["role"]) == ("execution-record", "record_id", "record")
+        assert [(lk["field"], lk["kinds"], lk["required"]) for lk in arr["links"]] == [("about", ["plan-item"], True)]
+        declared = next(n for n in collect_annotations(str(_TOOLKIT_ROOT)).nodes if n.kind == "execution-record")
+        assert declared.value["step"] == "16b"
+        assert "execution-record" not in _UNREGISTERED_KINDS
+
+
+# ---------------------------------------------------------------------------
+# Registry cutover to the graph shape (WI-M3-18)
+# ---------------------------------------------------------------------------
+
+
+def _registered_kinds(registry: dict[str, Any]) -> dict[str, set[tuple[str, str | None, bool]]]:
+    """Map each registered kind to the ``(step, role, coarse)`` triples it is registered with."""
+    found: dict[str, set[tuple[str, str | None, bool]]] = {}
+    for entry in registry.values():
+        for array in _iter_all_arrays(entry):
+            found.setdefault(array["kind"], set()).add((entry["step"], array.get("role"), array.get("coarse", False)))
+    return found
+
+
+class TestRegistryCutover:
+    """The registry the annotated schemas produce, against the kind table and the generator's lists."""
+
+    def test_registry_lint_passes_on_every_real_schema(self) -> None:
+        decls = collect_annotations(str(_TOOLKIT_ROOT))
+        assert not decls.empty
+        assert lint_annotations(decls) == []
+
+    def test_kind_table_equals_registry(self) -> None:
+        table = json.loads(_KIND_ROLE_TABLE_PATH.read_text(encoding="utf-8"))["kinds"]
+        registered = _registered_kinds(_run_generator()[0]["registry"])
+        assert set(registered) - set(table) == _UNLISTED_KINDS
+        unregistered = {k for k in table if k not in registered}
+        assert unregistered == _UNREGISTERED_KINDS | {k for k, row in table.items() if row["role"] == "content"}
+        for kind, triples in registered.items():
+            if kind in _UNLISTED_KINDS:
+                continue
+            row = table[kind]
+            steps = {step for step, _, _ in triples}
+            if kind in _KINDS_IN_A_SHARED_GLOB_ENTRY:
+                assert steps == {_KINDS_IN_A_SHARED_GLOB_ENTRY[kind]}, (kind, steps)
+                continue
+            assert steps <= {row["step"]} or row["step"] == "any", (kind, steps)
+            assert {role for _, role, _ in triples} == {row["role"]}, kind
+            assert {coarse for _, _, coarse in triples} == {row.get("coarse", False)}, kind
+
+    def test_only_the_plan_file_steps_are_without_entry_arrays(self) -> None:
+        reg_doc, _ = _run_generator()
+        assert reg_doc["steps_without_entry_arrays"] == [
+            {"step": step, "rationale": generate_module.INSIDE_PLAN_FILE_RATIONALE} for step in ("16b", "16c")
+        ]
+
+    def test_registry_generate_writes_schema_change_checklist_byte_identically(self, tmp_path: Path) -> None:
+        paths = {name: str(tmp_path / name) for name in ("reg.json", "paths.json", "checklist.md")}
+        run(str(_TOOLKIT_ROOT), paths["reg.json"], paths["paths.json"], checklist_out=paths["checklist.md"])
+        written = Path(paths["checklist.md"]).read_bytes()
+        assert written == _CHECKLIST_PATH.read_bytes()
+        assert written == generate_checklist(_TOOLKIT_ROOT).encode("utf-8")
+
+    def test_a_rows_file_that_cannot_be_used_writes_no_output_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def unusable(_repo_root: Path) -> str:
+            raise ChecklistError("tools/schema_changes.json: rows[0]: id: duplicate")
+
+        monkeypatch.setattr("specdev_tools.registry.generate.generate_checklist", unusable)
+        paths = {name: str(tmp_path / name) for name in ("reg.json", "paths.json", "order.json", "checklist.md")}
+        with pytest.raises(ChecklistError):
+            run(str(_TOOLKIT_ROOT), paths["reg.json"], paths["paths.json"],
+                step_order_out=paths["order.json"], checklist_out=paths["checklist.md"])
+        assert list(tmp_path.iterdir()) == []
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +371,7 @@ class TestKindInferenceIdSuffix:
         assert arr["kind"] == "fr"
 
     def test_11_redteam_threats_kind(self) -> None:
-        """11_redteam.json → .threats: threat_id → kind: threat"""
+        """11_redteam.json → .threats: threat_id → kind: threat (the ``_id`` suffix wins over a bare ``id``)"""
         reg_doc, _ = _run_generator()
         entry = reg_doc["registry"]["11_redteam.json"]
         arr = next(a for a in entry["arrays"] if a["array_path"] == ".threats")
@@ -335,24 +413,17 @@ class TestKindInferenceBareId:
             f"Expected 'edge-case' (singularize edge_cases + snake→kebab), got '{arr['kind']}'"
         )
 
-    def test_14_roadmap_dependencies_kind(self) -> None:
-        """14_roadmap.json → .dependencies: id → singularize('dependencies') = 'dependency' → kind: dependency"""
+    def test_14_roadmap_has_no_dependencies_array_and_declares_graph_kinds(self) -> None:
+        """14_roadmap.json: the top-level ``dependencies`` array is gone; the nodes are declared by ``x-node``."""
         reg_doc, _ = _run_generator()
         entry = reg_doc["registry"]["14_roadmap.json"]
-        arr = next(a for a in entry["arrays"] if a["array_path"] == ".dependencies")
-        assert arr["id_field"] == "id"
-        assert arr["kind"] == "dependency", (
-            f"Expected 'dependency' (singularize dependencies 'ies'→'y'), got '{arr['kind']}'"
-        )
+        assert ".dependencies" not in {a["array_path"] for a in entry["arrays"]}
+        milestones = next(a for a in entry["arrays"] if a["array_path"] == ".milestones")
+        assert milestones["kind"] == "roadmap-milestone"
+        tasks = next(n for n in milestones["nested"] if n["array_path"] == ".tasks")
+        criteria = next(n for n in tasks["nested"] if n["array_path"] == ".acceptance_criteria")
+        assert (tasks["kind"], criteria["kind"], criteria["id_field"]) == ("task", "task-criterion", "criterion_id")
 
-    def test_11_redteam_threats_uses_id_suffix_not_bare_id(self) -> None:
-        """Confirm .threats uses threat_id (not bare id), validating Rule A priority."""
-        reg_doc, _ = _run_generator()
-        entry = reg_doc["registry"]["11_redteam.json"]
-        arr = next(a for a in entry["arrays"] if a["array_path"] == ".threats")
-        # id_field must be threat_id (suffix-_id wins over bare 'id')
-        assert arr["id_field"] == "threat_id"
-        assert arr["kind"] == "threat"
 
 
 # ---------------------------------------------------------------------------
@@ -574,3 +645,58 @@ class TestSchemaFileForStepHardening:
         assert "99_alpha.schema.json" in msg, f"ValueError should list file; got: {msg!r}"
         assert "99_beta.schema.json" in msg, f"ValueError should list file; got: {msg!r}"
         assert "SCHEMA_SKIP" in msg, f"ValueError should mention SCHEMA_SKIP; got: {msg!r}"
+
+
+# ---------------------------------------------------------------------------
+# No heuristic: every kind is declared by x-node (DEVSPEC-251 ask 5)
+# ---------------------------------------------------------------------------
+
+
+class TestNoHeuristic:
+    def test_step_13_registers_its_two_declared_kinds(self) -> None:
+        reg_doc, _ = _run_generator()
+        paths = [a["array_path"] for a in reg_doc["registry"]["13_extension_manifest.json"]["arrays"]]
+        assert paths == [".ambiguities", ".extensions"]
+
+    def test_every_registry_array_is_declared_by_x_node(self) -> None:
+        reg_doc, _ = _run_generator()
+        undeclared = [
+            (basename, arr["array_path"])
+            for basename, entry in reg_doc["registry"].items()
+            for arr in _iter_all_arrays(entry)
+            if arr.get("source") != "x-node"
+        ]
+        assert undeclared == []
+
+
+# ---------------------------------------------------------------------------
+# extraction_paths.json lists nested and map-keyed paths (DEVSPEC-251 ask 7)
+# ---------------------------------------------------------------------------
+
+
+def _full_paths(arr: dict[str, Any], full_path: str) -> list[str]:
+    paths = [full_path]
+    for nested in arr.get("nested", []):
+        paths += _full_paths(nested, join_nested_path(full_path, nested["array_path"]))
+    return paths
+
+
+class TestExtractionPathsNested:
+    def test_nested_kinds_have_their_full_path(self) -> None:
+        _, paths = _run_generator()
+        assert {
+            ".milestones", ".milestones[].tasks", ".milestones[].tasks[].acceptance_criteria", ".ambiguities"
+        } <= set(paths["14"]["14_roadmap.json"])
+        assert ".functional_requirements[].acceptance_criteria" in paths["04"]["04_fr_list.json"]
+        assert ".apis[].errors" in paths["05"]["05_interface_contracts.json"]
+
+    def test_every_registry_array_has_a_path(self) -> None:
+        reg_doc, paths = _run_generator()
+        missing = []
+        for basename, entry in reg_doc["registry"].items():
+            if entry["step"] == generate_module.RECORD_HOST_STEP:
+                continue  # a record host belongs to no step: extraction_paths.json has no block for it
+            listed = set(paths[entry["step"]][basename])
+            for arr in entry["arrays"]:
+                missing += [(basename, p) for p in _full_paths(arr, arr["array_path"]) if p not in listed]
+        assert missing == []

@@ -4,6 +4,10 @@
   "title": "13_extension_manifest",
   "type": "object",
   "properties": {
+    "ambiguities": {
+      "$ref": "vc:core:collections#ambiguityList",
+      "description": "Open ambiguities this step could not settle; each names what it is about. An item is deleted once its answer is applied."
+    },
     "extension_decision": {
       "type": "object",
       "additionalProperties": false,
@@ -18,14 +22,30 @@
         "rationale": {
           "type": "string",
           "minLength": 40,
-          "description": "Justification for the decision. For 'none-required', must cite component_ids from 02_system_sketch.json AND NFR categories from 07_nfrs.json evaluated and ruled out. For 'extensions-required', must cite the specific domain gaps that necessitate extensions."
+          "description": "Justification for the decision, in prose (at least 40 characters). What it should cover is guidance in the step 13 prompt; nothing checks it."
         }
       }
     },
     "extensions": {
       "type": "array",
       "minItems": 0,
-      "description": "Ordered list of domain-specific extension specs to generate as part of this step. Each entry defines one extension artifact (its ID, schema requirements, and governance anchors). When extension_decision.status is 'none-required', this array must be empty.",
+      "description": "Ordered list of domain-specific extension specs to generate as part of this step. Each entry defines one extension artifact (its ID, the upstream nodes that justify it, schema requirements, and governance anchors) and is a node of the spec graph. When extension_decision.status is 'none-required', this array must be empty.",
+      "x-node": {
+        "kind": "extension",
+        "role": "plan",
+        "contract": [
+          "title",
+          "area_of_concern",
+          "justification",
+          "required_schema_sections",
+          "schema_design_guidelines",
+          "tag_ref",
+          "policy_ref",
+          "id_pattern_ref",
+          "governance_label_ref"
+        ],
+        "id": "extension_id"
+      },
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -37,11 +57,11 @@
           },
           "title": {
             "type": "string",
-            "description": "Short, human-readable name for this extension displayed in reports and the trace matrix. Should be title-cased and describe the domain concern clearly (e.g. 'Database Layer Extension', 'Authentication Provider Extension'). Avoid abbreviations."
+            "description": "Short, human-readable name for this extension displayed in reports. Should be title-cased and describe the domain concern clearly (e.g. 'Database Layer Extension', 'Authentication Provider Extension'). Avoid abbreviations."
           },
           "area_of_concern": {
             "type": "string",
-            "description": "High-level domain category this extension addresses. Use a concise noun phrase that classifies the extension's technical scope. Decision rule: when two area names could apply, choose the one that describes the domain concern (the business problem being extended), not the technology implementing it. Canonical disambiguation: 'AI' for user-facing AI features such as recommendation engines, content generation, and AI assistants; 'ML' for model training pipelines, experimentation frameworks, and model management infrastructure; 'Payments' for payment processing flows, transaction management, and financial reconciliation; 'Data' for ETL pipelines, analytics schemas, and data quality frameworks. Examples: an LLM-powered chat feature → 'AI'; a model retraining pipeline → 'ML'; a Stripe integration → 'Payments'; a dbt pipeline → 'Data'. Other accepted values: 'Security', 'Notifications', 'Infrastructure'. Anti-pattern: 'General', 'Other', 'Misc' — these defeat the purpose of domain-specific extensions and will be flagged by canonical-lint; every extension must have a specific, nameable concern."
+            "description": "High-level domain category this extension addresses. Use a concise noun phrase that classifies the extension's technical scope. Decision rule: when two area names could apply, choose the one that describes the domain concern (the business problem being extended), not the technology implementing it. Canonical disambiguation: 'AI' for user-facing AI features such as recommendation engines, content generation, and AI assistants; 'ML' for model training pipelines, experimentation frameworks, and model management infrastructure; 'Payments' for payment processing flows, transaction management, and financial reconciliation; 'Data' for ETL pipelines, analytics schemas, and data quality frameworks. Examples: an LLM-powered chat feature → 'AI'; a model retraining pipeline → 'ML'; a Stripe integration → 'Payments'; a dbt pipeline → 'Data'. Other accepted values: 'Security', 'Notifications', 'Infrastructure'. Anti-pattern: 'General', 'Other', 'Misc' — avoid these vague values: they defeat the purpose of domain-specific extensions; every extension should have a specific, nameable concern."
           },
           "justification": {
             "type": "string",
@@ -49,11 +69,11 @@
           },
           "required_schema_sections": {
             "type": "array",
-            "minItems": 1,
-            "description": "Schema sections that must be present in any valid extension generated by this template. Each entry identifies a mandatory structural element. Use to enforce non-negotiable quality gates — for example, every extension should have a 'trace' section and a 'validation_rules' section. Extensions that omit required sections fail the extension generator validation. Must contain at least the sections that establish traceability and governance for the extension.",
+            "minItems": 3,
+            "description": "Schema sections that must be present in any valid extension generated by this template. Each entry identifies a mandatory structural element. Use to enforce non-negotiable quality gates — for example, every extension should have a 'validation_rules' section. Extensions that omit required sections fail the extension generator validation. Must contain at least the sections that establish traceability and governance for the extension. An extension needs at least 3 dedicated sections (minItems); fewer means the concern fits an existing step.",
             "items": {
               "type": "string",
-              "description": "Exact key name of a section that must appear in the generated extension schema. Use the exact JSON key as it will appear in the schema's properties. Common sections by area_of_concern: for 'Data' → 'entities', 'schemas', 'migrations'; for 'Security' → 'policies', 'threat_models', 'access_controls'; for 'Payments' → 'providers', 'transaction_types', 'reconciliation'; for 'AI/ML' → 'models', 'evaluation_criteria', 'data_lineage'. Always include 'trace' and 'validation_rules' as minimum sections regardless of area_of_concern. Anti-pattern: 'general', 'other', 'misc' — every section name should be domain-specific."
+              "description": "Exact key name of a section that must appear in the generated extension schema. Use the exact JSON key as it will appear in the schema's properties. Common sections by area_of_concern: for 'Data' → 'entities', 'schemas', 'migrations'; for 'Security' → 'policies', 'threat_models', 'access_controls'; for 'Payments' → 'providers', 'transaction_types', 'reconciliation'; for 'AI/ML' → 'models', 'evaluation_criteria', 'data_lineage'. Always include 'validation_rules' as a minimum section regardless of area_of_concern. Anti-pattern: 'general', 'other', 'misc' — every section name should be domain-specific."
             }
           },
           "schema_design_guidelines": {
@@ -88,7 +108,22 @@
               { "$ref": "vc:core:collections#canonicalRef" },
               { "properties": { "kind": { "const": "governance_label" } } }
             ],
-            "description": "Canonical reference to the governance label applied to this extension. Kind is structurally pinned to 'governance_label'. Example: {\"id\": \"cn:core:governance_label:mandatory\", \"kind\": \"governance_label\"}. Required field — dual-checked by canonical-integrity (canon/manifest.json) and step_13.py (10_governance.json canonical_refs_used). Links the extension to its governance review tier (mandatory, recommended, optional)."
+            "description": "Canonical reference to the governance label applied to this extension. Kind is structurally pinned to 'governance_label'. Example: {\"id\": \"cn:core:governance_label:mandatory\", \"kind\": \"governance_label\"}. Required field — checked by canonical-integrity against canon/manifest.json (E110). Do not list the label in step 10's canonical_refs_used. Links the extension to its governance review tier (mandatory, recommended, optional)."
+          },
+          "justified_by": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "vc:core:atoms#kebabId" },
+            "description": "Ids of the upstream nodes that make this extension necessary: components or third parties (step 02), capabilities (step 01), functional requirements (step 04) or NFRs (step 07). At least one. The justification says why in words; this field names the nodes, so an edit of one of them marks the link suspect (E763) until the entry is read again and accepted with specdev attest. Naming a node here is not a use of it: an FR that only an extension entry names is still unused (E740). Example: [\"fr-password-reset\", \"identity-service\"].",
+            "x-link": {
+              "kinds": ["component", "third-party", "capability", "fr", "nfr"],
+              "required": true
+            }
+          },
+          "lifecycle": {
+            "description": "Lifecycle state of this extension: active (default), deprecated or not_applicable.",
+            "$ref": "vc:core:graph#lifecycle"
           }
         },
         "required": [
@@ -98,9 +133,10 @@
           "justification",
           "required_schema_sections",
           "schema_design_guidelines",
-          "governance_label_ref"
+          "governance_label_ref",
+          "justified_by"
         ],
-        "description": "A single extension spec definition. Bundles the extension's identity (extension_id, title), domain scope (area_of_concern), rationale (justification), structural requirements (required_schema_sections, schema_design_guidelines), and canonical registry anchors (tag_ref, policy_ref, id_pattern_ref, governance_label_ref). Output filename is derived: extension_id with hyphens replaced by underscores + '.json'."
+        "description": "A single extension spec definition. Bundles the extension's identity (extension_id, title), domain scope (area_of_concern), rationale (justification, and justified_by: the ids of the upstream nodes behind it), structural requirements (required_schema_sections, schema_design_guidelines), and canonical registry anchors (tag_ref, policy_ref, id_pattern_ref, governance_label_ref). Output filename is derived: extension_id with hyphens replaced by underscores + '.json'."
       }
     }
   },

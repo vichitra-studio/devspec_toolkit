@@ -24,14 +24,22 @@ def load_governance(spec_dir: str) -> dict | None:
     return None
 
 def check_commit_message(spec_dir: str, message: str) -> list[SpecError]:
-    gov = load_governance(spec_dir) or {}
-    rules = gov.get("commit_message_rules") or {}
+    gov = load_governance(spec_dir)
+    rules = gov.get("commit_message_rules") if isinstance(gov, dict) else None
     errs: list[SpecError] = []
+    if not isinstance(rules, dict):
+        return errs  # absent, or not an object: the schema check of the step reports a malformed value
     require_ids = rules.get("require_spec_ids")
     pattern = rules.get("pattern")
     custom_msg = rules.get("error_message")
+    # The schema requires `pattern` whenever `require_spec_ids` is true.
     if require_ids and pattern:
-        if not re.match(pattern, message or ""):
+        try:
+            matched = re.match(pattern, message or "")
+        except (re.error, TypeError) as exc:
+            errs.append(make_error("E303", f"commit_message_rules.pattern is not a valid regular expression: {exc}"))
+            return errs
+        if not matched:
             if custom_msg:
                 errs.append(make_error("E303", f"Commit message mismatch. {custom_msg}"))
             else:

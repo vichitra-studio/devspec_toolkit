@@ -9,20 +9,26 @@
       "description": "Malicious input in queries or document content can lead to injection attacks that bypass validation and potentially affect system behavior",
       "vector": "input-injection",
       "category": "business_logic",
-      "risk_category_ref": {"id": "cn:core:risk_category:business-logic", "kind": "risk_category"},
-      "mitigations": [
-        {
-          "type": "inv",
-          "id": "inv-input-validation"
-        }
-      ],
-      "severity": "high"
+      "risk_category_ref": {
+        "id": "cn:core:risk_category:business-logic",
+        "kind": "risk_category"
+      },
+      "severity": "high",
+      "mitigated_by": [
+        "inv-input-validation"
+      ]
     }
   ],
   "edge_cases": [
     {
       "id": "ec-query-timeout",
-      "description": "Query timeouts during complex retrieval operations"
+      "description": "Query timeouts during complex retrieval operations",
+      "threatens": [
+        "api-ask"
+      ],
+      "mitigated_by": [
+        "inv-input-validation"
+      ]
     }
   ],
   "canonical_refs_used": []

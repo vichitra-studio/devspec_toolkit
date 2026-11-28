@@ -13,32 +13,31 @@ Translate governance rules and fixture expectations into enforceable CI automati
 ## Extraction Intent
 
 ### Primary Sources (directly consumed)
-- `spec/10_governance.json`: commit patterns, PR rules, quality gates — these ARE the CI gate definitions
-- `spec/04_fr_list.json`: high-priority FRs that must be gated
+- **10_governance.json**: commit patterns and `rules` (each with its `cli_command` or `enforcer`) — these ARE the CI gate definitions
 
 ### Reference Sources (context only)
-- `spec/02a_delivery_baseline.json`: CI gate definitions and deployment environments — referenced for coverage closure (every ci_gate must map to a job_id) and environment_ref sourcing
-- `spec/06_invariants.json`: Invariant entries — determines whether an invariants-check job step is required
-- `spec/07_nfrs.json`: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
-- `spec/08_fixtures.json`: Fixture entries — Self-Audit Gate prerequisite confirming at least one fixture entry exists
-- `spec/05_interface_contracts.json`: API contracts for schema validation gates — referenced to verify completeness of gate coverage
-- `spec/09_impl_plan.json`: Milestone deliverables for completeness gate design — referenced to verify completeness of gate coverage
-- `spec/11_redteam.json`: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
-- All other spec steps: referenced only to verify completeness of gate coverage
+- **02a_delivery_baseline.json**: CI gate definitions and deployment environments — referenced for coverage closure (every gate, environment and secret must be named in the `realises` of a job) and environment_ref sourcing
+- **06_invariants.json**: Invariant entries — determines whether an invariants-check job step is required
+- **07_nfrs.json**: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
+- **08_fixtures.json**: Fixture entries — Self-Audit Gate prerequisite confirming at least one fixture entry exists
+- **05_interface_contracts.json**: API contracts for schema validation gates — referenced to verify completeness of gate coverage
+- **09_impl_plan.json**: Milestones for completeness gate design — referenced to verify completeness of gate coverage
+- **11_redteam.json**: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
+- All other upstream steps (00 to 11): referenced only to verify completeness of gate coverage
 
 ## Operating Flow: Survey → Gate → Threshold → Emit
-- **Survey**: Survey all mandatory spec steps and their validators — identify every step that requires a CI quality checkpoint, including schema validation, fixture lint, traceability matrix, invariants, governance, and red team mitigations.
+- **Survey**: Survey all mandatory spec steps and their validators — identify every step that requires a CI quality checkpoint, including `spec-check`, fixture lint, invariants, governance, and red team mitigations.
 - **Gate**: Gate each step with a specific CLI command from the toolkit (e.g., `spec-check`, `fixtures-lint`, `invariants-check`, `governance-check`). No gate may be a manual review step — every gate must be machine-executable.
 - **Threshold**: Set thresholds for pass/fail criteria for each gate — numeric coverage percentages, zero-error exit codes, or explicit count limits. No subjective pass criteria allowed.
 - **Emit**: Write the artifact when all gates have executable commands, measurable thresholds, and correct stage assignments.
 
 ## Heuristics For Completeness
-- MUST include a `governance-check` job step when `spec/10_governance.json` defines `pr_rules`. MUST include an `invariants-check` job step when `spec/06_invariants.json` contains >=1 invariant. MUST populate `coverage_thresholds` when any NFR in `spec/07_nfrs.json` specifies a coverage metric.
+- MUST include a `governance-check` job step when `spec/10_governance.json` defines `commit_message_rules` with `require_spec_ids`. A rule of Step 10 that names neither `enforcer` nor `cli_command` is enforced by a job here: name it in that job's `realises`. MUST include an `invariants-check` job step when `spec/06_invariants.json` contains >=1 invariant. MUST populate `coverage_thresholds` when any NFR in `spec/07_nfrs.json` specifies a coverage metric. These three rules are authoring and review rules: no tool checks them.
 - Ambiguity scrub: make pipeline DAG explicit; avoid implicit sequencing.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- `spec/10_governance.json` is present and contains at least one pr_rules entry.
+- `spec/10_governance.json` is present and contains at least one `rules` entry.
 - `spec/07_nfrs.json` is present and contains at least one nfr entry.
 - `spec/08_fixtures.json` is present and contains at least one fixture entry.
 
@@ -50,12 +49,13 @@ Translate governance rules and fixture expectations into enforceable CI automati
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `ci_gate` defined in `spec/02a_delivery_baseline.json` is implemented as a `job_id` in this artifact. For any gate that cannot be expressed as a CI job, add a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
-- All `pr_rules` commands from `spec/10_governance.json` have corresponding CI job steps.
+- Every gate in `ci_gates` of `spec/02a_delivery_baseline.json` is named in the `realises` of a job in this artifact, and so is every environment and secret of that step. A job that proves an NFR names it in `verifies` (a load test for a latency target), not in `realises`. A node left unnamed is reported as `E740` (`<kind> <id> is not used by any node`). For any gate that cannot be expressed as a CI job, add a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
+- Every rule in `spec/10_governance.json` with a `cli_command` has a CI job step that runs that command, and every rule with neither `enforcer` nor `cli_command` is named in a job's `realises`.
 - Every environment stage (`dev`, `ci`, `staging`, `prod`) in the delivery baseline has coverage from ≥1 CI job.
-- All `requires` dependencies between jobs form a valid DAG — no circular dependencies.
+- All `depends_on` links between jobs form a valid DAG — no circular dependencies.
+- No node ids in prose: a mention that states a relation is a link field; any other mention is reworded; contract values (paths, error codes, field names) stay.
 - If any required gate cannot be expressed as a CI job: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID from ingested context has been consumed
+- [ ] Every upstream node this step must cover is used by a node of this step (`spec-check` reports an unused one, E740 to E745; `specdev coverage` lists them)
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every governance rule from Step 10 has a corresponding CI gate
@@ -67,13 +67,13 @@ Before emitting, verify:
 
 ## Hallucination Vectors
 - Do not invent new tools or commands that do not exist in the repository.
-- Do not reference non-existent job IDs in `requires` fields.
+- Do not reference non-existent job IDs in `depends_on` fields.
 - Use only commands that correspond to tools present in this repository's tooling (specdev CLI, shell scripts in `tools/`, or standard POSIX shell commands). Do not invent command prefixes or reference tools not confirmed in the repo.
 - Do not create circular dependencies in job requirements.
 
 ## Step-Specific Completeness Checklist
-- Job graph is complete: all required jobs listed with dependencies in `requires` as needed.
-- Steps include validations for schema, fixtures, matrix, invariants, coverage, governance, scaffolding checks where applicable.
+- Job graph is complete: all required jobs listed with dependencies in `depends_on` as needed.
+- Steps include validations for schema (`spec-check`), fixtures, invariants, coverage, governance, scaffolding checks where applicable.
 - Coverage thresholds are set (lines/branches) or intentionally omitted with rationale (not in JSON).
 - Job names and IDs map to actual CI runner capabilities.
 
@@ -81,7 +81,7 @@ Before emitting, verify:
 - jobs[*].environment_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) sourced from `spec/02a_delivery_baseline.json` -> `environments[]`. Each job MUST reference the environment it targets (e.g., `ci`, `staging`, `prod`). Look up the environment ID in `canon/manifest.json` to resolve the canonical ref. If the environment is not in the canonical registry, add it to `canonical_proposals`.
 
 ## Best Practices
-- **Jobs**: Define each `job` with reproducible `steps` (CLI commands, scripts) and `requires` dependencies to express the pipeline graph.
+- **Jobs**: Define each `job` with reproducible `steps` (CLI commands, scripts) and `depends_on` to express the pipeline graph; name in `realises` the environment, gate, secret or rule each job runs, and in `verifies` the NFRs it proves.
 - **Naming**: Align job names with reality (e.g., `validate`, `fixtures`, `redteam`, `deploy`) to match tooling and dashboards.
 - **Coverage**: Set `coverage_thresholds` that reflect NFR commitments and update them when metric expectations change.
 - **Stability**: Keep job IDs stable so generated CI configs and monitoring references remain valid. Kebab-case format is enforced by schema `vc:12-ci-gates` via `vc:core:atoms#kebabId`.
@@ -116,7 +116,6 @@ Before emitting, verify:
       "name": "Validate All Spec Artifacts",
       "steps": [
         {
-          "id": "step-spec-check",
           "name": "Run schema validation",
           "command": "./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root ."
         }
@@ -124,7 +123,8 @@ Before emitting, verify:
       "environment_ref": {
         "id": "cn:core:environment:ci",
         "kind": "environment"
-      }
+      },
+      "realises": ["gate-schema-validate"]
     }
   ],
   "canonical_refs_used": [

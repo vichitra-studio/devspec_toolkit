@@ -1,0 +1,43 @@
+{
+  "$schema": "vc:14-roadmap",
+  "id": "roadmap-password-reset",
+  "owner": "product",
+  "created_at": "2026-11-15T00:00:00Z",
+  "milestones": [
+    {
+      "milestone_id": "ms-account-recovery",
+      "name": "Account Recovery",
+      "target_date": "2026-12-15",
+      "user_story": "As a registered member, I want to reset a forgotten password so that I can get back in without support.",
+      "tasks": [
+        {
+          "task_id": "task-implement-password-reset-confirm",
+          "description": "Implement the confirm endpoint that redeems a reset token and sets the new password.",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "tc-confirm-expired-token",
+              "text": "POST /v1/password-resets/{token} with a token issued 31 minutes earlier returns HTTP 410 with error token-expired and leaves the password hash unchanged.",
+              "refines": [
+                "ac-password-reset-3"
+              ],
+              "verified_by": [
+                "fix-password-reset-expired-token"
+              ]
+            },
+            {
+              "criterion_id": "tc-confirm-reused-token",
+              "text": "A second redemption of a token that already changed the password returns HTTP 410, even within 30 minutes.",
+              "refines": [
+                "inv-reset-token-single-use"
+              ],
+              "verified_by": [
+                "fix-password-reset-reused-token"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "canonical_refs_used": []
+}

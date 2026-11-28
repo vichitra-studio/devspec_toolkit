@@ -9,11 +9,11 @@
     "$schema": {
       "type": "string",
       "format": "uri",
-      "description": "JSON Schema URI identifying the schema this artifact conforms to. Format: vc:{NN}-{step-name}. Examples: 'vc:00-charter' for a charter artifact, 'vc:01-capabilities' for capabilities, 'vc:04-fr-list' for FR list. Must match the $id of the step schema exactly as registered in schema_registry.json. Do NOT use HTTP URLs — the registry uses vc: URNs. An incorrect URI here causes schema resolution to fail silently."
+      "description": "JSON Schema URI identifying the schema this artifact conforms to. Format: vc:{NN}-{step-name}. Examples: 'vc:00-charter' for a charter artifact, 'vc:01-capabilities' for capabilities, 'vc:04-fr-list' for FR list. Must match the $id of the step schema exactly as registered in schema_registry.json. Do NOT use HTTP URLs — the registry uses vc: URNs. An incorrect URI here causes schema resolution to fail silently. Required in every artifact: it selects the schema the file is checked against, so a file without it fails `specdev validate` with E520 `missing_schema_uri` before any other check (this is why it is not in the `required` list of this schema)."
     },
     "id": {
       "$ref": "vc:core:atoms#kebabId",
-      "description": "Unique kebab-case identifier for this artifact instance. Convention: {step-noun}-v{N}. Examples: 'charter-v1', 'capabilities-v1', 'fr-list-v1', 'system-sketch-v1', 'nfrs-v1'. Increment the version suffix only on full regeneration of the artifact. Anti-pattern: using a capability or FR prefix (cap-*, fr-*) for an artifact-level ID — those prefixes are reserved for items within the artifact, not the artifact itself."
+      "description": "Unique kebab-case identifier for this artifact instance, for example 'charter-v1' or 'fr-list-v1'. The tools read it as an id only: a version suffix has no meaning to them, and a change of the artifact is a change of its nodes (see specdev diff), not a new artifact id. Anti-pattern: using a capability or FR prefix (cap-*, fr-*) for an artifact-level ID — those prefixes are reserved for items within the artifact, not the artifact itself."
     },
     "owner": {
       "$ref": "vc:core:atoms#owner",
@@ -42,14 +42,6 @@
         "description": "A migration annotation string added by canonical-autofix or align tooling."
       },
       "description": "Optional migration annotations added by canonical-autofix or align tooling during schema migrations. Do NOT populate this field manually — it is written exclusively by specdev tooling (canonical-autofix, align apply). Human authors should leave this field absent. If present after a tooling run, it documents what was auto-corrected and should be reviewed before committing."
-    },
-    "spec_refs_ingested": {
-      "$ref": "vc:core:collections#specRefIngestedArray",
-      "description": "Optional record of upstream spec artifacts consumed during generation of this artifact. Each entry captures {step_id, artifact_id, hash?} so drift detection and forward-replay can identify when a downstream artifact was produced against an upstream that has since changed. Populated by AI authoring prompts when producing the artifact; validated by dependency-order-lint. Anti-pattern: listing every upstream step — list only the specific artifacts that shaped this output."
-    },
-    "seed_refs_ingested": {
-      "$ref": "vc:core:collections#seedRefArray",
-      "description": "Optional record of seed documents consumed during generation of this artifact. Each entry captures {seed_id, hash?, version?} so drift detection can identify when the artifact was derived from a seed version that has since changed. Applies to any step whose prompt reads seed documents directly, as determined by the manifest. Anti-pattern: adding entries for seeds the prompt did not actually read — use only for seeds whose content materially shaped this artifact."
     }
   },
   "required": [

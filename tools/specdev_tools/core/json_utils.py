@@ -14,17 +14,23 @@ future extractor.py). The CLI entry point (main) handles printing to stdout.
 """
 
 import argparse
+import contextlib
 import glob as glob_mod
 import json
 import os
+import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple
+from collections import Counter
+from collections.abc import Callable, Iterator
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
 from specdev_tools.core import entry_key_registry as _ekreg
+from specdev_tools.core.host_schemas import find_host_schemas, schema_place_of, schema_uri_problem, spec_root_of
 from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
 from specdev_tools.core.schema_validate import (
     NoSchemaError,
@@ -34,8 +40,12 @@ from specdev_tools.core.schema_validate import (
     SchemaReferencingError,
     SchemaRuntimeError,
     SchemaValidationError,
-    validate_data_against_schema,
+    SchemaViolation,
+    jq_path_of,
+    schema_violations,
+    violation_text,
 )
+from specdev_tools.trace.lockfile import replace_file_atomically
 
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
 # Used to guard read-multi, whose {key: value} construct produces one output object per
@@ -43,7 +53,12 @@ from specdev_tools.core.schema_validate import (
 _STREAMING_FILTER_RE = re.compile(r'\[\s*\]')
 
 # --- Configuration ---
-JQ_INDENT = 4  # Enforce 4-space indent to match repo style
+JQ_INDENT = 4  # Indent of a new file; an existing file keeps its own (see detect_indent)
+
+
+def _jq_command(args: List[str]) -> List[str]:
+    """The jq command line for *args*, with jq resolved in this process (jq itself gets no PATH)."""
+    return [shutil.which('jq') or 'jq', *args]
 
 
 # --- Exceptions ---
@@ -84,9 +99,10 @@ def validate_jq_filter(jq_filter: str) -> Optional[str]:
     try:
         # Wrap in try/catch so runtime-only errors (null iteration, missing keys)
         # don't block valid filters — we only want to catch syntax errors here.
+        # jq starts with no environment (env={}): a filter such as ``$ENV.TOKEN`` or ``env.TOKEN`` reads null.
         result = subprocess.run(
-            ['jq', '-n', f'try ({jq_filter}) catch null'],
-            capture_output=True, text=True, timeout=5,
+            _jq_command(['-n', f'try ({jq_filter}) catch null']),
+            capture_output=True, text=True, timeout=5, env={},
         )
         if result.returncode != 0 and result.stderr:
             stderr = result.stderr.strip()
@@ -115,15 +131,15 @@ def _require_valid_filter(jq_filter: str) -> None:
 
 def run_jq(args: List[str], input_data: Optional[str] = None, file_path: Optional[str] = None, timeout: int = 30) -> str:
     """Run jq command and return output. Raises JsonUtilsError on failure."""
-    cmd = ['jq'] + args
+    cmd = _jq_command(args)
     if file_path:
         cmd.append(file_path)
 
     try:
         if input_data is not None:
-            result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout)
+            result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout, env={})
         else:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout, env={})
         return result.stdout.strip()
     except FileNotFoundError:
         raise JsonUtilsError("jq is not installed or not on PATH. Install with: brew install jq")
@@ -150,21 +166,26 @@ def run_jq(args: List[str], input_data: Optional[str] = None, file_path: Optiona
 
 # --- Schema Resolution ---
 
-def build_id_index(schema_dir: str) -> Dict[str, str]:
+def build_id_index(schema_dir: str, spec_root: Optional[str] = None) -> Dict[str, str]:
     """Scan schema dir once, build {$id: file_path} mapping from all *.schema.json files.
 
     Also scans a sibling canon/ directory if it exists, so that canon schema
     $id values (vc:canon:kind, vc:canon:aliases) are indexed for $ref resolution.
+
+    With *spec_root* (the spec folder of the file being resolved), the accepted
+    extension schemas of that folder (``<spec_root>/extensions/*.schema.json``,
+    see ``core/host_schemas.py``) are indexed too; none of them takes a toolkit
+    ``$id``.  ``None``, or a folder with no such schema, gives the toolkit's index alone.
     """
     index = {}
     # Primary: schema/**/*.schema.json
     for path in glob_mod.glob(os.path.join(schema_dir, '**/*.schema.json'), recursive=True):
         try:
-            with open(path, 'r') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if '$id' in data:
+                if isinstance(data, dict) and '$id' in data:
                     index[data['$id']] = path
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             continue
 
     # Also scan sibling canon/ directory for canon schemas
@@ -172,13 +193,14 @@ def build_id_index(schema_dir: str) -> Dict[str, str]:
     if os.path.isdir(canon_dir):
         for path in glob_mod.glob(os.path.join(canon_dir, '**/*.schema.json'), recursive=True):
             try:
-                with open(path, 'r') as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    if '$id' in data:
+                    if isinstance(data, dict) and '$id' in data:
                         index[data['$id']] = path
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 continue
 
+    index.update(find_host_schemas(spec_root, index).paths)
     return index
 
 
@@ -198,7 +220,7 @@ def resolve_ref(ref: str, id_index: Dict[str, str], cache: Dict[str, dict]) -> O
 
     if file_path not in cache:
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 cache[file_path] = json.load(f)
         except (json.JSONDecodeError, OSError):
             return None
@@ -218,8 +240,7 @@ def find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
     """Locate the schema/ directory.
 
     Public API: this is part of json_utils' supported surface and may be imported
-    by other toolkit modules (e.g. validation linters). The legacy
-    ``_find_schema_dir`` name is retained below as a backward-compatible alias.
+    by other toolkit modules (e.g. validation linters).
 
     Search order:
     1. repo_root/schema (explicit --repo-root from CLI)
@@ -245,20 +266,18 @@ def find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
     return None
 
 
-# Backward-compatible alias for the formerly-private name. Retained so existing
-# internal callers and imports continue to resolve; prefer ``find_schema_dir``.
-_find_schema_dir = find_schema_dir
-
-
 def resolve_schema_path(
     file_path: str,
     repo_root: Optional[str] = None,
     id_index: Optional[Dict[str, str]] = None,
+    spec_root: Optional[str] = None,
 ) -> Optional[str]:
     """Resolve the local schema file path from the target JSON's $schema field.
 
     Uses $id-index resolution. If id_index is pre-built, reuses it (avoids
-    double scan when called from json_schema_discovery).
+    double scan when called from json_schema_discovery).  An index built here
+    takes the extension schemas of *spec_root*; without it, those of the spec
+    folder an extension file lies in (``host_schemas.spec_root_of``).
     """
     # 1. Read $schema URI from the target file
     try:
@@ -272,7 +291,7 @@ def resolve_schema_path(
     if id_index is None:
         schema_dir = find_schema_dir(repo_root)
         if schema_dir:
-            id_index = build_id_index(schema_dir)
+            id_index = build_id_index(schema_dir, spec_root or spec_root_of(file_path))
 
     if id_index:
         resolved = id_index.get(schema_url)
@@ -284,8 +303,11 @@ def resolve_schema_path(
 
 # --- Core Operations ---
 
-def json_read(file_path: str, jq_filter: str) -> Optional[str]:
-    """Read data using a jq filter. Returns the result string, or None if empty."""
+def json_read(file_path: str, jq_filter: str, as_json: bool = False) -> Optional[str]:
+    """Read data using a jq filter. Returns the result string, or None if empty.
+
+    With *as_json* the value is printed as JSON (a string keeps its quotes) instead of raw text.
+    """
     if jq_filter == ".":
         raise JsonUtilsError(
             "Full JSON reads are not allowed. Specify a targeted path (e.g. .title, .items[0])."
@@ -294,7 +316,8 @@ def json_read(file_path: str, jq_filter: str) -> Optional[str]:
     _check_file(file_path)
     _require_valid_filter(jq_filter)
 
-    result = run_jq(['-r', jq_filter], file_path=file_path, timeout=10)
+    flags = [] if as_json else ['-r']
+    result = run_jq([*flags, jq_filter], file_path=file_path, timeout=10)
     if result == 'null':
         return "null"
     return result
@@ -346,46 +369,63 @@ def json_keys(file_path: str, path_selector: str) -> Optional[str]:
     return None
 
 
+def detect_indent(text: str, default: str = " " * JQ_INDENT) -> str:
+    """The indentation unit of the JSON *text*: the leading whitespace of its first indented non-blank line
+    (``"\t"`` for a tab), else *default*."""
+    for line in text.split("\n"):
+        stripped = line.lstrip(" \t")
+        lead = line[: len(line) - len(stripped)]
+        if stripped.strip("\r") and lead:
+            return "\t" if lead.startswith("\t") else lead
+    return default
+
+
+def _jq_indent_args(indent: str) -> List[str]:
+    """The jq flags that print *indent*: ``--tab``, ``--indent n`` for 1 to 7 spaces, else the default indent."""
+    if indent == "\t":
+        return ["--tab"]
+    if indent.strip(" ") == "" and 1 <= len(indent) <= 7:
+        return ["--indent", str(len(indent))]
+    return ["--indent", str(JQ_INDENT)]
+
+
 def json_write_atomic(file_path: str, data_str: str) -> None:
-    """Write string data to file atomically, enforcing format."""
+    """Write *data_str* to *file_path* atomically in the file's own indentation (new file: ``JQ_INDENT`` spaces).
+
+    Raises JsonUtilsError on empty content or a jq failure; a failed write leaves no temp file (the write is
+    ``trace.lockfile.replace_file_atomically``: the file keeps its mode).
+    """
     if not data_str or not data_str.strip():
         raise JsonUtilsError(
             f"Refusing to write empty content to {file_path}. "
             "This usually indicates an upstream jq error — check the filter and input."
         )
 
-    formatted = run_jq(['--indent', str(JQ_INDENT), '.'], input_data=data_str, timeout=10)
+    try:
+        with open(file_path, encoding='utf-8') as fh:
+            original_text = fh.read()
+    except OSError:
+        original_text = ''
+    indent_args = _jq_indent_args(detect_indent(original_text))
+    formatted = run_jq([*indent_args, '.'], input_data=data_str, timeout=10)
 
     if not formatted or not formatted.strip():
         raise JsonUtilsError(
             f"jq formatting produced empty output for {file_path}. Input may be invalid JSON."
         )
 
-    dirname = os.path.dirname(file_path) or '.'
-    # Preserve original file permissions (temp files default to 0o600)
-    try:
-        original_mode = os.stat(file_path).st_mode
-    except OSError:
-        original_mode = None
-
-    with tempfile.NamedTemporaryFile('w', dir=dirname, delete=False) as tf:
-        tf.write(formatted + '\n')
-        temp_name = tf.name
-
-    os.replace(temp_name, file_path)
-    if original_mode is not None:
-        os.chmod(file_path, original_mode)
+    replace_file_atomically(file_path, formatted + '\n')
 
 
 # --- WS1: Differential schema validation helpers ---
 
-def _resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
+def resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
     """Resolve the effective toolkit root for schema validation.
 
     If ``repo_root`` is falsy (None/empty) **or** ``repo_root/tools/schema_registry.json``
     does not exist (e.g. the default ``--repo-root .`` pointing at a host wrapper dir
     in a submodule deployment), fall back to the package-relative toolkit root derived
-    from ``json_utils.__file__``.  This is the same anchor that ``_find_schema_dir``
+    from ``json_utils.__file__``.  This is the same anchor that ``find_schema_dir``
     candidate #2 uses, guaranteeing bare agent invocations (no ``--repo-root``) always
     resolve the schema registry correctly.
 
@@ -399,33 +439,36 @@ def _resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
     return os.path.normpath(os.path.join(this_dir, "..", "..", ".."))
 
 
-def _path_tuple_to_jq(path_tuple: tuple) -> str:
-    """Convert a jsonschema path tuple to a jq-style path string.
+def _call_validate_or_raise(
+    eff_root: str, doc: dict, file_path: str, command: str, spec_root: Optional[str] = None, place: Optional[str] = None,
+) -> List[SchemaViolation]:
+    """Run schema_violations, mapping every schema-validation failure
+    to a fail-CLOSED JsonUtilsError (never crash, never silently return []).
 
-    Example: ('plan', 'spec_alignment', 'checklist', 1, 'status') → '.plan.spec_alignment.checklist[1].status'
-    """
-    parts = []
-    for segment in path_tuple:
-        if isinstance(segment, int):
-            parts.append(f"[{segment}]")
-        else:
-            parts.append(f".{segment}")
-    return "".join(parts) if parts else "."
-
-
-def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> list:
-    """Run validate_data_against_schema, mapping every schema-validation failure
-    to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
+    *spec_root* is the spec folder whose extension schemas are known beside the toolkit's (``schema_violations``).
+    The data file of an extension is judged by the schema its file name gives and by no other, and that schema judges
+    no other file (``schema_uri_problem``).  *place* is where the file lies when *file_path* is not a path from the
+    current folder (``check_edit``); *file_path* stays the name the messages use."""
+    mismatch = schema_uri_problem(place or file_path, doc, spec_root)
+    if mismatch:
+        raise JsonUtilsError(f"Could not validate this write to {file_path}: {mismatch}; refusing to write.")
     try:
-        return validate_data_against_schema(eff_root, doc)
+        return schema_violations(eff_root, doc, spec_root)
     except NoSchemaError:
         raise JsonUtilsError(
-            f"{file_path} declares no $schema; json patch validates writes against "
+            f"{file_path} declares no $schema; {command} validates writes against "
             "the file's schema and cannot proceed without one. "
             "If this is a spec artifact, restore its $schema."
         )
     except (SchemaNotFoundError, SchemaDecodeError, SchemaBootstrapError) as exc:
         uri = getattr(exc, "uri", None) or getattr(exc, "original", exc)
+        place = schema_place_of(uri) if isinstance(uri, str) else None
+        if place:
+            raise JsonUtilsError(
+                f"Could not locate schema for {file_path} ($schema URI: {uri}); "
+                f"refusing to write. An extension schema is read from {place} in the spec folder: "
+                "write that file, or correct it if `specdev spec-check` reports it."
+            )
         raise JsonUtilsError(
             f"Could not locate schema for {file_path} ($schema URI: {uri}); "
             "refusing to write. Check --repo-root points to the toolkit root and "
@@ -450,6 +493,10 @@ def _ws1_differential_check(
     content: str,
     new_content: str,
     eff_root: str,
+    *,
+    command: str,
+    spec_root: Optional[str] = None,
+    place: Optional[str] = None,
 ) -> None:
     """Run the WS1 differential validation algorithm.
 
@@ -470,13 +517,33 @@ def _ws1_differential_check(
     new_content:
         The post-edit document (JSON string).
     eff_root:
-        Already-resolved toolkit root (from ``_resolve_effective_toolkit_root``).
+        Already-resolved toolkit root (from ``resolve_effective_toolkit_root``).
+    spec_root:
+        The spec folder whose extension schemas are known beside the toolkit's.
+        Without it, the spec folder an extension file lies in (*file_path* in an
+        ``extensions`` folder); for any other file, the toolkit's schemas alone.
+    place:
+        Where the file lies, from a caller that knows the spec folder and
+        whose *file_path* is relative to it (``check_edit``).  Default: *file_path*.
     """
+    spec_root = spec_root or spec_root_of(file_path)
     try:
         original = json.loads(content)
         new = json.loads(new_content)
     except json.JSONDecodeError as exc:
         raise JsonUtilsError(f"Internal: could not parse document for validation: {exc}") from exc
+
+    if new is None:
+        raise JsonUtilsError(
+            f"Refusing to write: `{command}` at the path '.' would replace the whole document with null. "
+            "Name a value inside the document."
+        )
+    if not isinstance(new, dict) or not isinstance(original, dict):
+        raise JsonUtilsError(
+            f"Refusing to write: `{command}` validates a write against the document's `$schema`, "
+            "and the document is not a JSON object"
+            + (" after this edit." if isinstance(original, dict) else ".")
+        )
 
     # Step 1: Detect $schema change (content-based, robust to any jq form).
     if new.get("$schema") != original.get("$schema"):
@@ -487,32 +554,275 @@ def _ws1_differential_check(
     # Step 2: Refuse if resulting doc has no $schema.
     if not new.get("$schema"):
         raise JsonUtilsError(
-            f"{file_path} declares no $schema; json patch validates writes against "
+            f"{file_path} declares no $schema; {command} validates writes against "
             "the file's schema and cannot proceed without one. "
             "If this is a spec artifact, restore its $schema."
         )
 
     # Step 3: Validate post-edit doc — wrapped per catch strategy (fail closed).
-    errors_after = _call_validate_or_raise(eff_root, new, file_path)
+    errors_after = _call_validate_or_raise(eff_root, new, file_path, command, spec_root, place)
 
     # Fast path: no errors after edit → write is safe.
     if not errors_after:
         return
 
     # Step 4: Compute errors_before to distinguish pre-existing from newly introduced.
-    errors_before = _call_validate_or_raise(eff_root, original, file_path)
+    errors_before = _call_validate_or_raise(eff_root, original, file_path, command, spec_root, place)
+    errors_before = _reindexed_after_removal(errors_before, _removed_array_item(original, new))
 
-    new_errors = set(errors_after) - set(errors_before)
-    if new_errors:
-        # Sort for deterministic output.
-        sorted_errors = sorted(new_errors, key=lambda x: (x[0], x[1]))
+    added = _added_violations(errors_before, errors_after)
+    if added:
         lines = [
-            f"  path {_path_tuple_to_jq(path)}: {msg}"
-            for path, msg in sorted_errors
+            f"  path {jq_path_of(violation.path)}: {violation_text(violation)}"
+            for violation in added
         ]
         raise JsonUtilsError(
             "Write refused: this edit introduces schema violation(s):\n" + "\n".join(lines)
         )
+
+
+def _removed_array_item(original: Any, new: Any, path: tuple = ()) -> Optional[Tuple[tuple, int]]:
+    """``(path of the array, index)`` when *new* is *original* with one array item removed, else ``None``."""
+    if isinstance(original, list) and isinstance(new, list):
+        if len(original) == len(new) + 1:
+            index = next((i for i, item in enumerate(new) if original[i] != item), len(new))
+            return (path, index) if original[:index] + original[index + 1:] == new else None
+        if len(original) == len(new):
+            for i, (old_item, new_item) in enumerate(zip(original, new)):
+                found = _removed_array_item(old_item, new_item, path + (i,))
+                if found:
+                    return found
+    elif isinstance(original, dict) and isinstance(new, dict):
+        for key in original.keys() & new.keys():
+            found = _removed_array_item(original[key], new[key], path + (key,))
+            if found:
+                return found
+    return None
+
+
+def _reindexed_after_removal(
+    before: List[SchemaViolation], removed: Optional[Tuple[tuple, int]]
+) -> List[SchemaViolation]:
+    """*before* as its paths read once array item ``removed`` is gone: the removed item's violations drop out and the
+    later items' violations move down one index, so a violation of a later sibling is not counted as added."""
+    if removed is None:
+        return before
+    array_path, index = removed
+    depth = len(array_path)
+    result: List[SchemaViolation] = []
+    for violation in before:
+        path = violation.path
+        if path[:depth] == array_path and len(path) > depth and isinstance(path[depth], int):
+            if path[depth] == index:
+                continue
+            if path[depth] > index:
+                violation = violation._replace(path=path[:depth] + (path[depth] - 1,) + path[depth + 1:])
+        result.append(violation)
+    return result
+
+
+def _added_violations(
+    before: List[SchemaViolation], after: List[SchemaViolation]
+) -> List[SchemaViolation]:
+    """The violations of *after* that an edit added, sorted by path then message (``unevaluatedProperties`` last).
+
+    A violation is identified by ``(path, keyword)``, not by its message: the message of ``minItems`` or ``anyOf``
+    quotes the instance and so changes with any edit inside it.  For each identity the violations beyond the count
+    that *before* already had are the added ones, so one more violation of a kind that was already there at a path is
+    still refused (DEVSPEC-317).
+    """
+    already = Counter((violation.path, violation.keyword) for violation in before)
+    added: List[SchemaViolation] = []
+    for violation in sorted(after, key=lambda v: (v.path, v.keyword, v.message)):
+        key = (violation.path, violation.keyword)
+        if already[key] > 0:
+            already[key] -= 1
+        else:
+            added.append(violation)
+    # An ``unevaluatedProperties`` violation only repeats that a deeper one exists: the specific ones come first.
+    return sorted(added, key=lambda v: (v.keyword == "unevaluatedProperties", v.path, v.message))
+
+
+def check_edit(
+    file_path: str, content: str, new_content: str, repo_root: Optional[str], *, command: str = "json patch",
+    spec_root: Optional[str] = None,
+) -> None:
+    """Refuse (``JsonUtilsError``) *new_content* when it adds a schema violation to *content*, the text of *file_path*.
+
+    The same differential check ``json patch`` and ``json insert`` run before they write (the refusal names
+    *command*, ``json patch`` by default), for a caller that holds the edited text in memory.  Violations that *content* already had are ignored.
+    *spec_root* is the spec folder of the file, and with it a relative *file_path* is relative to that folder, not to
+    the current one (an id-keyed write names its file so): the schema of an extension file is found there, and
+    ``extensions/<name>`` is a file of its extensions folder from whatever folder the command runs.  See
+    ``_ws1_differential_check`` for the default.
+    """
+    place = os.path.join(spec_root, file_path) if spec_root is not None else None  # an absolute path stays what it is
+    _ws1_differential_check(
+        file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command=command, spec_root=spec_root,
+        place=place,
+    )
+
+
+def _run_value_filter(filter_expr: str, content: str, value: str, is_json: bool) -> str:
+    """Run *filter_expr* over the JSON text *content* with ``$v`` bound to *value* (JSON when *is_json*, else a string)."""
+    args = ['--indent', str(JQ_INDENT), '--argjson' if is_json else '--arg', 'v', value, filter_expr]
+    return run_jq(args, input_data=content, timeout=10)
+
+
+def patch_text(content: str, path_selector: str, value: str, is_json: bool = True) -> str:
+    """The JSON text *content* with the value at *path_selector* replaced by *value*; nothing is read or written.
+
+    Raises ``JsonUtilsError`` for a jq filter that does not parse or fails on the document.
+    """
+    _require_valid_filter(path_selector)
+    return _run_value_filter(f'({path_selector}) = $v', content, value, is_json)
+
+
+_ARRAY_ITEM_OBJECT_COUNT = (
+    '[path({sel}) as $p | select(($p|length)>0 and ($p|last|type)=="number") | getpath($p) | select(type=="object")] | length'
+)
+
+
+def _refuse_array_item_target(content: str, path_selector: str) -> None:
+    """Raise ``JsonUtilsError`` when *path_selector* names an object held as an item of an array in *content*."""
+    try:
+        count = int(run_jq([_ARRAY_ITEM_OBJECT_COUNT.format(sel=path_selector)], input_data=content, timeout=10))
+    except (JsonUtilsError, ValueError):
+        return  # not a path expression: the insert filter reports it
+    if count > 0:
+        raise JsonUtilsError(
+            f"'{path_selector}' names an item of an array (an object): an insert there would merge into that item, "
+            "not add one. Insert into the array itself (the path without the index) to append, "
+            "or use json patch for a field of the item."
+        )
+
+
+def insert_text(content: str, path_selector: str, value: str, is_json: bool = True, *, create: bool = False) -> str:
+    """The JSON text *content* with *value* appended to the array (or merged into the object) at *path_selector*.
+
+    With *create*, a missing (null) target becomes ``[value]``.  A path that names an object held as an array item
+    (``.rules[1]``) is refused: the value would merge into that item.  Raises ``JsonUtilsError`` for a jq filter that
+    does not parse, for such a path, or when the target is neither an array nor an object (nor null with *create*).
+    """
+    _require_valid_filter(path_selector)
+    _refuse_array_item_target(content, path_selector)
+    return _run_value_filter(_insert_filter(path_selector, create=create), content, value, is_json)
+
+
+def delete_text(content: str, path_selector: str) -> str:
+    """The JSON text *content* without the value at *path_selector*.
+
+    Raises ``JsonUtilsError`` for a jq filter that does not parse or fails on the document.
+    """
+    _require_valid_filter(path_selector)
+    return run_jq(['--indent', str(JQ_INDENT), f'del({path_selector})'], input_data=content, timeout=10)
+
+
+def _insert_filter(path_selector: str, *, create: bool) -> str:
+    """The jq filter that appends ``$v`` to the array or merges it into the object at *path_selector*.
+
+    With *create*, a null target (a missing field) becomes ``[$v]`` instead of an error.
+    """
+    on_null = 'elif type=="null" then [$v] ' if create else ''
+    return (
+        f'({path_selector}) |= (if type=="array" then . + [$v] '
+        f'elif type=="object" then . + $v '
+        f'{on_null}else error("Cannot insert into " + type) end)'
+    )
+
+
+# A path through an array index at or past the end of that array does not exist: a patch there would pad the array.
+_COUNT_PATHS = (
+    '. as $d | [path({sel}) | select(. as $p | all(range(0; length); . as $i | (($p[$i] | type) != "number") or '
+    '(try ($d | getpath($p[:$i]) | if type == "array" then ($p[$i] < length and $p[$i] >= -length) else true end) '
+    'catch true)))] | length'
+)
+_COUNT_EXISTING_PATHS = (
+    '. as $d | [path({sel}) | select(length==0 or (. as $p | try ($d | getpath($p[:-1]) | '
+    'if type=="array" then ($p[-1]|type)=="number" and $p[-1] < length and $p[-1] >= -length '
+    'elif type=="object" then has($p[-1]) else false end) catch false))] | length'
+)
+
+
+def _count_targets(content: str, path_selector: str, *, existing_only: bool) -> Optional[int]:
+    """How many paths *path_selector* yields in *content* (with *existing_only*: paths that exist and can be deleted).
+
+    Returns None when jq cannot count it (the selector is not a path expression); the edit then reports its own error.
+    """
+    template = _COUNT_EXISTING_PATHS if existing_only else _COUNT_PATHS
+    try:
+        return int(run_jq([template.format(sel=path_selector)], input_data=content, timeout=10))
+    except (JsonUtilsError, ValueError):
+        return None
+
+
+def _warn_if_many(path_selector: str, count: Optional[int], dry_run: bool = False) -> None:
+    """Print the multi-match warning to stderr when *count* is above one (``would be changed`` on a dry run)."""
+    if count is not None and count > 1:
+        verb = "would be changed" if dry_run else "are changed"
+        print(f"warning: '{path_selector}' matches {count} values; all {count} {verb}.", file=sys.stderr)
+
+
+def _edit_counted(
+    content: str, path_selector: str, location: str, edit: Callable[[], str], *, existing_only: bool,
+) -> tuple[str, Optional[int]]:
+    """Run ``edit()`` (a patch or delete of *path_selector* in the text *content*) and return the new text and count.
+
+    Raises ``JsonUtilsError`` before the edit when the selector matches nothing (with *existing_only*, nothing that
+    exists and can be deleted); warns on stderr when it matches several values.  The one place both ``json patch`` /
+    ``json delete`` and a batch item get this refusal.  Returns ``(new text, match count)``; the caller warns
+    (``_warn_if_many``) once the edit has passed its schema check, so the warning is true.
+    """
+    count = _count_targets(content, path_selector, existing_only=existing_only)
+    if count == 0 and existing_only:
+        raise JsonUtilsError(
+            f"Nothing to delete at '{path_selector}' in {location}: the selector matches nothing, "
+            "or the index is out of range. Nothing was changed."
+        )
+    if count == 0:
+        raise JsonUtilsError(
+            f"The selector '{path_selector}' matches nothing in {location}: nothing was changed. "
+            "Check the filter (a select() that names no item, or an index past the end of an array?)."
+        )
+    return edit(), count
+
+
+_SUMMARY_MAX_MATCHES = 5
+_SUMMARY_MAX_CHARS = 120
+
+
+def _compact(value: Any) -> str:
+    """*value* as compact JSON, cut at ``_SUMMARY_MAX_CHARS`` characters."""
+    text = json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    return text if len(text) <= _SUMMARY_MAX_CHARS else text[:_SUMMARY_MAX_CHARS] + '...'
+
+
+def _value_of(value: str, is_json: bool) -> Any:
+    """The Python value that the command line *value* stands for (JSON when *is_json*, else the raw string)."""
+    return json.loads(value) if is_json else value
+
+
+def _dry_run_text(
+    verb: str, path_selector: str, location: str, content: str, new_content: str,
+    *, new: Optional[tuple[Any]], show_old: bool, show_file: bool,
+) -> str:
+    """What a dry run returns: the whole resulting file (*show_file*), else a short report of the matches.
+
+    *new* is a one-item tuple holding the value written at each match (None for a delete); *show_old* lists the
+    values now at the matches, at most ``_SUMMARY_MAX_MATCHES`` of them.
+    """
+    if show_file:
+        return f"[dry-run] Would {verb} {path_selector} in {location}:\n{new_content}"
+    matches = json.loads(run_jq(['-c', f'[({path_selector})]'], input_data=content, timeout=10))
+    lines = [f"[dry-run] Would {verb} {path_selector} in {location}: {len(matches)} value(s)"]
+    for old in matches[:_SUMMARY_MAX_MATCHES]:
+        if show_old:
+            lines.append(f"  old: {_compact(old)}")
+        if new is not None:
+            lines.append(f"  new: {_compact(new[0])}")
+    if len(matches) > _SUMMARY_MAX_MATCHES:
+        lines.append(f"  ... and {len(matches) - _SUMMARY_MAX_MATCHES} more")
+    return "\n".join(lines)
 
 
 def json_patch(
@@ -523,11 +833,12 @@ def json_patch(
     dry_run: bool = False,
     repo_root: Optional[str] = None,
     validate: bool = True,
+    show_file: bool = False,
 ) -> str:
     """Update a value at the path.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
+    (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
 
     When ``validate`` is True (the default), the edit is validated against the
     document's own ``$schema`` before writing.  Uses a differential (before/after)
@@ -535,30 +846,116 @@ def json_patch(
     — only violations *introduced* by this edit are refused.
     """
     _check_file(file_path)
-    _require_valid_filter(path_selector)
 
-    args = ['--indent', str(JQ_INDENT)]
-    if is_json:
-        args.extend(['--argjson', 'v', value])
-    else:
-        args.extend(['--arg', 'v', value])
-
-    filter_expr = f'({path_selector}) = $v'
-    args.append(filter_expr)
-
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    new_content = run_jq(args, input_data=content, timeout=10)
+    new_content, count = _edit_counted(
+        content, path_selector, file_path, lambda: patch_text(content, path_selector, value, is_json), existing_only=False,
+    )
 
     if validate:
-        eff_root = _resolve_effective_toolkit_root(repo_root)
-        _ws1_differential_check(file_path, content, new_content, eff_root)
+        eff_root = resolve_effective_toolkit_root(repo_root)
+        _ws1_differential_check(file_path, content, new_content, eff_root, command="json patch")
+    _warn_if_many(path_selector, count, dry_run)
 
     if dry_run:
-        return f"[dry-run] Would update {path_selector} in {file_path}:\n{new_content}"
+        return _dry_run_text(
+            "update", path_selector, file_path, content, new_content,
+            new=(_value_of(value, is_json),), show_old=True, show_file=show_file,
+        )
     json_write_atomic(file_path, new_content)
     return f"Updated {path_selector} in {file_path}"
+
+
+_BATCH_VERBS = {"patch": "update", "insert": "insert into", "delete": "delete"}
+
+
+def _apply_batch_item(index: int, item: Any, content: str, location: str) -> tuple[str, str, str, Optional[int]]:
+    """Apply one item of a batch file to the JSON text *content*.
+
+    Returns ``(verb, path, new_content, match count)`` (the count is None for an insert).  Raises ``JsonUtilsError("batch item <i> (<op> <path>): <reason>")`` for a
+    malformed item, a selector that matches nothing or a failing jq filter.
+    """
+    op = item.get("op") if isinstance(item, dict) else None
+    path = item.get("path") if isinstance(item, dict) else None
+    label = f"batch item {index} ({op} {path})"
+    if op not in _BATCH_VERBS:
+        raise JsonUtilsError(f"{label}: 'op' must be one of {', '.join(_BATCH_VERBS)}")
+    if not isinstance(path, str) or not path:
+        raise JsonUtilsError(f"{label}: 'path' must be a jq path")
+    if op != "delete" and "value" not in item:
+        raise JsonUtilsError(f"{label}: 'value' is missing")
+    try:
+        if op == "delete":
+            new_content, count = _edit_counted(
+                content, path, location, lambda: delete_text(content, path), existing_only=True,
+            )
+            return _BATCH_VERBS[op], path, new_content, count
+        value = json.dumps(item["value"], ensure_ascii=False)
+        if op == "patch":
+            new_content, count = _edit_counted(
+                content, path, location, lambda: patch_text(content, path, value, True), existing_only=False,
+            )
+        else:
+            new_content, count = insert_text(content, path, value, True), None
+        return _BATCH_VERBS[op], path, new_content, count
+    except JsonUtilsError as error:
+        raise JsonUtilsError(f"{label}: {error}") from error
+
+
+def json_patch_batch(
+    file_path: str,
+    ops_path: str,
+    dry_run: bool = False,
+    repo_root: Optional[str] = None,
+    show_file: bool = False,
+) -> str:
+    """Apply the operations of the JSON array in *ops_path* to *file_path* in order: one validation, one atomic write.
+
+    Each item is ``{"op": "patch"|"insert"|"delete", "path": "<jq path>", "value": <any JSON>}`` (no ``value`` for
+    ``delete``).  Returns ``Applied <n> operations to <file>``; with *dry_run* a report that lists the first
+    ``_SUMMARY_MAX_MATCHES`` operations (the whole resulting file with *show_file*) and writes nothing.
+    Raises ``JsonUtilsError`` before anything is written when the ops file is not an array, an item is malformed or
+    fails (the message names the item), or the edit adds a schema violation.
+    """
+    _check_file(file_path)
+    try:
+        with open(ops_path, 'r', encoding='utf-8') as f:
+            ops = json.load(f)
+    except (OSError, json.JSONDecodeError) as error:
+        raise JsonUtilsError(f"cannot read the batch file {ops_path}: {error}") from error
+    if not isinstance(ops, list) or not ops:
+        raise JsonUtilsError(f"The batch file {ops_path} must hold a non-empty JSON array of {{op, path, value}} items.")
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        original = f.read()
+    running = original
+    reports: list[str] = []
+    counts: list[tuple[str, Optional[int]]] = []
+    for index, item in enumerate(ops):
+        before = running
+        verb, path, running, count = _apply_batch_item(index, item, before, file_path)
+        counts.append((path, count))
+        if dry_run and not show_file and index < _SUMMARY_MAX_MATCHES:
+            new = None if verb == "delete" else (item["value"],)
+            reports.append(_dry_run_text(
+                verb, path, file_path, before, running, new=new, show_old=verb != "insert into", show_file=False,
+            ))
+
+    _ws1_differential_check(
+        file_path, original, running, resolve_effective_toolkit_root(repo_root), command="json patch --batch",
+    )
+    for path, count in counts:
+        _warn_if_many(path, count, dry_run)
+    if not dry_run:
+        json_write_atomic(file_path, running)
+        return f"Applied {len(ops)} operations to {file_path}"
+    heading = f"[dry-run] Would apply {len(ops)} operations to {file_path}"
+    if show_file:
+        return f"{heading}:\n{running}"
+    more = [f"  ... and {len(ops) - _SUMMARY_MAX_MATCHES} more operations"] if len(ops) > _SUMMARY_MAX_MATCHES else []
+    return "\n".join([heading, *reports, *more])
 
 
 def json_insert(
@@ -570,11 +967,12 @@ def json_insert(
     repo_root: Optional[str] = None,
     validate: bool = True,
     create_schema: Optional[str] = None,
+    show_file: bool = False,
 ) -> str:
-    """Append to array or merge object.
+    """Append to array or merge object.  A path that names an object held as an array item is refused (see ``insert_text``).
 
     Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
+    (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
 
     When ``validate`` is True (the default), the edit is validated against the
     document's own ``$schema`` before writing.  Uses a differential (before/after)
@@ -591,54 +989,29 @@ def json_insert(
     # ``_check_file`` is normally the first statement and raises ``File not found``
     # before any other logic.  The ``--create-schema`` seed branch MUST be the
     # function's first action so it short-circuits ``_check_file`` for missing files.
-    # Normal (error-on-null) filter: used for existing files.
-    _normal_filter = (
-        f'({path_selector}) |= (if type=="array" then . + [$v] '
-        f'elif type=="object" then . + $v '
-        f'else error("Cannot insert into " + type) end)'
-    )
-    # Create-variant filter: null-coalesces the target so a missing array field is
-    # bootstrapped to [$v] instead of erroring "Cannot insert into null".
-    # (The normal filter hits ``else error(...)`` on a null/missing field.)
-    _create_filter = (
-        f'({path_selector}) |= (if type=="array" then . + [$v] '
-        f'elif type=="object" then . + $v '
-        f'elif type=="null" then [$v] '
-        f'else error("Cannot insert into " + type) end)'
-    )
-
+    # ``_insert_filter(create=True)`` (seed path) null-coalesces the target so a missing array field is
+    # bootstrapped to [$v]; the normal filter errors "Cannot insert into null" for an existing file.
     using_seed = False
     if create_schema and not os.path.isfile(file_path):
         # Seed path: create the file content in memory; do NOT call _check_file.
         content = json.dumps({"$schema": create_schema})
         using_seed = True
-        active_filter = _create_filter
     else:
         _check_file(file_path)
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        active_filter = _normal_filter
 
-    _require_valid_filter(path_selector)
-
-    args = ['--indent', str(JQ_INDENT)]
-    if is_json:
-        args.extend(['--argjson', 'v', value])
-    else:
-        args.extend(['--arg', 'v', value])
-
-    args.append(active_filter)
-
-    new_content = run_jq(args, input_data=content, timeout=10)
+    new_content = insert_text(content, path_selector, value, is_json, create=using_seed)
 
     if validate:
-        eff_root = _resolve_effective_toolkit_root(repo_root)
-        _ws1_differential_check(file_path, content, new_content, eff_root)
+        eff_root = resolve_effective_toolkit_root(repo_root)
+        _ws1_differential_check(file_path, content, new_content, eff_root, command="json insert")
 
     if dry_run:
-        if using_seed:
-            return f"[dry-run] Would create and insert into {path_selector} in {file_path}:\n{new_content}"
-        return f"[dry-run] Would insert into {path_selector} in {file_path}:\n{new_content}"
+        return _dry_run_text(
+            "create and insert into" if using_seed else "insert into", path_selector, file_path, content, new_content,
+            new=(_value_of(value, is_json),), show_old=False, show_file=show_file,
+        )
 
     # On seed path, ensure the parent directory exists before writing.
     if using_seed:
@@ -654,25 +1027,35 @@ def json_delete(
     file_path: str,
     path_selector: str,
     dry_run: bool = False,
+    repo_root: Optional[str] = None,
+    validate: bool = False,
+    show_file: bool = False,
 ) -> str:
     """Delete item at path.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
+    (no file is written): a short report of the matches, or with *show_file* the whole resulting file.
+
+    ``validate`` defaults to False as a library default; the ``json delete`` command passes True.  When
+    True, the edit is checked against the document's own ``$schema`` as ``json patch`` is: only a violation the
+    deletion adds refuses it.  When the deletion removes an array item, the violations of the later items are compared
+    at their new index, so a violation a later sibling already had is not counted as added.
     """
     _check_file(file_path)
-    _require_valid_filter(path_selector)
 
-    args = ['--indent', str(JQ_INDENT)]
-    filter_expr = f'del({path_selector})'
-    args.append(filter_expr)
-
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    new_content = run_jq(args, input_data=content, timeout=10)
+    new_content, count = _edit_counted(
+        content, path_selector, file_path, lambda: delete_text(content, path_selector), existing_only=True,
+    )
+    if validate:
+        _ws1_differential_check(file_path, content, new_content, resolve_effective_toolkit_root(repo_root), command="json delete")
+    _warn_if_many(path_selector, count, dry_run)
     if dry_run:
-        return f"[dry-run] Would delete {path_selector} in {file_path}:\n{new_content}"
+        return _dry_run_text(
+            "delete", path_selector, file_path, content, new_content, new=None, show_old=True, show_file=show_file,
+        )
     json_write_atomic(file_path, new_content)
     return f"Deleted {path_selector} in {file_path}"
 
@@ -759,26 +1142,60 @@ def _effective_schema(node: dict, resolve_fn) -> dict:
     return _schema_nav_effective_schema(node, resolve_fn, include_conditionals=True)
 
 
-def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optional[str] = None) -> Optional[str]:
+_CONSTRAINT_KEYWORDS = (
+    "minItems", "maxItems", "uniqueItems", "minLength", "maxLength", "pattern", "format",
+    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "additionalProperties", "const",
+)
+
+
+def _declared_schema(file_path: str) -> Optional[dict]:
+    """``{"$schema": <value>}`` as the file declares it (``{}`` when it declares none); ``None`` for a file that cannot be
+    read as a JSON object."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            document = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    return {"$schema": document["$schema"]} if "$schema" in document else {}
+
+
+def json_schema_discovery(
+    file_path: str, path_selector: str, repo_root: Optional[str] = None, spec_root: Optional[str] = None,
+) -> Optional[str]:
     """Discover allowable fields from the schema, resolving $ref URNs and allOf inline.
 
-    Returns JSON string of discovered schema info.
+    Returns JSON string of discovered schema info.  The schema of an extension file is found in the ``extensions``
+    folder of *spec_root*; without *spec_root*, in the folder the file itself lies in (``host_schemas.spec_root_of``).
     """
     _check_file(file_path)
+    declared = _declared_schema(file_path)
+    mismatch = schema_uri_problem(file_path, declared, spec_root)
+    if mismatch:
+        raise JsonUtilsError(f"Could not resolve schema for {file_path}: {mismatch}.")
 
     # Build index once — shared between resolve_schema_path and ref resolution
     schema_dir = find_schema_dir(repo_root)
-    id_index = build_id_index(schema_dir) if schema_dir else {}
+    id_index = build_id_index(schema_dir, spec_root or spec_root_of(file_path)) if schema_dir else {}
     ref_cache: Dict[str, dict] = {}
 
     schema_path = resolve_schema_path(file_path, repo_root=repo_root, id_index=id_index)
     if not schema_path:
+        uri = declared.get("$schema") if isinstance(declared, dict) else None
+        place = schema_place_of(uri) if isinstance(uri, str) else None
+        if place:
+            raise JsonUtilsError(
+                f"Could not resolve schema for {file_path} ($schema URI: {uri}). "
+                f"An extension schema is read from {place} in the spec folder: "
+                "write that file, or correct it if `specdev spec-check` reports it."
+            )
         raise JsonUtilsError(
             f"Could not resolve schema for {file_path}. "
             "Make sure it has a $schema field and the schema directory is accessible."
         )
 
-    with open(schema_path, 'r') as f:
+    with open(schema_path, 'r', encoding='utf-8') as f:
         schema = json.load(f)
 
     def _resolve_node(node: dict) -> Optional[dict]:
@@ -837,7 +1254,7 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
             }
         }, indent=2)
 
-    info = {
+    info: Dict[str, Any] = {
         "type": current.get("type"),
         "description": current.get("description"),
         "allowed_properties": list(current.get("properties", {}).keys()) if current.get("type") == "object" or current.get("properties") else None,
@@ -845,7 +1262,17 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
         "required": current.get("required"),
         "enum": current.get("enum")
     }
+    info.update(_constraints_of(current))
+    if current.get("type") == "array" and isinstance(current.get("items"), dict):
+        items_constraints = _constraints_of(_effective_schema(current["items"], _resolve_node))
+        if items_constraints:
+            info["items_constraints"] = items_constraints
     return json.dumps(info, indent=2)
+
+
+def _constraints_of(node: Dict[str, Any]) -> Dict[str, Any]:
+    """The keywords of ``_CONSTRAINT_KEYWORDS`` that the schema *node* carries, under their own names."""
+    return {keyword: node[keyword] for keyword in _CONSTRAINT_KEYWORDS if keyword in node}
 
 
 def _summarise_prop(prop: dict) -> dict:
@@ -878,6 +1305,12 @@ _FORBIDDEN_ABS_PREFIXES = (
 )
 
 
+def _under_any(paths: set[str], prefix: str) -> bool:
+    """True when any of *paths* is *prefix* or below it, comparing the prefix as written and with symlinks resolved."""
+    prefixes = {os.path.normpath(prefix), os.path.realpath(prefix)}
+    return any(p == q or p.startswith(q + os.sep) for p in paths for q in prefixes)
+
+
 def _is_forbidden_path(file_path: str) -> Optional[str]:
     """Return a reason string if file_path is a forbidden pointer target, else None.
 
@@ -891,16 +1324,13 @@ def _is_forbidden_path(file_path: str) -> Optional[str]:
     """
     # C1: Reject absolute paths under known temp directories before other checks.
     if os.path.isabs(file_path):
-        norm = os.path.normpath(file_path)
+        forms = {os.path.normpath(file_path), os.path.realpath(file_path)}
         for prefix in _FORBIDDEN_ABS_PREFIXES:
-            prefix_norm = os.path.normpath(prefix)
-            if norm == prefix_norm or norm.startswith(prefix_norm + os.sep):
+            if _under_any(forms, prefix):
                 return f"path is under forbidden temp prefix '{prefix}'"
         tmpdir = os.environ.get("TMPDIR")
-        if tmpdir:
-            tmpdir_norm = os.path.normpath(tmpdir)
-            if norm == tmpdir_norm or norm.startswith(tmpdir_norm + os.sep):
-                return f"path is under forbidden temp prefix (TMPDIR='{tmpdir}')"
+        if tmpdir and _under_any(forms, tmpdir):
+            return f"path is under forbidden temp prefix (TMPDIR='{tmpdir}')"
 
     # Normalise away leading ./ for prefix matching
     normalised = file_path.lstrip("./").replace("\\", "/")
@@ -969,7 +1399,7 @@ def _kebab_tokens(s: str) -> List[str]:
     return [t for t in s.replace("_", "-").split("-") if t]
 
 
-def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict[str, Any]]:
+def nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict[str, Any]]:
     """Return top_n nearest ids by normalised token-level Levenshtein distance.
 
     Scoring: 1 - (edit_distance / max_len) so higher = more similar.
@@ -994,12 +1424,20 @@ def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dic
 # ---------------------------------------------------------------------------
 
 
-def _collect_ids_from_file(
+class _IdDefinition(NamedTuple):
+    """One definition of an id in a spec file: the singular kind label, its jq path, and the raw entry."""
+
+    kind: str
+    jq_path: str
+    entry: Any
+
+
+def _collect_id_definitions(
     data: Any,
     spec_file: str,
     repo_root: str,
-) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
-    """Walk a parsed JSON object and collect all entry ids.
+) -> Tuple[List[str], Dict[str, List[_IdDefinition]]]:
+    """Walk a parsed JSON object and collect every definition of every entry id.
 
     For each spec file, the entry-key registry (``<repo_root>/tools/entry_key_registry.json``)
     is the sole source of truth for which arrays to scan and which id field to use.
@@ -1016,13 +1454,12 @@ def _collect_ids_from_file(
 
     Returns:
       - ``all_ids``: flat list of every discovered id (for nearest-search).
-      - ``id_map``: {id_value -> (kind, jq_path, entry_object)}
-        where kind is the singular kind label (e.g. "functional_requirement"),
-        jq_path is the resolved path (e.g. ".functional_requirements[2]"),
-        and entry_object is the raw dict.
+      - ``id_map``: {id_value -> [definitions in document order]}; each
+        definition is an ``_IdDefinition`` (kind, jq_path, entry).  More than
+        one definition means the id is ambiguous.
     """
     all_ids: List[str] = []
-    id_map: Dict[str, Tuple[str, str, Any]] = {}
+    id_map: Dict[str, List[_IdDefinition]] = {}
 
     if not isinstance(data, dict):
         return all_ids, id_map
@@ -1044,14 +1481,16 @@ def _collect_ids_from_file(
     # walked to arbitrary depth by ``iter_array_path`` — no single-level cap.
     by_top: Dict[str, List[Any]] = {}
     for entry in reg_entries:
-        top_key = entry.array_path.lstrip(".").split("[")[0]
+        top_key = _ekreg.array_top_key(entry.array_path)
         by_top.setdefault(top_key, []).append(entry)
 
     # Outer iteration follows the spec document's key order (as before) so id
     # collection order is data-driven and deterministic; inner iteration follows
     # registry order (top-level array, then each deeper nested array).
     for top_key, top_val in data.items():
-        if not isinstance(top_val, list):
+        # A top-level node container is a list, or an object holding the nodes
+        # (dotted paths such as ``.plan.items``, map-keyed ``.environments{}``).
+        if not isinstance(top_val, (list, dict)):
             continue
         # Skip corpus-excluded keys.
         if _ekreg.is_corpus_excluded(top_key, repo_root):
@@ -1061,16 +1500,31 @@ def _collect_ids_from_file(
             continue
 
         for entry in by_top[top_key]:
-            for item, jq_path in _ekreg.iter_array_path(data, entry.array_path):
-                found_id = item.get(entry.id_field)
+            for item, jq_path, map_key in _ekreg.iter_nodes(data, entry.array_path):
+                # A map-keyed node's id is its map key; otherwise read the id field.
+                found_id = map_key if map_key is not None else item.get(entry.id_field)
                 if not isinstance(found_id, str) or not found_id:
                     continue
                 all_ids.append(found_id)
-                # On id collision, keep first occurrence (deterministic).
-                if found_id not in id_map:
-                    id_map[found_id] = (entry.kind, jq_path, item)
+                id_map.setdefault(found_id, []).append(_IdDefinition(entry.kind, jq_path, item))
 
     return all_ids, id_map
+
+
+def _collect_ids_from_file(
+    data: Any,
+    spec_file: str,
+    repo_root: str,
+) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
+    """Like ``_collect_id_definitions`` but ``id_map`` keeps the first definition of each id as a tuple.
+
+    Only tests call it (``test_entry_key_registry.py``, ``test_annotation_scan.py``); the toolkit reads definitions.
+
+    Returns ``(all_ids, {id_value -> (kind, jq_path, entry_object)})``; on a collision the first
+    occurrence wins (deterministic).
+    """
+    all_ids, definitions = _collect_id_definitions(data, spec_file, repo_root)
+    return all_ids, {found_id: (found[0].kind, found[0].jq_path, found[0].entry) for found_id, found in definitions.items()}
 
 
 def _resolve_single_pointer(
@@ -1084,7 +1538,9 @@ def _resolve_single_pointer(
     repo_root (keyword-only, required) is the toolkit root directory containing
     ``tools/entry_key_registry.json``.
     git_root (keyword-only) anchors relative ``file`` paths; defaults to cwd.
-    Always returns a dict; never raises.
+    A pointer that does not resolve returns a dict with ``exists: False``.
+    Raises ``FileNotFoundError`` when the registry is missing under *repo_root*
+    and ``UnicodeDecodeError`` when the target file is not UTF-8.
     """
     base_dir = os.path.abspath(git_root) if git_root else os.getcwd()
 
@@ -1180,7 +1636,7 @@ def _resolve_single_pointer(
                 if reg_entries:
                     # Match by the last array segment name
                     for reg_e in reg_entries:
-                        reg_arr_key = reg_e.array_path.split("[].")[-1].lstrip(".")
+                        reg_arr_key = _ekreg.array_leaf_key(reg_e.array_path)
                         if reg_arr_key == raw_key:
                             kind = reg_e.kind
                             break
@@ -1213,23 +1669,28 @@ def _resolve_single_pointer(
     # so -O (optimised) builds don't silently skip the guard.
     if id_val is None:
         raise JsonUtilsError("internal: id_val is None; pointer shape check failed")
-    all_ids, id_map = _collect_ids_from_file(data, spec_file=file_val, repo_root=repo_root)
+    all_ids, id_map = _collect_id_definitions(data, spec_file=file_val, repo_root=repo_root)
 
     if id_val in id_map:
-        kind_found, resolved_jq, entry = id_map[id_val]
+        definitions = id_map[id_val]
+        first = definitions[0]
         # Build value_preview (first 3 keys)
-        preview_keys = list(entry.keys())[:3]
-        value_preview = {k: entry[k] for k in preview_keys}
-        return {
+        preview_keys = list(first.entry.keys())[:3]
+        value_preview = {k: first.entry[k] for k in preview_keys}
+        hit: Dict[str, Any] = {
             "pointer": pointer,
             "exists": True,
-            "kind": kind_found,
-            "jq_path": resolved_jq,
+            "kind": first.kind,
+            "jq_path": first.jq_path,
             "value_preview": value_preview,
         }
+        if len(definitions) > 1:
+            hit["ambiguous"] = True
+            hit["locations"] = [{"kind": d.kind, "jq_path": d.jq_path} for d in definitions]
+        return hit
     else:
         # Miss — compute nearest ids from the file's id corpus
-        nearest = _nearest_ids(id_val, all_ids, top_n=3)
+        nearest = nearest_ids(id_val, all_ids, top_n=3)
         result = {
             "pointer": pointer,
             "exists": False,
@@ -1259,8 +1720,10 @@ def resolve_pointers(
     Returns:
         Report dict: {"results": [...], "summary": {"hits": N, "misses": M}}
 
-    Always returns a valid dict once repo_root is supplied; never raises beyond
-    the argument-binding TypeError described above.
+    A pointer that does not resolve is a miss in the report. Beyond the
+    argument-binding TypeError described above, raises ``FileNotFoundError``
+    when the registry is missing under *repo_root* and ``UnicodeDecodeError``
+    when a target file is not UTF-8.
     """
     results = []
     hits = 0
@@ -1291,7 +1754,10 @@ def resolve_pointers_from_stdin(
     All parameters are keyword-only. ``repo_root`` is REQUIRED and is the
     toolkit root directory containing ``tools/entry_key_registry.json``.
     Reads JSON pointer list from stdin. Writes report JSON to ``out_path``
-    (file) or stdout. Always exits 0 — the report is the artifact (§ specdev json resolve-pointers).
+    (file) or stdout. Exits 0 when a report is written, whatever its misses — the
+    report is the artifact (§ specdev json resolve-pointers). A registry missing
+    under ``repo_root`` (``FileNotFoundError``) or a target file that is not UTF-8
+    (``UnicodeDecodeError``) propagates and the command exits non-zero.
     """
     raw = sys.stdin.read()
 
@@ -1336,7 +1802,72 @@ def _write_report(report: Dict[str, Any], out_path: Optional[str]) -> None:
 
 # --- CLI Setup ---
 
-def main():
+def _add_repo_root(parser: argparse.ArgumentParser, command: str) -> None:
+    """Give *parser* the ``--repo-root`` flag the rest of the ``json`` family takes (unused by *command*)."""
+    parser.add_argument("--repo-root", default=".", help=f"Accepted for CLI consistency; unused by {command}")
+
+
+def _add_ref(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--ref REF`` option of the read subcommands."""
+    parser.add_argument(
+        "--ref", metavar="REF", default=None,
+        help="Read the file as of this git ref (tag, branch or commit) instead of the working tree",
+    )
+
+
+def _materialise_at_ref(file_path: str, ref: str) -> str:
+    """Write *file_path* as of the git *ref* to a new temporary folder and return the copy's path.
+
+    Raises ``JsonUtilsError`` (``cannot read <path> at <ref>: <git reason>``) when git is missing, the folder is not in
+    a repository, the ref is unknown or the path is absent at the ref.  The caller removes the folder.
+    """
+    # Imported here: ``graph`` is heavy, and only ``--ref`` needs it.
+    from specdev_tools.graph.gitview import GitViewError, git_reason, run_git
+
+    # Resolve the folder as git does (``--show-toplevel`` is a real path), so a path through a symlink gets a ``rel``.
+    absolute = os.path.abspath(file_path)
+    abs_path = os.path.join(os.path.realpath(os.path.dirname(absolute)), os.path.basename(absolute))
+    folder = os.path.dirname(abs_path)
+    while not os.path.isdir(folder):
+        folder = os.path.dirname(folder)
+    try:
+        top = run_git(folder, ["rev-parse", "--show-toplevel"])
+        if top.returncode != 0:
+            raise JsonUtilsError(f"cannot read {file_path} at {ref}: {git_reason(top)}")
+        root = top.stdout.decode("utf-8").strip()
+        rel = os.path.relpath(abs_path, root).replace(os.sep, "/")
+        shown = run_git(root, ["show", f"{ref}:{rel}"])
+    except GitViewError as error:
+        raise JsonUtilsError(f"cannot read {file_path} at {ref}: {error}") from error
+    if shown.returncode != 0:
+        raise JsonUtilsError(f"cannot read {rel} at {ref}: {git_reason(shown)}")
+    copy_dir = tempfile.mkdtemp()
+    copy_path = os.path.join(copy_dir, os.path.basename(abs_path))
+    try:
+        pathlib.Path(copy_path).write_bytes(shown.stdout)
+    except BaseException:
+        shutil.rmtree(copy_dir, ignore_errors=True)
+        raise
+    return copy_path
+
+
+@contextlib.contextmanager
+def _read_source(file_path: str, ref: Optional[str]) -> Iterator[str]:
+    """The path to read: *file_path* itself, or a temporary copy of it as of the git *ref* (removed on exit)."""
+    if ref is None:
+        yield file_path
+        return
+    copy_path = _materialise_at_ref(file_path, ref)
+    try:
+        yield copy_path
+    except JsonUtilsError as error:
+        raise JsonUtilsError(str(error).replace(copy_path, f"{file_path} at {ref}")) from error
+    finally:
+        shutil.rmtree(os.path.dirname(copy_path), ignore_errors=True)
+
+
+def build_json_parser() -> argparse.ArgumentParser:
+    """Build the ``specdev json`` argparse parser (no parsing, no side effects)."""
     parser = argparse.ArgumentParser(description="Smart JSON Tool for AI Agents")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1345,20 +1876,34 @@ def main():
     p_read.add_argument("file", help="JSON file path")
     p_read.add_argument("filter", help="jq filter (e.g. .items[0].name, .version, '.items[] | select(.id==\"x\")')")
     p_read.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read")
+    p_read.add_argument(
+        "--json", dest="as_json", action="store_true",
+        help="Print the value as JSON (strings quoted) instead of raw text",
+    )
+    _add_ref(p_read)
 
     # Read-multi
     p_readm = subparsers.add_parser("read-multi", help="Read multiple paths in one pass (keyed output)")
     p_readm.add_argument("file", help="JSON file path")
     p_readm.add_argument("filters", nargs="+", help="jq filters (e.g. .version .name)")
     p_readm.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read-multi")
+    _add_ref(p_readm)
 
     # Patch
-    p_patch = subparsers.add_parser("patch", help="Update value")
+    p_patch = subparsers.add_parser(
+        "patch", help="Update value",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json patch --id <node-id> <field-path> <value> (`specdev json patch --id <node-id> --help`).",
+    )
     p_patch.add_argument("file", help="JSON file path")
-    p_patch.add_argument("path", help="jq path to target (e.g. .version)")
-    p_patch.add_argument("value", help="New value (JSON string or raw string)")
+    p_patch.add_argument("path", nargs="?", help="jq path to target (e.g. .version)")
+    p_patch.add_argument("value", nargs="?", help="New value (JSON string or raw string)")
+    p_patch.add_argument(
+        "--batch", metavar="OPS_FILE", default=None,
+        help='JSON array of {"op": "patch"|"insert"|"delete", "path": ..., "value": ...} applied in one validation and one write',
+    )
     p_patch.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
-    p_patch.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    p_patch.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
+    p_patch.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
     p_patch.add_argument(
         "--repo-root",
         default=".",
@@ -1370,12 +1915,16 @@ def main():
     )
 
     # Insert
-    p_insert = subparsers.add_parser("insert", help="Insert/Append value")
+    p_insert = subparsers.add_parser(
+        "insert", help="Insert/Append value",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json insert --id <node-id> <field-path> <value>, or --step <NN> <collection-path> <node-object> for a new node (`specdev json insert --id <node-id> --help`).",
+    )
     p_insert.add_argument("file", help="JSON file path")
     p_insert.add_argument("path", help="jq path to target array/object")
     p_insert.add_argument("value", help="Value to insert")
     p_insert.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
-    p_insert.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    p_insert.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
+    p_insert.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
     p_insert.add_argument(
         "--create-schema",
         metavar="URI",
@@ -1398,20 +1947,32 @@ def main():
     )
 
     # Delete
-    p_del = subparsers.add_parser("delete", help="Delete value")
+    p_del = subparsers.add_parser(
+        "delete", help="Delete value",
+        epilog="This is the file form (a file and a jq path). A node of a spec is written by its id: specdev json delete --id <node-id> (`specdev json delete --id <node-id> --help`).",
+    )
     p_del.add_argument("file", help="JSON file path")
     p_del.add_argument("path", help="jq path to target")
-    p_del.add_argument("--dry-run", action="store_true", help="Preview result without writing")
+    p_del.add_argument("--dry-run", action="store_true", help="Print a short summary of the change without writing")
+    p_del.add_argument("--show-file", action="store_true", help="With --dry-run, print the whole resulting file")
+    p_del.add_argument(
+        "--repo-root", default=".",
+        help="Toolkit root for the schema check (as for patch); falls back to the package-relative toolkit root",
+    )
 
     # Keys
     p_keys = subparsers.add_parser("keys", help="List keys")
     p_keys.add_argument("file", help="JSON file path")
     p_keys.add_argument("path", help="jq path (optional)", default=".", nargs="?")
+    _add_repo_root(p_keys, "keys")
+    _add_ref(p_keys)
 
     # Structure
     p_struct = subparsers.add_parser("structure", help="Show visual hierarchical structure")
     p_struct.add_argument("file", help="JSON file path")
     p_struct.add_argument("path", help="jq path (optional)", default=".", nargs="?")
+    _add_repo_root(p_struct, "structure")
+    _add_ref(p_struct)
 
     # Schema
     p_schema = subparsers.add_parser("schema", help="Query schema capabilities")
@@ -1421,10 +1982,11 @@ def main():
 
     # Resolve-pointers: validate and resolve a JSON array of pointer objects.
     # Input: pointer list from stdin (no --in flag; flag minimalism).
-    # Output: report to --out <path> or stdout.  Always exits 0.
+    # Output: report to --out <path> or stdout.  Exits 0 when a report is written;
+    # a missing registry or a target file that is not UTF-8 exits non-zero.
     p_rp = subparsers.add_parser(
         "resolve-pointers",
-        help="Validate a JSON pointer list and return a resolution report (always exits 0)",
+        help="Validate a JSON pointer list and return a resolution report (exits 0 with a report; non-zero when the registry is missing or a target file is not UTF-8)",
     )
     p_rp.add_argument(
         "--out",
@@ -1459,21 +2021,40 @@ def main():
         metavar="DIR",
         help="Root directory for resolving relative file paths (defaults to cwd)",
     )
+    return parser
+
+
+def main():
+    parser = build_json_parser()
 
     args = parser.parse_args()
+    if getattr(args, "show_file", False) and not getattr(args, "dry_run", False):
+        parser.error("--show-file needs --dry-run (it prints the file a dry run would write)")
 
     try:
         result = None
         if args.command == "read":
-            result = json_read(args.file, args.filter)
+            with _read_source(args.file, args.ref) as path:
+                result = json_read(path, args.filter, as_json=args.as_json)
         elif args.command == "read-multi":
-            result = json_read_multi(args.file, args.filters)
+            with _read_source(args.file, args.ref) as path:
+                result = json_read_multi(path, args.filters)
+        elif args.command == "patch" and args.batch:
+            if args.path is not None or args.value is not None:
+                raise JsonUtilsError("--batch takes the operations from its file: give no path or value with it.")
+            result = json_patch_batch(
+                args.file, args.batch, dry_run=args.dry_run, repo_root=os.path.abspath(args.repo_root),
+                show_file=args.show_file,
+            )
         elif args.command == "patch":
+            if args.path is None or args.value is None:
+                parser.error("the following arguments are required: path, value (or give --batch OPS_FILE)")
             result = json_patch(
                 args.file, args.path, args.value, not args.raw,
                 dry_run=getattr(args, "dry_run", False),
                 repo_root=os.path.abspath(args.repo_root),
                 validate=True,
+                show_file=args.show_file,
             )
         elif args.command == "insert":
             result = json_insert(
@@ -1482,17 +2063,23 @@ def main():
                 repo_root=os.path.abspath(args.repo_root),
                 validate=True,
                 create_schema=getattr(args, "create_schema", None),
+                show_file=args.show_file,
             )
         elif args.command == "delete":
-            result = json_delete(args.file, args.path, dry_run=getattr(args, "dry_run", False))
+            result = json_delete(
+                args.file, args.path, dry_run=getattr(args, "dry_run", False),
+                repo_root=os.path.abspath(args.repo_root), validate=True, show_file=args.show_file,
+            )
         elif args.command == "keys":
-            result = json_keys(args.file, args.path)
+            with _read_source(args.file, args.ref) as path:
+                result = json_keys(path, args.path)
         elif args.command == "structure":
-            result = json_structure(args.file, args.path)
+            with _read_source(args.file, args.ref) as path:
+                result = json_structure(path, args.path)
         elif args.command == "schema":
             result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
         elif args.command == "resolve-pointers":
-            # Always exits 0; report is the artifact.
+            # Exits 0 when a report is written; the report is the artifact.
             if getattr(args, "spec_root", None):
                 print(
                     "--spec-root is no longer used by resolve-pointers (registry is toolkit-side). "
